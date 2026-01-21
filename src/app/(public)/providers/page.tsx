@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Section } from "@/components/ui/section";
-import { providersMock } from "@/features/catalog/data/mock";
 import { ProviderCard } from "@/features/catalog/components/provider-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +21,6 @@ const initialFilters: CatalogFiltersState = {
   onlyAvailableToday: false,
 };
 
-
 function toNumberSafe(v: string): number | null {
   const cleaned = v.replace(/[^\d]/g, "");
   if (!cleaned) return null;
@@ -34,14 +32,45 @@ export default function ProvidersPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [filters, setFilters] = useState<CatalogFiltersState>(initialFilters);
 
-  const counts = useMemo(() => {
-    const masters = providersMock.filter((p) => p.type === "MASTER").length;
-    const studios = providersMock.filter((p) => p.type === "STUDIO").length;
-    return { all: providersMock.length, masters, studios };
+  // ✅ данные из API
+  const [providers, setProviders] = useState<ProviderCardModel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/providers", { cache: "no-store" });
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+        const data = (await res.json()) as ProviderCardModel[];
+
+        if (alive) setProviders(Array.isArray(data) ? data : []);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Unknown error");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
+  const counts = useMemo(() => {
+    const masters = providers.filter((p) => p.type === "MASTER").length;
+    const studios = providers.filter((p) => p.type === "STUDIO").length;
+    return { all: providers.length, masters, studios };
+  }, [providers]);
+
   const filtered: ProviderCardModel[] = useMemo(() => {
-    let items = [...providersMock];
+    let items = [...providers];
 
     // tab
     if (tab === "masters") items = items.filter((p) => p.type === "MASTER");
@@ -50,30 +79,30 @@ export default function ProvidersPage() {
     // only available today
     if (filters.onlyAvailableToday) {
       items = items.filter((p) => p.availableToday === true);
-      // search (name/tagline/categories)
-      const q = filters.query.trim().toLowerCase();
-      if (q) {
-        items = items.filter((p) => {
-          const haystack = [
-            p.name,
-            p.tagline,
-            p.district,
-            p.address,
-            ...p.categories,
-            p.type === "MASTER" ? "мастер" : "студия",
-          ]
-            .join(" ")
-            .toLowerCase();
+    }
 
-          return haystack.includes(q);
-        });
-      }
+    // search (name/tagline/categories)
+    const q = filters.query.trim().toLowerCase();
+    if (q) {
+      items = items.filter((p) => {
+        const haystack = [
+          p.name,
+          p.tagline,
+          p.district,
+          p.address,
+          ...(p.categories ?? []),
+          p.type === "MASTER" ? "мастер" : "студия",
+        ]
+          .join(" ")
+          .toLowerCase();
 
+        return haystack.includes(q);
+      });
     }
 
     // category
     if (filters.category) {
-      items = items.filter((p) => p.categories.includes(filters.category));
+      items = items.filter((p) => (p.categories ?? []).includes(filters.category));
     }
 
     // district
@@ -92,13 +121,13 @@ export default function ProvidersPage() {
     items.sort((a, b) => b.rating - a.rating);
 
     return items;
-  }, [tab, filters]);
+  }, [tab, filters, providers]);
 
   return (
     <div className="space-y-6">
       <Section
         title="Каталог"
-        subtitle="Фильтруй по категории, району и цене. Позже добавим поиск по слотам."
+        subtitle="Данные идут из Supabase (через API)."
         right={
           <Tabs
             value={tab}
@@ -118,7 +147,7 @@ export default function ProvidersPage() {
         {/* LEFT */}
         <div className="space-y-4 lg:sticky lg:top-24 h-fit">
           <CatalogFilters
-            providers={providersMock}
+            providers={providers}
             value={filters}
             onChange={setFilters}
             onReset={() => setFilters(initialFilters)}
@@ -128,12 +157,12 @@ export default function ProvidersPage() {
             <CardContent className="p-5 md:p-6">
               <div className="text-sm font-semibold text-neutral-900">Подсказка MVP</div>
               <p className="mt-2 text-sm text-neutral-600">
-                Дальше добавим: сортировку по цене, “рядом со мной”, и показ ближайших слотов.
+                Дальше: подключим профиль провайдера + реальные записи.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge>фильтры</Badge>
-                <Badge>табы</Badge>
-                <Badge>мок-слоты</Badge>
+                <Badge>supabase</Badge>
+                <Badge>prisma</Badge>
+                <Badge>api</Badge>
               </div>
             </CardContent>
           </Card>
@@ -141,30 +170,46 @@ export default function ProvidersPage() {
 
         {/* RIGHT */}
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-neutral-600">
-              Найдено: <span className="font-semibold text-neutral-900">{filtered.length}</span>
-            </div>
-            <div className="text-xs text-neutral-500">
-              Сортировка: рейтинг ↓
-            </div>
-          </div>
-
-          {filtered.length === 0 ? (
+          {loading ? (
             <Card>
               <CardContent className="p-6">
-                <div className="text-sm font-semibold text-neutral-900">Ничего не найдено</div>
-                <div className="mt-2 text-sm text-neutral-600">
-                  Попробуй сбросить фильтры или выбрать другую категорию.
-                </div>
+                <div className="text-sm font-semibold text-neutral-900">Загрузка каталога…</div>
+                <div className="mt-2 text-sm text-neutral-600">Тянем провайдеров из базы.</div>
+              </CardContent>
+            </Card>
+          ) : error ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-sm font-semibold text-neutral-900">Ошибка загрузки</div>
+                <div className="mt-2 text-sm text-neutral-600">{error}</div>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {filtered.map((p) => (
-                <ProviderCard key={p.id} p={p} />
-              ))}
-            </div>
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-neutral-600">
+                  Найдено: <span className="font-semibold text-neutral-900">{filtered.length}</span>
+                </div>
+                <div className="text-xs text-neutral-500">Сортировка: рейтинг ↓</div>
+              </div>
+
+              {filtered.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-sm font-semibold text-neutral-900">Ничего не найдено</div>
+                    <div className="mt-2 text-sm text-neutral-600">
+                      Попробуй сбросить фильтры или выбрать другую категорию.
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filtered.map((p) => (
+                    <ProviderCard key={p.id} p={p} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
