@@ -12,6 +12,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Абая 52, 2 этаж",
     district: "Центр",
     categories: ["Брови", "Ресницы"],
+    availableToday: true,
   },
   {
     id: "p2",
@@ -24,6 +25,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "пр-т Достык, 17",
     district: "Медеуский",
     categories: ["Маникюр", "Ресницы", "Визаж"],
+    availableToday: true,
   },
   {
     id: "p3",
@@ -36,6 +38,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Тимирязева, 24",
     district: "Бостандык",
     categories: ["Барбер"],
+    availableToday: true,
   },
   {
     id: "p4",
@@ -48,6 +51,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Сатпаева, 8",
     district: "Алмалинский",
     categories: ["Маникюр", "Дизайн", "Педикюр"],
+    availableToday: true,
   },
   {
     id: "p5",
@@ -60,6 +64,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Кабанбай батыра, 93",
     district: "Центр",
     categories: ["Брови"],
+    availableToday: false,
   },
   {
     id: "p6",
@@ -72,6 +77,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Жандосова, 55",
     district: "Ауэзовский",
     categories: ["Ресницы", "Ламинирование"],
+    availableToday: false,
   },
   {
     id: "p7",
@@ -84,6 +90,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Навои, 310",
     district: "Бостандык",
     categories: ["Массаж", "Релакс"],
+    availableToday: true,
   },
   {
     id: "p8",
@@ -96,6 +103,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Аль-Фараби, 45",
     district: "Медеуский",
     categories: ["Визаж", "Укладка"],
+    availableToday: false,
   },
   {
     id: "p9",
@@ -108,6 +116,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Розыбакиева, 247",
     district: "Бостандык",
     categories: ["Маникюр", "Педикюр"],
+    availableToday: true,
   },
   {
     id: "p10",
@@ -120,6 +129,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Сейфуллина, 498",
     district: "Алмалинский",
     categories: ["Косметология", "Уход"],
+    availableToday: true,
   },
   {
     id: "p11",
@@ -132,6 +142,7 @@ export const providersMock: ProviderCardModel[] = [
     address: "Панфилова, 101",
     district: "Центр",
     categories: ["Барбер"],
+    availableToday: true,
   },
   {
     id: "p12",
@@ -144,5 +155,6 @@ export const providersMock: ProviderCardModel[] = [
     address: "Брусиловского, 12",
     district: "Ауэзовский",
     categories: ["Депиляция"],
+    availableToday: true,
   },
 ];

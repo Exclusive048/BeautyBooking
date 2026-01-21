@@ -11,4 +11,6 @@ export type ProviderCardModel = {
   address: string;
   district: string;
   categories: string[];
+
+  availableToday?: boolean;
 };
