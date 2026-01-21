@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BeautyHub 💅✨
 
-## Getting Started
+**City-wide beauty booking platform** — a single entry point for clients, solo masters, and studios.
 
-First, run the development server:
+BeautyHub is a marketplace-style booking app inspired by “doctor directories”, but built for beauty services:
+clients discover providers by service, location, and price — then book an appointment in a couple of clicks.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+> **Status:** MVP in active development 🚧  
+> **Goal:** Launch in one city → validate demand → scale to other cities.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Key Idea
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### For clients
 
-## Learn More
+- Browse beauty providers (solo masters & studios)
+- Filter by category, district, price
+- Open a provider profile, view services and portfolio
+- Book a time slot online (MVP uses mock slots, real scheduling coming next)
 
-To learn more about Next.js, take a look at the following resources:
+### For providers
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- A clean dashboard for incoming bookings
+- A scalable foundation for:
+  - schedules & availability
+  - booking statuses
+  - services & portfolio management
+  - studio admin roles
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## ✅ MVP Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Public
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `/providers` — catalog with tabs (All / Masters / Studios)
+- Filters: category, district, price, “available today”
+- Search across provider name/tagline/categories
+- `/providers/[id]` — provider profile + booking widget
+
+### Bookings
+
+- Create bookings via real backend API
+- View bookings inside provider dashboards
+
+### Provider dashboards (MVP)
+
+- `/master` — master dashboard (currently linked to demo provider `p1`)
+- `/studio` — studio dashboard (currently linked to demo provider `p2`)
+
+---
+
+## 🧩 Subscription Model (planned)
+
+We design the architecture for **3 subscription tiers**, applicable for both solo masters and studios:
+
+1. **Private (link-only)**  
+   Works as a booking link — not visible in public search or map.
+
+2. **Listed (public catalog + map)**  
+   Visible inside the marketplace, can be discovered organically.
+
+3. **Promoted (boosted placement)**  
+   Highlighted on the home page / category sections, ranking boost.
+
+---
+
+## 🛠 Tech Stack
+
+- **Next.js (App Router)**
+- **React + TypeScript**
+- **TailwindCSS**
+- **Prisma ORM**
+- **PostgreSQL (Supabase)**
