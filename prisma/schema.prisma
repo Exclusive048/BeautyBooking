@@ -12,30 +12,87 @@ enum ProviderType {
   STUDIO
 }
 
+enum AccountType {
+  CLIENT
+  MASTER
+  STUDIO
+  STUDIO_ADMIN
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
 }
 
+model UserProfile {
+  id          String        @id @default(cuid())
+  roles       AccountType[] @default([CLIENT])
+  displayName String?
+  phone       String?       @unique
+  email       String?       @unique
+
+  providers   Provider[]    @relation("ProviderOwner")
+  bookings    Booking[]     @relation("BookingClient")
+
+  telegram    TelegramLink?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model TelegramLink {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  phone     String   @unique
+  chatId    String   @unique
+  username  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone])
+  @@index([chatId])
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  usedAt     DateTime?
+
+  createdAt  DateTime @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
+}
+
 model Provider {
-  id            String       @id @default(cuid())
-  type          ProviderType
-  name          String
-  tagline       String
-  rating        Float        @default(0)
-  reviews       Int          @default(0)
-  priceFrom     Int          @default(0)
-  address       String
-  district      String
-  categories    String[]     @default([])
-  availableToday Boolean     @default(false)
+  id             String        @id @default(cuid())
+  type           ProviderType
+  name           String
+  tagline        String
+  rating         Float         @default(0)
+  reviews        Int           @default(0)
+  priceFrom      Int           @default(0)
+  address        String
+  district       String
+  categories     String[]      @default([])
+  availableToday Boolean       @default(false)
 
-  services      Service[]
-  bookings      Booking[]
+  ownerUserId    String?
+  owner          UserProfile?  @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  services       Service[]
+  bookings       Booking[]
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([ownerUserId])
 }
 
 model Service {
@@ -47,30 +104,36 @@ model Service {
   durationMin Int
   price       Int
 
-  bookings    Booking[] 
+  bookings    Booking[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([providerId])
 }
 
 model Booking {
-  id          String        @id @default(cuid())
-  providerId  String
-  provider    Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  providerId   String
+  provider     Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
-  serviceId   String
-  service     Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  serviceId    String
+  service      Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
 
-  slotLabel   String
-  clientName  String
-  clientPhone String
-  comment     String?
+  clientUserId String?
+  clientUser   UserProfile?  @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
 
-  status      BookingStatus @default(PENDING)
+  slotLabel    String
+  clientName   String
+  clientPhone  String
+  comment      String?
 
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status       BookingStatus @default(PENDING)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@index([providerId])
   @@index([serviceId])
+  @@index([clientUserId])
 }

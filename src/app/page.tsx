@@ -18,7 +18,7 @@ const categories = [
 
 export default function HomePage() {
   return (
-    <div className="space-y-10">
+    <div className="mx-auto w-full max-w-6xl space-y-10 px-4 sm:px-6 lg:px-8">
       {/* HERO */}
       <div className="relative overflow-hidden rounded-[2.5rem] border border-neutral-200 bg-white shadow-sm">
         <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/10 via-transparent to-transparent" />
