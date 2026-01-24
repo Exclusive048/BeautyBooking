@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { getSessionUser } from "@/lib/auth/session";
+import { LogoutButton } from "@/components/auth/logout-button";
 
-export function Topbar() {
+export async function Topbar() {
+  const user = await getSessionUser();
+
   return (
     <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -13,24 +17,29 @@ export function Topbar() {
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
-          <Link className="rounded-xl px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" href="/providers">
-            Каталог
-          </Link>
-          <Link className="rounded-xl px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" href="/provider">
-            Кабинет мастера
-          </Link>
-          <Link className="rounded-xl px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100" href="/admin">
-            Админ
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <Button variant="secondary">Войти</Button>
-          <Button className="hidden md:inline-flex" asChild>
-            <Link href="/provider">Добавить профиль</Link>
+        <nav className="flex items-center gap-2">
+          <Button asChild variant="secondary">
+            <Link href="/providers">Каталог</Link>
           </Button>
-        </div>
+
+          {user ? (
+            <>
+              <Button asChild variant="secondary">
+                <Link href="/cabinet?tab=profile">Мой кабинет</Link>
+              </Button>
+
+              <Button asChild variant="secondary" className="hidden sm:inline-flex">
+                <Link href="/cabinet?tab=bookings">Мои записи</Link>
+              </Button>
+
+              <LogoutButton />
+            </>
+          ) : (
+            <Button asChild>
+              <Link href="/login">Вход</Link>
+            </Button>
+          )}
+        </nav>
       </div>
     </header>
   );

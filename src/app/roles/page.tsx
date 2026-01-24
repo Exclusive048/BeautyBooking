@@ -1,64 +1,47 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
+import { setLastRole } from "@/app/(cabinet)/cabinet/actions";
 
 export default async function RolesPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Роли</h1>
-      <p className="mt-2 text-neutral-600">
-        Вы можете использовать несколько ролей. Клиент доступен всегда.
-      </p>
-
-      <div className="mt-6 space-y-3">
-        <RoleRow title="Клиент" active={user.roles.includes("CLIENT")} />
-        <RoleRow
-          title="Мастер"
-          active={user.roles.includes("MASTER")}
-          actionHref="/api/auth/roles/add?role=MASTER"
-        />
-        <RoleRow
-          title="Студия"
-          active={user.roles.includes("STUDIO")}
-          actionHref="/api/auth/roles/add?role=STUDIO"
-        />
+    <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Кто вы в BeautyHub?</h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          Выберите режим. Можно переключаться позже в кабинете.
+        </p>
       </div>
 
-      <div className="mt-8">
-        <Link href="/cabinet" className="underline">
-          Назад в кабинет
-        </Link>
+      <div className="grid gap-3 md:grid-cols-2">
+        <form action={chooseClient}>
+          <button className="w-full rounded-2xl border bg-white p-6 text-left hover:bg-neutral-50">
+            <div className="text-lg font-semibold">Клиент</div>
+            <div className="mt-1 text-sm text-neutral-600">Записываться и смотреть свои записи.</div>
+          </button>
+        </form>
+
+        <form action={chooseProvider}>
+          <button className="w-full rounded-2xl border bg-white p-6 text-left hover:bg-neutral-50">
+            <div className="text-lg font-semibold">Мастер / Студия</div>
+            <div className="mt-1 text-sm text-neutral-600">Принимать записи и управлять профилем.</div>
+          </button>
+        </form>
       </div>
     </div>
   );
 }
 
-function RoleRow({
-  title,
-  active,
-  actionHref,
-}: {
-  title: string;
-  active: boolean;
-  actionHref?: string;
-}) {
-  return (
-    <div className="rounded-2xl border p-4 flex items-center justify-between gap-3">
-      <div>
-        <div className="font-medium">{title}</div>
-        <div className="text-sm text-neutral-600">
-          {active ? "Подключено" : "Не подключено"}
-        </div>
-      </div>
+async function chooseClient() {
+  "use server";
+  await setLastRole("client");
+  redirect("/cabinet");
+}
 
-      {active || !actionHref ? null : (
-        <a className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium" href={actionHref}>
-          Добавить
-        </a>
-      )}
-    </div>
-  );
+async function chooseProvider() {
+  "use server";
+  await setLastRole("provider");
+  redirect("/cabinet");
 }

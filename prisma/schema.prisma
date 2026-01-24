@@ -32,6 +32,15 @@ model UserProfile {
   phone       String?       @unique
   email       String?       @unique
 
+  // NEW (optional profile fields)
+  firstName   String?
+  lastName    String?
+  middleName  String?
+  birthDate   DateTime?
+  address     String?
+  geoLat      Float?
+  geoLng      Float?
+
   providers   Provider[]    @relation("ProviderOwner")
   bookings    Booking[]     @relation("BookingClient")
 
@@ -83,6 +92,16 @@ model Provider {
   categories     String[]      @default([])
   availableToday Boolean       @default(false)
 
+  // NEW (optional business contact + publish + geo)
+  contactName    String?
+  contactPhone   String?
+  contactEmail   String?
+  description    String?
+  avatarUrl      String?
+  geoLat         Float?
+  geoLng         Float?
+  isPublished    Boolean       @default(false)
+  
   ownerUserId    String?
   owner          UserProfile?  @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 

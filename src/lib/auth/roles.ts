@@ -11,14 +11,14 @@ export function isAllowedRoleAddition(role: AccountType): boolean {
 }
 
 export function roleRedirect(role: AccountType): string {
-  if (role === AccountType.MASTER) return "/master";
-  if (role === AccountType.STUDIO) return "/studio";
+  if (role === AccountType.MASTER) return "/cabinet/master";
+  if (role === AccountType.STUDIO) return "/cabinet/studio";
   return "/roles";
 }
 
 export function accountTypeRedirect(type: AccountType): string {
-  if (type === AccountType.MASTER) return "/master";
-  if (type === AccountType.STUDIO) return "/studio";
+  if (type === AccountType.MASTER) return "/cabinet/master";
+  if (type === AccountType.STUDIO) return "/cabinet/studio";
   return "/";
 }
 
