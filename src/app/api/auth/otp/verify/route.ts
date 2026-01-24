@@ -1,35 +1,23 @@
-import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken } from "@/lib/auth/jwt";
-
-function normalizePhone(input: string) {
-  const cleaned = input.replace(/[()\s-]/g, "");
-  if (!cleaned) return "";
-  if (cleaned.startsWith("+")) return cleaned;
-  return `+${cleaned}`;
-}
-
-function hashCode(phone: string, code: string) {
-  const secret = process.env.AUTH_JWT_SECRET!;
-  return crypto.createHmac("sha256", secret).update(`${phone}:${code}`).digest("hex");
-}
+import { AccountType } from "@prisma/client";
+import { fail, ok } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
+import { hashOtpCode } from "@/lib/auth/otp";
+import { otpVerifySchema } from "@/lib/auth/schemas";
+import { ensureClientRoleForUser } from "@/lib/auth/roles";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-  const phone = normalizePhone((body?.phone as string) ?? "");
-  const code = String((body?.code as string) ?? "").trim();
-
-  if (!phone || phone.length < 8) {
-    return NextResponse.json({ ok: false, error: "INVALID_PHONE" }, { status: 400 });
+  const parsed = otpVerifySchema.safeParse(body);
+  if (!parsed.success) {
+    return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
   }
-  if (!code || code.length < 4) {
-    return NextResponse.json({ ok: false, error: "INVALID_CODE" }, { status: 400 });
-  }
+  const { phone, code } = parsed.data;
 
   const now = new Date();
-  const codeHash = hashCode(phone, code);
+  const codeHash = hashOtpCode(phone, code);
 
   const otp = await prisma.otpCode.findFirst({
     where: {
@@ -42,7 +30,7 @@ export async function POST(req: Request) {
   });
 
   if (!otp) {
-    return NextResponse.json({ ok: false, error: "CODE_NOT_FOUND" }, { status: 401 });
+    return fail("Code not found", 401, "CODE_NOT_FOUND");
   }
 
   await prisma.otpCode.update({
@@ -51,25 +39,23 @@ export async function POST(req: Request) {
   });
 
   let profile = await prisma.userProfile.findUnique({ where: { phone } });
+
   if (!profile) {
     profile = await prisma.userProfile.create({
       data: {
         phone,
-        roles: ["CLIENT"],
+        roles: [AccountType.CLIENT],
       },
     });
   } else {
-    // гарантируем, что CLIENT есть всегда
-    if (!profile.roles.includes("CLIENT")) {
-      profile = await prisma.userProfile.update({
-        where: { id: profile.id },
-        data: { roles: { set: Array.from(new Set([...profile.roles, "CLIENT"])) as any } },
-      });
+    const nextRoles = await ensureClientRoleForUser(profile.id, profile.roles);
+    if (nextRoles !== profile.roles) {
+      profile = { ...profile, roles: nextRoles };
     }
   }
 
   const token = createSessionToken(
-    { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles as any },
+    { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles },
     60 * 60 * 24 * 30
   );
 
@@ -84,5 +70,5 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  return NextResponse.json({ ok: true });
+  return ok({});
 }

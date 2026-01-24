@@ -1,34 +1,19 @@
-import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-
-function normalizePhone(input: string) {
-  const cleaned = input.replace(/[()\s-]/g, "");
-  if (!cleaned) return "";
-  if (cleaned.startsWith("+")) return cleaned;
-  return `+${cleaned}`;
-}
-
-function generateCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
-function hashCode(phone: string, code: string) {
-  const secret = process.env.AUTH_JWT_SECRET!;
-  return crypto.createHmac("sha256", secret).update(`${phone}:${code}`).digest("hex");
-}
+import { fail, ok } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
+import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
+import { otpRequestSchema } from "@/lib/auth/schemas";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-  const phoneRaw = body?.phone as string | undefined;
-
-  const phone = normalizePhone(phoneRaw ?? "");
-  if (!phone || phone.length < 8) {
-    return NextResponse.json({ ok: false, error: "INVALID_PHONE" }, { status: 400 });
+  const parsed = otpRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
   }
 
-  const code = generateCode();
-  const codeHash = hashCode(phone, code);
+  const { phone } = parsed.data;
+  const code = generateOtpCode();
+  const codeHash = hashOtpCode(phone, code);
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
   await prisma.otpCode.create({
@@ -42,5 +27,5 @@ export async function POST(req: Request) {
   // MVP: пока без доставки — печатаем в консоль сервера
   console.log(`[OTP] phone=${phone} code=${code} expiresAt=${expiresAt.toISOString()}`);
 
-  return NextResponse.json({ ok: true });
+  return ok({});
 }

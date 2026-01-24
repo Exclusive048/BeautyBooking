@@ -1,13 +1,22 @@
-import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { fail, ok } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
+import { emptyBodySchema } from "@/lib/auth/schemas";
+import { AccountType } from "@prisma/client";
 
-export async function POST() {
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}));
+  const parsed = emptyBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data.user) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    return fail("Unauthorized", 401, "UNAUTHORIZED");
   }
 
   const user = data.user;
@@ -20,7 +29,7 @@ export async function POST() {
     where: { id: user.id },
     create: {
       id: user.id,
-      accountType: "CLIENT",
+      roles: [AccountType.CLIENT],
       phone: phone ?? undefined,
     },
     update: {
@@ -28,5 +37,5 @@ export async function POST() {
     },
   });
 
-  return NextResponse.json({ ok: true, profile });
+  return ok({ profile });
 }
