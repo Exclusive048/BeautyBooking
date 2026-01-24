@@ -5,36 +5,16 @@ import { useParams } from "next/navigation";
 import { Section } from "@/components/ui/section";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookingWidget } from "@/features/booking/components/booking-widget";
+import BookingWidget from "@/features/booking/components/booking-widget";
 import { moneyRUB } from "@/lib/format";
-
-type ServiceLite = {
-  id: string;
-  name: string;
-  durationMin: number;
-  price: number;
-};
-
-type ProviderWithServices = {
-  id: string;
-  type: "MASTER" | "STUDIO";
-  name: string;
-  tagline: string;
-  rating: number;
-  reviews: number;
-  priceFrom: number;
-  address: string;
-  district: string;
-  categories: string[];
-  availableToday: boolean;
-  services: ServiceLite[];
-};
+import type { ProviderProfileDto } from "@/lib/providers/dto";
+import type { ApiResponse } from "@/lib/types/api";
 
 export default function ProviderProfilePage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
 
-  const [p, setP] = useState<ProviderWithServices | null>(null);
+  const [p, setP] = useState<ProviderProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,10 +27,21 @@ export default function ProviderProfilePage() {
         setError(null);
 
         const res = await fetch(`/api/providers/${id}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ provider: ProviderProfileDto | null }>
+          | null;
 
-        const data = (await res.json()) as ProviderWithServices;
-        if (alive) setP(data);
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`);
+        }
+
+        if (!json || !json.ok) {
+          const message = json?.error?.message ?? "Failed to load provider";
+          throw new Error(message);
+        }
+
+        const provider = json.data.provider;
+        if (alive) setP(provider);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Unknown error");
       } finally {

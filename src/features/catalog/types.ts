@@ -1,16 +1,4 @@
-export type ProviderType = "MASTER" | "STUDIO";
+import type { ProviderCardDto, ProviderTypeDto } from "@/lib/providers/dto";
 
-export type ProviderCardModel = {
-  id: string;
-  type: ProviderType;
-  name: string;
-  tagline: string;
-  rating: number;
-  reviews: number;
-  priceFrom: number;
-  address: string;
-  district: string;
-  categories: string[];
-
-  availableToday?: boolean;
-};
+export type ProviderType = ProviderTypeDto;
+export type ProviderCardModel = ProviderCardDto;

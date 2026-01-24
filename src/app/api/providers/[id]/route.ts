@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { fail, ok } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
+import { providerIdParamSchema } from "@/lib/providers/schemas";
+import { mapProviderProfile } from "@/lib/providers/mappers";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -7,24 +10,35 @@ type RouteContext = {
 
 export async function GET(_req: Request, ctx: RouteContext) {
   try {
-    const { id } = await ctx.params; // ✅ важно: params — Promise
-
-    if (!id) {
-      return NextResponse.json({ message: "Missing provider id" }, { status: 400 });
+    const params = await ctx.params;
+    const parsed = providerIdParamSchema.safeParse(params);
+    if (!parsed.success) {
+      return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
+    const { id } = parsed.data;
 
     const provider = await prisma.provider.findUnique({
       where: { id },
-      include: { services: true },
+      include: {
+        services: {
+          select: {
+            id: true,
+            name: true,
+            durationMin: true,
+            price: true,
+          },
+        },
+      },
     });
 
     if (!provider) {
-      return NextResponse.json({ message: "Not found" }, { status: 404 });
+      return fail("Provider not found", 404, "PROVIDER_NOT_FOUND");
     }
 
-    return NextResponse.json(provider);
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ message: "Internal error", detail }, { status: 500 });
+    return ok({ provider: mapProviderProfile(provider) });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown error";
+    console.error("GET /api/providers/[id] failed:", detail);
+    return fail("Internal error", 500, "INTERNAL_ERROR");
   }
 }

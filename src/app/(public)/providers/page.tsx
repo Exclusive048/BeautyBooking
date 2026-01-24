@@ -6,6 +6,7 @@ import { ProviderCard } from "@/features/catalog/components/provider-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/ui/tabs";
+import type { ApiResponse } from "@/lib/types/api";
 
 import type { ProviderCardModel } from "@/features/catalog/types";
 import { CatalogFilters, CatalogFiltersState } from "@/features/catalog/components/filters";
@@ -46,11 +47,20 @@ export default function ProvidersPage() {
         setError(null);
 
         const res = await fetch("/api/providers", { cache: "no-store" });
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ providers: ProviderCardModel[] }>
+          | null;
 
-        const data = (await res.json()) as ProviderCardModel[];
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`);
+        }
 
-        if (alive) setProviders(Array.isArray(data) ? data : []);
+        if (!json || !json.ok) {
+          const message = json?.error?.message ?? "Failed to load providers";
+          throw new Error(message);
+        }
+
+        if (alive) setProviders(json.data.providers);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
