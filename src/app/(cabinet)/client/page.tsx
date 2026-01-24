@@ -1,23 +1,26 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth/session";
+import { BookingStatus } from "@prisma/client";
+import { serverApiFetch } from "@/lib/api/server-fetch";
 
 export default async function ClientCabinetPage() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+  const bookingsResponse = await serverApiFetch<{
+    bookings: Array<{
+      id: string;
+      slotLabel: string;
+      comment: string | null;
+      status: BookingStatus;
+      provider: { id: string; name: string; district: string; address: string };
+      service: { name: string };
+    }>;
+  }>("/api/bookings/my");
 
-  // CLIENT гарантируем при логине, но пусть будет проверка
-  if (!user.roles.includes("CLIENT")) redirect("/403");
+  if (!bookingsResponse.ok) {
+    if (bookingsResponse.error.code === "UNAUTHORIZED") redirect("/login");
+    if (bookingsResponse.error.code === "FORBIDDEN") redirect("/403");
+  }
 
-  const bookings = await prisma.booking.findMany({
-    where: { clientUserId: user.id },
-    orderBy: { createdAt: "desc" },
-    include: {
-      provider: true,
-      service: true,
-    },
-    take: 100,
-  });
+  const bookingsError = bookingsResponse.ok ? null : bookingsResponse.error.message;
+  const bookings = bookingsResponse.ok ? bookingsResponse.data.bookings : [];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 space-y-6">
@@ -28,7 +31,11 @@ export default async function ClientCabinetPage() {
         </p>
       </div>
 
-      {bookings.length === 0 ? (
+      {bookingsError ? (
+        <div className="rounded-2xl border p-6 text-red-600">
+          Ошибка загрузки: {bookingsError}
+        </div>
+      ) : bookings.length === 0 ? (
         <div className="rounded-2xl border p-6 text-neutral-600">
           Пока нет записей. Найдите мастера в каталоге и запишитесь.
         </div>
