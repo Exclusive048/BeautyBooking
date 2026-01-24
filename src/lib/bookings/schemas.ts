@@ -1,0 +1,14 @@
+import { z } from "zod";
+
+export const bookingsQuerySchema = z.object({
+  providerId: z.string().min(1, "Provider id is required"),
+});
+
+export const createBookingSchema = z.object({
+  providerId: z.string().min(1, "Provider id is required"),
+  serviceId: z.string().min(1, "Service id is required"),
+  slotLabel: z.string().trim().min(1, "Slot is required"),
+  clientName: z.string().trim().min(1, "Client name is required"),
+  clientPhone: z.string().trim().min(1, "Client phone is required"),
+  comment: z.string().trim().nullable().optional(),
+});

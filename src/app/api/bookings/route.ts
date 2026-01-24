@@ -1,19 +1,23 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth/session";
+import { fail, ok } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
+import { bookingsQuerySchema, createBookingSchema } from "@/lib/bookings/schemas";
+import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { AccountType } from "@prisma/client";
 
 export async function GET(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const url = new URL(req.url);
-  const providerId = url.searchParams.get("providerId");
-
-  if (!providerId) {
-    return NextResponse.json({ ok: false, error: "providerId_required" }, { status: 400 });
+  const parsed = bookingsQuerySchema.safeParse({
+    providerId: url.searchParams.get("providerId"),
+  });
+  if (!parsed.success) {
+    return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
   }
+  const { providerId } = parsed.data;
 
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
@@ -21,11 +25,11 @@ export async function GET(req: Request) {
   });
 
   if (!provider) {
-    return NextResponse.json({ ok: false, error: "provider_not_found" }, { status: 404 });
+    return fail("Provider not found", 404, "PROVIDER_NOT_FOUND");
   }
 
   if (!provider.ownerUserId || provider.ownerUserId !== user.id) {
-    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    return fail("Forbidden", 403, "FORBIDDEN");
   }
 
   const bookings = await prisma.booking.findMany({
@@ -35,43 +39,26 @@ export async function GET(req: Request) {
     take: 200,
   });
 
-  return NextResponse.json({ ok: true, bookings });
+  return ok({ bookings });
 }
 
 export async function POST(req: Request) {
   // ✅ Строго: только авторизованные клиенты
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, error: "AUTH_REQUIRED" },
-      { status: 401 }
-    );
-  }
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   // ✅ Строго: у юзера должна быть роль CLIENT (она у тебя всегда добавляется при логине, но оставим проверку)
-  if (!user.roles.includes("CLIENT")) {
-    return NextResponse.json(
-      { ok: false, error: "CLIENT_ROLE_REQUIRED" },
-      { status: 403 }
-    );
-  }
+  const roleError = requireRole(user, AccountType.CLIENT);
+  if (roleError) return roleError;
 
   const body = await req.json().catch(() => null);
-
-  const providerId = body?.providerId as string | undefined;
-  const serviceId = body?.serviceId as string | undefined;
-
-  const slotLabel = body?.slotLabel as string | undefined;
-  const clientName = body?.clientName as string | undefined;
-  const clientPhone = body?.clientPhone as string | undefined;
-  const comment = (body?.comment as string | undefined) ?? null;
-
-  if (!providerId || !serviceId || !slotLabel || !clientName || !clientPhone) {
-    return NextResponse.json(
-      { ok: false, error: "missing_fields" },
-      { status: 400 }
-    );
+  const parsedBody = createBookingSchema.safeParse(body);
+  if (!parsedBody.success) {
+    return fail(formatZodError(parsedBody.error), 400, "VALIDATION_ERROR");
   }
+  const { providerId, serviceId, slotLabel, clientName, clientPhone, comment } =
+    parsedBody.data;
 
   // Проверяем, что service принадлежит provider
   const service = await prisma.service.findUnique({
@@ -80,9 +67,10 @@ export async function POST(req: Request) {
   });
 
   if (!service || service.providerId !== providerId) {
-    return NextResponse.json(
-      { ok: false, error: "service_not_belongs_to_provider" },
-      { status: 400 }
+    return fail(
+      "Service does not belong to provider",
+      400,
+      "SERVICE_NOT_BELONGS_TO_PROVIDER"
     );
   }
 
@@ -98,5 +86,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true, booking }, { status: 201 });
+  return ok({ booking }, { status: 201 });
 }

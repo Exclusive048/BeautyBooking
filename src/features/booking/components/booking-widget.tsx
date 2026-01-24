@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ApiResponse } from "@/lib/types/api";
 
 type Service = {
   id: string;
@@ -72,11 +73,13 @@ export default function BookingWidget({ providerId, services, defaultServiceId }
       setMeLoading(true);
       try {
         const res = await fetch("/api/me", { method: "GET" });
-        const json = await res.json().catch(() => ({}));
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ user: MeUser | null }>
+          | null;
 
         if (cancelled) return;
 
-        const user = (json?.user ?? null) as MeUser | null;
+        const user = json?.ok ? json.data.user : null;
         setMe(user);
 
         // Автоподстановка только если поля ещё пустые (не перетираем ручной ввод)
@@ -138,19 +141,27 @@ export default function BookingWidget({ providerId, services, defaultServiceId }
         }),
       });
 
-      const json = await res.json().catch(() => ({}));
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ booking: { id: string } }>
+        | null;
 
-      if (res.status === 401 && (json?.error === "AUTH_REQUIRED" || json?.error === "UNAUTHORIZED")) {
+      const errorCode = json && !json.ok ? json.error?.code : undefined;
+      if (res.status === 401 && (errorCode === "AUTH_REQUIRED" || errorCode === "UNAUTHORIZED")) {
         setShowAuthModal(true);
         return;
       }
 
-      if (!res.ok || !json?.ok) {
-        setErrorText(json?.error ?? "Не удалось создать запись");
+      if (!res.ok) {
+        setErrorText("Не удалось создать запись");
         return;
       }
 
-      setSuccessId(json.booking?.id ?? "ok");
+      if (!json || !json.ok) {
+        setErrorText(json?.error?.message ?? "Не удалось создать запись");
+        return;
+      }
+
+      setSuccessId(json.data.booking?.id ?? "ok");
       setComment("");
     } finally {
       setLoading(false);

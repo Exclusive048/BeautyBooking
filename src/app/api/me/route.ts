@@ -1,16 +1,15 @@
-import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
+import { ok } from "@/lib/api/response";
 
 export async function GET() {
   const user = await getSessionUser();
 
   if (!user) {
-    return NextResponse.json({ ok: true, user: null });
+    return ok({ user: null });
   }
 
   // Отдаем только безопасные поля
-  return NextResponse.json({
-    ok: true,
+  return ok({
     user: {
       id: user.id,
       roles: user.roles,
