@@ -7,6 +7,9 @@ export const bookingsQuerySchema = z.object({
 export const createBookingSchema = z.object({
   providerId: z.string().min(1, "Provider id is required"),
   serviceId: z.string().min(1, "Service id is required"),
+  masterProviderId: z.string().min(1).optional(),
+  startAtUtc: z.string().min(1).optional(),
+  endAtUtc: z.string().min(1).optional(),
   slotLabel: z.string().trim().min(1, "Slot is required"),
   clientName: z.string().trim().min(1, "Client name is required"),
   clientPhone: z.string().trim().min(1, "Client phone is required"),

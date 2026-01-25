@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookingStatus } from "@prisma/client";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { serverApiFetch } from "@/lib/api/server-fetch";
-import { CabinetShell, CabinetTabs } from "@/features/cabinet/components/cabinet-shell";
+import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
+import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
 import { RoleSwitch } from "@/features/cabinet/components/role-switch";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
+import { MasterServicesPanel } from "@/features/cabinet/components/master-services-panel";
+import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
+import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
 
 type MeDto = {
   id: string;
@@ -28,7 +31,10 @@ export default async function MasterCabinetPage(props: {
   const sp =
     props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;
 
-  const tab = (sp?.tab === "profile" ? "profile" : "bookings") as "bookings" | "profile";
+  const tab =
+    sp?.tab === "profile" || sp?.tab === "services" || sp?.tab === "schedule"
+      ? sp.tab
+      : "bookings";
 
   const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
     "/api/providers/me"
@@ -40,12 +46,12 @@ export default async function MasterCabinetPage(props: {
 
     return (
       <CabinetShell
-        title="РљР°Р±РёРЅРµС‚ РјР°СЃС‚РµСЂР°"
-        subtitle="РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РґР°РЅРЅС‹С… РїСЂРѕС„РёР»СЏ."
+        title="Кабинет мастера"
+        subtitle="Ошибка загрузки данных профиля."
         right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="rounded-2xl border p-6 text-red-600">
-          РћС€РёР±РєР° СЃРµСЂРІРµСЂР°: {providerResponse.error.message}
+          Ошибка сервера: {providerResponse.error.message}
         </div>
       </CabinetShell>
     );
@@ -56,19 +62,19 @@ export default async function MasterCabinetPage(props: {
   if (!provider) {
     return (
       <CabinetShell
-        title="РљР°Р±РёРЅРµС‚ РјР°СЃС‚РµСЂР°"
-        subtitle="РЎРѕР·РґР°Р№С‚Рµ РїСЂРѕС„РёР»СЊ РјР°СЃС‚РµСЂР°, С‡С‚РѕР±С‹ РїСЂРёРЅРёРјР°С‚СЊ Р·Р°РїРёСЃРё."
+        title="Кабинет мастера"
+        subtitle="Создайте профиль мастера, чтобы принимать записи."
         right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="rounded-2xl border p-6">
           <p className="text-neutral-700">
-            РЈ РІР°СЃ РїРѕРєР° РЅРµС‚ РїСЂРѕС„РёР»СЏ РїСЂРѕРІР°Р№РґРµСЂР°. РЎРѕР·РґР°Р№С‚Рµ РїСЂРѕС„РёР»СЊ РјР°СЃС‚РµСЂР°, С‡С‚РѕР±С‹ РЅР°С‡Р°С‚СЊ РїСЂРёРЅРёРјР°С‚СЊ
-            Р·Р°РїРёСЃРё.
+            У вас пока нет профиля провайдера. Создайте профиль мастера, чтобы начать принимать
+            записи.
           </p>
 
           <form action={createMyMasterProviderAction} className="mt-6">
             <button className="rounded-xl bg-black text-white px-4 py-2 font-medium">
-              РЎРѕР·РґР°С‚СЊ РїСЂРѕС„РёР»СЊ РјР°СЃС‚РµСЂР°
+              Создать профиль мастера
             </button>
           </form>
         </div>
@@ -92,26 +98,34 @@ export default async function MasterCabinetPage(props: {
 
     return (
       <CabinetShell
-        title="РљР°Р±РёРЅРµС‚ РјР°СЃС‚РµСЂР°"
-        subtitle="Р›РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ Р°РєРєР°СѓРЅС‚Р° (Р¤РРћ, РєРѕРЅС‚Р°РєС‚С‹, РґР°С‚Р° СЂРѕР¶РґРµРЅРёСЏ, Р°РґСЂРµСЃ)."
+        title="Кабинет мастера"
+        subtitle="Личные данные аккаунта (ФИО, контакты, дата рождения, адрес)."
         right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="flex items-center justify-between gap-3">
-          <CabinetTabs active="profile" baseHref="/cabinet/master" />
+          <CabinetNavTabs
+            activeId="profile"
+            items={[
+              { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
+              { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
+              { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
+              { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
+            ]}
+          />
           <Link
             href={`/providers/${provider.id}`}
             className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
           >
-            РћС‚РєСЂС‹С‚СЊ РїСѓР±Р»РёС‡РЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ
+            Открыть публичную страницу
           </Link>
         </div>
 
         <ProfileForm initialUser={meResponse.data.user} />
 
         <section className="rounded-2xl border p-5">
-          <h3 className="text-sm font-semibold">Р”Р°Р»СЊС€Рµ (СЃР»РµРґСѓСЋС‰РёР№ С€Р°Рі)</h3>
+          <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
           <p className="mt-2 text-sm text-neutral-600">
-            РћС‚РґРµР»СЊРЅРѕ СЃРґРµР»Р°РµРј С„РѕСЂРјСѓ вЂњРџСЂРѕС„РёР»СЊ РјР°СЃС‚РµСЂР°вЂќ (РёРјСЏ/СЃР»РѕРіР°РЅ/Р°РґСЂРµСЃ/СЂР°Р№РѕРЅ/РєР°С‚РµРіРѕСЂРёРё) вЂ” СЌС‚Рѕ РїРѕР»СЏ
+            Отдельно сделаем форму “Профиль мастера” (имя/слоган/адрес/район/категории) — это поля
             Provider.
           </p>
         </section>
@@ -119,68 +133,86 @@ export default async function MasterCabinetPage(props: {
     );
   }
 
-  const bookingsResponse = await serverApiFetch<{
-    bookings: Array<{
-      id: string;
-      slotLabel: string;
-      clientName: string;
-      clientPhone: string;
-      comment: string | null;
-      status: BookingStatus;
-      service: { name: string };
-    }>;
-  }>(`/api/bookings?providerId=${provider.id}`);
+  if (tab === "services") {
+    return (
+      <CabinetShell
+        title="Кабинет мастера"
+        subtitle="Управляйте списком услуг и ценами."
+        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
+      >
+        <CabinetNavTabs
+          activeId="services"
+          items={[
+            { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
+            { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
+            { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
+            { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
+          ]}
+        />
 
-  const bookingsError = bookingsResponse.ok ? null : bookingsResponse.error.message;
-  const bookings = bookingsResponse.ok ? bookingsResponse.data.bookings : [];
+        <MasterServicesPanel masterId={provider.id} />
+      </CabinetShell>
+    );
+  }
+
+  if (tab === "schedule") {
+    return (
+      <CabinetShell
+        title="Кабинет мастера"
+        subtitle="Настройте недельное расписание."
+        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
+      >
+        <CabinetNavTabs
+          activeId="schedule"
+          items={[
+            { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
+            { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
+            { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
+            { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
+          ]}
+        />
+
+        <MasterSchedulePanel masterId={provider.id} />
+      </CabinetShell>
+    );
+  }
 
   return (
     <CabinetShell
-      title="РљР°Р±РёРЅРµС‚ РјР°СЃС‚РµСЂР°"
-      subtitle="РЈРїСЂР°РІР»СЏР№С‚Рµ Р·Р°РїРёСЃСЏРјРё Рё РїСЂРѕС„РёР»РµРј РјР°СЃС‚РµСЂР°."
+      title="Кабинет мастера"
+      subtitle="Управляйте записями и профилем мастера."
       right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
     >
       <div className="flex items-center justify-between gap-3">
-        <CabinetTabs active="bookings" baseHref="/cabinet/master" />
+        <CabinetNavTabs
+          activeId="bookings"
+          items={[
+            { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
+            { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
+            { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
+            { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
+          ]}
+        />
         <Link
           href={`/providers/${provider.id}`}
           className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
         >
-          РћС‚РєСЂС‹С‚СЊ РїСѓР±Р»РёС‡РЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ
+          Открыть публичную страницу
         </Link>
       </div>
 
       <section className="rounded-2xl border p-5">
         <div>
-          <h2 className="text-lg font-semibold">РњРѕРё Р·Р°РїРёСЃРё</h2>
+          <h2 className="text-lg font-semibold">Мои записи</h2>
           <div className="mt-2 text-neutral-700">
             <div className="font-medium">{provider.name}</div>
             <div className="text-sm text-neutral-600">{provider.tagline}</div>
           </div>
         </div>
 
-        {bookingsError ? (
-          <p className="mt-3 text-sm text-red-600">РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё: {bookingsError}</p>
-        ) : bookings.length === 0 ? (
-          <p className="mt-3 text-neutral-600">РџРѕРєР° РЅРµС‚ Р·Р°РїРёСЃРµР№.</p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {bookings.map((b) => (
-              <div key={b.id} className="rounded-xl border p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium">{b.clientName}</div>
-                  <div className="text-sm text-neutral-600">{b.status}</div>
-                </div>
-                <div className="mt-1 text-sm text-neutral-700">
-                  {b.slotLabel} вЂў {b.service.name} вЂў {b.clientPhone}
-                </div>
-                {b.comment ? (
-                  <div className="mt-2 text-sm text-neutral-600">{b.comment}</div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="mt-4">
+          <ProviderBookingsPanel endpoint={`/api/masters/${provider.id}/bookings`} />
+        </div>
       </section>
     </CabinetShell>
   );

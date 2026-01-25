@@ -15,6 +15,7 @@ export default function ProviderProfilePage() {
   const id = params?.id;
 
   const [p, setP] = useState<ProviderProfileDto | null>(null);
+  const [masters, setMasters] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +43,25 @@ export default function ProviderProfilePage() {
 
         const provider = json.data.provider;
         if (alive) setP(provider);
+
+        if (provider?.type === "STUDIO") {
+          const mastersRes = await fetch(`/api/providers/${provider.id}/masters`, {
+            cache: "no-store",
+          });
+          const mastersJson = (await mastersRes.json().catch(() => null)) as
+            | ApiResponse<{ masters: Array<{ id: string; name: string }> }>
+            | null;
+
+          if (alive) {
+            if (mastersRes.ok && mastersJson?.ok) {
+              setMasters(mastersJson.data.masters);
+            } else {
+              setMasters([]);
+            }
+          }
+        } else if (alive) {
+          setMasters([]);
+        }
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -130,7 +150,12 @@ export default function ProviderProfilePage() {
 
         {/* RIGHT */}
         <div className="lg:sticky lg:top-24 h-fit">
-          <BookingWidget providerId={p.id} services={p.services} />
+          <BookingWidget
+            providerId={p.id}
+            providerType={p.type}
+            services={p.services}
+            masters={masters}
+          />
         </div>
       </div>
     </div>

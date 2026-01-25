@@ -46,7 +46,7 @@ export default function ProvidersPage() {
           p.district,
           p.address,
           ...(p.categories ?? []),
-          p.type === "MASTER" ? "??????" : "??????",
+          p.type === "MASTER" ? "master" : "studio",
         ]
           .join(" ")
           .toLowerCase();
@@ -75,8 +75,8 @@ export default function ProvidersPage() {
   return (
     <div className="space-y-6">
       <Section
-        title="??????? ????????"
-        subtitle="???????? ?? ??????, ?????? ? ????. ?????? ??????? ????????? ?????."
+        title="Featured Providers"
+        subtitle="Search by service, price, and district. Find the right fit for you."
       />
 
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
@@ -91,14 +91,14 @@ export default function ProvidersPage() {
 
           <Card className="bg-white">
             <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-neutral-900">????????? MVP</div>
+              <div className="text-sm font-semibold text-neutral-900">MVP Highlights</div>
               <p className="mt-2 text-sm text-neutral-600">
-                ?????: ????????? ????????, ?????? ?? ?????, ?????????? ?? ???????? ? ????.
+                Includes: studio schedule, booking flow, and management of services and masters.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge>free trial</Badge>
-                <Badge>?????????</Badge>
-                <Badge>??????? ??????</Badge>
+                <Badge>online booking</Badge>
+                <Badge>fast launch</Badge>
               </div>
             </CardContent>
           </Card>
@@ -108,14 +108,14 @@ export default function ProvidersPage() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-neutral-600">
-              ???????: <span className="font-semibold text-neutral-900">{filtered.length}</span>
+              Results: <span className="font-semibold text-neutral-900">{filtered.length}</span>
             </div>
             <div className="flex gap-2">
               <button className="rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm hover:bg-neutral-50">
-                ??????????: ???????
+                Sort: rating
               </button>
               <button className="rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm hover:bg-neutral-50">
-                ????????: ????? ????
+                Filter: open now
               </button>
             </div>
           </div>

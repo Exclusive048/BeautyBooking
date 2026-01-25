@@ -2,7 +2,35 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
-import type { BookingMeUser, BookingWidgetProps } from "../model/types";
+import type { BookingService } from "@/features/booking/model/types";
+import { SlotPicker } from "@/features/booking/components/slot-picker";
+
+type BookingUser = {
+  id: string;
+  roles: string[];
+  displayName: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+type MasterOption = {
+  id: string;
+  name: string;
+};
+
+type SlotItem = {
+  startAtUtc: string;
+  endAtUtc: string;
+  label: string;
+};
+
+type Props = {
+  providerId: string;
+  providerType: "MASTER" | "STUDIO";
+  services: BookingService[];
+  masters?: MasterOption[];
+  defaultServiceId?: string;
+};
 
 function formatMoney(n: number) {
   try {
@@ -18,23 +46,34 @@ function buildLoginUrl(nextPath: string) {
   return `/login?${p.toString()}`;
 }
 
+function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
+  return json && !json.ok ? json.error.message ?? fallback : fallback;
+}
+
 export default function BookingWidget({
   providerId,
+  providerType,
   services,
+  masters = [],
   defaultServiceId,
-}: BookingWidgetProps) {
+}: Props) {
   const initialServiceId = useMemo(() => {
     if (defaultServiceId && services.some((s) => s.id === defaultServiceId)) return defaultServiceId;
     return services[0]?.id ?? "";
   }, [defaultServiceId, services]);
 
   const [serviceId, setServiceId] = useState(initialServiceId);
+  const [masterId, setMasterId] = useState(masters[0]?.id ?? "");
   const [slotLabel, setSlotLabel] = useState("");
+  const [slots, setSlots] = useState<SlotItem[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [comment, setComment] = useState("");
 
-  const [me, setMe] = useState<BookingMeUser | null>(null);
+  const [me, setMe] = useState<BookingUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
 
   const [loading, setLoading] = useState(false);
@@ -51,6 +90,10 @@ export default function BookingWidget({
       : "/";
 
   useEffect(() => {
+    setMasterId(masters[0]?.id ?? "");
+  }, [masters]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadMe() {
@@ -58,7 +101,7 @@ export default function BookingWidget({
       try {
         const res = await fetch("/api/me", { method: "GET" });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ user: BookingMeUser | null }>
+          | ApiResponse<{ user: BookingUser | null }>
           | null;
 
         if (cancelled) return;
@@ -66,7 +109,6 @@ export default function BookingWidget({
         const user = json?.ok ? json.data.user : null;
         setMe(user);
 
-        // РђРІС‚РѕРїРѕРґСЃС‚Р°РЅРѕРІРєР° С‚РѕР»СЊРєРѕ РµСЃР»Рё РїРѕР»СЏ РµС‰С‘ РїСѓСЃС‚С‹Рµ (РЅРµ РїРµСЂРµС‚РёСЂР°РµРј СЂСѓС‡РЅРѕР№ РІРІРѕРґ)
         if (user) {
           if (!clientName.trim() && user.displayName) setClientName(user.displayName);
           if (!clientPhone.trim() && user.phone) setClientPhone(user.phone);
@@ -83,30 +125,107 @@ export default function BookingWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSlots() {
+      const targetMasterId = providerType === "STUDIO" ? masterId : providerId;
+      if (!serviceId || !targetMasterId) {
+        setSlots([]);
+        setSlotLabel("");
+        return;
+      }
+
+      setSlotsLoading(true);
+      setSlotsError(null);
+
+      try {
+        const from = new Date();
+        const to = new Date();
+        to.setDate(to.getDate() + 14);
+        const url = new URL(`/api/masters/${targetMasterId}/availability`, window.location.origin);
+        url.searchParams.set("serviceId", serviceId);
+        url.searchParams.set("from", from.toISOString());
+        url.searchParams.set("to", to.toISOString());
+
+        const res = await fetch(url.toString(), { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ slots: SlotItem[] }>
+          | null;
+
+        if (!res.ok) throw new Error(getErrorMessage(json, "Failed to load slots"));
+        if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load slots"));
+
+        if (cancelled) return;
+        setSlots(json.data.slots);
+        setSlotLabel((prev) => prev || json.data.slots[0]?.label || "");
+      } catch (e) {
+        if (!cancelled) {
+          setSlotsError(e instanceof Error ? e.message : "Unknown error");
+          setSlots([]);
+          setSlotLabel("");
+        }
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
+      }
+    }
+
+    loadSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [providerId, providerType, masterId, serviceId]);
+
+  const slotGroups = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const slot of slots) {
+      const [date, time] = slot.label.split(" ");
+      if (!date || !time) continue;
+      const list = map.get(date) ?? [];
+      list.push(time);
+      map.set(date, list);
+    }
+    return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
+  }, [slots]);
+
+  const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
+
   async function submit() {
     setErrorText(null);
     setSuccessId(null);
 
     if (!providerId) {
-      setErrorText("providerId РЅРµ Р·Р°РґР°РЅ");
-      return;
-    }
-    if (!serviceId) {
-      setErrorText("Р’С‹Р±РµСЂРёС‚Рµ СѓСЃР»СѓРіСѓ");
-      return;
-    }
-    if (!slotLabel.trim()) {
-      setErrorText("Р’С‹Р±РµСЂРёС‚Рµ СЃР»РѕС‚/РІСЂРµРјСЏ");
+      setErrorText("providerId не задан");
       return;
     }
 
-    // Р’Р°Р¶РЅРѕ: Сѓ РЅР°СЃ СЃРµР№С‡Р°СЃ РЅР° Р±СЌРєРµ РїРѕР»СЏ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ
+    if (providerType === "STUDIO" && !masterId) {
+      setErrorText("Выберите мастера");
+      return;
+    }
+
+    if (!serviceId) {
+      setErrorText("Выберите услугу");
+      return;
+    }
+
+    if (!slotLabel) {
+      setErrorText("Выберите слот/время");
+      return;
+    }
+
     if (!clientName.trim()) {
-      setErrorText("Р’РІРµРґРёС‚Рµ РёРјСЏ");
+      setErrorText("Введите имя");
       return;
     }
     if (!clientPhone.trim()) {
-      setErrorText("Р’РІРµРґРёС‚Рµ С‚РµР»РµС„РѕРЅ");
+      setErrorText("Введите телефон");
+      return;
+    }
+
+    const slot = slotByLabel.get(slotLabel) ?? null;
+    if (!slot) {
+      setErrorText("Выберите корректный слот");
       return;
     }
 
@@ -118,7 +237,10 @@ export default function BookingWidget({
         body: JSON.stringify({
           providerId,
           serviceId,
-          slotLabel: slotLabel.trim(),
+          masterProviderId: providerType === "STUDIO" ? masterId : undefined,
+          startAtUtc: slot.startAtUtc,
+          endAtUtc: slot.endAtUtc,
+          slotLabel: slot.label,
           clientName: clientName.trim(),
           clientPhone: clientPhone.trim(),
           comment: comment.trim() ? comment.trim() : null,
@@ -136,12 +258,12 @@ export default function BookingWidget({
       }
 
       if (!res.ok) {
-        setErrorText("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р·Р°РїРёСЃСЊ");
+        setErrorText(getErrorMessage(json, "Не удалось создать запись"));
         return;
       }
 
       if (!json || !json.ok) {
-        setErrorText(json?.error?.message ?? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р·Р°РїРёСЃСЊ");
+        setErrorText(getErrorMessage(json, "Не удалось создать запись"));
         return;
       }
 
@@ -156,37 +278,33 @@ export default function BookingWidget({
     <div className="rounded-2xl border p-5 bg-white">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-lg font-semibold">Р—Р°РїРёСЃСЊ</div>
+          <div className="text-lg font-semibold">Запись</div>
           <div className="text-sm text-neutral-600 mt-1">
-            Р—Р°РїРёСЃСЊ РґРѕСЃС‚СѓРїРЅР° С‚РѕР»СЊРєРѕ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РєР»РёРµРЅС‚Р°Рј.
+            Запись доступна только авторизованным клиентам.
           </div>
         </div>
 
         {selectedService ? (
           <div className="text-right">
-            <div className="text-sm text-neutral-600">РЎС‚РѕРёРјРѕСЃС‚СЊ</div>
-            <div className="font-semibold">{formatMoney(selectedService.price)} в‚ё</div>
+            <div className="text-sm text-neutral-600">Стоимость</div>
+            <div className="font-semibold">{formatMoney(selectedService.price)} ?</div>
           </div>
         ) : null}
       </div>
 
-      {/* Auth badge */}
       <div className="mt-4">
         {meLoading ? (
-          <div className="text-sm text-neutral-600">РџСЂРѕРІРµСЂСЏРµРј Р°РІС‚РѕСЂРёР·Р°С†РёСЋвЂ¦</div>
+          <div className="text-sm text-neutral-600">Проверяем авторизацию…</div>
         ) : me ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            Р’С‹ Р°РІС‚РѕСЂРёР·РѕРІР°РЅС‹ вњ…
+            Вы авторизованы ?
             {me.phone ? <span className="ml-2 text-emerald-700">({me.phone})</span> : null}
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            Р’РѕР№РґРёС‚Рµ, С‡С‚РѕР±С‹ Р·Р°РїРёСЃР°С‚СЊСЃСЏ.
-            <a
-              href={buildLoginUrl(nextPath)}
-              className="ml-2 underline font-medium"
-            >
-              Р’РѕР№С‚Рё
+            Войдите, чтобы записаться.
+            <a href={buildLoginUrl(nextPath)} className="ml-2 underline font-medium">
+              Войти
             </a>
           </div>
         )}
@@ -200,14 +318,32 @@ export default function BookingWidget({
 
       {successId ? (
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Р—Р°СЏРІРєР° РѕС‚РїСЂР°РІР»РµРЅР° вњ… (ID: {successId})
+          Заявка отправлена ? (ID: {successId})
         </div>
       ) : null}
 
       <div className="mt-5 space-y-4">
-        {/* Service */}
+        {providerType === "STUDIO" ? (
+          <div>
+            <label className="block text-sm font-medium">Мастер</label>
+            <select
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
+              value={masterId}
+              onChange={(e) => setMasterId(e.target.value)}
+              disabled={loading}
+            >
+              <option value="">Выберите мастера</option>
+              {masters.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         <div>
-          <label className="block text-sm font-medium">РЈСЃР»СѓРіР°</label>
+          <label className="block text-sm font-medium">Услуга</label>
           <select
             className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
             value={serviceId}
@@ -216,39 +352,40 @@ export default function BookingWidget({
           >
             {services.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} вЂў {s.durationMin} РјРёРЅ вЂў {formatMoney(s.price)} в‚ё
+                {s.name} • {s.durationMin} мин • {formatMoney(s.price)} ?
               </option>
             ))}
           </select>
         </div>
 
-        {/* Slot label (MVP) */}
         <div>
-          <label className="block text-sm font-medium">РЎР»РѕС‚ (РїРѕРєР° С‚РµРєСЃС‚РѕРј)</label>
-          <input
-            className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-            placeholder="РќР°РїСЂРёРјРµСЂ: РЎРµРіРѕРґРЅСЏ 18:00"
-            value={slotLabel}
-            onChange={(e) => setSlotLabel(e.target.value)}
-            disabled={loading}
-          />
+          <label className="block text-sm font-medium">Слот</label>
+          {slotsLoading ? (
+            <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
+          ) : slotsError ? (
+            <div className="mt-2 text-sm text-red-600">{slotsError}</div>
+          ) : slotGroups.length === 0 ? (
+            <div className="mt-2 text-sm text-neutral-600">Свободных слотов нет.</div>
+          ) : (
+            <div className="mt-2">
+              <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+            </div>
+          )}
         </div>
 
-        {/* Name */}
         <div>
-          <label className="block text-sm font-medium">РРјСЏ</label>
+          <label className="block text-sm font-medium">Имя</label>
           <input
             className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-            placeholder="Р’Р°С€Рµ РёРјСЏ"
+            placeholder="Ваше имя"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
             disabled={loading}
           />
         </div>
 
-        {/* Phone */}
         <div>
-          <label className="block text-sm font-medium">РўРµР»РµС„РѕРЅ</label>
+          <label className="block text-sm font-medium">Телефон</label>
           <input
             className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
             placeholder="+7..."
@@ -260,12 +397,11 @@ export default function BookingWidget({
           />
         </div>
 
-        {/* Comment */}
         <div>
-          <label className="block text-sm font-medium">РљРѕРјРјРµРЅС‚Р°СЂРёР№ (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ)</label>
+          <label className="block text-sm font-medium">Комментарий (необязательно)</label>
           <textarea
             className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 min-h-[90px]"
-            placeholder="РќР°РїСЂРёРјРµСЂ: С…РѕС‡Сѓ РµСЃС‚РµСЃС‚РІРµРЅРЅС‹Р№ РЅСЋРґ"
+            placeholder="Например: хочу естественный нюд"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             disabled={loading}
@@ -274,18 +410,18 @@ export default function BookingWidget({
 
         <button
           onClick={submit}
-          disabled={loading || (!meLoading && !me)} // РµСЃР»Рё С‚РѕС‡РЅРѕ Р·РЅР°РµРј С‡С‚Рѕ РЅРµ Р·Р°Р»РѕРіРёРЅРµРЅ вЂ” Р±Р»РѕРєРёСЂСѓРµРј
+          disabled={loading || (!meLoading && !me)}
           className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
         >
-          {loading ? "РћС‚РїСЂР°РІР»СЏРµРј..." : "Р—Р°РїРёСЃР°С‚СЊСЃСЏ"}
+          {loading ? "Отправляем..." : "Записаться"}
         </button>
       </div>
 
-      {/* Auth required modal */}
       {showAuthModal ? (
-        <Modal title="Р’РѕР№РґРёС‚Рµ, С‡С‚РѕР±С‹ Р·Р°РїРёСЃР°С‚СЊСЃСЏ" onClose={() => setShowAuthModal(false)}>
+        <Modal title="Войдите, чтобы записаться" onClose={() => setShowAuthModal(false)}>
           <div className="text-sm text-neutral-700">
-            РњС‹ РїСЂРёРЅРёРјР°РµРј Р·Р°РїРёСЃРё С‚РѕР»СЊРєРѕ РѕС‚ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹С… РєР»РёРµРЅС‚РѕРІ вЂ” С‚Р°Рє РјР°СЃС‚РµСЂР°Рј СЃРїРѕРєРѕР№РЅРµРµ Рё РјРµРЅСЊС€Рµ С„РµР№РєРѕРІС‹С… Р·Р°СЏРІРѕРє.
+            Мы принимаем записи только от авторизованных клиентов — так мастерам спокойнее и меньше
+            фейковых заявок.
           </div>
 
           <div className="mt-5 flex gap-3">
@@ -293,13 +429,13 @@ export default function BookingWidget({
               href={buildLoginUrl(nextPath)}
               className="flex-1 text-center rounded-xl bg-black text-white py-2 font-medium"
             >
-              Р’РѕР№С‚Рё
+              Войти
             </a>
             <button
               onClick={() => setShowAuthModal(false)}
               className="flex-1 rounded-xl border py-2 font-medium"
             >
-              РќРµ СЃРµР№С‡Р°СЃ
+              Не сейчас
             </button>
           </div>
         </Modal>
@@ -329,7 +465,7 @@ function Modal({
               className="rounded-lg px-2 py-1 text-neutral-600 hover:bg-neutral-100"
               aria-label="Close"
             >
-              вњ•
+              ?
             </button>
           </div>
           <div className="mt-3">{children}</div>

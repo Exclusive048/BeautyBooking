@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
+import { AccountType } from "@prisma/client";
 
 export default async function CabinetEntryPage(props: {
   searchParams?: Promise<{ tab?: string }> | { tab?: string };
@@ -17,9 +18,22 @@ export default async function CabinetEntryPage(props: {
   const tabQs = `?tab=${tab}`;
 
   const jar = await cookies();
-  const last = jar.get("bh_last_role")?.value as "client" | "provider" | undefined;
+  const cookieLast = jar.get("bh_last_role")?.value as "client" | "provider" | undefined;
+  let last = cookieLast;
 
-  if (!last) redirect("/roles");
+  if (!last) {
+    const roles = user.roles ?? [];
+    const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
+    const hasMaster = roles.includes(AccountType.MASTER);
+    last = hasStudio || hasMaster ? "provider" : "client";
+
+    jar.set("bh_last_role", last, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
 
   if (last === "client") {
     redirect(`/cabinet/client${tabQs}`);
@@ -33,9 +47,29 @@ export default async function CabinetEntryPage(props: {
     redirect(`/cabinet/client${tabQs}`);
   }
 
-  const provider = providerResponse.data.provider;
+  let provider = providerResponse.data.provider;
 
-  if (!provider) redirect("/onboarding");
+  if (!provider) {
+    const createResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
+      "/api/providers/me",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }
+    );
+
+    if (createResponse.ok) {
+      const reloadResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
+        "/api/providers/me"
+      );
+      if (reloadResponse.ok) provider = reloadResponse.data.provider ?? createResponse.data.provider;
+    }
+  }
+
+  if (!provider) {
+    redirect(`/cabinet/client${tabQs}`);
+  }
 
   if (provider.type === "STUDIO") redirect(`/cabinet/studio${tabQs}`);
   redirect(`/cabinet/master${tabQs}`);

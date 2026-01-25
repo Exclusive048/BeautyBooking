@@ -25,6 +25,12 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum BookingCancelledBy {
+  CLIENT
+  PROVIDER
+  SYSTEM
+}
+
 model UserProfile {
   id          String        @id @default(cuid())
   roles       AccountType[] @default([CLIENT])
@@ -91,6 +97,11 @@ model Provider {
   district       String
   categories     String[]      @default([])
   availableToday Boolean       @default(false)
+  timezone       String        @default("Asia/Almaty")
+
+  studioId       String?
+  studio         Provider?     @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)
+  masters        Provider[]    @relation("StudioMasters")
 
   // NEW (optional business contact + publish + geo)
   contactName    String?
@@ -106,12 +117,18 @@ model Provider {
   owner          UserProfile?  @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   services       Service[]
+  masterServices MasterService[] @relation("MasterServices")
   bookings       Booking[]
+  masterBookings Booking[]     @relation("BookingMaster")
+  weeklySchedule WeeklySchedule[]
+  scheduleOverrides ScheduleOverride[]
+  scheduleBlocks ScheduleBlock[]
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@index([ownerUserId])
+  @@index([studioId])
 }
 
 model Service {
@@ -124,11 +141,31 @@ model Service {
   price       Int
 
   bookings    Booking[]
+  masterServices MasterService[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([providerId])
+}
+
+model MasterService {
+  id                 String   @id @default(cuid())
+  masterProviderId   String
+  masterProvider     Provider @relation("MasterServices", fields: [masterProviderId], references: [id], onDelete: Cascade)
+  serviceId          String
+  service            Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  priceOverride      Int?
+  durationOverrideMin Int?
+  isEnabled          Boolean  @default(true)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([masterProviderId, serviceId])
+  @@index([masterProviderId])
+  @@index([serviceId])
 }
 
 model Booking {
@@ -139,8 +176,14 @@ model Booking {
   serviceId    String
   service      Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
 
+  masterProviderId String?
+  masterProvider   Provider?   @relation("BookingMaster", fields: [masterProviderId], references: [id], onDelete: SetNull)
+
   clientUserId String?
   clientUser   UserProfile?  @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  startAtUtc   DateTime?
+  endAtUtc     DateTime?
 
   slotLabel    String
   clientName   String
@@ -148,11 +191,65 @@ model Booking {
   comment      String?
 
   status       BookingStatus @default(PENDING)
+  cancelledBy  BookingCancelledBy?
+  cancelReason String?
 
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   @@index([providerId])
+  @@index([masterProviderId])
+  @@index([startAtUtc])
   @@index([serviceId])
   @@index([clientUserId])
+}
+
+model WeeklySchedule {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  dayOfWeek  Int
+  startLocal String
+  endLocal   String
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, dayOfWeek])
+}
+
+model ScheduleOverride {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  date       DateTime
+  isDayOff   Boolean  @default(false)
+  startLocal String?
+  endLocal   String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, date])
+}
+
+model ScheduleBlock {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  date       DateTime
+  startLocal String
+  endLocal   String
+  reason     String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, date])
 }

@@ -3,6 +3,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { bookingsQuerySchema, createBookingSchema } from "@/lib/bookings/schemas";
 import { requireAuth, requireRole } from "@/lib/auth/guards";
 import { createClientBooking, getProviderBookingsForOwner } from "@/lib/bookings/service";
+import { createBooking } from "@/lib/bookings/usecases";
 import { AccountType } from "@prisma/client";
 
 export async function GET(req: Request) {
@@ -26,12 +27,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // ✅ Строго: только авторизованные клиенты
+  // ? ������: ������ �������������� �������
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { user } = auth;
 
-  // ✅ Строго: у юзера должна быть роль CLIENT (она у тебя всегда добавляется при логине, но оставим проверку)
+  // ? ������: � ����� ������ ���� ���� CLIENT
   const roleError = requireRole(user, AccountType.CLIENT);
   if (roleError) return roleError;
 
@@ -40,10 +41,46 @@ export async function POST(req: Request) {
   if (!parsedBody.success) {
     return fail(formatZodError(parsedBody.error), 400, "VALIDATION_ERROR");
   }
-  const { providerId, serviceId, slotLabel, clientName, clientPhone, comment } =
-    parsedBody.data;
 
-  // Проверяем, что service принадлежит provider
+  const {
+    providerId,
+    serviceId,
+    masterProviderId,
+    startAtUtc: startAtUtcRaw,
+    endAtUtc: endAtUtcRaw,
+    slotLabel,
+    clientName,
+    clientPhone,
+    comment,
+  } = parsedBody.data;
+
+  const startAtUtc = startAtUtcRaw ? new Date(startAtUtcRaw) : null;
+  const endAtUtc = endAtUtcRaw ? new Date(endAtUtcRaw) : null;
+  if (startAtUtc && Number.isNaN(startAtUtc.getTime())) {
+    return fail("Invalid startAtUtc", 400, "DATE_INVALID");
+  }
+  if (endAtUtc && Number.isNaN(endAtUtc.getTime())) {
+    return fail("Invalid endAtUtc", 400, "DATE_INVALID");
+  }
+
+  if (startAtUtc) {
+    const created = await createBooking({
+      providerId,
+      serviceId,
+      masterProviderId: masterProviderId ?? null,
+      startAtUtc,
+      endAtUtc: endAtUtc ?? null,
+      slotLabel,
+      clientName,
+      clientPhone,
+      comment,
+      clientUserId: user.id,
+    });
+
+    if (!created.ok) return fail(created.message, created.status, created.code);
+    return ok({ booking: created.data }, { status: 201 });
+  }
+
   const result = await createClientBooking(user.id, {
     providerId,
     serviceId,
