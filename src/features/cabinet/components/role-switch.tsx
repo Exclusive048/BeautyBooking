@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setLastRole } from "@/app/(cabinet)/cabinet/actions";
+import { setLastRole } from "@/features/cabinet/lib/actions";
 
 export function RoleSwitch({
   value,

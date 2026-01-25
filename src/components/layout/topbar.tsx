@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth/session";
-import { LogoutButton } from "@/components/auth/logout-button";
+import { LogoutButton } from "@/features/auth/components/logout-button";
 
 export async function Topbar() {
   const user = await getSessionUser();

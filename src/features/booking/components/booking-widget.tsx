@@ -2,27 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
-
-type Service = {
-  id: string;
-  name: string;
-  durationMin: number;
-  price: number;
-};
-
-type MeUser = {
-  id: string;
-  roles: string[];
-  displayName: string | null;
-  phone: string | null;
-  email: string | null;
-};
-
-type Props = {
-  providerId: string;
-  services: Service[];
-  defaultServiceId?: string;
-};
+import type { BookingMeUser, BookingWidgetProps } from "../model/types";
 
 function formatMoney(n: number) {
   try {
@@ -38,7 +18,11 @@ function buildLoginUrl(nextPath: string) {
   return `/login?${p.toString()}`;
 }
 
-export default function BookingWidget({ providerId, services, defaultServiceId }: Props) {
+export default function BookingWidget({
+  providerId,
+  services,
+  defaultServiceId,
+}: BookingWidgetProps) {
   const initialServiceId = useMemo(() => {
     if (defaultServiceId && services.some((s) => s.id === defaultServiceId)) return defaultServiceId;
     return services[0]?.id ?? "";
@@ -50,7 +34,7 @@ export default function BookingWidget({ providerId, services, defaultServiceId }
   const [clientPhone, setClientPhone] = useState("");
   const [comment, setComment] = useState("");
 
-  const [me, setMe] = useState<MeUser | null>(null);
+  const [me, setMe] = useState<BookingMeUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
 
   const [loading, setLoading] = useState(false);
@@ -74,7 +58,7 @@ export default function BookingWidget({ providerId, services, defaultServiceId }
       try {
         const res = await fetch("/api/me", { method: "GET" });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ user: MeUser | null }>
+          | ApiResponse<{ user: BookingMeUser | null }>
           | null;
 
         if (cancelled) return;

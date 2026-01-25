@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { minutesToHuman, moneyRUB } from "@/lib/format";
-import { ProviderService } from "../types";
+import { ProviderService } from "../model/types";
 
 export function ServicesList({
   services,

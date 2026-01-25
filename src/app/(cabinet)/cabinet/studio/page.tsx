@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import { BookingStatus } from "@prisma/client";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { serverApiFetch } from "@/lib/api/server-fetch";
-import { CabinetShell, CabinetTabs } from "@/components/cabinet/cabinet-shell";
-import { RoleSwitch } from "@/components/cabinet/role-switch";
-import { ProfileForm } from "@/components/cabinet/profile-form";
+import { CabinetShell, CabinetTabs } from "@/features/cabinet/components/cabinet-shell";
+import { RoleSwitch } from "@/features/cabinet/components/role-switch";
+import { ProfileForm } from "@/features/cabinet/components/profile-form";
 
 type MeDto = {
   id: string;

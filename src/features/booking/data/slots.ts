@@ -1,7 +1,4 @@
-export type Slot = {
-  id: string;
-  label: string;
-};
+import type { Slot } from "../model/types";
 
 export function makeMockSlots(): Slot[] {
   // MVP: фиксированные слоты, чтобы показать механику

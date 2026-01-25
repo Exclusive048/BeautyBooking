@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
 
-import type { ProviderCardModel } from "@/features/catalog/types";
+import type { ProviderCardModel } from "@/features/catalog/model/types";
 import { CatalogFilters, CatalogFiltersState } from "@/features/catalog/components/filters";
 
 type Tab = "all" | "masters" | "studios";

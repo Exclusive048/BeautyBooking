@@ -1,4 +1,4 @@
-import type { ProviderCardModel } from "../types";
+import type { ProviderCardModel } from "../model/types";
 
 export const providersMock: ProviderCardModel[] = [
   {

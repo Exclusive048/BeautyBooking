@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import type { SlotGroup } from "../model/types";
 
 export function SlotPicker({
   groups,
@@ -6,7 +7,7 @@ export function SlotPicker({
   onChange,
   disabled,
 }: {
-  groups: Array<{ date: string; items: string[] }>;
+  groups: SlotGroup[];
   value?: string;
   onChange?: (v: string) => void;
   disabled?: boolean;

@@ -4,29 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { moneyRUB, minutesToHuman } from "@/lib/format";
-
-type BookingItem = {
-  id: string;
-  slotLabel: string;
-  clientName: string;
-  clientPhone: string;
-  comment: string | null;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
-  createdAt: string;
-
-  service: {
-    id: string;
-    name: string;
-    durationMin: number;
-    price: number;
-  };
-
-  provider: {
-    id: string;
-    name: string;
-    type: "MASTER" | "STUDIO";
-  };
-};
+import type { BookingItem } from "../model/types";
 
 function statusLabel(s: BookingItem["status"]) {
   if (s === "PENDING") return "Ожидает";

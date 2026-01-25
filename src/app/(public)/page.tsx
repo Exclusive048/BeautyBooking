@@ -8,7 +8,7 @@ import { ProviderCard } from "@/features/catalog/components/provider-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { CatalogFiltersState } from "@/features/catalog/components/filters";
-import type { ProviderCardModel } from "@/features/catalog/types";
+import type { ProviderCardModel } from "@/features/catalog/model/types";
 
 const initialFilters: CatalogFiltersState = {
   query: "",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { ProviderCardModel } from "../types";
+import type { ProviderCardModel } from "../model/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

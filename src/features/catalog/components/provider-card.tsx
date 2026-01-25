@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ProviderCardModel } from "../types";
+import type { ProviderCardModel } from "../model/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { moneyRUB } from "@/lib/format";

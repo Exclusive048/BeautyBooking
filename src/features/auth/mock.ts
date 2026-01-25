@@ -1,4 +1,4 @@
-import type { AccountType } from "./types";
+import type { AccountType } from "./model/types";
 
 export type CurrentAccount = {
   id: string;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { useCurrentAccount } from "../use-current-account";
-import type { AccountType } from "../types";
+import type { AccountType } from "../model/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 

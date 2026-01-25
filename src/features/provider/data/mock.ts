@@ -1,4 +1,4 @@
-import { ProviderProfileFull } from "../types";
+import { ProviderProfileFull } from "../model/types";
 
 export const providerFullMock: Record<string, ProviderProfileFull> = {
   p1: {

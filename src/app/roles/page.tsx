@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
-import { setLastRole } from "@/app/(cabinet)/cabinet/actions";
+import { setLastRole } from "@/features/cabinet/lib/actions";
 
 export default async function RolesPage() {
   const user = await getSessionUser();
