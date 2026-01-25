@@ -18,25 +18,19 @@ export default async function CabinetEntryPage(props: {
   const tabQs = `?tab=${tab}`;
 
   const jar = await cookies();
-  const cookieLast = jar.get("bh_last_role")?.value as "client" | "provider" | undefined;
-  let last = cookieLast;
+  const last = jar.get("bh_last_role")?.value as "client" | "provider" | undefined;
 
-  if (!last) {
-    const roles = user.roles ?? [];
-    const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
-    const hasMaster = roles.includes(AccountType.MASTER);
-    last = hasStudio || hasMaster ? "provider" : "client";
-
-    jar.set("bh_last_role", last, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
-  }
+  if (!last) redirect(`/cabinet/ensure-role?next=/cabinet${tabQs}`);
 
   if (last === "client") {
     redirect(`/cabinet/client${tabQs}`);
+  }
+
+  const roles = user.roles ?? [];
+  const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
+  const hasMaster = roles.includes(AccountType.MASTER);
+  if (!hasStudio && !hasMaster) {
+    redirect("/onboarding");
   }
 
   const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(

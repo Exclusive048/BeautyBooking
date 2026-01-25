@@ -40,15 +40,15 @@ export default async function ClientCabinetPage(props: {
 
     return (
       <CabinetShell
-        title="Êàáèíåò êëèåíòà"
-        subtitle="Ëè÷íûå äàííûå è íàñòðîéêè."
+        title="ÐšÐ°Ð±Ð¸Ð½ÐµÑ‚ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð°"
+        subtitle="Ð›Ð¸Ñ‡Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸ Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸."
         right={<RoleSwitch value="client" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="profile"
           items={[
-            { id: "bookings", label: "Çàïèñè", href: "/cabinet/client?tab=bookings" },
-            { id: "profile", label: "Ïðîôèëü", href: "/cabinet/client?tab=profile" },
+            { id: "bookings", label: "Ð—Ð°Ð¿Ð¸ÑÐ¸", href: "/cabinet/client?tab=bookings" },
+            { id: "profile", label: "ÐŸÑ€Ð¾Ñ„Ð¸Ð»ÑŒ", href: "/cabinet/client?tab=profile" },
           ]}
         />
 
@@ -59,19 +59,19 @@ export default async function ClientCabinetPage(props: {
 
   return (
     <CabinetShell
-      title="Êàáèíåò êëèåíòà"
-      subtitle="Âàøè çàïèñè ê ìàñòåðàì è â ñòóäèè."
+      title="ÐšÐ°Ð±Ð¸Ð½ÐµÑ‚ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð°"
+      subtitle="Ð’Ð°ÑˆÐ¸ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ðº Ð¼Ð°ÑÑ‚ÐµÑ€Ð°Ð¼ Ð¸ Ð² ÑÑ‚ÑƒÐ´Ð¸Ð¸."
       right={<RoleSwitch value="client" clientHref="/cabinet/client" providerHref="/cabinet" />}
     >
       <CabinetNavTabs
         activeId="bookings"
         items={[
-          { id: "bookings", label: "Çàïèñè", href: "/cabinet/client?tab=bookings" },
-          { id: "profile", label: "Ïðîôèëü", href: "/cabinet/client?tab=profile" },
+          { id: "bookings", label: "Ð—Ð°Ð¿Ð¸ÑÐ¸", href: "/cabinet/client?tab=bookings" },
+          { id: "profile", label: "ÐŸÑ€Ð¾Ñ„Ð¸Ð»ÑŒ", href: "/cabinet/client?tab=profile" },
         ]}
       />
 
       <ClientBookingsPanel />
     </CabinetShell>
   );
-}
+}

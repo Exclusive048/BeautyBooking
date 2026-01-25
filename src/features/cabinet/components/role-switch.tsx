@@ -1,8 +1,6 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { setLastRole } from "@/features/cabinet/lib/actions";
 
 export function RoleSwitch({
   value,
@@ -13,7 +11,6 @@ export function RoleSwitch({
   clientHref: string;
   providerHref: string;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const base = "rounded-xl px-3 py-2 text-sm font-medium";
@@ -22,8 +19,9 @@ export function RoleSwitch({
 
   const go = (next: "client" | "provider") => {
     startTransition(async () => {
-      await setLastRole(next);
-      router.push(next === "client" ? clientHref : providerHref);
+      const target = next === "client" ? clientHref : providerHref;
+      const url = `/cabinet/set-role?role=${next}&next=${encodeURIComponent(target)}`;
+      window.location.assign(url);
     });
   };
 
