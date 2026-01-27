@@ -1,0 +1,1 @@
+ALTER TABLE "Provider" ADD COLUMN "bufferBetweenBookingsMin" INTEGER NOT NULL DEFAULT 0;

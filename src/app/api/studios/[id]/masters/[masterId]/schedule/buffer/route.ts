@@ -3,22 +3,11 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
-import { setWeeklySchedule } from "@/lib/schedule/usecases";
-import type { DayOfWeek } from "@/lib/domain/schedule";
+import { getProviderBuffer, setProviderBuffer } from "@/lib/schedule/usecases";
 
-const breakSchema = z.object({
-  startLocal: z.string().min(1),
-  endLocal: z.string().min(1),
+const bufferSchema = z.object({
+  bufferBetweenBookingsMin: z.number().int().min(0).max(30),
 });
-
-const weeklySchema = z.array(
-  z.object({
-    dayOfWeek: z.number().int().min(0).max(6),
-    startLocal: z.string().min(1),
-    endLocal: z.string().min(1),
-    breaks: z.array(breakSchema).max(3).optional(),
-  })
-);
 
 async function ensureStudioOwner(studioId: string, userId: string) {
   const studio = await prisma.provider.findUnique({
@@ -60,35 +49,10 @@ export async function GET(
   const masterError = await ensureMasterInStudio(p.masterId, p.id);
   if (masterError) return masterError;
 
-  const items = await prisma.weeklySchedule.findMany({
-    where: { providerId: p.masterId },
-    select: { dayOfWeek: true, startLocal: true, endLocal: true },
-    orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
-  });
+  const result = await getProviderBuffer(p.masterId);
+  if (!result.ok) return fail(result.message, result.status, result.code);
 
-  const breaks = await prisma.scheduleBreak.findMany({
-    where: { providerId: p.masterId, kind: "WEEKLY" },
-    select: { dayOfWeek: true, startLocal: true, endLocal: true },
-    orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
-  });
-
-  const breaksByDay = new Map<number, typeof breaks>();
-  for (const b of breaks) {
-    const key = b.dayOfWeek ?? 0;
-    const list = breaksByDay.get(key) ?? [];
-    list.push(b);
-    breaksByDay.set(key, list);
-  }
-
-  const itemsWithBreaks = items.map((item) => ({
-    ...item,
-    breaks: breaksByDay.get(item.dayOfWeek)?.map((b) => ({
-      startLocal: b.startLocal,
-      endLocal: b.endLocal,
-    })),
-  }));
-
-  return ok({ items: itemsWithBreaks });
+  return ok({ bufferBetweenBookingsMin: result.data.bufferBetweenBookingsMin });
 }
 
 export async function PUT(
@@ -107,16 +71,11 @@ export async function PUT(
   if (masterError) return masterError;
 
   const body = await req.json().catch(() => null);
-  const parsed = weeklySchema.safeParse(body);
+  const parsed = bufferSchema.safeParse(body);
   if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
 
-  const items = parsed.data.map((item) => ({
-    ...item,
-    dayOfWeek: item.dayOfWeek as DayOfWeek,
-  }));
-
-  const result = await setWeeklySchedule(p.masterId, items);
+  const result = await setProviderBuffer(p.masterId, parsed.data.bufferBetweenBookingsMin);
   if (!result.ok) return fail(result.message, result.status, result.code);
 
-  return ok({ count: result.data.count });
+  return ok({ bufferBetweenBookingsMin: result.data.bufferBetweenBookingsMin });
 }

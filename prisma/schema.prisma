@@ -31,6 +31,11 @@ enum BookingCancelledBy {
   SYSTEM
 }
 
+enum ScheduleBreakKind {
+  WEEKLY
+  OVERRIDE
+}
+
 model UserProfile {
   id          String        @id @default(cuid())
   roles       AccountType[] @default([CLIENT])
@@ -98,6 +103,7 @@ model Provider {
   categories     String[]      @default([])
   availableToday Boolean       @default(false)
   timezone       String        @default("Asia/Almaty")
+  bufferBetweenBookingsMin Int @default(0)
 
   studioId       String?
   studio         Provider?     @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)
@@ -123,6 +129,7 @@ model Provider {
   weeklySchedule WeeklySchedule[]
   scheduleOverrides ScheduleOverride[]
   scheduleBlocks ScheduleBlock[]
+  scheduleBreaks ScheduleBreak[]
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -229,6 +236,7 @@ model ScheduleOverride {
   isDayOff   Boolean  @default(false)
   startLocal String?
   endLocal   String?
+  reason     String?
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -251,5 +259,25 @@ model ScheduleBlock {
   updatedAt  DateTime @updatedAt
 
   @@index([providerId])
+  @@index([providerId, date])
+}
+
+model ScheduleBreak {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  kind       ScheduleBreakKind
+  dayOfWeek  Int?
+  date       DateTime?
+  startLocal String
+  endLocal   String
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, kind])
+  @@index([providerId, kind, dayOfWeek])
   @@index([providerId, date])
 }

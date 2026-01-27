@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import type { BookingService } from "@/features/booking/model/types";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
+import { timeToMinutes } from "@/lib/schedule/time";
 
 type BookingUser = {
   id: string;
@@ -68,6 +69,7 @@ export default function BookingWidget({
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -177,18 +179,83 @@ export default function BookingWidget({
   }, [providerId, providerType, masterId, serviceId]);
 
   const slotGroups = useMemo(() => {
-    const map = new Map<string, string[]>();
+    const byDate = new Map<string, { label: string; minutes: number }[]>();
     for (const slot of slots) {
       const [date, time] = slot.label.split(" ");
       if (!date || !time) continue;
-      const list = map.get(date) ?? [];
-      list.push(time);
-      map.set(date, list);
+      const minutes = timeToMinutes(time);
+      if (minutes === null) continue;
+      const list = byDate.get(date) ?? [];
+      list.push({ label: slot.label, minutes });
+      byDate.set(date, list);
     }
-    return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
-  }, [slots]);
+
+    for (const list of byDate.values()) {
+      list.sort((a, b) => a.minutes - b.minutes);
+    }
+
+    if (!byDate.size) return [];
+
+    const dates = Array.from(byDate.keys()).sort();
+    const activeDate = selectedDate && byDate.has(selectedDate) ? selectedDate : dates[0];
+    const items = byDate.get(activeDate) ?? [];
+    const earliest = items[0]?.minutes ?? null;
+
+    const groups = [
+      { id: "morning", label: "Утро", items: [] as string[] },
+      { id: "day", label: "День", items: [] as string[] },
+      { id: "evening", label: "Вечер", items: [] as string[] },
+    ];
+
+    for (const item of items) {
+      const group = item.minutes < 13 * 60 ? groups[0] : item.minutes < 18 * 60 ? groups[1] : groups[2];
+      group.items.push(item.label);
+    }
+
+    const targetGroup =
+      earliest === null ? null : earliest < 13 * 60 ? "morning" : earliest < 18 * 60 ? "day" : "evening";
+
+    return groups
+      .filter((g) => g.items.length > 0)
+      .map((g) => ({
+        id: `${activeDate}-${g.id}`,
+        label: g.label,
+        items: g.items,
+        defaultOpen: targetGroup ? g.id === targetGroup : undefined,
+      }));
+  }, [slots, selectedDate]);
 
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
+
+  const availableDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (const slot of slots) {
+      const [date] = slot.label.split(" ");
+      if (date) dates.add(date);
+    }
+    return Array.from(dates).sort();
+  }, [slots]);
+
+  useEffect(() => {
+    if (!availableDates.length) {
+      setSelectedDate("");
+      return;
+    }
+    if (selectedDate && availableDates.includes(selectedDate)) return;
+    const preferred = slotLabel ? slotLabel.split(" ")[0] : "";
+    if (preferred && availableDates.includes(preferred)) {
+      setSelectedDate(preferred);
+      return;
+    }
+    setSelectedDate(availableDates[0] ?? "");
+  }, [availableDates, selectedDate, slotLabel]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    if (slotLabel.startsWith(`${selectedDate} `)) return;
+    const next = slots.find((s) => s.label.startsWith(`${selectedDate} `))?.label ?? "";
+    if (next) setSlotLabel(next);
+  }, [selectedDate, slotLabel, slots]);
 
   async function submit() {
     setErrorText(null);
@@ -367,7 +434,28 @@ export default function BookingWidget({
           ) : slotGroups.length === 0 ? (
             <div className="mt-2 text-sm text-neutral-600">Свободных слотов нет.</div>
           ) : (
-            <div className="mt-2">
+            <div className="mt-2 space-y-3">
+              {availableDates.length > 0 ? (
+                <div className="flex gap-2 overflow-x-auto">
+                  {availableDates.map((date) => {
+                    const active = date === selectedDate;
+                    return (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() => setSelectedDate(date)}
+                        className={`rounded-full border px-3 py-1 text-xs ${
+                          active
+                            ? "border-neutral-900 bg-neutral-900 text-white"
+                            : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                        }`}
+                      >
+                        {date}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
               <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
             </div>
           )}

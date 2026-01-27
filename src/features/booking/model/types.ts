@@ -38,8 +38,10 @@ export type BookingItem = {
 };
 
 export type SlotGroup = {
-  date: string;
+  id: string;
+  label: string;
   items: string[];
+  defaultOpen?: boolean;
 };
 
 export type Slot = {

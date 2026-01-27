@@ -1,19 +1,19 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
-import { ScheduleOverridesPanel } from "@/features/cabinet/components/schedule-overrides-panel";
-import { ScheduleBlocksPanel } from "@/features/cabinet/components/schedule-blocks-panel";
-
-type MasterItem = {
-  id: string;
-  name: string;
-};
+import { ScheduleExceptionsPanel } from "@/features/cabinet/components/schedule-exceptions-panel";
 
 type WeeklyItem = {
   dayOfWeek: number;
   startLocal: string;
   endLocal: string;
+  breaks?: { startLocal: string; endLocal: string }[];
+};
+
+type MasterItem = {
+  id: string;
+  name: string;
 };
 
 type Props = {
@@ -33,6 +33,10 @@ export function StudioSchedulePanel({ studioId }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bufferMin, setBufferMin] = useState(0);
+  const [bufferLoading, setBufferLoading] = useState(true);
+  const [bufferSaving, setBufferSaving] = useState(false);
+  const [bufferError, setBufferError] = useState<string | null>(null);
 
   const mastersEndpoint = useMemo(() => `/api/studios/${studioId}/masters`, [studioId]);
   const weeklyEndpoint = useMemo(() => {
@@ -46,6 +50,10 @@ export function StudioSchedulePanel({ studioId }: Props) {
   const blocksEndpoint = useMemo(() => {
     if (!selectedMasterId) return "";
     return `/api/studios/${studioId}/masters/${selectedMasterId}/schedule/blocks`;
+  }, [studioId, selectedMasterId]);
+  const bufferEndpoint = useMemo(() => {
+    if (!selectedMasterId) return "";
+    return `/api/studios/${studioId}/masters/${selectedMasterId}/schedule/buffer`;
   }, [studioId, selectedMasterId]);
 
   const loadMasters = useCallback(async () => {
@@ -92,6 +100,36 @@ export function StudioSchedulePanel({ studioId }: Props) {
     void loadSchedule();
   }, [loadSchedule]);
 
+  const loadBuffer = useCallback(async () => {
+    if (!bufferEndpoint) return;
+    setBufferLoading(true);
+    setBufferError(null);
+    try {
+      const res = await fetch(bufferEndpoint, { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ bufferBetweenBookingsMin: number }>
+        | null;
+      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to load buffer"));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load buffer"));
+      setBufferMin(json.data.bufferBetweenBookingsMin ?? 0);
+    } catch (e) {
+      setBufferError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setBufferLoading(false);
+    }
+  }, [bufferEndpoint]);
+
+  useEffect(() => {
+    void loadBuffer();
+  }, [loadBuffer]);
+
+  useEffect(() => {
+    if (!selectedMasterId) {
+      setBufferMin(0);
+      setBufferError(null);
+    }
+  }, [selectedMasterId]);
+
   const rows = useMemo(() => {
     const byDay = new Map(items.map((i) => [i.dayOfWeek, i]));
     return dayLabels.map((label, dayOfWeek) => {
@@ -113,7 +151,12 @@ export function StudioSchedulePanel({ studioId }: Props) {
     try {
       const payload = draft
         .filter((r) => r.enabled)
-        .map((r) => ({ dayOfWeek: r.dayOfWeek, startLocal: r.startLocal, endLocal: r.endLocal }));
+        .map((r) => ({
+          dayOfWeek: r.dayOfWeek,
+          startLocal: r.startLocal,
+          endLocal: r.endLocal,
+          breaks: r.breaks ?? [],
+        }));
 
       const res = await fetch(weeklyEndpoint, {
         method: "PUT",
@@ -131,8 +174,31 @@ export function StudioSchedulePanel({ studioId }: Props) {
     }
   };
 
+  const saveBuffer = async () => {
+    if (!bufferEndpoint) return;
+    setBufferSaving(true);
+    setBufferError(null);
+    try {
+      const res = await fetch(bufferEndpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bufferBetweenBookingsMin: bufferMin }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ bufferBetweenBookingsMin: number }>
+        | null;
+      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to save buffer"));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to save buffer"));
+      setBufferMin(json.data.bufferBetweenBookingsMin ?? 0);
+    } catch (e) {
+      setBufferError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setBufferSaving(false);
+    }
+  };
+
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка…</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка...</div>;
   }
 
   return (
@@ -155,6 +221,34 @@ export function StudioSchedulePanel({ studioId }: Props) {
       {error ? (
         <div className="rounded-2xl border p-4 text-sm text-red-600">Ошибка: {error}</div>
       ) : null}
+
+      <div className="rounded-2xl border p-4 space-y-3">
+        <div className="text-sm font-semibold">Буфер между записями</div>
+        {bufferError ? (
+          <div className="rounded-xl border p-3 text-sm text-red-600">Ошибка: {bufferError}</div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="number"
+            min={0}
+            max={30}
+            step={5}
+            className="rounded-lg border px-2 py-1 text-sm w-24"
+            value={bufferMin}
+            onChange={(e) => setBufferMin(Number(e.target.value))}
+            disabled={bufferLoading || !selectedMasterId}
+          />
+          <span className="text-sm text-neutral-500">минут</span>
+          <button
+            type="button"
+            onClick={saveBuffer}
+            disabled={bufferSaving || bufferLoading || !selectedMasterId}
+            className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {bufferSaving ? "Сохраняем..." : "Сохранить буфер"}
+          </button>
+        </div>
+      </div>
 
       <div className="rounded-2xl border divide-y">
         {draft.map((row, idx) => (
@@ -213,10 +307,7 @@ export function StudioSchedulePanel({ studioId }: Props) {
       </button>
 
       {overridesEndpoint && blocksEndpoint ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ScheduleOverridesPanel endpoint={overridesEndpoint} />
-          <ScheduleBlocksPanel endpoint={blocksEndpoint} />
-        </div>
+        <ScheduleExceptionsPanel overridesEndpoint={overridesEndpoint} blocksEndpoint={blocksEndpoint} />
       ) : null}
     </div>
   );

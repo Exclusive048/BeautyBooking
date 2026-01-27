@@ -8,6 +8,17 @@ type BookingRecord = {
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
 };
 
+function normalizeBufferMinutes(value: number | null | undefined): number {
+  if (!Number.isFinite(value)) return 0;
+  const safe = Math.floor(value as number);
+  if (safe <= 0) return 0;
+  return Math.min(30, safe);
+}
+
+function shiftMinutes(date: Date, minutes: number): Date {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
 function isValidDate(value: Date | null | undefined): value is Date {
   return value instanceof Date && !Number.isNaN(value.getTime());
 }
@@ -17,9 +28,10 @@ function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
 }
 
 export async function createBooking(input: BookingCreateInput): Promise<Result<BookingRecord>> {
+  let masterBufferMin: number | null = null;
   const provider = await prisma.provider.findUnique({
     where: { id: input.providerId },
-    select: { id: true, type: true },
+    select: { id: true, type: true, bufferBetweenBookingsMin: true },
   });
   if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
 
@@ -36,7 +48,7 @@ export async function createBooking(input: BookingCreateInput): Promise<Result<B
 
     const master = await prisma.provider.findUnique({
       where: { id: input.masterProviderId },
-      select: { id: true, type: true, studioId: true },
+      select: { id: true, type: true, studioId: true, bufferBetweenBookingsMin: true },
     });
     if (!master || master.type !== ProviderType.MASTER || master.studioId !== provider.id) {
       return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
@@ -45,6 +57,7 @@ export async function createBooking(input: BookingCreateInput): Promise<Result<B
     if (service.providerId !== provider.id) {
       return { ok: false, status: 400, message: "Service not in studio", code: "SERVICE_INVALID" };
     }
+    masterBufferMin = normalizeBufferMinutes(master.bufferBetweenBookingsMin);
   } else if (service.providerId !== provider.id) {
     return { ok: false, status: 400, message: "Service not in provider", code: "SERVICE_INVALID" };
   }
@@ -77,26 +90,22 @@ export async function createBooking(input: BookingCreateInput): Promise<Result<B
     ? input.endAtUtc
     : new Date(startAtUtc.getTime() + durationMin * 60 * 1000);
 
-  const conflictWhere = input.masterProviderId
-    ? { providerId: input.providerId, masterProviderId: input.masterProviderId }
-    : { providerId: input.providerId };
+  if (provider.type === ProviderType.STUDIO && input.masterProviderId) {
+    const bufferMin = masterBufferMin ?? 0;
+    const result = await ensureNoConflicts(
+      input.providerId,
+      input.masterProviderId,
+      startAtUtc,
+      endAtUtc,
+      bufferMin
+    );
+    if (!result.ok) return result;
+  }
 
-  const conflicts = await prisma.booking.findMany({
-    where: {
-      ...conflictWhere,
-      status: { not: "CANCELLED" },
-      startAtUtc: { not: null, lt: endAtUtc },
-      endAtUtc: { not: null, gt: startAtUtc },
-    },
-    select: { id: true, startAtUtc: true, endAtUtc: true },
-    take: 1,
-  });
-
-  const conflict = conflicts.find((b) =>
-    b.startAtUtc && b.endAtUtc ? overlaps(startAtUtc, endAtUtc, b.startAtUtc, b.endAtUtc) : false
-  );
-  if (conflict) {
-    return { ok: false, status: 409, message: "Time slot is not available", code: "SLOT_CONFLICT" };
+  if (provider.type === ProviderType.MASTER) {
+    const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
+    const result = await ensureNoConflicts(input.providerId, null, startAtUtc, endAtUtc, bufferMin);
+    if (!result.ok) return result;
   }
 
   const created = await prisma.booking.create({
@@ -117,6 +126,45 @@ export async function createBooking(input: BookingCreateInput): Promise<Result<B
   });
 
   return { ok: true, data: created };
+}
+
+async function ensureNoConflicts(
+  providerId: string,
+  masterProviderId: string | null,
+  startAtUtc: Date,
+  endAtUtc: Date,
+  bufferMin: number
+): Promise<Result<null>> {
+  const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
+  const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
+
+  const conflictWhere = masterProviderId
+    ? { providerId, masterProviderId }
+    : { providerId };
+
+  const conflicts = await prisma.booking.findMany({
+    where: {
+      ...conflictWhere,
+      status: { not: "CANCELLED" },
+      startAtUtc: { not: null, lt: bufferedEnd },
+      endAtUtc: { not: null, gt: bufferedStart },
+    },
+    select: { id: true, startAtUtc: true, endAtUtc: true },
+    take: 1,
+  });
+
+  const conflict = conflicts.find((b) => {
+    if (!b.startAtUtc || !b.endAtUtc) return false;
+    const bufferedStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
+    const bufferedEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
+    return overlaps(startAtUtc, endAtUtc, bufferedStart, bufferedEnd);
+  });
+
+  if (conflict) {
+    return { ok: false, status: 409, message: "Time slot is not available", code: "SLOT_CONFLICT" };
+  }
+
+  return { ok: true, data: null };
 }
 
 export async function confirmBooking(bookingId: string): Promise<Result<BookingRecord>> {
@@ -145,27 +193,32 @@ export async function confirmBooking(bookingId: string): Promise<Result<BookingR
     return { ok: false, status: 409, message: "Booking time is missing", code: "BOOKING_TIME_REQUIRED" };
   }
 
+  const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
   const conflictWhere = booking.masterProviderId
     ? { providerId: booking.providerId, masterProviderId: booking.masterProviderId }
     : { providerId: booking.providerId };
+
+  const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
+  const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
 
   const conflicts = await prisma.booking.findMany({
     where: {
       ...conflictWhere,
       id: { not: booking.id },
       status: { not: "CANCELLED" },
-      startAtUtc: { not: null, lt: endAtUtc },
-      endAtUtc: { not: null, gt: startAtUtc },
+      startAtUtc: { not: null, lt: bufferedEnd },
+      endAtUtc: { not: null, gt: bufferedStart },
     },
     select: { id: true, startAtUtc: true, endAtUtc: true },
     take: 1,
   });
 
-  const conflict = conflicts.find((b) =>
-    b.startAtUtc && b.endAtUtc
-      ? overlaps(startAtUtc, endAtUtc, b.startAtUtc, b.endAtUtc)
-      : false
-  );
+  const conflict = conflicts.find((b) => {
+    if (!b.startAtUtc || !b.endAtUtc) return false;
+    const bufferedStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
+    const bufferedEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
+    return overlaps(startAtUtc, endAtUtc, bufferedStart, bufferedEnd);
+  });
   if (conflict) {
     return { ok: false, status: 409, message: "Time slot is not available", code: "SLOT_CONFLICT" };
   }
@@ -177,6 +230,25 @@ export async function confirmBooking(bookingId: string): Promise<Result<BookingR
   });
 
   return { ok: true, data: updated };
+}
+
+async function resolveBufferMinutes(
+  providerId: string,
+  masterProviderId: string | null
+): Promise<number> {
+  if (masterProviderId) {
+    const master = await prisma.provider.findUnique({
+      where: { id: masterProviderId },
+      select: { bufferBetweenBookingsMin: true },
+    });
+    return normalizeBufferMinutes(master?.bufferBetweenBookingsMin);
+  }
+
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { bufferBetweenBookingsMin: true },
+  });
+  return normalizeBufferMinutes(provider?.bufferBetweenBookingsMin);
 }
 
 export async function cancelBooking(input: BookingCancelInput): Promise<Result<BookingRecord>> {

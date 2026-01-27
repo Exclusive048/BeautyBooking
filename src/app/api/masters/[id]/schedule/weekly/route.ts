@@ -6,11 +6,17 @@ import { ProviderType } from "@prisma/client";
 import { setWeeklySchedule } from "@/lib/schedule/usecases";
 import type { DayOfWeek } from "@/lib/domain/schedule";
 
+const breakSchema = z.object({
+  startLocal: z.string().min(1),
+  endLocal: z.string().min(1),
+});
+
 const weeklySchema = z.array(
   z.object({
     dayOfWeek: z.number().int().min(0).max(6),
     startLocal: z.string().min(1),
     endLocal: z.string().min(1),
+    breaks: z.array(breakSchema).max(3).optional(),
   })
 );
 
@@ -70,5 +76,27 @@ export async function GET(
     orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
   });
 
-  return ok({ items });
+  const breaks = await prisma.scheduleBreak.findMany({
+    where: { providerId: p.id, kind: "WEEKLY" },
+    select: { dayOfWeek: true, startLocal: true, endLocal: true },
+    orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
+  });
+
+  const breaksByDay = new Map<number, typeof breaks>();
+  for (const b of breaks) {
+    const key = b.dayOfWeek ?? 0;
+    const list = breaksByDay.get(key) ?? [];
+    list.push(b);
+    breaksByDay.set(key, list);
+  }
+
+  const itemsWithBreaks = items.map((item) => ({
+    ...item,
+    breaks: breaksByDay.get(item.dayOfWeek)?.map((b) => ({
+      startLocal: b.startLocal,
+      endLocal: b.endLocal,
+    })),
+  }));
+
+  return ok({ items: itemsWithBreaks });
 }

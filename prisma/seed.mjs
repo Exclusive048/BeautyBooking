@@ -20,6 +20,7 @@ async function main() {
       district: "Центр",
       categories: ["Брови", "Ресницы"],
       availableToday: true,
+      bufferBetweenBookingsMin: 10,
       services: {
         create: [
           { id: "s1", name: "Коррекция бровей", durationMin: 45, price: 1700 },
@@ -53,6 +54,7 @@ async function main() {
       district: "Медеуский",
       categories: ["Маникюр", "Ресницы", "Визаж"],
       availableToday: false,
+      bufferBetweenBookingsMin: 0,
       services: {
         create: [
           {

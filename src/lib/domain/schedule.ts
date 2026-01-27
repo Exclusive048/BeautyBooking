@@ -4,6 +4,7 @@ export type WeeklyScheduleItem = {
   dayOfWeek: DayOfWeek;
   startLocal: string; // HH:mm
   endLocal: string; // HH:mm
+  breaks?: ScheduleBreakInterval[];
 };
 
 export type ScheduleOverride = {
@@ -11,6 +12,8 @@ export type ScheduleOverride = {
   isDayOff: boolean;
   startLocal?: string | null;
   endLocal?: string | null;
+  breaks?: ScheduleBreakInterval[];
+  reason?: string | null;
 };
 
 export type ScheduleBlock = {
@@ -24,4 +27,9 @@ export type AvailabilitySlot = {
   startAtUtc: Date;
   endAtUtc: Date;
   label: string;
+};
+
+export type ScheduleBreakInterval = {
+  startLocal: string; // HH:mm
+  endLocal: string; // HH:mm
 };
