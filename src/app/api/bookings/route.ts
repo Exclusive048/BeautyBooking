@@ -27,12 +27,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // ? Строго: только авторизованные клиенты
+  // ? РЎС‚СЂРѕРіРѕ: С‚РѕР»СЊРєРѕ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рµ РєР»РёРµРЅС‚С‹
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { user } = auth;
 
-  // ? Строго: у юзера должна быть роль CLIENT
+  // ? РЎС‚СЂРѕРіРѕ: Сѓ СЋР·РµСЂР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ СЂРѕР»СЊ CLIENT
   const roleError = requireRole(user, AccountType.CLIENT);
   if (roleError) return roleError;
 

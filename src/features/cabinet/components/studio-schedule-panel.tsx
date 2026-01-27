@@ -20,7 +20,7 @@ type Props = {
   studioId: string;
 };
 
-const dayLabels = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const dayLabels = ["Р’СЃ", "РџРЅ", "Р’С‚", "РЎСЂ", "Р§С‚", "РџС‚", "РЎР±"];
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
@@ -132,13 +132,13 @@ export function StudioSchedulePanel({ studioId }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка…</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Р—Р°РіСЂСѓР·РєР°вЂ¦</div>;
   }
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border p-4 flex flex-wrap items-center gap-3">
-        <div className="text-sm font-semibold">Мастер</div>
+        <div className="text-sm font-semibold">РњР°СЃС‚РµСЂ</div>
         <select
           className="rounded-xl border px-3 py-2 text-sm"
           value={selectedMasterId}
@@ -153,7 +153,7 @@ export function StudioSchedulePanel({ studioId }: Props) {
       </div>
 
       {error ? (
-        <div className="rounded-2xl border p-4 text-sm text-red-600">Ошибка: {error}</div>
+        <div className="rounded-2xl border p-4 text-sm text-red-600">РћС€РёР±РєР°: {error}</div>
       ) : null}
 
       <div className="rounded-2xl border divide-y">
@@ -186,7 +186,7 @@ export function StudioSchedulePanel({ studioId }: Props) {
               }
               disabled={!row.enabled}
             />
-            <span className="text-sm text-neutral-500">—</span>
+            <span className="text-sm text-neutral-500">вЂ”</span>
             <input
               className="rounded-lg border px-2 py-1 text-sm w-24"
               value={row.endLocal}
@@ -209,7 +209,7 @@ export function StudioSchedulePanel({ studioId }: Props) {
         disabled={saving}
         className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
       >
-        {saving ? "Сохраняем..." : "Сохранить расписание"}
+        {saving ? "РЎРѕС…СЂР°РЅСЏРµРј..." : "РЎРѕС…СЂР°РЅРёС‚СЊ СЂР°СЃРїРёСЃР°РЅРёРµ"}
       </button>
 
       {overridesEndpoint && blocksEndpoint ? (

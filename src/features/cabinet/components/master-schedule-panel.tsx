@@ -15,7 +15,7 @@ type Props = {
   masterId: string;
 };
 
-const dayLabels = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const dayLabels = ["Р’СЃ", "РџРЅ", "Р’С‚", "РЎСЂ", "Р§С‚", "РџС‚", "РЎР±"];
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
@@ -93,13 +93,13 @@ export function MasterSchedulePanel({ masterId }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка расписания…</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Р—Р°РіСЂСѓР·РєР° СЂР°СЃРїРёСЃР°РЅРёСЏвЂ¦</div>;
   }
 
   return (
     <div className="space-y-4">
       {error ? (
-        <div className="rounded-2xl border p-4 text-sm text-red-600">Ошибка: {error}</div>
+        <div className="rounded-2xl border p-4 text-sm text-red-600">РћС€РёР±РєР°: {error}</div>
       ) : null}
 
       <div className="rounded-2xl border divide-y">
@@ -132,7 +132,7 @@ export function MasterSchedulePanel({ masterId }: Props) {
               }
               disabled={!row.enabled}
             />
-            <span className="text-sm text-neutral-500">—</span>
+            <span className="text-sm text-neutral-500">вЂ”</span>
             <input
               className="rounded-lg border px-2 py-1 text-sm w-24"
               value={row.endLocal}
@@ -155,7 +155,7 @@ export function MasterSchedulePanel({ masterId }: Props) {
         disabled={saving}
         className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
       >
-        {saving ? "Сохраняем..." : "Сохранить расписание"}
+        {saving ? "РЎРѕС…СЂР°РЅСЏРµРј..." : "РЎРѕС…СЂР°РЅРёС‚СЊ СЂР°СЃРїРёСЃР°РЅРёРµ"}
       </button>
 
       <div className="grid gap-4 lg:grid-cols-2">

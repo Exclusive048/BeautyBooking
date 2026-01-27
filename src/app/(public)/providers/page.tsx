@@ -137,7 +137,7 @@ export default function ProvidersPage() {
     <div className="space-y-6">
       <Section
         title="Каталог"
-        subtitle="Данные идут из Supabase (через API)."
+        subtitle="Данные идут из БД"
         right={
           <Tabs
             value={tab}
@@ -165,15 +165,7 @@ export default function ProvidersPage() {
 
           <Card className="bg-white">
             <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-neutral-900">Подсказка MVP</div>
-              <p className="mt-2 text-sm text-neutral-600">
-                Дальше: подключим профиль провайдера + реальные записи.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge>supabase</Badge>
-                <Badge>prisma</Badge>
-                <Badge>api</Badge>
-              </div>
+              <div className="text-sm font-semibold text-neutral-900">Доп фильтры мб</div>
             </CardContent>
           </Card>
         </div>
@@ -200,7 +192,7 @@ export default function ProvidersPage() {
                 <div className="text-sm text-neutral-600">
                   Найдено: <span className="font-semibold text-neutral-900">{filtered.length}</span>
                 </div>
-                <div className="text-xs text-neutral-500">Сортировка: рейтинг ↓</div>
+                <div className="text-xs text-neutral-500">Сортировка: рейтинг ↓(будет рабочая). </div>
               </div>
 
               {filtered.length === 0 ? (

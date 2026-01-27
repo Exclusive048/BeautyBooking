@@ -173,7 +173,7 @@ export async function listAvailabilitySlots(
   });
   if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
 
-  const stepMin = range.stepMin ?? 10;
+  const stepMin = range.stepMin ?? 15;
   if (!Number.isInteger(stepMin) || stepMin <= 0) {
     return { ok: false, status: 400, message: "Invalid step", code: "STEP_INVALID" };
   }

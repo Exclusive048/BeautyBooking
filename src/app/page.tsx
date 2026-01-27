@@ -24,11 +24,6 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/10 via-transparent to-transparent" />
         <div className="relative grid gap-8 p-6 md:grid-cols-2 md:items-center md:p-10">
           <div>
-            <div className="flex flex-wrap gap-2">
-              <Badge>МVP</Badge>
-              <Badge>город → потом масштаб</Badge>
-              <Badge>как “ПроДокторов”</Badge>
-            </div>
 
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
               Запись к бьюти-мастерам{" "}
@@ -74,9 +69,6 @@ export default function HomePage() {
           <Card className="bg-white">
             <CardContent className="p-5 md:p-6">
               <div className="text-sm font-semibold text-neutral-900">Быстрый поиск</div>
-              <p className="mt-1 text-xs text-neutral-500">
-                В MVP — статично. Дальше подключим поиск и гео.
-              </p>
 
               <div className="mt-4 grid gap-3">
                 <Input placeholder="Услуга (маникюр / ресницы / барбер…)" />
