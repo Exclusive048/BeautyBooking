@@ -5,6 +5,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import type { BookingService } from "@/features/booking/model/types";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
 import { timeToMinutes } from "@/lib/schedule/time";
+import { Card, CardContent } from "@/components/ui/card";
 
 type BookingUser = {
   id: string;
@@ -41,6 +42,12 @@ function formatMoney(n: number) {
   }
 }
 
+function formatDuration(min: number | null | undefined) {
+  if (!min || min <= 0) return null;
+  if (min % 60 === 0) return `${min / 60} ч`;
+  return `${min} мин`;
+}
+
 function buildLoginUrl(nextPath: string) {
   const p = new URLSearchParams();
   p.set("next", nextPath);
@@ -49,6 +56,34 @@ function buildLoginUrl(nextPath: string) {
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
+}
+
+function toDateKey(d: Date) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateLabel(dateKey: string) {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  return dt.toLocaleDateString("ru-RU", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function buildDateRange() {
+  const start = new Date();
+  const items: string[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    items.push(toDateKey(d));
+  }
+  return items;
 }
 
 export default function BookingWidget({
@@ -69,7 +104,7 @@ export default function BookingWidget({
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange()[0] ?? "");
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -155,15 +190,15 @@ export default function BookingWidget({
           | ApiResponse<{ slots: SlotItem[] }>
           | null;
 
-        if (!res.ok) throw new Error(getErrorMessage(json, "Failed to load slots"));
-        if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load slots"));
+        if (!res.ok) throw new Error(getErrorMessage(json, "Не удалось загрузить слоты"));
+        if (!json || !json.ok) throw new Error(getErrorMessage(json, "Не удалось загрузить слоты"));
 
         if (cancelled) return;
         setSlots(json.data.slots);
         setSlotLabel((prev) => prev || json.data.slots[0]?.label || "");
       } catch (e) {
         if (!cancelled) {
-          setSlotsError(e instanceof Error ? e.message : "Unknown error");
+          setSlotsError(e instanceof Error ? e.message : "Неизвестная ошибка");
           setSlots([]);
           setSlotLabel("");
         }
@@ -178,28 +213,25 @@ export default function BookingWidget({
     };
   }, [providerId, providerType, masterId, serviceId]);
 
+  const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
+
+  const slotsForSelectedDate = useMemo(() => {
+    if (!selectedDate) return [] as SlotItem[];
+    return slots.filter((s) => s.label.startsWith(`${selectedDate} `));
+  }, [slots, selectedDate]);
+
   const slotGroups = useMemo(() => {
-    const byDate = new Map<string, { label: string; minutes: number }[]>();
-    for (const slot of slots) {
-      const [date, time] = slot.label.split(" ");
-      if (!date || !time) continue;
-      const minutes = timeToMinutes(time);
-      if (minutes === null) continue;
-      const list = byDate.get(date) ?? [];
-      list.push({ label: slot.label, minutes });
-      byDate.set(date, list);
-    }
+    const items = slotsForSelectedDate
+      .map((slot) => {
+        const [date, time] = slot.label.split(" ");
+        if (!date || !time) return null;
+        const minutes = timeToMinutes(time);
+        if (minutes === null) return null;
+        return { label: slot.label, minutes };
+      })
+      .filter((v): v is { label: string; minutes: number } => Boolean(v));
 
-    for (const list of byDate.values()) {
-      list.sort((a, b) => a.minutes - b.minutes);
-    }
-
-    if (!byDate.size) return [];
-
-    const dates = Array.from(byDate.keys()).sort();
-    const activeDate = selectedDate && byDate.has(selectedDate) ? selectedDate : dates[0];
-    const items = byDate.get(activeDate) ?? [];
-    const earliest = items[0]?.minutes ?? null;
+    items.sort((a, b) => a.minutes - b.minutes);
 
     const groups = [
       { id: "morning", label: "Утро", items: [] as string[] },
@@ -212,50 +244,21 @@ export default function BookingWidget({
       group.items.push(item.label);
     }
 
-    const targetGroup =
-      earliest === null ? null : earliest < 13 * 60 ? "morning" : earliest < 18 * 60 ? "day" : "evening";
-
     return groups
       .filter((g) => g.items.length > 0)
       .map((g) => ({
-        id: `${activeDate}-${g.id}`,
+        id: `${selectedDate}-${g.id}`,
         label: g.label,
         items: g.items,
-        defaultOpen: targetGroup ? g.id === targetGroup : undefined,
       }));
-  }, [slots, selectedDate]);
-
-  const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
-
-  const availableDates = useMemo(() => {
-    const dates = new Set<string>();
-    for (const slot of slots) {
-      const [date] = slot.label.split(" ");
-      if (date) dates.add(date);
-    }
-    return Array.from(dates).sort();
-  }, [slots]);
-
-  useEffect(() => {
-    if (!availableDates.length) {
-      setSelectedDate("");
-      return;
-    }
-    if (selectedDate && availableDates.includes(selectedDate)) return;
-    const preferred = slotLabel ? slotLabel.split(" ")[0] : "";
-    if (preferred && availableDates.includes(preferred)) {
-      setSelectedDate(preferred);
-      return;
-    }
-    setSelectedDate(availableDates[0] ?? "");
-  }, [availableDates, selectedDate, slotLabel]);
+  }, [slotsForSelectedDate, selectedDate]);
 
   useEffect(() => {
     if (!selectedDate) return;
     if (slotLabel.startsWith(`${selectedDate} `)) return;
-    const next = slots.find((s) => s.label.startsWith(`${selectedDate} `))?.label ?? "";
+    const next = slotsForSelectedDate[0]?.label ?? "";
     if (next) setSlotLabel(next);
-  }, [selectedDate, slotLabel, slots]);
+  }, [selectedDate, slotLabel, slotsForSelectedDate]);
 
   async function submit() {
     setErrorText(null);
@@ -341,22 +344,168 @@ export default function BookingWidget({
     }
   }
 
+  const dateOptions = useMemo(() => buildDateRange(), []);
+  const hasSlotsForSelectedDate = slotsForSelectedDate.length > 0;
+
+  if (providerType !== "STUDIO") {
+    return (
+      <div className="rounded-2xl border p-5 bg-white">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-lg font-semibold">Запись</div>
+            <div className="text-sm text-neutral-600 mt-1">
+              Запись доступна только авторизованным клиентам.
+            </div>
+          </div>
+
+          {selectedService ? (
+            <div className="text-right">
+              <div className="text-sm text-neutral-600">Стоимость</div>
+              <div className="font-semibold">{formatMoney(selectedService.price)} ₽</div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-4">
+          {meLoading ? (
+            <div className="text-sm text-neutral-600">Проверяем авторизацию…</div>
+          ) : me ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              Вы авторизованы
+              {me.phone ? <span className="ml-2 text-emerald-700">({me.phone})</span> : null}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Войдите, чтобы записаться.
+              <a href={buildLoginUrl(nextPath)} className="ml-2 underline font-medium">
+                Войти
+              </a>
+            </div>
+          )}
+        </div>
+
+        {errorText ? (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {errorText}
+          </div>
+        ) : null}
+
+        {successId ? (
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+            Заявка отправлена (ID: {successId})
+          </div>
+        ) : null}
+
+        <div className="mt-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium">Услуга</label>
+            <select
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
+              disabled={loading}
+            >
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} • {s.durationMin} мин • {formatMoney(s.price)} ₽
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Слот</label>
+            {slotsLoading ? (
+              <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
+            ) : slotsError ? (
+              <div className="mt-2 text-sm text-red-600">{slotsError}</div>
+            ) : slotGroups.length === 0 ? (
+              <div className="mt-2 text-sm text-neutral-600">Свободных слотов нет.</div>
+            ) : (
+              <div className="mt-2 space-y-3">
+                <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Имя</label>
+            <input
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
+              placeholder="Ваше имя"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Телефон</label>
+            <input
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
+              placeholder="+7..."
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              disabled={loading}
+              inputMode="tel"
+              autoComplete="tel"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Комментарий (необязательно)</label>
+            <textarea
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 min-h-[90px]"
+              placeholder="Например: хочу естественный нюд"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <button
+            onClick={submit}
+            disabled={loading || (!meLoading && !me)}
+            className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
+          >
+            {loading ? "Отправляем..." : "Записаться"}
+          </button>
+        </div>
+
+        {showAuthModal ? (
+          <Modal title="Войдите, чтобы записаться" onClose={() => setShowAuthModal(false)}>
+            <div className="text-sm text-neutral-700">
+              Мы принимаем записи только от авторизованных клиентов — так мастерам спокойнее и меньше
+              фейковых заявок.
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <a
+                href={buildLoginUrl(nextPath)}
+                className="flex-1 text-center rounded-xl bg-black text-white py-2 font-medium"
+              >
+                Войти
+              </a>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="flex-1 rounded-xl border py-2 font-medium"
+              >
+                Не сейчас
+              </button>
+            </div>
+          </Modal>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border p-5 bg-white">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-lg font-semibold">Запись</div>
-          <div className="text-sm text-neutral-600 mt-1">
-            Запись доступна только авторизованным клиентам.
-          </div>
+          <div className="text-sm text-neutral-600 mt-1">Выберите услугу, затем мастера и время</div>
         </div>
-
-        {selectedService ? (
-          <div className="text-right">
-            <div className="text-sm text-neutral-600">Стоимость</div>
-            <div className="font-semibold">{formatMoney(selectedService.price)} ?</div>
-          </div>
-        ) : null}
       </div>
 
       <div className="mt-4">
@@ -364,7 +513,7 @@ export default function BookingWidget({
           <div className="text-sm text-neutral-600">Проверяем авторизацию…</div>
         ) : me ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            Вы авторизованы ?
+            Вы авторизованы
             {me.phone ? <span className="ml-2 text-emerald-700">({me.phone})</span> : null}
           </div>
         ) : (
@@ -385,120 +534,202 @@ export default function BookingWidget({
 
       {successId ? (
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Заявка отправлена ? (ID: {successId})
+          Заявка отправлена (ID: {successId})
         </div>
       ) : null}
 
-      <div className="mt-5 space-y-4">
-        {providerType === "STUDIO" ? (
+      <div className="mt-5 space-y-6">
+        <div>
+          <div className="text-sm font-medium">Дата</div>
+          <div className="mt-2 flex gap-2 overflow-x-auto">
+            {dateOptions.map((date) => {
+              const active = date === selectedDate;
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => setSelectedDate(date)}
+                  className={`rounded-full border px-3 py-1 text-xs whitespace-nowrap ${
+                    active
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                  }`}
+                >
+                  {formatDateLabel(date)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-sm font-medium">Услуги</div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {services.length === 0 ? (
+              <div className="text-sm text-neutral-600">Услуг пока нет.</div>
+            ) : (
+              services.map((s) => {
+                const active = s.id === serviceId;
+                const duration = formatDuration(s.durationMin);
+                return (
+                  <Card
+                    key={s.id}
+                    className={`cursor-pointer border ${
+                      active
+                        ? "border-neutral-900 bg-neutral-900 text-white"
+                        : "border-neutral-200 bg-white hover:border-neutral-400"
+                    }`}
+                    onClick={() => {
+                      setServiceId(s.id);
+                      setSlotLabel("");
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="text-sm font-semibold">{s.name}</div>
+                      <div className={`mt-2 text-xs ${active ? "text-neutral-200" : "text-neutral-500"}`}>
+                        {duration ? duration : "Длительность уточняется"}
+                      </div>
+                      <div className={`mt-1 text-sm ${active ? "text-white" : "text-neutral-800"}`}>
+                        {s.price > 0 ? `от ${formatMoney(s.price)} ₽` : "Цена уточняется"}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {serviceId ? (
           <div>
-            <label className="block text-sm font-medium">Мастер</label>
-            <select
-              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-              value={masterId}
-              onChange={(e) => setMasterId(e.target.value)}
-              disabled={loading}
-            >
-              <option value="">Выберите мастера</option>
-              {masters.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            <div className="text-sm font-medium">Мастера</div>
+            {masters.length === 0 ? (
+              <div className="mt-2 text-sm text-neutral-600">Нет доступных мастеров.</div>
+            ) : (
+              <div className="mt-3 grid gap-3">
+                {masters.map((m) => {
+                  const active = m.id === masterId;
+                  const slotsCount = active ? slotsForSelectedDate.length : null;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setMasterId(m.id);
+                        setSlotLabel("");
+                      }}
+                      className={`w-full rounded-2xl border p-4 text-left transition ${
+                        active
+                          ? "border-neutral-900 bg-neutral-900 text-white"
+                          : "border-neutral-200 bg-white hover:border-neutral-400"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`h-12 w-12 rounded-2xl ${
+                            active ? "bg-white/10" : "bg-neutral-100"
+                          }`}
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold">{m.name}</div>
+                          <div className={`mt-1 text-xs ${active ? "text-neutral-200" : "text-neutral-500"}`}>
+                            Рейтинг уточняется
+                          </div>
+                        </div>
+                        <div className={`text-xs ${active ? "text-neutral-200" : "text-neutral-500"}`}>
+                          {slotsCount !== null
+                            ? `Слотов: ${slotsCount}`
+                            : "Слоты уточняются"}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedService ? (
+              <div className="mt-3 text-sm text-neutral-600">
+                {selectedService.durationMin > 0
+                  ? `Длительность: ${formatDuration(selectedService.durationMin)}`
+                  : "Длительность: уточняется"}
+                {selectedService.price > 0
+                  ? ` · Цена: от ${formatMoney(selectedService.price)} ₽`
+                  : " · Цена: уточняется"}
+                {masterId
+                  ? ` · Слотов на дату: ${slotsForSelectedDate.length || 0}`
+                  : " · Слоты уточняются"}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        <div>
-          <label className="block text-sm font-medium">Услуга</label>
-          <select
-            className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-            value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
-            disabled={loading}
-          >
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} • {s.durationMin} мин • {formatMoney(s.price)} ?
-              </option>
-            ))}
-          </select>
-        </div>
+        {masterId ? (
+          <div>
+            <div className="text-sm font-medium">Слоты</div>
+            {slotsLoading ? (
+              <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
+            ) : slotsError ? (
+              <div className="mt-2 text-sm text-red-600">{slotsError}</div>
+            ) : slotGroups.length === 0 ? (
+              <div className="mt-2 text-sm text-neutral-600">
+                Нет слотов на выбранную дату. Попробуйте другую дату или мастера.
+              </div>
+            ) : (
+              <div className="mt-3">
+                <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+              </div>
+            )}
+          </div>
+        ) : null}
 
-        <div>
-          <label className="block text-sm font-medium">Слот</label>
-          {slotsLoading ? (
-            <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
-          ) : slotsError ? (
-            <div className="mt-2 text-sm text-red-600">{slotsError}</div>
-          ) : slotGroups.length === 0 ? (
-            <div className="mt-2 text-sm text-neutral-600">Свободных слотов нет.</div>
-          ) : (
-            <div className="mt-2 space-y-3">
-              {availableDates.length > 0 ? (
-                <div className="flex gap-2 overflow-x-auto">
-                  {availableDates.map((date) => {
-                    const active = date === selectedDate;
-                    return (
-                      <button
-                        key={date}
-                        type="button"
-                        onClick={() => setSelectedDate(date)}
-                        className={`rounded-full border px-3 py-1 text-xs ${
-                          active
-                            ? "border-neutral-900 bg-neutral-900 text-white"
-                            : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
-                        }`}
-                      >
-                        {date}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-              <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
-            </div>
-          )}
-        </div>
+        <div className="grid gap-3">
+          <div>
+            <label className="block text-sm font-medium">Имя</label>
+            <input
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
+              placeholder="Ваше имя"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              disabled={loading}
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium">Имя</label>
-          <input
-            className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-            placeholder="Ваше имя"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            disabled={loading}
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium">Телефон</label>
+            <input
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
+              placeholder="+7..."
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              disabled={loading}
+              inputMode="tel"
+              autoComplete="tel"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium">Телефон</label>
-          <input
-            className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-            placeholder="+7..."
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-            disabled={loading}
-            inputMode="tel"
-            autoComplete="tel"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium">Комментарий (необязательно)</label>
-          <textarea
-            className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 min-h-[90px]"
-            placeholder="Например: хочу естественный нюд"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            disabled={loading}
-          />
+          <div>
+            <label className="block text-sm font-medium">Комментарий (необязательно)</label>
+            <textarea
+              className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 min-h-[90px]"
+              placeholder="Например: хочу естественный нюд"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              disabled={loading}
+            />
+          </div>
         </div>
 
         <button
           onClick={submit}
-          disabled={loading || (!meLoading && !me)}
+          disabled={
+            loading ||
+            (!meLoading && !me) ||
+            !serviceId ||
+            !masterId ||
+            !slotLabel ||
+            !hasSlotsForSelectedDate
+          }
           className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
         >
           {loading ? "Отправляем..." : "Записаться"}
@@ -553,7 +784,7 @@ function Modal({
               className="rounded-lg px-2 py-1 text-neutral-600 hover:bg-neutral-100"
               aria-label="Close"
             >
-              ?
+              ×
             </button>
           </div>
           <div className="mt-3">{children}</div>
@@ -561,4 +792,4 @@ function Modal({
       </div>
     </div>
   );
-}
+}
