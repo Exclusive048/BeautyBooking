@@ -102,6 +102,7 @@ export async function GET(
 
   const breaksByDate = new Map<string, typeof breaks>();
   for (const b of breaks) {
+    if (!b.date) continue;
     const key = b.date.toISOString().slice(0, 10);
     const list = breaksByDate.get(key) ?? [];
     list.push(b);

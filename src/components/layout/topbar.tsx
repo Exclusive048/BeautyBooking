@@ -2,9 +2,19 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/features/auth/components/logout-button";
+import { prisma } from "@/lib/prisma";
+import { MembershipStatus } from "@prisma/client";
 
 export async function Topbar() {
   const user = await getSessionUser();
+  const hasInvites = user?.phone
+    ? Boolean(
+        await prisma.studioInvite.findFirst({
+          where: { phone: user.phone, status: MembershipStatus.PENDING },
+          select: { id: true },
+        })
+      )
+    : false;
 
   return (
     <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/80 backdrop-blur">
@@ -29,8 +39,18 @@ export async function Topbar() {
               </Button>
 
               <Button asChild variant="secondary" className="hidden sm:inline-flex">
+                <Link href="/cabinet/studio">Мои студии</Link>
+              </Button>
+
+              <Button asChild variant="secondary" className="hidden sm:inline-flex">
                 <Link href="/cabinet?tab=bookings">Мои записи</Link>
               </Button>
+
+              {hasInvites ? (
+                <Button asChild variant="secondary" className="hidden sm:inline-flex">
+                  <Link href="/cabinet/invites">Приглашения</Link>
+                </Button>
+              ) : null}
 
               <LogoutButton />
             </>

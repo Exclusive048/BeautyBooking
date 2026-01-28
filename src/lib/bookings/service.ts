@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { MembershipStatus, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 type BookingWithService = Prisma.BookingGetPayload<{ include: { service: true } }>;
@@ -13,14 +14,55 @@ export async function getProviderBookingsForOwner(
 ): Promise<BookingResult<{ bookings: BookingWithService[] }>> {
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
-    select: { id: true, ownerUserId: true },
+    select: { id: true, ownerUserId: true, type: true, studioId: true },
   });
 
   if (!provider) {
     return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
   }
 
-  if (!provider.ownerUserId || provider.ownerUserId !== userId) {
+  if (provider.ownerUserId && provider.ownerUserId === userId) {
+    const bookings = await prisma.booking.findMany({
+      where: { providerId },
+      orderBy: { createdAt: "desc" },
+      include: { service: true },
+      take: 200,
+    });
+
+    return { ok: true, data: { bookings } };
+  }
+
+  let studioId: string | null = null;
+
+  if (provider.type === "STUDIO") {
+    const studio = await prisma.studio.findUnique({
+      where: { providerId: provider.id },
+      select: { id: true },
+    });
+    studioId = studio?.id ?? null;
+  } else if (provider.studioId) {
+    const studio = await prisma.studio.findUnique({
+      where: { providerId: provider.studioId },
+      select: { id: true },
+    });
+    studioId = studio?.id ?? null;
+  }
+
+  if (!studioId) {
+    return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
+  }
+
+  const membership = await prisma.studioMembership.findFirst({
+    where: {
+      userId,
+      studioId,
+      status: MembershipStatus.ACTIVE,
+      roles: { has: StudioRole.ADMIN },
+    },
+    select: { id: true },
+  });
+
+  if (!membership) {
     return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
   }
 

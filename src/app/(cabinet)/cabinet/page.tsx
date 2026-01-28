@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
+import { MembershipStatus } from "@prisma/client";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { AccountType } from "@prisma/client";
@@ -10,6 +12,17 @@ export default async function CabinetEntryPage(props: {
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+
+  if (user.phone) {
+    const pendingInvite = await prisma.studioInvite.findFirst({
+      where: { phone: user.phone, status: MembershipStatus.PENDING },
+      select: { id: true },
+    });
+
+    if (pendingInvite) {
+      redirect("/cabinet/invites");
+    }
+  }
 
   const sp =
     props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;

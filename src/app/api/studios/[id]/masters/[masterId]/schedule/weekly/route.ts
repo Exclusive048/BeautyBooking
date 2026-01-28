@@ -3,6 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
+import { ensureStudioAccess } from "@/lib/studios/access";
 import { setWeeklySchedule } from "@/lib/schedule/usecases";
 import type { DayOfWeek } from "@/lib/domain/schedule";
 
@@ -21,17 +22,7 @@ const weeklySchema = z.array(
 );
 
 async function ensureStudioOwner(studioId: string, userId: string) {
-  const studio = await prisma.provider.findUnique({
-    where: { id: studioId },
-    select: { id: true, type: true, ownerUserId: true },
-  });
-  if (!studio || studio.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
-  }
-  if (studio.ownerUserId !== userId) {
-    return fail("Forbidden", 403, "FORBIDDEN");
-  }
-  return null;
+  return ensureStudioAccess(studioId, userId);
 }
 
 async function ensureMasterInStudio(masterId: string, studioId: string) {

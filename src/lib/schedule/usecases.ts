@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type { Result } from "@/lib/domain/result";
 import type {
   AvailabilitySlot,
@@ -144,7 +145,7 @@ export async function setWeeklySchedule(
     normalized.push(validated.data);
   }
 
-  const ops = [
+  const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.weeklySchedule.deleteMany({ where: { providerId } }),
     prisma.weeklySchedule.createMany({
       data: normalized.map((item) => ({
@@ -199,7 +200,7 @@ export async function setScheduleOverride(
     where: { providerId, date },
   });
 
-  const ops = [
+  const ops: Prisma.PrismaPromise<unknown>[] = [
     existing
       ? prisma.scheduleOverride.update({
           where: { id: existing.id },
@@ -230,7 +231,7 @@ export async function setScheduleOverride(
   if (!validated.data.isDayOff && breaks && breaks.length > 0) {
     ops.push(
       prisma.scheduleBreak.createMany({
-        data: breaks.map((b) => ({
+        data: breaks.map((b: ScheduleBreakInterval) => ({
           providerId,
           kind: "OVERRIDE",
           date,
@@ -241,7 +242,8 @@ export async function setScheduleOverride(
     );
   }
 
-  const [saved] = await prisma.$transaction(ops);
+  type ScheduleOverrideRecord = Prisma.ScheduleOverrideGetPayload<Record<string, never>>;
+  const [saved] = (await prisma.$transaction(ops)) as [ScheduleOverrideRecord];
 
   return {
     ok: true,
@@ -384,6 +386,7 @@ export async function listAvailabilitySlots(
 
   const overrideBreaksByDate = new Map<string, typeof overrideBreaks>();
   for (const b of overrideBreaks) {
+    if (!b.date) continue;
     const key = toDateKey(b.date);
     const list = overrideBreaksByDate.get(key) ?? [];
     list.push(b);
@@ -502,7 +505,7 @@ export async function setProviderBuffer(
       select: { bufferBetweenBookingsMin: true },
     });
     return { ok: true, data: { bufferBetweenBookingsMin: updated.bufferBetweenBookingsMin } };
-  } catch (e) {
+  } catch {
     return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
   }
 }

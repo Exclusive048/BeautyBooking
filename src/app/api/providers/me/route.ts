@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { AccountType, ProviderType } from "@prisma/client";
+import { AccountType, MembershipStatus, ProviderType } from "@prisma/client";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { emptyBodySchema } from "@/lib/providers/schemas";
@@ -14,23 +14,101 @@ function providerTypeFromRoles(roles: AccountType[]) {
   return null;
 }
 
-export async function GET() {
+const providerWithServicesInclude = {
+  services: {
+    select: {
+      id: true,
+      name: true,
+      durationMin: true,
+      price: true,
+    },
+  },
+};
+
+export async function GET(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { user } = auth;
 
-  const myProvider = await prisma.provider.findFirst({
-    where: { ownerUserId: user.id },
-    include: {
-      services: {
-        select: {
-          id: true,
-          name: true,
-          durationMin: true,
-          price: true,
+  const url = new URL(req.url);
+  const typeParam = url.searchParams.get("type");
+  const studioId = url.searchParams.get("studioId");
+
+  if (studioId) {
+    const studio = await prisma.studio.findUnique({
+      where: { id: studioId },
+      select: {
+        id: true,
+        provider: {
+          include: providerWithServicesInclude,
         },
       },
-    },
+    });
+
+    if (!studio || studio.provider.type !== ProviderType.STUDIO) {
+      return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    }
+
+    if (studio.provider.ownerUserId !== user.id) {
+      const membership = await prisma.studioMembership.findFirst({
+        where: { userId: user.id, studioId: studio.id, status: MembershipStatus.ACTIVE },
+        select: { id: true },
+      });
+
+      if (!membership) {
+        return fail("Forbidden", 403, "FORBIDDEN");
+      }
+    }
+
+    return ok({ provider: mapProviderProfile(studio.provider) });
+  }
+
+  if (typeParam === "MASTER") {
+    const masterProvider = await prisma.provider.findFirst({
+      where: { ownerUserId: user.id, type: ProviderType.MASTER },
+      include: providerWithServicesInclude,
+    });
+
+    return ok({ provider: masterProvider ? mapProviderProfile(masterProvider) : null });
+  }
+
+  if (typeParam === "STUDIO") {
+    const ownedStudioProvider = await prisma.provider.findFirst({
+      where: { ownerUserId: user.id, type: ProviderType.STUDIO },
+      include: providerWithServicesInclude,
+    });
+
+    if (ownedStudioProvider) {
+      return ok({ provider: mapProviderProfile(ownedStudioProvider) });
+    }
+
+    const memberships = await prisma.studioMembership.findMany({
+      where: { userId: user.id, status: MembershipStatus.ACTIVE },
+      select: {
+        studio: {
+          select: {
+            provider: {
+              include: providerWithServicesInclude,
+            },
+          },
+        },
+      },
+    });
+
+    if (memberships.length === 1) {
+      return ok({ provider: mapProviderProfile(memberships[0].studio.provider) });
+    }
+
+    if (memberships.length > 1) {
+      return fail("Studio selection required", 409, "STUDIO_SELECTION_REQUIRED");
+    }
+
+    return ok({ provider: null });
+  }
+
+  const myProvider = await prisma.provider.findFirst({
+    where: { ownerUserId: user.id },
+    include: providerWithServicesInclude,
   });
 
   return ok({ provider: myProvider ? mapProviderProfile(myProvider) : null });
@@ -54,16 +132,7 @@ export async function POST(req: Request) {
 
   const existing = await prisma.provider.findFirst({
     where: { ownerUserId: user.id, type: pType },
-    include: {
-      services: {
-        select: {
-          id: true,
-          name: true,
-          durationMin: true,
-          price: true,
-        },
-      },
-    },
+    include: providerWithServicesInclude,
   });
 
   if (existing) {
@@ -84,16 +153,7 @@ export async function POST(req: Request) {
       categories: [],
       availableToday: false,
     },
-    include: {
-      services: {
-        select: {
-          id: true,
-          name: true,
-          durationMin: true,
-          price: true,
-        },
-      },
-    },
+    include: providerWithServicesInclude,
   });
 
   return ok({ provider: mapProviderProfile(created) }, { status: 201 });

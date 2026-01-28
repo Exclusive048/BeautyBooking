@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Section } from "@/components/ui/section";
 import { ProviderCard } from "@/features/catalog/components/provider-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
 

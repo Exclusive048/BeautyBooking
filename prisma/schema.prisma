@@ -12,6 +12,17 @@ enum ProviderType {
   STUDIO
 }
 
+enum StudioRole {
+  ADMIN
+  MASTER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+}
+
 enum AccountType {
   CLIENT
   MASTER
@@ -53,12 +64,73 @@ model UserProfile {
   geoLng      Float?
 
   providers   Provider[]    @relation("ProviderOwner")
+  masterProfile MasterProfile?
+  studioMemberships StudioMembership[]
+  studioInvites StudioInvite[] @relation("StudioInvitedBy")
   bookings    Booking[]     @relation("BookingClient")
 
   telegram    TelegramLink?
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+}
+
+model Studio {
+  id          String             @id @default(cuid())
+  providerId  String             @unique
+  provider    Provider           @relation("StudioProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  memberships StudioMembership[]
+  invites     StudioInvite[]
+
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model MasterProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId  String    @unique
+  provider    Provider  @relation("MasterProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model StudioMembership {
+  id        String           @id @default(cuid())
+  userId    String
+  user      UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId  String
+  studio    Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  roles     StudioRole[]
+  status    MembershipStatus @default(PENDING)
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([studioId])
+  @@index([status])
+  @@unique([userId, studioId])
+}
+
+model StudioInvite {
+  id              String           @id @default(cuid())
+  studioId        String
+  studio          Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  phone           String
+  status          MembershipStatus @default(PENDING)
+  invitedByUserId String
+  invitedBy       UserProfile      @relation("StudioInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([studioId])
+  @@index([phone])
+  @@index([status])
+  @@unique([studioId, phone])
 }
 
 model TelegramLink {
@@ -130,6 +202,9 @@ model Provider {
   scheduleOverrides ScheduleOverride[]
   scheduleBlocks ScheduleBlock[]
   scheduleBreaks ScheduleBreak[]
+
+  studioProfile Studio?       @relation("StudioProvider")
+  masterProfile MasterProfile? @relation("MasterProvider")
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

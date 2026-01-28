@@ -1,38 +1,33 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 
-export default async function OnboardingPage() {
+export default async function ProfessionalOnboardingPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
   return (
     <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Кто вы?</h1>
+      <h1 className="text-2xl font-semibold">Профессиональный профиль</h1>
       <p className="mt-2 text-neutral-600">
-        Выберите тип аккаунта. Это влияет на доступ к кабинетам.
+        Выберите путь — мастер или студия. Мы создадим нужный профиль и откроем кабинет.
       </p>
 
       <div className="mt-6 grid gap-3">
         <RoleCard
-          title="Я клиент"
-          desc="Записываюсь к мастерам и в студии."
-          href="/api/auth/account-type/set?type=CLIENT"
-        />
-        <RoleCard
-          title="Я мастер"
-          desc="У меня будет кабинет мастера и записи."
+          title="Я мастер (работаю сам)"
+          desc="Создать профиль мастера и перейти в кабинет мастера."
           href="/api/onboarding/professional/master"
         />
         <RoleCard
-          title="Я студия"
-          desc="Кабинет студии, мастера и услуги."
+          title="Я представляю студию"
+          desc="Создать студию, назначить меня администратором и открыть кабинет студии."
           href="/api/onboarding/professional/studio"
         />
       </div>
 
       <div className="mt-6 text-sm text-neutral-600">
-        После выбора можно будет поменять в настройках (позже).
+        Клиентский кабинет доступен всегда — он создаётся автоматически.
       </div>
 
       <div className="mt-6">

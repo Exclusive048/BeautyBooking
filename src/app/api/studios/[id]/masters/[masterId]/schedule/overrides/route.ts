@@ -3,6 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
+import { ensureStudioAccess } from "@/lib/studios/access";
 import { removeScheduleOverride, setScheduleOverride } from "@/lib/schedule/usecases";
 
 const breakSchema = z.object({
@@ -24,17 +25,7 @@ const deleteSchema = z.object({
 });
 
 async function ensureStudioOwner(studioId: string, userId: string) {
-  const studio = await prisma.provider.findUnique({
-    where: { id: studioId },
-    select: { id: true, type: true, ownerUserId: true },
-  });
-  if (!studio || studio.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
-  }
-  if (studio.ownerUserId !== userId) {
-    return fail("Forbidden", 403, "FORBIDDEN");
-  }
-  return null;
+  return ensureStudioAccess(studioId, userId);
 }
 
 async function ensureMasterInStudio(masterId: string, studioId: string) {
@@ -86,6 +77,7 @@ export async function GET(
 
   const breaksByDate = new Map<string, typeof breaks>();
   for (const b of breaks) {
+    if (!b.date) continue;
     const key = b.date.toISOString().slice(0, 10);
     const list = breaksByDate.get(key) ?? [];
     list.push(b);

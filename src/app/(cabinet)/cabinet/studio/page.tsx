@@ -4,13 +4,15 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
 import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
-import { RoleSwitch } from "@/features/cabinet/components/role-switch";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { StudioMastersPanel } from "@/features/cabinet/components/studio-masters-panel";
 import { StudioServicesPanel } from "@/features/cabinet/components/studio-services-panel";
 import { StudioOverridesPanel } from "@/features/cabinet/components/studio-overrides-panel";
 import { StudioSchedulePanel } from "@/features/cabinet/components/studio-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
+import { getSessionUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
+import { MembershipStatus } from "@prisma/client";
 
 type MeDto = {
   id: string;
@@ -27,12 +29,70 @@ type MeDto = {
   geoLng: number | null;
 };
 
+type SearchParams = { tab?: string };
+
 export default async function StudioCabinetPage(props: {
-  searchParams?: Promise<{ tab?: string }> | { tab?: string };
+  searchParams?: Promise<SearchParams> | SearchParams;
 }) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
   const sp =
     props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;
 
+  const memberships = await prisma.studioMembership.findMany({
+    where: { userId: user.id, status: MembershipStatus.ACTIVE },
+    select: {
+      studioId: true,
+      roles: true,
+      studio: {
+        select: {
+          provider: {
+            select: { id: true, name: true, tagline: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (memberships.length === 1) {
+    return redirect(`/cabinet/studio/${memberships[0].studioId}`);
+  }
+
+  if (memberships.length > 1) {
+    return (
+      <CabinetShell
+        title="Мои студии"
+        subtitle="Выберите студию, чтобы перейти в кабинет."
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          {memberships.map((membership) => (
+            <Link
+              key={membership.studioId}
+              href={`/cabinet/studio/${membership.studioId}`}
+              className="rounded-2xl border p-4 transition hover:bg-neutral-50"
+            >
+              <div className="text-sm text-neutral-500">Студия</div>
+              <div className="mt-1 text-lg font-semibold">
+                {membership.studio.provider.name}
+              </div>
+              <div className="mt-1 text-sm text-neutral-600">
+                {membership.studio.provider.tagline}
+              </div>
+              <div className="mt-3 text-xs text-neutral-500">
+                Роли: {membership.roles.join(", ")}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </CabinetShell>
+    );
+  }
+
+  return renderLegacyStudioCabinet(sp);
+}
+
+async function renderLegacyStudioCabinet(sp?: SearchParams) {
   const tab =
     sp?.tab === "profile" ||
     sp?.tab === "masters" ||
@@ -43,7 +103,7 @@ export default async function StudioCabinetPage(props: {
       : "bookings";
 
   const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-    "/api/providers/me"
+    "/api/providers/me?type=STUDIO"
   );
 
   if (!providerResponse.ok) {
@@ -54,7 +114,6 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Ошибка загрузки данных профиля."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="rounded-2xl border p-6 text-red-600">
           Ошибка сервера: {providerResponse.error.message}
@@ -70,12 +129,11 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Создайте профиль студии, чтобы принимать записи."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="rounded-2xl border p-6">
           <p className="text-neutral-700">
-            У вас пока нет профиля провайдера. Создайте профиль студии, чтобы начать принимать
-            записи.
+            У вас пока нет профиля провайдера. Создайте профиль студии, чтобы начать
+            принимать записи.
           </p>
 
           <form action={createMyStudioProviderAction} className="mt-6">
@@ -106,7 +164,6 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Личные данные владельца/аккаунта (ФИО, контакты, дата рождения, адрес)."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="flex items-center justify-between gap-3">
           <CabinetNavTabs
@@ -128,13 +185,13 @@ export default async function StudioCabinetPage(props: {
           </Link>
         </div>
 
-        <ProfileForm initialUser={meResponse.data.user} />
+        <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
 
         <section className="rounded-2xl border p-5">
           <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
           <p className="mt-2 text-sm text-neutral-600">
-            Отдельно сделаем форму “Профиль студии” (название, адрес, район, описание, контакты) —
-            это поля Provider.
+            Отдельно сделаем форму “Профиль студии” (название, адрес, район, описание,
+            контакты) — это поля Provider.
           </p>
         </section>
       </CabinetShell>
@@ -146,7 +203,6 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Управляйте мастерами студии."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="masters"
@@ -170,7 +226,6 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Управляйте каталогом услуг студии."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="services"
@@ -194,7 +249,6 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Настройки услуг для мастеров."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="overrides"
@@ -218,7 +272,6 @@ export default async function StudioCabinetPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Расписание мастеров студии."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="schedule"
@@ -241,7 +294,6 @@ export default async function StudioCabinetPage(props: {
     <CabinetShell
       title="Кабинет студии"
       subtitle="Управляйте записями и профилем студии."
-      right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
     >
       <div className="flex items-center justify-between gap-3">
         <CabinetNavTabs

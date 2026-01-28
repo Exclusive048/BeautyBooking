@@ -4,7 +4,6 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
 import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
-import { RoleSwitch } from "@/features/cabinet/components/role-switch";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { MasterServicesPanel } from "@/features/cabinet/components/master-services-panel";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
@@ -37,7 +36,7 @@ export default async function MasterCabinetPage(props: {
       : "bookings";
 
   const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-    "/api/providers/me"
+    "/api/providers/me?type=MASTER"
   );
 
   if (!providerResponse.ok) {
@@ -48,7 +47,6 @@ export default async function MasterCabinetPage(props: {
       <CabinetShell
         title="Кабинет мастера"
         subtitle="Ошибка загрузки данных профиля."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="rounded-2xl border p-6 text-red-600">
           Ошибка сервера: {providerResponse.error.message}
@@ -64,12 +62,11 @@ export default async function MasterCabinetPage(props: {
       <CabinetShell
         title="Кабинет мастера"
         subtitle="Создайте профиль мастера, чтобы принимать записи."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="rounded-2xl border p-6">
           <p className="text-neutral-700">
-            У вас пока нет профиля провайдера. Создайте профиль мастера, чтобы начать принимать
-            записи.
+            У вас пока нет профиля провайдера. Создайте профиль мастера, чтобы начать
+            принимать записи.
           </p>
 
           <form action={createMyMasterProviderAction} className="mt-6">
@@ -100,7 +97,6 @@ export default async function MasterCabinetPage(props: {
       <CabinetShell
         title="Кабинет мастера"
         subtitle="Личные данные аккаунта (ФИО, контакты, дата рождения, адрес)."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <div className="flex items-center justify-between gap-3">
           <CabinetNavTabs
@@ -120,13 +116,13 @@ export default async function MasterCabinetPage(props: {
           </Link>
         </div>
 
-        <ProfileForm initialUser={meResponse.data.user} />
+        <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
 
         <section className="rounded-2xl border p-5">
           <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
           <p className="mt-2 text-sm text-neutral-600">
-            Отдельно сделаем форму “Профиль мастера” (имя/слоган/адрес/район/категории) — это поля
-            Provider.
+            Отдельно сделаем форму “Профиль мастера” (имя/слоган/адрес/район/категории) —
+            это поля Provider.
           </p>
         </section>
       </CabinetShell>
@@ -138,7 +134,6 @@ export default async function MasterCabinetPage(props: {
       <CabinetShell
         title="Кабинет мастера"
         subtitle="Управляйте списком услуг и ценами."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="services"
@@ -160,7 +155,6 @@ export default async function MasterCabinetPage(props: {
       <CabinetShell
         title="Кабинет мастера"
         subtitle="Настройте недельное расписание."
-        right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="schedule"
@@ -181,7 +175,6 @@ export default async function MasterCabinetPage(props: {
     <CabinetShell
       title="Кабинет мастера"
       subtitle="Управляйте записями и профилем мастера."
-      right={<RoleSwitch value="provider" clientHref="/cabinet/client" providerHref="/cabinet" />}
     >
       <div className="flex items-center justify-between gap-3">
         <CabinetNavTabs

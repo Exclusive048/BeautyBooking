@@ -7,8 +7,7 @@ import {
   listProviderServices,
   updateProviderService,
 } from "@/lib/providers/services";
-import { prisma } from "@/lib/prisma";
-import { ProviderType } from "@prisma/client";
+import { ensureStudioAccess } from "@/lib/studios/access";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -28,20 +27,7 @@ const deleteSchema = z.object({
 });
 
 async function ensureStudioOwner(providerId: string, userId: string) {
-  const provider = await prisma.provider.findUnique({
-    where: { id: providerId },
-    select: { id: true, type: true, ownerUserId: true },
-  });
-
-  if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
-  }
-
-  if (provider.ownerUserId !== userId) {
-    return fail("Forbidden", 403, "FORBIDDEN");
-  }
-
-  return null;
+  return ensureStudioAccess(providerId, userId);
 }
 
 export async function GET(

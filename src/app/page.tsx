@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
 import { providersMock } from "@/features/catalog/data/mock";
 import { ProviderCard } from "@/features/catalog/components/provider-card";
-import { Badge } from "@/components/ui/badge";
 
 const categories = [
   { title: "Маникюр", hint: "покрытие, дизайн" },
@@ -24,14 +23,14 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/10 via-transparent to-transparent" />
         <div className="relative grid gap-8 p-6 md:grid-cols-2 md:items-center md:p-10">
           <div>
-
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
               Запись к бьюти-мастерам{" "}
               <span className="text-neutral-500">в одном месте</span>
             </h1>
 
             <p className="mt-4 text-base text-neutral-600 md:text-lg">
-              Выбирай услугу, смотри работы и бронируй время. Всё прозрачно: цены, локация, свободные слоты.
+              Выбирай услугу, смотри работы и бронируй время. Всё прозрачно: цены,
+              локации, свободные слоты.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -46,19 +45,19 @@ export default function HomePage() {
             <div className="mt-6 grid gap-3 md:grid-cols-3">
               <Card className="bg-neutral-50">
                 <CardContent className="p-4">
-                  <div className="text-xs text-neutral-500">Мастеров</div>
+                  <div className="text-xs text-neutral-500">Салонов</div>
                   <div className="mt-1 text-xl font-semibold">120+</div>
                 </CardContent>
               </Card>
               <Card className="bg-neutral-50">
                 <CardContent className="p-4">
-                  <div className="text-xs text-neutral-500">Записей/мес</div>
+                  <div className="text-xs text-neutral-500">Мастеров/студий</div>
                   <div className="mt-1 text-xl font-semibold">1 500+</div>
                 </CardContent>
               </Card>
               <Card className="bg-neutral-50">
                 <CardContent className="p-4">
-                  <div className="text-xs text-neutral-500">Средний рейтинг</div>
+                  <div className="text-xs text-neutral-500">Средняя оценка</div>
                   <div className="mt-1 text-xl font-semibold">4.8</div>
                 </CardContent>
               </Card>
@@ -71,7 +70,7 @@ export default function HomePage() {
               <div className="text-sm font-semibold text-neutral-900">Быстрый поиск</div>
 
               <div className="mt-4 grid gap-3">
-                <Input placeholder="Услуга (маникюр / ресницы / барбер…)" />
+                <Input placeholder="Услуга (маникюр / ресницы / массаж)" />
                 <Input placeholder="Район / адрес" />
                 <Button asChild>
                   <Link href="/providers">Найти</Link>
@@ -97,8 +96,8 @@ export default function HomePage() {
 
       {/* POPULAR */}
       <Section
-        title="Популярные рядом"
-        subtitle="Подборка для демо. Потом будет по гео/рейтингу/конверсии."
+        title="Популярные мастера"
+        subtitle="Подборка на сегодня. Смотреть можно по цене/рейтингу/локации."
         right={
           <Link className="text-sm text-neutral-700 hover:underline" href="/providers">
             Смотреть все →

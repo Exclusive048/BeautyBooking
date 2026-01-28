@@ -1,4 +1,4 @@
-import { AccountType } from "@prisma/client";
+import { AccountType, MembershipStatus, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const ALLOWED_ROLE_ADDITIONS: ReadonlySet<AccountType> = new Set([
@@ -63,4 +63,22 @@ export async function ensureClientRoleForUser(
     data: { roles: { set: nextRoles } },
   });
   return nextRoles;
+}
+
+export async function hasMasterProfile(userId: string): Promise<boolean> {
+  const profile = await prisma.masterProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  return Boolean(profile);
+}
+
+export async function getActiveStudioMemberships(userId: string): Promise<
+  { studioId: string; roles: StudioRole[] }[]
+> {
+  const memberships = await prisma.studioMembership.findMany({
+    where: { userId, status: MembershipStatus.ACTIVE },
+    select: { studioId: true, roles: true },
+  });
+  return memberships;
 }

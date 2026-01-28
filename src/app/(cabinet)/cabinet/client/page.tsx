@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
 import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
-import { RoleSwitch } from "@/features/cabinet/components/role-switch";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { ClientBookingsPanel } from "@/features/cabinet/components/client-bookings-panel";
 
@@ -42,7 +41,6 @@ export default async function ClientCabinetPage(props: {
       <CabinetShell
         title="Кабинет клиента"
         subtitle="Личные данные и настройки."
-        right={<RoleSwitch value="client" clientHref="/cabinet/client" providerHref="/cabinet" />}
       >
         <CabinetNavTabs
           activeId="profile"
@@ -61,7 +59,6 @@ export default async function ClientCabinetPage(props: {
     <CabinetShell
       title="Кабинет клиента"
       subtitle="Ваши записи к мастерам и в студии."
-      right={<RoleSwitch value="client" clientHref="/cabinet/client" providerHref="/cabinet" />}
     >
       <CabinetNavTabs
         activeId="bookings"
@@ -74,4 +71,4 @@ export default async function ClientCabinetPage(props: {
       <ClientBookingsPanel />
     </CabinetShell>
   );
-}
+}
