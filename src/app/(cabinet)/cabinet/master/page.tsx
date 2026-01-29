@@ -5,7 +5,6 @@ import { serverApiFetch } from "@/lib/api/server-fetch";
 import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
 import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
-import { MasterServicesPanel } from "@/features/cabinet/components/master-services-panel";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
 
@@ -30,10 +29,13 @@ export default async function MasterCabinetPage(props: {
   const sp =
     props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;
 
-  const tab =
-    sp?.tab === "profile" || sp?.tab === "services" || sp?.tab === "schedule"
-      ? sp.tab
-      : "bookings";
+  const tab = sp?.tab === "profile" || sp?.tab === "schedule" ? sp.tab : "bookings";
+
+  const tabs = [
+    { id: "bookings", label: "Записи клиентов", href: "/cabinet/master?tab=bookings" },
+    { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
+    { id: "profile", label: "Профиль мастера", href: "/cabinet/master?tab=profile" },
+  ];
 
   const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
     "/api/providers/me?type=MASTER"
@@ -99,15 +101,7 @@ export default async function MasterCabinetPage(props: {
         subtitle="Личные данные аккаунта (ФИО, контакты, дата рождения, адрес)."
       >
         <div className="flex items-center justify-between gap-3">
-          <CabinetNavTabs
-            activeId="profile"
-            items={[
-              { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
-              { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
-              { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
-              { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
-            ]}
-          />
+          <CabinetNavTabs activeId="profile" items={tabs} />
           <Link
             href={`/providers/${provider.id}`}
             className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
@@ -121,31 +115,10 @@ export default async function MasterCabinetPage(props: {
         <section className="rounded-2xl border p-5">
           <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
           <p className="mt-2 text-sm text-neutral-600">
-            Отдельно сделаем форму “Профиль мастера” (имя/слоган/адрес/район/категории) —
-            это поля Provider.
+            Отдельно сделаем форму “Профиль мастера” (имя/слоган/адрес/район/категории)
+            — это поля Provider.
           </p>
         </section>
-      </CabinetShell>
-    );
-  }
-
-  if (tab === "services") {
-    return (
-      <CabinetShell
-        title="Кабинет мастера"
-        subtitle="Управляйте списком услуг и ценами."
-      >
-        <CabinetNavTabs
-          activeId="services"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
-            { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
-          ]}
-        />
-
-        <MasterServicesPanel masterId={provider.id} />
       </CabinetShell>
     );
   }
@@ -156,15 +129,7 @@ export default async function MasterCabinetPage(props: {
         title="Кабинет мастера"
         subtitle="Настройте недельное расписание."
       >
-        <CabinetNavTabs
-          activeId="schedule"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
-            { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
-          ]}
-        />
+        <CabinetNavTabs activeId="schedule" items={tabs} />
 
         <MasterSchedulePanel masterId={provider.id} />
       </CabinetShell>
@@ -172,20 +137,9 @@ export default async function MasterCabinetPage(props: {
   }
 
   return (
-    <CabinetShell
-      title="Кабинет мастера"
-      subtitle="Управляйте записями и профилем мастера."
-    >
+    <CabinetShell title="Кабинет мастера" subtitle="Управляйте записями клиентов.">
       <div className="flex items-center justify-between gap-3">
-        <CabinetNavTabs
-          activeId="bookings"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/master?tab=bookings" },
-            { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/master?tab=profile" },
-          ]}
-        />
+        <CabinetNavTabs activeId="bookings" items={tabs} />
         <Link
           href={`/providers/${provider.id}`}
           className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
@@ -196,7 +150,7 @@ export default async function MasterCabinetPage(props: {
 
       <section className="rounded-2xl border p-5">
         <div>
-          <h2 className="text-lg font-semibold">Мои записи</h2>
+          <h2 className="text-lg font-semibold">Записи клиентов</h2>
           <div className="mt-2 text-neutral-700">
             <div className="font-medium">{provider.name}</div>
             <div className="text-sm text-neutral-600">{provider.tagline}</div>

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { prisma } from "@/lib/prisma";
-import { MembershipStatus } from "@prisma/client";
+import { AccountType, MembershipStatus } from "@prisma/client";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export async function Topbar() {
@@ -16,6 +16,19 @@ export async function Topbar() {
         })
       )
     : false;
+  const roles = user?.roles ?? [];
+  const hasMasterRole = roles.includes(AccountType.MASTER);
+  const hasStudioRole =
+    roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
+  const hasActiveMembership = user
+    ? Boolean(
+        await prisma.studioMembership.findFirst({
+          where: { userId: user.id, status: MembershipStatus.ACTIVE },
+          select: { id: true },
+        })
+      )
+    : false;
+  const showStudios = hasStudioRole || hasActiveMembership;
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur dark:bg-bg/70">
@@ -24,7 +37,7 @@ export async function Topbar() {
           <div className="h-10 w-10 rounded-2xl bg-neutral-900 dark:bg-accent" />
           <div className="leading-tight">
             <div className="text-sm font-semibold text-text">BeautyHub</div>
-            <div className="text-xs text-text-muted">запись к мастерам</div>
+            <div className="text-xs text-text-muted">Запись к мастерам</div>
           </div>
         </Link>
 
@@ -36,22 +49,33 @@ export async function Topbar() {
           {user ? (
             <>
               <Button asChild variant="secondary">
-                <Link href="/cabinet?tab=profile">Мой кабинет</Link>
-              </Button>
-
-              <Button asChild variant="secondary" className="hidden sm:inline-flex">
-                <Link href="/cabinet/studio">Мои студии</Link>
-              </Button>
-
-              <Button asChild variant="secondary" className="hidden sm:inline-flex">
                 <Link href="/cabinet?tab=bookings">Мои записи</Link>
               </Button>
 
-              {hasInvites ? (
-                <Button asChild variant="secondary" className="hidden sm:inline-flex">
-                  <Link href="/cabinet/invites">Приглашения</Link>
+              <Button asChild variant="secondary">
+                <Link href="/cabinet?tab=profile">Профиль</Link>
+              </Button>
+
+              {showStudios ? (
+                <Button asChild variant="secondary">
+                  <Link href="/cabinet/studio">Мои студии</Link>
                 </Button>
               ) : null}
+
+              {hasMasterRole ? (
+                <Button asChild variant="secondary">
+                  <Link href="/cabinet/master">Мой кабинет</Link>
+                </Button>
+              ) : null}
+
+              <Button asChild variant="secondary" className="relative">
+                <Link href="/cabinet/invites" aria-label="Уведомления">
+                  <span aria-hidden>🔔</span>
+                  {hasInvites ? (
+                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
+                  ) : null}
+                </Link>
+              </Button>
 
               <ThemeToggle />
               <LogoutButton />

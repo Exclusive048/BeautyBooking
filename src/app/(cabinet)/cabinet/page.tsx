@@ -43,7 +43,7 @@ export default async function CabinetEntryPage(props: {
   const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
   const hasMaster = roles.includes(AccountType.MASTER);
   if (!hasStudio && !hasMaster) {
-    redirect("/onboarding");
+    redirect(`/cabinet/client${tabQs}`);
   }
 
   const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
