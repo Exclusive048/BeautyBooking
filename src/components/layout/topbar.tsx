@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus } from "@prisma/client";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export async function Topbar() {
   const user = await getSessionUser();
@@ -17,13 +18,13 @@ export async function Topbar() {
     : false;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur dark:bg-bg/70">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-neutral-900" />
+          <div className="h-10 w-10 rounded-2xl bg-neutral-900 dark:bg-accent" />
           <div className="leading-tight">
-            <div className="text-sm font-semibold text-neutral-900">BeautyHub</div>
-            <div className="text-xs text-neutral-500">запись к мастерам</div>
+            <div className="text-sm font-semibold text-text">BeautyHub</div>
+            <div className="text-xs text-text-muted">запись к мастерам</div>
           </div>
         </Link>
 
@@ -52,12 +53,16 @@ export async function Topbar() {
                 </Button>
               ) : null}
 
+              <ThemeToggle />
               <LogoutButton />
             </>
           ) : (
-            <Button asChild>
-              <Link href="/login">Вход</Link>
-            </Button>
+            <>
+              <ThemeToggle />
+              <Button asChild>
+                <Link href="/login">Вход</Link>
+              </Button>
+            </>
           )}
         </nav>
       </div>

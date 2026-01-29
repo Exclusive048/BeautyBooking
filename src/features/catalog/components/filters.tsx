@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 
 export type CatalogFiltersState = {
-  query: string; 
+  query: string;
   category: string;
   district: string;
   priceMin: string;
@@ -47,7 +47,7 @@ export function CatalogFilters({
     value.onlyAvailableToday;
 
   return (
-    <Card className="bg-white">
+    <Card>
       <CardContent className="p-5 md:p-6 space-y-5">
         <div className="flex items-center justify-between gap-2">
           <div className="text-sm font-semibold text-neutral-900">Фильтры</div>
@@ -75,8 +75,8 @@ export function CatalogFilters({
         {/* toggle */}
         <label
           className={cn(
-            "flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-neutral-200 p-3 transition",
-            value.onlyAvailableToday ? "bg-neutral-50" : "bg-white hover:bg-neutral-50"
+            "flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border p-3 transition",
+            value.onlyAvailableToday ? "bg-muted" : "bg-surface hover:bg-surface-hover"
           )}
         >
           <div className="min-w-0">
@@ -100,7 +100,7 @@ export function CatalogFilters({
           <select
             value={value.category}
             onChange={(e) => onChange({ ...value, category: e.target.value })}
-            className="h-11 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-900"
+            className="h-11 w-full rounded-2xl border border-border bg-input px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
           >
             <option value="">Любая</option>
             {categories.map((c) => (
@@ -117,7 +117,7 @@ export function CatalogFilters({
           <select
             value={value.district}
             onChange={(e) => onChange({ ...value, district: e.target.value })}
-            className="h-11 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-900"
+            className="h-11 w-full rounded-2xl border border-border bg-input px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
           >
             <option value="">Любой</option>
             {districts.map((d) => (

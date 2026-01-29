@@ -2,5 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { height: 100%; }
-* { -webkit-tap-highlight-color: transparent; }
+@layer base {
+  :root {
+    --bg: 248 246 242;
+    --surface: 255 255 255;
+    --elevated: 252 251 248;
+    --input: 252 251 248;
+    --surface-hover: 246 244 239;
+    --muted: 242 239 233;
+    --border: 228 224 216;
+    --text: 24 23 21;
+    --text-muted: 120 116 111;
+    --accent: 198 169 126;
+    --accent-hover: 214 191 156;
+    --ring: 198 169 126;
+    --shadow: 0 12px 30px rgba(20, 20, 20, 0.08);
+    --accent-foreground: 24 23 21;
+  }
+
+  .dark {
+    --bg: 12 12 13;
+    --surface: 20 20 22;
+    --elevated: 26 26 29;
+    --input: 24 24 27;
+    --surface-hover: 32 32 36;
+    --muted: 30 30 34;
+    --border: 52 52 58;
+    --text: 235 235 238;
+    --text-muted: 160 160 168;
+    --accent: 198 169 126;
+    --accent-hover: 214 191 156;
+    --ring: 198 169 126;
+    --shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+    --accent-foreground: 24 23 21;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: rgb(var(--bg));
+    color: rgb(var(--text));
+  }
+
+  /* ВАЖНО: чтобы Link внутри Button(asChild) наследовал цвет кнопки */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  input,
+  textarea,
+  select {
+    background-color: rgb(var(--input));
+    color: rgb(var(--text));
+    border-color: rgb(var(--border));
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--text-muted));
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: rgb(var(--ring));
+    box-shadow: 0 0 0 2px rgb(var(--ring) / 0.35);
+  }
+
+  /* Чтобы нативные option не выбивались (особенно в dark) */
+  option {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text));
+  }
+}
+
+@layer utilities {
+  .dark .bg-white {
+    background-color: rgb(var(--surface));
+  }
+  .dark .bg-neutral-50 {
+    background-color: rgb(var(--surface));
+  }
+  .dark .bg-neutral-100 {
+    background-color: rgb(var(--muted));
+  }
+  .dark .border-neutral-200 {
+    border-color: rgb(var(--border));
+  }
+  .dark .border-neutral-300 {
+    border-color: rgb(var(--border));
+  }
+  .dark .text-neutral-900 {
+    color: rgb(var(--text));
+  }
+  .dark .text-neutral-800 {
+    color: rgb(var(--text));
+  }
+  .dark .text-neutral-700 {
+    color: rgb(var(--text));
+  }
+  .dark .text-neutral-600 {
+    color: rgb(var(--text-muted));
+  }
+  .dark .text-neutral-500 {
+    color: rgb(var(--text-muted));
+  }
+  .dark .text-neutral-400 {
+    color: rgb(var(--text-muted));
+  }
+}

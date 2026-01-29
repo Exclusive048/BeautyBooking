@@ -176,7 +176,7 @@ export default function LoginClient() {
 
         {nextPath ? (
           <div className="mt-6 text-xs text-neutral-500">
-            После входа вы вернетесь на: <span className="font-mono">{nextPath}</span>
+            После входа вы вернётесь на: <span className="font-mono">{nextPath}</span>
           </div>
         ) : null}
       </div>

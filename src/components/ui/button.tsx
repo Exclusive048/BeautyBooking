@@ -12,10 +12,13 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-neutral-900 text-white hover:bg-neutral-800",
-  secondary: "bg-neutral-100 text-neutral-900 hover:bg-neutral-200",
-  ghost: "bg-transparent text-neutral-900 hover:bg-neutral-100",
-  danger: "bg-red-600 text-white hover:bg-red-500",
+  primary:
+    "bg-accent text-[rgb(var(--accent-foreground))] hover:bg-accent-hover focus-visible:ring-2 focus-visible:ring-ring",
+  secondary:
+    "border border-border bg-surface text-text hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+  ghost:
+    "bg-transparent text-text hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+  danger: "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-500",
 };
 
 const sizes: Record<ButtonSize, string> = {
@@ -37,7 +40,7 @@ export function Button({
   return (
     <Comp
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none",
+        "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none",
         variants[variant],
         sizes[size],
         className

@@ -19,16 +19,16 @@ export default function HomePage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 px-4 sm:px-6 lg:px-8">
       {/* HERO */}
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-neutral-200 bg-white shadow-sm">
-        <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/10 via-transparent to-transparent" />
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-[rgb(var(--border))] bg-[rgb(var(--card))] shadow-[var(--shadow)]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(198,169,126,0.15),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.15),transparent_45%)] dark:bg-[radial-gradient(circle_at_20%_20%,rgba(198,169,126,0.15),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.06),transparent_45%)]" />
         <div className="relative grid gap-8 p-6 md:grid-cols-2 md:items-center md:p-10">
           <div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[rgb(var(--text))] md:text-5xl">
               Запись к бьюти-мастерам{" "}
-              <span className="text-neutral-500">в одном месте</span>
+              <span className="text-[rgb(var(--text-muted))]">в одном месте</span>
             </h1>
 
-            <p className="mt-4 text-base text-neutral-600 md:text-lg">
+            <p className="mt-4 text-base text-[rgb(var(--text-muted))] md:text-lg">
               Выбирай услугу, смотри работы и бронируй время. Всё прозрачно: цены,
               локации, свободные слоты.
             </p>
@@ -43,31 +43,27 @@ export default function HomePage() {
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <Card className="bg-neutral-50">
-                <CardContent className="p-4">
-                  <div className="text-xs text-neutral-500">Салонов</div>
-                  <div className="mt-1 text-xl font-semibold">120+</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-neutral-50">
-                <CardContent className="p-4">
-                  <div className="text-xs text-neutral-500">Мастеров/студий</div>
-                  <div className="mt-1 text-xl font-semibold">1 500+</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-neutral-50">
-                <CardContent className="p-4">
-                  <div className="text-xs text-neutral-500">Средняя оценка</div>
-                  <div className="mt-1 text-xl font-semibold">4.8</div>
-                </CardContent>
-              </Card>
+              {[
+                { label: "Салонов", value: "120+" },
+                { label: "Мастеров/студий", value: "1 500+" },
+                { label: "Средняя оценка", value: "4.8" },
+              ].map((stat) => (
+                <Card key={stat.label} className="bg-[rgb(var(--muted))]">
+                  <CardContent className="p-4">
+                    <div className="text-xs text-[rgb(var(--text-muted))]">{stat.label}</div>
+                    <div className="mt-1 text-xl font-semibold text-[rgb(var(--text))]">
+                      {stat.value}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
 
           {/* Search Card */}
-          <Card className="bg-white">
+          <Card className="bg-[rgb(var(--card))]">
             <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-neutral-900">Быстрый поиск</div>
+              <div className="text-sm font-semibold text-[rgb(var(--text))]">Быстрый поиск</div>
 
               <div className="mt-4 grid gap-3">
                 <Input placeholder="Услуга (маникюр / ресницы / массаж)" />
@@ -77,15 +73,14 @@ export default function HomePage() {
                 </Button>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-3">
+              <div className="mt-6 flex flex-wrap gap-2">
                 {categories.slice(0, 6).map((c) => (
                   <Link
                     key={c.title}
                     href="/providers"
-                    className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-left hover:bg-neutral-100"
+                    className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--muted))] px-3 py-2 text-left text-xs font-medium text-[rgb(var(--text))] transition hover:-translate-y-[1px] hover:bg-[rgb(var(--card))]"
                   >
-                    <div className="text-sm font-semibold text-neutral-900">{c.title}</div>
-                    <div className="mt-1 text-xs text-neutral-500">{c.hint}</div>
+                    {c.title}
                   </Link>
                 ))}
               </div>
@@ -96,10 +91,10 @@ export default function HomePage() {
 
       {/* POPULAR */}
       <Section
-        title="Популярные мастера"
-        subtitle="Подборка на сегодня. Смотреть можно по цене/рейтингу/локации."
+        title="Популярное"
+        subtitle="Подборка на сегодня. Сортируем по цене, рейтингу и локации."
         right={
-          <Link className="text-sm text-neutral-700 hover:underline" href="/providers">
+          <Link className="text-sm text-[rgb(var(--text-muted))] hover:underline" href="/providers">
             Смотреть все →
           </Link>
         }
