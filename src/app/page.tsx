@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
-import { providersMock } from "@/features/catalog/data/mock";
 import { ProviderCard } from "@/features/catalog/components/provider-card";
+import { listProviderCards } from "@/lib/providers/queries";
 
 const categories = [
   { title: "Маникюр", hint: "покрытие, дизайн" },
@@ -15,7 +15,10 @@ const categories = [
   { title: "Визаж", hint: "макияж" },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const providers = await listProviderCards();
+  const popular = providers.slice(0, 6);
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 px-4 sm:px-6 lg:px-8">
       {/* HERO */}
@@ -91,7 +94,7 @@ export default function HomePage() {
 
       {/* POPULAR */}
       <Section
-        title="Популярное"
+        title="Популярные рядом"
         subtitle="Подборка на сегодня. Сортируем по цене, рейтингу и локации."
         right={
           <Link className="text-sm text-[rgb(var(--text-muted))] hover:underline" href="/providers">
@@ -100,7 +103,7 @@ export default function HomePage() {
         }
       >
         <div className="grid gap-4 md:grid-cols-3">
-          {providersMock.map((p) => (
+          {popular.map((p) => (
             <ProviderCard key={p.id} p={p} />
           ))}
         </div>

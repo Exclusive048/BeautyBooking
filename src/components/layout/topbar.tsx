@@ -8,14 +8,17 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export async function Topbar() {
   const user = await getSessionUser();
-  const hasInvites = user?.phone
-    ? Boolean(
-        await prisma.studioInvite.findFirst({
-          where: { phone: user.phone, status: MembershipStatus.PENDING },
-          select: { id: true },
-        })
-      )
-    : false;
+  const invitesCount = user?.phone
+    ? await prisma.studioInvite.count({
+        where: { phone: user.phone, status: MembershipStatus.PENDING },
+      })
+    : 0;
+  const unreadNotificationsCount = user
+    ? await prisma.notification.count({
+        where: { userId: user.id, readAt: null },
+      })
+    : 0;
+  const notificationsCount = invitesCount + unreadNotificationsCount;
   const roles = user?.roles ?? [];
   const hasMasterRole = roles.includes(AccountType.MASTER);
   const hasStudioRole =
@@ -71,8 +74,10 @@ export async function Topbar() {
               <Button asChild variant="secondary" className="relative">
                 <Link href="/cabinet/invites" aria-label="Уведомления">
                   <span aria-hidden>🔔</span>
-                  {hasInvites ? (
-                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
+                  {notificationsCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                      {notificationsCount > 9 ? "9+" : notificationsCount}
+                    </span>
                   ) : null}
                 </Link>
               </Button>

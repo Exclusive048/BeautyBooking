@@ -9,6 +9,13 @@ type MasterItem = {
   studioId: string | null;
 };
 
+type InviteItem = {
+  id: string;
+  phone: string;
+  status: "PENDING" | "ACTIVE" | "REJECTED";
+  createdAt: string;
+};
+
 type Props = {
   studioId: string;
 };
@@ -19,12 +26,16 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
 
 export function StudioMastersPanel({ studioId }: Props) {
   const [items, setItems] = useState<MasterItem[]>([]);
+  const [invites, setInvites] = useState<InviteItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingInvites, setLoadingInvites] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [masterId, setMasterId] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [inviteSent, setInviteSent] = useState<string | null>(null);
 
   const endpoint = useMemo(() => `/api/studios/${studioId}/masters`, [studioId]);
+  const invitesEndpoint = useMemo(() => `/api/studios/${studioId}/invites`, [studioId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,30 +55,51 @@ export function StudioMastersPanel({ studioId }: Props) {
     }
   }, [endpoint]);
 
+  const loadInvites = useCallback(async () => {
+    setLoadingInvites(true);
+    try {
+      const res = await fetch(invitesEndpoint, { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ invites: InviteItem[] }>
+        | null;
+      if (!res.ok) throw new Error(getErrorMessage(json, `API error: ${res.status}`));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load invites"));
+      setInvites(json.data.invites);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoadingInvites(false);
+    }
+  }, [invitesEndpoint]);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadInvites();
+  }, [load, loadInvites]);
 
   const attach = async () => {
-    if (!masterId.trim()) {
-      setError("Укажите ID мастера");
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      setError("??????? ????? ????????");
       return;
     }
     setSaving(true);
     setError(null);
+    setInviteSent(null);
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(invitesEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ masterProviderId: masterId.trim() }),
+        body: JSON.stringify({ phone: trimmed }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ master: MasterItem }>
+        | ApiResponse<{ invite: InviteItem }>
         | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to attach master"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to attach master"));
-      setItems((prev) => [...prev, json.data.master]);
-      setMasterId("");
+      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to send invite"));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to send invite"));
+      setInvites((prev) => [json.data.invite, ...prev.filter((i) => i.id !== json.data.invite.id)]);
+      setPhone("");
+      setInviteSent("??????????? ??????????");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -98,19 +130,19 @@ export function StudioMastersPanel({ studioId }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка мастеров…</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">???????? ?????????</div>;
   }
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border p-4 space-y-3">
-        <div className="text-sm font-semibold">Добавить мастера в студию</div>
+        <div className="text-sm font-semibold">?????????? ??????? ?? ????????</div>
         <div className="flex flex-wrap gap-3">
           <input
             className="rounded-xl border px-3 py-2 text-sm flex-1 min-w-[200px]"
-            placeholder="ID мастера"
-            value={masterId}
-            onChange={(e) => setMasterId(e.target.value)}
+            placeholder="??????? ???????"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
           />
           <button
             type="button"
@@ -118,20 +150,42 @@ export function StudioMastersPanel({ studioId }: Props) {
             disabled={saving}
             className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            Добавить
+            ??????????
           </button>
         </div>
+        {inviteSent ? (
+          <div className="text-xs text-green-700">{inviteSent}</div>
+        ) : null}
       </div>
 
       {error ? (
-        <div className="rounded-2xl border p-4 text-sm text-red-600">Ошибка: {error}</div>
+        <div className="rounded-2xl border p-4 text-sm text-red-600">??????: {error}</div>
       ) : null}
 
       <div className="space-y-3">
-        {items.length === 0 ? (
+        <div className="text-sm font-semibold">???????????</div>
+        {loadingInvites ? (
           <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-            Мастеров пока нет.
+            ???????? ????????????
           </div>
+        ) : invites.length === 0 ? (
+          <div className="rounded-2xl border p-4 text-sm text-neutral-600">
+            ??????????? ???? ???.
+          </div>
+        ) : (
+          invites.map((invite) => (
+            <div key={invite.id} className="rounded-2xl border p-4">
+              <div className="text-sm text-neutral-700">{invite.phone}</div>
+              <div className="text-xs text-neutral-500">??????: {invite.status}</div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="text-sm font-semibold">??????? ??????</div>
+        {items.length === 0 ? (
+          <div className="rounded-2xl border p-4 text-sm text-neutral-600">???????? ???? ???.</div>
         ) : (
           items.map((m) => (
             <div key={m.id} className="rounded-2xl border p-4 flex items-center justify-between gap-3">
@@ -145,7 +199,7 @@ export function StudioMastersPanel({ studioId }: Props) {
                 disabled={saving}
                 className="rounded-xl border px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
               >
-                Удалить
+                ???????
               </button>
             </div>
           ))

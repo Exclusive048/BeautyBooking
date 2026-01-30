@@ -21,6 +21,7 @@ enum MembershipStatus {
   ACTIVE
   PENDING
   REJECTED
+  LEFT
 }
 
 enum AccountType {
@@ -47,6 +48,12 @@ enum ScheduleBreakKind {
   OVERRIDE
 }
 
+enum NotificationType {
+  BOOKING_CREATED
+  BOOKING_CANCELLED
+  BOOKING_RESCHEDULED
+}
+
 model UserProfile {
   id          String        @id @default(cuid())
   roles       AccountType[] @default([CLIENT])
@@ -68,6 +75,7 @@ model UserProfile {
   studioMemberships StudioMembership[]
   studioInvites StudioInvite[] @relation("StudioInvitedBy")
   bookings    Booking[]     @relation("BookingClient")
+  notifications Notification[]
 
   telegram    TelegramLink?
 
@@ -279,11 +287,31 @@ model Booking {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  notifications Notification[]
+
   @@index([providerId])
   @@index([masterProviderId])
   @@index([startAtUtc])
   @@index([serviceId])
   @@index([clientUserId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  body      String?
+  bookingId String?
+  booking   Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  readAt    DateTime?
+
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@index([bookingId])
 }
 
 model WeeklySchedule {

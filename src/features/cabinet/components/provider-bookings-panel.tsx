@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
+import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
 
 type BookingItem = {
   id: string;
@@ -10,7 +11,9 @@ type BookingItem = {
   clientPhone: string;
   comment: string | null;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
-  service: { name: string };
+  providerId: string;
+  masterProviderId: string | null;
+  service: { id: string; name: string };
 };
 
 type Props = {
@@ -27,6 +30,7 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [rescheduleBooking, setRescheduleBooking] = useState<BookingItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,58 +103,92 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка записей…</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">???????? ????????</div>;
   }
 
   if (error) {
     return (
       <div className="rounded-2xl border p-5 text-sm text-red-600">
-        Ошибка загрузки: {error}
+        ?????? ????????: {error}
       </div>
     );
   }
 
   if (items.length === 0) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Записей пока нет.</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">??????? ???? ???.</div>;
   }
 
   return (
-    <div className="space-y-3">
-      {items.map((b) => (
-        <div key={b.id} className="rounded-2xl border p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="font-medium">{b.clientName}</div>
-            <div className="text-sm text-neutral-600">{b.status}</div>
-          </div>
-          <div className="mt-1 text-sm text-neutral-700">
-            {b.slotLabel} • {b.service.name} • {b.clientPhone}
-          </div>
-          {b.comment ? <div className="mt-2 text-sm text-neutral-600">{b.comment}</div> : null}
+    <>
+      <div className="space-y-3">
+        {items.map((b) => (
+          <div key={b.id} className="rounded-2xl border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="font-medium">{b.clientName}</div>
+              <div className="text-sm text-neutral-600">{b.status}</div>
+            </div>
+            <div className="mt-1 text-sm text-neutral-700">
+              {b.slotLabel} ? {b.service.name} ? {b.clientPhone}
+            </div>
+            {b.comment ? <div className="mt-2 text-sm text-neutral-600">{b.comment}</div> : null}
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {canConfirm && b.status === "PENDING" ? (
-              <button
-                type="button"
-                onClick={() => confirmBooking(b.id)}
-                disabled={actionId === b.id}
-                className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
-              >
-                Подтвердить
-              </button>
-            ) : null}
-            {b.status !== "CANCELLED" ? (
-              <button
-                type="button"
-                onClick={() => cancelBooking(b.id)}
-                disabled={actionId === b.id}
-                className="rounded-lg border px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-              >
-                Отменить
-              </button>
-            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canConfirm && b.status === "PENDING" ? (
+                <button
+                  type="button"
+                  onClick={() => confirmBooking(b.id)}
+                  disabled={actionId === b.id}
+                  className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
+                >
+                  ???????????
+                </button>
+              ) : null}
+              {b.status !== "CANCELLED" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRescheduleBooking(b)}
+                    disabled={actionId === b.id}
+                    className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
+                  >
+                    ?????????
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cancelBooking(b.id)}
+                    disabled={actionId === b.id}
+                    className="rounded-lg border px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    ????????
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      {rescheduleBooking ? (
+        <RescheduleModal
+          booking={{
+            id: rescheduleBooking.id,
+            providerId: rescheduleBooking.providerId,
+            masterProviderId: rescheduleBooking.masterProviderId,
+            serviceId: rescheduleBooking.service.id,
+            slotLabel: rescheduleBooking.slotLabel,
+          }}
+          onClose={() => setRescheduleBooking(null)}
+          onSuccess={(next) => {
+            setItems((prev) =>
+              prev.map((item) =>
+                item.id === rescheduleBooking.id
+                  ? { ...item, slotLabel: next.slotLabel }
+                  : item
+              )
+            );
+          }}
+        />
+      ) : null}
+    </>
   );
 }

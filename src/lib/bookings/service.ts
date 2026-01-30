@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createBookingNotifications } from "@/lib/notifications/service";
 
 type BookingWithService = Prisma.BookingGetPayload<{ include: { service: true } }>;
 
@@ -113,6 +114,12 @@ export async function createClientBooking(
     },
     include: { service: true },
   });
+
+  try {
+    await createBookingNotifications({ bookingId: booking.id, kind: "CREATED" });
+  } catch (error) {
+    console.error("Failed to create booking notifications:", error);
+  }
 
   return { ok: true, data: { booking } };
 }

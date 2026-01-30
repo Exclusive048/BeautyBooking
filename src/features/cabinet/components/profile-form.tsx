@@ -30,7 +30,8 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
   const [error, setError] = useState<string | null>(null);
 
   const hasMasterRole = initialUser.roles.includes("MASTER");
-  const hasStudioRole = initialUser.roles.includes("STUDIO") || initialUser.roles.includes("STUDIO_ADMIN");
+  const hasStudioRole =
+    initialUser.roles.includes("STUDIO") || initialUser.roles.includes("STUDIO_ADMIN");
   const hasProfessionalRole = hasMasterRole || hasStudioRole;
   const canAddMasterRole = hasStudioRole && !hasMasterRole;
 

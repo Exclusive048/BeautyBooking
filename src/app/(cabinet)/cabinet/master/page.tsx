@@ -7,6 +7,9 @@ import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
+import { prisma } from "@/lib/prisma";
+import { MembershipStatus, StudioRole } from "@prisma/client";
+import { MasterInfoCard } from "@/features/cabinet/components/master-info-card";
 
 type MeDto = {
   id: string;
@@ -46,10 +49,7 @@ export default async function MasterCabinetPage(props: {
     if (providerResponse.error.code === "FORBIDDEN_ROLE") redirect("/403");
 
     return (
-      <CabinetShell
-        title="Кабинет мастера"
-        subtitle="Ошибка загрузки данных профиля."
-      >
+      <CabinetShell title="Кабинет мастера" subtitle="Ошибка загрузки данных профиля.">
         <div className="rounded-2xl border p-6 text-red-600">
           Ошибка сервера: {providerResponse.error.message}
         </div>
@@ -61,10 +61,7 @@ export default async function MasterCabinetPage(props: {
 
   if (!provider) {
     return (
-      <CabinetShell
-        title="Кабинет мастера"
-        subtitle="Создайте профиль мастера, чтобы принимать записи."
-      >
+      <CabinetShell title="Кабинет мастера" subtitle="Создайте профиль мастера, чтобы принимать записи.">
         <div className="rounded-2xl border p-6">
           <p className="text-neutral-700">
             У вас пока нет профиля провайдера. Создайте профиль мастера, чтобы начать
@@ -95,6 +92,22 @@ export default async function MasterCabinetPage(props: {
 
     if (!meResponse.data.user) redirect("/login");
 
+    const membership = await prisma.studioMembership.findFirst({
+      where: {
+        userId: meResponse.data.user.id,
+        status: MembershipStatus.ACTIVE,
+        roles: { has: StudioRole.MASTER },
+      },
+      select: {
+        studioId: true,
+        studio: { select: { provider: { select: { name: true } } } },
+      },
+    });
+
+    const studioInfo = membership
+      ? { id: membership.studioId, name: membership.studio.provider.name }
+      : null;
+
     return (
       <CabinetShell
         title="Кабинет мастера"
@@ -112,23 +125,14 @@ export default async function MasterCabinetPage(props: {
 
         <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
 
-        <section className="rounded-2xl border p-5">
-          <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
-          <p className="mt-2 text-sm text-neutral-600">
-            Отдельно сделаем форму “Профиль мастера” (имя/слоган/адрес/район/категории)
-            — это поля Provider.
-          </p>
-        </section>
+        <MasterInfoCard address={provider.address} studio={studioInfo} />
       </CabinetShell>
     );
   }
 
   if (tab === "schedule") {
     return (
-      <CabinetShell
-        title="Кабинет мастера"
-        subtitle="Настройте недельное расписание."
-      >
+      <CabinetShell title="Кабинет мастера" subtitle="Настройте недельное расписание.">
         <CabinetNavTabs activeId="schedule" items={tabs} />
 
         <MasterSchedulePanel masterId={provider.id} />

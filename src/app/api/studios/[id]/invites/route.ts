@@ -3,11 +3,56 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { ensureStudioAccess } from "@/lib/studios/access";
 import { prisma } from "@/lib/prisma";
+import { normalizePhone } from "@/lib/auth/otp";
 import { MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
 
 const createSchema = z.object({
   phone: z.string().trim().min(6),
 });
+
+function normalizeInvitePhone(input: string): string {
+  const normalized = normalizePhone(input);
+  if (!normalized) return "";
+  const match = normalized.match(/^\+8(\d{10})$/);
+  if (match) return `+7${match[1]}`;
+  return normalized;
+}
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+
+  const p = params instanceof Promise ? await params : params;
+  const accessError = await ensureStudioAccess(p.id, auth.user.id);
+  if (accessError) return accessError;
+
+  const provider = await prisma.provider.findUnique({
+    where: { id: p.id },
+    select: { id: true, type: true },
+  });
+  if (!provider || provider.type !== ProviderType.STUDIO) {
+    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  }
+
+  const studio = await prisma.studio.findUnique({
+    where: { providerId: provider.id },
+    select: { id: true },
+  });
+  if (!studio) {
+    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  }
+
+  const invites = await prisma.studioInvite.findMany({
+    where: { studioId: studio.id, status: MembershipStatus.PENDING },
+    select: { id: true, phone: true, status: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return ok({ invites });
+}
 
 export async function POST(
   req: Request,
@@ -55,6 +100,10 @@ export async function POST(
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  const phone = normalizeInvitePhone(parsed.data.phone);
+  if (!phone || phone.length < 8) {
+    return fail("Invalid phone", 400, "VALIDATION_ERROR");
+  }
 
   const studio = await prisma.studio.findUnique({
     where: { providerId: provider.id },
@@ -65,11 +114,11 @@ export async function POST(
   }
 
   const invite = await prisma.studioInvite.upsert({
-    where: { studioId_phone: { studioId: studio.id, phone: parsed.data.phone } },
+    where: { studioId_phone: { studioId: studio.id, phone } },
     update: { status: MembershipStatus.PENDING, invitedByUserId: auth.user.id },
     create: {
       studioId: studio.id,
-      phone: parsed.data.phone,
+      phone,
       status: MembershipStatus.PENDING,
       invitedByUserId: auth.user.id,
     },

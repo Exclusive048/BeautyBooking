@@ -4,7 +4,6 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
 import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
-import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { StudioMastersPanel } from "@/features/cabinet/components/studio-masters-panel";
 import { StudioServicesPanel } from "@/features/cabinet/components/studio-services-panel";
 import { StudioOverridesPanel } from "@/features/cabinet/components/studio-overrides-panel";
@@ -13,21 +12,7 @@ import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bo
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus } from "@prisma/client";
-
-type MeDto = {
-  id: string;
-  roles: string[];
-  displayName: string | null;
-  phone: string | null;
-  email: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  middleName: string | null;
-  birthDate: string | null; // yyyy-mm-dd
-  address: string | null;
-  geoLat: number | null;
-  geoLng: number | null;
-};
+import { StudioProfileCard } from "@/features/cabinet/components/studio-profile-card";
 
 type SearchParams = { tab?: string };
 
@@ -61,10 +46,7 @@ export default async function StudioCabinetPage(props: {
 
   if (memberships.length > 1) {
     return (
-      <CabinetShell
-        title="Мои студии"
-        subtitle="Выберите студию, чтобы перейти в кабинет."
-      >
+      <CabinetShell title="Мои студии" subtitle="Выберите студию, чтобы перейти в кабинет.">
         <div className="grid gap-3 md:grid-cols-2">
           {memberships.map((membership) => (
             <Link
@@ -111,10 +93,7 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
     if (providerResponse.error.code === "FORBIDDEN_ROLE") redirect("/403");
 
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Ошибка загрузки данных профиля."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Ошибка загрузки данных профиля.">
         <div className="rounded-2xl border p-6 text-red-600">
           Ошибка сервера: {providerResponse.error.message}
         </div>
@@ -126,10 +105,7 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
 
   if (!provider) {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Создайте профиль студии, чтобы принимать записи."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Создайте профиль студии, чтобы принимать записи.">
         <div className="rounded-2xl border p-6">
           <p className="text-neutral-700">
             У вас пока нет профиля провайдера. Создайте профиль студии, чтобы начать
@@ -151,20 +127,8 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   }
 
   if (tab === "profile") {
-    const meResponse = await serverApiFetch<{ user: MeDto | null }>("/api/me");
-
-    if (!meResponse.ok) {
-      if (meResponse.error.code === "UNAUTHORIZED") redirect("/login");
-      redirect("/403");
-    }
-
-    if (!meResponse.data.user) redirect("/login");
-
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Личные данные владельца/аккаунта (ФИО, контакты, дата рождения, адрес)."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Информация о студии.">
         <div className="flex items-center justify-between gap-3">
           <CabinetNavTabs
             activeId="profile"
@@ -185,25 +149,14 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
           </Link>
         </div>
 
-        <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
-
-        <section className="rounded-2xl border p-5">
-          <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
-          <p className="mt-2 text-sm text-neutral-600">
-            Отдельно сделаем форму “Профиль студии” (название, адрес, район, описание,
-            контакты) — это поля Provider.
-          </p>
-        </section>
+        <StudioProfileCard provider={provider} />
       </CabinetShell>
     );
   }
 
   if (tab === "masters") {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Управляйте мастерами студии."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Управляйте мастерами студии.">
         <CabinetNavTabs
           activeId="masters"
           items={[
@@ -223,10 +176,7 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
 
   if (tab === "services") {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Управляйте каталогом услуг студии."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Управляйте каталогом услуг студии.">
         <CabinetNavTabs
           activeId="services"
           items={[
@@ -246,10 +196,7 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
 
   if (tab === "overrides") {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Настройки услуг для мастеров."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Настройки услуг для мастеров.">
         <CabinetNavTabs
           activeId="overrides"
           items={[
@@ -269,10 +216,7 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
 
   if (tab === "schedule") {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Расписание мастеров студии."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Расписание мастеров студии.">
         <CabinetNavTabs
           activeId="schedule"
           items={[
@@ -291,10 +235,7 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   }
 
   return (
-    <CabinetShell
-      title="Кабинет студии"
-      subtitle="Управляйте записями и профилем студии."
-    >
+    <CabinetShell title="Кабинет студии" subtitle="Управляйте записями и профилем студии.">
       <div className="flex items-center justify-between gap-3">
         <CabinetNavTabs
           activeId="bookings"

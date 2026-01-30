@@ -13,6 +13,8 @@ import { StudioOverridesPanel } from "@/features/cabinet/components/studio-overr
 import { StudioSchedulePanel } from "@/features/cabinet/components/studio-schedule-panel";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
+import { StudioProfileCard } from "@/features/cabinet/components/studio-profile-card";
+import { MasterInfoCard } from "@/features/cabinet/components/master-info-card";
 
 type MeDto = {
   id: string;
@@ -112,7 +114,11 @@ export default async function StudioCabinetByIdPage(props: {
     { id: "schedule", label: "Расписание", href: `/cabinet/studio/${p.studioId}?tab=schedule` },
     { id: "masters", label: "Мастера", href: `/cabinet/studio/${p.studioId}?tab=masters` },
     { id: "services", label: "Услуги", href: `/cabinet/studio/${p.studioId}?tab=services` },
-    { id: "profile", label: "Профиль студии", href: `/cabinet/studio/${p.studioId}?tab=profile` },
+    {
+      id: "profile",
+      label: "Профиль студии",
+      href: `/cabinet/studio/${p.studioId}?tab=profile`,
+    },
     { id: "overrides", label: "Настройки", href: `/cabinet/studio/${p.studioId}?tab=overrides` },
   ];
 
@@ -164,7 +170,38 @@ export default async function StudioCabinetByIdPage(props: {
     <CabinetNavTabs activeId={activeId} items={tabs} />
   );
 
-  if (tab === "profile" || tab === "master-profile") {
+  if (tab === "profile") {
+    const studioProfile = await prisma.provider.findUnique({
+      where: { id: provider.id },
+      select: {
+        name: true,
+        tagline: true,
+        address: true,
+        district: true,
+        categories: true,
+      },
+    });
+
+    if (!studioProfile) redirect("/cabinet/studio");
+
+    return (
+      <CabinetShell title="Кабинет студии" subtitle="Информация о студии.">
+        <div className="flex items-center justify-between gap-3">
+          {renderTabs(tab)}
+          <Link
+            href={`/providers/${provider.id}`}
+            className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+          >
+            Открыть публичную страницу
+          </Link>
+        </div>
+
+        <StudioProfileCard provider={studioProfile} />
+      </CabinetShell>
+    );
+  }
+
+  if (tab === "master-profile") {
     const meResponse = await serverApiFetch<{ user: MeDto | null }>("/api/me");
 
     if (!meResponse.ok) {
@@ -174,20 +211,23 @@ export default async function StudioCabinetByIdPage(props: {
 
     if (!meResponse.data.user) redirect("/login");
 
-    const isMasterProfile = tab === "master-profile";
-    const title = isMasterProfile ? "Профиль мастера" : "Профиль студии";
-    const subtitle = isMasterProfile
-      ? "Личные данные аккаунта мастера (ФИО, контакты, дата рождения, адрес)."
-      : "Личные данные владельца/аккаунта (ФИО, контакты, дата рождения, адрес).";
-    const profileLink = isMasterProfile ? masterProvider?.id : provider.id;
+    const masterProfile = masterProvider
+      ? await prisma.provider.findUnique({
+          where: { id: masterProvider.id },
+          select: { address: true },
+        })
+      : null;
 
     return (
-      <CabinetShell title="Кабинет студии" subtitle={subtitle}>
+      <CabinetShell
+        title="Кабинет студии"
+        subtitle="Личные данные аккаунта мастера (ФИО, контакты, дата рождения, адрес)."
+      >
         <div className="flex items-center justify-between gap-3">
           {renderTabs(tab)}
-          {profileLink ? (
+          {masterProvider ? (
             <Link
-              href={`/providers/${profileLink}`}
+              href={`/providers/${masterProvider.id}`}
               className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
             >
               Открыть публичную страницу
@@ -197,23 +237,20 @@ export default async function StudioCabinetByIdPage(props: {
 
         <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
 
-        <section className="rounded-2xl border p-5">
-          <h3 className="text-sm font-semibold">Дальше (следующий шаг)</h3>
-          <p className="mt-2 text-sm text-neutral-600">
-            Отдельно сделаем форму “{title}” (название, адрес, район, описание,
-            категории) — это поля Provider.
-          </p>
-        </section>
+        {masterProfile ? (
+          <MasterInfoCard address={masterProfile.address} studio={{ id: studio.id, name: provider.name }} />
+        ) : (
+          <div className="rounded-2xl border p-5 text-sm text-neutral-600">
+            Не найден профиль мастера для студийного кабинета.
+          </div>
+        )}
       </CabinetShell>
     );
   }
 
   if (tab === "masters") {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Добавляйте и приглашайте мастеров в студию."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Добавляйте и приглашайте мастеров в студию.">
         {renderTabs("masters")}
 
         <StudioMastersPanel studioId={provider.id} />
@@ -223,10 +260,7 @@ export default async function StudioCabinetByIdPage(props: {
 
   if (tab === "services") {
     return (
-      <CabinetShell
-        title="Кабинет студии"
-        subtitle="Управляйте списком услуг и ценами."
-      >
+      <CabinetShell title="Кабинет студии" subtitle="Управляйте списком услуг и ценами.">
         {renderTabs("services")}
 
         <StudioServicesPanel studioId={provider.id} />
@@ -267,9 +301,7 @@ export default async function StudioCabinetByIdPage(props: {
   return (
     <CabinetShell
       title="Кабинет студии"
-      subtitle={
-        isMasterOnly ? "Мои записи." : "Управляйте записями и профилем студии."
-      }
+      subtitle={isMasterOnly ? "Мои записи." : "Управляйте записями и профилем студии."}
     >
       <div className="flex items-center justify-between gap-3">
         {renderTabs("bookings")}

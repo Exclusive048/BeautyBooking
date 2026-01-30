@@ -2,10 +2,19 @@ import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
 import type { BookingCancelInput, BookingCreateInput } from "@/lib/domain/bookings";
 import { ProviderType } from "@prisma/client";
+import { createBookingNotifications } from "@/lib/notifications/service";
 
 type BookingRecord = {
   id: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
+};
+
+type RescheduleRecord = {
+  id: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  slotLabel: string;
+  startAtUtc: Date | null;
+  endAtUtc: Date | null;
 };
 
 function normalizeBufferMinutes(value: number | null | undefined): number {
@@ -25,6 +34,47 @@ function isValidDate(value: Date | null | undefined): value is Date {
 
 function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart < bEnd && aEnd > bStart;
+}
+
+async function ensureNoConflictsExcluding(
+  bookingId: string,
+  providerId: string,
+  masterProviderId: string | null,
+  startAtUtc: Date,
+  endAtUtc: Date,
+  bufferMin: number
+): Promise<Result<null>> {
+  const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
+  const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
+
+  const conflictWhere = masterProviderId
+    ? { providerId, masterProviderId }
+    : { providerId };
+
+  const conflicts = await prisma.booking.findMany({
+    where: {
+      ...conflictWhere,
+      id: { not: bookingId },
+      status: { not: "CANCELLED" },
+      startAtUtc: { not: null, lt: bufferedEnd },
+      endAtUtc: { not: null, gt: bufferedStart },
+    },
+    select: { id: true, startAtUtc: true, endAtUtc: true },
+    take: 1,
+  });
+
+  const conflict = conflicts.find((b) => {
+    if (!b.startAtUtc || !b.endAtUtc) return false;
+    const itemStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
+    const itemEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
+    return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
+  });
+
+  if (conflict) {
+    return { ok: false, status: 409, message: "Time slot is not available", code: "SLOT_CONFLICT" };
+  }
+
+  return { ok: true, data: null };
 }
 
 export async function createBooking(input: BookingCreateInput): Promise<Result<BookingRecord>> {
@@ -124,6 +174,12 @@ export async function createBooking(input: BookingCreateInput): Promise<Result<B
     },
     select: { id: true, status: true },
   });
+
+  try {
+    await createBookingNotifications({ bookingId: created.id, kind: "CREATED" });
+  } catch (error) {
+    console.error("Failed to create booking notifications:", error);
+  }
 
   return { ok: true, data: created };
 }
@@ -271,6 +327,73 @@ export async function cancelBooking(input: BookingCancelInput): Promise<Result<B
     },
     select: { id: true, status: true },
   });
+
+  try {
+    await createBookingNotifications({ bookingId: updated.id, kind: "CANCELLED" });
+  } catch (error) {
+    console.error("Failed to create booking notifications:", error);
+  }
+
+  return { ok: true, data: updated };
+}
+
+export async function rescheduleBooking(input: {
+  bookingId: string;
+  startAtUtc: Date;
+  endAtUtc: Date;
+  slotLabel: string;
+}): Promise<Result<RescheduleRecord>> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: input.bookingId },
+    select: {
+      id: true,
+      status: true,
+      providerId: true,
+      masterProviderId: true,
+    },
+  });
+  if (!booking) return { ok: false, status: 404, message: "Booking not found", code: "BOOKING_NOT_FOUND" };
+
+  if (booking.status === "CANCELLED") {
+    return { ok: false, status: 409, message: "Booking cancelled", code: "BOOKING_CANCELLED" };
+  }
+
+  if (!isValidDate(input.startAtUtc) || !isValidDate(input.endAtUtc)) {
+    return { ok: false, status: 400, message: "Invalid booking time", code: "DATE_INVALID" };
+  }
+
+  const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
+  const conflict = await ensureNoConflictsExcluding(
+    booking.id,
+    booking.providerId,
+    booking.masterProviderId ?? null,
+    input.startAtUtc,
+    input.endAtUtc,
+    bufferMin
+  );
+  if (!conflict.ok) return conflict;
+
+  const updated = await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      startAtUtc: input.startAtUtc,
+      endAtUtc: input.endAtUtc,
+      slotLabel: input.slotLabel,
+    },
+    select: {
+      id: true,
+      status: true,
+      slotLabel: true,
+      startAtUtc: true,
+      endAtUtc: true,
+    },
+  });
+
+  try {
+    await createBookingNotifications({ bookingId: updated.id, kind: "RESCHEDULED" });
+  } catch (error) {
+    console.error("Failed to create booking notifications:", error);
+  }
 
   return { ok: true, data: updated };
 }
