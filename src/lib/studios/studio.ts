@@ -67,3 +67,65 @@ export async function getStudioProviderById(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
   };
 }
+
+export type StudioProfileUpdate = {
+  name?: string;
+  tagline?: string;
+  address?: string;
+  district?: string;
+};
+
+export async function updateStudioProviderProfile(
+  providerId: string,
+  input: StudioProfileUpdate
+): Promise<StudioProviderPrivateDto | null> {
+  const provider = await prisma.provider.update({
+    where: { id: providerId },
+    data: {
+      name: input.name,
+      tagline: input.tagline,
+      address: input.address,
+      district: input.district,
+    },
+    select: {
+      id: true,
+      type: true,
+      name: true,
+      tagline: true,
+      address: true,
+      district: true,
+      categories: true,
+      contactName: true,
+      contactPhone: true,
+      contactEmail: true,
+      description: true,
+      avatarUrl: true,
+      geoLat: true,
+      geoLng: true,
+      isPublished: true,
+      timezone: true,
+      bufferBetweenBookingsMin: true,
+    },
+  });
+
+  if (!provider || provider.type !== ProviderType.STUDIO) return null;
+
+  return {
+    id: provider.id,
+    name: provider.name,
+    tagline: provider.tagline,
+    address: provider.address,
+    district: provider.district,
+    categories: provider.categories,
+    contactName: provider.contactName,
+    contactPhone: provider.contactPhone,
+    contactEmail: provider.contactEmail,
+    description: provider.description,
+    avatarUrl: provider.avatarUrl,
+    geoLat: provider.geoLat,
+    geoLng: provider.geoLng,
+    isPublished: provider.isPublished,
+    timezone: provider.timezone,
+    bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
+  };
+}

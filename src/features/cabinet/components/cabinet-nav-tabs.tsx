@@ -13,12 +13,12 @@ export function CabinetNavTabs({
   items: CabinetNavItem[];
   activeId: string;
 }) {
-  const base = "rounded-xl px-3 py-2 text-sm font-medium";
+  const base = "rounded-xl px-3 py-2 text-sm font-medium whitespace-nowrap";
   const on = "bg-black text-white";
   const off = "border hover:bg-neutral-50";
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
       {items.map((item) => (
         <Link
           key={item.id}

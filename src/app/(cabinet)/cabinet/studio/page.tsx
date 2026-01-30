@@ -128,28 +128,35 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
 
   if (tab === "profile") {
     return (
-      <CabinetShell title="Кабинет студии" subtitle="Информация о студии.">
-        <div className="flex items-center justify-between gap-3">
-          <CabinetNavTabs
-            activeId="profile"
-            items={[
-              { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
-              { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
-              { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
-              { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
-              { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
-              { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
-            ]}
-          />
+      <CabinetShell
+        title="Кабинет студии"
+        subtitle="Информация о студии."
+        right={
           <Link
             href={`/providers/${provider.id}`}
-            className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+            className="rounded-xl border px-3 py-2 text-sm font-medium whitespace-nowrap hover:bg-neutral-50"
           >
-            Открыть публичную страницу
+            Публичная страница
           </Link>
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CabinetNavTabs
+              activeId="profile"
+              items={[
+                { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
+                { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
+                { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
+                { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
+                { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
+                { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
+              ]}
+            />
+          </div>
         </div>
 
-        <StudioProfileCard provider={provider} />
+        <StudioProfileCard provider={provider} studioId={provider.id} canEdit />
       </CabinetShell>
     );
   }
@@ -157,17 +164,21 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   if (tab === "masters") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Управляйте мастерами студии.">
-        <CabinetNavTabs
-          activeId="masters"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
-            { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
-            { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
-            { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
-          ]}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CabinetNavTabs
+              activeId="masters"
+              items={[
+                { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
+                { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
+                { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
+                { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
+                { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
+                { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
+              ]}
+            />
+          </div>
+        </div>
 
         <StudioMastersPanel studioId={provider.id} />
       </CabinetShell>
@@ -177,17 +188,21 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   if (tab === "services") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Управляйте каталогом услуг студии.">
-        <CabinetNavTabs
-          activeId="services"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
-            { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
-            { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
-            { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
-          ]}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CabinetNavTabs
+              activeId="services"
+              items={[
+                { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
+                { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
+                { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
+                { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
+                { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
+                { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
+              ]}
+            />
+          </div>
+        </div>
 
         <StudioServicesPanel studioId={provider.id} />
       </CabinetShell>
@@ -197,17 +212,21 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   if (tab === "overrides") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Настройки услуг для мастеров.">
-        <CabinetNavTabs
-          activeId="overrides"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
-            { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
-            { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
-            { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
-          ]}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CabinetNavTabs
+              activeId="overrides"
+              items={[
+                { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
+                { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
+                { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
+                { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
+                { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
+                { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
+              ]}
+            />
+          </div>
+        </div>
 
         <StudioOverridesPanel studioId={provider.id} />
       </CabinetShell>
@@ -217,17 +236,21 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   if (tab === "schedule") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Расписание мастеров студии.">
-        <CabinetNavTabs
-          activeId="schedule"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
-            { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
-            { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
-            { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
-          ]}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CabinetNavTabs
+              activeId="schedule"
+              items={[
+                { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
+                { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
+                { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
+                { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
+                { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
+                { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
+              ]}
+            />
+          </div>
+        </div>
 
         <StudioSchedulePanel studioId={provider.id} />
       </CabinetShell>
@@ -235,25 +258,32 @@ async function renderLegacyStudioCabinet(sp?: SearchParams) {
   }
 
   return (
-    <CabinetShell title="Кабинет студии" subtitle="Управляйте записями и профилем студии.">
-      <div className="flex items-center justify-between gap-3">
-        <CabinetNavTabs
-          activeId="bookings"
-          items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
-            { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
-            { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
-            { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
-            { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
-            { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
-          ]}
-        />
+    <CabinetShell
+      title="Кабинет студии"
+      subtitle="Управляйте записями и профилем студии."
+      right={
         <Link
           href={`/providers/${provider.id}`}
-          className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+          className="rounded-xl border px-3 py-2 text-sm font-medium whitespace-nowrap hover:bg-neutral-50"
         >
-          Открыть публичную страницу
+          Публичная страница
         </Link>
+      }
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <CabinetNavTabs
+            activeId="bookings"
+            items={[
+              { id: "bookings", label: "Записи", href: "/cabinet/studio?tab=bookings" },
+              { id: "masters", label: "Мастера", href: "/cabinet/studio?tab=masters" },
+              { id: "services", label: "Услуги", href: "/cabinet/studio?tab=services" },
+              { id: "overrides", label: "Настройки", href: "/cabinet/studio?tab=overrides" },
+              { id: "schedule", label: "Расписание", href: "/cabinet/studio?tab=schedule" },
+              { id: "profile", label: "Профиль", href: "/cabinet/studio?tab=profile" },
+            ]}
+          />
+        </div>
       </div>
 
       <section className="rounded-2xl border p-5">

@@ -201,18 +201,27 @@ export default async function StudioCabinetByIdPage(props: {
     if (!studioProfile) redirect("/cabinet/studio");
 
     return (
-      <CabinetShell title="Кабинет студии" subtitle="Информация о студии.">
-        <div className="flex items-center justify-between gap-3">
-          {renderTabs(tab)}
+      <CabinetShell
+        title="Кабинет студии"
+        subtitle="Информация о студии."
+        right={
           <Link
             href={`/providers/${provider.id}`}
-            className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+            className="rounded-xl border px-3 py-2 text-sm font-medium whitespace-nowrap hover:bg-neutral-50"
           >
-            Открыть публичную страницу
+            Публичная страница
           </Link>
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{renderTabs(tab)}</div>
         </div>
 
-        <StudioProfileCard provider={studioProfile} />
+        <StudioProfileCard
+          provider={studioProfile}
+          studioId={provider.id}
+          canEdit={isAdmin}
+        />
       </CabinetShell>
     );
   }
@@ -250,17 +259,19 @@ export default async function StudioCabinetByIdPage(props: {
       <CabinetShell
         title="Кабинет студии"
         subtitle="Личные данные аккаунта мастера (ФИО, контакты, дата рождения, адрес)."
-      >
-        <div className="flex items-center justify-between gap-3">
-          {renderTabs(tab)}
-          {masterProvider ? (
+        right={
+          masterProvider ? (
             <Link
               href={`/providers/${masterProvider.id}`}
-              className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+              className="rounded-xl border px-3 py-2 text-sm font-medium whitespace-nowrap hover:bg-neutral-50"
             >
-              Открыть публичную страницу
+              Публичная страница
             </Link>
-          ) : null}
+          ) : null
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{renderTabs(tab)}</div>
         </div>
 
         <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
@@ -274,6 +285,7 @@ export default async function StudioCabinetByIdPage(props: {
               roleLabel,
               canLeave,
             }}
+            canEditProfile={Boolean(masterProvider)}
           />
         ) : (
           <div className="rounded-2xl border p-5 text-sm text-neutral-600">
@@ -305,7 +317,9 @@ export default async function StudioCabinetByIdPage(props: {
         title="Кабинет студии"
         subtitle="Добавляйте и приглашайте мастеров в студию."
       >
-        {renderTabs("masters")}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{renderTabs("masters")}</div>
+        </div>
 
         <StudioMastersPanel studioId={provider.id} canManage={isAdmin} />
       </CabinetShell>
@@ -315,7 +329,9 @@ export default async function StudioCabinetByIdPage(props: {
   if (tab === "services") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Управляйте списком услуг и ценами.">
-        {renderTabs("services")}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{renderTabs("services")}</div>
+        </div>
 
         {isAdmin ? (
           <div className="space-y-6">
@@ -349,7 +365,9 @@ export default async function StudioCabinetByIdPage(props: {
   if (tab === "overrides") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Настройки услуг и расписания.">
-        {renderTabs("overrides")}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{renderTabs("overrides")}</div>
+        </div>
 
         <StudioOverridesPanel studioId={provider.id} />
       </CabinetShell>
@@ -359,7 +377,9 @@ export default async function StudioCabinetByIdPage(props: {
   if (tab === "schedule") {
     return (
       <CabinetShell title="Кабинет студии" subtitle="Расписание мастеров.">
-        {renderTabs("schedule")}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{renderTabs("schedule")}</div>
+        </div>
 
         {isMasterOnly ? (
           masterProvider ? (
@@ -380,15 +400,35 @@ export default async function StudioCabinetByIdPage(props: {
     <CabinetShell
       title="Кабинет студии"
       subtitle={isMasterOnly ? "Мои записи." : "Управляйте записями и профилем студии."}
+      right={
+        <Link
+          href={`/providers/${provider.id}`}
+          className="rounded-xl border px-3 py-2 text-sm font-medium whitespace-nowrap hover:bg-neutral-50"
+        >
+          Публичная страница
+        </Link>
+      }
     >
-      <div className="flex items-center justify-between gap-3">
-        {renderTabs("bookings")}
-        <div className="flex items-center gap-3">
+      <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+        <div className="min-w-0 pr-2">{renderTabs("bookings")}</div>
+      </div>
+
+      <section className="rounded-2xl border p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">
+              {isMasterOnly ? "Мои записи" : "Записи студии"}
+            </h2>
+            <div className="mt-2 text-neutral-700">
+              <div className="font-medium">{provider.name}</div>
+              <div className="text-sm text-neutral-600">{provider.tagline}</div>
+            </div>
+          </div>
           {isAdminAndMaster ? (
-            <div className="inline-flex items-center gap-1 rounded-2xl border p-1">
+            <div className="inline-flex items-center whitespace-nowrap rounded-xl border p-1">
               <Link
                 href={`/cabinet/studio/${p.studioId}?tab=bookings&scope=all`}
-                className={`rounded-xl px-3 py-1 text-sm font-medium ${
+                className={`rounded-lg px-3 py-1 text-sm font-medium ${
                   bookingScope === "all" ? "bg-black text-white" : "hover:bg-neutral-50"
                 }`}
               >
@@ -396,7 +436,7 @@ export default async function StudioCabinetByIdPage(props: {
               </Link>
               <Link
                 href={`/cabinet/studio/${p.studioId}?tab=bookings&scope=my`}
-                className={`rounded-xl px-3 py-1 text-sm font-medium ${
+                className={`rounded-lg px-3 py-1 text-sm font-medium ${
                   bookingScope === "my" ? "bg-black text-white" : "hover:bg-neutral-50"
                 }`}
               >
@@ -404,24 +444,6 @@ export default async function StudioCabinetByIdPage(props: {
               </Link>
             </div>
           ) : null}
-          <Link
-            href={`/providers/${provider.id}`}
-            className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
-          >
-            Открыть публичную страницу
-          </Link>
-        </div>
-      </div>
-
-      <section className="rounded-2xl border p-5">
-        <div>
-          <h2 className="text-lg font-semibold">
-            {isMasterOnly ? "Мои записи" : "Записи студии"}
-          </h2>
-          <div className="mt-2 text-neutral-700">
-            <div className="font-medium">{provider.name}</div>
-            <div className="text-sm text-neutral-600">{provider.tagline}</div>
-          </div>
         </div>
 
         <div className="mt-4">
