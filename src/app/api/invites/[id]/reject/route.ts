@@ -1,35 +1,23 @@
-import { NextResponse } from "next/server";
-import { MembershipStatus } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth/session";
+import { ok, fail } from "@/lib/api/response";
+import { requireAuth } from "@/lib/auth/guards";
+import { rejectStudioInvite } from "@/lib/invites/service";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(new URL("/login", req.url));
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
+  if (!p.id) return fail("Invite id is required", 400, "VALIDATION_ERROR");
 
-  const invite = await prisma.studioInvite.findUnique({
-    where: { id: p.id },
-    select: { id: true, phone: true, status: true },
+  const result = await rejectStudioInvite(p.id, {
+    id: auth.user.id,
+    phone: auth.user.phone,
   });
 
-  if (!invite || invite.status !== MembershipStatus.PENDING) {
-    return NextResponse.redirect(new URL("/cabinet", req.url));
-  }
+  if (!result.ok) return fail(result.message, result.status, result.code);
 
-  if (!user.phone || user.phone !== invite.phone) {
-    return NextResponse.redirect(new URL("/403", req.url));
-  }
-
-  await prisma.studioInvite.update({
-    where: { id: invite.id },
-    data: { status: MembershipStatus.REJECTED },
-    select: { id: true },
-  });
-
-  return NextResponse.redirect(new URL("/cabinet", req.url));
+  return ok({ inviteId: result.data.inviteId });
 }

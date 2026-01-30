@@ -1,16 +1,16 @@
-# BeautyHub 💅✨
+# BeautyHub
 
-**City-wide beauty booking platform** — a single entry point for clients, solo masters, and studios.
+**City-wide beauty booking platform** - a single entry point for clients, solo masters, and studios.
 
-BeautyHub is a marketplace-style booking app inspired by “doctor directories”, but built for beauty services:
-clients discover providers by service, location, and price — then book an appointment in a couple of clicks.
+BeautyHub is a marketplace-style booking app inspired by "doctor directories", but built for beauty services:
+clients discover providers by service, location, and price - then book an appointment in a couple of clicks.
 
-> **Status:** MVP in active development 🚧  
-> **Goal:** Launch in one city → validate demand → scale to other cities.
+> **Status:** MVP in active development  
+> **Goal:** Launch in one city -> validate demand -> scale to other cities.
 
 ---
 
-## 🚀 Key Idea
+## Key Idea
 
 ### For clients
 
@@ -30,14 +30,14 @@ clients discover providers by service, location, and price — then book an appo
 
 ---
 
-## ✅ MVP Features
+## MVP Features
 
 ### Public
 
-- `/providers` — catalog with tabs (All / Masters / Studios)
-- Filters: category, district, price, “available today”
+- `/providers` - catalog with tabs (All / Masters / Studios)
+- Filters: category, district, price, "available today"
 - Search across provider name/tagline/categories
-- `/providers/[id]` — provider profile + booking widget
+- `/providers/[id]` - provider profile + booking widget
 
 ### Bookings
 
@@ -46,17 +46,17 @@ clients discover providers by service, location, and price — then book an appo
 
 ### Provider dashboards (MVP)
 
-- `/master` — master dashboard (currently linked to demo provider `p1`)
-- `/studio` — studio dashboard (currently linked to demo provider `p2`)
+- `/master` - master dashboard (currently linked to demo provider `p1`)
+- `/studio` - studio dashboard (currently linked to demo provider `p2`)
 
 ---
 
-## 🧩 Subscription Model (planned)
+## Subscription Model (planned)
 
 We design the architecture for **3 subscription tiers**, applicable for both solo masters and studios:
 
 1. **Private (link-only)**  
-   Works as a booking link — not visible in public search or map.
+   Works as a booking link - not visible in public search or map.
 
 2. **Listed (public catalog + map)**  
    Visible inside the marketplace, can be discovered organically.
@@ -66,7 +66,7 @@ We design the architecture for **3 subscription tiers**, applicable for both sol
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Next.js (App Router)**
 - **React + TypeScript**
@@ -76,9 +76,9 @@ We design the architecture for **3 subscription tiers**, applicable for both sol
 ---
 
 ## Smoke checklist
-- logged-in ? /login redirects to /cabinet?tab=profile
-- ????? ?? ????????? ?????????? ????????? /providers/[id] ? /studios/[id]
-- ??????: ???? ???????/??? ??????? ????? ? /cabinet?tab=profile|bookings
-- ??????? ?? ???????? ?????????? ? /cabinet/invites
-- ?????? ????? ????? ?? ?????? (?????? ? ??????? ???????)
-- reschedule: ?????? ??????????? ????????? ??????? ? ???????????? ???????
+- logged-in -> /login redirects to /cabinet?tab=profile
+- переход на страницы провайдеров: /providers/[id] и /studios/[id]
+- кабинет: после логина доступен /cabinet?tab=profile|bookings
+- приглашения и уведомления доступны в /cabinet/invites
+- смена роли мастер/студия (мастер и владелец студии)
+- reschedule: перенос записи в расписании мастера и в списке записей клиента

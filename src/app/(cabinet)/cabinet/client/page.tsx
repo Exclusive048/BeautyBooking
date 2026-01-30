@@ -18,6 +18,8 @@ type MeDto = {
   address: string | null;
   geoLat: number | null;
   geoLng: number | null;
+  hasMasterProfile: boolean;
+  hasStudioProfile: boolean;
 };
 
 export default async function ClientCabinetPage(props: {
@@ -38,10 +40,7 @@ export default async function ClientCabinetPage(props: {
     if (!meResponse.data.user) redirect("/login");
 
     return (
-      <CabinetShell
-        title="Кабинет клиента"
-        subtitle="Личные данные и настройки."
-      >
+      <CabinetShell title="Кабинет клиента" subtitle="Личные данные и настройки.">
         <CabinetNavTabs
           activeId="profile"
           items={[
@@ -56,10 +55,7 @@ export default async function ClientCabinetPage(props: {
   }
 
   return (
-    <CabinetShell
-      title="Кабинет клиента"
-      subtitle="Ваши записи к мастерам и в студии."
-    >
+    <CabinetShell title="Кабинет клиента" subtitle="Ваши записи к мастерам и в студии.">
       <CabinetNavTabs
         activeId="bookings"
         items={[

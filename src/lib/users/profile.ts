@@ -1,3 +1,4 @@
+import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ProfileUpdateInput } from "@/lib/users/schemas";
 
@@ -14,6 +15,8 @@ export type MeProfile = {
   address: string | null;
   geoLat: number | null;
   geoLng: number | null;
+  hasMasterProfile: boolean;
+  hasStudioProfile: boolean;
 };
 
 function serializeBirthDate(date: Date | null): string | null {
@@ -21,29 +24,41 @@ function serializeBirthDate(date: Date | null): string | null {
 }
 
 export async function getMeProfile(userId: string): Promise<MeProfile | null> {
-  const profile = await prisma.userProfile.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      roles: true,
-      displayName: true,
-      phone: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      middleName: true,
-      birthDate: true,
-      address: true,
-      geoLat: true,
-      geoLng: true,
-    },
-  });
+  const [profile, masterProfile, studioProvider] = await prisma.$transaction([
+    prisma.userProfile.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        roles: true,
+        displayName: true,
+        phone: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        birthDate: true,
+        address: true,
+        geoLat: true,
+        geoLng: true,
+      },
+    }),
+    prisma.masterProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    }),
+    prisma.provider.findFirst({
+      where: { ownerUserId: userId, type: ProviderType.STUDIO },
+      select: { studioProfile: { select: { id: true } } },
+    }),
+  ]);
 
   if (!profile) return null;
 
   return {
     ...profile,
     birthDate: serializeBirthDate(profile.birthDate),
+    hasMasterProfile: Boolean(masterProfile),
+    hasStudioProfile: Boolean(studioProvider?.studioProfile),
   };
 }
 
@@ -89,8 +104,21 @@ export async function updateMeProfile(
     },
   });
 
+  const [masterProfile, studioProvider] = await prisma.$transaction([
+    prisma.masterProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    }),
+    prisma.provider.findFirst({
+      where: { ownerUserId: userId, type: ProviderType.STUDIO },
+      select: { studioProfile: { select: { id: true } } },
+    }),
+  ]);
+
   return {
     ...updated,
     birthDate: serializeBirthDate(updated.birthDate),
+    hasMasterProfile: Boolean(masterProfile),
+    hasStudioProfile: Boolean(studioProvider?.studioProfile),
   };
 }

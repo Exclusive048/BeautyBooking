@@ -1,67 +1,28 @@
-import { NextResponse } from "next/server";
-import { AccountType, MembershipStatus, StudioRole } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth/session";
-import { addRoleToUser } from "@/lib/auth/roles";
+import { ok, fail } from "@/lib/api/response";
+import { requireAuth } from "@/lib/auth/guards";
+import { acceptStudioInvite } from "@/lib/invites/service";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(new URL("/login", req.url));
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
+  if (!p.id) return fail("Invite id is required", 400, "VALIDATION_ERROR");
 
-  const invite = await prisma.studioInvite.findUnique({
-    where: { id: p.id },
-    select: { id: true, phone: true, studioId: true, status: true },
+  const result = await acceptStudioInvite(p.id, {
+    id: auth.user.id,
+    phone: auth.user.phone,
+    roles: auth.user.roles,
   });
 
-  if (!invite || invite.status !== MembershipStatus.PENDING) {
-    return NextResponse.redirect(new URL("/cabinet", req.url));
-  }
+  if (!result.ok) return fail(result.message, result.status, result.code);
 
-  if (!user.phone || user.phone !== invite.phone) {
-    return NextResponse.redirect(new URL("/403", req.url));
-  }
-
-  const existingMembership = await prisma.studioMembership.findUnique({
-    where: { userId_studioId: { userId: user.id, studioId: invite.studioId } },
-    select: { id: true, roles: true },
+  return ok({
+    inviteId: result.data.inviteId,
+    studioId: result.data.studioId,
+    memberId: result.data.memberId,
   });
-
-  const nextRoles = existingMembership
-    ? Array.from(new Set([...existingMembership.roles, StudioRole.MASTER]))
-    : [StudioRole.MASTER];
-
-  if (existingMembership) {
-    await prisma.studioMembership.update({
-      where: { id: existingMembership.id },
-      data: { status: MembershipStatus.ACTIVE, roles: nextRoles },
-      select: { id: true },
-    });
-  } else {
-    await prisma.studioMembership.create({
-      data: {
-        userId: user.id,
-        studioId: invite.studioId,
-        status: MembershipStatus.ACTIVE,
-        roles: nextRoles,
-      },
-      select: { id: true },
-    });
-  }
-
-  await prisma.studioInvite.update({
-    where: { id: invite.id },
-    data: { status: MembershipStatus.ACTIVE },
-    select: { id: true },
-  });
-
-  if (!user.roles.includes(AccountType.MASTER)) {
-    await addRoleToUser(user.id, user.roles, AccountType.MASTER);
-  }
-
-  return NextResponse.redirect(new URL(`/cabinet/studio/${invite.studioId}`, req.url));
 }

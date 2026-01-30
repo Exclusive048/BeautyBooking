@@ -70,18 +70,18 @@ export function ClientBookingsPanel() {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">?????????</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загружаем записи</div>;
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border p-5 text-sm text-red-600">??????: {error}</div>
+      <div className="rounded-2xl border p-5 text-sm text-red-600">Ошибка: {error}</div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border p-5 text-sm text-neutral-600">??????? ???? ???.</div>
+      <div className="rounded-2xl border p-5 text-sm text-neutral-600">Записей пока нет.</div>
     );
   }
 
@@ -95,10 +95,10 @@ export function ClientBookingsPanel() {
               <div className="text-sm text-neutral-600">{b.status}</div>
             </div>
             <div className="mt-1 text-sm text-neutral-700">
-              {b.slotLabel} ? {b.service.name}
+              {b.slotLabel} · {b.service.name}
             </div>
             <div className="mt-1 text-sm text-neutral-600">
-              {b.provider.district} ? {b.provider.address}
+              {b.provider.district} · {b.provider.address}
             </div>
             {b.comment ? <div className="mt-2 text-sm text-neutral-600">{b.comment}</div> : null}
             {b.status !== "CANCELLED" ? (
@@ -109,7 +109,7 @@ export function ClientBookingsPanel() {
                   disabled={actionId === b.id}
                   className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
                 >
-                  ?????????
+                  Перенести
                 </button>
                 <button
                   type="button"
@@ -117,7 +117,7 @@ export function ClientBookingsPanel() {
                   disabled={actionId === b.id}
                   className="rounded-lg border px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                 >
-                  ???????? ??????
+                  Отменить запись
                 </button>
               </div>
             ) : null}

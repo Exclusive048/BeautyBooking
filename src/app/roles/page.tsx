@@ -19,14 +19,18 @@ export default async function RolesPage() {
         <form action={chooseClient}>
           <button className="w-full rounded-2xl border bg-white p-6 text-left hover:bg-neutral-50">
             <div className="text-lg font-semibold">Клиент</div>
-            <div className="mt-1 text-sm text-neutral-600">Записываться и смотреть свои записи.</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Записываться и смотреть свои записи.
+            </div>
           </button>
         </form>
 
         <form action={chooseProvider}>
           <button className="w-full rounded-2xl border bg-white p-6 text-left hover:bg-neutral-50">
             <div className="text-lg font-semibold">Мастер / Студия</div>
-            <div className="mt-1 text-sm text-neutral-600">Принимать записи и управлять профилем.</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Принимать записи и управлять профилем.
+            </div>
           </button>
         </form>
       </div>

@@ -7,9 +7,6 @@ import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
-import { prisma } from "@/lib/prisma";
-import { MembershipStatus, StudioRole } from "@prisma/client";
-import { MasterInfoCard } from "@/features/cabinet/components/master-info-card";
 
 type MeDto = {
   id: string;
@@ -24,6 +21,8 @@ type MeDto = {
   address: string | null;
   geoLat: number | null;
   geoLng: number | null;
+  hasMasterProfile: boolean;
+  hasStudioProfile: boolean;
 };
 
 export default async function MasterCabinetPage(props: {
@@ -61,7 +60,10 @@ export default async function MasterCabinetPage(props: {
 
   if (!provider) {
     return (
-      <CabinetShell title="Кабинет мастера" subtitle="Создайте профиль мастера, чтобы принимать записи.">
+      <CabinetShell
+        title="Кабинет мастера"
+        subtitle="Создайте профиль мастера, чтобы принимать записи."
+      >
         <div className="rounded-2xl border p-6">
           <p className="text-neutral-700">
             У вас пока нет профиля провайдера. Создайте профиль мастера, чтобы начать
@@ -92,22 +94,6 @@ export default async function MasterCabinetPage(props: {
 
     if (!meResponse.data.user) redirect("/login");
 
-    const membership = await prisma.studioMembership.findFirst({
-      where: {
-        userId: meResponse.data.user.id,
-        status: MembershipStatus.ACTIVE,
-        roles: { has: StudioRole.MASTER },
-      },
-      select: {
-        studioId: true,
-        studio: { select: { provider: { select: { name: true } } } },
-      },
-    });
-
-    const studioInfo = membership
-      ? { id: membership.studioId, name: membership.studio.provider.name }
-      : null;
-
     return (
       <CabinetShell
         title="Кабинет мастера"
@@ -124,8 +110,6 @@ export default async function MasterCabinetPage(props: {
         </div>
 
         <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
-
-        <MasterInfoCard address={provider.address} studio={studioInfo} />
       </CabinetShell>
     );
   }

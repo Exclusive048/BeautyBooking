@@ -80,7 +80,7 @@ export function StudioMastersPanel({ studioId }: Props) {
   const attach = async () => {
     const trimmed = phone.trim();
     if (!trimmed) {
-      setError("??????? ????? ????????");
+      setError("Введите номер телефона");
       return;
     }
     setSaving(true);
@@ -99,7 +99,7 @@ export function StudioMastersPanel({ studioId }: Props) {
       if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to send invite"));
       setInvites((prev) => [json.data.invite, ...prev.filter((i) => i.id !== json.data.invite.id)]);
       setPhone("");
-      setInviteSent("??????????? ??????????");
+      setInviteSent("Приглашение отправлено");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -130,17 +130,17 @@ export function StudioMastersPanel({ studioId }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">???????? ?????????</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загружаем мастеров</div>;
   }
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border p-4 space-y-3">
-        <div className="text-sm font-semibold">?????????? ??????? ?? ????????</div>
+        <div className="text-sm font-semibold">Пригласите мастера по телефону</div>
         <div className="flex flex-wrap gap-3">
           <input
             className="rounded-xl border px-3 py-2 text-sm flex-1 min-w-[200px]"
-            placeholder="??????? ???????"
+            placeholder="Введите телефон"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
@@ -150,7 +150,7 @@ export function StudioMastersPanel({ studioId }: Props) {
             disabled={saving}
             className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            ??????????
+            Пригласить
           </button>
         </div>
         {inviteSent ? (
@@ -159,33 +159,33 @@ export function StudioMastersPanel({ studioId }: Props) {
       </div>
 
       {error ? (
-        <div className="rounded-2xl border p-4 text-sm text-red-600">??????: {error}</div>
+        <div className="rounded-2xl border p-4 text-sm text-red-600">Ошибка: {error}</div>
       ) : null}
 
       <div className="space-y-3">
-        <div className="text-sm font-semibold">???????????</div>
+        <div className="text-sm font-semibold">Приглашения</div>
         {loadingInvites ? (
           <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-            ???????? ????????????
+            Загружаем приглашения
           </div>
         ) : invites.length === 0 ? (
           <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-            ??????????? ???? ???.
+            Приглашений пока нет.
           </div>
         ) : (
           invites.map((invite) => (
             <div key={invite.id} className="rounded-2xl border p-4">
               <div className="text-sm text-neutral-700">{invite.phone}</div>
-              <div className="text-xs text-neutral-500">??????: {invite.status}</div>
+              <div className="text-xs text-neutral-500">Статус: {invite.status}</div>
             </div>
           ))
         )}
       </div>
 
       <div className="space-y-3">
-        <div className="text-sm font-semibold">??????? ??????</div>
+        <div className="text-sm font-semibold">Мастера студии</div>
         {items.length === 0 ? (
-          <div className="rounded-2xl border p-4 text-sm text-neutral-600">???????? ???? ???.</div>
+          <div className="rounded-2xl border p-4 text-sm text-neutral-600">Мастеров пока нет.</div>
         ) : (
           items.map((m) => (
             <div key={m.id} className="rounded-2xl border p-4 flex items-center justify-between gap-3">
@@ -199,7 +199,7 @@ export function StudioMastersPanel({ studioId }: Props) {
                 disabled={saving}
                 className="rounded-xl border px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
               >
-                ???????
+                Удалить
               </button>
             </div>
           ))

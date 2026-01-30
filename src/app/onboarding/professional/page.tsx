@@ -27,7 +27,7 @@ export default async function ProfessionalOnboardingPage() {
       </div>
 
       <div className="mt-6 text-sm text-neutral-600">
-        Клиентский кабинет доступен всегда — он создаётся автоматически.
+        Клиентский кабинет доступен всегда — он создается автоматически.
       </div>
 
       <div className="mt-6">

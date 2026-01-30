@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 
 type MeDto = {
@@ -17,6 +17,8 @@ type MeDto = {
   address: string | null;
   geoLat: number | null;
   geoLng: number | null;
+  hasMasterProfile: boolean;
+  hasStudioProfile: boolean;
 };
 
 type Props = {
@@ -24,16 +26,22 @@ type Props = {
   showProfessionalCta?: boolean;
 };
 
+type ProfileCreateResponse = { profile: { id: string; providerId: string } };
+
+type RoleAction = "master" | "studio" | null;
+
 export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [roleMessage, setRoleMessage] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleAction, setRoleAction] = useState<RoleAction>(null);
 
-  const hasMasterRole = initialUser.roles.includes("MASTER");
-  const hasStudioRole =
-    initialUser.roles.includes("STUDIO") || initialUser.roles.includes("STUDIO_ADMIN");
-  const hasProfessionalRole = hasMasterRole || hasStudioRole;
-  const canAddMasterRole = hasStudioRole && !hasMasterRole;
+  const hasMasterProfile = initialUser.hasMasterProfile;
+  const hasStudioProfile = initialUser.hasStudioProfile;
+  const hasProfessionalRole = hasMasterProfile || hasStudioProfile;
 
   const [form, setForm] = useState({
     displayName: initialUser.displayName ?? "",
@@ -90,8 +98,10 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           return;
         }
 
+        const message = data && !data.ok ? data.error.message : null;
+
         if (!data || !data.ok) {
-          setError(data?.error?.message ?? "Не удалось сохранить");
+          setError(message ?? "Не удалось сохранить");
           return;
         }
 
@@ -102,10 +112,87 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
     });
   };
 
+  const createMasterProfile = async () => {
+    setRoleMessage(null);
+    setRoleError(null);
+    setRoleAction("master");
+
+    try {
+      const res = await fetch("/api/profiles/master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | ApiResponse<ProfileCreateResponse>
+        | null;
+
+      const message = data && !data.ok ? data.error.message : null;
+
+      if (!res.ok) {
+        setRoleError(message ?? "Не удалось создать профиль мастера");
+        return;
+      }
+
+      if (!data || !data.ok) {
+        setRoleError(message ?? "Не удалось создать профиль мастера");
+        return;
+      }
+
+      setRoleMessage("Профиль мастера создан");
+      router.refresh();
+    } catch {
+      setRoleError("Сеть недоступна или сервер не отвечает");
+    } finally {
+      setRoleAction(null);
+    }
+  };
+
+  const createStudioProfile = async () => {
+    setRoleMessage(null);
+    setRoleError(null);
+    setRoleAction("studio");
+
+    try {
+      const res = await fetch("/api/profiles/studio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | ApiResponse<ProfileCreateResponse>
+        | null;
+
+      const message = data && !data.ok ? data.error.message : null;
+
+      if (!res.ok) {
+        setRoleError(message ?? "Не удалось создать студию");
+        return;
+      }
+
+      if (!data || !data.ok) {
+        setRoleError(message ?? "Не удалось создать студию");
+        return;
+      }
+
+      setRoleMessage("Студия создана");
+      router.refresh();
+    } catch {
+      setRoleError("Сеть недоступна или сервер не отвечает");
+    } finally {
+      setRoleAction(null);
+    }
+  };
+
   const inputClass =
     "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-neutral-200";
 
   const labelClass = "text-xs font-medium text-neutral-600";
+
+  const isCreatingMaster = roleAction === "master";
+  const isCreatingStudio = roleAction === "studio";
 
   return (
     <div className="rounded-2xl border p-5 space-y-5">
@@ -117,33 +204,46 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
       </div>
 
       {showProfessionalCta ? (
-        <div className="rounded-2xl border p-4">
-          <div className="text-sm font-semibold">Мои профессиональные роли</div>
-          <div className="mt-1 text-sm text-neutral-600">
-            {hasProfessionalRole
-              ? "У вас уже есть профессиональные роли."
-              : "Вы пока клиент. Начните работу как мастер или студия."}
+        <div className="rounded-2xl border p-4 space-y-3">
+          <div>
+            <div className="text-sm font-semibold">Мои профессиональные роли</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              {hasProfessionalRole
+                ? "Вы уже добавили профессиональные роли. Можно добавить еще."
+                : "Вы пока клиент. Добавьте роль мастера или студии."}
+            </div>
           </div>
-          {!hasProfessionalRole ? (
-            <div className="mt-3">
-              <Link
-                href="/onboarding/professional"
-                className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+
+          <div className="flex flex-wrap items-center gap-2">
+            {hasMasterProfile ? (
+              <div className="text-xs text-neutral-600">Вы уже мастер</div>
+            ) : (
+              <button
+                type="button"
+                onClick={createMasterProfile}
+                disabled={roleAction !== null}
+                className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
               >
-                Стать профессионалом
-              </Link>
-            </div>
-          ) : null}
-          {canAddMasterRole ? (
-            <div className="mt-3">
-              <Link
-                href="/api/onboarding/professional/master"
-                className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+                {isCreatingMaster ? "Создаем профиль мастера..." : "Стать мастером"}
+              </button>
+            )}
+
+            {hasStudioProfile ? (
+              <div className="text-xs text-neutral-600">Вы уже владелец студии</div>
+            ) : (
+              <button
+                type="button"
+                onClick={createStudioProfile}
+                disabled={roleAction !== null}
+                className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
               >
-                Добавить роль мастера
-              </Link>
-            </div>
-          ) : null}
+                {isCreatingStudio ? "Создаем студию..." : "Создать студию"}
+              </button>
+            )}
+          </div>
+
+          {roleMessage ? <div className="text-xs text-green-700">{roleMessage}</div> : null}
+          {roleError ? <div className="text-xs text-red-600">{roleError}</div> : null}
         </div>
       ) : null}
 
@@ -243,7 +343,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
             placeholder="Город, улица, дом..."
           />
           <div className="text-xs text-neutral-500 mt-1">
-            Позже добавим кнопку “Показать на карте” и будем сохранять координаты.
+            Позже добавим кнопку &quot;Показать на карте&quot; и будем сохранять координаты.
           </div>
         </div>
       </div>

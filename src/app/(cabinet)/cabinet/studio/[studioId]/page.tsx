@@ -29,6 +29,8 @@ type MeDto = {
   address: string | null;
   geoLat: number | null;
   geoLng: number | null;
+  hasMasterProfile: boolean;
+  hasStudioProfile: boolean;
 };
 
 type SearchParams = { tab?: string; scope?: string };
@@ -111,7 +113,11 @@ export default async function StudioCabinetByIdPage(props: {
 
   const adminTabs: TabItem[] = [
     { id: "bookings", label: "Записи", href: `/cabinet/studio/${p.studioId}?tab=bookings` },
-    { id: "schedule", label: "Расписание", href: `/cabinet/studio/${p.studioId}?tab=schedule` },
+    {
+      id: "schedule",
+      label: "Расписание",
+      href: `/cabinet/studio/${p.studioId}?tab=schedule`,
+    },
     { id: "masters", label: "Мастера", href: `/cabinet/studio/${p.studioId}?tab=masters` },
     { id: "services", label: "Услуги", href: `/cabinet/studio/${p.studioId}?tab=services` },
     {
@@ -119,12 +125,20 @@ export default async function StudioCabinetByIdPage(props: {
       label: "Профиль студии",
       href: `/cabinet/studio/${p.studioId}?tab=profile`,
     },
-    { id: "overrides", label: "Настройки", href: `/cabinet/studio/${p.studioId}?tab=overrides` },
+    {
+      id: "overrides",
+      label: "Настройки",
+      href: `/cabinet/studio/${p.studioId}?tab=overrides`,
+    },
   ];
 
   const masterOnlyTabs: TabItem[] = [
     { id: "bookings", label: "Записи", href: `/cabinet/studio/${p.studioId}?tab=bookings` },
-    { id: "schedule", label: "Расписание", href: `/cabinet/studio/${p.studioId}?tab=schedule` },
+    {
+      id: "schedule",
+      label: "Расписание",
+      href: `/cabinet/studio/${p.studioId}?tab=schedule`,
+    },
     {
       id: "master-profile",
       label: "Профиль мастера",
@@ -238,7 +252,10 @@ export default async function StudioCabinetByIdPage(props: {
         <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
 
         {masterProfile ? (
-          <MasterInfoCard address={masterProfile.address} studio={{ id: studio.id, name: provider.name }} />
+          <MasterInfoCard
+            address={masterProfile.address}
+            studio={{ id: studio.id, name: provider.name }}
+          />
         ) : (
           <div className="rounded-2xl border p-5 text-sm text-neutral-600">
             Не найден профиль мастера для студийного кабинета.
@@ -250,7 +267,10 @@ export default async function StudioCabinetByIdPage(props: {
 
   if (tab === "masters") {
     return (
-      <CabinetShell title="Кабинет студии" subtitle="Добавляйте и приглашайте мастеров в студию.">
+      <CabinetShell
+        title="Кабинет студии"
+        subtitle="Добавляйте и приглашайте мастеров в студию."
+      >
         {renderTabs("masters")}
 
         <StudioMastersPanel studioId={provider.id} />

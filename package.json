@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:mojibake": "rg -n -F \"???\" src README.md && exit 1 || exit 0"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

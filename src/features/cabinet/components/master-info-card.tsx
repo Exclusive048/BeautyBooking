@@ -31,18 +31,17 @@ export function MasterInfoCard({ address, studio }: Props) {
 
       <div className="space-y-1">
         <div className="text-xs font-medium text-neutral-600">Адрес</div>
-        <input
-          className={inputClass}
-          defaultValue={address}
-          placeholder="Город, улица, дом..."
-        />
+        <input className={inputClass} defaultValue={address} placeholder="Город, улица, дом..." />
       </div>
 
       <div className="rounded-2xl border p-4">
         <div className="text-sm font-semibold">Текущая студия</div>
         {studio ? (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-700">
-            <div>{studio.name}</div>
+            <div>
+              <div>{studio.name}</div>
+              <div className="text-xs text-neutral-500">Статус: член студии</div>
+            </div>
             <form action={`/api/studios/${studio.id}/leave`} method="post">
               <button
                 type="submit"
