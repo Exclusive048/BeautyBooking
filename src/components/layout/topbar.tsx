@@ -55,6 +55,84 @@ export async function Topbar() {
   const hasGlobalMaster = user ? await hasGlobalMasterProfile(user.id) : false;
   const hasStudioAccess = user ? await hasAnyStudioAccess(user.id) : false;
   const primaryNav = buildPrimaryNavItem({ hasGlobalMaster, hasStudioAccess });
+  const navItems: JSX.Element[] = [];
+
+  navItems.push(
+    <Button key="nav-catalog" asChild variant="secondary">
+      <Link href="/providers">Каталог</Link>
+    </Button>
+  );
+
+  if (user) {
+    navItems.push(
+      <Button key="nav-client-bookings" asChild variant="secondary">
+        <Link href="/cabinet?tab=bookings">Мои записи</Link>
+      </Button>
+    );
+
+    navItems.push(
+      <Button key="nav-client-profile" asChild variant="secondary">
+        <Link href="/cabinet?tab=profile">Профиль</Link>
+      </Button>
+    );
+
+    if (primaryNav) {
+      if (primaryNav.mode === "single") {
+        navItems.push(
+          <Button key="nav-studio-or-cabinet" asChild variant="secondary">
+            <Link href={primaryNav.href}>{primaryNav.label}</Link>
+          </Button>
+        );
+      } else {
+        navItems.push(
+          <div key="nav-studio-or-cabinet" className="relative flex items-center gap-1">
+            <Button asChild variant="secondary">
+              <Link href={primaryNav.href}>{primaryNav.label}</Link>
+            </Button>
+            <details className="relative">
+              <summary className="list-none rounded-xl border px-2 py-2 text-sm font-medium hover:bg-neutral-50 cursor-pointer">
+                ▾
+              </summary>
+              <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-white shadow-lg p-1">
+                {primaryNav.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-50"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </details>
+          </div>
+        );
+      }
+    }
+
+    navItems.push(
+      <Button key="nav-notifications" asChild variant="secondary" className="relative">
+        <Link href="/cabinet/invites" aria-label="Уведомления">
+          <span aria-hidden>🔔</span>
+          {notificationsCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+              {notificationsCount > 9 ? "9+" : notificationsCount}
+            </span>
+          ) : null}
+        </Link>
+      </Button>
+    );
+
+    navItems.push(<ThemeToggle key="nav-theme-toggle" />);
+    navItems.push(<LogoutButton key="nav-logout" />);
+  } else {
+    navItems.push(<ThemeToggle key="nav-theme-toggle" />);
+    navItems.push(
+      <Button key="nav-login" asChild>
+        <Link href="/login">Вход</Link>
+      </Button>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur dark:bg-bg/70">
@@ -67,73 +145,7 @@ export async function Topbar() {
           </div>
         </Link>
 
-        <nav className="flex items-center gap-2">
-          <Button asChild variant="secondary">
-            <Link href="/providers">Каталог</Link>
-          </Button>
-
-          {user ? (
-            <>
-              <Button asChild variant="secondary">
-                <Link href="/cabinet?tab=bookings">Мои записи</Link>
-              </Button>
-
-              <Button asChild variant="secondary">
-                <Link href="/cabinet?tab=profile">Профиль</Link>
-              </Button>
-              {primaryNav ? (
-                primaryNav.mode === "single" ? (
-                  <Button asChild variant="secondary">
-                    <Link href={primaryNav.href}>{primaryNav.label}</Link>
-                  </Button>
-                ) : (
-                  <div className="relative flex items-center gap-1">
-                    <Button asChild variant="secondary">
-                      <Link href={primaryNav.href}>{primaryNav.label}</Link>
-                    </Button>
-                    <details className="relative">
-                      <summary className="list-none rounded-xl border px-2 py-2 text-sm font-medium hover:bg-neutral-50 cursor-pointer">
-                        ▾
-                      </summary>
-                      <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-white shadow-lg p-1">
-                        {primaryNav.items.map((item) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-50"
-                          >
-                            {item.label}
-                          </Link>
-                        ))}
-                      </div>
-                    </details>
-                  </div>
-                )
-              ) : null}
-
-              <Button asChild variant="secondary" className="relative">
-                <Link href="/cabinet/invites" aria-label="Уведомления">
-                  <span aria-hidden>🔔</span>
-                  {notificationsCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                      {notificationsCount > 9 ? "9+" : notificationsCount}
-                    </span>
-                  ) : null}
-                </Link>
-              </Button>
-
-              <ThemeToggle />
-              <LogoutButton />
-            </>
-          ) : (
-            <>
-              <ThemeToggle />
-              <Button asChild>
-                <Link href="/login">Вход</Link>
-              </Button>
-            </>
-          )}
-        </nav>
+        <nav className="flex items-center gap-2">{navItems}</nav>
       </div>
     </header>
   );
