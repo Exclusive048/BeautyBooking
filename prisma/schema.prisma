@@ -13,6 +13,7 @@ enum ProviderType {
 }
 
 enum StudioRole {
+  OWNER
   ADMIN
   MASTER
 }
@@ -29,6 +30,8 @@ enum AccountType {
   MASTER
   STUDIO
   STUDIO_ADMIN
+  ADMIN
+  SUPERADMIN
 }
 
 enum BookingStatus {
@@ -71,6 +74,7 @@ model UserProfile {
   geoLng      Float?
 
   providers   Provider[]    @relation("ProviderOwner")
+  ownedStudios Studio[]     @relation("StudioOwner")
   masterProfile MasterProfile?
   studioMemberships StudioMembership[]
   studioInvites StudioInvite[] @relation("StudioInvitedBy")
@@ -87,6 +91,8 @@ model Studio {
   id          String             @id @default(cuid())
   providerId  String             @unique
   provider    Provider           @relation("StudioProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  ownerUserId String?
+  owner       UserProfile?       @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   memberships StudioMembership[]
   invites     StudioInvite[]
 
@@ -229,6 +235,7 @@ model Service {
   name        String
   durationMin Int
   price       Int
+  isEnabled   Boolean  @default(true)
 
   bookings    Booking[]
   masterServices MasterService[]

@@ -10,6 +10,7 @@ import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { StudioMastersPanel } from "@/features/cabinet/components/studio-masters-panel";
 import { StudioServicesPanel } from "@/features/cabinet/components/studio-services-panel";
 import { StudioOverridesPanel } from "@/features/cabinet/components/studio-overrides-panel";
+import { StudioMemberServicesPanel } from "@/features/cabinet/components/studio-member-services-panel";
 import { StudioSchedulePanel } from "@/features/cabinet/components/studio-schedule-panel";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
@@ -66,6 +67,7 @@ export default async function StudioCabinetByIdPage(props: {
     where: { id: p.studioId },
     select: {
       id: true,
+      ownerUserId: true,
       provider: {
         select: {
           id: true,
@@ -86,7 +88,7 @@ export default async function StudioCabinetByIdPage(props: {
   });
 
   const provider = studio.provider as StudioProviderInfo;
-  const isLegacyOwner = provider.ownerUserId === user.id;
+  const isLegacyOwner = provider.ownerUserId === user.id || studio.ownerUserId === user.id;
 
   if (!membership && !isLegacyOwner) redirect("/403");
 
@@ -95,7 +97,8 @@ export default async function StudioCabinetByIdPage(props: {
   }
 
   const membershipRoles = membership?.roles ?? [];
-  const isAdmin = membershipRoles.includes(StudioRole.ADMIN) || isLegacyOwner;
+  const isOwner = membershipRoles.includes(StudioRole.OWNER) || isLegacyOwner;
+  const isAdmin = isOwner || membershipRoles.includes(StudioRole.ADMIN);
   const isMaster = membershipRoles.includes(StudioRole.MASTER);
   const isMasterOnly = isMaster && !isAdmin;
   const isAdminAndMaster = isAdmin && isMaster;
@@ -139,6 +142,7 @@ export default async function StudioCabinetByIdPage(props: {
       label: "Расписание",
       href: `/cabinet/studio/${p.studioId}?tab=schedule`,
     },
+    { id: "services", label: "Услуги", href: `/cabinet/studio/${p.studioId}?tab=services` },
     {
       id: "master-profile",
       label: "Профиль мастера",
@@ -180,9 +184,7 @@ export default async function StudioCabinetByIdPage(props: {
     return `/api/bookings?providerId=${provider.id}`;
   })();
 
-  const renderTabs = (activeId: string) => (
-    <CabinetNavTabs activeId={activeId} items={tabs} />
-  );
+  const renderTabs = (activeId: string) => <CabinetNavTabs activeId={activeId} items={tabs} />;
 
   if (tab === "profile") {
     const studioProfile = await prisma.provider.findUnique({
@@ -232,6 +234,18 @@ export default async function StudioCabinetByIdPage(props: {
         })
       : null;
 
+    const roleLabel = isOwner
+      ? "Владелец студии"
+      : membershipRoles.includes(StudioRole.ADMIN)
+        ? "Админ студии"
+        : membershipRoles.includes(StudioRole.MASTER)
+          ? "Мастер студии"
+          : null;
+    const canLeave =
+      !isOwner &&
+      (membershipRoles.includes(StudioRole.ADMIN) ||
+        membershipRoles.includes(StudioRole.MASTER));
+
     return (
       <CabinetShell
         title="Кабинет студии"
@@ -254,13 +268,33 @@ export default async function StudioCabinetByIdPage(props: {
         {masterProfile ? (
           <MasterInfoCard
             address={masterProfile.address}
-            studio={{ id: studio.id, name: provider.name }}
+            studio={{
+              id: studio.id,
+              name: provider.name,
+              roleLabel,
+              canLeave,
+            }}
           />
         ) : (
           <div className="rounded-2xl border p-5 text-sm text-neutral-600">
             Не найден профиль мастера для студийного кабинета.
           </div>
         )}
+
+        {masterProvider ? (
+          <div className="rounded-2xl border p-5">
+            <div className="text-sm font-semibold">Услуги мастера в студии</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Настройте услуги, которые доступны клиентам в этой студии.
+            </div>
+            <Link
+              href={`/cabinet/studio/${p.studioId}?tab=services`}
+              className="mt-3 inline-flex rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+            >
+              Настроить услуги
+            </Link>
+          </div>
+        ) : null}
       </CabinetShell>
     );
   }
@@ -273,7 +307,7 @@ export default async function StudioCabinetByIdPage(props: {
       >
         {renderTabs("masters")}
 
-        <StudioMastersPanel studioId={provider.id} />
+        <StudioMastersPanel studioId={provider.id} canManage={isAdmin} />
       </CabinetShell>
     );
   }
@@ -283,7 +317,31 @@ export default async function StudioCabinetByIdPage(props: {
       <CabinetShell title="Кабинет студии" subtitle="Управляйте списком услуг и ценами.">
         {renderTabs("services")}
 
-        <StudioServicesPanel studioId={provider.id} />
+        {isAdmin ? (
+          <div className="space-y-6">
+            <section className="rounded-2xl border p-5">
+              <div className="text-sm font-semibold">Каталог студии</div>
+              <div className="mt-1 text-sm text-neutral-600">
+                Создавайте услуги студии и управляйте их доступностью.
+              </div>
+              <div className="mt-4">
+                <StudioServicesPanel studioId={provider.id} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border p-5">
+              <div className="text-sm font-semibold">Услуги мастера</div>
+              <div className="mt-1 text-sm text-neutral-600">
+                Выберите мастера и настройте доступные ему услуги.
+              </div>
+              <div className="mt-4">
+                <StudioOverridesPanel studioId={provider.id} />
+              </div>
+            </section>
+          </div>
+        ) : (
+          <StudioMemberServicesPanel studioId={provider.id} />
+        )}
       </CabinetShell>
     );
   }

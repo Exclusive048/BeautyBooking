@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
-import { ensureStudioAccess } from "@/lib/studios/access";
+import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
 import { setWeeklySchedule } from "@/lib/schedule/usecases";
 import type { DayOfWeek } from "@/lib/domain/schedule";
 
@@ -21,7 +21,7 @@ const weeklySchema = z.array(
   })
 );
 
-async function ensureStudioOwner(studioId: string, userId: string) {
+async function ensureStudioViewer(studioId: string, userId: string) {
   return ensureStudioAccess(studioId, userId);
 }
 
@@ -46,7 +46,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioViewer(p.id, auth.user.id);
   if (accessError) return accessError;
   const masterError = await ensureMasterInStudio(p.masterId, p.id);
   if (masterError) return masterError;
@@ -92,7 +92,7 @@ export async function PUT(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
   const masterError = await ensureMasterInStudio(p.masterId, p.id);
   if (masterError) return masterError;

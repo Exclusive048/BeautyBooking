@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { AccountType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/session";
+import { hasMasterProfile } from "@/lib/auth/roles";
+import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -8,9 +9,8 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const roles = user.roles ?? [];
-  const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
-  const hasMaster = roles.includes(AccountType.MASTER);
+  const hasStudio = await hasAnyStudioAccess(user.id);
+  const hasMaster = await hasMasterProfile(user.id);
   const last = hasStudio || hasMaster ? "provider" : "client";
 
   const url = new URL(req.url);

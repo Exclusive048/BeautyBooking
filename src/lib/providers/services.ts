@@ -45,6 +45,7 @@ function toServiceRecord(service: {
   name: string;
   durationMin: number;
   price: number;
+  isEnabled: boolean;
 }): ServiceRecord {
   return {
     id: service.id,
@@ -52,6 +53,7 @@ function toServiceRecord(service: {
     name: service.name,
     durationMin: service.durationMin,
     price: service.price,
+    isEnabled: service.isEnabled,
   };
 }
 
@@ -124,4 +126,22 @@ export async function deleteProviderService(
   await prisma.service.delete({ where: { id: serviceId } });
 
   return { ok: true, data: { id: serviceId } };
+}
+
+export async function setProviderServiceEnabled(
+  providerId: string,
+  serviceId: string,
+  isEnabled: boolean
+): Promise<Result<ServiceRecord>> {
+  const existing = await prisma.service.findFirst({
+    where: { id: serviceId, providerId },
+  });
+  if (!existing) return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+
+  const service = await prisma.service.update({
+    where: { id: serviceId },
+    data: { isEnabled },
+  });
+
+  return { ok: true, data: toServiceRecord(service) };
 }

@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { MembershipStatus } from "@prisma/client";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
-import { AccountType } from "@prisma/client";
+import { hasMasterProfile } from "@/lib/auth/roles";
+import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
 
 export default async function CabinetEntryPage(props: {
   searchParams?: Promise<{ tab?: string }> | { tab?: string };
@@ -39,9 +40,8 @@ export default async function CabinetEntryPage(props: {
     redirect(`/cabinet/client${tabQs}`);
   }
 
-  const roles = user.roles ?? [];
-  const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
-  const hasMaster = roles.includes(AccountType.MASTER);
+  const hasStudio = await hasAnyStudioAccess(user.id);
+  const hasMaster = await hasMasterProfile(user.id);
   if (!hasStudio && !hasMaster) {
     redirect(`/cabinet/client${tabQs}`);
   }

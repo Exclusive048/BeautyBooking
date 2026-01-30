@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
-import { ensureStudioAccess } from "@/lib/studios/access";
+import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
 import { addScheduleBlock, removeScheduleBlock } from "@/lib/schedule/usecases";
 
 const addSchema = z.object({
@@ -17,7 +17,7 @@ const removeSchema = z.object({
   blockId: z.string().min(1),
 });
 
-async function ensureStudioOwner(studioId: string, userId: string) {
+async function ensureStudioViewer(studioId: string, userId: string) {
   return ensureStudioAccess(studioId, userId);
 }
 
@@ -42,7 +42,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioViewer(p.id, auth.user.id);
   if (accessError) return accessError;
   const masterError = await ensureMasterInStudio(p.masterId, p.id);
   if (masterError) return masterError;
@@ -75,7 +75,7 @@ export async function POST(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
   const masterError = await ensureMasterInStudio(p.masterId, p.id);
   if (masterError) return masterError;
@@ -108,7 +108,7 @@ export async function DELETE(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
   const masterError = await ensureMasterInStudio(p.masterId, p.id);
   if (masterError) return masterError;

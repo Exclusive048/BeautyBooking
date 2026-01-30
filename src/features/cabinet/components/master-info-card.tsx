@@ -1,6 +1,8 @@
 type StudioInfo = {
   id: string;
   name: string;
+  roleLabel?: string | null;
+  canLeave?: boolean;
 };
 
 type Props = {

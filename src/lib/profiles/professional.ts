@@ -108,8 +108,8 @@ export async function createStudioProfile(
 
   const studio = await prisma.studio.upsert({
     where: { providerId: provider.id },
-    update: {},
-    create: { providerId: provider.id },
+    update: { ownerUserId: input.userId },
+    create: { providerId: provider.id, ownerUserId: input.userId },
     select: { id: true },
   });
 
@@ -119,8 +119,8 @@ export async function createStudioProfile(
   });
 
   const nextRoles = existingMembership
-    ? Array.from(new Set([...existingMembership.roles, StudioRole.ADMIN]))
-    : [StudioRole.ADMIN];
+    ? Array.from(new Set([...existingMembership.roles, StudioRole.OWNER]))
+    : [StudioRole.OWNER];
 
   if (existingMembership) {
     await prisma.studioMembership.update({

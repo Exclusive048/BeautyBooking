@@ -58,7 +58,7 @@ export async function getProviderBookingsForOwner(
       userId,
       studioId,
       status: MembershipStatus.ACTIVE,
-      roles: { has: StudioRole.ADMIN },
+      roles: { hasSome: [StudioRole.ADMIN, StudioRole.OWNER] },
     },
     select: { id: true },
   });

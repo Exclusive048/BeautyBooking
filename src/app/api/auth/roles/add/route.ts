@@ -1,21 +1,41 @@
-import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth/session";
 import { roleQuerySchema } from "@/lib/auth/schemas";
-import { addRoleToUser, isAllowedRoleAddition, roleRedirect } from "@/lib/auth/roles";
+import { ok, fail } from "@/lib/api/response";
+import { requireAuth, requireAdmin } from "@/lib/auth/guards";
+import { addRoleToUser, isAllowedRoleAddition } from "@/lib/auth/roles";
 
-export async function GET(req: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(new URL("/login", req.url));
+async function readBody(req: Request): Promise<unknown> {
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    return req.json();
+  }
+  if (
+    contentType.includes("application/x-www-form-urlencoded") ||
+    contentType.includes("multipart/form-data")
+  ) {
+    const form = await req.formData();
+    return { role: form.get("role") };
+  }
+  return req.json().catch(() => null);
+}
 
-  const url = new URL(req.url);
-  const roleParam = url.searchParams.get("role");
-  const parsed = roleQuerySchema.safeParse({ role: roleParam });
-  const role = parsed.success ? parsed.data.role : null;
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
 
-  if (!role || !isAllowedRoleAddition(role)) {
-    return NextResponse.redirect(new URL("/roles", req.url));
+  const roleError = requireAdmin(auth.user);
+  if (roleError) return roleError;
+
+  const body = await readBody(req);
+  const parsed = roleQuerySchema.safeParse(body);
+  if (!parsed.success) {
+    return fail("Invalid request body", 400, "INVALID_BODY");
   }
 
-  await addRoleToUser(user.id, user.roles, role);
-  return NextResponse.redirect(new URL(roleRedirect(role), req.url));
+  const { role } = parsed.data;
+  if (!isAllowedRoleAddition(role)) {
+    return fail("Forbidden role", 403, "FORBIDDEN_ROLE");
+  }
+
+  const roles = await addRoleToUser(auth.user.id, auth.user.roles, role);
+  return ok({ roles });
 }

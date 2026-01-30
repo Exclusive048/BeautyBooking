@@ -7,6 +7,7 @@ import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
+import { MasterServicesPanel } from "@/features/cabinet/components/master-services-panel";
 
 type MeDto = {
   id: string;
@@ -31,11 +32,15 @@ export default async function MasterCabinetPage(props: {
   const sp =
     props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;
 
-  const tab = sp?.tab === "profile" || sp?.tab === "schedule" ? sp.tab : "bookings";
+  const tab =
+    sp?.tab === "profile" || sp?.tab === "schedule" || sp?.tab === "services"
+      ? sp.tab
+      : "bookings";
 
   const tabs = [
     { id: "bookings", label: "Записи клиентов", href: "/cabinet/master?tab=bookings" },
     { id: "schedule", label: "Расписание", href: "/cabinet/master?tab=schedule" },
+    { id: "services", label: "Услуги", href: "/cabinet/master?tab=services" },
     { id: "profile", label: "Профиль мастера", href: "/cabinet/master?tab=profile" },
   ];
 
@@ -48,7 +53,10 @@ export default async function MasterCabinetPage(props: {
     if (providerResponse.error.code === "FORBIDDEN_ROLE") redirect("/403");
 
     return (
-      <CabinetShell title="Кабинет мастера" subtitle="Ошибка загрузки данных профиля.">
+      <CabinetShell
+        title="Кабинет мастера"
+        subtitle="Ошибка загрузки данных профиля."
+      >
         <div className="rounded-2xl border p-6 text-red-600">
           Ошибка сервера: {providerResponse.error.message}
         </div>
@@ -120,6 +128,16 @@ export default async function MasterCabinetPage(props: {
         <CabinetNavTabs activeId="schedule" items={tabs} />
 
         <MasterSchedulePanel masterId={provider.id} />
+      </CabinetShell>
+    );
+  }
+
+  if (tab === "services") {
+    return (
+      <CabinetShell title="Кабинет мастера" subtitle="Настройте услуги, которые доступны клиентам.">
+        <CabinetNavTabs activeId="services" items={tabs} />
+
+        <MasterServicesPanel />
       </CabinetShell>
     );
   }

@@ -16,6 +16,7 @@ export type ServiceRecord = {
   name: string;
   durationMin: number;
   price: number;
+  isEnabled: boolean;
 };
 
 export type MasterServiceOverride = {

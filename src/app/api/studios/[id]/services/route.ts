@@ -5,9 +5,10 @@ import {
   createProviderService,
   deleteProviderService,
   listProviderServices,
+  setProviderServiceEnabled,
   updateProviderService,
 } from "@/lib/providers/services";
-import { ensureStudioAccess } from "@/lib/studios/access";
+import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -26,7 +27,12 @@ const deleteSchema = z.object({
   serviceId: z.string().min(1),
 });
 
-async function ensureStudioOwner(providerId: string, userId: string) {
+const toggleSchema = z.object({
+  serviceId: z.string().min(1),
+  isEnabled: z.boolean(),
+});
+
+async function ensureStudioViewer(providerId: string, userId: string) {
   return ensureStudioAccess(providerId, userId);
 }
 
@@ -38,7 +44,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioViewer(p.id, auth.user.id);
   if (accessError) return accessError;
 
   const result = await listProviderServices(p.id);
@@ -55,7 +61,7 @@ export async function POST(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
   const body = await req.json().catch(() => null);
@@ -68,6 +74,27 @@ export async function POST(
   return ok({ service: result.data }, { status: 201 });
 }
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+
+  const p = params instanceof Promise ? await params : params;
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
+  if (accessError) return accessError;
+
+  const body = await req.json().catch(() => null);
+  const parsed = toggleSchema.safeParse(body);
+  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+
+  const result = await setProviderServiceEnabled(p.id, parsed.data.serviceId, parsed.data.isEnabled);
+  if (!result.ok) return fail(result.message, result.status, result.code);
+
+  return ok({ service: result.data });
+}
+
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
@@ -76,7 +103,7 @@ export async function PUT(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
   const body = await req.json().catch(() => null);
@@ -98,7 +125,7 @@ export async function DELETE(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioOwner(p.id, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
   const body = await req.json().catch(() => null);

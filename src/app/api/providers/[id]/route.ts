@@ -21,6 +21,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
       where: { id },
       include: {
         services: {
+          where: { isEnabled: true },
           select: {
             id: true,
             name: true,

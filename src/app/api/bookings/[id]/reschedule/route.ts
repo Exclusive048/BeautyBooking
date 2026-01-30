@@ -40,7 +40,7 @@ async function canRescheduleBooking(bookingId: string, userId: string): Promise<
         studioId: studio.id,
         userId,
         status: MembershipStatus.ACTIVE,
-        roles: { has: StudioRole.ADMIN },
+        roles: { hasSome: [StudioRole.ADMIN, StudioRole.OWNER] },
       },
       select: { id: true },
     });

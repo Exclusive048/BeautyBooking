@@ -8,7 +8,7 @@ import { mapProviderProfile } from "@/lib/providers/mappers";
 
 function providerTypeFromRoles(roles: AccountType[]) {
   if (roles.includes(AccountType.MASTER)) return ProviderType.MASTER;
-  if (roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN)) {
+  if (roles.includes(AccountType.STUDIO)) {
     return ProviderType.STUDIO;
   }
   return null;

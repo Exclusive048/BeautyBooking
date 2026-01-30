@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth/session";
+import { AccountTypeCard } from "@/app/onboarding/account-type-card";
 
 export default async function OnboardingPage() {
   const user = await getSessionUser();
@@ -14,10 +15,10 @@ export default async function OnboardingPage() {
       </p>
 
       <div className="mt-6 grid gap-3">
-        <RoleCard
+        <AccountTypeCard
+          type="CLIENT"
           title="Я клиент"
           desc="Записываюсь к мастерам и в студии."
-          href="/api/auth/account-type/set?type=CLIENT"
         />
         <RoleCard
           title="Я мастер"

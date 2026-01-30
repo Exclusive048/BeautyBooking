@@ -6,8 +6,18 @@ const ALLOWED_ROLE_ADDITIONS: ReadonlySet<AccountType> = new Set([
   AccountType.STUDIO,
 ]);
 
+const SELF_SERVICE_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set([
+  AccountType.CLIENT,
+  AccountType.MASTER,
+  AccountType.STUDIO,
+]);
+
 export function isAllowedRoleAddition(role: AccountType): boolean {
   return ALLOWED_ROLE_ADDITIONS.has(role);
+}
+
+export function isAllowedAccountTypeSelection(type: AccountType): boolean {
+  return SELF_SERVICE_ACCOUNT_TYPES.has(type);
 }
 
 export function roleRedirect(role: AccountType): string {
@@ -81,4 +91,12 @@ export async function getActiveStudioMemberships(userId: string): Promise<
     select: { studioId: true, roles: true },
   });
   return memberships;
+}
+
+export async function hasGlobalMasterProfile(userId: string): Promise<boolean> {
+  const profile = await prisma.masterProfile.findUnique({
+    where: { userId },
+    select: { provider: { select: { studioId: true } } },
+  });
+  return Boolean(profile && profile.provider?.studioId == null);
 }

@@ -13,6 +13,7 @@ type ServiceItem = {
   name: string;
   durationMin: number;
   price: number;
+  isEnabled: boolean;
 };
 
 type OverrideItem = {
@@ -68,8 +69,12 @@ export function StudioOverridesPanel({ studioId }: Props) {
 
       if (!mastersRes.ok) throw new Error(getErrorMessage(mastersJson, "Failed to load masters"));
       if (!servicesRes.ok) throw new Error(getErrorMessage(servicesJson, "Failed to load services"));
-      if (!mastersJson || !mastersJson.ok) throw new Error(getErrorMessage(mastersJson, "Failed to load masters"));
-      if (!servicesJson || !servicesJson.ok) throw new Error(getErrorMessage(servicesJson, "Failed to load services"));
+      if (!mastersJson || !mastersJson.ok) {
+        throw new Error(getErrorMessage(mastersJson, "Failed to load masters"));
+      }
+      if (!servicesJson || !servicesJson.ok) {
+        throw new Error(getErrorMessage(servicesJson, "Failed to load services"));
+      }
 
       setMasters(mastersJson.data.masters);
       setServices(servicesJson.data.services);
@@ -152,7 +157,9 @@ export function StudioOverridesPanel({ studioId }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка данных…</div>;
+    return (
+      <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка данных...</div>
+    );
   }
 
   return (
@@ -177,14 +184,16 @@ export function StudioOverridesPanel({ studioId }: Props) {
       ) : null}
 
       {services.length === 0 ? (
-        <div className="rounded-2xl border p-4 text-sm text-neutral-600">Нет услуг студии.</div>
+        <div className="rounded-2xl border p-4 text-sm text-neutral-600">
+          Нет услуг студии.
+        </div>
       ) : (
         <div className="space-y-3">
           {services.map((service) => {
             const current = overrideMap.get(service.id);
             const key = `${service.id}:${current?.priceOverride ?? ""}:${current?.durationOverrideMin ?? ""}:${
               current?.isEnabled ?? true
-            }`;
+            }:${service.isEnabled}`;
             return (
               <OverrideRow
                 key={key}
@@ -218,6 +227,9 @@ function OverrideRow({
     isEnabled: initial?.isEnabled ?? true,
   });
 
+  const catalogEnabled = service.isEnabled;
+  const rowDisabled = disabled || !catalogEnabled;
+
   return (
     <div className="rounded-2xl border p-4 space-y-2">
       <div className="font-medium">{service.name}</div>
@@ -227,33 +239,36 @@ function OverrideRow({
           placeholder={`Цена (база ${service.price})`}
           value={draft.priceOverride}
           onChange={(e) => setDraft((s) => ({ ...s, priceOverride: e.target.value }))}
-          disabled={disabled}
+          disabled={rowDisabled}
         />
         <input
           className="rounded-xl border px-3 py-2 text-sm"
           placeholder={`Длительность (база ${service.durationMin})`}
           value={draft.durationOverrideMin}
           onChange={(e) => setDraft((s) => ({ ...s, durationOverrideMin: e.target.value }))}
-          disabled={disabled}
+          disabled={rowDisabled}
         />
         <label className="inline-flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={draft.isEnabled}
+            checked={catalogEnabled ? draft.isEnabled : false}
             onChange={(e) => setDraft((s) => ({ ...s, isEnabled: e.target.checked }))}
-            disabled={disabled}
+            disabled={rowDisabled}
           />
           Включено
         </label>
         <button
           type="button"
           onClick={() => onSave(draft)}
-          disabled={disabled}
+          disabled={rowDisabled}
           className="rounded-xl border px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50"
         >
           Сохранить
         </button>
       </div>
+      {!catalogEnabled ? (
+        <div className="text-xs text-neutral-500">Услуга выключена в каталоге.</div>
+      ) : null}
     </div>
   );
 }

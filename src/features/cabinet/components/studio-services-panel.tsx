@@ -8,6 +8,7 @@ type ServiceItem = {
   name: string;
   durationMin: number;
   price: number;
+  isEnabled: boolean;
 };
 
 type Props = {
@@ -130,21 +131,21 @@ export function StudioServicesPanel({ studioId }: Props) {
     }
   };
 
-  const deleteService = async (id: string) => {
+  const toggleService = async (id: string, isEnabled: boolean) => {
     setSavingId(id);
     setError(null);
     try {
       const res = await fetch(endpoint, {
-        method: "DELETE",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serviceId: id }),
+        body: JSON.stringify({ serviceId: id, isEnabled }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ id: string }>
+        | ApiResponse<{ service: ServiceItem }>
         | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to delete"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to delete"));
-      setItems((prev) => prev.filter((s) => s.id !== id));
+      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to update"));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to update"));
+      setItems((prev) => prev.map((s) => (s.id === id ? json.data.service : s)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -153,13 +154,15 @@ export function StudioServicesPanel({ studioId }: Props) {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка услуг…</div>;
+    return (
+      <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загрузка услуг...</div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border p-4 space-y-3">
-        <div className="text-sm font-semibold">Добавить услугу студии</div>
+        <div className="text-sm font-semibold">Добавить услугу в каталог</div>
         <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]">
           <input
             className="rounded-xl border px-3 py-2 text-sm"
@@ -197,11 +200,11 @@ export function StudioServicesPanel({ studioId }: Props) {
       <div className="space-y-3">
         {items.map((item) => (
           <ServiceRow
-            key={`${item.id}:${item.name}:${item.durationMin}:${item.price}`}
+            key={`${item.id}:${item.name}:${item.durationMin}:${item.price}:${item.isEnabled}`}
             item={item}
             disabled={savingId === item.id}
             onSave={updateService}
-            onDelete={deleteService}
+            onToggle={toggleService}
           />
         ))}
       </div>
@@ -213,12 +216,12 @@ function ServiceRow({
   item,
   disabled,
   onSave,
-  onDelete,
+  onToggle,
 }: {
   item: ServiceItem;
   disabled: boolean;
   onSave: (id: string, next: Editable) => void;
-  onDelete: (id: string) => void;
+  onToggle: (id: string, isEnabled: boolean) => void;
 }) {
   const [form, setForm] = useState<Editable>({
     name: item.name,
@@ -228,7 +231,7 @@ function ServiceRow({
 
   return (
     <div className="rounded-2xl border p-4 space-y-3">
-      <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto_auto]">
+      <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto_auto] items-center">
         <input
           className="rounded-xl border px-3 py-2 text-sm"
           value={form.name}
@@ -247,6 +250,15 @@ function ServiceRow({
           onChange={(e) => setForm((s) => ({ ...s, price: e.target.value }))}
           disabled={disabled}
         />
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={item.isEnabled}
+            onChange={(e) => onToggle(item.id, e.target.checked)}
+            disabled={disabled}
+          />
+          Включено
+        </label>
         <button
           type="button"
           onClick={() => onSave(item.id, form)}
@@ -254,14 +266,6 @@ function ServiceRow({
           className="rounded-xl border px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50"
         >
           Сохранить
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(item.id)}
-          disabled={disabled}
-          className="rounded-xl border px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-        >
-          Удалить
         </button>
       </div>
     </div>

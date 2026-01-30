@@ -3,8 +3,41 @@ import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { prisma } from "@/lib/prisma";
-import { AccountType, MembershipStatus } from "@prisma/client";
+import { MembershipStatus } from "@prisma/client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { hasGlobalMasterProfile } from "@/lib/auth/roles";
+import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
+
+type PrimaryNavItem =
+  | { mode: "single"; label: string; href: string }
+  | { mode: "dropdown"; label: string; href: string; items: { label: string; href: string }[] };
+
+function buildPrimaryNavItem(input: {
+  hasGlobalMaster: boolean;
+  hasStudioAccess: boolean;
+}): PrimaryNavItem | null {
+  const { hasGlobalMaster, hasStudioAccess } = input;
+  const showDropdown = hasStudioAccess && hasGlobalMaster;
+
+  if (showDropdown) {
+    return {
+      mode: "dropdown",
+      label: "Мои студии",
+      href: "/cabinet/studio?tab=bookings",
+      items: [{ label: "Мой кабинет", href: "/cabinet/master?tab=bookings" }],
+    };
+  }
+
+  if (hasStudioAccess) {
+    return { mode: "single", label: "Мои студии", href: "/cabinet/studio?tab=bookings" };
+  }
+
+  if (hasGlobalMaster) {
+    return { mode: "single", label: "Мой кабинет", href: "/cabinet/master?tab=bookings" };
+  }
+
+  return null;
+}
 
 export async function Topbar() {
   const user = await getSessionUser();
@@ -19,19 +52,9 @@ export async function Topbar() {
       })
     : 0;
   const notificationsCount = invitesCount + unreadNotificationsCount;
-  const roles = user?.roles ?? [];
-  const hasMasterRole = roles.includes(AccountType.MASTER);
-  const hasStudioRole =
-    roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
-  const hasActiveMembership = user
-    ? Boolean(
-        await prisma.studioMembership.findFirst({
-          where: { userId: user.id, status: MembershipStatus.ACTIVE },
-          select: { id: true },
-        })
-      )
-    : false;
-  const showStudios = hasStudioRole || hasActiveMembership;
+  const hasGlobalMaster = user ? await hasGlobalMasterProfile(user.id) : false;
+  const hasStudioAccess = user ? await hasAnyStudioAccess(user.id) : false;
+  const primaryNav = buildPrimaryNavItem({ hasGlobalMaster, hasStudioAccess });
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur dark:bg-bg/70">
@@ -58,17 +81,34 @@ export async function Topbar() {
               <Button asChild variant="secondary">
                 <Link href="/cabinet?tab=profile">Профиль</Link>
               </Button>
-
-              {showStudios ? (
-                <Button asChild variant="secondary">
-                  <Link href="/cabinet/studio">Мои студии</Link>
-                </Button>
-              ) : null}
-
-              {hasMasterRole ? (
-                <Button asChild variant="secondary">
-                  <Link href="/cabinet/master">Мой кабинет</Link>
-                </Button>
+              {primaryNav ? (
+                primaryNav.mode === "single" ? (
+                  <Button asChild variant="secondary">
+                    <Link href={primaryNav.href}>{primaryNav.label}</Link>
+                  </Button>
+                ) : (
+                  <div className="relative flex items-center gap-1">
+                    <Button asChild variant="secondary">
+                      <Link href={primaryNav.href}>{primaryNav.label}</Link>
+                    </Button>
+                    <details className="relative">
+                      <summary className="list-none rounded-xl border px-2 py-2 text-sm font-medium hover:bg-neutral-50 cursor-pointer">
+                        ▾
+                      </summary>
+                      <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-white shadow-lg p-1">
+                        {primaryNav.items.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-50"
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                )
               ) : null}
 
               <Button asChild variant="secondary" className="relative">

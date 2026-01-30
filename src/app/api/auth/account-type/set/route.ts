@@ -1,21 +1,42 @@
-import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth/session";
 import { accountTypeQuerySchema } from "@/lib/auth/schemas";
-import { accountTypeRedirect, setAccountTypeRoles } from "@/lib/auth/roles";
+import { ok, fail } from "@/lib/api/response";
+import { requireAuth } from "@/lib/auth/guards";
+import {
+  accountTypeRedirect,
+  isAllowedAccountTypeSelection,
+  setAccountTypeRoles,
+} from "@/lib/auth/roles";
 
-export async function GET(req: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(new URL("/login", req.url));
+async function readBody(req: Request): Promise<unknown> {
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    return req.json();
+  }
+  if (
+    contentType.includes("application/x-www-form-urlencoded") ||
+    contentType.includes("multipart/form-data")
+  ) {
+    const form = await req.formData();
+    return { type: form.get("type") };
+  }
+  return req.json().catch(() => null);
+}
 
-  const url = new URL(req.url);
-  const typeParam = url.searchParams.get("type");
-  const parsed = accountTypeQuerySchema.safeParse({ type: typeParam });
-  const type = parsed.success ? parsed.data.type : null;
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
 
-  if (!type) {
-    return NextResponse.redirect(new URL("/onboarding", req.url));
+  const body = await readBody(req);
+  const parsed = accountTypeQuerySchema.safeParse(body);
+  if (!parsed.success) {
+    return fail("Invalid request body", 400, "INVALID_BODY");
   }
 
-  await setAccountTypeRoles(user.id, user.roles, type);
-  return NextResponse.redirect(new URL(accountTypeRedirect(type), req.url));
+  const { type } = parsed.data;
+  if (!isAllowedAccountTypeSelection(type)) {
+    return fail("Forbidden role", 403, "FORBIDDEN_ROLE");
+  }
+
+  const roles = await setAccountTypeRoles(auth.user.id, auth.user.roles, type);
+  return ok({ roles, redirect: accountTypeRedirect(type) });
 }

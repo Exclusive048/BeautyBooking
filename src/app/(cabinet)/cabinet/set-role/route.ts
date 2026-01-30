@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { AccountType } from "@prisma/client";
+import { hasMasterProfile } from "@/lib/auth/roles";
+import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -15,11 +16,10 @@ export async function GET(req: Request) {
   }
 
   if (role === "provider") {
-    const roles = user.roles ?? [];
-    const hasStudio = roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN);
-    const hasMaster = roles.includes(AccountType.MASTER);
+    const hasStudio = await hasAnyStudioAccess(user.id);
+    const hasMaster = await hasMasterProfile(user.id);
     if (!hasStudio && !hasMaster) {
-      return NextResponse.redirect(new URL("/onboarding", req.url));
+      return NextResponse.redirect(new URL("/cabinet?tab=profile", req.url));
     }
   }
 
