@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
+import TelegramLoginButton from "@/components/auth/telegram-login-button";
 
 function normalizePhone(input: string) {
   const cleaned = input.replace(/[()\s-]/g, "");
@@ -179,6 +180,10 @@ export default function LoginClient() {
             После входа вы вернётесь на: <span className="font-mono">{nextPath}</span>
           </div>
         ) : null}
+
+        <div className="mt-6 border-t pt-6">
+          <TelegramLoginButton />
+        </div>
       </div>
     </div>
   );

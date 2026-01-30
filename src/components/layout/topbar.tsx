@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus } from "@prisma/client";
+import type { ReactElement } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { hasGlobalMasterProfile } from "@/lib/auth/roles";
 import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
@@ -55,7 +56,7 @@ export async function Topbar() {
   const hasGlobalMaster = user ? await hasGlobalMasterProfile(user.id) : false;
   const hasStudioAccess = user ? await hasAnyStudioAccess(user.id) : false;
   const primaryNav = buildPrimaryNavItem({ hasGlobalMaster, hasStudioAccess });
-  const navItems: JSX.Element[] = [];
+  const navItems: ReactElement[] = [];
 
   navItems.push(
     <Button key="nav-catalog" asChild variant="secondary">
