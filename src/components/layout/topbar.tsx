@@ -9,35 +9,32 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { hasGlobalMasterProfile } from "@/lib/auth/roles";
 import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
 
-type PrimaryNavItem =
-  | { mode: "single"; label: string; href: string }
-  | { mode: "dropdown"; label: string; href: string; items: { label: string; href: string }[] };
+type CabinetItem = { label: string; href: string };
 
-function buildPrimaryNavItem(input: {
+function buildCabinetNav(input: {
   hasGlobalMaster: boolean;
   hasStudioAccess: boolean;
-}): PrimaryNavItem | null {
+}): { items: CabinetItem[]; defaultHref: string } {
   const { hasGlobalMaster, hasStudioAccess } = input;
-  const showDropdown = hasStudioAccess && hasGlobalMaster;
-
-  if (showDropdown) {
-    return {
-      mode: "dropdown",
-      label: "Мои студии",
-      href: "/cabinet/studio?tab=bookings",
-      items: [{ label: "Мой кабинет", href: "/cabinet/master?tab=bookings" }],
-    };
-  }
+  const items: CabinetItem[] = [
+    { label: "Профиль", href: "/cabinet/client?tab=profile" },
+    { label: "Мои записи", href: "/cabinet/client?tab=bookings" },
+  ];
 
   if (hasStudioAccess) {
-    return { mode: "single", label: "Мои студии", href: "/cabinet/studio?tab=bookings" };
+    items.push({ label: "Кабинет студии", href: "/cabinet/studio?tab=bookings" });
   }
-
   if (hasGlobalMaster) {
-    return { mode: "single", label: "Мой кабинет", href: "/cabinet/master?tab=bookings" };
+    items.push({ label: "Кабинет мастера", href: "/cabinet/master?tab=bookings" });
   }
 
-  return null;
+  const defaultHref = hasStudioAccess
+    ? "/cabinet/studio?tab=bookings"
+    : hasGlobalMaster
+      ? "/cabinet/master?tab=bookings"
+      : "/cabinet/client?tab=bookings";
+
+  return { items, defaultHref };
 }
 
 export async function Topbar() {
@@ -55,7 +52,7 @@ export async function Topbar() {
   const notificationsCount = invitesCount + unreadNotificationsCount;
   const hasGlobalMaster = user ? await hasGlobalMasterProfile(user.id) : false;
   const hasStudioAccess = user ? await hasAnyStudioAccess(user.id) : false;
-  const primaryNav = buildPrimaryNavItem({ hasGlobalMaster, hasStudioAccess });
+  const cabinetNav = buildCabinetNav({ hasGlobalMaster, hasStudioAccess });
   const navItems: ReactElement[] = [];
 
   navItems.push(
@@ -66,50 +63,23 @@ export async function Topbar() {
 
   if (user) {
     navItems.push(
-      <Button key="nav-client-bookings" asChild variant="secondary">
-        <Link href="/cabinet?tab=bookings">Мои записи</Link>
-      </Button>
+      <details key="nav-cabinet" className="relative">
+        <Button asChild variant="secondary">
+          <summary className="list-none cursor-pointer">Мой кабинет</summary>
+        </Button>
+        <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-1">
+          {cabinetNav.items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-50"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </details>
     );
-
-    navItems.push(
-      <Button key="nav-client-profile" asChild variant="secondary">
-        <Link href="/cabinet?tab=profile">Профиль</Link>
-      </Button>
-    );
-
-    if (primaryNav) {
-      if (primaryNav.mode === "single") {
-        navItems.push(
-          <Button key="nav-studio-or-cabinet" asChild variant="secondary">
-            <Link href={primaryNav.href}>{primaryNav.label}</Link>
-          </Button>
-        );
-      } else {
-        navItems.push(
-          <div key="nav-studio-or-cabinet" className="relative flex items-center gap-1">
-            <Button asChild variant="secondary">
-              <Link href={primaryNav.href}>{primaryNav.label}</Link>
-            </Button>
-            <details className="relative">
-              <summary className="list-none rounded-xl border px-2 py-2 text-sm font-medium hover:bg-neutral-50 cursor-pointer">
-                ▾
-              </summary>
-              <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-white shadow-lg p-1">
-                {primaryNav.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-50"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            </details>
-          </div>
-        );
-      }
-    }
 
     navItems.push(
       <Button key="nav-notifications" asChild variant="secondary" className="relative">
