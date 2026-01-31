@@ -1,32 +1,34 @@
-import { ok, fail } from "@/lib/api/response";
-import { requireAuth } from "@/lib/auth/guards";
-import { confirmBooking } from "@/lib/bookings/usecases";
-import { prisma } from "@/lib/prisma";
-
-async function ensureProviderOwner(bookingId: string, userId: string) {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    select: { id: true, provider: { select: { ownerUserId: true } } },
-  });
-
-  if (!booking) return fail("Booking not found", 404, "BOOKING_NOT_FOUND");
-  if (booking.provider.ownerUserId !== userId) return fail("Forbidden", 403, "FORBIDDEN");
-  return null;
-}
+import { jsonFail, jsonOk } from "@/lib/api/contracts";
+import { toAppError } from "@/lib/api/errors";
+import { getSessionUser } from "@/lib/auth/access";
+import { requireBookingConfirmAccess } from "@/lib/auth/ownership";
+import { confirmBooking } from "@/lib/bookings/confirmBooking";
+import { getRequestId, logError } from "@/lib/logging/logger";
 
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
+  let userId: string | undefined;
+  try {
+    const user = await getSessionUser(_req);
+    userId = user.userId;
+    const p = params instanceof Promise ? await params : params;
+    await requireBookingConfirmAccess(user, p.id);
 
-  const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureProviderOwner(p.id, auth.user.id);
-  if (accessError) return accessError;
-
-  const result = await confirmBooking(p.id);
-  if (!result.ok) return fail(result.message, result.status, result.code);
-
-  return ok({ booking: result.data });
+    const booking = await confirmBooking(p.id);
+    return jsonOk({ booking });
+  } catch (error) {
+    const appError = toAppError(error);
+    const requestId = getRequestId(_req);
+    if (appError.status >= 500) {
+      logError("POST /api/bookings/[id]/confirm failed", {
+        requestId,
+        route: "POST /api/bookings/{id}/confirm",
+        userId,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+  }
 }

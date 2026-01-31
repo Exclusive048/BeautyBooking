@@ -1,8 +1,9 @@
-import { prisma } from "@/lib/prisma";
-import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
-import { mapProviderProfile } from "@/lib/providers/mappers";
+import { jsonOk, jsonFail } from "@/lib/api/contracts";
+import { toAppError } from "@/lib/api/errors";
+import { getRequestId, logError } from "@/lib/logging/logger";
+import { getProviderProfile } from "@/lib/providers/usecases";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -13,33 +14,22 @@ export async function GET(_req: Request, ctx: RouteContext) {
     const params = await ctx.params;
     const parsed = providerIdParamSchema.safeParse(params);
     if (!parsed.success) {
-      return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
+      return jsonFail(400, formatZodError(parsed.error), "VALIDATION_ERROR");
     }
     const { id } = parsed.data;
 
-    const provider = await prisma.provider.findUnique({
-      where: { id },
-      include: {
-        services: {
-          where: { isEnabled: true },
-          select: {
-            id: true,
-            name: true,
-            durationMin: true,
-            price: true,
-          },
-        },
-      },
-    });
-
-    if (!provider) {
-      return fail("Provider not found", 404, "PROVIDER_NOT_FOUND");
-    }
-
-    return ok({ provider: mapProviderProfile(provider) });
+    const provider = await getProviderProfile(id);
+    return jsonOk({ provider });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "Unknown error";
-    console.error("GET /api/providers/[id] failed:", detail);
-    return fail("Internal error", 500, "INTERNAL_ERROR");
+    const appError = toAppError(error);
+    const requestId = getRequestId(_req);
+    if (appError.status >= 500) {
+      logError("GET /api/providers/[id] failed", {
+        requestId,
+        route: "GET /api/providers/{id}",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

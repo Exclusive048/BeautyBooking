@@ -1,7 +1,22 @@
-import { ok } from "@/lib/api/response";
-import { listProviderCards } from "@/lib/providers/queries";
+import { listProviders } from "@/lib/providers/usecases";
+import { jsonOk, jsonFail } from "@/lib/api/contracts";
+import { toAppError } from "@/lib/api/errors";
+import { getRequestId, logError } from "@/lib/logging/logger";
 
-export async function GET() {
-  const providers = await listProviderCards();
-  return ok({ providers });
+export async function GET(req: Request) {
+  try {
+    const providers = await listProviders();
+    return jsonOk({ providers });
+  } catch (error) {
+    const appError = toAppError(error);
+    const requestId = getRequestId(req);
+    if (appError.status >= 500) {
+      logError("GET /api/providers failed", {
+        requestId,
+        route: "GET /api/providers",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code);
+  }
 }

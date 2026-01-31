@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Section } from "@/components/ui/section";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +13,13 @@ import type { ApiResponse } from "@/lib/types/api";
 export default function ProviderProfilePage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
+  const router = useRouter();
 
   const [p, setP] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -42,26 +44,16 @@ export default function ProviderProfilePage() {
         }
 
         const provider = json.data.provider;
+        if (provider?.type === "STUDIO") {
+          if (alive) {
+            setRedirecting(true);
+            router.replace(`/studios/${provider.id}`);
+          }
+          return;
+        }
         if (alive) setP(provider);
 
-        if (provider?.type === "STUDIO") {
-          const mastersRes = await fetch(`/api/providers/${provider.id}/masters`, {
-            cache: "no-store",
-          });
-          const mastersJson = (await mastersRes.json().catch(() => null)) as
-            | ApiResponse<{ masters: Array<{ id: string; name: string }> }>
-            | null;
-
-          if (alive) {
-            if (mastersRes.ok && mastersJson?.ok) {
-              setMasters(mastersJson.data.masters);
-            } else {
-              setMasters([]);
-            }
-          }
-        } else if (alive) {
-          setMasters([]);
-        }
+        if (alive) setMasters([]);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -72,7 +64,7 @@ export default function ProviderProfilePage() {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, router]);
 
   if (loading) {
     return (
@@ -80,6 +72,17 @@ export default function ProviderProfilePage() {
         <CardContent className="p-6">
           <div className="text-sm font-semibold text-neutral-900">Загрузка профиля…</div>
           <div className="mt-2 text-sm text-neutral-600">Тянем данные из Supabase.</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (redirecting) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-sm font-semibold text-neutral-900">Перенаправляем в студию…</div>
+          <div className="mt-2 text-sm text-neutral-600">Открываем профиль студии.</div>
         </CardContent>
       </Card>
     );

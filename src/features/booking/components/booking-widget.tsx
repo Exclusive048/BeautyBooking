@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
 import type { BookingService } from "@/features/booking/model/types";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { Card, CardContent } from "@/components/ui/card";
+import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type BookingUser = {
   id: string;
@@ -54,36 +55,11 @@ function buildLoginUrl(nextPath: string) {
   return `/login?${p.toString()}`;
 }
 
-function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
-  return json && !json.ok ? json.error.message ?? fallback : fallback;
-}
-
 function toDateKey(d: Date) {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function formatDateLabel(dateKey: string) {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  return dt.toLocaleDateString("ru-RU", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-function buildDateRange() {
-  const start = new Date();
-  const items: string[] = [];
-  for (let i = 0; i < 7; i += 1) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    items.push(toDateKey(d));
-  }
-  return items;
 }
 
 export default function BookingWidget({
@@ -104,7 +80,13 @@ export default function BookingWidget({
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange()[0] ?? "");
+  const [selectedDate, setSelectedDate] = useState<string>(() => toDateKey(new Date()));
+  const dateBounds = useMemo(() => {
+    const min = toDateKey(new Date());
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 14);
+    return { min, max: toDateKey(maxDate) };
+  }, []);
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -136,20 +118,19 @@ export default function BookingWidget({
     async function loadMe() {
       setMeLoading(true);
       try {
-        const res = await fetch("/api/me", { method: "GET" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ user: BookingUser | null }>
-          | null;
+        const data = await fetchJson<{ user: BookingUser | null }>("/api/me", { method: "GET" });
 
         if (cancelled) return;
 
-        const user = json?.ok ? json.data.user : null;
+        const user = data.user ?? null;
         setMe(user);
 
         if (user) {
           if (!clientName.trim() && user.displayName) setClientName(user.displayName);
           if (!clientPhone.trim() && user.phone) setClientPhone(user.phone);
         }
+      } catch {
+        if (!cancelled) setMe(null);
       } finally {
         if (!cancelled) setMeLoading(false);
       }
@@ -185,20 +166,19 @@ export default function BookingWidget({
         url.searchParams.set("from", from.toISOString());
         url.searchParams.set("to", to.toISOString());
 
-        const res = await fetch(url.toString(), { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ slots: SlotItem[] }>
-          | null;
-
-        if (!res.ok) throw new Error(getErrorMessage(json, "Не удалось загрузить слоты"));
-        if (!json || !json.ok) throw new Error(getErrorMessage(json, "Не удалось загрузить слоты"));
+        const data = await fetchJson<{ slots: SlotItem[] }>(url.toString(), { cache: "no-store" });
 
         if (cancelled) return;
-        setSlots(json.data.slots);
-        setSlotLabel((prev) => prev || json.data.slots[0]?.label || "");
+        setSlots(data.slots);
+        setSlotLabel((prev) => prev || data.slots[0]?.label || "");
       } catch (e) {
         if (!cancelled) {
-          setSlotsError(e instanceof Error ? e.message : "Неизвестная ошибка");
+          if (e instanceof ApiClientError) {
+            const mapped = getErrorMessageByCode(e.code);
+            setSlotsError(mapped ?? e.message ?? "???? ?????????????? ?????????????????? ??????????");
+          } else {
+            setSlotsError(e instanceof Error ? e.message : "?????????????????????? ????????????");
+          }
           setSlots([]);
           setSlotLabel("");
         }
@@ -301,7 +281,7 @@ export default function BookingWidget({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/bookings", {
+      const data = await fetchJson<{ booking: { id: string } }>("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -317,34 +297,24 @@ export default function BookingWidget({
         }),
       });
 
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ booking: { id: string } }>
-        | null;
-
-      const errorCode = json && !json.ok ? json.error?.code : undefined;
-      if (res.status === 401 && (errorCode === "AUTH_REQUIRED" || errorCode === "UNAUTHORIZED")) {
-        setShowAuthModal(true);
-        return;
-      }
-
-      if (!res.ok) {
-        setErrorText(getErrorMessage(json, "Не удалось создать запись"));
-        return;
-      }
-
-      if (!json || !json.ok) {
-        setErrorText(getErrorMessage(json, "Не удалось создать запись"));
-        return;
-      }
-
-      setSuccessId(json.data.booking?.id ?? "ok");
+      setSuccessId(data.booking?.id ?? "ok");
       setComment("");
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        const mapped = getErrorMessageByCode(error.code);
+        if (error.status === 401 && error.code === "UNAUTHORIZED") {
+          setShowAuthModal(true);
+          return;
+        }
+        setErrorText(mapped ?? error.message ?? "???? ?????????????? ?????????????? ????????????");
+      } else {
+        setErrorText("???? ?????????????? ?????????????? ????????????");
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  const dateOptions = useMemo(() => buildDateRange(), []);
   const hasSlotsForSelectedDate = slotsForSelectedDate.length > 0;
 
   if (providerType !== "STUDIO") {
@@ -540,25 +510,18 @@ export default function BookingWidget({
 
       <div className="mt-5 space-y-6">
         <div>
-          <div className="text-sm font-medium">Дата</div>
-          <div className="mt-2 flex gap-2 overflow-x-auto">
-            {dateOptions.map((date) => {
-              const active = date === selectedDate;
-              return (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() => setSelectedDate(date)}
-                  className={`rounded-full border px-3 py-1 text-xs whitespace-nowrap ${
-                    active
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
-                  }`}
-                >
-                  {formatDateLabel(date)}
-                </button>
-              );
-            })}
+          <div className="text-sm font-medium">????</div>
+          <div className="mt-2">
+            <DatePicker
+              value={selectedDate}
+              min={dateBounds.min}
+              max={dateBounds.max}
+              onChange={setSelectedDate}
+              disabled={loading}
+            />
+          </div>
+          <div className="mt-2 text-xs text-neutral-500">
+            ????????? ????: ? {dateBounds.min} ?? {dateBounds.max}.
           </div>
         </div>
 

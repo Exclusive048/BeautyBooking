@@ -394,15 +394,15 @@ export default function StudioBookingPage() {
                     onClick={() => setServiceId(service.id)}
                     className={`rounded-2xl border p-4 text-left transition ${
                       active
-                        ? "border-text bg-text text-white"
-                        : "border-border bg-surface hover:border-text/60"
+                        ? "border-[rgb(var(--accent))] bg-accent text-[rgb(var(--accent-foreground))]"
+                        : "border-border bg-surface hover:border-[rgb(var(--accent))]"
                     }`}
                   >
                     <div className="text-sm font-semibold">{service.name}</div>
-                    <div className={`mt-2 text-xs ${active ? "text-white/80" : "text-text-muted"}`}>
+                    <div className={`mt-2 text-xs ${active ? "text-[rgb(var(--accent-foreground))] opacity-80" : "text-text-muted"}`}>
                       {minutesToHuman(service.durationMin)}
                     </div>
-                    <div className={`mt-1 text-sm ${active ? "text-white" : "text-text"}`}>
+                    <div className={`mt-1 text-sm ${active ? "text-[rgb(var(--accent-foreground))]" : "text-text"}`}>
                       {service.price > 0 ? moneyRUB(service.price) : "Цена уточняется"}
                     </div>
                   </button>
@@ -446,30 +446,30 @@ export default function StudioBookingPage() {
                     onClick={() => setMasterId(master.id)}
                     className={`rounded-2xl border p-4 text-left transition ${
                       active
-                        ? "border-text bg-text text-white"
-                        : "border-border bg-surface hover:border-text/60"
+                        ? "border-[rgb(var(--accent))] bg-accent text-[rgb(var(--accent-foreground))]"
+                        : "border-border bg-surface hover:border-[rgb(var(--accent))]"
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className={`h-12 w-12 rounded-2xl ${
-                          active ? "bg-white/10" : "bg-muted border border-border"
+                          active ? "bg-[rgb(var(--accent-foreground))]/10" : "bg-muted border border-border"
                         }`}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold truncate">{master.name}</div>
-                        <div className={`mt-1 text-xs ${active ? "text-white/80" : "text-text-muted"}`}>
+                        <div className={`mt-1 text-xs ${active ? "text-[rgb(var(--accent-foreground))] opacity-80" : "text-text-muted"}`}>
                           {selectedService
                             ? `${minutesToHuman(selectedService.durationMin)} · ${selectedService.price > 0 ? moneyRUB(selectedService.price) : "Цена уточняется"}`
                             : "Данные услуги уточняются"}
                         </div>
                       </div>
-                      <div className={`text-xs ${active ? "text-white/80" : "text-text-muted"}`}>
+                      <div className={`text-xs ${active ? "text-[rgb(var(--accent-foreground))] opacity-80" : "text-text-muted"}`}>
                         {slotText}
                       </div>
                     </div>
                     {availability?.error ? (
-                      <div className={`mt-2 text-xs ${active ? "text-white/80" : "text-text-muted"}`}>
+                      <div className={`mt-2 text-xs ${active ? "text-[rgb(var(--accent-foreground))] opacity-80" : "text-text-muted"}`}>
                         {availability.error}
                       </div>
                     ) : null}

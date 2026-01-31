@@ -1,21 +1,26 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
-import { prisma } from "@/lib/prisma";
+import { listClientBookings } from "@/lib/bookings/list";
+import { toAppError } from "@/lib/api/errors";
+import { getRequestId, logError } from "@/lib/logging/logger";
 
-export async function GET() {
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
+export async function GET(req: Request) {
+  try {
+    const auth = await requireAuth();
+    if (!auth.ok) return auth.response;
 
-  const bookings = await prisma.booking.findMany({
-    where: { clientUserId: auth.user.id },
-    orderBy: { createdAt: "desc" },
-    include: {
-      provider: { select: { id: true, name: true, type: true } },
-      service: { select: { id: true, name: true, durationMin: true, price: true } },
-    },
-  });
-
-  if (!bookings) return fail("Failed to load bookings", 500, "BOOKINGS_LOAD_FAILED");
-
-  return ok({ bookings });
+    const bookings = await listClientBookings(auth.user.id);
+    return ok({ bookings });
+  } catch (error) {
+    const appError = toAppError(error);
+    const requestId = getRequestId(req);
+    if (appError.status >= 500) {
+      logError("GET /api/me/bookings failed", {
+        requestId,
+        route: "GET /api/me/bookings",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return fail(appError.message, appError.status, appError.code);
+  }
 }

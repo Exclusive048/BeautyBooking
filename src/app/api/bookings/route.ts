@@ -1,96 +1,110 @@
-import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
-import { bookingsQuerySchema, createBookingSchema } from "@/lib/bookings/schemas";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
-import { createClientBooking, getProviderBookingsForOwner } from "@/lib/bookings/service";
-import { createBooking } from "@/lib/bookings/usecases";
+import { bookingsQuerySchema } from "@/lib/bookings/schemas";
+import { requireAuth } from "@/lib/auth/guards";
+import { createClientBooking } from "@/lib/bookings/createClientBooking";
+import { createBooking } from "@/lib/bookings/createBooking";
 import { AccountType } from "@prisma/client";
+import { jsonOk, jsonFail } from "@/lib/api/contracts";
+import { toAppError } from "@/lib/api/errors";
+import { parseBody } from "@/lib/validation";
+import { bookingCreateSchema } from "@/lib/validation/bookings";
+import { getSessionUser, requireRole } from "@/lib/auth/access";
+import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
+import { getRequestId, logError } from "@/lib/logging/logger";
+import { listProviderBookingsForOwner } from "@/lib/bookings/list";
 
 export async function GET(req: Request) {
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
-  const { user } = auth;
+  try {
+    const auth = await requireAuth();
+    if (!auth.ok) return auth.response;
+    const { user } = auth;
 
-  const url = new URL(req.url);
-  const parsed = bookingsQuerySchema.safeParse({
-    providerId: url.searchParams.get("providerId"),
-  });
-  if (!parsed.success) {
-    return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
+    const url = new URL(req.url);
+    const parsed = bookingsQuerySchema.safeParse({
+      providerId: url.searchParams.get("providerId"),
+    });
+    if (!parsed.success) {
+      return jsonFail(400, formatZodError(parsed.error), "VALIDATION_ERROR");
+    }
+    const { providerId } = parsed.data;
+
+    const bookings = await listProviderBookingsForOwner(user.id, providerId);
+    return jsonOk({ bookings });
+  } catch (error) {
+    const appError = toAppError(error);
+    const requestId = getRequestId(req);
+    if (appError.status >= 500) {
+      logError("GET /api/bookings failed", {
+        requestId,
+        route: "GET /api/bookings",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code);
   }
-  const { providerId } = parsed.data;
-
-  const result = await getProviderBookingsForOwner(user.id, providerId);
-  if (!result.ok) return fail(result.message, result.status, result.code);
-
-  return ok(result.data);
 }
 
 export async function POST(req: Request) {
-  // ? Строго: только авторизованные клиенты
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
-  const { user } = auth;
+  let userId: string | undefined;
+  try {
+    const user = await getSessionUser(req);
+    userId = user.userId;
+    const roleError = requireRole(user, [AccountType.CLIENT]);
+    if (roleError) throw roleError;
 
-  // ? Строго: у юзера должна быть роль CLIENT
-  const roleError = requireRole(user, AccountType.CLIENT);
-  if (roleError) return roleError;
-
-  const body = await req.json().catch(() => null);
-  const parsedBody = createBookingSchema.safeParse(body);
-  if (!parsedBody.success) {
-    return fail(formatZodError(parsedBody.error), 400, "VALIDATION_ERROR");
-  }
-
-  const {
-    providerId,
-    serviceId,
-    masterProviderId,
-    startAtUtc: startAtUtcRaw,
-    endAtUtc: endAtUtcRaw,
-    slotLabel,
-    clientName,
-    clientPhone,
-    comment,
-  } = parsedBody.data;
-
-  const startAtUtc = startAtUtcRaw ? new Date(startAtUtcRaw) : null;
-  const endAtUtc = endAtUtcRaw ? new Date(endAtUtcRaw) : null;
-  if (startAtUtc && Number.isNaN(startAtUtc.getTime())) {
-    return fail("Invalid startAtUtc", 400, "DATE_INVALID");
-  }
-  if (endAtUtc && Number.isNaN(endAtUtc.getTime())) {
-    return fail("Invalid endAtUtc", 400, "DATE_INVALID");
-  }
-
-  if (startAtUtc) {
-    const created = await createBooking({
+    const {
       providerId,
       serviceId,
-      masterProviderId: masterProviderId ?? null,
-      startAtUtc,
-      endAtUtc: endAtUtc ?? null,
+      masterProviderId,
+      startAtUtc: startAtUtcRaw,
+      endAtUtc: endAtUtcRaw,
       slotLabel,
       clientName,
       clientPhone,
       comment,
-      clientUserId: user.id,
+    } = await parseBody(req, bookingCreateSchema);
+
+    const startAtUtc = startAtUtcRaw ? parseISOToUTC(startAtUtcRaw, "startAtUtc") : null;
+    const endAtUtc = endAtUtcRaw ? parseISOToUTC(endAtUtcRaw, "endAtUtc") : null;
+    if (startAtUtc && endAtUtc) {
+      ensureStartBeforeEnd(startAtUtc, endAtUtc);
+    }
+    if (startAtUtc) {
+      const created = await createBooking({
+        providerId,
+        serviceId,
+        masterProviderId: masterProviderId ?? null,
+        startAtUtc,
+        endAtUtc: endAtUtc ?? null,
+        slotLabel,
+        clientName,
+        clientPhone,
+        comment,
+        clientUserId: user.userId,
+      });
+      return jsonOk({ booking: created }, { status: 201 });
+    }
+
+    const booking = await createClientBooking(user.userId, {
+      providerId,
+      serviceId,
+      slotLabel,
+      clientName,
+      clientPhone,
+      comment,
     });
-
-    if (!created.ok) return fail(created.message, created.status, created.code);
-    return ok({ booking: created.data }, { status: 201 });
+    return jsonOk({ booking }, { status: 201 });
+  } catch (error) {
+    const appError = toAppError(error);
+    const requestId = getRequestId(req);
+    if (appError.status >= 500) {
+      logError("POST /api/bookings failed", {
+        requestId,
+        route: "POST /api/bookings",
+        userId,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code);
   }
-
-  const result = await createClientBooking(user.id, {
-    providerId,
-    serviceId,
-    slotLabel,
-    clientName,
-    clientPhone,
-    comment,
-  });
-
-  if (!result.ok) return fail(result.message, result.status, result.code);
-
-  return ok(result.data, { status: 201 });
 }

@@ -69,7 +69,9 @@ export function todayKey() {
 export function buildAvailabilityRange(dateKey: string) {
   const date = parseDateKey(dateKey);
   if (!date) return null;
-  return { from: date, to: date };
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  return { from: date, to: endOfDay };
 }
 
 async function safeJson<T>(res: Response) {
@@ -173,7 +175,7 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingC
   const json = await safeJson<ApiResponse<{ booking: { id: string } }>>(res);
   const errorCode = json && json.ok !== true ? json.error?.code : undefined;
 
-  if (res.status === 401 && (errorCode === "AUTH_REQUIRED" || errorCode === "UNAUTHORIZED")) {
+  if (res.status === 401 && errorCode === "UNAUTHORIZED") {
     return { ok: false, error: "AUTH_REQUIRED", code: errorCode, status: res.status };
   }
 

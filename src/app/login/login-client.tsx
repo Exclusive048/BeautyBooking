@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { ApiResponse } from "@/lib/types/api";
+import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 
 function normalizePhone(input: string) {
@@ -43,25 +43,19 @@ export default function LoginClient() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/otp/request", {
+      await fetchJson<Record<string, never>>("/api/auth/otp/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: normalized }),
       });
-
-      const json = (await res.json().catch(() => null)) as ApiResponse<Record<string, never>> | null;
-
-      if (!res.ok) {
-        setErrorText("Не удалось отправить код");
-        return;
-      }
-
-      if (!json || !json.ok) {
-        setErrorText(json?.error?.message ?? "Не удалось отправить код");
-        return;
-      }
-
       setStep("code");
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        const mapped = getErrorMessageByCode(error.code);
+        setErrorText(mapped ?? error.message ?? "???? ?????????????? ?????????????????? ??????");
+      } else {
+        setErrorText("???? ?????????????? ?????????????????? ??????");
+      }
     } finally {
       setLoading(false);
     }
@@ -78,27 +72,22 @@ export default function LoginClient() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/otp/verify", {
+      await fetchJson<Record<string, never>>("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: normalized, code }),
       });
 
-      const json = (await res.json().catch(() => null)) as ApiResponse<Record<string, never>> | null;
-
-      if (!res.ok) {
-        setErrorText("Неверный код");
-        return;
-      }
-
-      if (!json || !json.ok) {
-        setErrorText(json?.error?.message ?? "Неверный код");
-        return;
-      }
-
-      // ✅ редирект туда, куда просили
+      // ??? ???????????????? ????????, ???????? ??????????????
       router.replace(nextPath ?? "/cabinet");
       router.refresh();
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        const mapped = getErrorMessageByCode(error.code);
+        setErrorText(mapped ?? error.message ?? "???????????????? ??????");
+      } else {
+        setErrorText("???????????????? ??????");
+      }
     } finally {
       setLoading(false);
     }
