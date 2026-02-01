@@ -4,6 +4,13 @@ import type { BookingCreateInput } from "@/lib/domain/bookings";
 import { AppError } from "@/lib/api/errors";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
+import { checkAndSetIdempotency } from "@/lib/idempotency/idempotency";
+import {
+  buildCreateBookingIdempotencyKey,
+  CREATE_BOOKING_IDEMPOTENCY_TTL_SECONDS,
+} from "@/lib/bookings/idempotency";
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 
@@ -66,6 +73,28 @@ async function ensureNoConflicts(tx: Prisma.TransactionClient, input: ConflictCh
 }
 
 export async function createBooking(input: BookingCreateInput): Promise<BookingDto> {
+  if (input.clientUserId && input.idempotencyKey) {
+    const key = buildCreateBookingIdempotencyKey(input.clientUserId, input.idempotencyKey);
+    const allowed = await checkAndSetIdempotency(
+      key,
+      CREATE_BOOKING_IDEMPOTENCY_TTL_SECONDS
+    );
+    if (!allowed) {
+      throw new AppError("Duplicate request", 409, "DUPLICATE_REQUEST");
+    }
+  }
+
+  if (input.clientUserId) {
+    const allowed = await checkRateLimit(
+      `rate:createBooking:${input.clientUserId}`,
+      CREATE_BOOKING_RATE_LIMIT.limit,
+      CREATE_BOOKING_RATE_LIMIT.windowSeconds
+    );
+    if (!allowed) {
+      throw new AppError("Rate limit exceeded", 429, "RATE_LIMITED");
+    }
+  }
+
   return prisma.$transaction(
     async (tx) => {
       let masterBufferMin: number | null = null;

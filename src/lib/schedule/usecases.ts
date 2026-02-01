@@ -10,6 +10,7 @@ import type {
 } from "@/lib/domain/schedule";
 import { addMinutes, dateFromKey, minutesToTime, timeToMinutes, toDateKey } from "@/lib/schedule/time";
 import { getDayOfWeek, toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+import { getCachedSlots, invalidateSlotsForMaster, setCachedSlots } from "@/lib/schedule/slotsCache";
 
 type RangeInput = {
   from: Date;
@@ -183,6 +184,7 @@ export async function setWeeklySchedule(
   }
 
   await prisma.$transaction(ops);
+  await invalidateSlotsForMaster(providerId);
 
   return { ok: true, data: { count: normalized.length } };
 }
@@ -244,6 +246,7 @@ export async function setScheduleOverride(
 
   type ScheduleOverrideRecord = Prisma.ScheduleOverrideGetPayload<Record<string, never>>;
   const [saved] = (await prisma.$transaction(ops)) as [ScheduleOverrideRecord];
+  await invalidateSlotsForMaster(providerId);
 
   return {
     ok: true,
@@ -267,6 +270,7 @@ export async function removeScheduleOverride(
     prisma.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date: normalized } }),
     prisma.scheduleOverride.deleteMany({ where: { providerId, date: normalized } }),
   ]);
+  await invalidateSlotsForMaster(providerId);
   return { ok: true, data: { date: normalized } };
 }
 
@@ -286,6 +290,7 @@ export async function addScheduleBlock(
       reason: validated.data.reason ?? null,
     },
   });
+  await invalidateSlotsForMaster(providerId);
 
   return { ok: true, data: { id: created.id } };
 }
@@ -301,6 +306,7 @@ export async function removeScheduleBlock(
   if (!existing) return { ok: false, status: 404, message: "Block not found", code: "BLOCK_NOT_FOUND" };
 
   await prisma.scheduleBlock.delete({ where: { id: existing.id } });
+  await invalidateSlotsForMaster(providerId);
   return { ok: true, data: { id: existing.id } };
 }
 
@@ -311,6 +317,11 @@ export async function listAvailabilitySlots(
 ): Promise<Result<AvailabilitySlot[]>> {
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
     return { ok: false, status: 400, message: "Invalid duration", code: "DURATION_INVALID" };
+  }
+
+  const cached = await getCachedSlots(providerId, range.from, durationMin);
+  if (cached) {
+    return { ok: true, data: cached };
   }
 
   const provider = await prisma.provider.findUnique({
@@ -475,6 +486,7 @@ export async function listAvailabilitySlots(
     }
   }
 
+  await setCachedSlots(providerId, range.from, durationMin, slots);
   return { ok: true, data: slots };
 }
 

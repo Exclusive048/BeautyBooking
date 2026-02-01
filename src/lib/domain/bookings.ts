@@ -12,6 +12,7 @@ export type BookingCreateInput = {
   clientPhone: string;
   comment?: string | null;
   clientUserId?: string | null;
+  idempotencyKey?: string | null;
 };
 
 export type BookingCancelInput = {

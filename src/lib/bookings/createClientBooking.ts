@@ -2,6 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
+import { checkAndSetIdempotency } from "@/lib/idempotency/idempotency";
+import {
+  buildCreateBookingIdempotencyKey,
+  CREATE_BOOKING_IDEMPOTENCY_TTL_SECONDS,
+} from "@/lib/bookings/idempotency";
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 
@@ -14,8 +21,29 @@ export async function createClientBooking(
     clientName: string;
     clientPhone: string;
     comment: string | null | undefined;
-  }
+  },
+  idempotencyKey?: string | null
 ): Promise<BookingDto> {
+  if (idempotencyKey) {
+    const key = buildCreateBookingIdempotencyKey(userId, idempotencyKey);
+    const allowed = await checkAndSetIdempotency(
+      key,
+      CREATE_BOOKING_IDEMPOTENCY_TTL_SECONDS
+    );
+    if (!allowed) {
+      throw new AppError("Duplicate request", 409, "DUPLICATE_REQUEST");
+    }
+  }
+
+  const allowed = await checkRateLimit(
+    `rate:createBooking:${userId}`,
+    CREATE_BOOKING_RATE_LIMIT.limit,
+    CREATE_BOOKING_RATE_LIMIT.windowSeconds
+  );
+  if (!allowed) {
+    throw new AppError("Rate limit exceeded", 429, "RATE_LIMITED");
+  }
+
   const service = await prisma.service.findUnique({
     where: { id: data.serviceId },
     select: { id: true, providerId: true, name: true },

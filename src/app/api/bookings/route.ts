@@ -64,6 +64,10 @@ export async function POST(req: Request) {
       comment,
     } = await parseBody(req, bookingCreateSchema);
 
+    const idempotencyKeyRaw = req.headers.get("x-idempotency-key");
+    const idempotencyKey = idempotencyKeyRaw ? idempotencyKeyRaw.trim() : "";
+    const normalizedIdempotencyKey = idempotencyKey.length > 0 ? idempotencyKey : null;
+
     const startAtUtc = startAtUtcRaw ? parseISOToUTC(startAtUtcRaw, "startAtUtc") : null;
     const endAtUtc = endAtUtcRaw ? parseISOToUTC(endAtUtcRaw, "endAtUtc") : null;
     if (startAtUtc && endAtUtc) {
@@ -81,6 +85,7 @@ export async function POST(req: Request) {
         clientPhone,
         comment,
         clientUserId: user.userId,
+        idempotencyKey: normalizedIdempotencyKey,
       });
       return jsonOk({ booking: created }, { status: 201 });
     }
@@ -92,7 +97,7 @@ export async function POST(req: Request) {
       clientName,
       clientPhone,
       comment,
-    });
+    }, normalizedIdempotencyKey);
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);
