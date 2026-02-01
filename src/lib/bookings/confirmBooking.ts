@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 
 function shiftMinutes(date: Date, minutes: number): Date {
@@ -103,6 +104,12 @@ export async function confirmBooking(bookingId: string): Promise<BookingStatusUp
     data: { status: "CONFIRMED" },
     select: { id: true, status: true },
   });
+
+  try {
+    await sendBookingTelegramNotifications(updated.id, "CONFIRMED", { notifyMasterOnConfirm: false });
+  } catch (error) {
+    console.error("Failed to send Telegram booking notifications:", error);
+  }
 
   return { id: updated.id, status: updated.status };
 }

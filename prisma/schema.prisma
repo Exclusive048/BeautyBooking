@@ -65,6 +65,8 @@ model UserProfile {
   email       String?       @unique
   telegramId  String?       @unique
   telegramUsername String?
+  telegramLink TelegramLink?
+  telegramLinkTokens TelegramLinkToken[]
 
   // NEW (optional profile fields)
   firstName   String?
@@ -374,4 +376,25 @@ model ScheduleBreak {
   @@index([providerId, kind])
   @@index([providerId, kind, dayOfWeek])
   @@index([providerId, date])
+}
+
+model TelegramLink {
+  id             String       @id @default(cuid())
+  userId         String       @unique
+  telegramUserId String?
+  chatId         String?      @unique
+  isEnabled      Boolean      @default(true)
+  linkedAt       DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramLinkToken {
+  id        String      @id @default(cuid())
+  userId    String
+  tokenHash String      @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime    @default(now())
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

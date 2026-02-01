@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { createBookingNotifications } from "@/lib/notifications/service";
+import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingCancelInput } from "@/lib/domain/bookings";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 
@@ -29,6 +30,12 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     await createBookingNotifications({ bookingId: updated.id, kind: "CANCELLED" });
   } catch (error) {
     console.error("Failed to create booking notifications:", error);
+  }
+
+  try {
+    await sendBookingTelegramNotifications(updated.id, "CANCELLED");
+  } catch (error) {
+    console.error("Failed to send Telegram booking notifications:", error);
   }
 
   return { id: updated.id, status: updated.status };

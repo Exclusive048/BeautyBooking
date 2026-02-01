@@ -53,6 +53,7 @@ type PathItemObject = {
   get?: OperationObject;
   post?: OperationObject;
   put?: OperationObject;
+  patch?: OperationObject;
   delete?: OperationObject;
 };
 
@@ -157,6 +158,10 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/WeeklyScheduleData" },
               { $ref: "#/components/schemas/CountData" },
               { $ref: "#/components/schemas/DeleteResult" },
+              { $ref: "#/components/schemas/TelegramLinkData" },
+              { $ref: "#/components/schemas/TelegramStatusData" },
+              { $ref: "#/components/schemas/TelegramSettingsData" },
+              { $ref: "#/components/schemas/TelegramWebhookData" },
             ],
           },
         },
@@ -464,6 +469,43 @@ export const openApiSpec = {
           id: { type: "string" },
         },
       },
+      TelegramLinkData: {
+        type: "object",
+        required: ["url", "expiresAt"],
+        properties: {
+          url: { type: "string" },
+          expiresAt: { type: "string", format: "date-time" },
+          alreadyLinked: { type: "boolean" },
+        },
+      },
+      TelegramStatusData: {
+        type: "object",
+        required: ["linked", "enabled", "botUsername"],
+        properties: {
+          linked: { type: "boolean" },
+          enabled: { type: "boolean" },
+          botUsername: { type: "string" },
+        },
+      },
+      TelegramSettingsInput: {
+        type: "object",
+        required: ["enabled"],
+        properties: {
+          enabled: { type: "boolean" },
+        },
+      },
+      TelegramSettingsData: {
+        type: "object",
+        required: ["enabled"],
+        properties: {
+          enabled: { type: "boolean" },
+        },
+      },
+      TelegramWebhookData: {
+        type: "object",
+        nullable: true,
+        description: "Empty webhook response",
+      },
     },
   },
   paths: {
@@ -736,6 +778,63 @@ export const openApiSpec = {
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Master not found"),
           "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/telegram/link": {
+      get: {
+        summary: "Generate Telegram linking URL",
+        tags: ["telegram"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/TelegramLinkData" }),
+          "401": errorResponse("Unauthorized"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/telegram/status": {
+      get: {
+        summary: "Get Telegram notification status",
+        tags: ["telegram"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/TelegramStatusData" }),
+          "401": errorResponse("Unauthorized"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/telegram/settings": {
+      patch: {
+        summary: "Update Telegram notification settings",
+        tags: ["telegram"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/TelegramSettingsInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/TelegramSettingsData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/telegram/webhook": {
+      post: {
+        summary: "Telegram webhook (internal)",
+        tags: ["telegram", "internal"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { type: "object", additionalProperties: true } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/TelegramWebhookData" }),
+          "403": errorResponse("Forbidden"),
         },
       },
     },

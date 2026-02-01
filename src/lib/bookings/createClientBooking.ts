@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { createBookingNotifications } from "@/lib/notifications/service";
+import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 
@@ -53,6 +54,12 @@ export async function createClientBooking(
     await createBookingNotifications({ bookingId: booking.id, kind: "CREATED" });
   } catch (error) {
     console.error("Failed to create booking notifications:", error);
+  }
+
+  try {
+    await sendBookingTelegramNotifications(booking.id, "CREATED", { notifyClientOnCreate: true });
+  } catch (error) {
+    console.error("Failed to send Telegram booking notifications:", error);
   }
 
   return toBookingDto(booking);

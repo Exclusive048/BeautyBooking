@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
+import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 
 type MeDto = {
   id: string;
@@ -246,6 +247,8 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           {roleError ? <div className="text-xs text-red-600">{roleError}</div> : null}
         </div>
       ) : null}
+
+      <TelegramNotificationsSection />
 
       {saved ? (
         <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700">
