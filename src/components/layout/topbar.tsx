@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { hasGlobalMasterProfile } from "@/lib/auth/roles";
 import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type CabinetItem = { label: string; href: string };
 
@@ -17,15 +18,15 @@ function buildCabinetNav(input: {
 }): { items: CabinetItem[]; defaultHref: string } {
   const { hasGlobalMaster, hasStudioAccess } = input;
   const items: CabinetItem[] = [
-    { label: "Профиль", href: "/cabinet/client?tab=profile" },
-    { label: "Мои записи", href: "/cabinet/client?tab=bookings" },
+    { label: UI_TEXTS.common.profile, href: "/cabinet/client?tab=profile" },
+    { label: UI_TEXTS.common.myBookings, href: "/cabinet/client?tab=bookings" },
   ];
 
   if (hasStudioAccess) {
-    items.push({ label: "Кабинет студии", href: "/cabinet/studio?tab=bookings" });
+    items.push({ label: UI_TEXTS.topbar.cabinetStudio, href: "/cabinet/studio?tab=bookings" });
   }
   if (hasGlobalMaster) {
-    items.push({ label: "Кабинет мастера", href: "/cabinet/master?tab=bookings" });
+    items.push({ label: UI_TEXTS.topbar.cabinetMaster, href: "/cabinet/master?tab=bookings" });
   }
 
   const defaultHref = hasStudioAccess
@@ -57,7 +58,7 @@ export async function Topbar() {
 
   navItems.push(
     <Button key="nav-catalog" asChild variant="secondary">
-      <Link href="/providers">Каталог</Link>
+      <Link href="/providers">{UI_TEXTS.topbar.catalog}</Link>
     </Button>
   );
 
@@ -65,7 +66,7 @@ export async function Topbar() {
     navItems.push(
       <details key="nav-cabinet" className="relative">
         <Button asChild variant="secondary">
-          <summary className="list-none cursor-pointer">Мой кабинет</summary>
+          <summary className="list-none cursor-pointer">{UI_TEXTS.topbar.myCabinet}</summary>
         </Button>
         <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-1">
           {cabinetNav.items.map((item) => (
@@ -83,7 +84,7 @@ export async function Topbar() {
 
     navItems.push(
       <Button key="nav-notifications" asChild variant="secondary" className="relative">
-        <Link href="/cabinet/invites" aria-label="Уведомления">
+        <Link href="/cabinet/invites" aria-label={UI_TEXTS.topbar.notifications}>
           <span aria-hidden>🔔</span>
           {notificationsCount > 0 ? (
             <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
@@ -100,7 +101,7 @@ export async function Topbar() {
     navItems.push(<ThemeToggle key="nav-theme-toggle" />);
     navItems.push(
       <Button key="nav-login" asChild>
-        <Link href="/login">Вход</Link>
+        <Link href="/login">{UI_TEXTS.auth.login}</Link>
       </Button>
     );
   }
@@ -112,7 +113,7 @@ export async function Topbar() {
           <div className="h-10 w-10 rounded-2xl bg-neutral-900 dark:bg-accent" />
           <div className="leading-tight">
             <div className="text-sm font-semibold text-text">BeautyHub</div>
-            <div className="text-xs text-text-muted">Запись к мастерам</div>
+            <div className="text-xs text-text-muted">{UI_TEXTS.topbar.bookingToMasters}</div>
           </div>
         </Link>
 

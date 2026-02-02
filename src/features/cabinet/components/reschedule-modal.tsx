@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
 import { timeToMinutes } from "@/lib/schedule/time";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type SlotItem = {
   startAtUtc: string;
@@ -78,9 +79,9 @@ function groupSlotsByDayPeriod(slots: SlotItem[], dateKey: string): SlotGroup[] 
   items.sort((a, b) => a.minutes - b.minutes);
 
   const groups = [
-    { id: "morning", label: "Утро", items: [] as string[] },
-    { id: "day", label: "День", items: [] as string[] },
-    { id: "evening", label: "Вечер", items: [] as string[] },
+    { id: "morning", label: UI_TEXTS.booking.morning, items: [] as string[] },
+    { id: "day", label: UI_TEXTS.booking.day, items: [] as string[] },
+    { id: "evening", label: UI_TEXTS.booking.evening, items: [] as string[] },
   ];
 
   for (const item of items) {
@@ -124,11 +125,9 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         url.searchParams.set("to", to.toISOString());
 
         const res = await fetch(url.toString(), { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ slots: SlotItem[] }>
-          | null;
-        if (!res.ok) throw new Error(getErrorMessage(json, "Не удалось загрузить слоты"));
-        if (!json || !json.ok) throw new Error(getErrorMessage(json, "Не удалось загрузить слоты"));
+        const json = (await res.json().catch(() => null)) as ApiResponse<{ slots: SlotItem[] }> | null;
+        if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.loadSlotsFailed));
+        if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.loadSlotsFailed));
 
         if (!cancelled) {
           setSlots(json.data.slots ?? []);
@@ -137,7 +136,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Неизвестная ошибка");
+          setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
           setSlots([]);
         }
       } finally {
@@ -145,28 +144,24 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
       }
     }
 
-    loadSlots();
+    void loadSlots();
     return () => {
       cancelled = true;
     };
   }, [booking.serviceId, masterId, selectedDate]);
 
-  const slotGroups = useMemo(
-    () => groupSlotsByDayPeriod(slots, selectedDate),
-    [slots, selectedDate]
-  );
-
+  const slotGroups = useMemo(() => groupSlotsByDayPeriod(slots, selectedDate), [slots, selectedDate]);
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
 
   const submit = async () => {
     setError(null);
     if (!slotLabel) {
-      setError("Выберите слот");
+      setError(UI_TEXTS.booking.chooseTime);
       return;
     }
     const slot = slotByLabel.get(slotLabel);
     if (!slot) {
-      setError("Выберите корректный слот");
+      setError(UI_TEXTS.booking.chooseCorrectSlot);
       return;
     }
 
@@ -184,13 +179,13 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
       const json = (await res.json().catch(() => null)) as
         | ApiResponse<{ booking: { slotLabel: string } }>
         | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Не удалось перенести запись"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Не удалось перенести запись"));
+      if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.submitFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.submitFailed));
 
       onSuccess({ slotLabel: json.data.booking.slotLabel });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Неизвестная ошибка");
+      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setLoading(false);
     }
@@ -203,8 +198,8 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border p-5 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-lg font-semibold">Перенести запись</div>
-              <div className="text-sm text-neutral-600">Выберите новую дату и слот.</div>
+              <div className="text-lg font-semibold">{UI_TEXTS.booking.moveBooking}</div>
+              <div className="text-sm text-neutral-600">{UI_TEXTS.booking.moveBookingHint}</div>
             </div>
             <button
               onClick={onClose}
@@ -222,7 +217,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           ) : null}
 
           <div>
-            <div className="text-sm font-medium">Дата</div>
+            <div className="text-sm font-medium">{UI_TEXTS.booking.chooseDate}</div>
             <div className="mt-2 flex gap-2 overflow-x-auto">
               {dateOptions.map((date) => {
                 const active = date === selectedDate;
@@ -245,13 +240,11 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           </div>
 
           <div>
-            <div className="text-sm font-medium">Слоты</div>
+            <div className="text-sm font-medium">{UI_TEXTS.booking.chooseTime}</div>
             {loadingSlots ? (
-              <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.common.loading}</div>
             ) : slotGroups.length === 0 ? (
-              <div className="mt-2 text-sm text-neutral-600">
-                Нет слотов на выбранную дату.
-              </div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.booking.noSlots}</div>
             ) : (
               <div className="mt-3">
                 <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
@@ -265,7 +258,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
               onClick={onClose}
               className="flex-1 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
             >
-              Отмена
+              {UI_TEXTS.common.cancel}
             </button>
             <button
               type="button"
@@ -273,7 +266,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
               disabled={loading || loadingSlots}
               className="flex-1 rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-60"
             >
-              {loading ? "Переносим…" : "Подтвердить перенос"}
+              {loading ? UI_TEXTS.booking.moving : UI_TEXTS.booking.moveConfirm}
             </button>
           </div>
         </div>

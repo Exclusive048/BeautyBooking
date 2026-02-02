@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type MeDto = {
   id: string;
@@ -95,20 +96,20 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           | null;
 
         if (!res.ok) {
-          setError("Не удалось сохранить");
+          setError(UI_TEXTS.profile.saveFailed);
           return;
         }
 
         const message = data && !data.ok ? data.error.message : null;
 
         if (!data || !data.ok) {
-          setError(message ?? "Не удалось сохранить");
+          setError(message ?? UI_TEXTS.profile.saveFailed);
           return;
         }
 
-        setSaved("Сохранено");
+        setSaved(UI_TEXTS.profile.saved);
       } catch {
-        setError("Сеть недоступна или сервер не отвечает");
+        setError(UI_TEXTS.profile.networkError);
       }
     });
   };
@@ -132,19 +133,19 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
       const message = data && !data.ok ? data.error.message : null;
 
       if (!res.ok) {
-        setRoleError(message ?? "Не удалось создать профиль мастера");
+        setRoleError(message ?? UI_TEXTS.profile.createMasterFailed);
         return;
       }
 
       if (!data || !data.ok) {
-        setRoleError(message ?? "Не удалось создать профиль мастера");
+        setRoleError(message ?? UI_TEXTS.profile.createMasterFailed);
         return;
       }
 
-      setRoleMessage("Профиль мастера создан");
+      setRoleMessage(UI_TEXTS.profile.masterCreated);
       router.refresh();
     } catch {
-      setRoleError("Сеть недоступна или сервер не отвечает");
+      setRoleError(UI_TEXTS.profile.networkError);
     } finally {
       setRoleAction(null);
     }
@@ -169,19 +170,19 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
       const message = data && !data.ok ? data.error.message : null;
 
       if (!res.ok) {
-        setRoleError(message ?? "Не удалось создать студию");
+        setRoleError(message ?? UI_TEXTS.profile.createStudioFailed);
         return;
       }
 
       if (!data || !data.ok) {
-        setRoleError(message ?? "Не удалось создать студию");
+        setRoleError(message ?? UI_TEXTS.profile.createStudioFailed);
         return;
       }
 
-      setRoleMessage("Студия создана");
+      setRoleMessage(UI_TEXTS.profile.studioCreated);
       router.refresh();
     } catch {
-      setRoleError("Сеть недоступна или сервер не отвечает");
+      setRoleError(UI_TEXTS.profile.networkError);
     } finally {
       setRoleAction(null);
     }
@@ -198,26 +199,26 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
   return (
     <div className="rounded-2xl border p-5 space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">Профиль</h2>
+        <h2 className="text-lg font-semibold">{UI_TEXTS.common.profile}</h2>
         <p className="mt-1 text-sm text-neutral-600">
-          Все поля пока необязательные. Заполните то, что хотите показывать/использовать.
+          {UI_TEXTS.profile.description}
         </p>
       </div>
 
       {showProfessionalCta ? (
         <div className="rounded-2xl border p-4 space-y-3">
           <div>
-            <div className="text-sm font-semibold">Мои профессиональные роли</div>
+            <div className="text-sm font-semibold">{UI_TEXTS.profile.professionalRolesTitle}</div>
             <div className="mt-1 text-sm text-neutral-600">
               {hasProfessionalRole
-                ? "Вы уже добавили профессиональные роли. Можно добавить еще."
-                : "Вы пока клиент. Добавьте роль мастера или студии."}
+                ? UI_TEXTS.profile.rolesAddedCanAddMore
+                : UI_TEXTS.profile.stillClientAddRole}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {hasMasterProfile ? (
-              <div className="text-xs text-neutral-600">Вы уже мастер</div>
+              <div className="text-xs text-neutral-600">{UI_TEXTS.profile.alreadyMaster}</div>
             ) : (
               <button
                 type="button"
@@ -225,12 +226,12 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
                 disabled={roleAction !== null}
                 className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
               >
-                {isCreatingMaster ? "Создаем профиль мастера..." : "Стать мастером"}
+                {isCreatingMaster ? UI_TEXTS.profile.creatingMaster : UI_TEXTS.profile.becomeMaster}
               </button>
             )}
 
             {hasStudioProfile ? (
-              <div className="text-xs text-neutral-600">Вы уже владелец студии</div>
+              <div className="text-xs text-neutral-600">{UI_TEXTS.profile.alreadyStudioOwner}</div>
             ) : (
               <button
                 type="button"
@@ -238,7 +239,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
                 disabled={roleAction !== null}
                 className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
               >
-                {isCreatingStudio ? "Создаем студию..." : "Создать студию"}
+                {isCreatingStudio ? UI_TEXTS.profile.creatingStudio : UI_TEXTS.profile.createStudio}
               </button>
             )}
           </div>
@@ -264,49 +265,49 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1">
-          <div className={labelClass}>Фамилия</div>
+          <div className={labelClass}>{UI_TEXTS.profile.lastName}</div>
           <input
             className={inputClass}
             value={form.lastName}
             onChange={(e) => setForm((s) => ({ ...s, lastName: e.target.value }))}
-            placeholder="Иванов"
+            placeholder={UI_TEXTS.profile.lastNamePlaceholder}
           />
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>Имя</div>
+          <div className={labelClass}>{UI_TEXTS.profile.firstName}</div>
           <input
             className={inputClass}
             value={form.firstName}
             onChange={(e) => setForm((s) => ({ ...s, firstName: e.target.value }))}
-            placeholder="Иван"
+            placeholder={UI_TEXTS.profile.firstNamePlaceholder}
           />
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>Отчество</div>
+          <div className={labelClass}>{UI_TEXTS.profile.middleName}</div>
           <input
             className={inputClass}
             value={form.middleName}
             onChange={(e) => setForm((s) => ({ ...s, middleName: e.target.value }))}
-            placeholder="Иванович"
+            placeholder={UI_TEXTS.profile.middleNamePlaceholder}
           />
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1 md:col-span-1">
-          <div className={labelClass}>Отображаемое имя</div>
+          <div className={labelClass}>{UI_TEXTS.profile.displayName}</div>
           <input
             className={inputClass}
             value={form.displayName}
             onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))}
-            placeholder="Как вас показывать в интерфейсе"
+            placeholder={UI_TEXTS.profile.displayNamePlaceholder}
           />
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>Телефон</div>
+          <div className={labelClass}>{UI_TEXTS.common.phone}</div>
           <input
             className={inputClass}
             value={form.phone}
@@ -316,7 +317,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>Почта</div>
+          <div className={labelClass}>{UI_TEXTS.profile.email}</div>
           <input
             className={inputClass}
             value={form.email}
@@ -328,7 +329,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1">
-          <div className={labelClass}>Дата рождения</div>
+          <div className={labelClass}>{UI_TEXTS.profile.birthDate}</div>
           <input
             type="date"
             className={inputClass}
@@ -338,21 +339,23 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
         </div>
 
         <div className="space-y-1 md:col-span-2">
-          <div className={labelClass}>Адрес</div>
+          <div className={labelClass}>{UI_TEXTS.profile.address}</div>
           <input
             className={inputClass}
             value={form.address}
             onChange={(e) => setForm((s) => ({ ...s, address: e.target.value }))}
-            placeholder="Город, улица, дом..."
+            placeholder={UI_TEXTS.profile.addressPlaceholder}
           />
           <div className="text-xs text-neutral-500 mt-1">
-            Позже добавим кнопку &quot;Показать на карте&quot; и будем сохранять координаты.
+            {UI_TEXTS.profile.mapHint}
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-xs text-neutral-500">Роли: {initialUser.roles.join(", ")}</div>
+        <div className="text-xs text-neutral-500">
+          {UI_TEXTS.profile.rolesLabel} {initialUser.roles.join(", ")}
+        </div>
 
         <button
           type="button"
@@ -360,7 +363,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           onClick={onSave}
           className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          {pending ? "Сохранение..." : "Сохранить"}
+          {pending ? UI_TEXTS.profile.saving : UI_TEXTS.common.save}
         </button>
       </div>
     </div>

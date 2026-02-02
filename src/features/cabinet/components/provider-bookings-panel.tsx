@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type BookingItem = {
   id: string;
@@ -25,6 +26,12 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
 
+function statusLabel(status: BookingItem["status"]) {
+  if (status === "PENDING") return UI_TEXTS.booking.pending;
+  if (status === "CONFIRMED") return UI_TEXTS.booking.confirmed;
+  return UI_TEXTS.booking.cancelled;
+}
+
 export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
   const [items, setItems] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,16 +44,14 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
     setError(null);
     try {
       const res = await fetch(endpoint, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ bookings: BookingItem[] }>
-        | null;
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ bookings: BookingItem[] }> | null;
 
-      if (!res.ok) throw new Error(getErrorMessage(json, `API error: ${res.status}`));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load bookings"));
+      if (!res.ok) throw new Error(getErrorMessage(json, `${UI_TEXTS.bookingsPanel.apiErrorPrefix} ${res.status}`));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToLoad));
 
       setItems(json.data.bookings);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setLoading(false);
     }
@@ -68,12 +73,12 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
         | ApiResponse<{ booking: { id: string; status: BookingItem["status"] } }>
         | null;
 
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to confirm"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to confirm"));
+      if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToConfirm));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToConfirm));
 
       updateStatus(id, json.data.booking.status);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setActionId(null);
     }
@@ -91,31 +96,31 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
         | ApiResponse<{ booking: { id: string; status: BookingItem["status"] } }>
         | null;
 
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to cancel"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to cancel"));
+      if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToCancel));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToCancel));
 
       updateStatus(id, json.data.booking.status);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setActionId(null);
     }
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загружаем записи</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">{UI_TEXTS.bookingsPanel.loading}</div>;
   }
 
   if (error) {
     return (
       <div className="rounded-2xl border p-5 text-sm text-red-600">
-        Ошибка загрузки: {error}
+        {UI_TEXTS.bookingsPanel.loadErrorPrefix} {error}
       </div>
     );
   }
 
   if (items.length === 0) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Записей пока нет.</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">{UI_TEXTS.bookingsPanel.empty}</div>;
   }
 
   return (
@@ -125,7 +130,7 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
           <div key={b.id} className="rounded-2xl border p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="font-medium">{b.clientName}</div>
-              <div className="text-sm text-neutral-600">{b.status}</div>
+              <div className="text-sm text-neutral-600">{statusLabel(b.status)}</div>
             </div>
             <div className="mt-1 text-sm text-neutral-700">
               {b.slotLabel} · {b.service.name} · {b.clientPhone}
@@ -140,7 +145,7 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
                   disabled={actionId === b.id}
                   className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
                 >
-                  Подтвердить
+                  {UI_TEXTS.bookingsPanel.confirm}
                 </button>
               ) : null}
               {b.status !== "CANCELLED" ? (
@@ -151,7 +156,7 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
                     disabled={actionId === b.id}
                     className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
                   >
-                    Перенести
+                    {UI_TEXTS.bookingsPanel.reschedule}
                   </button>
                   <button
                     type="button"
@@ -159,7 +164,7 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
                     disabled={actionId === b.id}
                     className="rounded-lg border px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                   >
-                    Отменить
+                    {UI_TEXTS.bookingsPanel.cancelShort}
                   </button>
                 </>
               ) : null}
@@ -181,9 +186,7 @@ export function ProviderBookingsPanel({ endpoint, canConfirm = true }: Props) {
           onSuccess={(next) => {
             setItems((prev) =>
               prev.map((item) =>
-                item.id === rescheduleBooking.id
-                  ? { ...item, slotLabel: next.slotLabel }
-                  : item
+                item.id === rescheduleBooking.id ? { ...item, slotLabel: next.slotLabel } : item
               )
             );
           }}

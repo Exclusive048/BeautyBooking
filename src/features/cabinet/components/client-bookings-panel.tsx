@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type BookingItem = {
   id: string;
@@ -19,6 +20,12 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
 
+function statusLabel(status: BookingItem["status"]) {
+  if (status === "PENDING") return UI_TEXTS.booking.pending;
+  if (status === "CONFIRMED") return UI_TEXTS.booking.confirmed;
+  return UI_TEXTS.booking.cancelled;
+}
+
 export function ClientBookingsPanel() {
   const [items, setItems] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,14 +38,12 @@ export function ClientBookingsPanel() {
     setError(null);
     try {
       const res = await fetch("/api/me/bookings", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ bookings: BookingItem[] }>
-        | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, `API error: ${res.status}`));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load bookings"));
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ bookings: BookingItem[] }> | null;
+      if (!res.ok) throw new Error(getErrorMessage(json, `${UI_TEXTS.bookingsPanel.apiErrorPrefix} ${res.status}`));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToLoad));
       setItems(json.data.bookings);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setLoading(false);
     }
@@ -59,30 +64,30 @@ export function ClientBookingsPanel() {
       const json = (await res.json().catch(() => null)) as
         | ApiResponse<{ booking: { id: string; status: BookingItem["status"] } }>
         | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to cancel"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to cancel"));
+      if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToCancel));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToCancel));
       setItems((prev) => prev.map((b) => (b.id === id ? { ...b, status: "CANCELLED" } : b)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setActionId(null);
     }
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">Загружаем записи</div>;
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">{UI_TEXTS.bookingsPanel.loading}</div>;
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border p-5 text-sm text-red-600">Ошибка: {error}</div>
+      <div className="rounded-2xl border p-5 text-sm text-red-600">
+        {UI_TEXTS.common.error}: {error}
+      </div>
     );
   }
 
   if (items.length === 0) {
-    return (
-      <div className="rounded-2xl border p-5 text-sm text-neutral-600">Записей пока нет.</div>
-    );
+    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">{UI_TEXTS.bookingsPanel.empty}</div>;
   }
 
   return (
@@ -92,7 +97,7 @@ export function ClientBookingsPanel() {
           <div key={b.id} className="rounded-2xl border p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="font-medium">{b.provider.name}</div>
-              <div className="text-sm text-neutral-600">{b.status}</div>
+              <div className="text-sm text-neutral-600">{statusLabel(b.status)}</div>
             </div>
             <div className="mt-1 text-sm text-neutral-700">
               {b.slotLabel} · {b.service.name}
@@ -109,7 +114,7 @@ export function ClientBookingsPanel() {
                   disabled={actionId === b.id}
                   className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
                 >
-                  Перенести
+                  {UI_TEXTS.bookingsPanel.reschedule}
                 </button>
                 <button
                   type="button"
@@ -117,7 +122,7 @@ export function ClientBookingsPanel() {
                   disabled={actionId === b.id}
                   className="rounded-lg border px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                 >
-                  Отменить запись
+                  {UI_TEXTS.bookingsPanel.cancelBooking}
                 </button>
               </div>
             ) : null}
@@ -138,9 +143,7 @@ export function ClientBookingsPanel() {
           onSuccess={(next) => {
             setItems((prev) =>
               prev.map((item) =>
-                item.id === rescheduleBooking.id
-                  ? { ...item, slotLabel: next.slotLabel }
-                  : item
+                item.id === rescheduleBooking.id ? { ...item, slotLabel: next.slotLabel } : item
               )
             );
           }}

@@ -4,6 +4,7 @@ import { CabinetShell } from "@/features/cabinet/components/cabinet-shell";
 import { CabinetNavTabs } from "@/features/cabinet/components/cabinet-nav-tabs";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { ClientBookingsPanel } from "@/features/cabinet/components/client-bookings-panel";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type MeDto = {
   id: string;
@@ -40,12 +41,15 @@ export default async function ClientCabinetPage(props: {
     if (!meResponse.data.user) redirect("/login");
 
     return (
-      <CabinetShell title="Кабинет клиента" subtitle="Личные данные и настройки.">
+      <CabinetShell
+        title={UI_TEXTS.cabinet.clientTitle}
+        subtitle={UI_TEXTS.cabinet.clientProfileSubtitle}
+      >
         <CabinetNavTabs
           activeId="profile"
           items={[
-            { id: "bookings", label: "Записи", href: "/cabinet/client?tab=bookings" },
-            { id: "profile", label: "Профиль", href: "/cabinet/client?tab=profile" },
+            { id: "bookings", label: UI_TEXTS.common.myBookings, href: "/cabinet/client?tab=bookings" },
+            { id: "profile", label: UI_TEXTS.common.profile, href: "/cabinet/client?tab=profile" },
           ]}
         />
 
@@ -55,12 +59,15 @@ export default async function ClientCabinetPage(props: {
   }
 
   return (
-    <CabinetShell title="Кабинет клиента" subtitle="Ваши записи к мастерам и в студии.">
+    <CabinetShell
+      title={UI_TEXTS.cabinet.clientTitle}
+      subtitle={UI_TEXTS.cabinet.clientBookingsSubtitle}
+    >
       <CabinetNavTabs
         activeId="bookings"
         items={[
-          { id: "bookings", label: "Записи", href: "/cabinet/client?tab=bookings" },
-          { id: "profile", label: "Профиль", href: "/cabinet/client?tab=profile" },
+          { id: "bookings", label: UI_TEXTS.common.myBookings, href: "/cabinet/client?tab=bookings" },
+          { id: "profile", label: UI_TEXTS.common.profile, href: "/cabinet/client?tab=profile" },
         ]}
       />
 

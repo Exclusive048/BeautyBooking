@@ -7,6 +7,7 @@ import { timeToMinutes } from "@/lib/schedule/time";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { DatePicker } from "@/components/ui/date-picker";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type BookingUser = {
   id: string;
@@ -45,8 +46,8 @@ function formatMoney(n: number) {
 
 function formatDuration(min: number | null | undefined) {
   if (!min || min <= 0) return null;
-  if (min % 60 === 0) return `${min / 60} ч`;
-  return `${min} мин`;
+  if (min % 60 === 0) return `${min / 60} ${UI_TEXTS.booking.hourShort}`;
+  return `${min} ${UI_TEXTS.booking.minuteShort}`;
 }
 
 function buildLoginUrl(nextPath: string) {
@@ -175,9 +176,9 @@ export default function BookingWidget({
         if (!cancelled) {
           if (e instanceof ApiClientError) {
             const mapped = getErrorMessageByCode(e.code);
-            setSlotsError(mapped ?? e.message ?? "???? ?????????????? ?????????????????? ??????????");
+            setSlotsError(mapped ?? e.message ?? UI_TEXTS.booking.loadSlotsFailed);
           } else {
-            setSlotsError(e instanceof Error ? e.message : "?????????????????????? ????????????");
+            setSlotsError(e instanceof Error ? e.message : UI_TEXTS.booking.loadSlotsFailed);
           }
           setSlots([]);
           setSlotLabel("");
@@ -214,9 +215,9 @@ export default function BookingWidget({
     items.sort((a, b) => a.minutes - b.minutes);
 
     const groups = [
-      { id: "morning", label: "Утро", items: [] as string[] },
-      { id: "day", label: "День", items: [] as string[] },
-      { id: "evening", label: "Вечер", items: [] as string[] },
+      { id: "morning", label: UI_TEXTS.booking.morning, items: [] as string[] },
+      { id: "day", label: UI_TEXTS.booking.day, items: [] as string[] },
+      { id: "evening", label: UI_TEXTS.booking.evening, items: [] as string[] },
     ];
 
     for (const item of items) {
@@ -245,37 +246,37 @@ export default function BookingWidget({
     setSuccessId(null);
 
     if (!providerId) {
-      setErrorText("providerId не задан");
+      setErrorText(UI_TEXTS.booking.providerIdMissing);
       return;
     }
 
     if (providerType === "STUDIO" && !masterId) {
-      setErrorText("Выберите мастера");
+      setErrorText(UI_TEXTS.booking.chooseMaster);
       return;
     }
 
     if (!serviceId) {
-      setErrorText("Выберите услугу");
+      setErrorText(UI_TEXTS.booking.chooseService);
       return;
     }
 
     if (!slotLabel) {
-      setErrorText("Выберите слот/время");
+      setErrorText(UI_TEXTS.booking.chooseTime);
       return;
     }
 
     if (!clientName.trim()) {
-      setErrorText("Введите имя");
+      setErrorText(UI_TEXTS.booking.enterName);
       return;
     }
     if (!clientPhone.trim()) {
-      setErrorText("Введите телефон");
+      setErrorText(UI_TEXTS.booking.enterPhone);
       return;
     }
 
     const slot = slotByLabel.get(slotLabel) ?? null;
     if (!slot) {
-      setErrorText("Выберите корректный слот");
+      setErrorText(UI_TEXTS.booking.chooseCorrectSlot);
       return;
     }
 
@@ -306,9 +307,9 @@ export default function BookingWidget({
           setShowAuthModal(true);
           return;
         }
-        setErrorText(mapped ?? error.message ?? "???? ?????????????? ?????????????? ????????????");
+        setErrorText(mapped ?? error.message ?? UI_TEXTS.booking.submitFailed);
       } else {
-        setErrorText("???? ?????????????? ?????????????? ????????????");
+        setErrorText(UI_TEXTS.booking.submitFailed);
       }
     } finally {
       setLoading(false);
@@ -322,15 +323,15 @@ export default function BookingWidget({
       <div className="rounded-2xl border p-5 bg-white">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold">Запись</div>
+            <div className="text-lg font-semibold">{UI_TEXTS.booking.book}</div>
             <div className="text-sm text-neutral-600 mt-1">
-              Запись доступна только авторизованным клиентам.
+              {UI_TEXTS.booking.authOnlyDescription}
             </div>
           </div>
 
           {selectedService ? (
             <div className="text-right">
-              <div className="text-sm text-neutral-600">Стоимость</div>
+              <div className="text-sm text-neutral-600">{UI_TEXTS.booking.cost}</div>
               <div className="font-semibold">{formatMoney(selectedService.price)} ₽</div>
             </div>
           ) : null}
@@ -338,17 +339,17 @@ export default function BookingWidget({
 
         <div className="mt-4">
           {meLoading ? (
-            <div className="text-sm text-neutral-600">Проверяем авторизацию…</div>
+            <div className="text-sm text-neutral-600">{UI_TEXTS.common.loading}</div>
           ) : me ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              Вы авторизованы
+              {UI_TEXTS.booking.authorized}
               {me.phone ? <span className="ml-2 text-emerald-700">({me.phone})</span> : null}
             </div>
           ) : (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Войдите, чтобы записаться.
+              {UI_TEXTS.booking.loginToBook}
               <a href={buildLoginUrl(nextPath)} className="ml-2 underline font-medium">
-                Войти
+                {UI_TEXTS.auth.login}
               </a>
             </div>
           )}
@@ -362,13 +363,13 @@ export default function BookingWidget({
 
         {successId ? (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            Заявка отправлена (ID: {successId})
+            {UI_TEXTS.booking.requestSent} (ID: {successId})
           </div>
         ) : null}
 
         <div className="mt-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium">Услуга</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.booking.service}</label>
             <select
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
               value={serviceId}
@@ -377,20 +378,20 @@ export default function BookingWidget({
             >
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} • {s.durationMin} мин • {formatMoney(s.price)} ₽
+                  {s.name} • {s.durationMin} {UI_TEXTS.booking.minuteShort} • {formatMoney(s.price)} ₽
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Слот</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.booking.chooseTime}</label>
             {slotsLoading ? (
-              <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.common.loading}</div>
             ) : slotsError ? (
               <div className="mt-2 text-sm text-red-600">{slotsError}</div>
             ) : slotGroups.length === 0 ? (
-              <div className="mt-2 text-sm text-neutral-600">Свободных слотов нет.</div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.booking.noSlots}</div>
             ) : (
               <div className="mt-2 space-y-3">
                 <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
@@ -399,10 +400,10 @@ export default function BookingWidget({
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Имя</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.name}</label>
             <input
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-              placeholder="Ваше имя"
+              placeholder={UI_TEXTS.common.name}
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               disabled={loading}
@@ -410,7 +411,7 @@ export default function BookingWidget({
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Телефон</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.phone}</label>
             <input
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
               placeholder="+7..."
@@ -423,10 +424,10 @@ export default function BookingWidget({
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Комментарий (необязательно)</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.commentOptional}</label>
             <textarea
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 min-h-[90px]"
-              placeholder="Например: хочу естественный нюд"
+              placeholder={UI_TEXTS.booking.commentPlaceholder}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               disabled={loading}
@@ -438,29 +439,26 @@ export default function BookingWidget({
             disabled={loading || (!meLoading && !me)}
             className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
           >
-            {loading ? "Отправляем..." : "Записаться"}
+            {loading ? UI_TEXTS.common.loading : UI_TEXTS.booking.book}
           </button>
         </div>
 
         {showAuthModal ? (
-          <Modal title="Войдите, чтобы записаться" onClose={() => setShowAuthModal(false)}>
-            <div className="text-sm text-neutral-700">
-              Мы принимаем записи только от авторизованных клиентов — так мастерам спокойнее и меньше
-              фейковых заявок.
-            </div>
+          <Modal title={UI_TEXTS.booking.authModalTitle} onClose={() => setShowAuthModal(false)}>
+            <div className="text-sm text-neutral-700">{UI_TEXTS.booking.authModalText}</div>
 
             <div className="mt-5 flex gap-3">
               <a
                 href={buildLoginUrl(nextPath)}
                 className="flex-1 text-center rounded-xl bg-black text-white py-2 font-medium"
               >
-                Войти
+                {UI_TEXTS.auth.login}
               </a>
               <button
                 onClick={() => setShowAuthModal(false)}
                 className="flex-1 rounded-xl border py-2 font-medium"
               >
-                Не сейчас
+                {UI_TEXTS.common.notNow}
               </button>
             </div>
           </Modal>
@@ -473,24 +471,24 @@ export default function BookingWidget({
     <div className="rounded-2xl border p-5 bg-white">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-lg font-semibold">Запись</div>
-          <div className="text-sm text-neutral-600 mt-1">Выберите услугу, затем мастера и время</div>
+          <div className="text-lg font-semibold">{UI_TEXTS.booking.book}</div>
+          <div className="text-sm text-neutral-600 mt-1">{UI_TEXTS.booking.studioHint}</div>
         </div>
       </div>
 
       <div className="mt-4">
         {meLoading ? (
-          <div className="text-sm text-neutral-600">Проверяем авторизацию…</div>
+          <div className="text-sm text-neutral-600">{UI_TEXTS.common.loading}</div>
         ) : me ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            Вы авторизованы
+            {UI_TEXTS.booking.authorized}
             {me.phone ? <span className="ml-2 text-emerald-700">({me.phone})</span> : null}
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            Войдите, чтобы записаться.
+            {UI_TEXTS.booking.loginToBook}
             <a href={buildLoginUrl(nextPath)} className="ml-2 underline font-medium">
-              Войти
+              {UI_TEXTS.auth.login}
             </a>
           </div>
         )}
@@ -504,13 +502,13 @@ export default function BookingWidget({
 
       {successId ? (
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Заявка отправлена (ID: {successId})
+          {UI_TEXTS.booking.requestSent} (ID: {successId})
         </div>
       ) : null}
 
       <div className="mt-5 space-y-6">
         <div>
-          <div className="text-sm font-medium">????</div>
+          <div className="text-sm font-medium">{UI_TEXTS.booking.chooseDate}</div>
           <div className="mt-2">
             <DatePicker
               value={selectedDate}
@@ -521,15 +519,16 @@ export default function BookingWidget({
             />
           </div>
           <div className="mt-2 text-xs text-neutral-500">
-            ????????? ????: ? {dateBounds.min} ?? {dateBounds.max}.
+            {UI_TEXTS.booking.availablePeriodPrefix} {dateBounds.min} {UI_TEXTS.booking.availablePeriodInfix}{" "}
+            {dateBounds.max}.
           </div>
         </div>
 
         <div>
-          <div className="text-sm font-medium">Услуги</div>
+          <div className="text-sm font-medium">{UI_TEXTS.booking.services}</div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {services.length === 0 ? (
-              <div className="text-sm text-neutral-600">Услуг пока нет.</div>
+              <div className="text-sm text-neutral-600">{UI_TEXTS.booking.noServices}</div>
             ) : (
               services.map((s) => {
                 const active = s.id === serviceId;
@@ -550,10 +549,12 @@ export default function BookingWidget({
                     <CardContent className="p-4">
                       <div className="text-sm font-semibold">{s.name}</div>
                       <div className={`mt-2 text-xs ${active ? "text-neutral-200" : "text-neutral-500"}`}>
-                        {duration ? duration : "Длительность уточняется"}
+                        {duration ? duration : UI_TEXTS.booking.durationUnknown}
                       </div>
                       <div className={`mt-1 text-sm ${active ? "text-white" : "text-neutral-800"}`}>
-                        {s.price > 0 ? `от ${formatMoney(s.price)} ₽` : "Цена уточняется"}
+                        {s.price > 0
+                          ? `${UI_TEXTS.booking.from} ${formatMoney(s.price)} ₽`
+                          : UI_TEXTS.booking.priceUnknown}
                       </div>
                     </CardContent>
                   </Card>
@@ -565,9 +566,9 @@ export default function BookingWidget({
 
         {serviceId ? (
           <div>
-            <div className="text-sm font-medium">Мастера</div>
+            <div className="text-sm font-medium">{UI_TEXTS.booking.masters}</div>
             {masters.length === 0 ? (
-              <div className="mt-2 text-sm text-neutral-600">Нет доступных мастеров.</div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.booking.noMasters}</div>
             ) : (
               <div className="mt-3 grid gap-3">
                 {masters.map((m) => {
@@ -596,13 +597,13 @@ export default function BookingWidget({
                         <div className="flex-1">
                           <div className="text-sm font-semibold">{m.name}</div>
                           <div className={`mt-1 text-xs ${active ? "text-neutral-200" : "text-neutral-500"}`}>
-                            Рейтинг уточняется
+                            {UI_TEXTS.booking.ratingUnknown}
                           </div>
                         </div>
                         <div className={`text-xs ${active ? "text-neutral-200" : "text-neutral-500"}`}>
                           {slotsCount !== null
-                            ? `Слотов: ${slotsCount}`
-                            : "Слоты уточняются"}
+                            ? `${UI_TEXTS.booking.slotsLabel} ${slotsCount}`
+                            : UI_TEXTS.booking.slotsUnknown}
                         </div>
                       </div>
                     </button>
@@ -614,14 +615,14 @@ export default function BookingWidget({
             {selectedService ? (
               <div className="mt-3 text-sm text-neutral-600">
                 {selectedService.durationMin > 0
-                  ? `Длительность: ${formatDuration(selectedService.durationMin)}`
-                  : "Длительность: уточняется"}
+                  ? `${UI_TEXTS.booking.durationLabel} ${formatDuration(selectedService.durationMin)}`
+                  : `${UI_TEXTS.booking.durationLabel} ${UI_TEXTS.booking.durationUnknown.toLowerCase()}`}
                 {selectedService.price > 0
-                  ? ` · Цена: от ${formatMoney(selectedService.price)} ₽`
-                  : " · Цена: уточняется"}
+                  ? ` · ${UI_TEXTS.booking.priceLabel} ${UI_TEXTS.booking.from} ${formatMoney(selectedService.price)} ₽`
+                  : ` · ${UI_TEXTS.booking.priceLabel} ${UI_TEXTS.booking.priceUnknown.toLowerCase()}`}
                 {masterId
-                  ? ` · Слотов на дату: ${slotsForSelectedDate.length || 0}`
-                  : " · Слоты уточняются"}
+                  ? ` · ${UI_TEXTS.booking.slotsOnDate} ${slotsForSelectedDate.length || 0}`
+                  : ` · ${UI_TEXTS.booking.slotsUnknown}`}
               </div>
             ) : null}
           </div>
@@ -629,14 +630,14 @@ export default function BookingWidget({
 
         {masterId ? (
           <div>
-            <div className="text-sm font-medium">Слоты</div>
+            <div className="text-sm font-medium">{UI_TEXTS.booking.chooseTime}</div>
             {slotsLoading ? (
-              <div className="mt-2 text-sm text-neutral-600">Загрузка слотов…</div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.common.loading}</div>
             ) : slotsError ? (
               <div className="mt-2 text-sm text-red-600">{slotsError}</div>
             ) : slotGroups.length === 0 ? (
               <div className="mt-2 text-sm text-neutral-600">
-                Нет слотов на выбранную дату. Попробуйте другую дату или мастера.
+                {UI_TEXTS.booking.noSlots}. {UI_TEXTS.booking.chooseAnotherDateOrMaster}
               </div>
             ) : (
               <div className="mt-3">
@@ -648,10 +649,10 @@ export default function BookingWidget({
 
         <div className="grid gap-3">
           <div>
-            <label className="block text-sm font-medium">Имя</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.name}</label>
             <input
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-              placeholder="Ваше имя"
+              placeholder={UI_TEXTS.common.name}
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               disabled={loading}
@@ -659,7 +660,7 @@ export default function BookingWidget({
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Телефон</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.phone}</label>
             <input
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
               placeholder="+7..."
@@ -672,10 +673,10 @@ export default function BookingWidget({
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Комментарий (необязательно)</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.commentOptional}</label>
             <textarea
               className="mt-1 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 min-h-[90px]"
-              placeholder="Например: хочу естественный нюд"
+              placeholder={UI_TEXTS.booking.commentPlaceholder}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               disabled={loading}
@@ -695,29 +696,26 @@ export default function BookingWidget({
           }
           className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
         >
-          {loading ? "Отправляем..." : "Записаться"}
+          {loading ? UI_TEXTS.common.loading : UI_TEXTS.booking.book}
         </button>
       </div>
 
       {showAuthModal ? (
-        <Modal title="Войдите, чтобы записаться" onClose={() => setShowAuthModal(false)}>
-          <div className="text-sm text-neutral-700">
-            Мы принимаем записи только от авторизованных клиентов — так мастерам спокойнее и меньше
-            фейковых заявок.
-          </div>
+        <Modal title={UI_TEXTS.booking.authModalTitle} onClose={() => setShowAuthModal(false)}>
+          <div className="text-sm text-neutral-700">{UI_TEXTS.booking.authModalText}</div>
 
           <div className="mt-5 flex gap-3">
             <a
               href={buildLoginUrl(nextPath)}
               className="flex-1 text-center rounded-xl bg-black text-white py-2 font-medium"
             >
-              Войти
+              {UI_TEXTS.auth.login}
             </a>
             <button
               onClick={() => setShowAuthModal(false)}
               className="flex-1 rounded-xl border py-2 font-medium"
             >
-              Не сейчас
+              {UI_TEXTS.common.notNow}
             </button>
           </div>
         </Modal>

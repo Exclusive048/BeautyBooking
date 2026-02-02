@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { Button } from "@/components/ui/button";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type TelegramStatus = {
   linked: boolean;
@@ -35,7 +36,11 @@ export function TelegramNotificationsSection() {
     setError(null);
     try {
       const res = await fetch("/api/telegram/status", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ linked: boolean; enabled: boolean; botUsername: string }> | null;
+      const json = (await res.json().catch(() => null)) as ApiResponse<{
+        linked: boolean;
+        enabled: boolean;
+        botUsername: string;
+      }> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, "Failed to load Telegram status"));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load Telegram status"));
       setStatus(json.data);
@@ -92,7 +97,7 @@ export function TelegramNotificationsSection() {
   if (loading) {
     return (
       <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-        Загрузка Telegram настроек...
+        {UI_TEXTS.common.loading}
       </div>
     );
   }
@@ -103,20 +108,16 @@ export function TelegramNotificationsSection() {
   return (
     <div className="rounded-2xl border p-4 space-y-3">
       <div>
-        <div className="text-sm font-semibold">
-          Уведомления в Telegram
-        </div>
+        <div className="text-sm font-semibold">{UI_TEXTS.telegram.title}</div>
         <div className="mt-1 text-sm text-neutral-600">
-          {linked ? "Подключено" : "Не подключено"}
+          {linked ? UI_TEXTS.telegram.connected : UI_TEXTS.telegram.notConnected}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         {!linked ? (
           <Button type="button" onClick={onConnect} disabled={saving}>
-            {saving
-              ? "Получаем ссылку..."
-              : "Подключить"}
+            {saving ? UI_TEXTS.common.loading : UI_TEXTS.telegram.connectButton}
           </Button>
         ) : null}
 
@@ -127,14 +128,12 @@ export function TelegramNotificationsSection() {
             onChange={(e) => onToggle(e.target.checked)}
             disabled={!linked || saving}
           />
-          Уведомления включены
+          {enabled ? UI_TEXTS.telegram.enabled : UI_TEXTS.telegram.disabled}
         </label>
       </div>
 
       {linked ? (
-        <div className="text-xs text-neutral-500">
-          Если бот перестал писать — откройте чат с ботом и нажмите Start.
-        </div>
+        <div className="text-xs text-neutral-500">{UI_TEXTS.telegram.hint}</div>
       ) : null}
 
       {error ? <div className="text-xs text-red-600">{error}</div> : null}

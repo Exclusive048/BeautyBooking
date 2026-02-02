@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
+import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 function normalizePhone(input: string) {
   const cleaned = input.replace(/[()\s-]/g, "");
@@ -13,7 +14,7 @@ function normalizePhone(input: string) {
 }
 
 function safeNext(nextRaw: string | null) {
-  // Защита от open-redirect: разрешаем только относительные пути
+  // Защита от open-redirect: разрешаем только относительные пути.
   if (!nextRaw) return null;
   if (!nextRaw.startsWith("/")) return null;
   if (nextRaw.startsWith("//")) return null;
@@ -37,7 +38,7 @@ export default function LoginClient() {
     const normalized = normalizePhone(phone);
 
     if (!normalized || normalized.length < 8) {
-      setErrorText("Введите телефон в международном формате, например +77001234567");
+      setErrorText(UI_TEXTS.login.invalidPhone);
       return;
     }
 
@@ -52,9 +53,9 @@ export default function LoginClient() {
     } catch (error) {
       if (error instanceof ApiClientError) {
         const mapped = getErrorMessageByCode(error.code);
-        setErrorText(mapped ?? error.message ?? "???? ?????????????? ?????????????????? ??????");
+        setErrorText(mapped ?? error.message ?? UI_TEXTS.login.sendCodeFailed);
       } else {
-        setErrorText("???? ?????????????? ?????????????????? ??????");
+        setErrorText(UI_TEXTS.login.sendCodeFailed);
       }
     } finally {
       setLoading(false);
@@ -66,7 +67,7 @@ export default function LoginClient() {
     const normalized = normalizePhone(phone);
 
     if (!code || code.length < 4) {
-      setErrorText("Введите код");
+      setErrorText(UI_TEXTS.login.enterCode);
       return;
     }
 
@@ -78,15 +79,15 @@ export default function LoginClient() {
         body: JSON.stringify({ phone: normalized, code }),
       });
 
-      // ??? ???????????????? ????????, ???????? ??????????????
+      // Если next не передан, отправляем в кабинет.
       router.replace(nextPath ?? "/cabinet");
       router.refresh();
     } catch (error) {
       if (error instanceof ApiClientError) {
         const mapped = getErrorMessageByCode(error.code);
-        setErrorText(mapped ?? error.message ?? "???????????????? ??????");
+        setErrorText(mapped ?? error.message ?? UI_TEXTS.login.invalidCode);
       } else {
-        setErrorText("???????????????? ??????");
+        setErrorText(UI_TEXTS.login.invalidCode);
       }
     } finally {
       setLoading(false);
@@ -96,11 +97,11 @@ export default function LoginClient() {
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-2xl border p-6 shadow-sm bg-white">
-        <h1 className="text-xl font-semibold">Вход по телефону</h1>
+        <h1 className="text-xl font-semibold">{UI_TEXTS.login.title}</h1>
         <p className="text-sm text-neutral-600 mt-1">
-          Мы отправим код подтверждения.
+          {UI_TEXTS.login.subtitle}
           <span className="block mt-1 text-xs">
-            (Пока код выводится в консоль сервера; позже подключим SMS-агрегатор.)
+            {UI_TEXTS.login.devHint}
           </span>
         </p>
 
@@ -112,7 +113,7 @@ export default function LoginClient() {
 
         {step === "phone" ? (
           <div className="mt-6 space-y-3">
-            <label className="block text-sm font-medium">Телефон</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.common.phone}</label>
             <input
               className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
               placeholder="+77001234567"
@@ -127,16 +128,16 @@ export default function LoginClient() {
               disabled={loading}
               className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
             >
-              {loading ? "Отправляем..." : "Получить код"}
+              {loading ? UI_TEXTS.login.sending : UI_TEXTS.login.sendCode}
             </button>
           </div>
         ) : (
           <div className="mt-6 space-y-3">
             <div className="text-sm text-neutral-700">
-              Код отправлен на <span className="font-medium">{normalizePhone(phone)}</span>
+              {UI_TEXTS.login.codeSentTo} <span className="font-medium">{normalizePhone(phone)}</span>
             </div>
 
-            <label className="block text-sm font-medium">Код</label>
+            <label className="block text-sm font-medium">{UI_TEXTS.login.codeLabel}</label>
             <input
               className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 tracking-widest"
               placeholder="123456"
@@ -151,7 +152,7 @@ export default function LoginClient() {
               disabled={loading}
               className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
             >
-              {loading ? "Проверяем..." : "Войти"}
+              {loading ? UI_TEXTS.login.verifying : UI_TEXTS.auth.login}
             </button>
 
             <button
@@ -159,14 +160,14 @@ export default function LoginClient() {
               disabled={loading}
               className="w-full rounded-xl border py-2 font-medium disabled:opacity-60"
             >
-              Изменить телефон
+              {UI_TEXTS.login.changePhone}
             </button>
           </div>
         )}
 
         {nextPath ? (
           <div className="mt-6 text-xs text-neutral-500">
-            После входа вы вернётесь на: <span className="font-mono">{nextPath}</span>
+            {UI_TEXTS.login.returnAfterLogin} <span className="font-mono">{nextPath}</span>
           </div>
         ) : null}
 
