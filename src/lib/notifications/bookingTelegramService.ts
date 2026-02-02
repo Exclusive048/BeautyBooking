@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getAppPublicUrl } from "@/lib/telegram/config";
-import { sendTelegramMessage } from "@/lib/telegram/client";
 import { logError } from "@/lib/logging/logger";
 import { getTelegramChatIdForUser } from "@/lib/notifications/recipients";
+import { enqueue } from "@/lib/queue/queue";
+import { createTelegramSendJob } from "@/lib/queue/types";
 import {
   buildBookingCancelledText,
   buildBookingConfirmedText,
@@ -49,6 +50,15 @@ function formatDateTimeUtc(date: Date): string {
   const hours = pad2(date.getUTCHours());
   const minutes = pad2(date.getUTCMinutes());
   return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+async function enqueueTelegramSend(chatId: string, text: string): Promise<void> {
+  await enqueue(
+    createTelegramSendJob({
+      chatId,
+      text,
+    })
+  );
 }
 
 async function loadBookingContext(bookingId: string): Promise<BookingTelegramContext | null> {
@@ -116,7 +126,7 @@ export async function sendBookingTelegramNotifications(
           clientPhone: ctx.clientPhone,
           linkUrl: ctx.masterUrl,
         });
-        await sendTelegramMessage(masterChatId, text);
+        await enqueueTelegramSend(masterChatId, text);
       }
       if (config.notifyClientOnCreate && clientChatId) {
         const text = buildClientBookingCreatedText({
@@ -124,7 +134,7 @@ export async function sendBookingTelegramNotifications(
           whenText: ctx.whenText,
           linkUrl: ctx.clientUrl,
         });
-        await sendTelegramMessage(clientChatId, text);
+        await enqueueTelegramSend(clientChatId, text);
       }
       return;
     }
@@ -136,7 +146,7 @@ export async function sendBookingTelegramNotifications(
           whenText: ctx.whenText,
           linkUrl: ctx.masterUrl,
         });
-        await sendTelegramMessage(masterChatId, text);
+        await enqueueTelegramSend(masterChatId, text);
       }
       if (config.notifyClientOnCancel && clientChatId) {
         const text = buildBookingCancelledText({
@@ -144,7 +154,7 @@ export async function sendBookingTelegramNotifications(
           whenText: ctx.whenText,
           linkUrl: ctx.clientUrl,
         });
-        await sendTelegramMessage(clientChatId, text);
+        await enqueueTelegramSend(clientChatId, text);
       }
       return;
     }
@@ -157,7 +167,7 @@ export async function sendBookingTelegramNotifications(
           masterName: ctx.masterName,
           linkUrl: ctx.clientUrl,
         });
-        await sendTelegramMessage(clientChatId, text);
+        await enqueueTelegramSend(clientChatId, text);
       }
       if (config.notifyMasterOnConfirm && masterChatId) {
         const text = buildBookingConfirmedText({
@@ -166,7 +176,7 @@ export async function sendBookingTelegramNotifications(
           masterName: ctx.masterName,
           linkUrl: ctx.masterUrl,
         });
-        await sendTelegramMessage(masterChatId, text);
+        await enqueueTelegramSend(masterChatId, text);
       }
     }
   } catch (error) {

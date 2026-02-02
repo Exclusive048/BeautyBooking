@@ -1,21 +1,15 @@
 import { getRedisConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
-
-export type JobPayload = Record<string, unknown>;
-
-export type Job = {
-  id: string;
-  type: string;
-  payload: JobPayload;
-  createdAt: string;
-};
+import type { Job } from "@/lib/queue/types";
+import { isJob } from "@/lib/queue/types";
 
 const QUEUE_KEY = "queue:jobs";
 const memoryQueue: Job[] = [];
 
 function parseJob(raw: string): Job | null {
   try {
-    return JSON.parse(raw) as Job;
+    const parsed: unknown = JSON.parse(raw);
+    return isJob(parsed) ? parsed : null;
   } catch {
     return null;
   }

@@ -8,11 +8,10 @@ type SendMessagePayload = {
   text: string;
 };
 
-export async function sendTelegramMessage(chatId: string, text: string): Promise<void> {
+export async function sendTelegramMessage(chatId: string, text: string): Promise<boolean> {
   const token = getTelegramBotToken();
   if (!token) {
-    console.error("Telegram bot token is not configured");
-    return;
+    return false;
   }
 
   const controller = new AbortController();
@@ -26,11 +25,9 @@ export async function sendTelegramMessage(chatId: string, text: string): Promise
       signal: controller.signal,
     });
 
-    if (!res.ok) {
-      console.error("Telegram sendMessage failed", { status: res.status });
-    }
-  } catch (error) {
-    console.error("Telegram sendMessage error", { error });
+    return res.ok;
+  } catch {
+    return false;
   } finally {
     clearTimeout(timeout);
   }

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:mojibake": "rg -n -F \"???\" src README.md && exit 1 || exit 0"
+    "check:mojibake": "rg -n -F \"???\" src README.md && exit 1 || exit 0",
+    "worker:build": "npx tsc --noEmit",
+    "worker": "npx --yes tsx src/worker.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
