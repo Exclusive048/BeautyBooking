@@ -1,5 +1,6 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -9,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { moneyRUB, minutesToHuman } from "@/lib/format";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
+import type { ApiResponse } from "@/lib/types/api";
+import type { MediaAssetDto } from "@/lib/media/types";
 import {
   fetchStudioMasters,
   fetchStudioProfile,
@@ -22,6 +25,7 @@ export default function StudioProfilePage() {
 
   const [studio, setStudio] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<StudioMaster[]>([]);
+  const [portfolio, setPortfolio] = useState<MediaAssetDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,10 +43,7 @@ export default function StudioProfilePage() {
           fetchStudioMasters(studioId),
         ]);
 
-        if (!profileRes.ok) {
-          throw new Error(profileRes.error);
-        }
-
+        if (!profileRes.ok) throw new Error(profileRes.error);
         if (profileRes.provider.type !== "STUDIO") {
           throw new Error("Профиль доступен только для студий");
         }
@@ -50,6 +51,15 @@ export default function StudioProfilePage() {
         if (!alive) return;
         setStudio(profileRes.provider);
         setMasters(mastersRes.ok ? mastersRes.masters : []);
+
+        const mediaRes = await fetch(
+          `/api/media?entityType=STUDIO&entityId=${encodeURIComponent(profileRes.provider.id)}&kind=PORTFOLIO`,
+          { cache: "no-store" }
+        );
+        const mediaJson = (await mediaRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
+        if (alive && mediaRes.ok && mediaJson && mediaJson.ok) {
+          setPortfolio(mediaJson.data.assets);
+        }
       } catch (e) {
         if (!alive) return;
         setError(e instanceof Error ? e.message : "Не удалось загрузить студию");
@@ -73,7 +83,6 @@ export default function StudioProfilePage() {
       <Card>
         <CardContent className="p-6">
           <div className="text-sm font-semibold text-text">Загружаем профиль студии…</div>
-          <div className="mt-2 text-sm text-text-muted">Это может занять пару секунд.</div>
         </CardContent>
       </Card>
     );
@@ -104,6 +113,9 @@ export default function StudioProfilePage() {
 
       <Card className="bg-surface">
         <CardContent className="p-5 md:p-6 space-y-4">
+          {studio.avatarUrl ? (
+            <img src={studio.avatarUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <Badge>Студия</Badge>
             {studio.availableToday ? <Badge>Есть окна сегодня</Badge> : null}
@@ -130,24 +142,19 @@ export default function StudioProfilePage() {
         </CardContent>
       </Card>
 
-      <Section title="Адрес и карта" subtitle="Адрес студии и будущая карта.">
-        <Card className="bg-surface">
-          <CardContent className="p-6">
-            <div className="text-sm text-text">{studio.address}</div>
-            <div className="mt-4 h-40 rounded-2xl border border-dashed border-border bg-muted flex items-center justify-center text-sm text-text-muted">
-              Карта будет здесь
-            </div>
-          </CardContent>
-        </Card>
-      </Section>
-
-      <Section title="Фото студии" subtitle="Первые фото появятся в ближайшее время.">
+      <Section title="Фото студии" subtitle="Интерьер, команда и атмосфера.">
         <Card className="bg-surface">
           <CardContent className="p-5 md:p-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="aspect-square rounded-2xl bg-muted border border-border" />
-              ))}
+              {portfolio.length > 0
+                ? portfolio.map((asset) => (
+                    <div key={asset.id} className="aspect-square rounded-2xl bg-muted border border-border overflow-hidden">
+                      <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                    </div>
+                  ))
+                : Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="aspect-square rounded-2xl bg-muted border border-border" />
+                  ))}
             </div>
           </CardContent>
         </Card>

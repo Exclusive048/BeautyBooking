@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth/session";
@@ -9,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { hasGlobalMasterProfile } from "@/lib/auth/roles";
 import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
 import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { getSiteLogoUrl } from "@/lib/media/queries";
 
 type CabinetItem = { label: string; href: string };
 
@@ -53,6 +55,7 @@ export async function Topbar() {
   const notificationsCount = invitesCount + unreadNotificationsCount;
   const hasGlobalMaster = user ? await hasGlobalMasterProfile(user.id) : false;
   const hasStudioAccess = user ? await hasAnyStudioAccess(user.id) : false;
+  const siteLogoUrl = await getSiteLogoUrl();
   const cabinetNav = buildCabinetNav({ hasGlobalMaster, hasStudioAccess });
   const navItems: ReactElement[] = [];
 
@@ -110,7 +113,11 @@ export async function Topbar() {
     <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur dark:bg-bg/70">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-neutral-900 dark:bg-accent" />
+          {siteLogoUrl ? (
+            <img src={siteLogoUrl} alt="Site logo" className="h-10 w-10 rounded-2xl object-cover" />
+          ) : (
+            <div className="h-10 w-10 rounded-2xl bg-neutral-900 dark:bg-accent" />
+          )}
           <div className="leading-tight">
             <div className="text-sm font-semibold text-text">BeautyHub</div>
             <div className="text-xs text-text-muted">{UI_TEXTS.topbar.bookingToMasters}</div>

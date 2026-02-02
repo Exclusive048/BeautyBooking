@@ -12,6 +12,7 @@ type MeDto = {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  externalPhotoUrl: string | null;
   firstName: string | null;
   lastName: string | null;
   middleName: string | null;

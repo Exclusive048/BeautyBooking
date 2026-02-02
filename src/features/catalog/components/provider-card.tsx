@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import type { ProviderCardModel } from "../model/types";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,11 @@ export function ProviderCard({ p }: { p: ProviderCardModel }) {
       <Card className="transition hover:-translate-y-[1px] hover:border-[rgb(var(--accent))]/40 hover:shadow-[0_12px_25px_rgba(198,169,126,0.5)]">
         <CardContent className="p-5 md:p-6 h-full flex flex-col gap-4">
           <div className="flex items-start gap-4 min-h-[72px]">
-            <div className="h-12 w-12 rounded-2xl bg-[rgb(var(--muted))]" />
+            {p.avatarUrl ? (
+              <img src={p.avatarUrl} alt="" className="h-12 w-12 rounded-2xl object-cover" />
+            ) : (
+              <div className="h-12 w-12 rounded-2xl bg-[rgb(var(--muted))]" />
+            )}
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">

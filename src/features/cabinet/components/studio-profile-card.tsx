@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
+import { AvatarEditor } from "@/features/media/components/avatar-editor";
+import { PortfolioEditor } from "@/features/media/components/portfolio-editor";
 
 type Props = {
   studioId: string;
   canEdit?: boolean;
   provider: {
     name: string;
+    avatarUrl?: string | null;
     tagline: string;
     address: string;
     district: string;
@@ -86,18 +89,18 @@ export function StudioProfileCard({ provider, studioId, canEdit = true }: Props)
 
   return (
     <div className="rounded-2xl border p-5 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold">Профиль студии</h3>
-          <p className="mt-1 text-sm text-neutral-600">Информация о студии и контакты.</p>
-        </div>
-        <button
-          type="button"
-          className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
-        >
-          Добавить фото
-        </button>
+      <div>
+        <h3 className="text-lg font-semibold">Профиль студии</h3>
+        <p className="mt-1 text-sm text-neutral-600">Информация о студии и контакты.</p>
       </div>
+
+      <AvatarEditor
+        entityType="STUDIO"
+        entityId={studioId}
+        canEdit={canEdit}
+        fallbackUrl={provider.avatarUrl ?? null}
+      />
+      <PortfolioEditor entityType="STUDIO" entityId={studioId} canEdit={canEdit} />
 
       {saved ? (
         <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700">

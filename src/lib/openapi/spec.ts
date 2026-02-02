@@ -25,11 +25,7 @@ type ParameterObject = {
 
 type RequestBodyObject = {
   required?: boolean;
-  content: {
-    "application/json": {
-      schema: SchemaObject;
-    };
-  };
+  content: Record<string, { schema: SchemaObject }>;
 };
 
 type ResponseObject = {
@@ -162,6 +158,8 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/TelegramStatusData" },
               { $ref: "#/components/schemas/TelegramSettingsData" },
               { $ref: "#/components/schemas/TelegramWebhookData" },
+              { $ref: "#/components/schemas/MediaAssetData" },
+              { $ref: "#/components/schemas/MediaAssetListData" },
             ],
           },
         },
@@ -206,6 +204,7 @@ export const openApiSpec = {
           "id",
           "type",
           "name",
+          "avatarUrl",
           "tagline",
           "rating",
           "reviews",
@@ -219,6 +218,7 @@ export const openApiSpec = {
           id: { type: "string" },
           type: { $ref: "#/components/schemas/ProviderType" },
           name: { type: "string" },
+          avatarUrl: { type: "string", nullable: true },
           tagline: { type: "string" },
           rating: { type: "number" },
           reviews: { type: "integer" },
@@ -505,6 +505,53 @@ export const openApiSpec = {
         type: "object",
         nullable: true,
         description: "Empty webhook response",
+      },
+      MediaEntityType: {
+        type: "string",
+        enum: ["USER", "MASTER", "STUDIO", "SITE"],
+      },
+      MediaKind: {
+        type: "string",
+        enum: ["AVATAR", "PORTFOLIO"],
+      },
+      MediaAsset: {
+        type: "object",
+        required: [
+          "id",
+          "entityType",
+          "entityId",
+          "kind",
+          "mimeType",
+          "sizeBytes",
+          "originalFilename",
+          "url",
+          "createdAt",
+        ],
+        properties: {
+          id: { type: "string" },
+          entityType: { $ref: "#/components/schemas/MediaEntityType" },
+          entityId: { type: "string" },
+          kind: { $ref: "#/components/schemas/MediaKind" },
+          mimeType: { type: "string" },
+          sizeBytes: { type: "integer" },
+          originalFilename: { type: "string" },
+          url: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      MediaAssetData: {
+        type: "object",
+        required: ["asset"],
+        properties: {
+          asset: { $ref: "#/components/schemas/MediaAsset" },
+        },
+      },
+      MediaAssetListData: {
+        type: "object",
+        required: ["assets"],
+        properties: {
+          assets: { type: "array", items: { $ref: "#/components/schemas/MediaAsset" } },
+        },
       },
     },
   },
@@ -835,6 +882,109 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/TelegramWebhookData" }),
           "403": errorResponse("Forbidden"),
+        },
+      },
+    },
+    "/api/media": {
+      get: {
+        summary: "List media assets for entity",
+        tags: ["media"],
+        parameters: [
+          {
+            name: "entityType",
+            in: "query",
+            required: true,
+            schema: { $ref: "#/components/schemas/MediaEntityType" },
+          },
+          {
+            name: "entityId",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+          },
+          {
+            name: "kind",
+            in: "query",
+            required: false,
+            schema: { $ref: "#/components/schemas/MediaKind" },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MediaAssetListData" }),
+          "400": errorResponse("Validation error"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      post: {
+        summary: "Upload media asset",
+        tags: ["media"],
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                properties: {
+                  entityType: { $ref: "#/components/schemas/MediaEntityType" },
+                  entityId: { type: "string" },
+                  kind: { $ref: "#/components/schemas/MediaKind" },
+                  replaceAssetId: { type: "string" },
+                  file: { type: "string", format: "binary" },
+                },
+                required: ["entityType", "entityId", "kind", "file"],
+              },
+            },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/MediaAssetData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/media/{id}": {
+      delete: {
+        summary: "Delete media asset",
+        tags: ["media"],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/media/file/{id}": {
+      get: {
+        summary: "Serve media file",
+        tags: ["media"],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": { description: "Binary image stream" },
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
         },
       },
     },

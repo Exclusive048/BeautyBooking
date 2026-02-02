@@ -8,6 +8,8 @@ import { ProfileForm } from "@/features/cabinet/components/profile-form";
 import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedule-panel";
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
 import { MasterServicesPanel } from "@/features/cabinet/components/master-services-panel";
+import { AvatarEditor } from "@/features/media/components/avatar-editor";
+import { PortfolioEditor } from "@/features/media/components/portfolio-editor";
 
 type MeDto = {
   id: string;
@@ -15,6 +17,7 @@ type MeDto = {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  externalPhotoUrl: string | null;
   firstName: string | null;
   lastName: string | null;
   middleName: string | null;
@@ -118,6 +121,12 @@ export default async function MasterCabinetPage(props: {
         </div>
 
         <ProfileForm initialUser={meResponse.data.user} showProfessionalCta={false} />
+
+        <section className="rounded-2xl border p-5 space-y-4">
+          <h3 className="text-lg font-semibold">Фото мастера</h3>
+          <AvatarEditor entityType="MASTER" entityId={provider.id} fallbackUrl={provider.avatarUrl} />
+          <PortfolioEditor entityType="MASTER" entityId={provider.id} />
+        </section>
       </CabinetShell>
     );
   }

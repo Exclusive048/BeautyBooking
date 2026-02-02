@@ -11,6 +11,7 @@ export type ProviderCardDto = {
   id: string;
   type: ProviderTypeDto;
   name: string;
+  avatarUrl: string | null;
   tagline: string;
   rating: number;
   reviews: number;
@@ -25,6 +26,7 @@ export type ProviderProfileDto = {
   id: string;
   type: ProviderTypeDto;
   name: string;
+  avatarUrl: string | null;
   tagline: string;
   rating: number;
   reviews: number;

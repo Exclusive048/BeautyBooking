@@ -16,6 +16,8 @@ import { MasterSchedulePanel } from "@/features/cabinet/components/master-schedu
 import { ProviderBookingsPanel } from "@/features/cabinet/components/provider-bookings-panel";
 import { StudioProfileCard } from "@/features/cabinet/components/studio-profile-card";
 import { MasterInfoCard } from "@/features/cabinet/components/master-info-card";
+import { AvatarEditor } from "@/features/media/components/avatar-editor";
+import { PortfolioEditor } from "@/features/media/components/portfolio-editor";
 
 type MeDto = {
   id: string;
@@ -23,6 +25,7 @@ type MeDto = {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  externalPhotoUrl: string | null;
   firstName: string | null;
   lastName: string | null;
   middleName: string | null;
@@ -292,6 +295,14 @@ export default async function StudioCabinetByIdPage(props: {
             Не найден профиль мастера для студийного кабинета.
           </div>
         )}
+
+        {masterProvider ? (
+          <section className="rounded-2xl border p-5 space-y-4">
+            <h3 className="text-lg font-semibold">Фото мастера</h3>
+            <AvatarEditor entityType="MASTER" entityId={masterProvider.id} />
+            <PortfolioEditor entityType="MASTER" entityId={masterProvider.id} />
+          </section>
+        ) : null}
 
         {masterProvider ? (
           <div className="rounded-2xl border p-5">

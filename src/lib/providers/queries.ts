@@ -8,6 +8,7 @@ export async function listProviderCards() {
       id: true,
       type: true,
       name: true,
+      avatarUrl: true,
       tagline: true,
       rating: true,
       reviews: true,

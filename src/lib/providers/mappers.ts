@@ -7,6 +7,7 @@ type ProviderCardSource = Pick<
   | "id"
   | "type"
   | "name"
+  | "avatarUrl"
   | "tagline"
   | "rating"
   | "reviews"
@@ -32,6 +33,7 @@ export function mapProviderCard(provider: ProviderCardSource): ProviderCardDto {
     id: provider.id,
     type: provider.type,
     name: provider.name,
+    avatarUrl: provider.avatarUrl,
     tagline: provider.tagline,
     rating: provider.rating,
     reviews: provider.reviews,
@@ -48,6 +50,7 @@ export function mapProviderProfile(provider: ProviderWithServices): ProviderProf
     id: provider.id,
     type: provider.type,
     name: provider.name,
+    avatarUrl: provider.avatarUrl,
     tagline: provider.tagline,
     rating: provider.rating,
     reviews: provider.reviews,

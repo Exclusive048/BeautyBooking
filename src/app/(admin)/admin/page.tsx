@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
+import { hasAdminRole } from "@/lib/auth/guards";
+import { SiteLogoManager } from "@/features/media/components/site-logo-manager";
 
 const plans = [
   {
@@ -31,6 +33,7 @@ const plans = [
 export default async function AdminPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  if (!hasAdminRole(user)) redirect("/403");
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 space-y-8">
@@ -42,6 +45,8 @@ export default async function AdminPage() {
           управление и метрики.
         </p>
       </div>
+
+      <SiteLogoManager />
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Планы подписок</h2>

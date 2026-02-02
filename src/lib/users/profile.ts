@@ -8,6 +8,7 @@ export type MeProfile = {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  externalPhotoUrl: string | null;
   firstName: string | null;
   lastName: string | null;
   middleName: string | null;
@@ -33,6 +34,7 @@ export async function getMeProfile(userId: string): Promise<MeProfile | null> {
         displayName: true,
         phone: true,
         email: true,
+        externalPhotoUrl: true,
         firstName: true,
         lastName: true,
         middleName: true,
@@ -94,6 +96,7 @@ export async function updateMeProfile(
       displayName: true,
       phone: true,
       email: true,
+      externalPhotoUrl: true,
       firstName: true,
       lastName: true,
       middleName: true,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { AvatarEditor } from "@/features/media/components/avatar-editor";
 
 type MeDto = {
   id: string;
@@ -12,6 +13,7 @@ type MeDto = {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  externalPhotoUrl: string | null;
   firstName: string | null;
   lastName: string | null;
   middleName: string | null;
@@ -204,6 +206,12 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           {UI_TEXTS.profile.description}
         </p>
       </div>
+
+      <AvatarEditor
+        entityType="USER"
+        entityId={initialUser.id}
+        fallbackUrl={initialUser.externalPhotoUrl}
+      />
 
       {showProfessionalCta ? (
         <div className="rounded-2xl border p-4 space-y-3">

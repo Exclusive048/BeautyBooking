@@ -1,5 +1,6 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Section } from "@/components/ui/section";
@@ -9,14 +10,16 @@ import BookingWidget from "@/features/booking/components/booking-widget";
 import { moneyRUB } from "@/lib/format";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ApiResponse } from "@/lib/types/api";
+import type { MediaAssetDto } from "@/lib/media/types";
 
 export default function ProviderProfilePage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const router = useRouter();
 
-  const [p, setP] = useState<ProviderProfileDto | null>(null);
+  const [provider, setProvider] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<Array<{ id: string; name: string }>>([]);
+  const [portfolio, setPortfolio] = useState<MediaAssetDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
@@ -30,30 +33,35 @@ export default function ProviderProfilePage() {
         setError(null);
 
         const res = await fetch(`/api/providers/${id}`, { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ provider: ProviderProfileDto | null }>
-          | null;
+        const json = (await res.json().catch(() => null)) as ApiResponse<{ provider: ProviderProfileDto | null }> | null;
 
-        if (!res.ok) {
-          throw new Error(`API error: ${res.status}`);
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
 
-        if (!json || !json.ok) {
-          const message = json?.error?.message ?? "Failed to load provider";
-          throw new Error(message);
-        }
-
-        const provider = json.data.provider;
-        if (provider?.type === "STUDIO") {
+        const loaded = json.data.provider;
+        if (loaded?.type === "STUDIO") {
           if (alive) {
             setRedirecting(true);
-            router.replace(`/studios/${provider.id}`);
+            router.replace(`/studios/${loaded.id}`);
           }
           return;
         }
-        if (alive) setP(provider);
 
-        if (alive) setMasters([]);
+        if (!alive) return;
+        setProvider(loaded);
+        setMasters([]);
+
+        if (loaded?.type === "MASTER") {
+          const mediaRes = await fetch(
+            `/api/media?entityType=MASTER&entityId=${encodeURIComponent(loaded.id)}&kind=PORTFOLIO`,
+            { cache: "no-store" }
+          );
+          const mediaJson = (await mediaRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
+          if (alive && mediaRes.ok && mediaJson && mediaJson.ok) {
+            setPortfolio(mediaJson.data.assets);
+          }
+        }
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -71,7 +79,6 @@ export default function ProviderProfilePage() {
       <Card>
         <CardContent className="p-6">
           <div className="text-sm font-semibold text-neutral-900">Загрузка профиля…</div>
-          <div className="mt-2 text-sm text-neutral-600">Тянем данные из Supabase.</div>
         </CardContent>
       </Card>
     );
@@ -81,14 +88,13 @@ export default function ProviderProfilePage() {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">Перенаправляем в студию…</div>
-          <div className="mt-2 text-sm text-neutral-600">Открываем профиль студии.</div>
+          <div className="text-sm font-semibold text-neutral-900">Переадресация…</div>
         </CardContent>
       </Card>
     );
   }
 
-  if (error || !p) {
+  if (error || !provider) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -102,37 +108,41 @@ export default function ProviderProfilePage() {
   return (
     <div className="space-y-6">
       <Section
-        title={p.name}
-        subtitle={p.tagline}
+        title={provider.name}
+        subtitle={provider.tagline}
         right={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>{p.type === "MASTER" ? "Мастер" : "Студия"}</Badge>
-            {p.availableToday ? <Badge>Есть сегодня</Badge> : null}
+            <Badge>{provider.type === "MASTER" ? "Мастер" : "Студия"}</Badge>
+            {provider.availableToday ? <Badge>Есть сегодня</Badge> : null}
           </div>
         }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-        {/* LEFT */}
         <div className="space-y-4">
           <Card className="bg-white">
             <CardContent className="p-5 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-4">
+                {provider.avatarUrl ? (
+                  <img src={provider.avatarUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
+                ) : (
+                  <div className="h-20 w-20 rounded-2xl bg-neutral-100 border border-neutral-200" />
+                )}
                 <div className="text-sm text-neutral-700">
-                  <span className="font-semibold text-neutral-900">{p.rating.toFixed(1)}</span>{" "}
-                  <span className="text-neutral-500">({p.reviews} отзывов)</span>
+                  <span className="font-semibold text-neutral-900">{provider.rating.toFixed(1)}</span>{" "}
+                  <span className="text-neutral-500">({provider.reviews} отзывов)</span>
                 </div>
                 <div className="text-sm text-neutral-900">
-                  от <span className="font-semibold">{moneyRUB(p.priceFrom)}</span>
+                  от <span className="font-semibold">{moneyRUB(provider.priceFrom)}</span>
                 </div>
               </div>
 
               <div className="mt-3 text-sm text-neutral-600">
-                {p.district} · {p.address}
+                {provider.district} · {provider.address}
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {p.categories.map((c) => (
+                {provider.categories.map((c) => (
                   <Badge key={c}>{c}</Badge>
                 ))}
               </div>
@@ -141,22 +151,27 @@ export default function ProviderProfilePage() {
 
           <Card className="bg-white">
             <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-neutral-900">Портфолио (MVP)</div>
+              <div className="text-sm font-semibold text-neutral-900">Портфолио</div>
               <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="aspect-square rounded-2xl bg-neutral-100 border border-neutral-200" />
-                ))}
+                {portfolio.length > 0
+                  ? portfolio.map((asset) => (
+                      <div key={asset.id} className="aspect-square rounded-2xl bg-neutral-100 border border-neutral-200 overflow-hidden">
+                        <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    ))
+                  : Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="aspect-square rounded-2xl bg-neutral-100 border border-neutral-200" />
+                    ))}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* RIGHT */}
         <div className="lg:sticky lg:top-24 h-fit">
           <BookingWidget
-            providerId={p.id}
-            providerType={p.type}
-            services={p.services}
+            providerId={provider.id}
+            providerType={provider.type}
+            services={provider.services}
             masters={masters}
           />
         </div>

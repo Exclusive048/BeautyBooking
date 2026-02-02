@@ -50,6 +50,7 @@ export async function authenticateTelegramLogin(
       data: {
         telegramId,
         telegramUsername: payload.username ?? null,
+        externalPhotoUrl: payload.photo_url ?? null,
         firstName: payload.first_name,
         lastName: payload.last_name ?? null,
         displayName,
@@ -68,6 +69,9 @@ export async function authenticateTelegramLogin(
   }
   if (payload.username && payload.username !== profile.telegramUsername) {
     updateData.telegramUsername = payload.username;
+  }
+  if (payload.photo_url && payload.photo_url !== profile.externalPhotoUrl) {
+    updateData.externalPhotoUrl = payload.photo_url;
   }
 
   if (Object.keys(updateData).length > 0) {

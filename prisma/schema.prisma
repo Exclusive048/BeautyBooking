@@ -57,6 +57,18 @@ enum NotificationType {
   BOOKING_RESCHEDULED
 }
 
+enum MediaEntityType {
+  USER
+  MASTER
+  STUDIO
+  SITE
+}
+
+enum MediaKind {
+  AVATAR
+  PORTFOLIO
+}
+
 model UserProfile {
   id          String        @id @default(cuid())
   roles       AccountType[] @default([CLIENT])
@@ -65,6 +77,7 @@ model UserProfile {
   email       String?       @unique
   telegramId  String?       @unique
   telegramUsername String?
+  externalPhotoUrl String?
   telegramLink TelegramLink?
   telegramLinkTokens TelegramLinkToken[]
 
@@ -84,6 +97,7 @@ model UserProfile {
   studioInvites StudioInvite[] @relation("StudioInvitedBy")
   bookings    Booking[]     @relation("BookingClient")
   notifications Notification[]
+  mediaAssetsCreated MediaAsset[] @relation("MediaAssetCreatedBy")
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -397,4 +411,32 @@ model TelegramLinkToken {
   usedAt    DateTime?
   createdAt DateTime    @default(now())
   user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MediaAsset {
+  id               String          @id @default(cuid())
+  entityType       MediaEntityType
+  entityId         String
+  kind             MediaKind
+  storageProvider  String
+  storageKey       String
+  mimeType         String
+  sizeBytes        Int
+  originalFilename String
+  createdByUserId  String?
+  createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+
+  @@index([entityType, entityId, kind, deletedAt])
+  @@index([storageKey])
+  @@index([createdByUserId])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
