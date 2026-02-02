@@ -1,0 +1,550 @@
+﻿"use client";
+
+/* eslint-disable @next/next/no-img-element */
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { UI_TEXT } from "@/lib/ui/text";
+import type { ApiResponse } from "@/lib/types/api";
+
+type FeedItem = {
+  id: string;
+  mediaUrl: string;
+  caption: string | null;
+  width: number | null;
+  height: number | null;
+  masterId: string;
+  masterName: string;
+  masterAvatarUrl: string | null;
+  studioName: string | null;
+  serviceIds: string[];
+  primaryServiceTitle: string | null;
+  totalDurationMin: number;
+  totalPrice: number;
+  favoritesCount: number;
+  isFavorited: boolean;
+};
+
+type NearestSlot = {
+  startAt: string;
+};
+
+type PortfolioDetail = FeedItem & {
+  serviceOptions: Array<{
+    serviceId: string;
+    title: string;
+    durationMin: number;
+    price: number;
+  }>;
+  nearestSlots: NearestSlot[];
+  similarItems: Array<{
+    id: string;
+    mediaUrl: string;
+    masterName: string;
+    totalPrice: number;
+  }>;
+};
+
+type FeedResponse = {
+  items: FeedItem[];
+  nextCursor: string | null;
+};
+
+const FEED_LIMIT = 24;
+const SEARCH_DEBOUNCE_MS = 400;
+
+const CATEGORY_OPTIONS = [
+  { key: "nails", label: UI_TEXT.feed.categoryNails },
+  { key: "hair", label: UI_TEXT.feed.categoryHair },
+  { key: "brows", label: UI_TEXT.feed.categoryBrowsLashes },
+  { key: "makeup", label: UI_TEXT.feed.categoryMakeup },
+  { key: "body", label: UI_TEXT.feed.categoryBody },
+] as const;
+
+const TAG_OPTIONS = [
+  { key: "trends", label: UI_TEXT.feed.tagTrends },
+  { key: "nude", label: UI_TEXT.feed.tagNude },
+  { key: "gradient", label: UI_TEXT.feed.tagGradient },
+  { key: "near", label: UI_TEXT.feed.tagNearby },
+] as const;
+
+function formatPrice(value: number): string {
+  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
+}
+
+function formatDuration(min: number): string {
+  if (min <= 0) return "";
+  const hours = Math.floor(min / 60);
+  const minutes = min % 60;
+  if (hours > 0 && minutes > 0) return `${hours}ч ${minutes}м`;
+  if (hours > 0) return `${hours}ч`;
+  return `${minutes}м`;
+}
+
+function buildFeedUrl(params: {
+  q?: string;
+  category?: string;
+  tag?: string;
+  cursor?: string;
+}): string {
+  const query = new URLSearchParams();
+  query.set("limit", String(FEED_LIMIT));
+  if (params.q) query.set("q", params.q);
+  if (params.category) query.set("categoryId", params.category);
+  if (params.tag) query.set("tag", params.tag);
+  if (params.cursor) query.set("cursor", params.cursor);
+  return `/api/feed/portfolio?${query.toString()}`;
+}
+
+export function InspirationFeedPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const selectedCategory = searchParams.get("category") ?? "";
+  const selectedTag = searchParams.get("tag") ?? "";
+  const selectedQuery = searchParams.get("q") ?? "";
+
+  const [searchInput, setSearchInput] = useState(selectedQuery);
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<PortfolioDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const initialLoadedRef = useRef(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  const queryState = useMemo(
+    () => ({ q: selectedQuery, category: selectedCategory, tag: selectedTag }),
+    [selectedCategory, selectedQuery, selectedTag]
+  );
+
+  const replaceSearchParams = useCallback(
+    (next: { q?: string; category?: string; tag?: string }) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (next.q !== undefined) {
+        if (next.q.trim()) params.set("q", next.q.trim());
+        else params.delete("q");
+      }
+
+      if (next.category !== undefined) {
+        if (next.category) params.set("category", next.category);
+        else params.delete("category");
+      }
+
+      if (next.tag !== undefined) {
+        if (next.tag) params.set("tag", next.tag);
+        else params.delete("tag");
+      }
+
+      const queryString = params.toString();
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  useEffect(() => {
+    setSearchInput(selectedQuery);
+  }, [selectedQuery]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      if (searchInput !== selectedQuery) {
+        replaceSearchParams({ q: searchInput });
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(handle);
+  }, [replaceSearchParams, searchInput, selectedQuery]);
+
+  const fetchFeed = useCallback(
+    async (cursor?: string) => {
+      const res = await fetch(
+        buildFeedUrl({
+          q: queryState.q || undefined,
+          category: queryState.category || undefined,
+          tag: queryState.tag || undefined,
+          cursor,
+        }),
+        { cache: "no-store" }
+      );
+
+      const json = (await res.json().catch(() => null)) as ApiResponse<FeedResponse> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.feed.loadFailed);
+      }
+      return json.data;
+    },
+    [queryState.category, queryState.q, queryState.tag]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchFeed();
+        if (!cancelled) {
+          setItems(data.items);
+          setNextCursor(data.nextCursor);
+          initialLoadedRef.current = true;
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : UI_TEXT.feed.loadFailed);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchFeed]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const data = await fetchFeed(nextCursor);
+      setItems((prev) => [...prev, ...data.items]);
+      setNextCursor(data.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : UI_TEXT.feed.loadFailed);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchFeed, loadingMore, nextCursor]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !nextCursor || loadingMore) return;
+    const node = loadMoreRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          void loadMore();
+        }
+      },
+      { rootMargin: "240px 0px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadMore, loadingMore, nextCursor]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setSelectedItem(null);
+      setDetailError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setDetailError(null);
+      const res = await fetch(`/api/portfolio/${selectedId}`, { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ item: PortfolioDetail }> | null;
+      if (!cancelled && res.ok && json && json.ok) {
+        setSelectedItem(json.data.item);
+        return;
+      }
+      if (!cancelled) {
+        setSelectedItem(null);
+        setDetailError(json && !json.ok ? json.error.message : UI_TEXT.feed.detailsFailed);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
+
+  const onToggleFavorite = useCallback(async (itemId: string) => {
+    setItems((prev) =>
+      prev.map((entry) =>
+        entry.id === itemId
+          ? {
+              ...entry,
+              isFavorited: !entry.isFavorited,
+              favoritesCount: entry.isFavorited
+                ? Math.max(0, entry.favoritesCount - 1)
+                : entry.favoritesCount + 1,
+            }
+          : entry
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/portfolio/${itemId}/favorite`, { method: "POST" });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ isFavorited: boolean; favoritesCount: number }>
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.feed.loadFailed);
+      }
+      setItems((prev) =>
+        prev.map((entry) =>
+          entry.id === itemId
+            ? {
+                ...entry,
+                isFavorited: json.data.isFavorited,
+                favoritesCount: json.data.favoritesCount,
+              }
+            : entry
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : UI_TEXT.feed.loadFailed);
+      setItems((prev) =>
+        prev.map((entry) =>
+          entry.id === itemId
+            ? {
+                ...entry,
+                isFavorited: !entry.isFavorited,
+                favoritesCount: entry.isFavorited
+                  ? Math.max(0, entry.favoritesCount - 1)
+                  : entry.favoritesCount + 1,
+              }
+            : entry
+        )
+      );
+    }
+  }, []);
+
+  const headerShadow = initialLoadedRef.current ? "shadow-sm" : "";
+
+  return (
+    <div className="relative space-y-6">
+      <header className={`sticky top-0 z-20 -mx-4 border-b bg-accent/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 ${headerShadow}`}>
+        <div className="mx-auto max-w-7xl space-y-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold text-neutral-900 sm:text-xl">{UI_TEXT.feed.title}</h1>
+            <div className="text-xs text-neutral-500 sm:text-sm">{UI_TEXT.feed.subtitle}</div>
+          </div>
+
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none ring-black/10 transition focus:ring"
+            placeholder={UI_TEXT.feed.searchPlaceholder}
+          />
+
+          <div className="flex flex-wrap gap-2">
+            {CATEGORY_OPTIONS.map((option) => {
+              const active = selectedCategory === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() =>
+                    replaceSearchParams({ category: active ? "" : option.key })
+                  }
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                    active
+                      ? "border-black bg-black text-white"
+                      : "border-neutral-200 bg-white text-neutral-800 hover:border-neutral-300"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {TAG_OPTIONS.map((option) => {
+              const active = selectedTag === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => replaceSearchParams({ tag: active ? "" : option.key })}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                    active
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-neutral-200 bg-neutral-50 text-neutral-700 hover:border-neutral-300"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </header>
+
+      {loading ? <div className="rounded-2xl border bg-white p-6 text-sm text-neutral-600">{UI_TEXT.feed.loading}</div> : null}
+      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {!loading && items.length === 0 ? (
+        <div className="rounded-2xl border bg-white p-8 text-center text-sm text-neutral-600">{UI_TEXT.feed.emptyFeed}</div>
+      ) : null}
+
+      {!loading && items.length > 0 ? (
+        <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
+          {items.map((item) => (
+            <article key={item.id} className="group relative mb-4 break-inside-avoid overflow-hidden rounded-2xl bg-white shadow-sm">
+              <button type="button" onClick={() => setSelectedId(item.id)} className="block w-full text-left">
+                <img
+                  src={item.mediaUrl}
+                  alt={item.caption ?? item.primaryServiceTitle ?? item.masterName}
+                  className="h-auto w-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+
+              <div className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-xs font-medium text-white">
+                {item.totalPrice > 0 ? formatPrice(item.totalPrice) : "—"}
+              </div>
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 opacity-0 transition group-hover:opacity-100">
+                <div className="text-sm font-semibold text-white">{item.primaryServiceTitle ?? item.caption ?? item.masterName}</div>
+                <div className="mt-1 text-xs text-white/90">
+                  {formatDuration(item.totalDurationMin)}{item.totalPrice > 0 ? ` • ${formatPrice(item.totalPrice)}` : ""}
+                </div>
+                <div className="mt-1 text-xs text-white/90">{UI_TEXT.feed.byMaster}: {item.masterName}</div>
+                {item.studioName ? <div className="mt-0.5 text-xs text-white/80">{UI_TEXT.feed.byStudio}: {item.studioName}</div> : null}
+                <div className="pointer-events-auto mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onToggleFavorite(item.id)}
+                    title={item.isFavorited ? UI_TEXT.feed.removeFromFavorites : UI_TEXT.feed.addToFavorites}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-base text-neutral-900"
+                  >
+                    {item.isFavorited ? "❤" : "♡"}
+                  </button>
+                  <span className="text-xs text-white/90">{item.favoritesCount > 0 ? `🔥 ${item.favoritesCount}` : ""}</span>
+                  <Link
+                    href={`/book?portfolioId=${item.id}`}
+                    className="ml-auto inline-flex items-center rounded-full bg-white px-3 py-2 text-xs font-semibold text-neutral-900"
+                  >
+                    {UI_TEXT.feed.bookNow}
+                  </Link>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {!loading && nextCursor ? (
+        <div className="flex justify-center pb-8">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-800 transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingMore ? UI_TEXT.common.loading : UI_TEXT.feed.showMore}
+          </button>
+        </div>
+      ) : null}
+      <div ref={loadMoreRef} className="h-1 w-full" />
+
+      {selectedId ? (
+        <div className="fixed inset-0 z-50">
+          <button type="button" aria-label={UI_TEXT.common.cancel} className="absolute inset-0 bg-black/55" onClick={() => setSelectedId(null)} />
+          <div className="absolute inset-0 overflow-y-auto p-3 sm:p-6">
+            <div className="mx-auto mt-4 w-full max-w-6xl rounded-2xl bg-white p-4 shadow-2xl sm:mt-8 sm:p-6">
+              {detailError ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{detailError}</div> : null}
+              {selectedItem ? (
+                <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                  <div>
+                    <img
+                      src={selectedItem.mediaUrl}
+                      alt={selectedItem.caption ?? selectedItem.primaryServiceTitle ?? selectedItem.masterName}
+                      className="max-h-[75vh] w-full rounded-xl object-contain"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-sm text-neutral-500">{UI_TEXT.feed.byMaster}</div>
+                      <div className="text-lg font-semibold text-neutral-900">{selectedItem.masterName}</div>
+                      {selectedItem.studioName ? <div className="text-sm text-neutral-600">{selectedItem.studioName}</div> : null}
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.feed.whatOnPhoto}</div>
+                      <ul className="mt-2 space-y-1 text-sm text-neutral-700">
+                        {selectedItem.serviceOptions.map((service) => (
+                          <li key={service.serviceId}>
+                            • {service.title} — {formatDuration(service.durationMin)} / {formatPrice(service.price)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl bg-neutral-50 p-3 text-sm text-neutral-900">
+                      <div className="font-semibold">{UI_TEXT.feed.total}</div>
+                      <div className="mt-1">{formatDuration(selectedItem.totalDurationMin)} / {formatPrice(selectedItem.totalPrice)}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.feed.nearestSlots}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {selectedItem.nearestSlots.length === 0 ? (
+                          <span className="text-sm text-neutral-500">{UI_TEXT.feed.noSlots}</span>
+                        ) : (
+                          selectedItem.nearestSlots.map((slot) => (
+                            <span key={slot.startAt} className="rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700">
+                              {new Date(slot.startAt).toLocaleString("ru-RU", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/book?portfolioId=${selectedItem.id}`}
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+                    >
+                      {UI_TEXT.feed.bookThisService}
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedItem && selectedItem.similarItems.length > 0 ? (
+                <div className="mt-6">
+                  <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.feed.similarWorks}</div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    {selectedItem.similarItems.map((similar) => (
+                      <button
+                        key={similar.id}
+                        type="button"
+                        className="overflow-hidden rounded-xl border text-left"
+                        onClick={() => setSelectedId(similar.id)}
+                      >
+                        <img src={similar.mediaUrl} alt={similar.masterName} className="h-24 w-full object-cover" />
+                        <div className="p-2 text-xs">
+                          <div className="truncate text-neutral-800">{similar.masterName}</div>
+                          <div className="text-neutral-500">{formatPrice(similar.totalPrice)}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+

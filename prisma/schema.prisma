@@ -35,9 +35,14 @@ enum AccountType {
 }
 
 enum BookingStatus {
+  NEW
   PENDING
   CONFIRMED
+  PREPAID
+  STARTED
+  FINISHED
   CANCELLED
+  NO_SHOW
 }
 
 enum BookingCancelledBy {
@@ -67,6 +72,47 @@ enum MediaEntityType {
 enum MediaKind {
   AVATAR
   PORTFOLIO
+}
+
+enum StudioMemberRole {
+  OWNER
+  ADMIN
+  MASTER
+  FINANCE
+}
+
+enum StudioMemberStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum BookingSource {
+  MANUAL
+  WEB
+  APP
+}
+
+enum TimeBlockType {
+  BREAK
+  BLOCK
+}
+
+enum WorkExceptionType {
+  OFF
+  SHIFT
+}
+
+enum ScheduleChangeRequestType {
+  OFF
+  SHIFT
+  BLOCK
+}
+
+enum ScheduleChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum ReviewTargetType {
@@ -99,11 +145,13 @@ model UserProfile {
   ownedStudios Studio[]     @relation("StudioOwner")
   masterProfile MasterProfile?
   studioMemberships StudioMembership[]
+  studioMembers StudioMember[]
   studioInvites StudioInvite[] @relation("StudioInvitedBy")
   bookings    Booking[]     @relation("BookingClient")
   notifications Notification[]
   mediaAssetsCreated MediaAsset[] @relation("MediaAssetCreatedBy")
   reviewsAuthored Review[] @relation("ReviewAuthor")
+  favorites Favorite[]
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -116,9 +164,22 @@ model Studio {
   ownerUserId String?
   owner       UserProfile?       @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   memberships StudioMembership[]
+  studioMembers StudioMember[]
   invites     StudioInvite[]
   ratingAvg   Float              @default(0)
   ratingCount Int                @default(0)
+  serviceCategories ServiceCategory[]
+  masterServices MasterService[]
+  workShiftTemplates WorkShiftTemplate[]
+  workDayRules WorkDayRule[]
+  workExceptions WorkException[]
+  timeBlocks TimeBlock[]
+  scheduleRequests ScheduleChangeRequest[]
+  services Service[]
+  bookings Booking[]
+  bookingServiceItems BookingServiceItem[]
+  portfolioItems PortfolioItem[]
+  reviews Review[]
 
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
@@ -229,6 +290,8 @@ model Provider {
 
   studioProfile Studio?       @relation("StudioProvider")
   masterProfile MasterProfile? @relation("MasterProvider")
+  reviewsAbout Review[]
+  portfolioItems PortfolioItem[]
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -241,14 +304,26 @@ model Service {
   id          String   @id @default(cuid())
   providerId  String
   provider    Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  studioId    String?
+  studio      Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  categoryId  String?
+  category    ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   name        String
+  title       String?
+  description String?
   durationMin Int
   price       Int
+  baseDurationMin Int?
+  basePrice   Int?
+  sortOrder   Int      @default(0)
   isEnabled   Boolean  @default(true)
+  isActive    Boolean  @default(true)
 
   bookings    Booking[]
   masterServices MasterService[]
+  portfolioItems PortfolioItemService[]
+  bookingItems BookingServiceItem[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -260,12 +335,16 @@ model MasterService {
   id                 String   @id @default(cuid())
   masterProviderId   String
   masterProvider     Provider @relation("MasterServices", fields: [masterProviderId], references: [id], onDelete: Cascade)
+  studioId           String?
+  studio             Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId           String?
   serviceId          String
   service            Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   priceOverride      Int?
   durationOverrideMin Int?
   isEnabled          Boolean  @default(true)
+  commissionPct      Float?
 
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -291,11 +370,21 @@ model Booking {
 
   startAtUtc   DateTime?
   endAtUtc     DateTime?
+  studioId     String?
+  studio       Studio?      @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId     String?
+  clientId     String?
+  startAt      DateTime?
+  endAt        DateTime?
 
   slotLabel    String
   clientName   String
   clientPhone  String
+  clientNameSnapshot String?
+  clientPhoneSnapshot String?
   comment      String?
+  source       BookingSource @default(MANUAL)
+  notes        String?
 
   status       BookingStatus @default(PENDING)
   cancelledBy  BookingCancelledBy?
@@ -306,12 +395,16 @@ model Booking {
 
   notifications Notification[]
   review        Review?
+  serviceItems  BookingServiceItem[]
 
   @@index([providerId])
   @@index([masterProviderId])
   @@index([startAtUtc])
   @@index([serviceId])
   @@index([clientUserId])
+  @@index([studioId])
+  @@index([masterId])
+  @@index([status, startAtUtc])
 }
 
 model Notification {
@@ -454,16 +547,192 @@ model AppSetting {
 
 model Review {
   id         String           @id @default(cuid())
-  bookingId  String           @unique
-  booking    Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId  String?          @unique
+  booking    Booking?         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   authorId   String
   author     UserProfile      @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  studioId   String?
+  studio     Studio?          @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId   String?
+  master     Provider?        @relation(fields: [masterId], references: [id], onDelete: SetNull)
   targetType ReviewTargetType
   targetId   String
   rating     Int
   text       String?
+  replyText  String?
+  repliedAt  DateTime?
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
   @@index([targetType, targetId])
+  @@index([studioId, createdAt])
+  @@index([masterId, createdAt])
+}
+
+model StudioMember {
+  id        String           @id @default(cuid())
+  studioId  String
+  studio    Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId    String
+  user      UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      StudioMemberRole
+  status    StudioMemberStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([studioId, userId, role])
+  @@index([userId, status])
+  @@index([studioId, status])
+}
+
+model ServiceCategory {
+  id        String   @id @default(cuid())
+  studioId  String
+  studio    Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int      @default(0)
+  services  Service[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studioId, sortOrder])
+}
+
+model BookingServiceItem {
+  id                  String   @id @default(cuid())
+  bookingId           String
+  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  studioId            String?
+  studio              Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  serviceId           String?
+  service             Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  titleSnapshot       String
+  priceSnapshot       Int
+  durationSnapshotMin Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([studioId])
+  @@index([serviceId])
+}
+
+model WorkShiftTemplate {
+  id             String   @id @default(cuid())
+  studioId       String
+  studio         Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId       String?
+  title          String
+  startTime      String
+  endTime        String
+  breakRulesJson String?
+  dayRules       WorkDayRule[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([studioId, masterId])
+}
+
+model WorkDayRule {
+  id         String            @id @default(cuid())
+  studioId   String
+  studio     Studio            @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId   String
+  weekday    Int
+  templateId String
+  template   WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  isWorking  Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([studioId, masterId, weekday])
+  @@index([templateId])
+}
+
+model WorkException {
+  id        String            @id @default(cuid())
+  studioId  String?
+  studio    Studio?           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId  String
+  date      DateTime
+  type      WorkExceptionType
+  startTime String?
+  endTime   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([studioId, masterId, date])
+}
+
+model TimeBlock {
+  id        String        @id @default(cuid())
+  studioId  String?
+  studio    Studio?       @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId  String
+  startAt   DateTime
+  endAt     DateTime
+  type      TimeBlockType
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([studioId, masterId, startAt, endAt])
+}
+
+model ScheduleChangeRequest {
+  id          String                      @id @default(cuid())
+  studioId    String
+  studio      Studio                      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId    String
+  type        ScheduleChangeRequestType
+  payloadJson String
+  status      ScheduleChangeRequestStatus @default(PENDING)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  @@index([studioId, masterId, createdAt])
+  @@index([masterId, status, createdAt])
+}
+
+model PortfolioItem {
+  id        String                @id @default(cuid())
+  studioId  String?
+  studio    Studio?               @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId  String
+  master    Provider              @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  mediaUrl  String
+  caption   String?
+  isPublic  Boolean               @default(true)
+  width     Int?
+  height    Int?
+  services  PortfolioItemService[]
+  favorites Favorite[]
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([masterId, createdAt])
+  @@index([studioId, createdAt])
+}
+
+model PortfolioItemService {
+  portfolioItemId String
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@id([portfolioItemId, serviceId])
+  @@index([serviceId])
+}
+
+model Favorite {
+  id              String        @id @default(cuid())
+  userId          String
+  user            UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolioItemId String
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([userId, portfolioItemId])
+  @@index([portfolioItemId, createdAt])
 }

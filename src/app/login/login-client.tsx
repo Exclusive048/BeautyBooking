@@ -1,10 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
-import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
+import { UI_TEXT } from "@/lib/ui/text";
+
+type LoginClientProps = {
+  heroImageUrl: string | null;
+};
 
 function normalizePhone(input: string) {
   const cleaned = input.replace(/[()\s-]/g, "");
@@ -14,17 +18,15 @@ function normalizePhone(input: string) {
 }
 
 function safeNext(nextRaw: string | null) {
-  // Защита от open-redirect: разрешаем только относительные пути.
   if (!nextRaw) return null;
   if (!nextRaw.startsWith("/")) return null;
   if (nextRaw.startsWith("//")) return null;
   return nextRaw;
 }
 
-export default function LoginClient() {
+export default function LoginClient({ heroImageUrl }: LoginClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
 
   const [phone, setPhone] = useState("");
@@ -33,12 +35,30 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const previousOverflow = document.body.style.overflow;
+
+    const applyOverflow = (matches: boolean) => {
+      document.body.style.overflow = matches ? "hidden" : previousOverflow;
+    };
+
+    applyOverflow(media.matches);
+    const onMediaChange = (event: MediaQueryListEvent) => applyOverflow(event.matches);
+    media.addEventListener("change", onMediaChange);
+
+    return () => {
+      media.removeEventListener("change", onMediaChange);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   async function sendCode() {
     setErrorText(null);
     const normalized = normalizePhone(phone);
 
     if (!normalized || normalized.length < 8) {
-      setErrorText(UI_TEXTS.login.invalidPhone);
+      setErrorText(UI_TEXT.auth.loginPage.invalidPhone);
       return;
     }
 
@@ -53,9 +73,9 @@ export default function LoginClient() {
     } catch (error) {
       if (error instanceof ApiClientError) {
         const mapped = getErrorMessageByCode(error.code);
-        setErrorText(mapped ?? error.message ?? UI_TEXTS.login.sendCodeFailed);
+        setErrorText(mapped ?? error.message ?? UI_TEXT.auth.loginPage.sendCodeFailed);
       } else {
-        setErrorText(UI_TEXTS.login.sendCodeFailed);
+        setErrorText(UI_TEXT.auth.loginPage.sendCodeFailed);
       }
     } finally {
       setLoading(false);
@@ -67,7 +87,7 @@ export default function LoginClient() {
     const normalized = normalizePhone(phone);
 
     if (!code || code.length < 4) {
-      setErrorText(UI_TEXTS.login.enterCode);
+      setErrorText(UI_TEXT.auth.loginPage.enterCode);
       return;
     }
 
@@ -79,15 +99,14 @@ export default function LoginClient() {
         body: JSON.stringify({ phone: normalized, code }),
       });
 
-      // Если next не передан, отправляем в кабинет.
       router.replace(nextPath ?? "/cabinet");
       router.refresh();
     } catch (error) {
       if (error instanceof ApiClientError) {
         const mapped = getErrorMessageByCode(error.code);
-        setErrorText(mapped ?? error.message ?? UI_TEXTS.login.invalidCode);
+        setErrorText(mapped ?? error.message ?? UI_TEXT.auth.loginPage.invalidCode);
       } else {
-        setErrorText(UI_TEXTS.login.invalidCode);
+        setErrorText(UI_TEXT.auth.loginPage.invalidCode);
       }
     } finally {
       setLoading(false);
@@ -95,85 +114,121 @@ export default function LoginClient() {
   }
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border p-6 shadow-sm bg-white">
-        <h1 className="text-xl font-semibold">{UI_TEXTS.login.title}</h1>
-        <p className="text-sm text-neutral-600 mt-1">
-          {UI_TEXTS.login.subtitle}
-          <span className="block mt-1 text-xs">
-            {UI_TEXTS.login.devHint}
-          </span>
-        </p>
-
-        {errorText ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {errorText}
+    <div className="min-h-[100dvh] overflow-y-auto bg-background lg:fixed lg:inset-0 lg:z-50 lg:h-[100dvh] lg:w-screen lg:overflow-hidden">
+      <div className="grid h-full min-h-[100dvh] lg:min-h-0 lg:grid-cols-[5fr_7fr]">
+        <aside className="relative hidden min-h-0 overflow-hidden lg:block">
+          {heroImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={heroImageUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+          <div className="absolute bottom-10 left-8 right-8 text-white">
+            <p className="text-3xl font-semibold leading-tight">{UI_TEXT.auth.loginPage.heroTitle}</p>
+            <p className="mt-3 text-sm text-white/80">{UI_TEXT.auth.loginPage.heroSubtitle}</p>
           </div>
-        ) : null}
+        </aside>
 
-        {step === "phone" ? (
-          <div className="mt-6 space-y-3">
-            <label className="block text-sm font-medium">{UI_TEXTS.common.phone}</label>
-            <input
-              className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2"
-              placeholder="+77001234567"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              inputMode="tel"
-              autoComplete="tel"
-            />
-
-            <button
-              onClick={sendCode}
-              disabled={loading}
-              className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
-            >
-              {loading ? UI_TEXTS.login.sending : UI_TEXTS.login.sendCode}
-            </button>
-          </div>
-        ) : (
-          <div className="mt-6 space-y-3">
-            <div className="text-sm text-neutral-700">
-              {UI_TEXTS.login.codeSentTo} <span className="font-medium">{normalizePhone(phone)}</span>
+        <main className="flex h-full min-h-0 items-center justify-center px-4 py-4 sm:px-6 lg:px-10">
+          <div className="w-full max-w-md rounded-3xl border border-border/60 bg-card/90 p-6 shadow-sm sm:p-7">
+            <div className="mb-7">
+              <div className="text-sm font-semibold text-muted-foreground">BeautyHub</div>
+              <h1 className="mt-2 text-2xl font-semibold">{UI_TEXT.auth.loginPage.title}</h1>
+              <p className="mt-2 text-sm text-muted-foreground">{UI_TEXT.auth.loginPage.subtitle}</p>
             </div>
 
-            <label className="block text-sm font-medium">{UI_TEXTS.login.codeLabel}</label>
-            <input
-              className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 tracking-widest"
-              placeholder="123456"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\s/g, ""))}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-            />
+            {errorText ? (
+              <div
+                aria-live="polite"
+                className="mb-4 rounded-2xl border border-red-300/70 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+              >
+                {errorText}
+              </div>
+            ) : null}
 
-            <button
-              onClick={verifyCode}
-              disabled={loading}
-              className="w-full rounded-xl bg-black text-white py-2 font-medium disabled:opacity-60"
-            >
-              {loading ? UI_TEXTS.login.verifying : UI_TEXTS.auth.login}
-            </button>
+            {step === "phone" ? (
+              <div className="space-y-4">
+                <label className="block text-sm font-medium">{UI_TEXT.auth.loginPage.phoneLabel}</label>
+                <input
+                  className="h-12 w-full rounded-2xl border border-border bg-background px-5 text-base outline-none transition focus:ring-2 focus:ring-primary/40"
+                  placeholder={UI_TEXT.auth.loginPage.phonePlaceholder}
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  aria-label={UI_TEXT.auth.loginPage.phoneLabel}
+                />
 
-            <button
-              onClick={() => setStep("phone")}
-              disabled={loading}
-              className="w-full rounded-xl border py-2 font-medium disabled:opacity-60"
-            >
-              {UI_TEXTS.login.changePhone}
-            </button>
+                <button
+                  type="button"
+                  onClick={sendCode}
+                  disabled={loading}
+                  className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+                >
+                  {loading ? UI_TEXT.auth.loginPage.sending : UI_TEXT.auth.loginPage.sendCode}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  {UI_TEXT.auth.loginPage.codeSentTo}{" "}
+                  <span className="font-medium text-foreground">{normalizePhone(phone)}</span>
+                </div>
+
+                <label className="block text-sm font-medium">{UI_TEXT.auth.loginPage.codeLabel}</label>
+                <input
+                  className="h-12 w-full rounded-2xl border border-border bg-background px-5 text-base tracking-[0.15em] outline-none transition focus:ring-2 focus:ring-primary/40"
+                  placeholder={UI_TEXT.auth.loginPage.codePlaceholder}
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.replace(/\s/g, ""))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  aria-label={UI_TEXT.auth.loginPage.codeLabel}
+                />
+
+                <button
+                  type="button"
+                  onClick={verifyCode}
+                  disabled={loading}
+                  className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+                >
+                  {loading ? UI_TEXT.auth.loginPage.verifying : UI_TEXT.auth.login}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep("phone")}
+                  disabled={loading}
+                  className="h-11 w-full rounded-2xl border border-border bg-card text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
+                >
+                  {UI_TEXT.auth.loginPage.changePhone}
+                </button>
+              </div>
+            )}
+
+            <div className="my-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {UI_TEXT.auth.loginPage.or}
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div className="text-sm font-medium">{UI_TEXT.auth.loginPage.telegramSectionTitle}</div>
+              <TelegramLoginButton />
+            </div>
+
+            <p className="mt-6 text-center text-xs text-muted-foreground">{UI_TEXT.auth.loginPage.noAccountHint}</p>
+
+            {nextPath ? (
+              <div className="mt-4 text-xs text-muted-foreground">
+                {UI_TEXT.auth.loginPage.returnAfterLogin} <span className="font-mono">{nextPath}</span>
+              </div>
+            ) : null}
           </div>
-        )}
-
-        {nextPath ? (
-          <div className="mt-6 text-xs text-neutral-500">
-            {UI_TEXTS.login.returnAfterLogin} <span className="font-mono">{nextPath}</span>
-          </div>
-        ) : null}
-
-        <div className="mt-6 border-t pt-6">
-          <TelegramLoginButton />
-        </div>
+        </main>
       </div>
     </div>
   );

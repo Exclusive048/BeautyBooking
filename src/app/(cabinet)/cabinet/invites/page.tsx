@@ -2,11 +2,16 @@ import { redirect } from "next/navigation";
 import { MembershipStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
+import { hasMasterProfile } from "@/lib/auth/roles";
 import { InvitesPanel } from "@/features/cabinet/components/invites-panel";
 
 export default async function InvitesPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  const isMaster = await hasMasterProfile(user.id);
+  if (isMaster) {
+    redirect("/cabinet/master/notifications");
+  }
 
   const phone = user.phone ?? null;
 

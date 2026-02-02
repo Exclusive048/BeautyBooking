@@ -1,44 +1,14 @@
-/* eslint-disable @next/next/no-img-element */
+﻿/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth/session";
-import { LogoutButton } from "@/features/auth/components/logout-button";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus } from "@prisma/client";
 import type { ReactElement } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { hasGlobalMasterProfile } from "@/lib/auth/roles";
-import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
-import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { UI_TEXT } from "@/lib/ui/text";
 import { getSiteLogoUrl } from "@/lib/media/queries";
-
-type CabinetItem = { label: string; href: string };
-
-function buildCabinetNav(input: {
-  hasGlobalMaster: boolean;
-  hasStudioAccess: boolean;
-}): { items: CabinetItem[]; defaultHref: string } {
-  const { hasGlobalMaster, hasStudioAccess } = input;
-  const items: CabinetItem[] = [
-    { label: UI_TEXTS.common.profile, href: "/cabinet/client?tab=profile" },
-    { label: UI_TEXTS.common.myBookings, href: "/cabinet/client?tab=bookings" },
-  ];
-
-  if (hasStudioAccess) {
-    items.push({ label: UI_TEXTS.topbar.cabinetStudio, href: "/cabinet/studio?tab=bookings" });
-  }
-  if (hasGlobalMaster) {
-    items.push({ label: UI_TEXTS.topbar.cabinetMaster, href: "/cabinet/master?tab=bookings" });
-  }
-
-  const defaultHref = hasStudioAccess
-    ? "/cabinet/studio?tab=bookings"
-    : hasGlobalMaster
-      ? "/cabinet/master?tab=bookings"
-      : "/cabinet/client?tab=bookings";
-
-  return { items, defaultHref };
-}
+import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 
 export async function Topbar() {
   const user = await getSessionUser();
@@ -53,41 +23,13 @@ export async function Topbar() {
       })
     : 0;
   const notificationsCount = invitesCount + unreadNotificationsCount;
-  const hasGlobalMaster = user ? await hasGlobalMasterProfile(user.id) : false;
-  const hasStudioAccess = user ? await hasAnyStudioAccess(user.id) : false;
   const siteLogoUrl = await getSiteLogoUrl();
-  const cabinetNav = buildCabinetNav({ hasGlobalMaster, hasStudioAccess });
   const navItems: ReactElement[] = [];
-
-  navItems.push(
-    <Button key="nav-catalog" asChild variant="secondary">
-      <Link href="/providers">{UI_TEXTS.topbar.catalog}</Link>
-    </Button>
-  );
 
   if (user) {
     navItems.push(
-      <details key="nav-cabinet" className="relative">
-        <Button asChild variant="secondary">
-          <summary className="list-none cursor-pointer">{UI_TEXTS.topbar.myCabinet}</summary>
-        </Button>
-        <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-1">
-          {cabinetNav.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-50"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </details>
-    );
-
-    navItems.push(
       <Button key="nav-notifications" asChild variant="secondary" className="relative">
-        <Link href="/cabinet/invites" aria-label={UI_TEXTS.topbar.notifications}>
+        <Link href="/cabinet/invites" aria-label={UI_TEXT.nav.notifications}>
           <span aria-hidden>🔔</span>
           {notificationsCount > 0 ? (
             <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
@@ -99,12 +41,22 @@ export async function Topbar() {
     );
 
     navItems.push(<ThemeToggle key="nav-theme-toggle" />);
-    navItems.push(<LogoutButton key="nav-logout" />);
+    navItems.push(
+      <AuthUserMenu
+        key="nav-user-menu"
+        userLabel={user.displayName?.trim() || user.phone || UI_TEXT.auth.menu}
+      />
+    );
   } else {
+    navItems.push(
+      <Button key="nav-catalog" asChild variant="secondary">
+        <Link href="/providers">{UI_TEXT.nav.catalog}</Link>
+      </Button>
+    );
     navItems.push(<ThemeToggle key="nav-theme-toggle" />);
     navItems.push(
       <Button key="nav-login" asChild>
-        <Link href="/login">{UI_TEXTS.auth.login}</Link>
+        <Link href="/login">{UI_TEXT.auth.login}</Link>
       </Button>
     );
   }
@@ -120,7 +72,7 @@ export async function Topbar() {
           )}
           <div className="leading-tight">
             <div className="text-sm font-semibold text-text">BeautyHub</div>
-            <div className="text-xs text-text-muted">{UI_TEXTS.topbar.bookingToMasters}</div>
+            <div className="text-xs text-text-muted">{UI_TEXT.nav.bookingToMasters}</div>
           </div>
         </Link>
 
@@ -129,3 +81,4 @@ export async function Topbar() {
     </header>
   );
 }
+

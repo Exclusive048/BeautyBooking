@@ -1,83 +1,60 @@
-import { cookies } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/prisma";
-import { MembershipStatus } from "@prisma/client";
-import { serverApiFetch } from "@/lib/api/server-fetch";
-import type { ProviderProfileDto } from "@/lib/providers/dto";
-import { hasMasterProfile } from "@/lib/auth/roles";
 import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
+import { hasMasterProfile } from "@/lib/auth/roles";
+import { getSessionUser } from "@/lib/auth/session";
 
-export default async function CabinetEntryPage(props: {
-  searchParams?: Promise<{ tab?: string }> | { tab?: string };
-}) {
+export default async function CabinetEntryPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (user.phone) {
-    const pendingInvite = await prisma.studioInvite.findFirst({
-      where: { phone: user.phone, status: MembershipStatus.PENDING },
-      select: { id: true },
-    });
+  const [hasStudioMode, hasMasterMode] = await Promise.all([
+    hasAnyStudioAccess(user.id),
+    hasMasterProfile(user.id),
+  ]);
 
-    if (pendingInvite) {
-      redirect("/cabinet/invites");
-    }
-  }
+  return (
+    <section className="mx-auto max-w-3xl space-y-4 p-4">
+      <header>
+        <h1 className="text-2xl font-semibold">My cabinet</h1>
+        <p className="text-sm text-neutral-600">Choose mode to continue.</p>
+      </header>
 
-  const sp =
-    props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;
+      <div className="grid gap-3 md:grid-cols-3">
+        {hasStudioMode ? (
+          <Link
+            href="/cabinet/studio/calendar"
+            className="rounded-2xl border p-5 transition hover:bg-neutral-50"
+          >
+            <div className="text-lg font-semibold">Studio</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Calendar, services, team and studio management.
+            </div>
+          </Link>
+        ) : null}
 
-  const tab = sp?.tab === "profile" ? "profile" : "bookings";
-  const tabQs = `?tab=${tab}`;
+        {hasMasterMode ? (
+          <Link
+            href="/cabinet/master/dashboard"
+            className="rounded-2xl border p-5 transition hover:bg-neutral-50"
+          >
+            <div className="text-lg font-semibold">Master</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Day plan, schedule and storefront profile.
+            </div>
+          </Link>
+        ) : null}
 
-  const jar = await cookies();
-  const last = jar.get("bh_last_role")?.value as "client" | "provider" | undefined;
-
-  if (!last) redirect(`/cabinet/ensure-role?next=/cabinet${tabQs}`);
-
-  if (last === "client") {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  const hasStudio = await hasAnyStudioAccess(user.id);
-  const hasMaster = await hasMasterProfile(user.id);
-  if (!hasStudio && !hasMaster) {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-    "/api/providers/me"
+        <Link
+          href="/cabinet/client/bookings"
+          className="rounded-2xl border p-5 transition hover:bg-neutral-50"
+        >
+          <div className="text-lg font-semibold">Client</div>
+          <div className="mt-1 text-sm text-neutral-600">
+            My bookings, profile and personal settings.
+          </div>
+        </Link>
+      </div>
+    </section>
   );
-
-  if (!providerResponse.ok) {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  let provider = providerResponse.data.provider;
-
-  if (!provider) {
-    const createResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-      "/api/providers/me",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
-      }
-    );
-
-    if (createResponse.ok) {
-      const reloadResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-        "/api/providers/me"
-      );
-      if (reloadResponse.ok) provider = reloadResponse.data.provider ?? createResponse.data.provider;
-    }
-  }
-
-  if (!provider) {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  if (provider.type === "STUDIO") redirect(`/cabinet/studio${tabQs}`);
-  redirect(`/cabinet/master${tabQs}`);
 }

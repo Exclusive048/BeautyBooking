@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasAdminRole } from "@/lib/auth/guards";
 import { SiteLogoManager } from "@/features/media/components/site-logo-manager";
+import { LoginHeroImageManager } from "@/features/media/components/login-hero-image-manager";
 
 const plans = [
   {
@@ -46,7 +47,10 @@ export default async function AdminPage() {
         </p>
       </div>
 
-      <SiteLogoManager />
+      <div className="grid gap-4 md:grid-cols-2">
+        <SiteLogoManager />
+        <LoginHeroImageManager />
+      </div>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Планы подписок</h2>
