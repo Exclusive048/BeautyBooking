@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
+import { ReviewForm } from "@/features/reviews/components/review-form";
 import { UI_TEXTS } from "@/lib/ui-texts/ru";
 
 type BookingItem = {
@@ -32,6 +33,27 @@ export function ClientBookingsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<BookingItem | null>(null);
+  const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
+  const [canLeaveMap, setCanLeaveMap] = useState<Record<string, boolean>>({});
+
+  const loadCanLeave = useCallback(async (bookings: BookingItem[]) => {
+    const entries = await Promise.all(
+      bookings.map(async (booking) => {
+        try {
+          const res = await fetch(`/api/reviews/can-leave?bookingId=${encodeURIComponent(booking.id)}`, {
+            cache: "no-store",
+          });
+          const json = (await res.json().catch(() => null)) as ApiResponse<{ canLeave: boolean }> | null;
+          if (!res.ok || !json || !json.ok) return [booking.id, false] as const;
+          return [booking.id, json.data.canLeave] as const;
+        } catch {
+          return [booking.id, false] as const;
+        }
+      })
+    );
+
+    setCanLeaveMap(Object.fromEntries(entries));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,12 +64,13 @@ export function ClientBookingsPanel() {
       if (!res.ok) throw new Error(getErrorMessage(json, `${UI_TEXTS.bookingsPanel.apiErrorPrefix} ${res.status}`));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToLoad));
       setItems(json.data.bookings);
+      await loadCanLeave(json.data.bookings);
     } catch (e) {
       setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCanLeave]);
 
   useEffect(() => {
     void load();
@@ -67,6 +90,7 @@ export function ClientBookingsPanel() {
       if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToCancel));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.bookingsPanel.failedToCancel));
       setItems((prev) => prev.map((b) => (b.id === id ? { ...b, status: "CANCELLED" } : b)));
+      setCanLeaveMap((prev) => ({ ...prev, [id]: false }));
     } catch (e) {
       setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
     } finally {
@@ -100,10 +124,10 @@ export function ClientBookingsPanel() {
               <div className="text-sm text-neutral-600">{statusLabel(b.status)}</div>
             </div>
             <div className="mt-1 text-sm text-neutral-700">
-              {b.slotLabel} · {b.service.name}
+              {b.slotLabel} ? {b.service.name}
             </div>
             <div className="mt-1 text-sm text-neutral-600">
-              {b.provider.district} · {b.provider.address}
+              {b.provider.district} ? {b.provider.address}
             </div>
             {b.comment ? <div className="mt-2 text-sm text-neutral-600">{b.comment}</div> : null}
             {b.status !== "CANCELLED" ? (
@@ -124,6 +148,15 @@ export function ClientBookingsPanel() {
                 >
                   {UI_TEXTS.bookingsPanel.cancelBooking}
                 </button>
+                {canLeaveMap[b.id] ? (
+                  <button
+                    type="button"
+                    onClick={() => setReviewBookingId(b.id)}
+                    className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50"
+                  >
+                    Leave review
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -148,6 +181,19 @@ export function ClientBookingsPanel() {
             );
           }}
         />
+      ) : null}
+
+      {reviewBookingId ? (
+        <div className="mt-4">
+          <ReviewForm
+            bookingId={reviewBookingId}
+            onCancel={() => setReviewBookingId(null)}
+            onSubmitted={() => {
+              setCanLeaveMap((prev) => ({ ...prev, [reviewBookingId]: false }));
+              setReviewBookingId(null);
+            }}
+          />
+        </div>
       ) : null}
     </>
   );

@@ -69,6 +69,11 @@ enum MediaKind {
   PORTFOLIO
 }
 
+enum ReviewTargetType {
+  provider
+  studio
+}
+
 model UserProfile {
   id          String        @id @default(cuid())
   roles       AccountType[] @default([CLIENT])
@@ -98,6 +103,7 @@ model UserProfile {
   bookings    Booking[]     @relation("BookingClient")
   notifications Notification[]
   mediaAssetsCreated MediaAsset[] @relation("MediaAssetCreatedBy")
+  reviewsAuthored Review[] @relation("ReviewAuthor")
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -111,6 +117,8 @@ model Studio {
   owner       UserProfile?       @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   memberships StudioMembership[]
   invites     StudioInvite[]
+  ratingAvg   Float              @default(0)
+  ratingCount Int                @default(0)
 
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
@@ -183,6 +191,8 @@ model Provider {
   tagline        String
   rating         Float         @default(0)
   reviews        Int           @default(0)
+  ratingAvg      Float         @default(0)
+  ratingCount    Int           @default(0)
   priceFrom      Int           @default(0)
   address        String
   district       String
@@ -295,6 +305,7 @@ model Booking {
   updatedAt    DateTime      @updatedAt
 
   notifications Notification[]
+  review        Review?
 
   @@index([providerId])
   @@index([masterProviderId])
@@ -439,4 +450,20 @@ model AppSetting {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id         String           @id @default(cuid())
+  bookingId  String           @unique
+  booking    Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     UserProfile      @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetType ReviewTargetType
+  targetId   String
+  rating     Int
+  text       String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([targetType, targetId])
 }

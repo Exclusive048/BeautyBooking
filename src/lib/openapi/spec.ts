@@ -7,6 +7,7 @@ type SchemaObject = {
   format?: string;
   minimum?: number;
   maximum?: number;
+  maxLength?: number;
   description?: string;
   nullable?: boolean;
   oneOf?: SchemaObject[];
@@ -160,6 +161,9 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/TelegramWebhookData" },
               { $ref: "#/components/schemas/MediaAssetData" },
               { $ref: "#/components/schemas/MediaAssetListData" },
+              { $ref: "#/components/schemas/ReviewData" },
+              { $ref: "#/components/schemas/ReviewListData" },
+              { $ref: "#/components/schemas/CanLeaveReviewData" },
             ],
           },
         },
@@ -551,6 +555,65 @@ export const openApiSpec = {
         required: ["assets"],
         properties: {
           assets: { type: "array", items: { $ref: "#/components/schemas/MediaAsset" } },
+        },
+      },
+      ReviewTargetType: {
+        type: "string",
+        enum: ["provider", "studio"],
+      },
+      Review: {
+        type: "object",
+        required: [
+          "id",
+          "bookingId",
+          "authorId",
+          "authorName",
+          "targetType",
+          "targetId",
+          "rating",
+          "text",
+          "createdAt",
+        ],
+        properties: {
+          id: { type: "string" },
+          bookingId: { type: "string" },
+          authorId: { type: "string" },
+          authorName: { type: "string" },
+          targetType: { $ref: "#/components/schemas/ReviewTargetType" },
+          targetId: { type: "string" },
+          rating: { type: "integer", minimum: 1, maximum: 5 },
+          text: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      ReviewCreateInput: {
+        type: "object",
+        required: ["bookingId", "rating"],
+        properties: {
+          bookingId: { type: "string" },
+          rating: { type: "integer", minimum: 1, maximum: 5 },
+          text: { type: "string", maxLength: 1000 },
+        },
+      },
+      ReviewData: {
+        type: "object",
+        required: ["review"],
+        properties: {
+          review: { $ref: "#/components/schemas/Review" },
+        },
+      },
+      ReviewListData: {
+        type: "object",
+        required: ["reviews"],
+        properties: {
+          reviews: { type: "array", items: { $ref: "#/components/schemas/Review" } },
+        },
+      },
+      CanLeaveReviewData: {
+        type: "object",
+        required: ["canLeave"],
+        properties: {
+          canLeave: { type: "boolean" },
         },
       },
     },
@@ -984,6 +1047,83 @@ export const openApiSpec = {
           "200": { description: "Binary image stream" },
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/reviews": {
+      get: {
+        summary: "List reviews by target",
+        tags: ["reviews"],
+        parameters: [
+          {
+            name: "targetType",
+            in: "query",
+            required: true,
+            schema: { $ref: "#/components/schemas/ReviewTargetType" },
+          },
+          {
+            name: "targetId",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 100 },
+          },
+          {
+            name: "offset",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 0 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ReviewListData" }),
+          "400": errorResponse("Validation error"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      post: {
+        summary: "Create review for completed booking",
+        tags: ["reviews"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReviewCreateInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/ReviewData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Review not allowed"),
+          "404": errorResponse("Not found"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/reviews/can-leave": {
+      get: {
+        summary: "Check if current user can leave review for booking",
+        tags: ["reviews"],
+        parameters: [
+          {
+            name: "bookingId",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/CanLeaveReviewData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Booking not found"),
           "500": errorResponse("Internal error"),
         },
       },
