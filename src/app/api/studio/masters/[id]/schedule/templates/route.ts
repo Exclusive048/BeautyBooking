@@ -34,6 +34,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       title: body.title,
       startTime: body.startTime,
       endTime: body.endTime,
+      breaks: body.breaks,
     });
     return jsonOk(data, { status: 201 });
   } catch (error) {

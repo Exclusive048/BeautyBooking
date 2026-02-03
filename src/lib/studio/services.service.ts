@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
 export type StudioServiceAssignedMaster = {
   masterId: string;
@@ -191,6 +192,8 @@ export async function createStudioService(input: {
   baseDurationMin: number;
 }): Promise<{ id: string }> {
   const studio = await getStudioContext(input.studioId);
+  const normalizedPrice = normalizeStudioServicePrice(input.basePrice);
+  const normalizedDurationMin = normalizeStudioServiceDurationMin(input.baseDurationMin);
 
   const category = await prisma.serviceCategory.findUnique({
     where: { id: input.categoryId },
@@ -214,10 +217,10 @@ export async function createStudioService(input: {
       name: input.title.trim(),
       title: input.title.trim(),
       description: input.description?.trim() || null,
-      durationMin: input.baseDurationMin,
-      price: input.basePrice,
-      baseDurationMin: input.baseDurationMin,
-      basePrice: input.basePrice,
+      durationMin: normalizedDurationMin,
+      price: normalizedPrice,
+      baseDurationMin: normalizedDurationMin,
+      basePrice: normalizedPrice,
       sortOrder: (last?.sortOrder ?? -1) + 1,
       isActive: true,
       isEnabled: true,
@@ -259,15 +262,21 @@ export async function updateStudioService(input: {
   }
 
   const nextTitle = input.title?.trim();
+  const normalizedPrice =
+    typeof input.basePrice === "number" ? normalizeStudioServicePrice(input.basePrice) : undefined;
+  const normalizedDurationMin =
+    typeof input.baseDurationMin === "number"
+      ? normalizeStudioServiceDurationMin(input.baseDurationMin)
+      : undefined;
   await prisma.service.update({
     where: { id: input.serviceId },
     data: {
       ...(input.categoryId ? { categoryId: input.categoryId } : {}),
       ...(nextTitle ? { name: nextTitle, title: nextTitle } : {}),
       ...(typeof input.description === "string" ? { description: input.description.trim() || null } : {}),
-      ...(typeof input.basePrice === "number" ? { price: input.basePrice, basePrice: input.basePrice } : {}),
-      ...(typeof input.baseDurationMin === "number"
-        ? { durationMin: input.baseDurationMin, baseDurationMin: input.baseDurationMin }
+      ...(typeof normalizedPrice === "number" ? { price: normalizedPrice, basePrice: normalizedPrice } : {}),
+      ...(typeof normalizedDurationMin === "number"
+        ? { durationMin: normalizedDurationMin, baseDurationMin: normalizedDurationMin }
         : {}),
       ...(typeof input.isActive === "boolean" ? { isActive: input.isActive } : {}),
     },

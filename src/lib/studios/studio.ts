@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
 
 export type StudioProviderPrivateDto = {
   id: string;
@@ -18,6 +19,8 @@ export type StudioProviderPrivateDto = {
   isPublished: boolean;
   timezone: string;
   bufferBetweenBookingsMin: number;
+  bannerAssetId: string | null;
+  bannerUrl: string | null;
 };
 
 export async function getStudioProviderById(
@@ -48,6 +51,11 @@ export async function getStudioProviderById(
 
   if (!provider || provider.type !== ProviderType.STUDIO) return null;
 
+  const [bannerAssetId, bannerUrl] = await Promise.all([
+    getStudioBannerAssetId(provider.id),
+    getStudioBannerUrl(provider.id),
+  ]);
+
   return {
     id: provider.id,
     name: provider.name,
@@ -65,6 +73,8 @@ export async function getStudioProviderById(
     isPublished: provider.isPublished,
     timezone: provider.timezone,
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
+    bannerAssetId,
+    bannerUrl,
   };
 }
 
@@ -73,6 +83,16 @@ export type StudioProfileUpdate = {
   tagline?: string;
   address?: string;
   district?: string;
+  categories?: string[];
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  description?: string | null;
+  geoLat?: number | null;
+  geoLng?: number | null;
+  isPublished?: boolean;
+  timezone?: string;
+  bannerAssetId?: string | null;
 };
 
 export async function updateStudioProviderProfile(
@@ -82,10 +102,19 @@ export async function updateStudioProviderProfile(
   const provider = await prisma.provider.update({
     where: { id: providerId },
     data: {
-      name: input.name,
-      tagline: input.tagline,
-      address: input.address,
-      district: input.district,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.tagline !== undefined ? { tagline: input.tagline } : {}),
+      ...(input.address !== undefined ? { address: input.address } : {}),
+      ...(input.district !== undefined ? { district: input.district } : {}),
+      ...(input.categories !== undefined ? { categories: input.categories } : {}),
+      ...(input.contactName !== undefined ? { contactName: input.contactName } : {}),
+      ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone } : {}),
+      ...(input.contactEmail !== undefined ? { contactEmail: input.contactEmail } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
+      ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
+      ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
+      ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
     },
     select: {
       id: true,
@@ -110,6 +139,15 @@ export async function updateStudioProviderProfile(
 
   if (!provider || provider.type !== ProviderType.STUDIO) return null;
 
+  if (input.bannerAssetId !== undefined) {
+    await setStudioBannerAssetId(provider.id, input.bannerAssetId);
+  }
+
+  const [bannerAssetId, bannerUrl] = await Promise.all([
+    getStudioBannerAssetId(provider.id),
+    getStudioBannerUrl(provider.id),
+  ]);
+
   return {
     id: provider.id,
     name: provider.name,
@@ -127,5 +165,7 @@ export async function updateStudioProviderProfile(
     isPublished: provider.isPublished,
     timezone: provider.timezone,
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
+    bannerAssetId,
+    bannerUrl,
   };
 }

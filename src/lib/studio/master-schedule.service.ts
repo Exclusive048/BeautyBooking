@@ -1,6 +1,7 @@
 import { WorkExceptionType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 
 type StudioContext = {
   id: string;
@@ -18,7 +19,91 @@ async function getStudioContext(studioId: string): Promise<StudioContext> {
   return studio;
 }
 
-async function ensureStudioMaster(studioId: string, masterId: string): Promise<void> {
+type TemplateBreak = {
+  startTime: string;
+  endTime: string;
+};
+
+type TemplateBreakStored = {
+  startLocal: string;
+  endLocal: string;
+};
+
+function mapStudioWeekdayToSystemWeekday(studioWeekday: number): number {
+  return studioWeekday === 6 ? 0 : studioWeekday + 1;
+}
+
+function toMinutes(value: string): number | null {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function normalizeTemplateBreaks(input: TemplateBreak[], workStart: string, workEnd: string): TemplateBreakStored[] {
+  if (input.length > 3) {
+    throw new AppError("Too many breaks", 400, "BREAKS_LIMIT");
+  }
+
+  const workStartMin = toMinutes(workStart);
+  const workEndMin = toMinutes(workEnd);
+  if (workStartMin === null || workEndMin === null || workStartMin >= workEndMin) {
+    throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
+  }
+
+  const normalized = input.map((item) => {
+    const startMin = toMinutes(item.startTime);
+    const endMin = toMinutes(item.endTime);
+    if (startMin === null || endMin === null || startMin >= endMin) {
+      throw new AppError("Invalid break time", 400, "BREAK_INVALID");
+    }
+    if (startMin <= workStartMin || endMin >= workEndMin) {
+      throw new AppError("Break out of range", 400, "BREAK_RANGE");
+    }
+
+    return {
+      startTime: item.startTime,
+      endTime: item.endTime,
+      startMin,
+      endMin,
+    };
+  });
+
+  const sorted = normalized.slice().sort((a, b) => a.startMin - b.startMin);
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (sorted[index].startMin < sorted[index - 1].endMin) {
+      throw new AppError("Breaks overlap", 400, "BREAK_OVERLAP");
+    }
+  }
+
+  return sorted.map((item) => ({
+    startLocal: item.startTime,
+    endLocal: item.endTime,
+  }));
+}
+
+function readTemplateBreaks(raw: string | null): TemplateBreakStored[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const startLocal = "startLocal" in item ? item.startLocal : null;
+        const endLocal = "endLocal" in item ? item.endLocal : null;
+        if (typeof startLocal !== "string" || typeof endLocal !== "string") return null;
+        return { startLocal, endLocal };
+      })
+      .filter((item): item is TemplateBreakStored => item !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function ensureStudioMaster(studioId: string, masterId: string): Promise<{ providerId: string }> {
   const studio = await getStudioContext(studioId);
   const master = await prisma.provider.findFirst({
     where: {
@@ -31,6 +116,92 @@ async function ensureStudioMaster(studioId: string, masterId: string): Promise<v
   if (!master) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
   }
+  return { providerId: master.id };
+}
+
+async function syncMasterScheduleForSlots(input: {
+  studioId: string;
+  masterId: string;
+  providerId: string;
+}): Promise<void> {
+  const [dayRules, templates] = await Promise.all([
+    prisma.workDayRule.findMany({
+      where: { studioId: input.studioId, masterId: input.masterId },
+      select: { weekday: true, templateId: true, isWorking: true },
+    }),
+    prisma.workShiftTemplate.findMany({
+      where: {
+        studioId: input.studioId,
+        OR: [{ masterId: input.masterId }, { masterId: null }],
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        breakRulesJson: true,
+      },
+    }),
+  ]);
+
+  const templateById = new Map(
+    templates.map((template) => [
+      template.id,
+      {
+        startTime: template.startTime,
+        endTime: template.endTime,
+        breaks: readTemplateBreaks(template.breakRulesJson),
+      },
+    ])
+  );
+
+  const weeklyItems = dayRules
+    .filter((item) => item.isWorking)
+    .map((item) => {
+      const template = templateById.get(item.templateId);
+      if (!template) return null;
+      return {
+        dayOfWeek: mapStudioWeekdayToSystemWeekday(item.weekday),
+        startLocal: template.startTime,
+        endLocal: template.endTime,
+        breaks: template.breaks,
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        dayOfWeek: number;
+        startLocal: string;
+        endLocal: string;
+        breaks: TemplateBreakStored[];
+      } => item !== null
+    );
+
+  const weeklyScheduleData = weeklyItems.map((item) => ({
+    providerId: input.providerId,
+    dayOfWeek: item.dayOfWeek,
+    startLocal: item.startLocal,
+    endLocal: item.endLocal,
+  }));
+
+  const weeklyBreaksData = weeklyItems.flatMap((item) =>
+    item.breaks.map((breakItem) => ({
+      providerId: input.providerId,
+      kind: "WEEKLY" as const,
+      dayOfWeek: item.dayOfWeek,
+      startLocal: breakItem.startLocal,
+      endLocal: breakItem.endLocal,
+    }))
+  );
+
+  await prisma.$transaction([
+    prisma.weeklySchedule.deleteMany({ where: { providerId: input.providerId } }),
+    prisma.scheduleBreak.deleteMany({ where: { providerId: input.providerId, kind: "WEEKLY" } }),
+    prisma.weeklySchedule.createMany({ data: weeklyScheduleData }),
+    ...(weeklyBreaksData.length > 0 ? [prisma.scheduleBreak.createMany({ data: weeklyBreaksData })] : []),
+  ]);
+
+  await invalidateSlotsForMaster(input.providerId);
 }
 
 export type MasterScheduleData = {
@@ -39,6 +210,7 @@ export type MasterScheduleData = {
     title: string;
     startTime: string;
     endTime: string;
+    breaks: TemplateBreak[];
   }>;
   dayRules: Array<{
     id: string;
@@ -80,6 +252,7 @@ export async function getStudioMasterSchedule(input: {
         title: true,
         startTime: true,
         endTime: true,
+        breakRulesJson: true,
       },
     }),
     prisma.workDayRule.findMany({
@@ -119,7 +292,16 @@ export async function getStudioMasterSchedule(input: {
   ]);
 
   return {
-    templates,
+    templates: templates.map((template) => ({
+      id: template.id,
+      title: template.title,
+      startTime: template.startTime,
+      endTime: template.endTime,
+      breaks: readTemplateBreaks(template.breakRulesJson).map((item) => ({
+        startTime: item.startLocal,
+        endTime: item.endLocal,
+      })),
+    })),
     dayRules,
     exceptions: exceptions.map((item) => ({
       id: item.id,
@@ -144,8 +326,10 @@ export async function createStudioWorkTemplate(input: {
   title: string;
   startTime: string;
   endTime: string;
+  breaks: TemplateBreak[];
 }): Promise<{ id: string }> {
   await ensureStudioMaster(input.studioId, input.masterId);
+  const breaks = normalizeTemplateBreaks(input.breaks, input.startTime, input.endTime);
   const created = await prisma.workShiftTemplate.create({
     data: {
       studioId: input.studioId,
@@ -153,6 +337,7 @@ export async function createStudioWorkTemplate(input: {
       title: input.title.trim(),
       startTime: input.startTime,
       endTime: input.endTime,
+      breakRulesJson: JSON.stringify(breaks),
     },
     select: { id: true },
   });
@@ -168,7 +353,7 @@ export async function upsertStudioDayRules(input: {
     isWorking: boolean;
   }>;
 }): Promise<{ updated: number }> {
-  await ensureStudioMaster(input.studioId, input.masterId);
+  const master = await ensureStudioMaster(input.studioId, input.masterId);
 
   const templates = await prisma.workShiftTemplate.findMany({
     where: {
@@ -178,7 +363,8 @@ export async function upsertStudioDayRules(input: {
     },
     select: { id: true },
   });
-  if (templates.length !== input.items.length) {
+  const uniqueTemplateCount = new Set(input.items.map((item) => item.templateId)).size;
+  if (templates.length !== uniqueTemplateCount) {
     throw new AppError("Template not found", 404, "NOT_FOUND");
   }
 
@@ -206,6 +392,11 @@ export async function upsertStudioDayRules(input: {
       })
     )
   );
+  await syncMasterScheduleForSlots({
+    studioId: input.studioId,
+    masterId: input.masterId,
+    providerId: master.providerId,
+  });
 
   return { updated: input.items.length };
 }
@@ -218,23 +409,45 @@ export async function createStudioWorkException(input: {
   startTime?: string;
   endTime?: string;
 }): Promise<{ id: string }> {
-  await ensureStudioMaster(input.studioId, input.masterId);
+  const master = await ensureStudioMaster(input.studioId, input.masterId);
 
   if (input.type === WorkExceptionType.SHIFT && (!input.startTime || !input.endTime)) {
     throw new AppError("Shift exception requires start and end", 400, "VALIDATION_ERROR");
   }
 
+  const date = new Date(`${input.date}T00:00:00.000Z`);
+
   const created = await prisma.workException.create({
     data: {
       studioId: input.studioId,
       masterId: input.masterId,
-      date: new Date(`${input.date}T00:00:00.000Z`),
+      date,
       type: input.type,
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
     },
     select: { id: true },
   });
+
+  await prisma.$transaction([
+    prisma.scheduleOverride.deleteMany({
+      where: { providerId: master.providerId, date },
+    }),
+    prisma.scheduleBreak.deleteMany({
+      where: { providerId: master.providerId, kind: "OVERRIDE", date },
+    }),
+    prisma.scheduleOverride.create({
+      data: {
+        providerId: master.providerId,
+        date,
+        isDayOff: input.type === "OFF",
+        startLocal: input.type === "SHIFT" ? input.startTime ?? null : null,
+        endLocal: input.type === "SHIFT" ? input.endTime ?? null : null,
+      },
+    }),
+  ]);
+  await invalidateSlotsForMaster(master.providerId);
+
   return { id: created.id };
 }
 
@@ -243,16 +456,26 @@ export async function deleteStudioWorkException(input: {
   masterId: string;
   exceptionId: string;
 }): Promise<{ id: string }> {
-  await ensureStudioMaster(input.studioId, input.masterId);
+  const master = await ensureStudioMaster(input.studioId, input.masterId);
 
   const exception = await prisma.workException.findUnique({
     where: { id: input.exceptionId },
-    select: { id: true, studioId: true, masterId: true },
+    select: { id: true, studioId: true, masterId: true, date: true },
   });
   if (!exception || exception.studioId !== input.studioId || exception.masterId !== input.masterId) {
     throw new AppError("Not found", 404, "NOT_FOUND");
   }
 
-  await prisma.workException.delete({ where: { id: exception.id } });
+  await prisma.$transaction([
+    prisma.workException.delete({ where: { id: exception.id } }),
+    prisma.scheduleOverride.deleteMany({
+      where: { providerId: master.providerId, date: exception.date },
+    }),
+    prisma.scheduleBreak.deleteMany({
+      where: { providerId: master.providerId, kind: "OVERRIDE", date: exception.date },
+    }),
+  ]);
+  await invalidateSlotsForMaster(master.providerId);
+
   return { id: exception.id };
 }

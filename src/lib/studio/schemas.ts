@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
 export const studioCalendarQuerySchema = z.object({
   studioId: z.string().trim().min(1),
@@ -18,6 +20,17 @@ export const createStudioBlockSchema = z.object({
 
 export const studioServicesQuerySchema = z.object({
   studioId: z.string().trim().min(1),
+});
+
+export const studioClientsQuerySchema = z.object({
+  studioId: z.string().trim().min(1),
+});
+
+export const studioFinanceQuerySchema = z.object({
+  studioId: z.string().trim().min(1),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  groupBy: z.enum(["masters", "categories", "services"]).default("masters"),
 });
 
 export const createStudioCategorySchema = z.object({
@@ -40,8 +53,13 @@ export const createStudioServiceSchema = z.object({
   categoryId: z.string().trim().min(1),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(1000).optional(),
-  basePrice: z.number().int().min(0),
-  baseDurationMin: z.number().int().min(1).max(24 * 60),
+  basePrice: z.number().int().min(0).transform((value) => normalizeStudioServicePrice(value)),
+  baseDurationMin: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60)
+    .transform((value) => normalizeStudioServiceDurationMin(value)),
 });
 
 export const updateStudioServiceSchema = z.object({
@@ -49,8 +67,19 @@ export const updateStudioServiceSchema = z.object({
   categoryId: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(1000).optional(),
-  basePrice: z.number().int().min(0).optional(),
-  baseDurationMin: z.number().int().min(1).max(24 * 60).optional(),
+  basePrice: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .transform((value) => (typeof value === "number" ? normalizeStudioServicePrice(value) : undefined)),
+  baseDurationMin: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60)
+    .optional()
+    .transform((value) => (typeof value === "number" ? normalizeStudioServiceDurationMin(value) : undefined)),
   isActive: z.boolean().optional(),
 });
 
@@ -79,8 +108,15 @@ export const updateStudioMasterSchema = z.object({
 export const createStudioMasterSchema = z.object({
   studioId: z.string().trim().min(1),
   displayName: z.string().trim().min(1).max(120),
-  phone: z.string().trim().min(3).max(32).optional(),
-  title: z.string().trim().max(240).optional(),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Phone is required")
+    .transform((value) => normalizeRussianPhone(value))
+    .refine((value): value is string => value !== null, {
+      message: "Phone must match +7XXXXXXXXXX or 8XXXXXXXXXX",
+    }),
+  title: z.string().trim().min(1, "Title is required").max(240),
 });
 
 const hhmmSchema = z.string().regex(/^\d{2}:\d{2}$/);
@@ -90,6 +126,15 @@ export const createWorkShiftTemplateSchema = z.object({
   title: z.string().trim().min(1).max(120),
   startTime: hhmmSchema,
   endTime: hhmmSchema,
+  breaks: z
+    .array(
+      z.object({
+        startTime: hhmmSchema,
+        endTime: hhmmSchema,
+      })
+    )
+    .max(3)
+    .default([]),
 });
 
 export const upsertDayRulesSchema = z.object({

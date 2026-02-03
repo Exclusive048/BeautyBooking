@@ -12,6 +12,8 @@ export type StudioCalendarMaster = {
 export type StudioCalendarBooking = {
   id: string;
   masterId: string | null;
+  serviceId: string;
+  serviceTitle: string;
   startAt: string | null;
   endAt: string | null;
   status: string;
@@ -98,6 +100,13 @@ export async function getStudioCalendar(input: {
     select: {
       id: true,
       masterProviderId: true,
+      serviceId: true,
+      service: {
+        select: {
+          title: true,
+          name: true,
+        },
+      },
       startAtUtc: true,
       endAtUtc: true,
       status: true,
@@ -134,6 +143,8 @@ export async function getStudioCalendar(input: {
     bookings: bookings.map((booking) => ({
       id: booking.id,
       masterId: booking.masterProviderId ?? null,
+      serviceId: booking.serviceId,
+      serviceTitle: booking.service.title?.trim() || booking.service.name,
       startAt: booking.startAtUtc ? booking.startAtUtc.toISOString() : null,
       endAt: booking.endAtUtc ? booking.endAtUtc.toISOString() : null,
       status: booking.status,

@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { ProviderType } from "@prisma/client";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import { checkAndSetIdempotency } from "@/lib/idempotency/idempotency";
 import {
@@ -44,19 +45,33 @@ export async function createClientBooking(
     throw new AppError("Rate limit exceeded", 429, "RATE_LIMITED");
   }
 
-  const service = await prisma.service.findUnique({
-    where: { id: data.serviceId },
-    select: { id: true, providerId: true, name: true },
-  });
+  const [service, provider] = await Promise.all([
+    prisma.service.findUnique({
+      where: { id: data.serviceId },
+      select: { id: true, providerId: true, name: true },
+    }),
+    prisma.provider.findUnique({
+      where: { id: data.providerId },
+      select: { id: true, type: true },
+    }),
+  ]);
+
+  if (!provider) {
+    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+  }
 
   if (!service || service.providerId !== data.providerId) {
     throw new AppError("Service does not belong to provider", 400, "SERVICE_NOT_BELONGS_TO_PROVIDER");
   }
 
+  const resolvedMasterProviderId = provider.type === ProviderType.MASTER ? provider.id : null;
+
   const booking = await prisma.booking.create({
     data: {
       providerId: data.providerId,
       serviceId: data.serviceId,
+      masterProviderId: resolvedMasterProviderId,
+      masterId: resolvedMasterProviderId,
       slotLabel: data.slotLabel,
       clientName: data.clientName,
       clientPhone: data.clientPhone,

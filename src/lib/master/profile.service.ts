@@ -243,7 +243,7 @@ export async function updateMasterProfile(
   input: {
     displayName?: string;
     tagline?: string;
-    bio?: string;
+    bio?: string | null;
     avatarUrl?: string | null;
     isPublished?: boolean;
   }
@@ -254,7 +254,9 @@ export async function updateMasterProfile(
     data: {
       ...(input.displayName ? { name: input.displayName.trim() } : {}),
       ...(typeof input.tagline === "string" ? { tagline: input.tagline.trim() } : {}),
-      ...(typeof input.bio === "string" ? { description: input.bio.trim() || null } : {}),
+      ...(input.bio !== undefined
+        ? { description: typeof input.bio === "string" ? input.bio.trim() || null : null }
+        : {}),
       ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl?.trim() || null } : {}),
       ...(typeof input.isPublished === "boolean" ? { isPublished: input.isPublished } : {}),
     },

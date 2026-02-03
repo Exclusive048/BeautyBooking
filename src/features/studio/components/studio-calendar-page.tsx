@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 
 type CalendarView = "day" | "week" | "month";
-type CalendarMode = "none" | "block" | "booking";
 
 type CalendarMaster = {
   id: string;
@@ -15,6 +14,8 @@ type CalendarMaster = {
 type CalendarBooking = {
   id: string;
   masterId: string | null;
+  serviceId: string;
+  serviceTitle: string;
   startAt: string | null;
   endAt: string | null;
   status: string;
@@ -52,13 +53,6 @@ type Props = {
   studioId: string;
 };
 
-function statusColor(status: string): string {
-  if (status === "CONFIRMED" || status === "PREPAID") return "bg-emerald-100 border-emerald-300";
-  if (status === "CANCELLED") return "bg-red-50 border-red-200";
-  if (status === "NO_SHOW") return "bg-neutral-200 border-neutral-300";
-  return "bg-white border-neutral-300";
-}
-
 function toDateKey(date: Date): string {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -66,8 +60,46 @@ function toDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function slotToIso(dateKey: string, hour: number): string {
-  return `${dateKey}T${String(hour).padStart(2, "0")}:00:00.000Z`;
+function fromDateKey(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function startOfWeek(date: Date): Date {
+  const day = date.getUTCDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  return addDays(date, diffToMonday);
+}
+
+function monthGridStart(date: Date): Date {
+  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  return startOfWeek(first);
+}
+
+function statusClass(status: string): string {
+  if (status === "CONFIRMED" || status === "PREPAID") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "CANCELLED" || status === "NO_SHOW") return "border-neutral-300 bg-neutral-100 text-neutral-700";
+  return "border-blue-200 bg-blue-50 text-blue-800";
+}
+
+function timeRangeLabel(startAt: string | null, endAt: string | null): string {
+  if (!startAt || !endAt) return "Time is not set";
+  const start = new Date(startAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const end = new Date(endAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return `${start}–${end}`;
+}
+
+function dayLabel(dateKey: string): string {
+  return new Date(`${dateKey}T00:00:00.000Z`).toLocaleDateString("ru-RU", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
 export function StudioCalendarPage({ studioId }: Props) {
@@ -77,16 +109,14 @@ export function StudioCalendarPage({ studioId }: Props) {
   const [servicesData, setServicesData] = useState<ServicesData>({ categories: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<CalendarMode>("none");
-  const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [bookingModal, setBookingModal] = useState<{ masterId: string; hour: number } | null>(null);
-  const [bookingClientName, setBookingClientName] = useState("");
-  const [bookingClientPhone, setBookingClientPhone] = useState("");
-  const [bookingServiceId, setBookingServiceId] = useState("");
-  const [saving, setSaving] = useState(false);
 
-  const hours = useMemo(() => Array.from({ length: 12 }).map((_, index) => index + 9), []);
+  const [query, setQuery] = useState("");
+  const [masterFilter, setMasterFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const [monthDetailsDay, setMonthDetailsDay] = useState<string | null>(null);
 
   const load = async (): Promise<void> => {
     setLoading(true);
@@ -100,12 +130,16 @@ export function StudioCalendarPage({ studioId }: Props) {
 
       const calendarJson = (await calendarRes.json().catch(() => null)) as ApiResponse<CalendarData> | null;
       if (!calendarRes.ok || !calendarJson || !calendarJson.ok) {
-        throw new Error(calendarJson && !calendarJson.ok ? calendarJson.error.message : `API error: ${calendarRes.status}`);
+        throw new Error(
+          calendarJson && !calendarJson.ok ? calendarJson.error.message : `API error: ${calendarRes.status}`
+        );
       }
 
       const servicesJson = (await servicesRes.json().catch(() => null)) as ApiResponse<ServicesData> | null;
       if (!servicesRes.ok || !servicesJson || !servicesJson.ok) {
-        throw new Error(servicesJson && !servicesJson.ok ? servicesJson.error.message : `API error: ${servicesRes.status}`);
+        throw new Error(
+          servicesJson && !servicesJson.ok ? servicesJson.error.message : `API error: ${servicesRes.status}`
+        );
       }
 
       setData(calendarJson.data);
@@ -122,143 +156,118 @@ export function StudioCalendarPage({ studioId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studioId, date, view]);
 
-  const bookingMap = useMemo(() => {
+  const serviceMetaById = useMemo(() => {
+    const map = new Map<string, { categoryId: string; categoryTitle: string; title: string }>();
+    for (const category of servicesData.categories) {
+      for (const service of category.services) {
+        map.set(service.id, {
+          categoryId: category.id,
+          categoryTitle: category.title,
+          title: service.title,
+        });
+      }
+    }
+    return map;
+  }, [servicesData.categories]);
+
+  const statusOptions = useMemo(
+    () => Array.from(new Set(data.bookings.map((booking) => booking.status))).sort(),
+    [data.bookings]
+  );
+
+  const serviceOptions = useMemo(() => {
+    const all = servicesData.categories.flatMap((category) =>
+      category.services.map((service) => ({
+        id: service.id,
+        title: service.title,
+        categoryId: category.id,
+      }))
+    );
+    if (categoryFilter === "all") return all;
+    return all.filter((service) => service.categoryId === categoryFilter);
+  }, [categoryFilter, servicesData.categories]);
+
+  useEffect(() => {
+    if (serviceFilter !== "all" && !serviceOptions.some((service) => service.id === serviceFilter)) {
+      setServiceFilter("all");
+    }
+  }, [serviceFilter, serviceOptions]);
+
+  const filteredBookings = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return data.bookings.filter((booking) => {
+      if (masterFilter !== "all" && booking.masterId !== masterFilter) return false;
+      if (serviceFilter !== "all" && booking.serviceId !== serviceFilter) return false;
+      if (categoryFilter !== "all" && serviceMetaById.get(booking.serviceId)?.categoryId !== categoryFilter) {
+        return false;
+      }
+      if (statusFilter !== "all" && booking.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        booking.clientName.toLowerCase().includes(q) ||
+        booking.clientPhone.toLowerCase().includes(q) ||
+        booking.serviceTitle.toLowerCase().includes(q)
+      );
+    });
+  }, [categoryFilter, data.bookings, masterFilter, query, serviceFilter, serviceMetaById, statusFilter]);
+
+  const filteredBlocks = useMemo(() => {
+    return data.blocks.filter((block) => {
+      if (masterFilter !== "all" && block.masterId !== masterFilter) return false;
+      return true;
+    });
+  }, [data.blocks, masterFilter]);
+
+  const dayKeys = useMemo(() => {
+    const selectedDate = fromDateKey(date);
+    if (view === "day") return [date];
+    if (view === "week") {
+      const start = startOfWeek(selectedDate);
+      return Array.from({ length: 7 }, (_, index) => toDateKey(addDays(start, index)));
+    }
+    const monthStart = monthGridStart(selectedDate);
+    return Array.from({ length: 42 }, (_, index) => toDateKey(addDays(monthStart, index)));
+  }, [date, view]);
+
+  const bookingsByDay = useMemo(() => {
     const map = new Map<string, CalendarBooking[]>();
-    for (const booking of data.bookings) {
-      if (!booking.masterId || !booking.startAt) continue;
-      const dt = new Date(booking.startAt);
-      const key = `${booking.masterId}:${dt.getUTCHours()}`;
+    for (const booking of filteredBookings) {
+      if (!booking.startAt) continue;
+      const key = toDateKey(new Date(booking.startAt));
       const list = map.get(key) ?? [];
       list.push(booking);
       map.set(key, list);
     }
     return map;
-  }, [data.bookings]);
+  }, [filteredBookings]);
 
-  const blockMap = useMemo(() => {
+  const blocksByDay = useMemo(() => {
     const map = new Map<string, CalendarBlock[]>();
-    for (const block of data.blocks) {
-      const dt = new Date(block.startAt);
-      const key = `${block.masterId}:${dt.getUTCHours()}`;
+    for (const block of filteredBlocks) {
+      const key = toDateKey(new Date(block.startAt));
       const list = map.get(key) ?? [];
       list.push(block);
       map.set(key, list);
     }
     return map;
-  }, [data.blocks]);
+  }, [filteredBlocks]);
 
-  const hasServices = useMemo(
-    () => servicesData.categories.some((category) => category.services.length > 0),
-    [servicesData.categories]
-  );
+  const monthBase = fromDateKey(date);
+  const activeMonth = monthBase.getUTCMonth();
+  const activeYear = monthBase.getUTCFullYear();
 
-  const hasAssignedServices = useMemo(
-    () =>
-      servicesData.categories.some((category) =>
-        category.services.some((service) => service.masters.length > 0)
-      ),
-    [servicesData.categories]
-  );
-
-  const categories = useMemo(
-    () => servicesData.categories.map((category) => ({ id: category.id, title: category.title })),
-    [servicesData.categories]
-  );
-
-  const servicesForSelectedMaster = useMemo(() => {
-    if (!bookingModal) return [];
-    const masterId = bookingModal.masterId;
-    const all = servicesData.categories.flatMap((category) =>
-      category.services
-        .filter((service) => service.masters.some((master) => master.masterId === masterId))
-        .map((service) => ({
-          id: service.id,
-          title: service.title,
-          categoryId: category.id,
-        }))
-    );
-    if (categoryFilter === "all") return all;
-    return all.filter((service) => service.categoryId === categoryFilter);
-  }, [bookingModal, servicesData.categories, categoryFilter]);
-
-  const filteredBookings = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return data.bookings;
-    return data.bookings.filter((booking) => {
-      return (
-        booking.clientName.toLowerCase().includes(q) ||
-        booking.clientPhone.toLowerCase().includes(q)
-      );
+  const monthDayDetails = useMemo(() => {
+    if (!monthDetailsDay) return { bookings: [], blocks: [] };
+    const bookings = (bookingsByDay.get(monthDetailsDay) ?? []).slice().sort((a, b) => {
+      const aTime = a.startAt ? new Date(a.startAt).getTime() : 0;
+      const bTime = b.startAt ? new Date(b.startAt).getTime() : 0;
+      return aTime - bTime;
     });
-  }, [data.bookings, query]);
-
-  const filteredBookingIds = useMemo(
-    () => new Set(filteredBookings.map((booking) => booking.id)),
-    [filteredBookings]
-  );
-
-  const onSlotClick = async (masterId: string, hour: number): Promise<void> => {
-    if (mode === "block") {
-      const startAt = slotToIso(date, hour);
-      const endAt = slotToIso(date, hour + 1);
-      const res = await fetch("/api/studio/blocks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studioId,
-          masterId,
-          startAt,
-          endAt,
-          type: "BLOCK",
-        }),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ block: CalendarBlock }> | null;
-      if (!res.ok || !json || !json.ok) {
-        setError(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-        return;
-      }
-      await load();
-      return;
-    }
-
-    if (mode === "booking") {
-      setBookingModal({ masterId, hour });
-      setBookingServiceId("");
-      setBookingClientName("");
-      setBookingClientPhone("");
-    }
-  };
-
-  const createBooking = async (): Promise<void> => {
-    if (!bookingModal || !bookingServiceId || !bookingClientName.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const startAt = slotToIso(date, bookingModal.hour);
-      const res = await fetch("/api/studio/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studioId,
-          masterId: bookingModal.masterId,
-          startAt,
-          serviceId: bookingServiceId,
-          clientName: bookingClientName.trim(),
-          clientPhone: bookingClientPhone.trim() || undefined,
-        }),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-      }
-      setBookingModal(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create booking");
-    } finally {
-      setSaving(false);
-    }
-  };
+    const blocks = (blocksByDay.get(monthDetailsDay) ?? []).slice().sort((a, b) => {
+      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+    });
+    return { bookings, blocks };
+  }, [blocksByDay, bookingsByDay, monthDetailsDay]);
 
   return (
     <div className="space-y-4">
@@ -284,7 +293,7 @@ export function StudioCalendarPage({ studioId }: Props) {
           ))}
           <input
             type="search"
-            placeholder="Search by client or phone"
+            placeholder="Search client / phone / service"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="min-w-[220px] rounded-lg border px-3 py-2 text-sm"
@@ -292,34 +301,51 @@ export function StudioCalendarPage({ studioId }: Props) {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-500">Tools:</span>
-          <button
-            type="button"
-            onClick={() => setMode((current) => (current === "block" ? "none" : "block"))}
-            className={`rounded-lg border px-3 py-1.5 text-sm ${
-              mode === "block" ? "border-amber-300 bg-amber-100" : "border-neutral-300"
-            }`}
+          <select
+            value={masterFilter}
+            onChange={(event) => setMasterFilter(event.target.value)}
+            className="rounded-lg border px-3 py-1.5 text-sm"
           >
-            Block
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode((current) => (current === "booking" ? "none" : "booking"))}
-            className={`rounded-lg border px-3 py-1.5 text-sm ${
-              mode === "booking" ? "border-emerald-300 bg-emerald-100" : "border-neutral-300"
-            }`}
-          >
-            Booking
-          </button>
+            <option value="all">All masters</option>
+            {data.masters.map((master) => (
+              <option key={master.id} value={master.id}>
+                {master.name}
+              </option>
+            ))}
+          </select>
           <select
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
             className="rounded-lg border px-3 py-1.5 text-sm"
           >
             <option value="all">All categories</option>
-            {categories.map((category) => (
+            {servicesData.categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.title}
+              </option>
+            ))}
+          </select>
+          <select
+            value={serviceFilter}
+            onChange={(event) => setServiceFilter(event.target.value)}
+            className="rounded-lg border px-3 py-1.5 text-sm"
+          >
+            <option value="all">All services</option>
+            {serviceOptions.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.title}
+              </option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="rounded-lg border px-3 py-1.5 text-sm"
+          >
+            <option value="all">All statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
               </option>
             ))}
           </select>
@@ -339,122 +365,119 @@ export function StudioCalendarPage({ studioId }: Props) {
         </div>
       ) : null}
 
-      {!loading && data.masters.length > 0 && (!hasServices || !hasAssignedServices) ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Create services and assign them to masters in Services or in the master card.
+      {!loading && data.masters.length > 0 && view === "month" ? (
+        <div className="rounded-2xl border p-3">
+          <div className="grid grid-cols-7 gap-2 text-center text-xs text-neutral-500">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+              <div key={day}>{day}</div>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-7 gap-2">
+            {dayKeys.map((dayKey) => {
+              const dayDate = fromDateKey(dayKey);
+              const isCurrentMonth =
+                dayDate.getUTCMonth() === activeMonth && dayDate.getUTCFullYear() === activeYear;
+              const bookingsCount = bookingsByDay.get(dayKey)?.length ?? 0;
+              const blocksCount = blocksByDay.get(dayKey)?.length ?? 0;
+              return (
+                <button
+                  key={dayKey}
+                  type="button"
+                  onClick={() => setMonthDetailsDay(dayKey)}
+                  className={`min-h-[92px] rounded-xl border p-2 text-left transition hover:border-neutral-400 ${
+                    isCurrentMonth ? "bg-white" : "bg-neutral-50 text-neutral-400"
+                  }`}
+                >
+                  <div className="text-xs font-medium">{dayDate.getUTCDate()}</div>
+                  <div className="mt-2 space-y-1 text-[11px]">
+                    <div className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">Bookings: {bookingsCount}</div>
+                    <div className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">Blocks: {blocksCount}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
-      {!loading && data.masters.length > 0 ? (
-        <div className="overflow-auto rounded-2xl border">
-          <table className="w-full min-w-[900px] border-collapse">
-            <thead>
-              <tr className="bg-neutral-50">
-                <th className="border-b p-2 text-left text-xs font-semibold text-neutral-500">Time</th>
-                {data.masters.map((master) => (
-                  <th key={master.id} className="border-b p-2 text-left text-xs font-semibold text-neutral-700">
-                    {master.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {hours.map((hour) => (
-                <tr key={hour}>
-                  <td className="border-b p-2 text-xs text-neutral-500">{`${String(hour).padStart(2, "0")}:00`}</td>
-                  {data.masters.map((master) => {
-                    const key = `${master.id}:${hour}`;
-                    const bookings = (bookingMap.get(key) ?? []).filter((booking) => filteredBookingIds.has(booking.id));
-                    const blocks = blockMap.get(key) ?? [];
-                    return (
-                      <td key={key} className="border-b p-2 align-top">
-                        <button
-                          type="button"
-                          onClick={() => void onSlotClick(master.id, hour)}
-                          className="mb-2 block w-full rounded border border-dashed border-neutral-200 px-2 py-1 text-left text-[11px] text-neutral-400 hover:border-neutral-300"
-                        >
-                          {mode === "block" ? "Click to add block" : mode === "booking" ? "Click to create booking" : "Slot"}
-                        </button>
-                        <div className="space-y-1">
-                          {blocks.map((block) => (
-                            <div key={block.id} className="rounded border border-amber-200 bg-amber-50 p-2 text-xs">
-                              {block.type}
-                            </div>
-                          ))}
-                          {bookings.map((booking) => (
-                            <div key={booking.id} className={`rounded border p-2 text-xs ${statusColor(booking.status)}`}>
-                              <div className="font-semibold">{booking.clientName}</div>
-                              <div className="text-neutral-600">{booking.status}</div>
-                            </div>
-                          ))}
+      {!loading && data.masters.length > 0 && view !== "month" ? (
+        <div className="space-y-3">
+          {dayKeys.map((dayKey) => {
+            const bookings = (bookingsByDay.get(dayKey) ?? []).slice().sort((a, b) => {
+              const aTime = a.startAt ? new Date(a.startAt).getTime() : 0;
+              const bTime = b.startAt ? new Date(b.startAt).getTime() : 0;
+              return aTime - bTime;
+            });
+            const blocks = (blocksByDay.get(dayKey) ?? []).slice().sort((a, b) => {
+              return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+            });
+            return (
+              <section key={dayKey} className="rounded-2xl border p-4">
+                <header className="mb-3 text-sm font-semibold">{dayLabel(dayKey)}</header>
+                <div className="space-y-2">
+                  {bookings.map((booking) => (
+                    <article key={booking.id} className={`rounded-xl border p-3 text-sm ${statusClass(booking.status)}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-medium">{booking.clientName}</div>
+                        <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt)}</div>
+                      </div>
+                      <div className="mt-1 text-xs">
+                        {booking.status} · {booking.serviceTitle} · {booking.clientPhone}
+                      </div>
+                    </article>
+                  ))}
+                  {blocks.map((block) => (
+                    <article key={block.id} className="rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-sm text-neutral-700">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium">{block.type}</div>
+                        <div className="text-xs">
+                          {timeRangeLabel(block.startAt, block.endAt)}
                         </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </div>
+                    </article>
+                  ))}
+                  {bookings.length === 0 && blocks.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-3 text-sm text-neutral-500">No items for this day.</div>
+                  ) : null}
+                </div>
+              </section>
+            );
+          })}
         </div>
       ) : null}
 
-      {!loading && data.masters.length > 0 && data.bookings.length === 0 && data.blocks.length === 0 ? (
-        <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-          Calendar is empty. Create services and assign masters first.
-        </div>
-      ) : null}
-
-      {bookingModal ? (
+      {monthDetailsDay ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-4">
-            <h3 className="text-base font-semibold">Create booking</h3>
-            <p className="mt-1 text-xs text-neutral-500">
-              {date} at {String(bookingModal.hour).padStart(2, "0")}:00
-            </p>
-            <div className="mt-3 space-y-2">
-              <input
-                type="text"
-                value={bookingClientName}
-                onChange={(event) => setBookingClientName(event.target.value)}
-                placeholder="Client name"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-              <input
-                type="text"
-                value={bookingClientPhone}
-                onChange={(event) => setBookingClientPhone(event.target.value)}
-                placeholder="Client phone (optional)"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-              <select
-                value={bookingServiceId}
-                onChange={(event) => setBookingServiceId(event.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              >
-                <option value="">Select service</option>
-                {servicesForSelectedMaster.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.title}
-                  </option>
-                ))}
-              </select>
+          <div className="w-full max-w-2xl rounded-2xl border bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold">Day details — {dayLabel(monthDetailsDay)}</h3>
+              <button type="button" onClick={() => setMonthDetailsDay(null)} className="rounded-lg border px-3 py-1.5 text-sm">
+                Close
+              </button>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setBookingModal(null)}
-                className="rounded-lg border px-3 py-2 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void createBooking()}
-                disabled={saving}
-                className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Create"}
-              </button>
+            <div className="mt-3 space-y-2">
+              {monthDayDetails.bookings.map((booking) => (
+                <article key={booking.id} className={`rounded-xl border p-3 text-sm ${statusClass(booking.status)}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium">{booking.clientName}</div>
+                    <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt)}</div>
+                  </div>
+                  <div className="mt-1 text-xs">
+                    {booking.status} · {booking.serviceTitle} · {booking.clientPhone}
+                  </div>
+                </article>
+              ))}
+              {monthDayDetails.blocks.map((block) => (
+                <article key={block.id} className="rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-sm text-neutral-700">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium">{block.type}</div>
+                    <div className="text-xs">{timeRangeLabel(block.startAt, block.endAt)}</div>
+                  </div>
+                </article>
+              ))}
+              {monthDayDetails.bookings.length === 0 && monthDayDetails.blocks.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-3 text-sm text-neutral-500">No items for this day.</div>
+              ) : null}
             </div>
           </div>
         </div>

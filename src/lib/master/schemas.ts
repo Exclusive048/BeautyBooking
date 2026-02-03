@@ -21,6 +21,13 @@ export const masterScheduleQuerySchema = z.object({
 });
 
 const hhmmSchema = z.string().regex(/^\d{2}:\d{2}$/);
+const avatarUrlSchema = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((value) => /^https?:\/\/\S+$/i.test(value) || /^\/[^\s]+$/.test(value), {
+    message: "avatarUrl must be absolute URL or root-relative path",
+  });
 
 export const masterCreateExceptionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -39,8 +46,8 @@ export const masterCreateBlockSchema = z.object({
 export const updateMasterProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
   tagline: z.string().trim().max(240).optional(),
-  bio: z.string().trim().max(4000).optional(),
-  avatarUrl: z.string().url().max(2000).nullable().optional(),
+  bio: z.string().trim().max(4000).nullable().optional(),
+  avatarUrl: avatarUrlSchema.nullable().optional(),
   isPublished: z.boolean().optional(),
 });
 

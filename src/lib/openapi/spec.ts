@@ -256,15 +256,87 @@ export const openApiSpec = {
           { $ref: "#/components/schemas/ProviderCard" },
           {
             type: "object",
-            required: ["services"],
+            required: ["services", "studioId", "bannerUrl", "description"],
             properties: {
               services: {
                 type: "array",
                 items: { $ref: "#/components/schemas/ProviderService" },
               },
+              studioId: { type: "string", nullable: true },
+              bannerUrl: { type: "string", nullable: true },
+              description: { type: "string", nullable: true },
             },
           },
         ],
+      },
+      StudioPrivateProfile: {
+        type: "object",
+        required: [
+          "id",
+          "name",
+          "tagline",
+          "address",
+          "district",
+          "categories",
+          "contactName",
+          "contactPhone",
+          "contactEmail",
+          "description",
+          "avatarUrl",
+          "geoLat",
+          "geoLng",
+          "isPublished",
+          "timezone",
+          "bufferBetweenBookingsMin",
+          "bannerAssetId",
+          "bannerUrl",
+        ],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          tagline: { type: "string" },
+          address: { type: "string" },
+          district: { type: "string" },
+          categories: { type: "array", items: { type: "string" } },
+          contactName: { type: "string", nullable: true },
+          contactPhone: { type: "string", nullable: true },
+          contactEmail: { type: "string", nullable: true },
+          description: { type: "string", nullable: true },
+          avatarUrl: { type: "string", nullable: true },
+          geoLat: { type: "number", nullable: true },
+          geoLng: { type: "number", nullable: true },
+          isPublished: { type: "boolean" },
+          timezone: { type: "string" },
+          bufferBetweenBookingsMin: { type: "integer" },
+          bannerAssetId: { type: "string", nullable: true },
+          bannerUrl: { type: "string", nullable: true },
+        },
+      },
+      StudioPrivateProfileData: {
+        type: "object",
+        required: ["studio"],
+        properties: {
+          studio: { $ref: "#/components/schemas/StudioPrivateProfile" },
+        },
+      },
+      StudioPrivateProfileUpdateInput: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          tagline: { type: "string" },
+          address: { type: "string" },
+          district: { type: "string" },
+          categories: { type: "array", items: { type: "string" } },
+          contactName: { type: "string", nullable: true },
+          contactPhone: { type: "string", nullable: true },
+          contactEmail: { type: "string", nullable: true },
+          description: { type: "string", nullable: true },
+          geoLat: { type: "number", nullable: true },
+          geoLng: { type: "number", nullable: true },
+          isPublished: { type: "boolean" },
+          timezone: { type: "string" },
+          bannerAssetId: { type: "string", nullable: true },
+        },
       },
       Service: {
         type: "object",
@@ -645,10 +717,12 @@ export const openApiSpec = {
       },
       CalendarBooking: {
         type: "object",
-        required: ["id", "masterId", "startAt", "endAt", "status", "clientName", "clientPhone"],
+        required: ["id", "masterId", "serviceId", "serviceTitle", "startAt", "endAt", "status", "clientName", "clientPhone"],
         properties: {
           id: { type: "string" },
           masterId: { type: "string", nullable: true },
+          serviceId: { type: "string" },
+          serviceTitle: { type: "string" },
           startAt: { type: "string", format: "date-time", nullable: true },
           endAt: { type: "string", format: "date-time", nullable: true },
           status: { type: "string" },
@@ -675,6 +749,46 @@ export const openApiSpec = {
           masters: { type: "array", items: { $ref: "#/components/schemas/CalendarMaster" } },
           bookings: { type: "array", items: { $ref: "#/components/schemas/CalendarBooking" } },
           blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
+        },
+      },
+      StudioClientListItem: {
+        type: "object",
+        required: ["key", "displayName", "phone", "lastBookingAt", "lastServiceName", "visitsCount"],
+        properties: {
+          key: { type: "string" },
+          displayName: { type: "string" },
+          phone: { type: "string" },
+          lastBookingAt: { type: "string", format: "date-time" },
+          lastServiceName: { type: "string" },
+          visitsCount: { type: "integer" },
+        },
+      },
+      StudioClientsData: {
+        type: "object",
+        required: ["clients"],
+        properties: {
+          clients: { type: "array", items: { $ref: "#/components/schemas/StudioClientListItem" } },
+        },
+      },
+      StudioFinanceRow: {
+        type: "object",
+        required: ["key", "label", "visitsCount", "sumAmount"],
+        properties: {
+          key: { type: "string" },
+          label: { type: "string" },
+          visitsCount: { type: "integer" },
+          sumAmount: { type: "integer" },
+        },
+      },
+      StudioFinanceData: {
+        type: "object",
+        required: ["groupBy", "rows", "totalVisits", "totalAmount", "hasCategories"],
+        properties: {
+          groupBy: { type: "string", enum: ["masters", "categories", "services"] },
+          rows: { type: "array", items: { $ref: "#/components/schemas/StudioFinanceRow" } },
+          totalVisits: { type: "integer" },
+          totalAmount: { type: "integer" },
+          hasCategories: { type: "boolean" },
         },
       },
       CreateTimeBlockInput: {
@@ -844,12 +958,14 @@ export const openApiSpec = {
       },
       StudioMasterListItem: {
         type: "object",
-        required: ["id", "name", "isActive", "title"],
+        required: ["id", "name", "isActive", "title", "status", "phone"],
         properties: {
           id: { type: "string" },
           name: { type: "string" },
           isActive: { type: "boolean" },
           title: { type: "string" },
+          status: { type: "string", enum: ["PENDING", "ACTIVE"] },
+          phone: { type: "string", nullable: true },
         },
       },
       StudioMasterListData: {
@@ -861,7 +977,7 @@ export const openApiSpec = {
       },
       CreateStudioMasterInput: {
         type: "object",
-        required: ["studioId", "displayName"],
+        required: ["studioId", "displayName", "phone", "title"],
         properties: {
           studioId: { type: "string" },
           displayName: { type: "string" },
@@ -1156,7 +1272,7 @@ export const openApiSpec = {
         properties: {
           displayName: { type: "string" },
           tagline: { type: "string" },
-          bio: { type: "string" },
+          bio: { type: "string", nullable: true },
           avatarUrl: { type: "string", nullable: true },
           isPublished: { type: "boolean" },
         },
@@ -1279,14 +1395,23 @@ export const openApiSpec = {
           note: { type: "string", nullable: true },
         },
       },
+      WorkTemplateBreak: {
+        type: "object",
+        required: ["startTime", "endTime"],
+        properties: {
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+        },
+      },
       WorkTemplate: {
         type: "object",
-        required: ["id", "title", "startTime", "endTime"],
+        required: ["id", "title", "startTime", "endTime", "breaks"],
         properties: {
           id: { type: "string" },
           title: { type: "string" },
           startTime: { type: "string" },
           endTime: { type: "string" },
+          breaks: { type: "array", items: { $ref: "#/components/schemas/WorkTemplateBreak" } },
         },
       },
       WorkDayRule: {
@@ -1322,12 +1447,13 @@ export const openApiSpec = {
       },
       CreateWorkTemplateInput: {
         type: "object",
-        required: ["studioId", "title", "startTime", "endTime"],
+        required: ["studioId", "title", "startTime", "endTime", "breaks"],
         properties: {
           studioId: { type: "string" },
           title: { type: "string" },
           startTime: { type: "string" },
           endTime: { type: "string" },
+          breaks: { type: "array", items: { $ref: "#/components/schemas/WorkTemplateBreak" } },
         },
       },
       UpsertDayRulesInput: {
@@ -1536,6 +1662,41 @@ export const openApiSpec = {
           nextCursor: { type: "integer", nullable: true },
         },
       },
+      NotificationCenterInviteItem: {
+        type: "object",
+        required: ["id", "studioId", "studioName", "studioTagline", "studioAvatarUrl", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          studioId: { type: "string" },
+          studioName: { type: "string" },
+          studioTagline: { type: "string", nullable: true },
+          studioAvatarUrl: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      NotificationCenterNotificationItem: {
+        type: "object",
+        required: ["id", "title", "body", "type", "channel", "readAt", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          body: { type: "string", nullable: true },
+          type: { type: "string", enum: ["BOOKING_CREATED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED"] },
+          channel: { type: "string", enum: ["MASTER", "STUDIO", "SYSTEM"] },
+          readAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      NotificationCenterData: {
+        type: "object",
+        required: ["invites", "notifications", "unreadCount", "hasPhone"],
+        properties: {
+          invites: { type: "array", items: { $ref: "#/components/schemas/NotificationCenterInviteItem" } },
+          notifications: { type: "array", items: { $ref: "#/components/schemas/NotificationCenterNotificationItem" } },
+          unreadCount: { type: "integer" },
+          hasPhone: { type: "boolean" },
+        },
+      },
     },
   },
   paths: {
@@ -1582,6 +1743,53 @@ export const openApiSpec = {
           "200": okResponse({ $ref: "#/components/schemas/ProviderProfileData" }),
           "400": errorResponse("Validation error"),
           "404": errorResponse("Provider not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studios/{id}": {
+      get: {
+        summary: "Get studio private profile",
+        tags: ["studio"],
+        parameters: [providerIdParam],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPrivateProfileData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        summary: "Update studio private profile",
+        tags: ["studio"],
+        parameters: [providerIdParam],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/StudioPrivateProfileUpdateInput" },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPrivateProfileData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/notifications/center": {
+      get: {
+        summary: "Get unified notifications center payload",
+        tags: ["notifications"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/NotificationCenterData" }),
+          "401": errorResponse("Unauthorized"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -2089,6 +2297,46 @@ export const openApiSpec = {
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioCalendarData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/clients": {
+      get: {
+        summary: "Studio clients aggregated from bookings",
+        tags: ["studio", "clients"],
+        parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioClientsData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/finance": {
+      get: {
+        summary: "Studio finance analytics from booking snapshots",
+        tags: ["studio", "finance"],
+        parameters: [
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+          { name: "from", in: "query", required: true, schema: { type: "string" } },
+          { name: "to", in: "query", required: true, schema: { type: "string" } },
+          {
+            name: "groupBy",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["masters", "categories", "services"] },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioFinanceData" }),
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),

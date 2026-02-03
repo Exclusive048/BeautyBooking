@@ -1,4 +1,3 @@
-// РФ: локаль и валюта
 export const LOCALE = "ru-RU";
 export const CURRENCY = "RUB";
 
@@ -10,7 +9,6 @@ export function moneyRUB(value: number) {
   }).format(value);
 }
 
-// Удобно, если иногда надо без знака ₽
 export function moneyRUBPlain(value: number) {
   return new Intl.NumberFormat(LOCALE, {
     maximumFractionDigits: 0,

@@ -49,9 +49,12 @@ export function mapProviderProfile(provider: ProviderWithServices): ProviderProf
   return {
     id: provider.id,
     type: provider.type,
+    studioId: provider.studioId,
     name: provider.name,
     avatarUrl: provider.avatarUrl,
+    bannerUrl: null,
     tagline: provider.tagline,
+    description: provider.description ?? null,
     rating: provider.rating,
     reviews: provider.reviews,
     priceFrom: provider.priceFrom,

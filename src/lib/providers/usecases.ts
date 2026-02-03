@@ -3,6 +3,8 @@ import { AppError } from "@/lib/api/errors";
 import { listProviderCards } from "@/lib/providers/queries";
 import { mapProviderProfile } from "@/lib/providers/mappers";
 import type { ProviderCardDto, ProviderProfileDto } from "@/lib/providers/dto";
+import { ProviderType } from "@prisma/client";
+import { getStudioBannerUrl } from "@/lib/studios/banner";
 
 export async function listProviders(): Promise<ProviderCardDto[]> {
   return listProviderCards();
@@ -28,5 +30,9 @@ export async function getProviderProfile(providerId: string): Promise<ProviderPr
     throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
   }
 
-  return mapProviderProfile(provider);
+  const profile = mapProviderProfile(provider);
+  if (provider.type === ProviderType.STUDIO) {
+    profile.bannerUrl = await getStudioBannerUrl(provider.id);
+  }
+  return profile;
 }

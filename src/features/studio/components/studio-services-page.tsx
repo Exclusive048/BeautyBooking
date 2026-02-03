@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
+import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
 type StudioServiceAssignedMaster = {
   masterId: string;
@@ -158,6 +159,11 @@ export function StudioServicesPage({ studioId }: Props) {
 
   const submitService = async (): Promise<void> => {
     if (!newServiceTitle.trim() || !newServiceCategoryId) return;
+    const normalizedPrice = normalizeStudioServicePrice(Number(newServicePrice));
+    const normalizedDuration = normalizeStudioServiceDurationMin(Number(newServiceDuration));
+    setNewServicePrice(String(normalizedPrice));
+    setNewServiceDuration(String(normalizedDuration));
+
     setSubmittingService(true);
     setError(null);
     try {
@@ -168,8 +174,8 @@ export function StudioServicesPage({ studioId }: Props) {
           studioId,
           categoryId: newServiceCategoryId,
           title: newServiceTitle.trim(),
-          basePrice: Number(newServicePrice),
-          baseDurationMin: Number(newServiceDuration),
+          basePrice: normalizedPrice,
+          baseDurationMin: normalizedDuration,
         }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
@@ -347,15 +353,25 @@ export function StudioServicesPage({ studioId }: Props) {
               />
               <input
                 type="number"
+                min={0}
+                step={100}
                 value={newServicePrice}
                 onChange={(event) => setNewServicePrice(event.target.value)}
+                onBlur={() => {
+                  setNewServicePrice((current) => String(normalizeStudioServicePrice(Number(current))));
+                }}
                 placeholder="Price"
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
               <input
                 type="number"
+                min={5}
+                step={5}
                 value={newServiceDuration}
                 onChange={(event) => setNewServiceDuration(event.target.value)}
+                onBlur={() => {
+                  setNewServiceDuration((current) => String(normalizeStudioServiceDurationMin(Number(current))));
+                }}
                 placeholder="Duration (min)"
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />

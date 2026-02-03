@@ -179,7 +179,10 @@ export async function getMasterDay(input: {
   const [bookingsRaw, finishedMonth, reviews, services, weekly, override] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        masterProviderId: input.masterId,
+        OR: [
+          { masterProviderId: input.masterId },
+          { masterProviderId: null, providerId: input.masterId },
+        ],
         startAtUtc: { gte: start, lt: end },
       },
       select: {
@@ -196,7 +199,10 @@ export async function getMasterDay(input: {
     }),
     prisma.booking.findMany({
       where: {
-        masterProviderId: input.masterId,
+        OR: [
+          { masterProviderId: input.masterId },
+          { masterProviderId: null, providerId: input.masterId },
+        ],
         status: "FINISHED",
         startAtUtc: { gte: monthStart, lt: monthEnd },
       },

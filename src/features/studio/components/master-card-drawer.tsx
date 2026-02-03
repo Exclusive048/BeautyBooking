@@ -9,7 +9,6 @@ type MasterServiceItem = {
   isEnabled: boolean;
   priceOverride: number | null;
   durationOverrideMin: number | null;
-  commissionPct: number | null;
 };
 
 type MasterDetails = {
@@ -26,6 +25,10 @@ type MasterScheduleData = {
     title: string;
     startTime: string;
     endTime: string;
+    breaks: Array<{
+      startTime: string;
+      endTime: string;
+    }>;
   }>;
   dayRules: Array<{
     id: string;
@@ -78,6 +81,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
   const [newTemplateTitle, setNewTemplateTitle] = useState("Default shift");
   const [newTemplateStart, setNewTemplateStart] = useState("10:00");
   const [newTemplateEnd, setNewTemplateEnd] = useState("19:00");
+  const [newTemplateBreaks, setNewTemplateBreaks] = useState<Array<{ startTime: string; endTime: string }>>([]);
 
   const load = async (): Promise<void> => {
     if (!masterId) return;
@@ -152,7 +156,6 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
             isEnabled: item.isEnabled,
             priceOverride: item.priceOverride,
             durationOverrideMin: item.durationOverrideMin,
-            commissionPct: item.commissionPct,
           })),
         }),
       });
@@ -186,6 +189,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
+      setNewTemplateBreaks([]);
       await load();
       onSaved?.();
     } catch (err) {
@@ -259,6 +263,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
           title: newTemplateTitle.trim(),
           startTime: newTemplateStart,
           endTime: newTemplateEnd,
+          breaks: newTemplateBreaks,
         }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
@@ -361,7 +366,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                     Enabled
                   </label>
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <input
                     type="number"
                     className="rounded border px-2 py-1 text-sm"
@@ -388,21 +393,6 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                         [item.serviceId]: {
                           ...current[item.serviceId],
                           durationOverrideMin: event.target.value ? Number(event.target.value) : null,
-                        },
-                      }))
-                    }
-                  />
-                  <input
-                    type="number"
-                    className="rounded border px-2 py-1 text-sm"
-                    placeholder="commission %"
-                    value={item.commissionPct ?? ""}
-                    onChange={(event) =>
-                      setEdited((current) => ({
-                        ...current,
-                        [item.serviceId]: {
-                          ...current[item.serviceId],
-                          commissionPct: event.target.value ? Number(event.target.value) : null,
                         },
                       }))
                     }
@@ -448,10 +438,70 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                   Add template
                 </button>
               </div>
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-neutral-600">Breaks (up to 3)</div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewTemplateBreaks((current) =>
+                        current.length >= 3 ? current : [...current, { startTime: "13:00", endTime: "14:00" }]
+                      )
+                    }
+                    className="rounded border px-2 py-1 text-xs"
+                  >
+                    + Add break
+                  </button>
+                </div>
+                {newTemplateBreaks.map((item, index) => (
+                  <div key={`template-break-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                    <input
+                      type="text"
+                      value={item.startTime}
+                      onChange={(event) =>
+                        setNewTemplateBreaks((current) =>
+                          current.map((entry, entryIndex) =>
+                            entryIndex === index ? { ...entry, startTime: event.target.value } : entry
+                          )
+                        )
+                      }
+                      placeholder="HH:MM"
+                      className="rounded border px-2 py-1 text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={item.endTime}
+                      onChange={(event) =>
+                        setNewTemplateBreaks((current) =>
+                          current.map((entry, entryIndex) =>
+                            entryIndex === index ? { ...entry, endTime: event.target.value } : entry
+                          )
+                        )
+                      }
+                      placeholder="HH:MM"
+                      className="rounded border px-2 py-1 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNewTemplateBreaks((current) => current.filter((_, entryIndex) => entryIndex !== index))
+                      }
+                      className="rounded border px-2 py-1 text-xs text-red-600"
+                    >
+                      remove
+                    </button>
+                  </div>
+                ))}
+              </div>
               <div className="mt-2 space-y-1 text-xs text-neutral-600">
                 {schedule?.templates.map((template) => (
                   <div key={template.id}>
                     {template.title}: {template.startTime}-{template.endTime}
+                    {template.breaks.length > 0
+                      ? ` · breaks: ${template.breaks
+                          .map((breakItem) => `${breakItem.startTime}-${breakItem.endTime}`)
+                          .join(", ")}`
+                      : ""}
                   </div>
                 ))}
               </div>

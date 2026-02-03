@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
+import type { ApiResponse } from "@/lib/types/api";
 
 export type StudioTeamMaster = {
   id: string;
   name: string;
   isActive: boolean;
   title: string;
+  status: "PENDING" | "ACTIVE";
+  phone: string | null;
 };
 
 type MastersData = {
@@ -54,7 +57,15 @@ export function StudioTeamPage({ studioId }: Props) {
   }, [studioId]);
 
   const createMaster = async (): Promise<void> => {
-    if (!displayName.trim()) return;
+    const name = displayName.trim();
+    const normalizedPhone = normalizeRussianPhone(phone);
+    const roleTitle = title.trim();
+
+    if (!name || !roleTitle || !normalizedPhone) {
+      setError("Name, phone and title are required. Phone format: +7XXXXXXXXXX or 8XXXXXXXXXX.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -63,9 +74,9 @@ export function StudioTeamPage({ studioId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studioId,
-          displayName: displayName.trim(),
-          phone: phone.trim() || undefined,
-          title: title.trim() || undefined,
+          displayName: name,
+          phone: normalizedPhone,
+          title: roleTitle,
         }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
@@ -120,11 +131,25 @@ export function StudioTeamPage({ studioId }: Props) {
             onClick={() => setSelectedMasterId(master.id)}
             className="rounded-2xl border p-4 text-left transition hover:bg-neutral-50"
           >
-            <div className="font-medium">{master.name}</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium">{master.name}</div>
+              <span
+                className={
+                  master.status === "PENDING"
+                    ? "rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                    : "rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                }
+              >
+                {master.status}
+              </span>
+            </div>
             <div className="mt-1 text-xs text-neutral-500">
-              {master.isActive ? "Active" : "Inactive"}
+              {master.status === "PENDING" ? "Waiting for acceptance" : "Active"}
               {master.title ? ` · ${master.title}` : ""}
             </div>
+            {master.status === "PENDING" && master.phone ? (
+              <div className="mt-1 text-xs text-neutral-500">{master.phone}</div>
+            ) : null}
           </button>
         ))}
       </div>
@@ -139,20 +164,23 @@ export function StudioTeamPage({ studioId }: Props) {
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="Name"
+                required
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
-                placeholder="Phone (optional)"
+                placeholder="Phone: +7XXXXXXXXXX or 8XXXXXXXXXX"
+                required
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Title (optional)"
+                placeholder="Title"
+                required
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>

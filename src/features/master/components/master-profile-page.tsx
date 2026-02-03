@@ -2,6 +2,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
+import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 
@@ -88,7 +90,17 @@ function extractApiErrorMessage(
     if (Array.isArray(issues) && issues.length > 0) {
       const first = issues[0];
       if (first && typeof first === "object" && "message" in first) {
-        const message = (first as { message?: unknown }).message;
+        const issue = first as { message?: unknown; path?: unknown };
+        const message = issue.message;
+        const path = issue.path;
+        if (
+          typeof path === "string" &&
+          path.trim() &&
+          typeof message === "string" &&
+          message.trim()
+        ) {
+          return `${path}: ${message}`;
+        }
         if (typeof message === "string" && message.trim()) return message;
       }
     }
@@ -123,6 +135,7 @@ export function MasterProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autosaveInfo, setAutosaveInfo] = useState<string | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<NotificationCenterInviteItem[]>([]);
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -201,6 +214,23 @@ export function MasterProfilePage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    const loadInvites = async () => {
+      try {
+        const res = await fetch("/api/notifications/center", { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ invites: NotificationCenterInviteItem[] }>
+          | null;
+        if (!res.ok || !json || !json.ok) return;
+        setPendingInvites(json.data.invites);
+      } catch {
+        // Keep profile usable even if notifications center is unavailable.
+      }
+    };
+
+    void loadInvites();
+  }, []);
+
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
   const disabledServices = useMemo(
     () => serviceList.filter((service) => !service.isEnabled),
@@ -216,22 +246,62 @@ export function MasterProfilePage() {
   }
 
   const saveProfile = async (): Promise<void> => {
+    if (!data) return;
+
     setSaving(true);
     setError(null);
     try {
+      const currentMaster = data.master;
+      const payload: {
+        displayName?: string;
+        tagline?: string;
+        bio?: string | null;
+        avatarUrl?: string | null;
+      } = {};
+
+      const nextDisplayName = displayName.trim();
+      if (nextDisplayName !== currentMaster.displayName) {
+        payload.displayName = nextDisplayName;
+      }
+
+      const nextTagline = tagline.trim();
+      if (nextTagline !== currentMaster.tagline) {
+        payload.tagline = nextTagline;
+      }
+
+      const nextBio = bio.trim();
+      const currentBio = (currentMaster.bio ?? "").trim();
+      if (nextBio !== currentBio) {
+        payload.bio = nextBio;
+      }
+
+      const nextAvatarUrl = avatarUrl.trim() || null;
+      const currentAvatarUrl = (currentMaster.avatarUrl ?? "").trim() || null;
+      if (nextAvatarUrl !== currentAvatarUrl) {
+        payload.avatarUrl = nextAvatarUrl;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setAutosaveInfo("Нет изменений");
+        return;
+      }
+
       const res = await fetch("/api/master/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          displayName: displayName.trim(),
-          tagline: tagline.trim(),
-          bio: bio.trim(),
-          avatarUrl: avatarUrl.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ id: string }>
+        | ApiErrorShape
+        | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(
+          extractApiErrorMessage(
+            json && !json.ok ? json : null,
+            `API error: ${res.status}`
+          )
+        );
       }
       await load();
     } catch (err) {
@@ -520,6 +590,16 @@ export function MasterProfilePage() {
     <section className="space-y-4">
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
+      {pendingInvites.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+          <h3 className="text-sm font-semibold text-amber-900">Приглашение в студию</h3>
+          <p className="mt-1 text-xs text-amber-800">Примите или отклоните приглашение, чтобы начать работать в студии.</p>
+          <div className="mt-3">
+            <StudioInviteCards invites={pendingInvites} onChanged={setPendingInvites} />
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
         <div className="rounded-2xl border p-4">
           <h3 className="text-sm font-semibold">Профиль и витрина</h3>
@@ -589,35 +669,39 @@ export function MasterProfilePage() {
         {showAddServicePanel ? (
           <div className="mt-3 rounded-xl border p-3">
             {data.master.isSolo ? (
-              <div className="grid gap-2 sm:grid-cols-4">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_140px_150px_120px]">
                 <input
                   type="text"
                   value={newSoloServiceTitle}
                   onChange={(event) => setNewSoloServiceTitle(event.target.value)}
-                  className="rounded border px-2 py-1 text-sm"
+                  className="h-9 rounded border px-2.5 text-sm"
                   placeholder="Название"
                 />
                 <input
                   type="number"
                   min={0}
+                  step={100}
+                  inputMode="numeric"
                   value={newSoloServicePrice}
                   onChange={(event) => setNewSoloServicePrice(Number(event.target.value) || 0)}
                   onBlur={() => setNewSoloServicePrice((value) => (value > 0 ? normalizePrice(value) : value))}
-                  className="rounded border px-2 py-1 text-sm"
+                  className="h-9 rounded border px-2.5 text-sm"
                   placeholder="Цена (₽)"
                 />
                 <input
                   type="number"
-                  min={1}
+                  min={5}
+                  step={5}
+                  inputMode="numeric"
                   value={newSoloServiceDuration}
                   onChange={(event) => setNewSoloServiceDuration(Number(event.target.value) || 0)}
                   onBlur={() =>
                     setNewSoloServiceDuration((value) => (value > 0 ? normalizeDuration(value) : value))
                   }
-                  className="rounded border px-2 py-1 text-sm"
+                  className="h-9 rounded border px-2.5 text-sm"
                   placeholder="Длительность (мин)"
                 />
-                <button type="button" onClick={() => void createSoloService()} disabled={saving} className="rounded border px-2 py-1 text-sm">
+                <button type="button" onClick={() => void createSoloService()} disabled={saving} className="h-9 rounded border px-2.5 text-sm">
                   Добавить
                 </button>
               </div>
@@ -626,7 +710,7 @@ export function MasterProfilePage() {
                 <select
                   value={selectedStudioServiceId}
                   onChange={(event) => setSelectedStudioServiceId(event.target.value)}
-                  className="rounded border px-2 py-1 text-sm"
+                  className="h-9 rounded border px-2.5 text-sm"
                 >
                   <option value="">Выберите услугу из каталога студии</option>
                   {disabledServices.map((service) => (
@@ -635,7 +719,7 @@ export function MasterProfilePage() {
                     </option>
                   ))}
                 </select>
-                <button type="button" onClick={addStudioService} className="rounded border px-2 py-1 text-sm">
+                <button type="button" onClick={addStudioService} className="h-9 rounded border px-2.5 text-sm">
                   Добавить
                 </button>
               </div>
@@ -643,24 +727,28 @@ export function MasterProfilePage() {
           </div>
         ) : null}
 
-        <div className="mt-3 overflow-hidden rounded-xl border">
-          <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 border-b bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600">
+        <div className="mt-3 overflow-x-auto rounded-xl border">
+          <div className="min-w-[640px]">
+          <div className="grid grid-cols-[minmax(0,2fr)_130px_160px_90px] items-center gap-3 border-b bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600">
             <div>Название</div>
             <div>Цена</div>
             <div>Продолжительность</div>
-            <div>Включено</div>
+            <div className="text-center">Включено</div>
           </div>
           {serviceList.map((service) => (
             <div key={service.serviceId} className="border-b px-3 py-2 last:border-b-0">
-              <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-start">
-                <div className="pt-1 text-sm">{service.title}</div>
+              <div className="grid grid-cols-[minmax(0,2fr)_130px_160px_90px] items-start gap-3">
+                <div className="truncate pt-2 text-sm">{service.title}</div>
                 <div>
                   <input
                     type="number"
-                    className="w-full rounded border px-2 py-1 text-sm"
+                    className="h-9 w-full rounded border px-2.5 text-sm"
                     value={service.effectivePrice}
                     disabled={!service.canEditPrice}
                     placeholder="Цена (₽)"
+                    inputMode="numeric"
+                    step={100}
+                    min={0}
                     onChange={(event) => {
                       const raw = Number(event.target.value);
                       setServicesDraft((current) => ({
@@ -704,9 +792,12 @@ export function MasterProfilePage() {
                 <div>
                   <input
                     type="number"
-                    className="w-full rounded border px-2 py-1 text-sm"
+                    className="h-9 w-full rounded border px-2.5 text-sm"
                     value={service.effectiveDurationMin}
                     placeholder="Длительность (мин)"
+                    inputMode="numeric"
+                    step={5}
+                    min={5}
                     onChange={(event) => {
                       const raw = Number(event.target.value);
                       setServicesDraft((current) => ({
@@ -747,6 +838,7 @@ export function MasterProfilePage() {
                   ) : null}
                 </div>
                 <label className="pt-1 text-xs">
+                  <div className="flex h-9 items-center justify-center">
                   <input
                     type="checkbox"
                     checked={service.isEnabled}
@@ -757,6 +849,7 @@ export function MasterProfilePage() {
                       }))
                     }
                   />
+                  </div>
                 </label>
               </div>
               {!service.canEditPrice ? (
@@ -764,6 +857,7 @@ export function MasterProfilePage() {
               ) : null}
             </div>
           ))}
+          </div>
         </div>
       </div>
 

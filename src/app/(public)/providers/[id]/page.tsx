@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -151,6 +152,13 @@ export default function ProviderProfilePage() {
     );
   }
 
+  const studioBookingHref =
+    provider.type === "MASTER" && provider.studioId
+      ? `/studios/${provider.studioId}/booking?masterId=${encodeURIComponent(provider.id)}${
+          selectedServices[0] ? `&serviceId=${encodeURIComponent(selectedServices[0].id)}` : ""
+        }`
+      : null;
+
   return (
     <div className="space-y-6">
       <HeroBlock
@@ -202,13 +210,28 @@ export default function ProviderProfilePage() {
         </div>
 
         <div className="h-fit lg:sticky lg:top-6 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto">
-          <PublicBookingWidget
-            providerId={provider.id}
-            selectedServices={selectedServices}
-            onRemove={(serviceId) =>
-              setSelectedServices((prev) => prev.filter((service) => service.id !== serviceId))
-            }
-          />
+          {studioBookingHref ? (
+            <Card className="bg-white">
+              <CardContent className="space-y-3 p-5">
+                <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.studioBookingTitle}</div>
+                <div className="text-sm text-neutral-600">{UI_TEXT.publicProfile.page.studioBookingDescription}</div>
+                <Link
+                  href={studioBookingHref}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                >
+                  {UI_TEXT.publicProfile.page.studioBookingCta}
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <PublicBookingWidget
+              providerId={provider.id}
+              selectedServices={selectedServices}
+              onRemove={(serviceId) =>
+                setSelectedServices((prev) => prev.filter((service) => service.id !== serviceId))
+              }
+            />
+          )}
         </div>
       </div>
     </div>

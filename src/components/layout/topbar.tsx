@@ -9,12 +9,14 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UI_TEXT } from "@/lib/ui/text";
 import { getSiteLogoUrl } from "@/lib/media/queries";
 import { AuthUserMenu } from "@/components/layout/auth-user-menu";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 
 export async function Topbar() {
   const user = await getSessionUser();
-  const invitesCount = user?.phone
+  const userPhone = user?.phone ? normalizeRussianPhone(user.phone) : null;
+  const invitesCount = userPhone
     ? await prisma.studioInvite.count({
-        where: { phone: user.phone, status: MembershipStatus.PENDING },
+        where: { phone: userPhone, status: MembershipStatus.PENDING },
       })
     : 0;
   const unreadNotificationsCount = user
@@ -35,7 +37,7 @@ export async function Topbar() {
 
     navItems.push(
       <Button key="nav-notifications" asChild variant="secondary" className="relative">
-        <Link href="/cabinet/master/notifications" aria-label={UI_TEXT.nav.notifications}>
+        <Link href="/notifications" aria-label={UI_TEXT.nav.notifications}>
           <span aria-hidden>🔔</span>
           {notificationsCount > 0 ? (
             <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">

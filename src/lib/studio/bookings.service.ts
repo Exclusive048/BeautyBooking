@@ -214,12 +214,22 @@ export async function updateMasterBookingStatus(input: {
 }): Promise<{ id: string; status: string }> {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
-    select: { id: true, masterProviderId: true, status: true, startAtUtc: true, endAtUtc: true },
+    select: {
+      id: true,
+      providerId: true,
+      masterProviderId: true,
+      status: true,
+      startAtUtc: true,
+      endAtUtc: true,
+    },
   });
   if (!booking) {
     throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
   }
-  if (booking.masterProviderId !== input.masterId) {
+  const belongsToMaster =
+    booking.masterProviderId === input.masterId ||
+    (booking.masterProviderId === null && booking.providerId === input.masterId);
+  if (!belongsToMaster) {
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
 

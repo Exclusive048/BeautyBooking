@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { MembershipStatus, ProviderType } from "@prisma/client";
 
 export type StudioMasterServiceItem = {
   serviceId: string;
@@ -39,29 +40,51 @@ export type StudioMasterListItem = {
   name: string;
   isActive: boolean;
   title: string;
+  status: "PENDING" | "ACTIVE";
+  phone: string | null;
 };
 
 export async function listStudioMasters(studioId: string): Promise<{ masters: StudioMasterListItem[] }> {
   const studio = await getStudioContext(studioId);
-  const masters = await prisma.provider.findMany({
-    where: {
-      type: "MASTER",
-      studioId: studio.providerId,
-    },
-    select: {
-      id: true,
-      name: true,
-      isPublished: true,
-      tagline: true,
-    },
-    orderBy: { name: "asc" },
-  });
+  const [masters, pendingInvites] = await Promise.all([
+    prisma.provider.findMany({
+      where: {
+        type: "MASTER",
+        studioId: studio.providerId,
+      },
+      select: {
+        id: true,
+        name: true,
+        isPublished: true,
+        tagline: true,
+        contactPhone: true,
+        ownerUserId: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.studioInvite.findMany({
+      where: {
+        studioId: studio.id,
+        status: MembershipStatus.PENDING,
+      },
+      select: {
+        phone: true,
+      },
+    }),
+  ]);
+
+  const pendingPhones = new Set(pendingInvites.map((invite) => invite.phone));
+
   return {
     masters: masters.map((master) => ({
       id: master.id,
       name: master.name,
       isActive: master.isPublished,
       title: master.tagline,
+      status: !master.ownerUserId && !!master.contactPhone && pendingPhones.has(master.contactPhone)
+        ? "PENDING"
+        : "ACTIVE",
+      phone: master.contactPhone ?? null,
     })),
   };
 }
@@ -69,26 +92,76 @@ export async function listStudioMasters(studioId: string): Promise<{ masters: St
 export async function createStudioMaster(input: {
   studioId: string;
   displayName: string;
-  phone?: string;
-  title?: string;
+  phone: string;
+  title: string;
+  invitedByUserId: string;
 }): Promise<{ id: string }> {
   const studio = await getStudioContext(input.studioId);
-  const created = await prisma.provider.create({
-    data: {
-      type: "MASTER",
-      name: input.displayName.trim(),
-      tagline: input.title?.trim() || "",
-      studioId: studio.providerId,
-      ownerUserId: null,
-      isPublished: true,
-      contactPhone: input.phone?.trim() || null,
-      address: "",
-      district: "",
-      timezone: "Asia/Almaty",
-      categories: [],
-      availableToday: false,
-    },
-    select: { id: true },
+  const created = await prisma.$transaction(async (tx) => {
+    const existing = await tx.provider.findFirst({
+      where: {
+        type: ProviderType.MASTER,
+        studioId: studio.providerId,
+        contactPhone: input.phone,
+      },
+      select: { id: true, ownerUserId: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (existing?.ownerUserId) {
+      throw new AppError("Master with this phone already exists", 409, "ALREADY_EXISTS");
+    }
+
+    const master = existing
+      ? await tx.provider.update({
+          where: { id: existing.id },
+          data: {
+            name: input.displayName.trim(),
+            tagline: input.title.trim(),
+            isPublished: false,
+            contactPhone: input.phone,
+          },
+          select: { id: true },
+        })
+      : await tx.provider.create({
+          data: {
+            type: "MASTER",
+            name: input.displayName.trim(),
+            tagline: input.title.trim(),
+            studioId: studio.providerId,
+            ownerUserId: null,
+            isPublished: false,
+            contactPhone: input.phone,
+            address: "",
+            district: "",
+            timezone: "Asia/Almaty",
+            categories: [],
+            availableToday: false,
+          },
+          select: { id: true },
+        });
+
+    await tx.studioInvite.upsert({
+      where: {
+        studioId_phone: {
+          studioId: studio.id,
+          phone: input.phone,
+        },
+      },
+      update: {
+        status: MembershipStatus.PENDING,
+        invitedByUserId: input.invitedByUserId,
+      },
+      create: {
+        studioId: studio.id,
+        phone: input.phone,
+        status: MembershipStatus.PENDING,
+        invitedByUserId: input.invitedByUserId,
+      },
+      select: { id: true },
+    });
+
+    return master;
   });
 
   return { id: created.id };
@@ -165,7 +238,9 @@ export async function bulkUpdateMasterServices(input: {
           isEnabled: item.isEnabled,
           priceOverride: item.priceOverride ?? null,
           durationOverrideMin: item.durationOverrideMin ?? null,
-          commissionPct: item.commissionPct ?? null,
+          ...(typeof item.commissionPct === "number" || item.commissionPct === null
+            ? { commissionPct: item.commissionPct }
+            : {}),
         },
         update: {
           studioId: input.studioId,
@@ -173,7 +248,9 @@ export async function bulkUpdateMasterServices(input: {
           isEnabled: item.isEnabled,
           priceOverride: item.priceOverride ?? null,
           durationOverrideMin: item.durationOverrideMin ?? null,
-          commissionPct: item.commissionPct ?? null,
+          ...(typeof item.commissionPct === "number" || item.commissionPct === null
+            ? { commissionPct: item.commissionPct }
+            : {}),
         },
       })
     )

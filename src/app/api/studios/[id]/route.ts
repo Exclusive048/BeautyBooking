@@ -16,13 +16,33 @@ const updateSchema = z
     tagline: z.string().trim().optional(),
     address: z.string().trim().optional(),
     district: z.string().trim().optional(),
+    categories: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
+    contactName: z.string().trim().nullable().optional(),
+    contactPhone: z.string().trim().nullable().optional(),
+    contactEmail: z.string().trim().email().nullable().optional(),
+    description: z.string().trim().max(2000).nullable().optional(),
+    geoLat: z.number().nullable().optional(),
+    geoLng: z.number().nullable().optional(),
+    isPublished: z.boolean().optional(),
+    timezone: z.string().trim().optional(),
+    bannerAssetId: z.string().trim().nullable().optional(),
   })
   .refine(
     (data) =>
       data.name !== undefined ||
       data.tagline !== undefined ||
       data.address !== undefined ||
-      data.district !== undefined,
+      data.district !== undefined ||
+      data.categories !== undefined ||
+      data.contactName !== undefined ||
+      data.contactPhone !== undefined ||
+      data.contactEmail !== undefined ||
+      data.description !== undefined ||
+      data.geoLat !== undefined ||
+      data.geoLng !== undefined ||
+      data.isPublished !== undefined ||
+      data.timezone !== undefined ||
+      data.bannerAssetId !== undefined,
     { message: "At least one field is required" }
   );
 

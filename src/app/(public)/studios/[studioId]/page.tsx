@@ -149,7 +149,14 @@ export default function StudioProfilePage() {
 
   return (
     <div className="space-y-8">
-      <StudioHeroGallery studio={studio} imageUrls={portfolio.map((item) => item.url)} />
+      <StudioHeroGallery
+        studio={studio}
+        imageUrls={
+          studio.bannerUrl
+            ? [studio.bannerUrl, ...portfolio.map((item) => item.url).filter((url) => url !== studio.bannerUrl)]
+            : portfolio.map((item) => item.url)
+        }
+      />
 
       <div id="studio-booking-entry" className="rounded-2xl border border-border bg-surface p-5 md:p-6">
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -182,6 +189,9 @@ export default function StudioProfilePage() {
           <div className="text-sm text-text-muted">
             {studio.district} / {studio.address}
           </div>
+          {studio.description ? (
+            <div className="text-sm text-text-muted">{studio.description}</div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {studio.categories.length ? (
               studio.categories.map((c) => <Badge key={c}>{c}</Badge>)

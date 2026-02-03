@@ -49,7 +49,10 @@ export async function POST(req: Request) {
       allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
 
-    const data = await createStudioMaster(body);
+    const data = await createStudioMaster({
+      ...body,
+      invitedByUserId: user.id,
+    });
     return jsonOk(data, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

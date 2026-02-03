@@ -84,6 +84,9 @@ export async function createBookingNotifications(input: BookingNotificationConte
           id: true,
           name: true,
           ownerUserId: true,
+          masterProfile: {
+            select: { userId: true },
+          },
         },
       },
       masterProvider: {
@@ -108,6 +111,7 @@ export async function createBookingNotifications(input: BookingNotificationConte
     booking.masterProvider?.ownerUserId ??
     booking.masterProvider?.masterProfile?.userId ??
     booking.provider.ownerUserId ??
+    booking.provider.masterProfile?.userId ??
     null;
   if (masterOwnerId) recipientIds.add(masterOwnerId);
 
