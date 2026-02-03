@@ -1,19 +1,24 @@
-"use client";
+﻿"use client";
 
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { ReviewForm } from "@/features/reviews/components/review-form";
-import { moneyRUB, minutesToHuman } from "@/lib/format";
+import { StudioHeroGallery } from "@/features/public-studio/studio-hero-gallery";
+import { StudioMastersCarousel } from "@/features/public-studio/studio-masters-carousel";
+import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
+import { StudioServicesList } from "@/features/public-studio/studio-services-list";
+import { moneyRUB } from "@/lib/format";
 import type { MediaAssetDto } from "@/lib/media/types";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 import {
   fetchStudioMasters,
   fetchStudioProfile,
@@ -34,7 +39,6 @@ function stars(value: number): string {
 export default function StudioProfilePage() {
   const params = useParams<{ studioId: string }>();
   const studioId = params?.studioId;
-  const router = useRouter();
 
   const [studio, setStudio] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<StudioMaster[]>([]);
@@ -61,7 +65,7 @@ export default function StudioProfilePage() {
 
         if (!profileRes.ok) throw new Error(profileRes.error);
         if (profileRes.provider.type !== "STUDIO") {
-          throw new Error("Profile is only available for studios");
+          throw new Error(UI_TEXT.publicStudio.studioOnlyProfileError);
         }
 
         if (!alive) return;
@@ -111,7 +115,7 @@ export default function StudioProfilePage() {
         }
       } catch (e) {
         if (!alive) return;
-        setError(e instanceof Error ? e.message : "Failed to load studio");
+        setError(e instanceof Error ? e.message : UI_TEXT.publicStudio.bookingError);
       } finally {
         if (alive) setLoading(false);
       }
@@ -122,16 +126,11 @@ export default function StudioProfilePage() {
     };
   }, [studioId]);
 
-  const subtitle = useMemo(() => {
-    if (!studio) return "";
-    return studio.tagline?.trim() ? studio.tagline : "Studio description is not set yet.";
-  }, [studio]);
-
   if (loading) {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm font-semibold text-text">Loading studio profile...</div>
+          <div className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.loadingProfile}</div>
         </CardContent>
       </Card>
     );
@@ -141,8 +140,8 @@ export default function StudioProfilePage() {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm font-semibold text-text">Failed to open profile</div>
-          <div className="mt-2 text-sm text-text-muted">{error ?? "Studio not found"}</div>
+          <div className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.loadFailedTitle}</div>
+          <div className="mt-2 text-sm text-text-muted">{error ?? UI_TEXT.publicStudio.notFound}</div>
         </CardContent>
       </Card>
     );
@@ -150,32 +149,34 @@ export default function StudioProfilePage() {
 
   return (
     <div className="space-y-8">
-      <Section
-        title={studio.name}
-        subtitle={subtitle}
-        right={
-          <Button asChild>
-            <Link href={`/studios/${studio.id}/booking`}>Open booking</Link>
+      <StudioHeroGallery studio={studio} imageUrls={portfolio.map((item) => item.url)} />
+
+      <div id="studio-booking-entry" className="rounded-2xl border border-border bg-surface p-5 md:p-6">
+        <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.heroBook}</div>
+          <Button asChild variant="secondary">
+            <Link href={`/studios/${studio.id}/booking`}>{UI_TEXT.publicStudio.openBookingFlow}</Link>
           </Button>
-        }
-      />
+        </div>
+        <StudioBookingFlow studioId={studio.id} />
+      </div>
 
       <Card className="bg-surface">
-        <CardContent className="p-5 md:p-6 space-y-4">
+        <CardContent className="space-y-4 p-5 md:p-6">
           {studio.avatarUrl ? (
             <img src={studio.avatarUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>Studio</Badge>
-            {studio.availableToday ? <Badge>Available today</Badge> : null}
+            <Badge>{UI_TEXT.publicStudio.typeStudio}</Badge>
+            {studio.availableToday ? <Badge>{UI_TEXT.publicStudio.availableToday}</Badge> : null}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-text-muted">
               <span className="font-semibold text-text">{studio.rating.toFixed(1)}</span>{" "}
-              <span>({studio.reviews} reviews)</span>
+              <span>({studio.reviews} {UI_TEXT.publicStudio.reviewsCountLabel})</span>
             </div>
             <div className="text-sm text-text">
-              from <span className="font-semibold">{moneyRUB(studio.priceFrom)}</span>
+              {UI_TEXT.publicStudio.from} <span className="font-semibold">{moneyRUB(studio.priceFrom)}</span>
             </div>
           </div>
           <div className="text-sm text-text-muted">
@@ -185,36 +186,36 @@ export default function StudioProfilePage() {
             {studio.categories.length ? (
               studio.categories.map((c) => <Badge key={c}>{c}</Badge>)
             ) : (
-              <Badge>No categories</Badge>
+              <Badge>{UI_TEXT.publicStudio.noCategories}</Badge>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <Section title="Studio photos" subtitle="Interior, team and atmosphere.">
+      <Section title={UI_TEXT.publicStudio.sectionPhotos} subtitle={UI_TEXT.publicStudio.sectionPhotosSubtitle}>
         <Card className="bg-surface">
           <CardContent className="p-5 md:p-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {portfolio.length > 0
                 ? portfolio.map((asset) => (
-                    <div key={asset.id} className="aspect-square rounded-2xl bg-muted border border-border overflow-hidden">
+                    <div key={asset.id} className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
                       <img src={asset.url} alt="" className="h-full w-full object-cover" />
                     </div>
                   ))
                 : Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="aspect-square rounded-2xl bg-muted border border-border" />
+                    <div key={i} className="aspect-square rounded-2xl border border-border bg-muted" />
                   ))}
             </div>
           </CardContent>
         </Card>
       </Section>
 
-      <Section title="Reviews" subtitle="Latest client reviews.">
+      <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
         <Card className="bg-surface">
           <CardContent className="p-5 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-text-muted">
-                {stars(studio.rating)} / {studio.reviews} reviews
+                {stars(studio.rating)} / {studio.reviews} {UI_TEXT.publicStudio.reviewsCountLabel}
               </div>
               {canReviewBookingId && !showReviewForm ? (
                 <button
@@ -222,7 +223,7 @@ export default function StudioProfilePage() {
                   onClick={() => setShowReviewForm(true)}
                   className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
                 >
-                  Leave review
+                  {UI_TEXT.publicStudio.reviewLeave}
                 </button>
               ) : null}
             </div>
@@ -247,7 +248,7 @@ export default function StudioProfilePage() {
 
             <div className="mt-4 space-y-3">
               {reviews.length === 0 ? (
-                <div className="text-sm text-text-muted">No reviews yet.</div>
+                <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.reviewEmpty}</div>
               ) : (
                 reviews.map((review) => (
                   <div key={review.id} className="rounded-xl border p-3">
@@ -264,83 +265,24 @@ export default function StudioProfilePage() {
         </Card>
       </Section>
 
-      <Section title="Studio services" subtitle="Services list without slot selection.">
-        {studio.services.length === 0 ? (
-          <Card className="bg-surface">
-            <CardContent className="p-6 text-sm text-text-muted">
-              No services yet.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {studio.services.map((service) => (
-              <Card key={service.id} className="bg-surface">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-text">{service.name}</div>
-                      <div className="mt-1 text-xs text-text-muted">
-                        {minutesToHuman(service.durationMin)}
-                      </div>
-                    </div>
-                    <div className="text-sm font-semibold text-text">
-                      {service.price > 0 ? moneyRUB(service.price) : "Price on request"}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+      <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
+        <StudioServicesList
+          studioId={studio.id}
+          categories={studio.categories}
+          services={studio.services}
+        />
       </Section>
 
-      <Section title="Studio masters" subtitle="Pick a master and continue to booking.">
-        {masters.length === 0 ? (
-          <Card className="bg-surface">
-            <CardContent className="p-6 text-sm text-text-muted">
-              No available masters yet.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {masters.map((master) => (
-              <Card
-                key={master.id}
-                className="bg-surface cursor-pointer transition hover:border-text/60"
-                role="button"
-                tabIndex={0}
-                onClick={() => router.push(`/providers/${master.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    router.push(`/providers/${master.id}`);
-                  }
-                }}
-              >
-                <CardContent className="p-5 md:p-6 flex flex-wrap items-center gap-4 justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-12 w-12 rounded-2xl bg-muted border border-border" />
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-text truncate">{master.name}</div>
-                      <div className="text-xs text-text-muted">Studio master</div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" asChild>
-                      <Link
-                        href={`/studios/${studio.id}/booking?masterId=${master.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Book
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+      <Section title={UI_TEXT.publicStudio.teamTitle} subtitle={UI_TEXT.publicStudio.teamSubtitle}>
+        <StudioMastersCarousel studioId={studio.id} masters={masters} />
       </Section>
+
+      <a
+        href="#studio-booking-entry"
+        className="fixed bottom-5 right-5 z-20 inline-flex items-center justify-center rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-neutral-800"
+      >
+        {UI_TEXT.publicStudio.heroBook}
+      </a>
     </div>
   );
 }

@@ -1,12 +1,11 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 type Props = {
-  masterName: string;
   ratingLabel: string;
-  notificationsCount: number;
+  studioName?: string | null;
 };
 
 const NAV_ITEMS: Array<{ href: string; label: string }> = [
@@ -19,7 +18,7 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function MasterCabinetTopbar({ masterName, ratingLabel, notificationsCount }: Props) {
+export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
   const pathname = usePathname();
 
   return (
@@ -60,15 +59,7 @@ export function MasterCabinetTopbar({ masterName, ratingLabel, notificationsCoun
         </div>
 
         <div className="flex items-center gap-3 text-sm text-neutral-700">
-          <Link href="/cabinet/master/notifications" className="relative rounded-lg border px-3 py-1.5 hover:bg-neutral-50">
-            🔔
-            {notificationsCount > 0 ? (
-              <span className="absolute -right-1 -top-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                {notificationsCount > 9 ? "9+" : notificationsCount}
-              </span>
-            ) : null}
-          </Link>
-          <span className="rounded-lg border px-3 py-1.5">{masterName}</span>
+          {studioName ? <span className="rounded-lg border px-3 py-1.5">{studioName}</span> : null}
         </div>
       </div>
     </header>

@@ -349,6 +349,38 @@ export async function upsertMasterServices(
   return { updated: items.length };
 }
 
+export async function createSoloMasterService(
+  masterId: string,
+  input: { title: string; price: number; durationMin: number }
+): Promise<{ id: string }> {
+  const context = await getMasterContext(masterId);
+  if (!context.isSolo) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+
+  const last = await prisma.service.findFirst({
+    where: { providerId: masterId },
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true },
+  });
+
+  const created = await prisma.service.create({
+    data: {
+      providerId: masterId,
+      title: input.title.trim(),
+      name: input.title.trim(),
+      price: input.price,
+      durationMin: input.durationMin,
+      isEnabled: true,
+      isActive: true,
+      sortOrder: (last?.sortOrder ?? -1) + 1,
+    },
+    select: { id: true },
+  });
+
+  return { id: created.id };
+}
+
 export async function listMasterPortfolio(masterId: string): Promise<{ items: MasterPortfolioItem[] }> {
   await getMasterContext(masterId);
   const items = await prisma.portfolioItem.findMany({

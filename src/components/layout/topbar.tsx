@@ -28,8 +28,14 @@ export async function Topbar() {
 
   if (user) {
     navItems.push(
+      <Button key="nav-catalog" asChild variant="secondary">
+        <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
+      </Button>
+    );
+
+    navItems.push(
       <Button key="nav-notifications" asChild variant="secondary" className="relative">
-        <Link href="/cabinet/invites" aria-label={UI_TEXT.nav.notifications}>
+        <Link href="/cabinet/master/notifications" aria-label={UI_TEXT.nav.notifications}>
           <span aria-hidden>🔔</span>
           {notificationsCount > 0 ? (
             <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
@@ -50,7 +56,7 @@ export async function Topbar() {
   } else {
     navItems.push(
       <Button key="nav-catalog" asChild variant="secondary">
-        <Link href="/providers">{UI_TEXT.nav.catalog}</Link>
+        <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
       </Button>
     );
     navItems.push(<ThemeToggle key="nav-theme-toggle" />);
@@ -63,7 +69,7 @@ export async function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur dark:bg-bg/70">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-[var(--topbar-h)] max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3">
           {siteLogoUrl ? (
             <img src={siteLogoUrl} alt="Site logo" className="h-10 w-10 rounded-2xl object-cover" />

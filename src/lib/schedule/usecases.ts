@@ -25,6 +25,9 @@ function validateBufferMinutes(value: number): Result<number> {
   if (value < 0 || value > 30) {
     return { ok: false, status: 400, message: "Buffer out of range", code: "BUFFER_INVALID" };
   }
+  if (value % 5 !== 0) {
+    return { ok: false, status: 400, message: "Invalid buffer", code: "BUFFER_INVALID" };
+  }
   return { ok: true, data: value };
 }
 

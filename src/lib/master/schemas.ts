@@ -5,7 +5,7 @@ export const masterDayQuerySchema = z.object({
 });
 
 export const masterBookingStatusSchema = z.object({
-  status: z.enum(["STARTED", "NO_SHOW", "FINISHED"]),
+  status: z.enum(["CONFIRMED", "CANCELLED", "NO_SHOW"]),
 });
 
 export const createMasterBookingSchema = z.object({
@@ -55,6 +55,12 @@ export const upsertMasterServicesSchema = z.object({
       })
     )
     .max(500),
+});
+
+export const createMasterServiceSchema = z.object({
+  title: z.string().trim().min(1).max(240),
+  price: z.number().int().min(0),
+  durationMin: z.number().int().min(1).max(24 * 60),
 });
 
 export const createMasterPortfolioSchema = z.object({

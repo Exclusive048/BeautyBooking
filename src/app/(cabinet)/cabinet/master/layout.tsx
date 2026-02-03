@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasMasterProfile } from "@/lib/auth/roles";
@@ -17,28 +17,27 @@ export default async function MasterCabinetLayout({
   if (!hasProfile) redirect("/403");
 
   const masterId = await getCurrentMasterProviderId(user.id);
-  const [master, notificationsCount] = await Promise.all([
-    prisma.provider.findUnique({
-      where: { id: masterId },
-      select: { name: true, ratingAvg: true, rating: true },
-    }),
-    prisma.notification.count({
-      where: { userId: user.id, readAt: null },
-    }),
-  ]);
+  const master = await prisma.provider.findUnique({
+    where: { id: masterId },
+    select: { ratingAvg: true, rating: true, studioId: true },
+  });
 
   if (!master) redirect("/403");
 
   const rating = master.ratingAvg > 0 ? master.ratingAvg : master.rating;
   const ratingLabel = `⭐${rating.toFixed(1)}`;
+  const studioName = master.studioId
+    ? (
+        await prisma.provider.findUnique({
+          where: { id: master.studioId },
+          select: { name: true },
+        })
+      )?.name ?? null
+    : null;
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
-      <MasterCabinetTopbar
-        masterName={master.name}
-        ratingLabel={ratingLabel}
-        notificationsCount={notificationsCount}
-      />
+      <MasterCabinetTopbar ratingLabel={ratingLabel} studioName={studioName} />
       <main className="min-w-0">{children}</main>
     </section>
   );

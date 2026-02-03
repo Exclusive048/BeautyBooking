@@ -23,7 +23,7 @@ export function isAllowedAccountTypeSelection(type: AccountType): boolean {
 export function roleRedirect(role: AccountType): string {
   if (role === AccountType.MASTER) return "/cabinet/master";
   if (role === AccountType.STUDIO) return "/cabinet/studio";
-  return "/roles";
+  return "/cabinet";
 }
 
 export function accountTypeRedirect(type: AccountType): string {

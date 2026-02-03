@@ -5,7 +5,9 @@ export type MasterDayBooking = {
   id: string;
   startAt: string | null;
   endAt: string | null;
+  rawStatus: string;
   status: string;
+  canNoShow: boolean;
   clientName: string;
   clientPhone: string;
   notes: string | null;
@@ -33,9 +35,18 @@ export type MasterDayServiceOption = {
   durationMin: number;
 };
 
+export type MasterDayWorkingHours = {
+  isDayOff: boolean;
+  startLocal: string | null;
+  endLocal: string | null;
+  bufferBetweenBookingsMin: number;
+};
+
 type BaseDayData = {
+  masterId: string;
   date: string;
   isSolo: boolean;
+  workingHours: MasterDayWorkingHours;
   bookings: MasterDayBooking[];
   currentBookingId: string | null;
   nextBookingId: string | null;
@@ -51,6 +62,11 @@ function parseDateKey(date: string): Date {
     throw new AppError("Invalid date", 400, "DATE_INVALID");
   }
   return parsed;
+}
+
+function getDayOfWeekUtc(date: Date): number {
+  const value = date.getUTCDay();
+  return value === 0 ? 6 : value - 1;
 }
 
 function sumBookingPrice(input: { serviceItems: Array<{ priceSnapshot: number }>; servicePrice: number }): number {
@@ -106,6 +122,38 @@ function computeGaps(bookings: MasterDayBooking[], dateKey: string): MasterDayGa
   return result.slice(0, 3);
 }
 
+function deriveBookingStatus(input: {
+  rawStatus: string;
+  startAt: Date | null;
+  endAt: Date | null;
+  nowMs: number;
+}): string {
+  if (input.rawStatus === "CANCELLED" || input.rawStatus === "NO_SHOW" || input.rawStatus === "FINISHED") {
+    return input.rawStatus;
+  }
+  if (!input.startAt || !input.endAt) return input.rawStatus;
+  const graceMs = 60 * 60 * 1000;
+  const startMs = input.startAt.getTime();
+  const finishAtMs = input.endAt.getTime() + graceMs;
+  if (input.nowMs >= finishAtMs) return "FINISHED";
+  if (input.rawStatus === "CONFIRMED" && input.nowMs >= startMs) return "STARTED";
+  return input.rawStatus;
+}
+
+function canMarkNoShow(input: {
+  rawStatus: string;
+  startAt: Date | null;
+  endAt: Date | null;
+  nowMs: number;
+}): boolean {
+  if (input.rawStatus !== "CONFIRMED") return false;
+  if (!input.startAt || !input.endAt) return false;
+  const graceMs = 60 * 60 * 1000;
+  const startMs = input.startAt.getTime();
+  const finishAtMs = input.endAt.getTime() + graceMs;
+  return input.nowMs >= startMs && input.nowMs <= finishAtMs;
+}
+
 export async function getMasterDay(input: {
   masterId: string;
   date: string;
@@ -121,13 +169,14 @@ export async function getMasterDay(input: {
 
   const master = await prisma.provider.findUnique({
     where: { id: input.masterId },
-    select: { id: true, studioId: true },
+    select: { id: true, studioId: true, bufferBetweenBookingsMin: true },
   });
   if (!master) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
   }
 
-  const [bookingsRaw, finishedMonth, reviews, services] = await Promise.all([
+  const dayOfWeek = getDayOfWeekUtc(start);
+  const [bookingsRaw, finishedMonth, reviews, services, weekly, override] = await Promise.all([
     prisma.booking.findMany({
       where: {
         masterProviderId: input.masterId,
@@ -183,22 +232,57 @@ export async function getMasterDay(input: {
       },
       orderBy: { sortOrder: "asc" },
     }),
+    prisma.weeklySchedule.findMany({
+      where: {
+        providerId: input.masterId,
+        dayOfWeek,
+      },
+      select: { startLocal: true, endLocal: true },
+      orderBy: { startLocal: "asc" },
+    }),
+    prisma.scheduleOverride.findFirst({
+      where: {
+        providerId: input.masterId,
+        date: start,
+      },
+      select: { isDayOff: true, startLocal: true, endLocal: true },
+    }),
   ]);
 
-  const bookings: MasterDayBooking[] = bookingsRaw.map((item) => ({
-    id: item.id,
-    startAt: item.startAtUtc ? item.startAtUtc.toISOString() : null,
-    endAt: item.endAtUtc ? item.endAtUtc.toISOString() : null,
-    status: item.status,
-    clientName: item.clientName,
-    clientPhone: item.clientPhone,
-    notes: item.notes ?? null,
-    serviceTitle: item.service.title?.trim() || item.service.name,
-  }));
-
   const now = Date.now();
+  const bookings: MasterDayBooking[] = bookingsRaw.map((item) => {
+    const startAt = item.startAtUtc ? item.startAtUtc.toISOString() : null;
+    const endAt = item.endAtUtc ? item.endAtUtc.toISOString() : null;
+    const startAtDate = item.startAtUtc ?? null;
+    const endAtDate = item.endAtUtc ?? null;
+    const status = deriveBookingStatus({
+      rawStatus: item.status,
+      startAt: startAtDate,
+      endAt: endAtDate,
+      nowMs: now,
+    });
+    return {
+      id: item.id,
+      startAt,
+      endAt,
+      rawStatus: item.status,
+      status,
+      canNoShow: canMarkNoShow({
+        rawStatus: item.status,
+        startAt: startAtDate,
+        endAt: endAtDate,
+        nowMs: now,
+      }),
+      clientName: item.clientName,
+      clientPhone: item.clientPhone,
+      notes: item.notes ?? null,
+      serviceTitle: item.service.title?.trim() || item.service.name,
+    };
+  });
+
   const current = bookings.find((item) => {
     if (!item.startAt || !item.endAt) return false;
+    if (item.status === "CANCELLED" || item.status === "NO_SHOW" || item.status === "FINISHED") return false;
     const from = new Date(item.startAt).getTime();
     const to = new Date(item.endAt).getTime();
     return now >= from && now < to;
@@ -213,9 +297,25 @@ export async function getMasterDay(input: {
     0
   );
 
+  const scheduleStart =
+    override?.isDayOff
+      ? null
+      : override?.startLocal ?? (weekly.length > 0 ? weekly[0].startLocal : null);
+  const scheduleEnd =
+    override?.isDayOff
+      ? null
+      : override?.endLocal ?? (weekly.length > 0 ? weekly[weekly.length - 1].endLocal : null);
+
   return {
+    masterId: input.masterId,
     date: input.date,
     isSolo: master.studioId == null,
+    workingHours: {
+      isDayOff: Boolean(override?.isDayOff),
+      startLocal: scheduleStart,
+      endLocal: scheduleEnd,
+      bufferBetweenBookingsMin: master.bufferBetweenBookingsMin,
+    },
     bookings,
     currentBookingId: current?.id ?? null,
     nextBookingId: next?.id ?? null,

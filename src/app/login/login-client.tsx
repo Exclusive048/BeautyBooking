@@ -114,24 +114,24 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
   }
 
   return (
-    <div className="min-h-[100dvh] overflow-y-auto bg-background lg:fixed lg:inset-0 lg:z-50 lg:h-[100dvh] lg:w-screen lg:overflow-hidden">
-      <div className="grid h-full min-h-[100dvh] lg:min-h-0 lg:grid-cols-[5fr_7fr]">
-        <aside className="relative hidden min-h-0 overflow-hidden lg:block">
+    <div className="min-h-[100dvh] overflow-y-auto bg-background lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-20 lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
+      <div className="mx-auto grid h-full min-h-[100dvh] w-full max-w-6xl gap-10 px-4 py-6 lg:min-h-0 lg:grid-cols-[520px_1fr] lg:items-center lg:py-8">
+        <aside className="relative hidden h-full max-h-[720px] min-h-0 max-w-[520px] overflow-hidden rounded-3xl border border-white/10 bg-white/5 lg:block">
           {heroImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={heroImageUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
           <div className="absolute bottom-10 left-8 right-8 text-white">
             <p className="text-3xl font-semibold leading-tight">{UI_TEXT.auth.loginPage.heroTitle}</p>
             <p className="mt-3 text-sm text-white/80">{UI_TEXT.auth.loginPage.heroSubtitle}</p>
           </div>
         </aside>
 
-        <main className="flex h-full min-h-0 items-center justify-center px-4 py-4 sm:px-6 lg:px-10">
-          <div className="w-full max-w-md rounded-3xl border border-border/60 bg-card/90 p-6 shadow-sm sm:p-7">
+        <main className="flex h-full min-h-0 items-center justify-center lg:justify-start">
+          <div className="w-full max-w-[420px] rounded-3xl border border-border/60 bg-card/90 p-6 shadow-sm sm:p-7">
             <div className="mb-7">
               <div className="text-sm font-semibold text-muted-foreground">BeautyHub</div>
               <h1 className="mt-2 text-2xl font-semibold">{UI_TEXT.auth.loginPage.title}</h1>

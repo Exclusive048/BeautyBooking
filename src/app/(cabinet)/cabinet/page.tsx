@@ -20,7 +20,7 @@ export default async function CabinetEntryPage() {
         <p className="text-sm text-neutral-600">Choose mode to continue.</p>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         {hasStudioMode ? (
           <Link
             href="/cabinet/studio/calendar"
@@ -45,15 +45,6 @@ export default async function CabinetEntryPage() {
           </Link>
         ) : null}
 
-        <Link
-          href="/cabinet/client/bookings"
-          className="rounded-2xl border p-5 transition hover:bg-neutral-50"
-        >
-          <div className="text-lg font-semibold">Client</div>
-          <div className="mt-1 text-sm text-neutral-600">
-            My bookings, profile and personal settings.
-          </div>
-        </Link>
       </div>
     </section>
   );

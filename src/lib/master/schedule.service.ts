@@ -47,6 +47,7 @@ export type MasterScheduleDayLoad = {
 };
 
 export type MasterScheduleData = {
+  masterId: string;
   month: string;
   isSolo: boolean;
   dayLoads: MasterScheduleDayLoad[];
@@ -128,6 +129,7 @@ export async function getMasterSchedule(input: {
   const dayLoads = Array.from(dayLoadMap.entries()).map(([date, count]) => ({ date, count }));
 
   return {
+    masterId: input.masterId,
     month: input.month,
     isSolo: context.isSolo,
     dayLoads,

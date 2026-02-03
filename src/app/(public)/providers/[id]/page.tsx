@@ -1,18 +1,17 @@
 "use client";
-
-/* eslint-disable @next/next/no-img-element */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Section } from "@/components/ui/section";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import BookingWidget from "@/features/booking/components/booking-widget";
-import { ReviewForm } from "@/features/reviews/components/review-form";
-import { moneyRUB } from "@/lib/format";
-import type { MediaAssetDto } from "@/lib/media/types";
-import type { ProviderProfileDto } from "@/lib/providers/dto";
+import { HeroBlock } from "@/features/public-profile/master/hero-block";
+import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
+import { ReviewsPreview } from "@/features/public-profile/master/reviews-preview";
+import { ServicesMenu } from "@/features/public-profile/master/services-menu";
+import { PublicBookingWidget } from "@/features/public-profile/master/public-booking-widget";
+import type { ProviderProfileDto, ProviderServiceDto } from "@/lib/providers/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type ClientBooking = {
   id: string;
@@ -20,10 +19,13 @@ type ClientBooking = {
   provider: { id: string };
 };
 
-function stars(value: number): string {
-  const rounded = Math.max(0, Math.min(5, Math.round(value)));
-  return "*".repeat(rounded) + "-".repeat(5 - rounded);
-}
+type PortfolioItemPreview = {
+  id: string;
+  mediaUrl: string;
+  caption: string | null;
+  primaryServiceTitle: string | null;
+  masterName: string;
+};
 
 export default function ProviderProfilePage() {
   const params = useParams<{ id: string }>();
@@ -31,11 +33,10 @@ export default function ProviderProfilePage() {
   const router = useRouter();
 
   const [provider, setProvider] = useState<ProviderProfileDto | null>(null);
-  const [masters, setMasters] = useState<Array<{ id: string; name: string }>>([]);
-  const [portfolio, setPortfolio] = useState<MediaAssetDto[]>([]);
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItemPreview[]>([]);
   const [reviews, setReviews] = useState<ReviewDto[]>([]);
+  const [selectedServices, setSelectedServices] = useState<ProviderServiceDto[]>([]);
   const [canReviewBookingId, setCanReviewBookingId] = useState<string | null>(null);
-  const [showReviewForm, setShowReviewForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
@@ -52,7 +53,7 @@ export default function ProviderProfilePage() {
         const json = (await res.json().catch(() => null)) as ApiResponse<{ provider: ProviderProfileDto | null }> | null;
 
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+          throw new Error(json && !json.ok ? json.error.message : UI_TEXT.publicProfile.page.loadFailedTitle);
         }
 
         const loaded = json.data.provider;
@@ -66,23 +67,21 @@ export default function ProviderProfilePage() {
 
         if (!alive) return;
         setProvider(loaded);
-        setMasters([]);
 
         if (loaded?.type === "MASTER") {
-          const [mediaRes, reviewsRes] = await Promise.all([
-            fetch(
-              `/api/media?entityType=MASTER&entityId=${encodeURIComponent(loaded.id)}&kind=PORTFOLIO`,
-              { cache: "no-store" }
-            ),
+          const [portfolioRes, reviewsRes] = await Promise.all([
+            fetch(`/api/feed/portfolio?masterId=${encodeURIComponent(loaded.id)}&limit=8`, { cache: "no-store" }),
             fetch(
               `/api/reviews?targetType=provider&targetId=${encodeURIComponent(loaded.id)}&limit=3&offset=0`,
               { cache: "no-store" }
             ),
           ]);
 
-          const mediaJson = (await mediaRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
-          if (alive && mediaRes.ok && mediaJson && mediaJson.ok) {
-            setPortfolio(mediaJson.data.assets);
+          const portfolioJson = (await portfolioRes.json().catch(() => null)) as ApiResponse<{
+            items: PortfolioItemPreview[];
+          }> | null;
+          if (alive && portfolioRes.ok && portfolioJson && portfolioJson.ok) {
+            setPortfolioItems(portfolioJson.data.items);
           }
 
           const reviewsJson = (await reviewsRes.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
@@ -110,7 +109,7 @@ export default function ProviderProfilePage() {
           }
         }
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Unknown error");
+        if (alive) setError(e instanceof Error ? e.message : UI_TEXT.publicProfile.page.unknownError);
       } finally {
         if (alive) setLoading(false);
       }
@@ -125,7 +124,7 @@ export default function ProviderProfilePage() {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">Loading profile...</div>
+          <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.loading}</div>
         </CardContent>
       </Card>
     );
@@ -135,7 +134,7 @@ export default function ProviderProfilePage() {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">Redirecting...</div>
+          <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.redirecting}</div>
         </CardContent>
       </Card>
     );
@@ -145,8 +144,8 @@ export default function ProviderProfilePage() {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">Failed to open profile</div>
-          <div className="mt-2 text-sm text-neutral-600">{error ?? "Not found"}</div>
+          <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.loadFailedTitle}</div>
+          <div className="mt-2 text-sm text-neutral-600">{error ?? UI_TEXT.publicProfile.page.notFound}</div>
         </CardContent>
       </Card>
     );
@@ -154,131 +153,61 @@ export default function ProviderProfilePage() {
 
   return (
     <div className="space-y-6">
-      <Section
-        title={provider.name}
-        subtitle={provider.tagline}
-        right={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge>{provider.type === "MASTER" ? "Master" : "Studio"}</Badge>
-            {provider.availableToday ? <Badge>Available today</Badge> : null}
-          </div>
-        }
+      <HeroBlock
+        provider={provider}
+        coverUrl={portfolioItems[0]?.mediaUrl ?? null}
+        specialization={provider.tagline.trim() ? provider.tagline : null}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <div className="space-y-4">
+          <ServicesMenu
+            services={provider.services}
+            selectedServiceIds={selectedServices.map((service) => service.id)}
+            onAdd={(service) =>
+              setSelectedServices((prev) => (prev.some((item) => item.id === service.id) ? prev : [...prev, service]))
+            }
+          />
+
           <Card className="bg-white">
             <CardContent className="p-5 md:p-6">
-              <div className="flex items-center gap-4">
-                {provider.avatarUrl ? (
-                  <img src={provider.avatarUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
-                ) : (
-                  <div className="h-20 w-20 rounded-2xl bg-neutral-100 border border-neutral-200" />
-                )}
-                <div className="text-sm text-neutral-700">
-                  <span className="font-semibold text-neutral-900">{provider.rating.toFixed(1)}</span>{" "}
-                  <span className="text-neutral-500">({provider.reviews} reviews)</span>
-                </div>
-                <div className="text-sm text-neutral-900">
-                  from <span className="font-semibold">{moneyRUB(provider.priceFrom)}</span>
-                </div>
-              </div>
-
-              <div className="mt-3 text-sm text-neutral-600">
-                {provider.district} / {provider.address}
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {provider.categories.map((c) => (
-                  <Badge key={c}>{c}</Badge>
+              <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.categoriesTitle}</div>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {provider.categories.map((category) => (
+                  <Badge key={category}>{category}</Badge>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white">
-            <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-neutral-900">Portfolio</div>
-              <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-                {portfolio.length > 0
-                  ? portfolio.map((asset) => (
-                      <div key={asset.id} className="aspect-square rounded-2xl bg-neutral-100 border border-neutral-200 overflow-hidden">
-                        <img src={asset.url} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    ))
-                  : Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="aspect-square rounded-2xl bg-neutral-100 border border-neutral-200" />
-                    ))}
-              </div>
-            </CardContent>
-          </Card>
+          <PortfolioStrip items={portfolioItems} />
 
-          <Card className="bg-white">
-            <CardContent className="p-5 md:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-neutral-900">Reviews</div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    {stars(provider.rating)} / {provider.reviews} reviews
-                  </div>
-                </div>
-                {canReviewBookingId && !showReviewForm ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowReviewForm(true)}
-                    className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Leave review
-                  </button>
-                ) : null}
-              </div>
-
-              {showReviewForm && canReviewBookingId ? (
-                <div className="mt-4">
-                  <ReviewForm
-                    bookingId={canReviewBookingId}
-                    onCancel={() => setShowReviewForm(false)}
-                    onSubmitted={async (created) => {
-                      setShowReviewForm(false);
-                      setReviews((prev) => [created, ...prev].slice(0, 3));
-                      const res = await fetch(`/api/providers/${provider.id}`, { cache: "no-store" });
-                      const json = (await res.json().catch(() => null)) as ApiResponse<{ provider: ProviderProfileDto | null }> | null;
-                      if (res.ok && json && json.ok && json.data.provider) {
-                        setProvider(json.data.provider);
-                      }
-                      setCanReviewBookingId(null);
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              <div className="mt-4 space-y-3">
-                {reviews.length === 0 ? (
-                  <div className="text-sm text-neutral-500">No reviews yet.</div>
-                ) : (
-                  reviews.map((review) => (
-                    <div key={review.id} className="rounded-xl border p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-medium">{review.authorName}</div>
-                        <div className="text-xs text-neutral-500">{stars(review.rating)}</div>
-                      </div>
-                      {review.text ? (
-                        <div className="mt-2 text-sm text-neutral-700">{review.text}</div>
-                      ) : null}
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <ReviewsPreview
+            providerId={provider.id}
+            rating={provider.rating}
+            reviewsCount={provider.reviews}
+            initialReviews={reviews}
+            canReviewBookingId={canReviewBookingId}
+            onRatingRefresh={async () => {
+              const res = await fetch(`/api/providers/${provider.id}`, { cache: "no-store" });
+              const json = (await res.json().catch(() => null)) as ApiResponse<{
+                provider: ProviderProfileDto | null;
+              }> | null;
+              if (res.ok && json && json.ok && json.data.provider) {
+                setProvider(json.data.provider);
+                setCanReviewBookingId(null);
+              }
+            }}
+          />
         </div>
 
-        <div className="lg:sticky lg:top-24 h-fit">
-          <BookingWidget
+        <div className="h-fit lg:sticky lg:top-6 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto">
+          <PublicBookingWidget
             providerId={provider.id}
-            providerType={provider.type}
-            services={provider.services}
-            masters={masters}
+            selectedServices={selectedServices}
+            onRemove={(serviceId) =>
+              setSelectedServices((prev) => prev.filter((service) => service.id !== serviceId))
+            }
           />
         </div>
       </div>

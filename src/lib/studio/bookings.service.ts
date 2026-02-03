@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { createBookingNotifications } from "@/lib/notifications/service";
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
@@ -108,6 +109,12 @@ export async function createStudioBooking(input: {
     return booking;
   });
 
+  try {
+    await createBookingNotifications({ bookingId: created.id, kind: "CREATED" });
+  } catch (error) {
+    console.error("Failed to create booking notifications:", error);
+  }
+
   return { id: created.id };
 }
 
@@ -203,11 +210,11 @@ export async function moveStudioBooking(input: {
 export async function updateMasterBookingStatus(input: {
   bookingId: string;
   masterId: string;
-  status: "STARTED" | "NO_SHOW" | "FINISHED";
+  status: "CONFIRMED" | "CANCELLED" | "NO_SHOW";
 }): Promise<{ id: string; status: string }> {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
-    select: { id: true, masterProviderId: true },
+    select: { id: true, masterProviderId: true, status: true, startAtUtc: true, endAtUtc: true },
   });
   if (!booking) {
     throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
@@ -216,11 +223,58 @@ export async function updateMasterBookingStatus(input: {
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
 
+  if (booking.status === "CANCELLED" || booking.status === "NO_SHOW" || booking.status === "FINISHED") {
+    throw new AppError("Booking is in terminal state", 409, "VALIDATION_ERROR");
+  }
+
+  if (input.status === "NO_SHOW") {
+    if (booking.status !== "CONFIRMED") {
+      throw new AppError("No-show is allowed only for confirmed bookings", 409, "VALIDATION_ERROR");
+    }
+    if (!booking.startAtUtc || !booking.endAtUtc) {
+      throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
+    }
+    const now = Date.now();
+    const from = booking.startAtUtc.getTime();
+    const graceMs = 60 * 60 * 1000;
+    const to = booking.endAtUtc.getTime() + graceMs;
+    if (now < from || now > to) {
+      throw new AppError("No-show is not available yet", 409, "VALIDATION_ERROR");
+    }
+  }
+
   const updated = await prisma.booking.update({
     where: { id: booking.id },
-    data: { status: input.status },
+    data:
+      input.status === "CANCELLED"
+        ? { status: input.status, cancelledBy: "PROVIDER" }
+        : { status: input.status },
     select: { id: true, status: true },
   });
+
+  if (input.status === "CONFIRMED") {
+    try {
+      await createBookingNotifications({ bookingId: updated.id, kind: "CONFIRMED" });
+    } catch (error) {
+      console.error("Failed to create booking notifications:", error);
+    }
+  }
+
+  if (input.status === "CANCELLED") {
+    try {
+      await createBookingNotifications({ bookingId: updated.id, kind: "REJECTED" });
+    } catch (error) {
+      console.error("Failed to create booking notifications:", error);
+    }
+  }
+
+  if (input.status === "NO_SHOW") {
+    try {
+      await createBookingNotifications({ bookingId: updated.id, kind: "NO_SHOW" });
+    } catch (error) {
+      console.error("Failed to create booking notifications:", error);
+    }
+  }
 
   return { id: updated.id, status: updated.status };
 }

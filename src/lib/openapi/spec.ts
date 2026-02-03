@@ -909,16 +909,39 @@ export const openApiSpec = {
       },
       MasterDayBooking: {
         type: "object",
-        required: ["id", "startAt", "endAt", "status", "clientName", "clientPhone", "notes", "serviceTitle"],
+        required: [
+          "id",
+          "startAt",
+          "endAt",
+          "rawStatus",
+          "status",
+          "canNoShow",
+          "clientName",
+          "clientPhone",
+          "notes",
+          "serviceTitle",
+        ],
         properties: {
           id: { type: "string" },
           startAt: { type: "string", format: "date-time", nullable: true },
           endAt: { type: "string", format: "date-time", nullable: true },
+          rawStatus: { type: "string" },
           status: { type: "string" },
+          canNoShow: { type: "boolean" },
           clientName: { type: "string" },
           clientPhone: { type: "string" },
           notes: { type: "string", nullable: true },
           serviceTitle: { type: "string" },
+        },
+      },
+      MasterDayWorkingHours: {
+        type: "object",
+        required: ["isDayOff", "startLocal", "endLocal", "bufferBetweenBookingsMin"],
+        properties: {
+          isDayOff: { type: "boolean" },
+          startLocal: { type: "string", nullable: true },
+          endLocal: { type: "string", nullable: true },
+          bufferBetweenBookingsMin: { type: "integer" },
         },
       },
       MasterDayGap: {
@@ -956,6 +979,7 @@ export const openApiSpec = {
         required: [
           "date",
           "isSolo",
+          "workingHours",
           "bookings",
           "currentBookingId",
           "nextBookingId",
@@ -967,6 +991,7 @@ export const openApiSpec = {
         properties: {
           date: { type: "string" },
           isSolo: { type: "boolean" },
+          workingHours: { $ref: "#/components/schemas/MasterDayWorkingHours" },
           bookings: { type: "array", items: { $ref: "#/components/schemas/MasterDayBooking" } },
           currentBookingId: { type: "string", nullable: true },
           nextBookingId: { type: "string", nullable: true },
@@ -991,7 +1016,7 @@ export const openApiSpec = {
         type: "object",
         required: ["status"],
         properties: {
-          status: { type: "string", enum: ["STARTED", "NO_SHOW", "FINISHED"] },
+          status: { type: "string", enum: ["CONFIRMED", "CANCELLED", "NO_SHOW"] },
         },
       },
       MasterScheduleDayLoad: {
@@ -1777,39 +1802,6 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/masters/{id}/schedule/weekly": {
-      get: {
-        summary: "Get weekly schedule",
-        tags: ["schedule", "masters"],
-        parameters: [masterIdParam],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/WeeklyScheduleData" }),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Master not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-      put: {
-        summary: "Set weekly schedule",
-        tags: ["schedule", "masters"],
-        parameters: [masterIdParam],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": { schema: { $ref: "#/components/schemas/WeeklyScheduleInput" } },
-          },
-        },
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/CountData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Master not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
     "/api/telegram/link": {
       get: {
         summary: "Generate Telegram linking URL",
@@ -2567,6 +2559,88 @@ export const openApiSpec = {
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule/weekly": {
+      get: {
+        summary: "Get own weekly schedule",
+        tags: ["master", "schedule"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/WeeklyScheduleData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      put: {
+        summary: "Set own weekly schedule",
+        tags: ["master", "schedule"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/WeeklyScheduleInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/CountData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule/buffer": {
+      get: {
+        summary: "Get own booking buffer",
+        tags: ["master", "schedule"],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              bufferBetweenBookingsMin: { type: "integer" },
+            },
+            required: ["bufferBetweenBookingsMin"],
+          }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      put: {
+        summary: "Set own booking buffer",
+        tags: ["master", "schedule"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  bufferBetweenBookingsMin: { type: "integer", minimum: 0, maximum: 30 },
+                },
+                required: ["bufferBetweenBookingsMin"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              bufferBetweenBookingsMin: { type: "integer" },
+            },
+            required: ["bufferBetweenBookingsMin"],
+          }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
           "500": errorResponse("Internal error"),
         },
       },
