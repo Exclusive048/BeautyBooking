@@ -1,4 +1,4 @@
-﻿/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +33,7 @@ type MasterProfileData = {
     id: string;
     displayName: string;
     tagline: string;
+    address: string;
     bio: string | null;
     avatarUrl: string | null;
     isPublished: boolean;
@@ -55,6 +56,10 @@ type ApiErrorShape = {
     message: string;
     details?: unknown;
   };
+};
+
+type AddressSuggestResponse = {
+  suggestions: string[];
 };
 
 function parseMediaAssetId(url: string): string | null {
@@ -139,6 +144,7 @@ export function MasterProfilePage() {
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
+  const [address, setAddress] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarAssetId, setAvatarAssetId] = useState<string | null>(null);
@@ -158,9 +164,14 @@ export function MasterProfilePage() {
   const [portfolioServiceIds, setPortfolioServiceIds] = useState<string[]>([]);
   const [portfolioMetaOpen, setPortfolioMetaOpen] = useState(false);
   const [portfolioAssetIdsByUrl, setPortfolioAssetIdsByUrl] = useState<Record<string, string>>({});
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
+  const [addressSuggestFocused, setAddressSuggestFocused] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const newPortfolioInputRef = useRef<HTMLInputElement | null>(null);
+  const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
+  const addressSuggestAbortRef = useRef<AbortController | null>(null);
   const serviceAutosaveTimer = useRef<number | null>(null);
   const hydratedRef = useRef(false);
 
@@ -178,6 +189,7 @@ export function MasterProfilePage() {
       setData(profileData);
       setDisplayName(profileData.master.displayName);
       setTagline(profileData.master.tagline);
+      setAddress(profileData.master.address);
       setBio(profileData.master.bio ?? "");
       setAvatarUrl(profileData.master.avatarUrl ?? "");
       setServicesDraft(Object.fromEntries(profileData.services.map((item) => [item.serviceId, item])));
@@ -231,6 +243,77 @@ export function MasterProfilePage() {
     void loadInvites();
   }, []);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!addressSuggestRootRef.current) return;
+      if (addressSuggestRootRef.current.contains(event.target as Node)) return;
+      setAddressSuggestFocused(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      if (addressSuggestAbortRef.current) {
+        addressSuggestAbortRef.current.abort();
+        addressSuggestAbortRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!addressSuggestFocused) {
+      setAddressSuggestLoading(false);
+      return;
+    }
+
+    const query = address.trim();
+    if (query.length < 3) {
+      if (addressSuggestAbortRef.current) {
+        addressSuggestAbortRef.current.abort();
+        addressSuggestAbortRef.current = null;
+      }
+      setAddressSuggestions([]);
+      setAddressSuggestLoading(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const controller = new AbortController();
+      if (addressSuggestAbortRef.current) {
+        addressSuggestAbortRef.current.abort();
+      }
+      addressSuggestAbortRef.current = controller;
+      setAddressSuggestLoading(true);
+
+      void (async () => {
+        try {
+          const params = new URLSearchParams({ q: query, limit: "6" });
+          const res = await fetch(`/api/address/suggest?${params.toString()}`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          const json = (await res.json().catch(() => null)) as ApiResponse<AddressSuggestResponse> | null;
+          if (!res.ok || !json || !json.ok) {
+            setAddressSuggestions([]);
+            return;
+          }
+          setAddressSuggestions(json.data.suggestions);
+        } catch (suggestError) {
+          if (suggestError instanceof DOMException && suggestError.name === "AbortError") return;
+          setAddressSuggestions([]);
+        } finally {
+          if (!controller.signal.aborted) {
+            setAddressSuggestLoading(false);
+          }
+        }
+      })();
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [address, addressSuggestFocused]);
+
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
   const disabledServices = useMemo(
     () => serviceList.filter((service) => !service.isEnabled),
@@ -255,6 +338,7 @@ export function MasterProfilePage() {
       const payload: {
         displayName?: string;
         tagline?: string;
+        address?: string;
         bio?: string | null;
         avatarUrl?: string | null;
       } = {};
@@ -267,6 +351,11 @@ export function MasterProfilePage() {
       const nextTagline = tagline.trim();
       if (nextTagline !== currentMaster.tagline) {
         payload.tagline = nextTagline;
+      }
+
+      const nextAddress = address.trim();
+      if (nextAddress !== currentMaster.address.trim()) {
+        payload.address = nextAddress;
       }
 
       const nextBio = bio.trim();
@@ -633,6 +722,41 @@ export function MasterProfilePage() {
 
             <input className="w-full rounded-lg border px-3 py-2 text-sm" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Имя" />
             <input className="w-full rounded-lg border px-3 py-2 text-sm" value={tagline} onChange={(event) => setTagline(event.target.value)} placeholder="Тэглайн" />
+            <div className="relative" ref={addressSuggestRootRef}>
+              <input
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                onFocus={() => setAddressSuggestFocused(true)}
+                placeholder="Адрес приёма"
+              />
+              {addressSuggestFocused ? (
+                <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border bg-white shadow-sm">
+                  {addressSuggestLoading ? (
+                    <div className="px-3 py-2 text-xs text-neutral-500">Ищем адреса...</div>
+                  ) : addressSuggestions.length > 0 ? (
+                    addressSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        className="block w-full border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-neutral-50"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setAddress(suggestion);
+                          setAddressSuggestFocused(false);
+                        }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))
+                  ) : address.trim().length >= 3 ? (
+                    <div className="px-3 py-2 text-xs text-neutral-500">Совпадений не найдено</div>
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-neutral-500">Введите минимум 3 символа</div>
+                  )}
+                </div>
+              ) : null}
+            </div>
             <textarea className="w-full rounded-lg border px-3 py-2 text-sm" value={bio} onChange={(event) => setBio(event.target.value)} placeholder="О себе" />
             <button type="button" onClick={() => void saveProfile()} disabled={saving} className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-60">
               {saving ? "Сохраняем..." : "Сохранить профиль"}
@@ -646,6 +770,7 @@ export function MasterProfilePage() {
             {avatarUrl ? <img src={avatarUrl} alt="avatar" className="h-24 w-24 rounded-2xl object-cover" /> : <div className="h-24 w-24 rounded-2xl bg-neutral-100" />}
             <div className="mt-2 font-semibold">{displayName || "Без имени"}</div>
             <div className="text-sm text-neutral-600">{tagline}</div>
+            <div className="text-sm text-neutral-600">{address}</div>
             <div className="text-sm text-neutral-600">{bio}</div>
             <div className="mt-2 text-xs text-neutral-500">⭐ {data.master.ratingAvg.toFixed(1)} · {data.master.ratingCount} отзывов</div>
           </div>

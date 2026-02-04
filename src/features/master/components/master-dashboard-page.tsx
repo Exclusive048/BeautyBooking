@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 
@@ -65,6 +66,11 @@ type AvailabilitySlot = {
   label: string;
 };
 
+type DisplayAvailabilitySlot = {
+  key: string;
+  label: string;
+};
+
 function todayDateKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -104,8 +110,10 @@ function formatAvailabilitySlot(slot: AvailabilitySlot): string {
 }
 
 const STORIES_SLOTS_PER_CARD = 10;
+const DISPLAY_SLOT_STEP_MS = 60 * 60 * 1000;
 
 export function MasterDashboardPage() {
+  const router = useRouter();
   const [date, setDate] = useState(todayDateKey());
   const [data, setData] = useState<DayData>({
     masterId: "",
@@ -153,6 +161,30 @@ export function MasterDashboardPage() {
       return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
     });
   }, [data.bookings]);
+
+  const displayFreeSlots = useMemo<DisplayAvailabilitySlot[]>(() => {
+    const result: DisplayAvailabilitySlot[] = [];
+    let lastSlotStartMs: number | null = null;
+
+    for (const slot of freeSlots) {
+      const slotStartMs = new Date(slot.startAtUtc).getTime();
+      if (!Number.isFinite(slotStartMs)) continue;
+
+      const roundedStartMs = Math.ceil(slotStartMs / DISPLAY_SLOT_STEP_MS) * DISPLAY_SLOT_STEP_MS;
+      if (lastSlotStartMs !== null && roundedStartMs < lastSlotStartMs + DISPLAY_SLOT_STEP_MS) {
+        continue;
+      }
+
+      const roundedIso = new Date(roundedStartMs).toISOString();
+      result.push({
+        key: `${slot.startAtUtc}-${roundedStartMs}`,
+        label: formatSlotLabel(roundedIso),
+      });
+      lastSlotStartMs = roundedStartMs;
+    }
+
+    return result;
+  }, [freeSlots]);
 
   const load = async (signal?: AbortSignal): Promise<void> => {
     setLoading(true);
@@ -569,13 +601,13 @@ export function MasterDashboardPage() {
               {slotsLoading ? <div className="text-sm text-text-sec">Загрузка слотов...</div> : null}
               {slotsError ? <div className="text-sm text-red-600">{slotsError}</div> : null}
               {!slotsLoading && !slotsError ? (
-                freeSlots.length === 0 ? (
+                displayFreeSlots.length === 0 ? (
                   <div className="text-text-sec">Свободных слотов нет.</div>
                 ) : (
                   <div className="max-h-56 space-y-1 overflow-auto text-sm text-text-sec">
-                    {freeSlots.map((slot) => (
-                      <div key={slot.label} className="rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-1">
-                        {formatAvailabilitySlot(slot)}
+                    {displayFreeSlots.map((slot) => (
+                      <div key={slot.key} className="rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-1">
+                        {slot.label}
                       </div>
                     ))}
                   </div>
@@ -590,12 +622,17 @@ export function MasterDashboardPage() {
                     <div className="text-sm text-text-sec">Пока отзывов нет.</div>
                 ) : (
                   data.latestReviews.map((review) => (
-                    <div key={review.id} className="rounded-xl border border-border-subtle bg-bg-input/70 p-2 text-sm">
+                    <button
+                      key={review.id}
+                      type="button"
+                      onClick={() => router.push("/cabinet/master/reviews")}
+                      className="w-full rounded-xl border border-border-subtle bg-bg-input/70 p-2 text-left text-sm transition hover:bg-bg-input"
+                    >
                       <div className="font-medium">
                         {review.authorName} · ⭐{review.rating}
                       </div>
                       {review.text ? <div className="text-text-sec">{review.text}</div> : null}
-                    </div>
+                    </button>
                   ))
                 )}
               </div>

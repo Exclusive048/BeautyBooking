@@ -38,6 +38,7 @@ export async function PATCH(req: Request) {
     const data = await updateMasterProfile(masterId, {
       displayName: body.displayName,
       tagline: body.tagline,
+      address: body.address,
       bio: body.bio,
       avatarUrl: body.avatarUrl,
       isPublished: body.isPublished,

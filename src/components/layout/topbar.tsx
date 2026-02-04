@@ -75,7 +75,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           label: UI_TEXT.nav.masterWorkspace,
           ariaLabel: UI_TEXT.nav.openMasterWorkspace,
           avatarUrl: masterProfile.provider.avatarUrl ?? null,
-          fallbackIcon: "✂",
+          fallbackIcon: "✂️",
         }
       : null,
     studio: studioProvider
