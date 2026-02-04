@@ -11,6 +11,7 @@ type BookingItem = {
   id: string;
   slotLabel: string;
   comment: string | null;
+  silentMode: boolean;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
   providerId: string;
   masterProviderId: string | null;
@@ -176,12 +177,22 @@ export function ClientBookingsPanel() {
             masterProviderId: rescheduleBooking.masterProviderId,
             serviceId: rescheduleBooking.service.id,
             slotLabel: rescheduleBooking.slotLabel,
+            status: rescheduleBooking.status,
+            silentMode: rescheduleBooking.silentMode,
           }}
           onClose={() => setRescheduleBooking(null)}
           onSuccess={(next) => {
             setItems((prev) =>
               prev.map((item) =>
-                item.id === rescheduleBooking.id ? { ...item, slotLabel: next.slotLabel } : item
+                item.id === rescheduleBooking.id
+                  ? {
+                      ...item,
+                      slotLabel: next.slotLabel,
+                      ...(typeof next.silentMode === "boolean"
+                        ? { silentMode: next.silentMode }
+                        : {}),
+                    }
+                  : item
               )
             );
           }}

@@ -22,6 +22,7 @@ export async function createClientBooking(
     clientName: string;
     clientPhone: string;
     comment: string | null | undefined;
+    silentMode?: boolean;
   },
   idempotencyKey?: string | null
 ): Promise<BookingDto> {
@@ -76,6 +77,7 @@ export async function createClientBooking(
       clientName: data.clientName,
       clientPhone: data.clientPhone,
       comment: data.comment,
+      silentMode: data.silentMode ?? false,
       clientUserId: userId,
     },
     select: {
@@ -87,6 +89,7 @@ export async function createClientBooking(
       clientName: true,
       clientPhone: true,
       comment: true,
+      silentMode: true,
       startAtUtc: true,
       endAtUtc: true,
       service: { select: { id: true, name: true } },

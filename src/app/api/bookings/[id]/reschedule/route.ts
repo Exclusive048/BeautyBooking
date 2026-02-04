@@ -27,9 +27,11 @@ export async function POST(
 
     const result = await rescheduleBooking({
       bookingId: p.id,
+      actorUserId: user.userId,
       startAtUtc,
       endAtUtc,
       slotLabel: parsed.slotLabel,
+      silentMode: parsed.silentMode,
     });
     if (!result.ok) {
       return jsonFail(result.status, result.message, resolveErrorCode(result.code, "INTERNAL_ERROR"));

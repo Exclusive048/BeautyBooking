@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 
@@ -15,6 +16,7 @@ type DayBooking = {
   clientName: string;
   clientPhone: string;
   notes: string | null;
+  silentMode: boolean;
   serviceTitle: string;
 };
 
@@ -503,13 +505,21 @@ export function MasterDashboardPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold">{booking.clientName}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-semibold">{booking.clientName}</div>
+                      {booking.silentMode ? (
+                        <Badge className="px-2 py-0.5 text-[11px]">🤫 Тишина</Badge>
+                      ) : null}
+                    </div>
                     <div className="text-xs text-text-sec">{booking.clientPhone}</div>
                     <div className="text-xs text-text-sec">{booking.serviceTitle}</div>
                   </div>
                   <div className="text-xs text-text-sec">{getStatusLabel(booking.status)}</div>
                 </div>
                 {booking.notes ? <div className="mt-2 text-sm text-text-sec">{booking.notes}</div> : null}
+                {booking.silentMode ? (
+                  <div className="mt-2 text-xs text-text-sec">Режим тишины включён</div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(booking.rawStatus === "PENDING" || booking.rawStatus === "NEW") && (
                     <>

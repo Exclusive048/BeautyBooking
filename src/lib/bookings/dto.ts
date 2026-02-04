@@ -33,6 +33,7 @@ export type BookingDto = {
   clientName: string;
   clientPhone: string;
   comment: string | null;
+  silentMode: boolean;
   startAtUtc: string | null;
   endAtUtc: string | null;
 };

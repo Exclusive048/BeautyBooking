@@ -27,12 +27,14 @@ type BookingInfo = {
   masterProviderId: string | null;
   serviceId: string;
   slotLabel: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  silentMode: boolean;
 };
 
 type Props = {
   booking: BookingInfo;
   onClose: () => void;
-  onSuccess: (next: { slotLabel: string }) => void;
+  onSuccess: (next: { slotLabel: string; silentMode?: boolean }) => void;
 };
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
@@ -104,6 +106,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange(7)[0] ?? "");
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotLabel, setSlotLabel] = useState<string>(booking.slotLabel);
+  const [silentMode, setSilentMode] = useState<boolean>(booking.silentMode);
   const [loading, setLoading] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +165,11 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
 
   const slotGroups = useMemo(() => groupSlotsByDayPeriod(slots, selectedDate), [slots, selectedDate]);
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
+  const canEditSilentMode = booking.status === "PENDING";
+
+  useEffect(() => {
+    setSilentMode(booking.silentMode);
+  }, [booking.silentMode, booking.id]);
 
   const submit = async () => {
     setError(null);
@@ -184,15 +192,21 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           startAtUtc: slot.startAtUtc,
           endAtUtc: slot.endAtUtc,
           slotLabel: slot.label,
+          ...(canEditSilentMode ? { silentMode } : {}),
         }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ booking: { slotLabel: string } }>
+        | ApiResponse<{ booking: { slotLabel: string; silentMode: boolean } }>
         | null;
       if (!res.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
 
-      onSuccess({ slotLabel: json.data.booking.slotLabel });
+      onSuccess({
+        slotLabel: json.data.booking.slotLabel,
+        ...(typeof json.data.booking.silentMode === "boolean"
+          ? { silentMode: json.data.booking.silentMode }
+          : {}),
+      });
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
@@ -252,6 +266,40 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
             </div>
           )}
         </div>
+
+        <label className="block cursor-pointer rounded-xl border border-border-subtle bg-bg-input p-3" aria-label="Хочу помолчать">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-text-main">Хочу помолчать 🤫</div>
+              <div className="mt-1 text-xs text-text-sec">
+                Мастер поздоровается, уточнит детали и дальше будет работать без разговоров.
+              </div>
+              {!canEditSilentMode ? (
+                <div className="mt-1 text-xs text-text-sec">
+                  Флаг можно менять только пока запись в статусе PENDING.
+                </div>
+              ) : null}
+            </div>
+            <span
+              className={`relative mt-1 inline-flex h-6 w-11 shrink-0 rounded-full border transition ${
+                silentMode ? "border-primary/70 bg-primary/25" : "border-border-subtle bg-bg-card"
+              } ${canEditSilentMode ? "" : "opacity-60"}`}
+            >
+              <input
+                type="checkbox"
+                checked={silentMode}
+                disabled={!canEditSilentMode}
+                onChange={(event) => setSilentMode(event.target.checked)}
+                className="sr-only"
+              />
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                  silentMode ? "left-6" : "left-0.5"
+                }`}
+              />
+            </span>
+          </div>
+        </label>
 
         <div className="flex gap-2">
           <Button

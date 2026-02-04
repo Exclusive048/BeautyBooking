@@ -87,9 +87,11 @@ async function resolveBufferMinutes(
 
 export async function rescheduleBooking(input: {
   bookingId: string;
+  actorUserId: string;
   startAtUtc: Date;
   endAtUtc: Date;
   slotLabel: string;
+  silentMode?: boolean;
 }): Promise<Result<RescheduleRecord>> {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
@@ -98,12 +100,27 @@ export async function rescheduleBooking(input: {
       status: true,
       providerId: true,
       masterProviderId: true,
+      clientUserId: true,
     },
   });
   if (!booking) return { ok: false, status: 404, message: "Booking not found", code: "BOOKING_NOT_FOUND" };
 
   if (booking.status === "CANCELLED") {
     return { ok: false, status: 409, message: "Booking cancelled", code: "BOOKING_CANCELLED" };
+  }
+
+  if (typeof input.silentMode === "boolean") {
+    if (!booking.clientUserId || booking.clientUserId !== input.actorUserId) {
+      return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
+    }
+    if (booking.status !== "PENDING") {
+      return {
+        ok: false,
+        status: 409,
+        message: "Silent mode can be changed only for pending bookings",
+        code: "CONFLICT",
+      };
+    }
   }
 
   if (!isValidDate(input.startAtUtc) || !isValidDate(input.endAtUtc)) {
@@ -127,6 +144,7 @@ export async function rescheduleBooking(input: {
       startAtUtc: input.startAtUtc,
       endAtUtc: input.endAtUtc,
       slotLabel: input.slotLabel,
+      ...(typeof input.silentMode === "boolean" ? { silentMode: input.silentMode } : {}),
     },
     select: {
       id: true,
@@ -137,6 +155,7 @@ export async function rescheduleBooking(input: {
       clientName: true,
       clientPhone: true,
       comment: true,
+      silentMode: true,
       startAtUtc: true,
       endAtUtc: true,
       service: { select: { id: true, name: true } },

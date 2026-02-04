@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -57,6 +57,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
   const [me, setMe] = useState<BookingUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [comment, setComment] = useState("");
+  const [silentMode, setSilentMode] = useState(false);
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -221,6 +222,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
         clientName: me?.displayName ?? UI_TEXT.publicProfile.booking.clientFallbackName,
         clientPhone: me?.phone ?? "",
         comment: comment.trim() ? comment.trim() : null,
+        silentMode,
       });
 
       if (!result.ok && result.error === "AUTH_REQUIRED") {
@@ -390,6 +392,36 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
             </div>
           </div>
 
+          <label
+            className="mt-3 block cursor-pointer rounded-xl border border-border bg-surface p-3"
+            aria-label="Хочу помолчать"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-text">Хочу помолчать 🤫</div>
+                <div className="mt-1 text-xs text-text-muted">
+                  Мастер поздоровается, уточнит детали и дальше будет работать без разговоров.
+                </div>
+              </div>
+              <span
+                className={`relative mt-1 inline-flex h-6 w-11 shrink-0 rounded-full border transition ${
+                  silentMode ? "border-primary/70 bg-primary/25" : "border-border-subtle bg-muted/20"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={silentMode}
+                  onChange={(event) => setSilentMode(event.target.checked)}
+                  className="sr-only"
+                />
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                    silentMode ? "left-6" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </div>
+          </label>
           <label className="mt-3 block text-xs text-text-muted">{UI_TEXT.publicProfile.booking.comment}</label>
           <textarea
             value={comment}

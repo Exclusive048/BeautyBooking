@@ -21,6 +21,7 @@ export type BookingCreateInput = {
   clientName: string;
   clientPhone: string;
   comment: string | null;
+  silentMode?: boolean;
 };
 
 export type BookingCreateResult =

@@ -56,6 +56,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
   const [me, setMe] = useState<MeUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [comment, setComment] = useState("");
+  const [silentMode, setSilentMode] = useState(false);
   const [guestPhone, setGuestPhone] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -203,6 +204,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
           clientName,
           clientPhone,
           comment: comment.trim() ? comment.trim() : null,
+          silentMode,
         }),
       });
 
@@ -382,6 +384,36 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
           ) : null}
 
           <div>
+            <label
+              className="mb-2 block cursor-pointer rounded-xl border border-border-subtle bg-bg-input/70 p-3"
+              aria-label="Хочу помолчать"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-text-main">Хочу помолчать 🤫</div>
+                  <div className="mt-1 text-xs text-text-sec">
+                    Мастер поздоровается, уточнит детали и дальше будет работать без разговоров.
+                  </div>
+                </div>
+                <span
+                  className={`relative mt-1 inline-flex h-6 w-11 shrink-0 rounded-full border transition ${
+                    silentMode ? "border-primary/70 bg-primary/30" : "border-border-subtle bg-bg-card"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={silentMode}
+                    onChange={(event) => setSilentMode(event.target.checked)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                      silentMode ? "left-6" : "left-0.5"
+                    }`}
+                  />
+                </span>
+              </div>
+            </label>
             <label className="mb-1 block text-xs text-text-sec">{UI_TEXT.publicProfile.booking.comment}</label>
             <textarea
               value={comment}
