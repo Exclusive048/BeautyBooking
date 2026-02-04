@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { attachMasterToStudio, detachMasterFromStudio, listStudioMasters } from "@/lib/studios/masters";
-import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
+import { ensureStudioAdmin } from "@/lib/studios/access";
 
 const attachSchema = z.object({
   masterProviderId: z.string().min(1),
@@ -13,7 +13,7 @@ const detachSchema = z.object({
 });
 
 async function ensureStudioViewer(studioId: string, userId: string) {
-  return ensureStudioAccess(studioId, userId);
+  return ensureStudioAdmin(studioId, userId);
 }
 
 export async function GET(

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import type { NotificationCenterData } from "@/lib/notifications/center";
@@ -88,6 +89,13 @@ export function NotificationsCenterPage({ initialData }: Props) {
                   <div className="text-xs text-neutral-500">{UI_FMT.notificationTimeLabel(note.createdAt)}</div>
                 </div>
                 {note.body ? <div className="mt-2 text-sm text-neutral-700">{note.body}</div> : null}
+                {note.openHref ? (
+                  <div className="mt-3">
+                    <Link href={note.openHref} className="inline-flex rounded-lg border px-3 py-1.5 text-xs font-medium">
+                      Open
+                    </Link>
+                  </div>
+                ) : null}
               </article>
             ))}
             {filteredNotifications.length === 0 ? (

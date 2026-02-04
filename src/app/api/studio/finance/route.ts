@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     await ensureStudioRole({
       studioId: query.studioId,
       userId: user.id,
-      allowed: [StudioRole.OWNER, StudioRole.ADMIN, StudioRole.MASTER],
+      allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
 
     const data = await getStudioFinance({

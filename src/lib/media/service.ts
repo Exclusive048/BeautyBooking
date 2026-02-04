@@ -36,6 +36,10 @@ function normalizeEntityId(entityId: string): string {
   return entityId.trim();
 }
 
+function studioBannerSettingKey(studioProviderId: string): string {
+  return `studioBannerAssetId:${studioProviderId}`;
+}
+
 function validateUploadBasics(input: UploadMediaInput): void {
   if (!input.entityId.trim()) {
     throw new AppError("entityId is required", 400, "MEDIA_ENTITY_ID_REQUIRED");
@@ -67,12 +71,35 @@ async function deleteAssetById(assetId: string): Promise<void> {
 }
 
 async function enforcePortfolioLimit(entityType: MediaEntityType, entityId: string): Promise<void> {
+  const excludedAssetIds: string[] = [];
+
+  if (entityType === MediaEntityType.STUDIO) {
+    const bannerSetting = await prisma.appSetting.findUnique({
+      where: { key: studioBannerSettingKey(entityId) },
+      select: { value: true },
+    });
+    if (bannerSetting?.value) {
+      excludedAssetIds.push(bannerSetting.value);
+    }
+  }
+
+  if (entityType === MediaEntityType.SITE && entityId === "site") {
+    const heroSetting = await prisma.appSetting.findUnique({
+      where: { key: SITE_LOGIN_HERO_SETTING_KEY },
+      select: { value: true },
+    });
+    if (heroSetting?.value) {
+      excludedAssetIds.push(heroSetting.value);
+    }
+  }
+
   const count = await prisma.mediaAsset.count({
     where: {
       entityType,
       entityId,
       kind: MediaKind.PORTFOLIO,
       deletedAt: null,
+      ...(excludedAssetIds.length > 0 ? { id: { notIn: excludedAssetIds } } : {}),
     },
   });
   if (count >= MEDIA_PORTFOLIO_LIMIT) {

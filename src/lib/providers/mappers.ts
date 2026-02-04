@@ -62,6 +62,8 @@ export function mapProviderProfile(provider: ProviderWithServices): ProviderProf
     district: provider.district,
     categories: provider.categories,
     availableToday: provider.availableToday,
+    geoLat: provider.geoLat,
+    geoLng: provider.geoLng,
     services: provider.services.map(mapProviderService),
   };
 }

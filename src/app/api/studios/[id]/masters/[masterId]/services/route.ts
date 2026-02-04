@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { listMasterServiceOverrides, setMasterServiceOverride } from "@/lib/studios/master-services";
-import { ensureStudioAccess, ensureStudioAdminOrMasterSelf } from "@/lib/studios/access";
+import { ensureStudioAdmin } from "@/lib/studios/access";
 
 const updateSchema = z.object({
   serviceId: z.string().min(1),
@@ -12,7 +12,7 @@ const updateSchema = z.object({
 });
 
 async function ensureStudioViewer(studioId: string, userId: string) {
-  return ensureStudioAccess(studioId, userId);
+  return ensureStudioAdmin(studioId, userId);
 }
 
 export async function GET(
@@ -40,7 +40,7 @@ export async function PUT(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioAdminOrMasterSelf(p.id, p.masterId, auth.user.id);
+  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
   const body = await req.json().catch(() => null);

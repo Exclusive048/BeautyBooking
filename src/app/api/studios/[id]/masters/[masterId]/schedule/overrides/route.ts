@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
-import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
+import { ensureStudioAdmin } from "@/lib/studios/access";
 import { removeScheduleOverride, setScheduleOverride } from "@/lib/schedule/usecases";
 import { ensureStartNotAfterEnd, parseISOToUTC } from "@/lib/time";
 import { toAppError } from "@/lib/api/errors";
@@ -28,7 +28,7 @@ const deleteSchema = z.object({
 });
 
 async function ensureStudioViewer(studioId: string, userId: string) {
-  return ensureStudioAccess(studioId, userId);
+  return ensureStudioAdmin(studioId, userId);
 }
 
 async function ensureMasterInStudio(masterId: string, studioId: string) {

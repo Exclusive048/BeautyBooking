@@ -93,13 +93,13 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
 
     setLoading(true);
     try {
-      await fetchJson<Record<string, never>>("/api/auth/otp/verify", {
+      const result = await fetchJson<{ redirect: string }>("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: normalized, code }),
       });
 
-      router.replace(nextPath ?? "/cabinet");
+      router.replace(nextPath ?? result.redirect);
       router.refresh();
     } catch (error) {
       if (error instanceof ApiClientError) {

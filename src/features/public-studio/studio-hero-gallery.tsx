@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { UI_FMT } from "@/lib/ui/fmt";
+import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type StudioHeroData = {
@@ -9,6 +10,8 @@ type StudioHeroData = {
   rating: number;
   reviews: number;
   address: string;
+  geoLat?: number | null;
+  geoLng?: number | null;
 };
 
 type Props = {
@@ -17,10 +20,11 @@ type Props = {
 };
 
 export function StudioHeroGallery({ studio, imageUrls }: Props) {
-  const hasAddress = studio.address.trim().length > 0;
-  const mapsHref = hasAddress
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(studio.address)}`
-    : null;
+  const mapsHref = buildYandexMapsUrl({
+    address: studio.address,
+    lat: studio.geoLat ?? null,
+    lon: studio.geoLng ?? null,
+  });
 
   const heroImages = imageUrls.slice(0, 5);
   const primary = heroImages[0] ?? null;

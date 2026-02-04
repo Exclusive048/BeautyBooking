@@ -2,7 +2,7 @@ import { ok, fail } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { requireAuth } from "@/lib/auth/guards";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
-import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
+import { ensureStudioAdmin } from "@/lib/studios/access";
 import { getStudioProviderById, updateStudioProviderProfile } from "@/lib/studios/studio";
 import { z } from "zod";
 
@@ -57,7 +57,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
 
   const { id } = parsed.data;
-  const accessError = await ensureStudioAccess(id, auth.user.id);
+  const accessError = await ensureStudioAdmin(id, auth.user.id);
   if (accessError) return accessError;
 
   const studio = await getStudioProviderById(id);

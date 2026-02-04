@@ -38,5 +38,7 @@ export type ProviderProfileDto = {
   district: string;
   categories: string[];
   availableToday: boolean;
+  geoLat: number | null;
+  geoLng: number | null;
   services: ProviderServiceDto[];
 };

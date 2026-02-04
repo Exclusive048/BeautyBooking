@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
-import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
+import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { CabinetSideNav, type CabinetNavItem } from "@/features/cabinet/components/cabinet-side-nav";
 
 const STUDIO_NAV: CabinetNavItem[] = [
@@ -20,7 +20,7 @@ export default async function StudioCabinetLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const hasAccess = await hasAnyStudioAccess(user.id);
+  const hasAccess = await hasStudioAdminAccess(user.id);
   if (!hasAccess) redirect("/403");
 
   return (

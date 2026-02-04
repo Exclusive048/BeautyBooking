@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
-import { hasMasterProfile } from "@/lib/auth/roles";
+import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
+import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { getSessionUser } from "@/lib/auth/session";
 
 export default async function CabinetEntryPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const [hasStudioMode, hasMasterMode] = await Promise.all([
-    hasAnyStudioAccess(user.id),
-    hasMasterProfile(user.id),
-  ]);
+  const decision = await resolveCabinetRedirect(user.id);
+  if (!decision.needsHub) {
+    redirect(decision.target);
+  }
 
   return (
     <section className="mx-auto max-w-3xl space-y-4 p-4">
@@ -21,9 +21,9 @@ export default async function CabinetEntryPage() {
       </header>
 
       <div className="grid gap-3 md:grid-cols-2">
-        {hasStudioMode ? (
+        {decision.hasStudioMode ? (
           <Link
-            href="/cabinet/studio/calendar"
+            href={STUDIO_CABINET_PATH}
             className="rounded-2xl border p-5 transition hover:bg-neutral-50"
           >
             <div className="text-lg font-semibold">Studio</div>
@@ -33,9 +33,9 @@ export default async function CabinetEntryPage() {
           </Link>
         ) : null}
 
-        {hasMasterMode ? (
+        {decision.hasMasterMode ? (
           <Link
-            href="/cabinet/master/dashboard"
+            href={MASTER_CABINET_PATH}
             className="rounded-2xl border p-5 transition hover:bg-neutral-50"
           >
             <div className="text-lg font-semibold">Master</div>

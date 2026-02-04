@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
+import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -32,10 +33,11 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
     }
   }
 
-  const hasAddress = provider.address.trim().length > 0;
-  const mapsHref = hasAddress
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(provider.address)}`
-    : null;
+  const mapsHref = buildYandexMapsUrl({
+    address: provider.address,
+    lat: provider.geoLat,
+    lon: provider.geoLng,
+  });
 
   return (
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 shadow-lg">
@@ -109,4 +111,3 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
     </section>
   );
 }
-

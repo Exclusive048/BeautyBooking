@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { createSessionToken } from "@/lib/auth/jwt";
 import { authenticateTelegramLogin } from "@/lib/auth/telegram-login";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
@@ -38,5 +39,6 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  return ok({ redirect: "/cabinet?tab=profile" });
+  const redirectDecision = await resolveCabinetRedirect(result.user.id);
+  return ok({ redirect: redirectDecision.target });
 }

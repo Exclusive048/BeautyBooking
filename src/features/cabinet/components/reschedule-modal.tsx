@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
 import { timeToMinutes } from "@/lib/schedule/time";
-import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type SlotItem = {
   startAtUtc: string;
@@ -79,9 +79,9 @@ function groupSlotsByDayPeriod(slots: SlotItem[], dateKey: string): SlotGroup[] 
   items.sort((a, b) => a.minutes - b.minutes);
 
   const groups = [
-    { id: "morning", label: UI_TEXTS.booking.morning, items: [] as string[] },
-    { id: "day", label: UI_TEXTS.booking.day, items: [] as string[] },
-    { id: "evening", label: UI_TEXTS.booking.evening, items: [] as string[] },
+    { id: "morning", label: UI_TEXT.clientCabinet.booking.morning, items: [] as string[] },
+    { id: "day", label: UI_TEXT.clientCabinet.booking.day, items: [] as string[] },
+    { id: "evening", label: UI_TEXT.clientCabinet.booking.evening, items: [] as string[] },
   ];
 
   for (const item of items) {
@@ -97,6 +97,7 @@ function groupSlotsByDayPeriod(slots: SlotItem[], dateKey: string): SlotGroup[] 
 }
 
 export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
+  const t = UI_TEXT.clientCabinet;
   const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange(7)[0] ?? "");
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotLabel, setSlotLabel] = useState<string>(booking.slotLabel);
@@ -126,8 +127,8 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
 
         const res = await fetch(url.toString(), { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ slots: SlotItem[] }> | null;
-        if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.loadSlotsFailed));
-        if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.loadSlotsFailed));
+        if (!res.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
+        if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
 
         if (!cancelled) {
           setSlots(json.data.slots ?? []);
@@ -136,7 +137,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
+          setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
           setSlots([]);
         }
       } finally {
@@ -148,7 +149,13 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [booking.serviceId, masterId, selectedDate]);
+  }, [
+    booking.serviceId,
+    masterId,
+    selectedDate,
+    t.booking.loadSlotsFailed,
+    t.bookingsPanel.unknownError,
+  ]);
 
   const slotGroups = useMemo(() => groupSlotsByDayPeriod(slots, selectedDate), [slots, selectedDate]);
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
@@ -156,12 +163,12 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const submit = async () => {
     setError(null);
     if (!slotLabel) {
-      setError(UI_TEXTS.booking.chooseTime);
+      setError(t.booking.chooseTime);
       return;
     }
     const slot = slotByLabel.get(slotLabel);
     if (!slot) {
-      setError(UI_TEXTS.booking.chooseCorrectSlot);
+      setError(t.booking.chooseCorrectSlot);
       return;
     }
 
@@ -179,13 +186,13 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
       const json = (await res.json().catch(() => null)) as
         | ApiResponse<{ booking: { slotLabel: string } }>
         | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.submitFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, UI_TEXTS.booking.submitFailed));
+      if (!res.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
 
       onSuccess({ slotLabel: json.data.booking.slotLabel });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : UI_TEXTS.bookingsPanel.unknownError);
+      setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
     } finally {
       setLoading(false);
     }
@@ -198,15 +205,15 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border p-5 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-lg font-semibold">{UI_TEXTS.booking.moveBooking}</div>
-              <div className="text-sm text-neutral-600">{UI_TEXTS.booking.moveBookingHint}</div>
+              <div className="text-lg font-semibold">{t.booking.moveBooking}</div>
+              <div className="text-sm text-neutral-600">{t.booking.moveBookingHint}</div>
             </div>
             <button
               onClick={onClose}
               className="rounded-lg px-2 py-1 text-neutral-600 hover:bg-neutral-100"
               aria-label="Close"
             >
-              ×
+              X
             </button>
           </div>
 
@@ -217,7 +224,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           ) : null}
 
           <div>
-            <div className="text-sm font-medium">{UI_TEXTS.booking.chooseDate}</div>
+            <div className="text-sm font-medium">{t.booking.chooseDate}</div>
             <div className="mt-2 flex gap-2 overflow-x-auto">
               {dateOptions.map((date) => {
                 const active = date === selectedDate;
@@ -240,11 +247,11 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           </div>
 
           <div>
-            <div className="text-sm font-medium">{UI_TEXTS.booking.chooseTime}</div>
+            <div className="text-sm font-medium">{t.booking.chooseTime}</div>
             {loadingSlots ? (
-              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.common.loading}</div>
+              <div className="mt-2 text-sm text-neutral-600">{UI_TEXT.common.loading}</div>
             ) : slotGroups.length === 0 ? (
-              <div className="mt-2 text-sm text-neutral-600">{UI_TEXTS.booking.noSlots}</div>
+              <div className="mt-2 text-sm text-neutral-600">{t.booking.noSlots}</div>
             ) : (
               <div className="mt-3">
                 <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
@@ -258,7 +265,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
               onClick={onClose}
               className="flex-1 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
             >
-              {UI_TEXTS.common.cancel}
+              {UI_TEXT.common.cancel}
             </button>
             <button
               type="button"
@@ -266,7 +273,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
               disabled={loading || loadingSlots}
               className="flex-1 rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-60"
             >
-              {loading ? UI_TEXTS.booking.moving : UI_TEXTS.booking.moveConfirm}
+              {loading ? t.booking.moving : t.booking.moveConfirm}
             </button>
           </div>
         </div>

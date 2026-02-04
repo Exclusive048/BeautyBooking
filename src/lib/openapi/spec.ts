@@ -256,7 +256,7 @@ export const openApiSpec = {
           { $ref: "#/components/schemas/ProviderCard" },
           {
             type: "object",
-            required: ["services", "studioId", "bannerUrl", "description"],
+            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng"],
             properties: {
               services: {
                 type: "array",
@@ -265,6 +265,8 @@ export const openApiSpec = {
               studioId: { type: "string", nullable: true },
               bannerUrl: { type: "string", nullable: true },
               description: { type: "string", nullable: true },
+              geoLat: { type: "number", nullable: true },
+              geoLng: { type: "number", nullable: true },
             },
           },
         ],
@@ -1681,10 +1683,11 @@ export const openApiSpec = {
           id: { type: "string" },
           title: { type: "string" },
           body: { type: "string", nullable: true },
-          type: { type: "string", enum: ["BOOKING_CREATED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED"] },
+          type: { type: "string", enum: ["BOOKING_CREATED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED", "SCHEDULE_REQUEST"] },
           channel: { type: "string", enum: ["MASTER", "STUDIO", "SYSTEM"] },
           readAt: { type: "string", format: "date-time", nullable: true },
           createdAt: { type: "string", format: "date-time" },
+          openHref: { type: "string", nullable: true },
         },
       },
       NotificationCenterData: {
