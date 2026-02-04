@@ -4,36 +4,79 @@
 
 @layer base {
   :root {
-    --bg: 248 246 242;
-    --surface: 255 255 255;
-    --elevated: 252 251 248;
-    --input: 252 251 248;
-    --surface-hover: 246 244 239;
-    --muted: 242 239 233;
-    --border: 228 224 216;
-    --text: 24 23 21;
-    --text-muted: 120 116 111;
-    --accent: 198 169 126;
-    --accent-hover: 214 191 156;
-    --ring: 198 169 126;
-    --shadow: 0 12px 30px rgba(20, 20, 20, 0.08);
+    --bg-page: 246 243 238;
+    --bg-card: 255 255 255;
+    --bg-input: 251 248 243;
+    --bg-input-focus: 255 255 255;
+    --text-main: 28 27 24;
+    --text-label: 86 81 73;
+    --text-sec: 118 113 105;
+    --text-placeholder: 145 139 129;
+    --border-subtle: 228 223 214;
+    --border-focus: 198 169 126;
+    --primary: 198 169 126;
+    --primary-hover: 214 191 156;
+    --primary-magenta: 191 130 176;
+    --primary-glow: 198 169 126;
+    --shadow-sm: 0 10px 24px rgba(27, 26, 23, 0.08);
+    --shadow-lg: 0 24px 44px rgba(27, 26, 23, 0.14);
+    --shadow-card: 0 16px 34px rgba(27, 26, 23, 0.08);
+    --shadow-hover: 0 24px 44px rgba(27, 26, 23, 0.14);
+    --glass-border: 255 255 255;
+    --glass-bg: 255 255 255;
+
+    /* Backward-compatible aliases for existing Tailwind tokens. */
+    --bg: var(--bg-page);
+    --surface: var(--bg-card);
+    --elevated: 250 248 244;
+    --input: var(--bg-input);
+    --surface-hover: 243 239 232;
+    --muted: 242 238 231;
+    --border: var(--border-subtle);
+    --text: var(--text-main);
+    --text-muted: var(--text-sec);
+    --accent: var(--primary);
+    --accent-hover: var(--primary-hover);
+    --ring: var(--primary-glow);
+    --shadow: var(--shadow-sm);
     --accent-foreground: 24 23 21;
   }
 
   .dark {
-    --bg: 12 12 13;
-    --surface: 20 20 22;
-    --elevated: 26 26 29;
-    --input: 24 24 27;
-    --surface-hover: 32 32 36;
-    --muted: 30 30 34;
-    --border: 52 52 58;
-    --text: 235 235 238;
-    --text-muted: 160 160 168;
-    --accent: 198 169 126;
-    --accent-hover: 214 191 156;
-    --ring: 198 169 126;
-    --shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+    --bg-page: 17 19 25;
+    --bg-card: 25 28 34;
+    --bg-input: 32 35 42;
+    --bg-input-focus: 38 42 50;
+    --text-main: 235 237 244;
+    --text-label: 182 188 204;
+    --text-sec: 162 167 182;
+    --text-placeholder: 126 132 149;
+    --border-subtle: 60 66 80;
+    --border-focus: 216 182 132;
+    --primary: 206 178 136;
+    --primary-hover: 221 197 160;
+    --primary-magenta: 187 126 178;
+    --primary-glow: 216 182 132;
+    --shadow-sm: 0 12px 28px rgba(0, 0, 0, 0.38);
+    --shadow-lg: 0 28px 52px rgba(0, 0, 0, 0.52);
+    --shadow-card: 0 18px 36px rgba(0, 0, 0, 0.4);
+    --shadow-hover: 0 28px 52px rgba(0, 0, 0, 0.52);
+    --glass-border: 255 255 255;
+    --glass-bg: 13 16 22;
+
+    --bg: var(--bg-page);
+    --surface: var(--bg-card);
+    --elevated: 28 31 38;
+    --input: var(--bg-input);
+    --surface-hover: 36 39 48;
+    --muted: 33 36 44;
+    --border: var(--border-subtle);
+    --text: var(--text-main);
+    --text-muted: var(--text-sec);
+    --accent: var(--primary);
+    --accent-hover: var(--primary-hover);
+    --ring: var(--primary-glow);
+    --shadow: var(--shadow-sm);
     --accent-foreground: 24 23 21;
   }
 
@@ -47,11 +90,24 @@
   }
 
   body {
-    background-color: rgb(var(--bg));
-    color: rgb(var(--text));
+    min-height: 100%;
+    background-color: rgb(var(--bg-page));
+    background-image:
+      radial-gradient(
+        70rem 70rem at 8% -20%,
+        rgb(var(--primary) / 0.1) 0%,
+        transparent 56%
+      ),
+      radial-gradient(
+        60rem 60rem at 92% -12%,
+        rgb(var(--primary-magenta) / 0.08) 0%,
+        transparent 56%
+      );
+    color: rgb(var(--text-main));
+    transition: background-color 280ms ease, color 280ms ease;
   }
 
-  /* ВАЖНО: чтобы Link внутри Button(asChild) наследовал цвет кнопки */
+  /* Keep link color inheritance inside button(asChild). */
   a {
     color: inherit;
     text-decoration: none;
@@ -67,21 +123,65 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: rgb(var(--text-muted));
+    color: rgb(var(--text-placeholder));
   }
 
   input:focus,
   textarea:focus,
   select:focus {
     outline: none;
-    border-color: rgb(var(--ring));
-    box-shadow: 0 0 0 2px rgb(var(--ring) / 0.35);
+    border-color: rgb(var(--border-focus));
+    box-shadow: 0 0 0 2px rgb(var(--border-focus) / 0.22), 0 0 0 7px rgb(var(--border-focus) / 0.12);
   }
 
-  /* Чтобы нативные option не выбивались (особенно в dark) */
+  /* Keep native option palette aligned in dark mode. */
   option {
     background-color: rgb(var(--surface));
     color: rgb(var(--text));
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background-color: rgb(var(--glass-bg) / 0.75);
+    border: 1px solid rgb(var(--glass-border) / 0.18);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px);
+  }
+
+  .frost-panel {
+    background-color: rgb(var(--glass-bg) / 0.66);
+    border: 1px solid rgb(var(--glass-border) / 0.2);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px);
+  }
+
+  .lux-card {
+    background-color: rgb(var(--bg-card));
+    border: 1px solid rgb(var(--border-subtle) / 0.9);
+    box-shadow: var(--shadow-card);
+    transition: border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
+  }
+
+  .lux-card:hover {
+    border-color: rgb(var(--border-subtle) / 1);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .lux-input {
+    background-color: rgb(var(--bg-input));
+    border: 1px solid rgb(var(--border-subtle) / 0.68);
+    transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+  }
+
+  .lux-input:hover {
+    border-color: rgb(var(--border-subtle));
+  }
+
+  .lux-input:focus-visible {
+    background-color: rgb(var(--bg-input-focus));
+    border-color: rgb(var(--border-focus));
+    box-shadow: 0 0 0 1px rgb(var(--border-focus) / 0.34), 0 0 0 7px rgb(var(--border-focus) / 0.16);
   }
 }
 
@@ -98,33 +198,43 @@
   .dark .bg-white {
     background-color: rgb(var(--surface));
   }
+
   .dark .bg-neutral-50 {
     background-color: rgb(var(--surface));
   }
+
   .dark .bg-neutral-100 {
     background-color: rgb(var(--muted));
   }
+
   .dark .border-neutral-200 {
     border-color: rgb(var(--border));
   }
+
   .dark .border-neutral-300 {
     border-color: rgb(var(--border));
   }
+
   .dark .text-neutral-900 {
     color: rgb(var(--text));
   }
+
   .dark .text-neutral-800 {
     color: rgb(var(--text));
   }
+
   .dark .text-neutral-700 {
     color: rgb(var(--text));
   }
+
   .dark .text-neutral-600 {
     color: rgb(var(--text-muted));
   }
+
   .dark .text-neutral-500 {
     color: rgb(var(--text-muted));
   }
+
   .dark .text-neutral-400 {
     color: rgb(var(--text-muted));
   }

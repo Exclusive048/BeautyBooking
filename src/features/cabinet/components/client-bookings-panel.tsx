@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
 import { ReviewForm } from "@/features/reviews/components/review-form";
@@ -10,6 +11,7 @@ type BookingItem = {
   id: string;
   slotLabel: string;
   comment: string | null;
+  silentMode: boolean;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
   providerId: string;
   masterProviderId: string | null;
@@ -100,63 +102,66 @@ export function ClientBookingsPanel() {
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">{t.bookingsPanel.loading}</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.bookingsPanel.loading}</div>;
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border p-5 text-sm text-red-600">
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-600">
         {t.common.error}: {error}
       </div>
     );
   }
 
   if (items.length === 0) {
-    return <div className="rounded-2xl border p-5 text-sm text-neutral-600">{t.bookingsPanel.empty}</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.bookingsPanel.empty}</div>;
   }
 
   return (
     <>
       <div className="space-y-3">
         {items.map((b) => (
-          <div key={b.id} className="rounded-2xl border p-4">
+          <div key={b.id} className="lux-card rounded-[22px] p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="font-medium">{b.provider.name}</div>
-              <div className="text-sm text-neutral-600">{statusLabel(b.status)}</div>
+              <div className="text-sm text-text-sec">{statusLabel(b.status)}</div>
             </div>
-            <div className="mt-1 text-sm text-neutral-700">
+            <div className="mt-1 text-sm text-text-main">
               {b.slotLabel} / {b.service.name}
             </div>
-            <div className="mt-1 text-sm text-neutral-600">
+            <div className="mt-1 text-sm text-text-sec">
               {b.provider.district} / {b.provider.address}
             </div>
-            {b.comment ? <div className="mt-2 text-sm text-neutral-600">{b.comment}</div> : null}
+            {b.comment ? <div className="mt-2 text-sm text-text-sec">{b.comment}</div> : null}
             {b.status !== "CANCELLED" ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setRescheduleBooking(b)}
                   disabled={actionId === b.id}
-                  className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
                 >
                   {t.bookingsPanel.reschedule}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => cancelBooking(b.id)}
                   disabled={actionId === b.id}
-                  className="rounded-lg border px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  variant="danger"
+                  size="sm"
                 >
                   {t.bookingsPanel.cancelBooking}
-                </button>
+                </Button>
                 {canLeaveMap[b.id] ? (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setReviewBookingId(b.id)}
-                    className="rounded-lg border px-3 py-1 text-sm hover:bg-neutral-50"
+                    variant="secondary"
+                    size="sm"
                   >
                     {t.bookingsPanel.leaveReview}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             ) : null}
@@ -172,12 +177,22 @@ export function ClientBookingsPanel() {
             masterProviderId: rescheduleBooking.masterProviderId,
             serviceId: rescheduleBooking.service.id,
             slotLabel: rescheduleBooking.slotLabel,
+            status: rescheduleBooking.status,
+            silentMode: rescheduleBooking.silentMode,
           }}
           onClose={() => setRescheduleBooking(null)}
           onSuccess={(next) => {
             setItems((prev) =>
               prev.map((item) =>
-                item.id === rescheduleBooking.id ? { ...item, slotLabel: next.slotLabel } : item
+                item.id === rescheduleBooking.id
+                  ? {
+                      ...item,
+                      slotLabel: next.slotLabel,
+                      ...(typeof next.silentMode === "boolean"
+                        ? { silentMode: next.silentMode }
+                        : {}),
+                    }
+                  : item
               )
             );
           }}

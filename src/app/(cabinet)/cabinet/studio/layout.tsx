@@ -26,12 +26,12 @@ export default async function StudioCabinetLayout({
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:flex-row">
       <aside className="md:w-64 md:shrink-0">
-        <div className="rounded-2xl border p-3">
+        <div className="lux-card rounded-[22px] p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h1 className="text-sm font-semibold">Studio cabinet</h1>
             <Link
               href="/cabinet/studio/profile"
-              className="rounded-lg border px-2 py-1 text-xs hover:bg-neutral-50"
+              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
             >
               Profile
             </Link>

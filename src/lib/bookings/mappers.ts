@@ -12,6 +12,7 @@ type BookingWithServiceModel = Prisma.BookingGetPayload<{
     clientName: true;
     clientPhone: true;
     comment: true;
+    silentMode: true;
     startAtUtc: true;
     endAtUtc: true;
     service: { select: { id: true; name: true } };
@@ -28,6 +29,7 @@ type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
     clientName: true;
     clientPhone: true;
     comment: true;
+    silentMode: true;
     startAtUtc: true;
     endAtUtc: true;
     service: { select: { id: true; name: true } };
@@ -51,6 +53,7 @@ export function toBookingDto(model: BookingWithServiceModel): BookingDto {
     clientName: model.clientName,
     clientPhone: model.clientPhone,
     comment: model.comment ?? null,
+    silentMode: model.silentMode,
     startAtUtc: model.startAtUtc ? toISO(model.startAtUtc) : null,
     endAtUtc: model.endAtUtc ? toISO(model.endAtUtc) : null,
   };

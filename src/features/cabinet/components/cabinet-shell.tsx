@@ -18,7 +18,7 @@ export function CabinetShell({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{title}</h1>
-          {subtitle ? <p className="mt-1 text-sm text-neutral-600">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-1 text-sm text-text-sec">{subtitle}</p> : null}
         </div>
         {right ? <div className="shrink-0">{right}</div> : null}
       </div>
@@ -35,9 +35,10 @@ export function CabinetTabs({
   active: "bookings" | "profile";
   baseHref?: string;
 }) {
-  const base = "rounded-xl px-3 py-2 text-sm font-medium";
-  const on = "bg-black text-white";
-  const off = "border hover:bg-neutral-50";
+  const base = "relative rounded-xl px-3 py-2 text-sm font-medium transition-all duration-300";
+  const on =
+    "bg-bg-card pl-4 text-text-main shadow-card before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full before:bg-gradient-to-b before:from-primary before:to-primary-magenta";
+  const off = "text-text-sec hover:bg-bg-input hover:text-text-main";
 
   const href = (tab: "bookings" | "profile") => {
     // Use relative tab navigation when baseHref is not provided.

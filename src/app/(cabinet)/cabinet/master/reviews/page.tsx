@@ -1,14 +1,23 @@
-export default function MasterReviewsPage() {
+import { redirect } from "next/navigation";
+import { MasterReviewsPage } from "@/features/master/components/master-reviews-page";
+import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentMasterProviderId } from "@/lib/master/access";
+
+export default async function MasterReviewsRoute() {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
+  const masterId = await getCurrentMasterProviderId(user.id);
+
   return (
     <section className="space-y-4">
       <header>
         <h2 className="text-xl font-semibold">Отзывы</h2>
-        <p className="text-sm text-neutral-600">Отзывы клиентов (заглушка).</p>
+        <p className="text-sm text-text-sec">
+          Оценки и комментарии клиентов, отсортированные прямо в кабинете.
+        </p>
       </header>
-      <div className="rounded-2xl border p-5 text-sm text-neutral-600">
-        Раздел отзывов будет расширен в следующем проходе.
-      </div>
+      <MasterReviewsPage masterId={masterId} />
     </section>
   );
 }
-

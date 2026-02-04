@@ -40,21 +40,23 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
   });
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 shadow-lg">
-      <div className="relative h-64 md:h-72">
+    <section className="relative overflow-hidden rounded-[32px] border border-border-subtle/70 bg-bg-card shadow-hover">
+      <div className="relative h-[280px] md:h-[340px]">
         {coverUrl ? (
           <img src={coverUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
+          <div className="h-full w-full bg-gradient-to-br from-bg-card via-bg-input to-muted" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+        <div className="pointer-events-none absolute -left-16 -top-20 h-60 w-60 rounded-full bg-primary/25 blur-3xl" />
+        <div className="pointer-events-none absolute -right-12 top-8 h-56 w-56 rounded-full bg-primary-magenta/18 blur-3xl" />
 
         <div className="absolute right-4 top-4 flex items-center gap-2">
           <button
             type="button"
             onClick={onShare}
             aria-label={UI_TEXT.publicProfile.hero.share}
-            className="rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-white backdrop-blur hover:bg-black/60"
+            className="frost-panel rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
           >
             {UI_TEXT.publicProfile.hero.share}
           </button>
@@ -62,51 +64,55 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
             <button
               type="button"
               aria-label={UI_TEXT.publicProfile.hero.favorite}
-              className="rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-white backdrop-blur hover:bg-black/60"
+              className="frost-panel rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
             >
               {UI_TEXT.publicProfile.hero.favorite}
             </button>
           ) : null}
         </div>
 
-        <div className="absolute bottom-4 left-4 right-4 md:bottom-6 md:left-6 md:right-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="flex items-end gap-4">
-              {provider.avatarUrl ? (
-                <img
-                  src={provider.avatarUrl}
-                  alt={provider.name}
-                  className="h-24 w-24 rounded-2xl border border-white/20 object-cover md:h-28 md:w-28"
-                />
-              ) : (
-                <div className="h-24 w-24 rounded-2xl border border-white/20 bg-white/10 md:h-28 md:w-28" />
-              )}
+        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 md:px-6 md:pb-6">
+          <div className="frost-panel rounded-2xl p-4 md:p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex items-end gap-4">
+                {provider.avatarUrl ? (
+                  <img
+                    src={provider.avatarUrl}
+                    alt={provider.name}
+                    className="h-[120px] w-[120px] rounded-full border-4 border-white/65 object-cover shadow-card"
+                  />
+                ) : (
+                  <div className="h-[120px] w-[120px] rounded-full border-4 border-white/55 bg-white/20" />
+                )}
 
-              <div className="pb-1 text-white">
-                <h1 className="text-2xl font-semibold md:text-3xl">{provider.name}</h1>
-                {specialization ? <div className="mt-1 text-sm text-white/80">{specialization}</div> : null}
-                <div className="mt-2 text-sm">{UI_FMT.ratingLabel(provider.rating, provider.reviews)}</div>
+                <div className="pb-1 text-white">
+                  <h1 className="text-2xl font-semibold md:text-3xl">{provider.name}</h1>
+                  {specialization ? <div className="mt-1 text-sm text-white/85">{specialization}</div> : null}
+                  <div className="mt-2 text-sm">{UI_FMT.ratingLabel(provider.rating, provider.reviews)}</div>
+                </div>
               </div>
-            </div>
 
-            {mapsHref ? (
-              <a
-                href={mapsHref}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`${UI_TEXT.publicProfile.hero.address}: ${provider.address}`}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-white backdrop-blur hover:bg-black/60"
-              >
-                <span aria-hidden>📍</span>
-                <span>{provider.address}</span>
-              </a>
-            ) : null}
+              {mapsHref ? (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`${UI_TEXT.publicProfile.hero.address}: ${provider.address}`}
+                  className="frost-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
+                >
+                  <span aria-hidden>📍</span>
+                  <span>{provider.address}</span>
+                </a>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
 
       {shareMessage ? (
-        <div className="border-t border-white/10 px-4 py-2 text-xs text-neutral-300 md:px-6">{shareMessage}</div>
+        <div className="border-t border-border-subtle/70 px-4 py-2 text-xs text-text-sec md:px-6">
+          {shareMessage}
+        </div>
       ) : null}
     </section>
   );

@@ -11,6 +11,7 @@ export type MasterDayBooking = {
   clientName: string;
   clientPhone: string;
   notes: string | null;
+  silentMode: boolean;
   serviceTitle: string;
 };
 
@@ -193,6 +194,7 @@ export async function getMasterDay(input: {
         clientName: true,
         clientPhone: true,
         notes: true,
+        silentMode: true,
         service: { select: { name: true, title: true } },
       },
       orderBy: { startAtUtc: "asc" },
@@ -282,6 +284,7 @@ export async function getMasterDay(input: {
       clientName: item.clientName,
       clientPhone: item.clientPhone,
       notes: item.notes ?? null,
+      silentMode: item.silentMode,
       serviceTitle: item.service.title?.trim() || item.service.name,
     };
   });

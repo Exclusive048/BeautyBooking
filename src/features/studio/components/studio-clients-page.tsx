@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type ClientItem = {
   key: string;
@@ -31,6 +32,7 @@ function formatDateTime(value: string): string {
 }
 
 export function StudioClientsPage({ studioId }: Props) {
+  const t = UI_TEXT.studioCabinet.clients;
   const [data, setData] = useState<ClientsData>({ clients: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,21 +46,21 @@ export function StudioClientsPage({ studioId }: Props) {
         const res = await fetch(`/api/studio/clients?${params.toString()}`, { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<ClientsData> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+          throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
         }
         setData(json.data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load clients");
+        setError(err instanceof Error ? err.message : t.loadFailed);
       } finally {
         setLoading(false);
       }
     };
 
     void load();
-  }, [studioId]);
+  }, [studioId, t.apiErrorPrefix, t.loadFailed]);
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm">Loading clients...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
   }
 
   return (
@@ -66,27 +68,27 @@ export function StudioClientsPage({ studioId }: Props) {
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       {data.clients.length === 0 ? (
-        <div className="rounded-2xl border p-5 text-sm text-neutral-600">No clients yet. Clients are built from bookings.</div>
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.empty}</div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border">
-          <table className="w-full border-collapse">
+        <div className="lux-card overflow-hidden rounded-[24px]">
+          <table className="w-full border-separate border-spacing-0">
             <thead>
-              <tr className="bg-neutral-50">
-                <th className="border-b p-3 text-left text-xs font-semibold text-neutral-600">Client</th>
-                <th className="border-b p-3 text-left text-xs font-semibold text-neutral-600">Phone</th>
-                <th className="border-b p-3 text-left text-xs font-semibold text-neutral-600">Last booking</th>
-                <th className="border-b p-3 text-left text-xs font-semibold text-neutral-600">Service</th>
-                <th className="border-b p-3 text-left text-xs font-semibold text-neutral-600">Visits</th>
+              <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
+                <th className="px-4 py-3 text-left">{t.columns.client}</th>
+                <th className="px-4 py-3 text-left">{t.columns.phone}</th>
+                <th className="px-4 py-3 text-left">{t.columns.lastBooking}</th>
+                <th className="px-4 py-3 text-left">{t.columns.service}</th>
+                <th className="px-4 py-3 text-left">{t.columns.visits}</th>
               </tr>
             </thead>
             <tbody>
-              {data.clients.map((client) => (
-                <tr key={client.key}>
-                  <td className="border-b p-3 text-sm">{client.displayName}</td>
-                  <td className="border-b p-3 text-sm text-neutral-600">{client.phone}</td>
-                  <td className="border-b p-3 text-sm text-neutral-600">{formatDateTime(client.lastBookingAt)}</td>
-                  <td className="border-b p-3 text-sm text-neutral-600">{client.lastServiceName}</td>
-                  <td className="border-b p-3 text-sm font-medium">{client.visitsCount}</td>
+              {data.clients.map((client, index) => (
+                <tr key={client.key} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
+                  <td className="px-4 py-3 text-sm text-text-main">{client.displayName}</td>
+                  <td className="px-4 py-3 text-sm text-text-sec">{client.phone}</td>
+                  <td className="px-4 py-3 text-sm text-text-sec">{formatDateTime(client.lastBookingAt)}</td>
+                  <td className="px-4 py-3 text-sm text-text-sec">{client.lastServiceName}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-text-main">{client.visitsCount}</td>
                 </tr>
               ))}
             </tbody>

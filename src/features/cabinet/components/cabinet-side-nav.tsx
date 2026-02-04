@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SidebarItem } from "@/components/ui/sidebar-item";
 
 export type CabinetNavItem = {
   href: string;
@@ -24,17 +24,12 @@ export function CabinetSideNav({ items }: Props) {
       {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
-          <Link
+          <SidebarItem
             key={item.href}
             href={item.href}
-            className={`rounded-xl border px-3 py-2 text-sm transition ${
-              active
-                ? "border-black bg-black text-white"
-                : "border-neutral-200 text-neutral-700 hover:bg-neutral-50"
-            }`}
-          >
-            {item.label}
-          </Link>
+            label={item.label}
+            active={active}
+          />
         );
       })}
     </nav>

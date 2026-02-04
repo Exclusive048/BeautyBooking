@@ -29,7 +29,7 @@ export function roleRedirect(role: AccountType): string {
   if (role === AccountType.MASTER) return MASTER_CABINET_PATH;
   if (role === AccountType.STUDIO || role === AccountType.STUDIO_ADMIN) return STUDIO_CABINET_PATH;
   if (role === AccountType.CLIENT) return CLIENT_CABINET_PATH;
-  return "/cabinet";
+  return CLIENT_CABINET_PATH;
 }
 
 export function accountTypeRedirect(type: AccountType): string {

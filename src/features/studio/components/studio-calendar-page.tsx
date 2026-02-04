@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type CalendarView = "day" | "week" | "month";
 
@@ -82,16 +85,20 @@ function monthGridStart(date: Date): Date {
 }
 
 function statusClass(status: string): string {
-  if (status === "CONFIRMED" || status === "PREPAID") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "CANCELLED" || status === "NO_SHOW") return "border-neutral-300 bg-neutral-100 text-neutral-700";
-  return "border-blue-200 bg-blue-50 text-blue-800";
+  if (status === "CONFIRMED" || status === "PREPAID") {
+    return "border-emerald-300/70 bg-emerald-100/65 text-emerald-900";
+  }
+  if (status === "CANCELLED" || status === "NO_SHOW") {
+    return "border-border-subtle bg-bg-input text-text-sec";
+  }
+  return "border-primary/45 bg-primary/12 text-text-main";
 }
 
-function timeRangeLabel(startAt: string | null, endAt: string | null): string {
-  if (!startAt || !endAt) return "Time is not set";
+function timeRangeLabel(startAt: string | null, endAt: string | null, fallback = "—"): string {
+  if (!startAt || !endAt) return fallback;
   const start = new Date(startAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   const end = new Date(endAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${start}–${end}`;
+  return `${start}—${end}`;
 }
 
 function dayLabel(dateKey: string): string {
@@ -103,6 +110,7 @@ function dayLabel(dateKey: string): string {
 }
 
 export function StudioCalendarPage({ studioId }: Props) {
+  const t = UI_TEXT.studioCabinet.calendar;
   const [view, setView] = useState<CalendarView>("week");
   const [date, setDate] = useState(() => toDateKey(new Date()));
   const [data, setData] = useState<CalendarData>({ masters: [], bookings: [], blocks: [] });
@@ -131,21 +139,25 @@ export function StudioCalendarPage({ studioId }: Props) {
       const calendarJson = (await calendarRes.json().catch(() => null)) as ApiResponse<CalendarData> | null;
       if (!calendarRes.ok || !calendarJson || !calendarJson.ok) {
         throw new Error(
-          calendarJson && !calendarJson.ok ? calendarJson.error.message : `API error: ${calendarRes.status}`
+          calendarJson && !calendarJson.ok
+            ? calendarJson.error.message
+            : `${t.apiErrorPrefix}: ${calendarRes.status}`
         );
       }
 
       const servicesJson = (await servicesRes.json().catch(() => null)) as ApiResponse<ServicesData> | null;
       if (!servicesRes.ok || !servicesJson || !servicesJson.ok) {
         throw new Error(
-          servicesJson && !servicesJson.ok ? servicesJson.error.message : `API error: ${servicesRes.status}`
+          servicesJson && !servicesJson.ok
+            ? servicesJson.error.message
+            : `${t.apiErrorPrefix}: ${servicesRes.status}`
         );
       }
 
       setData(calendarJson.data);
       setServicesData(servicesJson.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load calendar");
+      setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -154,7 +166,7 @@ export function StudioCalendarPage({ studioId }: Props) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studioId, date, view]);
+  }, [studioId, date, view, t.loadFailed]);
 
   const serviceMetaById = useMemo(() => {
     const map = new Map<string, { categoryId: string; categoryTitle: string; title: string }>();
@@ -271,108 +283,108 @@ export function StudioCalendarPage({ studioId }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border p-4">
+      <div className="lux-card rounded-[24px] p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="rounded-lg border px-3 py-2 text-sm"
-          />
-          {(["day", "week", "month"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setView(item)}
-              className={`rounded-lg border px-3 py-2 text-sm ${
-                view === item ? "border-black bg-black text-white" : "border-neutral-300"
-              }`}
-            >
-              {item.toUpperCase()}
-            </button>
-          ))}
-          <input
+          <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-xl px-3 py-2 text-sm" />
+          <div className="inline-flex rounded-2xl border border-border-subtle bg-bg-input p-1">
+            {(["day", "week", "month"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setView(item)}
+                className={`rounded-xl px-3 py-2 text-sm transition-all ${
+                  view === item
+                    ? "bg-bg-card text-text-main shadow-card"
+                    : "text-text-sec hover:bg-bg-card/80 hover:text-text-main"
+                }`}
+              >
+                {item === "day" ? t.day : item === "week" ? t.week : t.month}
+              </button>
+            ))}
+          </div>
+          <Input
             type="search"
-            placeholder="Search client / phone / service"
+            placeholder={t.searchPlaceholder}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="min-w-[220px] rounded-lg border px-3 py-2 text-sm"
+            className="min-w-[220px] rounded-xl px-3 py-2 text-sm"
           />
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select
+          <Select
             value={masterFilter}
             onChange={(event) => setMasterFilter(event.target.value)}
-            className="rounded-lg border px-3 py-1.5 text-sm"
+            className="rounded-xl px-3 py-1.5 text-sm"
           >
-            <option value="all">All masters</option>
+            <option value="all">{t.allMasters}</option>
             {data.masters.map((master) => (
               <option key={master.id} value={master.id}>
                 {master.name}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
-            className="rounded-lg border px-3 py-1.5 text-sm"
+            className="rounded-xl px-3 py-1.5 text-sm"
           >
-            <option value="all">All categories</option>
+            <option value="all">{t.allCategories}</option>
             {servicesData.categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.title}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             value={serviceFilter}
             onChange={(event) => setServiceFilter(event.target.value)}
-            className="rounded-lg border px-3 py-1.5 text-sm"
+            className="rounded-xl px-3 py-1.5 text-sm"
           >
-            <option value="all">All services</option>
+            <option value="all">{t.allServices}</option>
             {serviceOptions.map((service) => (
               <option key={service.id} value={service.id}>
                 {service.title}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-lg border px-3 py-1.5 text-sm"
+            className="rounded-xl px-3 py-1.5 text-sm"
           >
-            <option value="all">All statuses</option>
+            <option value="all">{t.allStatuses}</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 
-      {loading ? <div className="rounded-2xl border p-6 text-sm">Loading...</div> : null}
+      {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{t.loading}</div> : null}
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       {!loading && data.masters.length === 0 ? (
-        <div className="rounded-2xl border p-5">
-          <h3 className="text-base font-semibold">No masters</h3>
-          <p className="mt-1 text-sm text-neutral-600">Add masters first in Team.</p>
-          <Link href="/cabinet/studio/team" className="mt-3 inline-flex rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50">
-            Go to Team
+        <div className="lux-card rounded-[24px] p-5">
+          <h3 className="text-base font-semibold">{t.noMasters}</h3>
+          <p className="mt-1 text-sm text-text-sec">{t.noMastersHint}</p>
+          <Link href="/cabinet/studio/team" className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm hover:bg-bg-card">
+            {t.goToTeam}
           </Link>
         </div>
       ) : null}
 
       {!loading && data.masters.length > 0 && view === "month" ? (
-        <div className="rounded-2xl border p-3">
-          <div className="grid grid-cols-7 gap-2 text-center text-xs text-neutral-500">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+        <div className="lux-card rounded-[24px] p-3">
+          <div className="grid grid-cols-7 gap-2 text-center text-xs text-text-sec">
+            {[t.weekdays.mon, t.weekdays.tue, t.weekdays.wed, t.weekdays.thu, t.weekdays.fri, t.weekdays.sat, t.weekdays.sun].map((day) => (
               <div key={day}>{day}</div>
             ))}
           </div>
-          <div className="mt-2 grid grid-cols-7 gap-2">
+          <div className="mt-2 rounded-2xl bg-border-subtle/35 p-2">
+            <div className="grid grid-cols-7 gap-2">
             {dayKeys.map((dayKey) => {
               const dayDate = fromDateKey(dayKey);
               const isCurrentMonth =
@@ -384,18 +396,23 @@ export function StudioCalendarPage({ studioId }: Props) {
                   key={dayKey}
                   type="button"
                   onClick={() => setMonthDetailsDay(dayKey)}
-                  className={`min-h-[92px] rounded-xl border p-2 text-left transition hover:border-neutral-400 ${
-                    isCurrentMonth ? "bg-white" : "bg-neutral-50 text-neutral-400"
+                  className={`min-h-[92px] rounded-2xl border border-border-subtle/70 p-2 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card ${
+                    isCurrentMonth ? "bg-bg-card" : "bg-bg-input text-text-sec"
                   }`}
                 >
                   <div className="text-xs font-medium">{dayDate.getUTCDate()}</div>
                   <div className="mt-2 space-y-1 text-[11px]">
-                    <div className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">Bookings: {bookingsCount}</div>
-                    <div className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">Blocks: {blocksCount}</div>
+                    {bookingsCount > 0 ? (
+                      <div className="rounded-full bg-primary/14 px-2 py-1 text-text-main">{bookingsCount}</div>
+                    ) : null}
+                    {blocksCount > 0 ? (
+                      <div className="rounded-full bg-bg-input px-2 py-1 text-text-sec">{t.blocksLabel}: {blocksCount}</div>
+                    ) : null}
                   </div>
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       ) : null}
@@ -412,22 +429,22 @@ export function StudioCalendarPage({ studioId }: Props) {
               return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
             });
             return (
-              <section key={dayKey} className="rounded-2xl border p-4">
+              <section key={dayKey} className="lux-card rounded-[24px] p-4">
                 <header className="mb-3 text-sm font-semibold">{dayLabel(dayKey)}</header>
                 <div className="space-y-2">
                   {bookings.map((booking) => (
-                    <article key={booking.id} className={`rounded-xl border p-3 text-sm ${statusClass(booking.status)}`}>
+                    <article key={booking.id} className={`rounded-2xl border p-3 text-sm ${statusClass(booking.status)}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="font-medium">{booking.clientName}</div>
                         <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt)}</div>
                       </div>
                       <div className="mt-1 text-xs">
-                        {booking.status} · {booking.serviceTitle} · {booking.clientPhone}
+                        {booking.status} • {booking.serviceTitle} • {booking.clientPhone}
                       </div>
                     </article>
                   ))}
                   {blocks.map((block) => (
-                    <article key={block.id} className="rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-sm text-neutral-700">
+                    <article key={block.id} className="rounded-2xl border border-border-subtle bg-bg-input p-3 text-sm text-text-sec">
                       <div className="flex items-center justify-between gap-2">
                         <div className="font-medium">{block.type}</div>
                         <div className="text-xs">
@@ -437,7 +454,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                     </article>
                   ))}
                   {bookings.length === 0 && blocks.length === 0 ? (
-                    <div className="rounded-xl border border-dashed p-3 text-sm text-neutral-500">No items for this day.</div>
+                    <div className="rounded-2xl border border-dashed border-border-subtle p-3 text-sm text-text-sec">{t.noItemsForDay}</div>
                   ) : null}
                 </div>
               </section>
@@ -448,27 +465,27 @@ export function StudioCalendarPage({ studioId }: Props) {
 
       {monthDetailsDay ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border bg-white p-4">
+          <div className="w-full max-w-2xl rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold">Day details — {dayLabel(monthDetailsDay)}</h3>
-              <button type="button" onClick={() => setMonthDetailsDay(null)} className="rounded-lg border px-3 py-1.5 text-sm">
-                Close
+              <h3 className="text-base font-semibold">{t.dayDetails} — {dayLabel(monthDetailsDay)}</h3>
+              <button type="button" onClick={() => setMonthDetailsDay(null)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm">
+                {UI_TEXT.common.close}
               </button>
             </div>
             <div className="mt-3 space-y-2">
               {monthDayDetails.bookings.map((booking) => (
-                <article key={booking.id} className={`rounded-xl border p-3 text-sm ${statusClass(booking.status)}`}>
+                <article key={booking.id} className={`rounded-2xl border p-3 text-sm ${statusClass(booking.status)}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium">{booking.clientName}</div>
                     <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt)}</div>
                   </div>
                   <div className="mt-1 text-xs">
-                    {booking.status} · {booking.serviceTitle} · {booking.clientPhone}
+                    {booking.status} • {booking.serviceTitle} • {booking.clientPhone}
                   </div>
                 </article>
               ))}
               {monthDayDetails.blocks.map((block) => (
-                <article key={block.id} className="rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-sm text-neutral-700">
+                <article key={block.id} className="rounded-2xl border border-border-subtle bg-bg-input p-3 text-sm text-text-sec">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-medium">{block.type}</div>
                     <div className="text-xs">{timeRangeLabel(block.startAt, block.endAt)}</div>
@@ -476,7 +493,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                 </article>
               ))}
               {monthDayDetails.bookings.length === 0 && monthDayDetails.blocks.length === 0 ? (
-                <div className="rounded-xl border border-dashed p-3 text-sm text-neutral-500">No items for this day.</div>
+                <div className="rounded-2xl border border-dashed border-border-subtle p-3 text-sm text-text-sec">{t.noItemsForDay}</div>
               ) : null}
             </div>
           </div>

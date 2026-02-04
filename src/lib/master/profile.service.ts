@@ -8,6 +8,7 @@ type MasterContext = {
   isSolo: boolean;
   name: string;
   tagline: string;
+  address: string;
   description: string | null;
   avatarUrl: string | null;
   isPublished: boolean;
@@ -24,6 +25,7 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
       studioId: true,
       name: true,
       tagline: true,
+      address: true,
       description: true,
       avatarUrl: true,
       isPublished: true,
@@ -43,6 +45,7 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
       isSolo: true,
       name: master.name,
       tagline: master.tagline,
+      address: master.address,
       description: master.description,
       avatarUrl: master.avatarUrl,
       isPublished: master.isPublished,
@@ -66,6 +69,7 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
     isSolo: false,
     name: master.name,
     tagline: master.tagline,
+    address: master.address,
     description: master.description,
     avatarUrl: master.avatarUrl,
     isPublished: master.isPublished,
@@ -100,6 +104,7 @@ export type MasterProfileData = {
     id: string;
     displayName: string;
     tagline: string;
+    address: string;
     bio: string | null;
     avatarUrl: string | null;
     isPublished: boolean;
@@ -141,6 +146,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         id: context.id,
         displayName: context.name,
         tagline: context.tagline,
+        address: context.address,
         bio: context.description,
         avatarUrl: context.avatarUrl,
         isPublished: context.isPublished,
@@ -201,6 +207,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       id: context.id,
       displayName: context.name,
       tagline: context.tagline,
+      address: context.address,
       bio: context.description,
       avatarUrl: context.avatarUrl,
       isPublished: context.isPublished,
@@ -243,6 +250,7 @@ export async function updateMasterProfile(
   input: {
     displayName?: string;
     tagline?: string;
+    address?: string;
     bio?: string | null;
     avatarUrl?: string | null;
     isPublished?: boolean;
@@ -254,6 +262,7 @@ export async function updateMasterProfile(
     data: {
       ...(input.displayName ? { name: input.displayName.trim() } : {}),
       ...(typeof input.tagline === "string" ? { tagline: input.tagline.trim() } : {}),
+      ...(typeof input.address === "string" ? { address: input.address.trim() } : {}),
       ...(input.bio !== undefined
         ? { description: typeof input.bio === "string" ? input.bio.trim() || null : null }
         : {}),

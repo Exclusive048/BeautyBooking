@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   entityType: MediaEntityType;
@@ -12,6 +13,7 @@ type Props = {
   fallbackUrl?: string | null;
   canEdit?: boolean;
   sizeClassName?: string;
+  showAddButton?: boolean;
 };
 
 function buildListUrl(entityType: MediaEntityType, entityId: string): string {
@@ -29,7 +31,9 @@ export function AvatarEditor({
   fallbackUrl = null,
   canEdit = true,
   sizeClassName = "h-28 w-28",
+  showAddButton = true,
 }: Props) {
+  const t = UI_TEXT.media.avatar;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [assets, setAssets] = useState<MediaAssetDto[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -45,15 +49,15 @@ export function AvatarEditor({
       const res = await fetch(buildListUrl(entityType, entityId), { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Failed to load avatar");
+        throw new Error(json && !json.ok ? json.error.message : t.loadFailed);
       }
       setAssets(json.data.assets);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load avatar");
+      setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
       setLoaded(true);
     }
-  }, [entityType, entityId]);
+  }, [entityType, entityId, t.loadFailed]);
 
   const upload = useCallback(
     async (file: File, replaceAssetId?: string) => {
@@ -70,16 +74,16 @@ export function AvatarEditor({
         const res = await fetch("/api/media", { method: "POST", body: form });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Failed to upload avatar");
+          throw new Error(json && !json.ok ? json.error.message : t.uploadFailed);
         }
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to upload avatar");
+        setError(e instanceof Error ? e.message : t.uploadFailed);
       } finally {
         setBusy(false);
       }
     },
-    [entityType, entityId, load]
+    [entityType, entityId, load, t.uploadFailed]
   );
 
   const remove = useCallback(async () => {
@@ -90,15 +94,15 @@ export function AvatarEditor({
       const res = await fetch(`/api/media/${activeAsset.id}`, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Failed to delete avatar");
+        throw new Error(json && !json.ok ? json.error.message : t.deleteFailed);
       }
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete avatar");
+      setError(e instanceof Error ? e.message : t.deleteFailed);
     } finally {
       setBusy(false);
     }
-  }, [activeAsset, load]);
+  }, [activeAsset, load, t.deleteFailed]);
 
   useEffect(() => {
     if (!loaded) {
@@ -106,7 +110,10 @@ export function AvatarEditor({
     }
   }, [loaded, load]);
 
-  const filePickerLabel = useMemo(() => (activeAsset ? "Replace avatar" : "Upload avatar"), [activeAsset]);
+  const filePickerLabel = useMemo(
+    () => (activeAsset ? t.replace : t.upload),
+    [activeAsset, t.replace, t.upload]
+  );
 
   return (
     <div className="space-y-2">
@@ -114,7 +121,7 @@ export function AvatarEditor({
         {imageUrl ? (
           <img src={imageUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500">No avatar</div>
+          <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500">{t.noAvatar}</div>
         )}
 
         {canEdit ? (
@@ -126,31 +133,31 @@ export function AvatarEditor({
               aria-label={filePickerLabel}
               className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
             >
-              ✏️
+              ✎
             </button>
             {activeAsset ? (
               <button
                 type="button"
                 onClick={remove}
                 disabled={busy}
-                aria-label="Delete avatar"
+                aria-label={t.remove}
                 className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
               >
-                ✖️
+                ✕
               </button>
             ) : null}
           </div>
         ) : null}
       </div>
 
-      {canEdit && !activeAsset ? (
+      {canEdit && !activeAsset && showAddButton ? (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           className="rounded-xl border px-3 py-2 text-sm hover:bg-neutral-50"
           disabled={busy}
         >
-          ➕
+          {t.upload}
         </button>
       ) : null}
 

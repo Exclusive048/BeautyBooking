@@ -385,6 +385,7 @@ model Booking {
   comment      String?
   source       BookingSource @default(MANUAL)
   notes        String?
+  silentMode   Boolean       @default(false)
 
   status       BookingStatus @default(PENDING)
   cancelledBy  BookingCancelledBy?

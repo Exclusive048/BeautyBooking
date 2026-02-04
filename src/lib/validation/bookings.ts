@@ -17,6 +17,7 @@ export const bookingCreateSchema = z
     clientName: z.string().trim().min(1, "Client name is required").max(120),
     clientPhone: z.string().trim().min(1, "Client phone is required").max(40),
     comment: z.string().trim().max(500).nullable().optional(),
+    silentMode: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
     if (value.endAtUtc && !value.startAtUtc) {
@@ -48,6 +49,7 @@ export const bookingRescheduleSchema = z
     startAtUtc: dateString,
     endAtUtc: dateString,
     slotLabel: z.string().trim().min(1).max(120),
+    silentMode: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
     const start = Date.parse(value.startAtUtc);

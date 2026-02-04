@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
 import { Button } from "@/components/ui/button";
+import { ListRow } from "@/components/ui/list-row";
+import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type TelegramStatus = {
@@ -21,11 +22,15 @@ type TelegramSettingsResponse = {
   enabled: boolean;
 };
 
+type Props = {
+  embedded?: boolean;
+};
+
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
 
-export function TelegramNotificationsSection() {
+export function TelegramNotificationsSection({ embedded = false }: Props) {
   const t = UI_TEXT.clientCabinet;
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,15 +47,15 @@ export function TelegramNotificationsSection() {
         enabled: boolean;
         botUsername: string;
       }> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to load Telegram status"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to load Telegram status"));
+      if (!res.ok) throw new Error(getErrorMessage(json, t.telegram.loadFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.telegram.loadFailed));
       setStatus(json.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : t.telegram.unknownError);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t.telegram.loadFailed, t.telegram.unknownError]);
 
   useEffect(() => {
     void loadStatus();
@@ -62,13 +67,12 @@ export function TelegramNotificationsSection() {
     try {
       const res = await fetch("/api/telegram/link", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<TelegramLinkResponse> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to get Telegram link"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to get Telegram link"));
-      const url = json.data.url;
-      window.open(url, "_blank", "noopener,noreferrer");
+      if (!res.ok) throw new Error(getErrorMessage(json, t.telegram.linkFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.telegram.linkFailed));
+      window.open(json.data.url, "_blank", "noopener,noreferrer");
       await loadStatus();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : t.telegram.unknownError);
     } finally {
       setSaving(false);
     }
@@ -85,11 +89,11 @@ export function TelegramNotificationsSection() {
         body: JSON.stringify({ enabled }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<TelegramSettingsResponse> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Failed to update settings"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Failed to update settings"));
+      if (!res.ok) throw new Error(getErrorMessage(json, t.telegram.settingsFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.telegram.settingsFailed));
       setStatus((prev) => (prev ? { ...prev, enabled: json.data.enabled } : prev));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : t.telegram.unknownError);
     } finally {
       setSaving(false);
     }
@@ -97,7 +101,7 @@ export function TelegramNotificationsSection() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border p-4 text-sm text-neutral-600">
+      <div className={embedded ? "text-sm text-text-sec" : "lux-card rounded-[24px] p-4 text-sm text-text-sec"}>
         {UI_TEXT.common.loading}
       </div>
     );
@@ -107,36 +111,32 @@ export function TelegramNotificationsSection() {
   const enabled = Boolean(status?.enabled);
 
   return (
-    <div className="rounded-2xl border p-4 space-y-3">
-      <div>
-        <div className="text-sm font-semibold">{t.telegram.title}</div>
-        <div className="mt-1 text-sm text-neutral-600">
-          {linked ? t.telegram.connected : t.telegram.notConnected}
-        </div>
-      </div>
+    <div className={embedded ? "space-y-3" : "lux-card rounded-[24px] p-4 space-y-3"}>
+      <ListRow
+        icon="TG"
+        title={t.telegram.title}
+        subtitle={linked ? t.telegram.connected : t.telegram.notConnected}
+        right={
+          !linked ? (
+            <Button type="button" onClick={onConnect} disabled={saving} size="sm">
+              {saving ? UI_TEXT.common.loading : t.telegram.connectButton}
+            </Button>
+          ) : (
+            <label className="inline-flex items-center gap-2 text-xs text-text-main">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => onToggle(e.target.checked)}
+                disabled={!linked || saving}
+                className="h-4 w-4 accent-primary"
+              />
+              {enabled ? t.telegram.enabled : t.telegram.disabled}
+            </label>
+          )
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        {!linked ? (
-          <Button type="button" onClick={onConnect} disabled={saving}>
-            {saving ? UI_TEXT.common.loading : t.telegram.connectButton}
-          </Button>
-        ) : null}
-
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => onToggle(e.target.checked)}
-            disabled={!linked || saving}
-          />
-          {enabled ? t.telegram.enabled : t.telegram.disabled}
-        </label>
-      </div>
-
-      {linked ? (
-        <div className="text-xs text-neutral-500">{t.telegram.hint}</div>
-      ) : null}
-
+      {linked ? <div className="text-xs text-text-sec">{t.telegram.hint}</div> : null}
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
     </div>
   );

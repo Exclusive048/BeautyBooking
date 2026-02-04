@@ -22,7 +22,7 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
   const pathname = usePathname();
 
   return (
-    <header className="rounded-2xl border bg-white p-3">
+    <header className="lux-card rounded-[22px] p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm font-semibold">
@@ -35,10 +35,10 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                  className={`relative rounded-xl px-3 py-1.5 text-sm transition-all duration-300 ${
                     active
-                      ? "border-black bg-black text-white"
-                      : "border-neutral-200 text-neutral-700 hover:bg-neutral-50"
+                      ? "bg-bg-card pl-4 text-text-main shadow-card before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-1 before:rounded-full before:bg-gradient-to-b before:from-primary before:to-primary-magenta"
+                      : "text-text-sec hover:bg-bg-input hover:text-text-main"
                   }`}
                 >
                   {item.label}
@@ -47,10 +47,10 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
             })}
             <Link
               href="/cabinet/master/reviews"
-              className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+              className={`relative rounded-xl px-3 py-1.5 text-sm transition-all duration-300 ${
                 isActive(pathname, "/cabinet/master/reviews")
-                  ? "border-black bg-black text-white"
-                  : "border-neutral-200 text-neutral-700 hover:bg-neutral-50"
+                  ? "bg-bg-card pl-4 text-text-main shadow-card before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-1 before:rounded-full before:bg-gradient-to-b before:from-primary before:to-primary-magenta"
+                  : "text-text-sec hover:bg-bg-input hover:text-text-main"
               }`}
             >
               Отзывы {ratingLabel}
@@ -58,8 +58,8 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3 text-sm text-neutral-700">
-          {studioName ? <span className="rounded-lg border px-3 py-1.5">{studioName}</span> : null}
+        <div className="flex items-center gap-3 text-sm text-text-sec">
+          {studioName ? <span className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5">{studioName}</span> : null}
         </div>
       </div>
     </header>

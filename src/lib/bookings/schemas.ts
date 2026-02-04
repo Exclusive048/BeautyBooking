@@ -14,4 +14,5 @@ export const createBookingSchema = z.object({
   clientName: z.string().trim().min(1, "Client name is required"),
   clientPhone: z.string().trim().min(1, "Client phone is required"),
   comment: z.string().trim().nullable().optional(),
+  silentMode: z.boolean().optional(),
 });
