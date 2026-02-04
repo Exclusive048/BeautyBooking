@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
-import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { UI_TEXT } from "@/lib/ui/text";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 
 type MeDto = {
@@ -35,6 +35,7 @@ type ProfileCreateResponse = { profile: { id: string; providerId: string } };
 type RoleAction = "master" | "studio" | null;
 
 export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) {
+  const t = UI_TEXT.clientCabinet;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<string | null>(null);
@@ -98,20 +99,20 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           | null;
 
         if (!res.ok) {
-          setError(UI_TEXTS.profile.saveFailed);
+          setError(t.profile.saveFailed);
           return;
         }
 
         const message = data && !data.ok ? data.error.message : null;
 
         if (!data || !data.ok) {
-          setError(message ?? UI_TEXTS.profile.saveFailed);
+          setError(message ?? t.profile.saveFailed);
           return;
         }
 
-        setSaved(UI_TEXTS.profile.saved);
+        setSaved(t.profile.saved);
       } catch {
-        setError(UI_TEXTS.profile.networkError);
+        setError(t.profile.networkError);
       }
     });
   };
@@ -135,19 +136,19 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
       const message = data && !data.ok ? data.error.message : null;
 
       if (!res.ok) {
-        setRoleError(message ?? UI_TEXTS.profile.createMasterFailed);
+        setRoleError(message ?? t.profile.createMasterFailed);
         return;
       }
 
       if (!data || !data.ok) {
-        setRoleError(message ?? UI_TEXTS.profile.createMasterFailed);
+        setRoleError(message ?? t.profile.createMasterFailed);
         return;
       }
 
-      setRoleMessage(UI_TEXTS.profile.masterCreated);
+      setRoleMessage(t.profile.masterCreated);
       router.refresh();
     } catch {
-      setRoleError(UI_TEXTS.profile.networkError);
+      setRoleError(t.profile.networkError);
     } finally {
       setRoleAction(null);
     }
@@ -172,19 +173,19 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
       const message = data && !data.ok ? data.error.message : null;
 
       if (!res.ok) {
-        setRoleError(message ?? UI_TEXTS.profile.createStudioFailed);
+        setRoleError(message ?? t.profile.createStudioFailed);
         return;
       }
 
       if (!data || !data.ok) {
-        setRoleError(message ?? UI_TEXTS.profile.createStudioFailed);
+        setRoleError(message ?? t.profile.createStudioFailed);
         return;
       }
 
-      setRoleMessage(UI_TEXTS.profile.studioCreated);
+      setRoleMessage(t.profile.studioCreated);
       router.refresh();
     } catch {
-      setRoleError(UI_TEXTS.profile.networkError);
+      setRoleError(t.profile.networkError);
     } finally {
       setRoleAction(null);
     }
@@ -201,9 +202,9 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
   return (
     <div className="rounded-2xl border p-5 space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">{UI_TEXTS.common.profile}</h2>
+        <h2 className="text-lg font-semibold">{t.common.profile}</h2>
         <p className="mt-1 text-sm text-neutral-600">
-          {UI_TEXTS.profile.description}
+          {t.profile.description}
         </p>
       </div>
 
@@ -216,17 +217,17 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
       {showProfessionalCta ? (
         <div className="rounded-2xl border p-4 space-y-3">
           <div>
-            <div className="text-sm font-semibold">{UI_TEXTS.profile.professionalRolesTitle}</div>
+            <div className="text-sm font-semibold">{t.profile.professionalRolesTitle}</div>
             <div className="mt-1 text-sm text-neutral-600">
               {hasProfessionalRole
-                ? UI_TEXTS.profile.rolesAddedCanAddMore
-                : UI_TEXTS.profile.stillClientAddRole}
+                ? t.profile.rolesAddedCanAddMore
+                : t.profile.stillClientAddRole}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {hasMasterProfile ? (
-              <div className="text-xs text-neutral-600">{UI_TEXTS.profile.alreadyMaster}</div>
+              <div className="text-xs text-neutral-600">{t.profile.alreadyMaster}</div>
             ) : (
               <button
                 type="button"
@@ -234,12 +235,12 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
                 disabled={roleAction !== null}
                 className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
               >
-                {isCreatingMaster ? UI_TEXTS.profile.creatingMaster : UI_TEXTS.profile.becomeMaster}
+                {isCreatingMaster ? t.profile.creatingMaster : t.profile.becomeMaster}
               </button>
             )}
 
             {hasStudioProfile ? (
-              <div className="text-xs text-neutral-600">{UI_TEXTS.profile.alreadyStudioOwner}</div>
+              <div className="text-xs text-neutral-600">{t.profile.alreadyStudioOwner}</div>
             ) : (
               <button
                 type="button"
@@ -247,7 +248,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
                 disabled={roleAction !== null}
                 className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
               >
-                {isCreatingStudio ? UI_TEXTS.profile.creatingStudio : UI_TEXTS.profile.createStudio}
+                {isCreatingStudio ? t.profile.creatingStudio : t.profile.createStudio}
               </button>
             )}
           </div>
@@ -273,49 +274,49 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1">
-          <div className={labelClass}>{UI_TEXTS.profile.lastName}</div>
+          <div className={labelClass}>{t.profile.lastName}</div>
           <input
             className={inputClass}
             value={form.lastName}
             onChange={(e) => setForm((s) => ({ ...s, lastName: e.target.value }))}
-            placeholder={UI_TEXTS.profile.lastNamePlaceholder}
+            placeholder={t.profile.lastNamePlaceholder}
           />
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>{UI_TEXTS.profile.firstName}</div>
+          <div className={labelClass}>{t.profile.firstName}</div>
           <input
             className={inputClass}
             value={form.firstName}
             onChange={(e) => setForm((s) => ({ ...s, firstName: e.target.value }))}
-            placeholder={UI_TEXTS.profile.firstNamePlaceholder}
+            placeholder={t.profile.firstNamePlaceholder}
           />
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>{UI_TEXTS.profile.middleName}</div>
+          <div className={labelClass}>{t.profile.middleName}</div>
           <input
             className={inputClass}
             value={form.middleName}
             onChange={(e) => setForm((s) => ({ ...s, middleName: e.target.value }))}
-            placeholder={UI_TEXTS.profile.middleNamePlaceholder}
+            placeholder={t.profile.middleNamePlaceholder}
           />
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1 md:col-span-1">
-          <div className={labelClass}>{UI_TEXTS.profile.displayName}</div>
+          <div className={labelClass}>{t.profile.displayName}</div>
           <input
             className={inputClass}
             value={form.displayName}
             onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))}
-            placeholder={UI_TEXTS.profile.displayNamePlaceholder}
+            placeholder={t.profile.displayNamePlaceholder}
           />
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>{UI_TEXTS.common.phone}</div>
+          <div className={labelClass}>{t.common.phone}</div>
           <input
             className={inputClass}
             value={form.phone}
@@ -325,7 +326,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
         </div>
 
         <div className="space-y-1">
-          <div className={labelClass}>{UI_TEXTS.profile.email}</div>
+          <div className={labelClass}>{t.profile.email}</div>
           <input
             className={inputClass}
             value={form.email}
@@ -337,7 +338,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1">
-          <div className={labelClass}>{UI_TEXTS.profile.birthDate}</div>
+          <div className={labelClass}>{t.profile.birthDate}</div>
           <input
             type="date"
             className={inputClass}
@@ -347,22 +348,22 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
         </div>
 
         <div className="space-y-1 md:col-span-2">
-          <div className={labelClass}>{UI_TEXTS.profile.address}</div>
+          <div className={labelClass}>{t.profile.address}</div>
           <input
             className={inputClass}
             value={form.address}
             onChange={(e) => setForm((s) => ({ ...s, address: e.target.value }))}
-            placeholder={UI_TEXTS.profile.addressPlaceholder}
+            placeholder={t.profile.addressPlaceholder}
           />
           <div className="text-xs text-neutral-500 mt-1">
-            {UI_TEXTS.profile.mapHint}
+            {t.profile.mapHint}
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-neutral-500">
-          {UI_TEXTS.profile.rolesLabel} {initialUser.roles.join(", ")}
+          {t.profile.rolesLabel} {initialUser.roles.join(", ")}
         </div>
 
         <button
@@ -371,7 +372,7 @@ export function ProfileForm({ initialUser, showProfessionalCta = true }: Props) 
           onClick={onSave}
           className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          {pending ? UI_TEXTS.profile.saving : UI_TEXTS.common.save}
+          {pending ? t.profile.saving : t.common.save}
         </button>
       </div>
     </div>

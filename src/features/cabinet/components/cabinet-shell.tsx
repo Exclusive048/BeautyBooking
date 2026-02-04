@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export function CabinetShell({
   title,
@@ -40,7 +40,7 @@ export function CabinetTabs({
   const off = "border hover:bg-neutral-50";
 
   const href = (tab: "bookings" | "profile") => {
-    // Если baseHref не задан, используем относительную навигацию.
+    // Use relative tab navigation when baseHref is not provided.
     if (!baseHref) return `?tab=${tab}`;
     return `${baseHref}?tab=${tab}`;
   };
@@ -48,10 +48,10 @@ export function CabinetTabs({
   return (
     <div className="flex items-center gap-2">
       <Link href={href("bookings")} className={`${base} ${active === "bookings" ? on : off}`}>
-        {UI_TEXTS.common.myBookings}
+        {UI_TEXT.clientCabinet.common.myBookings}
       </Link>
       <Link href={href("profile")} className={`${base} ${active === "profile" ? on : off}`}>
-        {UI_TEXTS.common.profile}
+        {UI_TEXT.clientCabinet.common.profile}
       </Link>
     </div>
   );

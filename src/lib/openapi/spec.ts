@@ -164,6 +164,24 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/ReviewData" },
               { $ref: "#/components/schemas/ReviewListData" },
               { $ref: "#/components/schemas/CanLeaveReviewData" },
+              { $ref: "#/components/schemas/StudioCalendarData" },
+              { $ref: "#/components/schemas/TimeBlockData" },
+              { $ref: "#/components/schemas/StudioServicesData" },
+              { $ref: "#/components/schemas/AssignMasterData" },
+              { $ref: "#/components/schemas/StudioMasterData" },
+              { $ref: "#/components/schemas/StudioMasterListData" },
+              { $ref: "#/components/schemas/BulkUpdatedData" },
+              { $ref: "#/components/schemas/StudioCategoryData" },
+              { $ref: "#/components/schemas/MasterDayData" },
+              { $ref: "#/components/schemas/MasterScheduleData" },
+              { $ref: "#/components/schemas/MasterProfileData" },
+              { $ref: "#/components/schemas/MasterPortfolioListData" },
+              { $ref: "#/components/schemas/PortfolioFeedData" },
+              { $ref: "#/components/schemas/PortfolioDetailData" },
+              { $ref: "#/components/schemas/CatalogSearchData" },
+              { $ref: "#/components/schemas/StudioBookingCreatedData" },
+              { $ref: "#/components/schemas/StudioMasterScheduleData" },
+              { $ref: "#/components/schemas/MeData" },
             ],
           },
         },
@@ -238,15 +256,89 @@ export const openApiSpec = {
           { $ref: "#/components/schemas/ProviderCard" },
           {
             type: "object",
-            required: ["services"],
+            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng"],
             properties: {
               services: {
                 type: "array",
                 items: { $ref: "#/components/schemas/ProviderService" },
               },
+              studioId: { type: "string", nullable: true },
+              bannerUrl: { type: "string", nullable: true },
+              description: { type: "string", nullable: true },
+              geoLat: { type: "number", nullable: true },
+              geoLng: { type: "number", nullable: true },
             },
           },
         ],
+      },
+      StudioPrivateProfile: {
+        type: "object",
+        required: [
+          "id",
+          "name",
+          "tagline",
+          "address",
+          "district",
+          "categories",
+          "contactName",
+          "contactPhone",
+          "contactEmail",
+          "description",
+          "avatarUrl",
+          "geoLat",
+          "geoLng",
+          "isPublished",
+          "timezone",
+          "bufferBetweenBookingsMin",
+          "bannerAssetId",
+          "bannerUrl",
+        ],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          tagline: { type: "string" },
+          address: { type: "string" },
+          district: { type: "string" },
+          categories: { type: "array", items: { type: "string" } },
+          contactName: { type: "string", nullable: true },
+          contactPhone: { type: "string", nullable: true },
+          contactEmail: { type: "string", nullable: true },
+          description: { type: "string", nullable: true },
+          avatarUrl: { type: "string", nullable: true },
+          geoLat: { type: "number", nullable: true },
+          geoLng: { type: "number", nullable: true },
+          isPublished: { type: "boolean" },
+          timezone: { type: "string" },
+          bufferBetweenBookingsMin: { type: "integer" },
+          bannerAssetId: { type: "string", nullable: true },
+          bannerUrl: { type: "string", nullable: true },
+        },
+      },
+      StudioPrivateProfileData: {
+        type: "object",
+        required: ["studio"],
+        properties: {
+          studio: { $ref: "#/components/schemas/StudioPrivateProfile" },
+        },
+      },
+      StudioPrivateProfileUpdateInput: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          tagline: { type: "string" },
+          address: { type: "string" },
+          district: { type: "string" },
+          categories: { type: "array", items: { type: "string" } },
+          contactName: { type: "string", nullable: true },
+          contactPhone: { type: "string", nullable: true },
+          contactEmail: { type: "string", nullable: true },
+          description: { type: "string", nullable: true },
+          geoLat: { type: "number", nullable: true },
+          geoLng: { type: "number", nullable: true },
+          isPublished: { type: "boolean" },
+          timezone: { type: "string" },
+          bannerAssetId: { type: "string", nullable: true },
+        },
       },
       Service: {
         type: "object",
@@ -616,9 +708,1025 @@ export const openApiSpec = {
           canLeave: { type: "boolean" },
         },
       },
+      CalendarMaster: {
+        type: "object",
+        required: ["id", "name", "isActive"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          isActive: { type: "boolean" },
+        },
+      },
+      CalendarBooking: {
+        type: "object",
+        required: ["id", "masterId", "serviceId", "serviceTitle", "startAt", "endAt", "status", "clientName", "clientPhone"],
+        properties: {
+          id: { type: "string" },
+          masterId: { type: "string", nullable: true },
+          serviceId: { type: "string" },
+          serviceTitle: { type: "string" },
+          startAt: { type: "string", format: "date-time", nullable: true },
+          endAt: { type: "string", format: "date-time", nullable: true },
+          status: { type: "string" },
+          clientName: { type: "string" },
+          clientPhone: { type: "string" },
+        },
+      },
+      TimeBlock: {
+        type: "object",
+        required: ["id", "masterId", "startAt", "endAt", "type", "note"],
+        properties: {
+          id: { type: "string" },
+          masterId: { type: "string" },
+          startAt: { type: "string", format: "date-time" },
+          endAt: { type: "string", format: "date-time" },
+          type: { type: "string", enum: ["BREAK", "BLOCK"] },
+          note: { type: "string", nullable: true },
+        },
+      },
+      StudioCalendarData: {
+        type: "object",
+        required: ["masters", "bookings", "blocks"],
+        properties: {
+          masters: { type: "array", items: { $ref: "#/components/schemas/CalendarMaster" } },
+          bookings: { type: "array", items: { $ref: "#/components/schemas/CalendarBooking" } },
+          blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
+        },
+      },
+      StudioClientListItem: {
+        type: "object",
+        required: ["key", "displayName", "phone", "lastBookingAt", "lastServiceName", "visitsCount"],
+        properties: {
+          key: { type: "string" },
+          displayName: { type: "string" },
+          phone: { type: "string" },
+          lastBookingAt: { type: "string", format: "date-time" },
+          lastServiceName: { type: "string" },
+          visitsCount: { type: "integer" },
+        },
+      },
+      StudioClientsData: {
+        type: "object",
+        required: ["clients"],
+        properties: {
+          clients: { type: "array", items: { $ref: "#/components/schemas/StudioClientListItem" } },
+        },
+      },
+      StudioFinanceRow: {
+        type: "object",
+        required: ["key", "label", "visitsCount", "sumAmount"],
+        properties: {
+          key: { type: "string" },
+          label: { type: "string" },
+          visitsCount: { type: "integer" },
+          sumAmount: { type: "integer" },
+        },
+      },
+      StudioFinanceData: {
+        type: "object",
+        required: ["groupBy", "rows", "totalVisits", "totalAmount", "hasCategories"],
+        properties: {
+          groupBy: { type: "string", enum: ["masters", "categories", "services"] },
+          rows: { type: "array", items: { $ref: "#/components/schemas/StudioFinanceRow" } },
+          totalVisits: { type: "integer" },
+          totalAmount: { type: "integer" },
+          hasCategories: { type: "boolean" },
+        },
+      },
+      CreateTimeBlockInput: {
+        type: "object",
+        required: ["studioId", "masterId", "startAt", "endAt", "type"],
+        properties: {
+          studioId: { type: "string" },
+          masterId: { type: "string" },
+          startAt: { type: "string", format: "date-time" },
+          endAt: { type: "string", format: "date-time" },
+          type: { type: "string", enum: ["BREAK", "BLOCK"] },
+          note: { type: "string" },
+        },
+      },
+      TimeBlockData: {
+        type: "object",
+        required: ["block"],
+        properties: {
+          block: { $ref: "#/components/schemas/TimeBlock" },
+        },
+      },
+      StudioServiceAssignedMaster: {
+        type: "object",
+        required: ["masterId", "masterName"],
+        properties: {
+          masterId: { type: "string" },
+          masterName: { type: "string" },
+        },
+      },
+      StudioService: {
+        type: "object",
+        required: ["id", "categoryId", "title", "basePrice", "baseDurationMin", "sortOrder", "isActive", "masters"],
+        properties: {
+          id: { type: "string" },
+          categoryId: { type: "string", nullable: true },
+          title: { type: "string" },
+          basePrice: { type: "integer" },
+          baseDurationMin: { type: "integer" },
+          sortOrder: { type: "integer" },
+          isActive: { type: "boolean" },
+          masters: { type: "array", items: { $ref: "#/components/schemas/StudioServiceAssignedMaster" } },
+        },
+      },
+      StudioServiceCategory: {
+        type: "object",
+        required: ["id", "title", "sortOrder", "services"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          sortOrder: { type: "integer" },
+          services: { type: "array", items: { $ref: "#/components/schemas/StudioService" } },
+        },
+      },
+      StudioServicesData: {
+        type: "object",
+        required: ["categories"],
+        properties: {
+          categories: { type: "array", items: { $ref: "#/components/schemas/StudioServiceCategory" } },
+        },
+      },
+      CreateStudioCategoryInput: {
+        type: "object",
+        required: ["studioId", "title"],
+        properties: {
+          studioId: { type: "string" },
+          title: { type: "string" },
+        },
+      },
+      StudioCategoryData: {
+        type: "object",
+        required: ["id", "title", "sortOrder"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          sortOrder: { type: "integer" },
+        },
+      },
+      ReorderIdsInput: {
+        type: "object",
+        required: ["studioId", "orderedIds"],
+        properties: {
+          studioId: { type: "string" },
+          orderedIds: { type: "array", items: { type: "string" } },
+        },
+      },
+      CreateStudioServiceInput: {
+        type: "object",
+        required: ["studioId", "categoryId", "title", "basePrice", "baseDurationMin"],
+        properties: {
+          studioId: { type: "string" },
+          categoryId: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          basePrice: { type: "integer" },
+          baseDurationMin: { type: "integer" },
+        },
+      },
+      UpdateStudioServiceInput: {
+        type: "object",
+        required: ["studioId"],
+        properties: {
+          studioId: { type: "string" },
+          categoryId: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          basePrice: { type: "integer" },
+          baseDurationMin: { type: "integer" },
+          isActive: { type: "boolean" },
+        },
+      },
+      AssignMasterInput: {
+        type: "object",
+        required: ["studioId", "masterId"],
+        properties: {
+          studioId: { type: "string" },
+          masterId: { type: "string" },
+        },
+      },
+      AssignMasterData: {
+        type: "object",
+        required: ["serviceId", "masterId"],
+        properties: {
+          serviceId: { type: "string" },
+          masterId: { type: "string" },
+        },
+      },
+      StudioMasterService: {
+        type: "object",
+        required: [
+          "serviceId",
+          "serviceTitle",
+          "isEnabled",
+          "priceOverride",
+          "durationOverrideMin",
+          "commissionPct",
+        ],
+        properties: {
+          serviceId: { type: "string" },
+          serviceTitle: { type: "string" },
+          isEnabled: { type: "boolean" },
+          priceOverride: { type: "integer", nullable: true },
+          durationOverrideMin: { type: "integer", nullable: true },
+          commissionPct: { type: "number", nullable: true },
+        },
+      },
+      StudioMaster: {
+        type: "object",
+        required: ["id", "name", "isActive", "tagline", "services"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          isActive: { type: "boolean" },
+          tagline: { type: "string" },
+          services: { type: "array", items: { $ref: "#/components/schemas/StudioMasterService" } },
+        },
+      },
+      StudioMasterData: {
+        type: "object",
+        required: ["id", "name", "isActive", "tagline", "services"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          isActive: { type: "boolean" },
+          tagline: { type: "string" },
+          services: { type: "array", items: { $ref: "#/components/schemas/StudioMasterService" } },
+        },
+      },
+      StudioMasterListItem: {
+        type: "object",
+        required: ["id", "name", "isActive", "title", "status", "phone"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          isActive: { type: "boolean" },
+          title: { type: "string" },
+          status: { type: "string", enum: ["PENDING", "ACTIVE"] },
+          phone: { type: "string", nullable: true },
+        },
+      },
+      StudioMasterListData: {
+        type: "object",
+        required: ["masters"],
+        properties: {
+          masters: { type: "array", items: { $ref: "#/components/schemas/StudioMasterListItem" } },
+        },
+      },
+      CreateStudioMasterInput: {
+        type: "object",
+        required: ["studioId", "displayName", "phone", "title"],
+        properties: {
+          studioId: { type: "string" },
+          displayName: { type: "string" },
+          phone: { type: "string" },
+          title: { type: "string" },
+        },
+      },
+      UpdateStudioMasterInput: {
+        type: "object",
+        required: ["studioId"],
+        properties: {
+          studioId: { type: "string" },
+          displayName: { type: "string" },
+          tagline: { type: "string" },
+          isActive: { type: "boolean" },
+        },
+      },
+      BulkMasterServicesInput: {
+        type: "object",
+        required: ["studioId", "items"],
+        properties: {
+          studioId: { type: "string" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["serviceId", "isEnabled"],
+              properties: {
+                serviceId: { type: "string" },
+                isEnabled: { type: "boolean" },
+                priceOverride: { type: "integer", nullable: true },
+                durationOverrideMin: { type: "integer", nullable: true },
+                commissionPct: { type: "number", nullable: true },
+              },
+            },
+          },
+        },
+      },
+      BulkUpdatedData: {
+        type: "object",
+        required: ["updated"],
+        properties: {
+          updated: { type: "integer" },
+        },
+      },
+      MasterDayBooking: {
+        type: "object",
+        required: [
+          "id",
+          "startAt",
+          "endAt",
+          "rawStatus",
+          "status",
+          "canNoShow",
+          "clientName",
+          "clientPhone",
+          "notes",
+          "serviceTitle",
+        ],
+        properties: {
+          id: { type: "string" },
+          startAt: { type: "string", format: "date-time", nullable: true },
+          endAt: { type: "string", format: "date-time", nullable: true },
+          rawStatus: { type: "string" },
+          status: { type: "string" },
+          canNoShow: { type: "boolean" },
+          clientName: { type: "string" },
+          clientPhone: { type: "string" },
+          notes: { type: "string", nullable: true },
+          serviceTitle: { type: "string" },
+        },
+      },
+      MasterDayWorkingHours: {
+        type: "object",
+        required: ["isDayOff", "startLocal", "endLocal", "bufferBetweenBookingsMin"],
+        properties: {
+          isDayOff: { type: "boolean" },
+          startLocal: { type: "string", nullable: true },
+          endLocal: { type: "string", nullable: true },
+          bufferBetweenBookingsMin: { type: "integer" },
+        },
+      },
+      MasterDayGap: {
+        type: "object",
+        required: ["startAt", "endAt", "minutes"],
+        properties: {
+          startAt: { type: "string", format: "date-time" },
+          endAt: { type: "string", format: "date-time" },
+          minutes: { type: "integer" },
+        },
+      },
+      MasterDayReview: {
+        type: "object",
+        required: ["id", "rating", "text", "authorName", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          rating: { type: "integer", minimum: 1, maximum: 5 },
+          text: { type: "string", nullable: true },
+          authorName: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      MasterDayServiceOption: {
+        type: "object",
+        required: ["id", "title", "price", "durationMin"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          price: { type: "integer" },
+          durationMin: { type: "integer" },
+        },
+      },
+      MasterDayData: {
+        type: "object",
+        required: [
+          "date",
+          "isSolo",
+          "workingHours",
+          "bookings",
+          "currentBookingId",
+          "nextBookingId",
+          "monthEarnings",
+          "upcomingGaps",
+          "latestReviews",
+          "services",
+        ],
+        properties: {
+          date: { type: "string" },
+          isSolo: { type: "boolean" },
+          workingHours: { $ref: "#/components/schemas/MasterDayWorkingHours" },
+          bookings: { type: "array", items: { $ref: "#/components/schemas/MasterDayBooking" } },
+          currentBookingId: { type: "string", nullable: true },
+          nextBookingId: { type: "string", nullable: true },
+          monthEarnings: { type: "integer" },
+          upcomingGaps: { type: "array", items: { $ref: "#/components/schemas/MasterDayGap" } },
+          latestReviews: { type: "array", items: { $ref: "#/components/schemas/MasterDayReview" } },
+          services: { type: "array", items: { $ref: "#/components/schemas/MasterDayServiceOption" } },
+        },
+      },
+      CreateMasterBookingInput: {
+        type: "object",
+        required: ["startAt", "serviceId", "clientName"],
+        properties: {
+          startAt: { type: "string", format: "date-time" },
+          serviceId: { type: "string" },
+          clientName: { type: "string" },
+          clientPhone: { type: "string" },
+          notes: { type: "string" },
+        },
+      },
+      UpdateMasterBookingStatusInput: {
+        type: "object",
+        required: ["status"],
+        properties: {
+          status: { type: "string", enum: ["CONFIRMED", "CANCELLED", "NO_SHOW"] },
+        },
+      },
+      MasterScheduleDayLoad: {
+        type: "object",
+        required: ["date", "count"],
+        properties: {
+          date: { type: "string" },
+          count: { type: "integer" },
+        },
+      },
+      MasterScheduleRequest: {
+        type: "object",
+        required: ["id", "type", "status", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          type: { type: "string", enum: ["OFF", "SHIFT", "BLOCK"] },
+          status: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      MasterScheduleData: {
+        type: "object",
+        required: ["month", "isSolo", "dayLoads", "exceptions", "blocks", "requests"],
+        properties: {
+          month: { type: "string" },
+          isSolo: { type: "boolean" },
+          dayLoads: { type: "array", items: { $ref: "#/components/schemas/MasterScheduleDayLoad" } },
+          exceptions: { type: "array", items: { $ref: "#/components/schemas/WorkException" } },
+          blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
+          requests: { type: "array", items: { $ref: "#/components/schemas/MasterScheduleRequest" } },
+        },
+      },
+      CreateMasterScheduleExceptionInput: {
+        type: "object",
+        required: ["date", "type"],
+        properties: {
+          date: { type: "string" },
+          type: { type: "string", enum: ["OFF", "SHIFT"] },
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+        },
+      },
+      CreateMasterBlockInput: {
+        type: "object",
+        required: ["startAt", "endAt", "type"],
+        properties: {
+          startAt: { type: "string", format: "date-time" },
+          endAt: { type: "string", format: "date-time" },
+          type: { type: "string", enum: ["BREAK", "BLOCK"] },
+          note: { type: "string" },
+        },
+      },
+      MasterApplyOrRequestData: {
+        type: "object",
+        required: ["applied"],
+        properties: {
+          applied: { type: "boolean" },
+          requestId: { type: "string" },
+          exceptionId: { type: "string" },
+          blockId: { type: "string" },
+        },
+      },
+      MasterProfile: {
+        type: "object",
+        required: [
+          "id",
+          "displayName",
+          "tagline",
+          "bio",
+          "avatarUrl",
+          "isPublished",
+          "isSolo",
+          "ratingAvg",
+          "ratingCount",
+        ],
+        properties: {
+          id: { type: "string" },
+          displayName: { type: "string" },
+          tagline: { type: "string" },
+          bio: { type: "string", nullable: true },
+          avatarUrl: { type: "string", nullable: true },
+          isPublished: { type: "boolean" },
+          isSolo: { type: "boolean" },
+          ratingAvg: { type: "number" },
+          ratingCount: { type: "integer" },
+        },
+      },
+      MasterProfileService: {
+        type: "object",
+        required: [
+          "serviceId",
+          "title",
+          "isEnabled",
+          "basePrice",
+          "baseDurationMin",
+          "priceOverride",
+          "durationOverrideMin",
+          "effectivePrice",
+          "effectiveDurationMin",
+          "canEditPrice",
+        ],
+        properties: {
+          serviceId: { type: "string" },
+          title: { type: "string" },
+          isEnabled: { type: "boolean" },
+          basePrice: { type: "integer" },
+          baseDurationMin: { type: "integer" },
+          priceOverride: { type: "integer", nullable: true },
+          durationOverrideMin: { type: "integer", nullable: true },
+          effectivePrice: { type: "integer" },
+          effectiveDurationMin: { type: "integer" },
+          canEditPrice: { type: "boolean" },
+        },
+      },
+      MasterPortfolioItem: {
+        type: "object",
+        required: ["id", "mediaUrl", "caption", "serviceIds", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          mediaUrl: { type: "string" },
+          caption: { type: "string", nullable: true },
+          serviceIds: { type: "array", items: { type: "string" } },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      MasterProfileData: {
+        type: "object",
+        required: ["master", "services", "portfolio"],
+        properties: {
+          master: { $ref: "#/components/schemas/MasterProfile" },
+          services: { type: "array", items: { $ref: "#/components/schemas/MasterProfileService" } },
+          portfolio: { type: "array", items: { $ref: "#/components/schemas/MasterPortfolioItem" } },
+        },
+      },
+      UpdateMasterProfileInput: {
+        type: "object",
+        properties: {
+          displayName: { type: "string" },
+          tagline: { type: "string" },
+          bio: { type: "string", nullable: true },
+          avatarUrl: { type: "string", nullable: true },
+          isPublished: { type: "boolean" },
+        },
+      },
+      UpsertMasterServicesInput: {
+        type: "object",
+        required: ["items"],
+        properties: {
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["serviceId", "isEnabled"],
+              properties: {
+                serviceId: { type: "string" },
+                isEnabled: { type: "boolean" },
+                durationOverrideMin: { type: "integer", nullable: true },
+                priceOverride: { type: "integer", nullable: true },
+              },
+            },
+          },
+        },
+      },
+      CreateMasterPortfolioInput: {
+        type: "object",
+        required: ["mediaUrl", "serviceIds"],
+        properties: {
+          mediaUrl: { type: "string" },
+          caption: { type: "string" },
+          serviceIds: { type: "array", items: { type: "string" } },
+        },
+      },
+      MasterPortfolioListData: {
+        type: "object",
+        required: ["items"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/MasterPortfolioItem" } },
+        },
+      },
+      MeUser: {
+        type: "object",
+        required: ["id", "roles"],
+        properties: {
+          id: { type: "string" },
+          roles: { type: "array", items: { type: "string" } },
+          displayName: { type: "string", nullable: true },
+          phone: { type: "string", nullable: true },
+          email: { type: "string", nullable: true },
+          externalPhotoUrl: { type: "string", nullable: true },
+          firstName: { type: "string", nullable: true },
+          lastName: { type: "string", nullable: true },
+          middleName: { type: "string", nullable: true },
+          birthDate: { type: "string", nullable: true },
+          address: { type: "string", nullable: true },
+          geoLat: { type: "number", nullable: true },
+          geoLng: { type: "number", nullable: true },
+          hasMasterProfile: { type: "boolean" },
+          hasStudioProfile: { type: "boolean" },
+        },
+      },
+      MeData: {
+        type: "object",
+        required: ["user"],
+        properties: {
+          user: { $ref: "#/components/schemas/MeUser" },
+        },
+      },
+      MeUpdateInput: {
+        type: "object",
+        properties: {
+          displayName: { type: "string" },
+          phone: { type: "string" },
+          email: { type: "string" },
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          middleName: { type: "string" },
+          birthDate: { type: "string" },
+          address: { type: "string" },
+        },
+      },
+      MoveStudioBookingInput: {
+        type: "object",
+        required: ["studioId", "targetMasterId", "targetStartAt", "strategy", "pricing"],
+        properties: {
+          studioId: { type: "string" },
+          targetMasterId: { type: "string" },
+          targetStartAt: { type: "string", format: "date-time" },
+          strategy: { type: "string", enum: ["KEEP_SERVICE", "CHANGE_SERVICE"] },
+          pricing: { type: "string", enum: ["KEEP_PRICE", "APPLY_TARGET"] },
+        },
+      },
+      CreateStudioBookingInput: {
+        type: "object",
+        required: ["studioId", "masterId", "startAt", "serviceId", "clientName"],
+        properties: {
+          studioId: { type: "string" },
+          masterId: { type: "string" },
+          startAt: { type: "string", format: "date-time" },
+          serviceId: { type: "string" },
+          clientName: { type: "string" },
+          clientPhone: { type: "string" },
+          notes: { type: "string" },
+        },
+      },
+      StudioBookingCreatedData: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          id: { type: "string" },
+        },
+      },
+      UpdateTimeBlockInput: {
+        type: "object",
+        required: ["studioId"],
+        properties: {
+          studioId: { type: "string" },
+          startAt: { type: "string", format: "date-time" },
+          endAt: { type: "string", format: "date-time" },
+          type: { type: "string", enum: ["BREAK", "BLOCK"] },
+          note: { type: "string", nullable: true },
+        },
+      },
+      WorkTemplateBreak: {
+        type: "object",
+        required: ["startTime", "endTime"],
+        properties: {
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+        },
+      },
+      WorkTemplate: {
+        type: "object",
+        required: ["id", "title", "startTime", "endTime", "breaks"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+          breaks: { type: "array", items: { $ref: "#/components/schemas/WorkTemplateBreak" } },
+        },
+      },
+      WorkDayRule: {
+        type: "object",
+        required: ["id", "weekday", "templateId", "isWorking"],
+        properties: {
+          id: { type: "string" },
+          weekday: { type: "integer" },
+          templateId: { type: "string" },
+          isWorking: { type: "boolean" },
+        },
+      },
+      WorkException: {
+        type: "object",
+        required: ["id", "date", "type", "startTime", "endTime"],
+        properties: {
+          id: { type: "string" },
+          date: { type: "string" },
+          type: { type: "string", enum: ["OFF", "SHIFT"] },
+          startTime: { type: "string", nullable: true },
+          endTime: { type: "string", nullable: true },
+        },
+      },
+      StudioMasterScheduleData: {
+        type: "object",
+        required: ["templates", "dayRules", "exceptions", "blocks"],
+        properties: {
+          templates: { type: "array", items: { $ref: "#/components/schemas/WorkTemplate" } },
+          dayRules: { type: "array", items: { $ref: "#/components/schemas/WorkDayRule" } },
+          exceptions: { type: "array", items: { $ref: "#/components/schemas/WorkException" } },
+          blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
+        },
+      },
+      CreateWorkTemplateInput: {
+        type: "object",
+        required: ["studioId", "title", "startTime", "endTime", "breaks"],
+        properties: {
+          studioId: { type: "string" },
+          title: { type: "string" },
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+          breaks: { type: "array", items: { $ref: "#/components/schemas/WorkTemplateBreak" } },
+        },
+      },
+      UpsertDayRulesInput: {
+        type: "object",
+        required: ["studioId", "items"],
+        properties: {
+          studioId: { type: "string" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["weekday", "templateId", "isWorking"],
+              properties: {
+                weekday: { type: "integer", minimum: 0, maximum: 6 },
+                templateId: { type: "string" },
+                isWorking: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+      CreateWorkExceptionInput: {
+        type: "object",
+        required: ["studioId", "date", "type"],
+        properties: {
+          studioId: { type: "string" },
+          date: { type: "string" },
+          type: { type: "string", enum: ["OFF", "SHIFT"] },
+          startTime: { type: "string" },
+          endTime: { type: "string" },
+        },
+      },
+      MasterBookingStatusData: {
+        type: "object",
+        required: ["id", "status"],
+        properties: {
+          id: { type: "string" },
+          status: { type: "string" },
+        },
+      },
+      PortfolioFeedItem: {
+        type: "object",
+        required: [
+          "id",
+          "mediaUrl",
+          "caption",
+          "width",
+          "height",
+          "masterId",
+          "masterName",
+          "masterAvatarUrl",
+          "studioName",
+          "serviceIds",
+          "primaryServiceTitle",
+          "totalDurationMin",
+          "totalPrice",
+          "favoritesCount",
+          "isFavorited",
+        ],
+        properties: {
+          id: { type: "string" },
+          mediaUrl: { type: "string" },
+          caption: { type: "string", nullable: true },
+          width: { type: "integer", nullable: true },
+          height: { type: "integer", nullable: true },
+          masterId: { type: "string" },
+          masterName: { type: "string" },
+          masterAvatarUrl: { type: "string", nullable: true },
+          studioName: { type: "string", nullable: true },
+          serviceIds: { type: "array", items: { type: "string" } },
+          primaryServiceTitle: { type: "string", nullable: true },
+          totalDurationMin: { type: "integer" },
+          totalPrice: { type: "integer" },
+          favoritesCount: { type: "integer" },
+          isFavorited: { type: "boolean" },
+        },
+      },
+      NearestSlot: {
+        type: "object",
+        required: ["startAt"],
+        properties: {
+          startAt: { type: "string", format: "date-time" },
+        },
+      },
+      SimilarPortfolioItem: {
+        type: "object",
+        required: ["id", "mediaUrl", "masterName", "totalPrice"],
+        properties: {
+          id: { type: "string" },
+          mediaUrl: { type: "string" },
+          masterName: { type: "string" },
+          totalPrice: { type: "integer" },
+        },
+      },
+      PortfolioServiceOption: {
+        type: "object",
+        required: ["serviceId", "title", "durationMin", "price"],
+        properties: {
+          serviceId: { type: "string" },
+          title: { type: "string" },
+          durationMin: { type: "integer" },
+          price: { type: "integer" },
+        },
+      },
+      PortfolioDetail: {
+        allOf: [
+          { $ref: "#/components/schemas/PortfolioFeedItem" },
+          {
+            type: "object",
+            required: ["serviceOptions", "nearestSlots", "similarItems"],
+            properties: {
+              serviceOptions: {
+                type: "array",
+                items: { $ref: "#/components/schemas/PortfolioServiceOption" },
+              },
+              nearestSlots: {
+                type: "array",
+                items: { $ref: "#/components/schemas/NearestSlot" },
+              },
+              similarItems: {
+                type: "array",
+                items: { $ref: "#/components/schemas/SimilarPortfolioItem" },
+              },
+            },
+          },
+        ],
+      },
+      ToggleFavoriteData: {
+        type: "object",
+        required: ["isFavorited", "favoritesCount"],
+        properties: {
+          isFavorited: { type: "boolean" },
+          favoritesCount: { type: "integer" },
+        },
+      },
+      PortfolioFeedData: {
+        type: "object",
+        required: ["items", "nextCursor"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/PortfolioFeedItem" } },
+          nextCursor: { type: "string", nullable: true },
+        },
+      },
+      PortfolioDetailData: {
+        type: "object",
+        required: ["item"],
+        properties: {
+          item: { $ref: "#/components/schemas/PortfolioDetail" },
+        },
+      },
+      CatalogEntityType: {
+        type: "string",
+        enum: ["master", "studio"],
+      },
+      CatalogPrimaryService: {
+        type: "object",
+        required: ["title", "price", "durationMin"],
+        properties: {
+          title: { type: "string" },
+          price: { type: "integer" },
+          durationMin: { type: "integer" },
+        },
+      },
+      CatalogNextSlot: {
+        type: "object",
+        required: ["startAt"],
+        properties: {
+          startAt: { type: "string", format: "date-time" },
+        },
+      },
+      CatalogSearchItem: {
+        type: "object",
+        required: [
+          "type",
+          "id",
+          "title",
+          "avatarUrl",
+          "ratingAvg",
+          "reviewsCount",
+          "distanceMeters",
+          "photos",
+          "primaryService",
+          "minPrice",
+          "nextSlot",
+        ],
+        properties: {
+          type: { $ref: "#/components/schemas/CatalogEntityType" },
+          id: { type: "string" },
+          title: { type: "string" },
+          avatarUrl: { type: "string", nullable: true },
+          ratingAvg: { type: "number" },
+          reviewsCount: { type: "integer" },
+          distanceMeters: { type: "integer", nullable: true },
+          photos: { type: "array", items: { type: "string" } },
+          primaryService: { allOf: [{ $ref: "#/components/schemas/CatalogPrimaryService" }], nullable: true },
+          minPrice: { type: "integer", nullable: true },
+          nextSlot: { allOf: [{ $ref: "#/components/schemas/CatalogNextSlot" }], nullable: true },
+          todaySlotsCount: { type: "integer" },
+        },
+      },
+      CatalogSearchData: {
+        type: "object",
+        required: ["items", "nextCursor"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/CatalogSearchItem" } },
+          nextCursor: { type: "integer", nullable: true },
+        },
+      },
+      NotificationCenterInviteItem: {
+        type: "object",
+        required: ["id", "studioId", "studioName", "studioTagline", "studioAvatarUrl", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          studioId: { type: "string" },
+          studioName: { type: "string" },
+          studioTagline: { type: "string", nullable: true },
+          studioAvatarUrl: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      NotificationCenterNotificationItem: {
+        type: "object",
+        required: ["id", "title", "body", "type", "channel", "readAt", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          body: { type: "string", nullable: true },
+          type: { type: "string", enum: ["BOOKING_CREATED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED", "SCHEDULE_REQUEST"] },
+          channel: { type: "string", enum: ["MASTER", "STUDIO", "SYSTEM"] },
+          readAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          openHref: { type: "string", nullable: true },
+        },
+      },
+      NotificationCenterData: {
+        type: "object",
+        required: ["invites", "notifications", "unreadCount", "hasPhone"],
+        properties: {
+          invites: { type: "array", items: { $ref: "#/components/schemas/NotificationCenterInviteItem" } },
+          notifications: { type: "array", items: { $ref: "#/components/schemas/NotificationCenterNotificationItem" } },
+          unreadCount: { type: "integer" },
+          hasPhone: { type: "boolean" },
+        },
+      },
     },
   },
   paths: {
+    "/api/catalog/search": {
+      get: {
+        summary: "Search catalog for masters/studios",
+        tags: ["catalog"],
+        parameters: [
+          { name: "serviceQuery", in: "query", required: false, schema: { type: "string" } },
+          { name: "district", in: "query", required: false, schema: { type: "string" } },
+          { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
+          { name: "priceMin", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+          { name: "priceMax", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+          { name: "availableToday", in: "query", required: false, schema: { type: "boolean" } },
+          { name: "ratingMin", in: "query", required: false, schema: { type: "number", minimum: 0, maximum: 5 } },
+          { name: "entityType", in: "query", required: false, schema: { type: "string", enum: ["all", "master", "studio"] } },
+          { name: "view", in: "query", required: false, schema: { type: "string", enum: ["list", "map"] } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 40 } },
+          { name: "cursor", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/CatalogSearchData" }),
+          "400": errorResponse("Validation error"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     "/api/providers": {
       get: {
         summary: "List providers",
@@ -638,6 +1746,53 @@ export const openApiSpec = {
           "200": okResponse({ $ref: "#/components/schemas/ProviderProfileData" }),
           "400": errorResponse("Validation error"),
           "404": errorResponse("Provider not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studios/{id}": {
+      get: {
+        summary: "Get studio private profile",
+        tags: ["studio"],
+        parameters: [providerIdParam],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPrivateProfileData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        summary: "Update studio private profile",
+        tags: ["studio"],
+        parameters: [providerIdParam],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/StudioPrivateProfileUpdateInput" },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPrivateProfileData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/notifications/center": {
+      get: {
+        summary: "Get unified notifications center payload",
+        tags: ["notifications"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/NotificationCenterData" }),
+          "401": errorResponse("Unauthorized"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -858,39 +2013,6 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/masters/{id}/schedule/weekly": {
-      get: {
-        summary: "Get weekly schedule",
-        tags: ["schedule", "masters"],
-        parameters: [masterIdParam],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/WeeklyScheduleData" }),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Master not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-      put: {
-        summary: "Set weekly schedule",
-        tags: ["schedule", "masters"],
-        parameters: [masterIdParam],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": { schema: { $ref: "#/components/schemas/WeeklyScheduleInput" } },
-          },
-        },
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/CountData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Master not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
     "/api/telegram/link": {
       get: {
         summary: "Generate Telegram linking URL",
@@ -945,6 +2067,44 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/TelegramWebhookData" }),
           "403": errorResponse("Forbidden"),
+        },
+      },
+    },
+    "/api/me": {
+      get: {
+        summary: "Get current user profile",
+        tags: ["me", "client"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MeData" }),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        summary: "Update current user profile",
+        tags: ["me", "client"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MeUpdateInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MeData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/me/bookings": {
+      get: {
+        summary: "List current user bookings",
+        tags: ["me", "client", "bookings"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BookingListData" }),
+          "401": errorResponse("Unauthorized"),
+          "500": errorResponse("Internal error"),
         },
       },
     },
@@ -1124,6 +2284,883 @@ export const openApiSpec = {
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "404": errorResponse("Booking not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/calendar": {
+      get: {
+        summary: "Studio unified calendar",
+        tags: ["studio", "calendar"],
+        parameters: [
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+          { name: "date", in: "query", required: true, schema: { type: "string" } },
+          { name: "view", in: "query", required: false, schema: { type: "string", enum: ["day", "week", "month"] } },
+          { name: "masterIds", in: "query", required: false, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioCalendarData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/clients": {
+      get: {
+        summary: "Studio clients aggregated from bookings",
+        tags: ["studio", "clients"],
+        parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioClientsData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/finance": {
+      get: {
+        summary: "Studio finance analytics from booking snapshots",
+        tags: ["studio", "finance"],
+        parameters: [
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+          { name: "from", in: "query", required: true, schema: { type: "string" } },
+          { name: "to", in: "query", required: true, schema: { type: "string" } },
+          {
+            name: "groupBy",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["masters", "categories", "services"] },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioFinanceData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/blocks": {
+      post: {
+        summary: "Create studio time block",
+        tags: ["studio", "calendar"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateTimeBlockInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/TimeBlockData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/blocks/{id}": {
+      patch: {
+        summary: "Update studio time block",
+        tags: ["studio", "calendar"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpdateTimeBlockInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/TimeBlockData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Block not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      delete: {
+        summary: "Delete studio time block",
+        tags: ["studio", "calendar"],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Block not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/categories": {
+      post: {
+        summary: "Create studio category",
+        tags: ["studio", "services"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateStudioCategoryInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/StudioCategoryData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/categories/{id}": {
+      patch: {
+        summary: "Rename studio category",
+        tags: ["studio", "services"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateStudioCategoryInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/categories/reorder": {
+      patch: {
+        summary: "Reorder studio categories",
+        tags: ["studio", "services"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReorderIdsInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/services": {
+      get: {
+        summary: "Studio services list with assigned masters",
+        tags: ["studio", "services"],
+        parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioServicesData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      post: {
+        summary: "Create studio service",
+        tags: ["studio", "services"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateStudioServiceInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/services/{id}": {
+      patch: {
+        summary: "Update studio service",
+        tags: ["studio", "services"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpdateStudioServiceInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/services/reorder": {
+      patch: {
+        summary: "Reorder studio services inside category",
+        tags: ["studio", "services"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReorderIdsInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters": {
+      get: {
+        summary: "List studio masters",
+        tags: ["studio", "masters"],
+        parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioMasterListData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      post: {
+        summary: "Create local studio master",
+        tags: ["studio", "masters"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateStudioMasterInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/services/{id}/assign-master": {
+      post: {
+        summary: "Assign master to service",
+        tags: ["studio", "services"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/AssignMasterInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AssignMasterData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Service not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}": {
+      get: {
+        summary: "Studio master card details",
+        tags: ["studio", "masters"],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioMasterData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        summary: "Update studio master profile",
+        tags: ["studio", "masters"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpdateStudioMasterInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}/services": {
+      put: {
+        summary: "Bulk update master services",
+        tags: ["studio", "masters", "services"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/BulkMasterServicesInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}/schedule": {
+      get: {
+        summary: "Get master schedule for studio drawer",
+        tags: ["studio", "masters", "schedule"],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioMasterScheduleData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}/schedule/templates": {
+      post: {
+        summary: "Create master shift template",
+        tags: ["studio", "masters", "schedule"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateWorkTemplateInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}/schedule/day-rules": {
+      put: {
+        summary: "Bulk upsert day rules",
+        tags: ["studio", "masters", "schedule"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpsertDayRulesInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}/schedule/exceptions": {
+      post: {
+        summary: "Create master schedule exception",
+        tags: ["studio", "masters", "schedule"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateWorkExceptionInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/masters/{id}/schedule/exceptions/{exceptionId}": {
+      delete: {
+        summary: "Delete master schedule exception",
+        tags: ["studio", "masters", "schedule"],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "exceptionId", in: "path", required: true, schema: { type: "string" } },
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/day": {
+      get: {
+        summary: "Master day timeline",
+        tags: ["master"],
+        parameters: [{ name: "date", in: "query", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterDayData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/bookings": {
+      post: {
+        summary: "Create manual booking from master cabinet (solo)",
+        tags: ["master", "bookings"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateMasterBookingInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/bookings/{id}/status": {
+      patch: {
+        summary: "Update booking status from master cabinet",
+        tags: ["master", "bookings"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpdateMasterBookingStatusInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterBookingStatusData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Booking not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule": {
+      get: {
+        summary: "Get master schedule for month",
+        tags: ["master", "schedule"],
+        parameters: [{ name: "month", in: "query", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterScheduleData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule/weekly": {
+      get: {
+        summary: "Get own weekly schedule",
+        tags: ["master", "schedule"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/WeeklyScheduleData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      put: {
+        summary: "Set own weekly schedule",
+        tags: ["master", "schedule"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/WeeklyScheduleInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/CountData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule/buffer": {
+      get: {
+        summary: "Get own booking buffer",
+        tags: ["master", "schedule"],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              bufferBetweenBookingsMin: { type: "integer" },
+            },
+            required: ["bufferBetweenBookingsMin"],
+          }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      put: {
+        summary: "Set own booking buffer",
+        tags: ["master", "schedule"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  bufferBetweenBookingsMin: { type: "integer", minimum: 0, maximum: 30 },
+                },
+                required: ["bufferBetweenBookingsMin"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              bufferBetweenBookingsMin: { type: "integer" },
+            },
+            required: ["bufferBetweenBookingsMin"],
+          }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Master not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule/exceptions": {
+      post: {
+        summary: "Create off-day/shift exception (solo apply, studio request)",
+        tags: ["master", "schedule"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateMasterScheduleExceptionInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/MasterApplyOrRequestData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/schedule/exceptions/{id}": {
+      delete: {
+        summary: "Delete master exception (solo only)",
+        tags: ["master", "schedule"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/blocks": {
+      post: {
+        summary: "Create master break/block (solo apply, studio request)",
+        tags: ["master", "schedule"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateMasterBlockInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/MasterApplyOrRequestData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/blocks/{id}": {
+      patch: {
+        summary: "Update master block (solo only)",
+        tags: ["master", "schedule"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateMasterBlockInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      delete: {
+        summary: "Delete master block (solo only)",
+        tags: ["master", "schedule"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/profile": {
+      get: {
+        summary: "Get master profile aggregate for cabinet",
+        tags: ["master", "profile"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterProfileData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        summary: "Update master profile",
+        tags: ["master", "profile"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpdateMasterProfileInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/services": {
+      put: {
+        summary: "Bulk update master services from cabinet",
+        tags: ["master", "services"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/UpsertMasterServicesInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/portfolio": {
+      get: {
+        summary: "List master portfolio items",
+        tags: ["master", "portfolio"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterPortfolioListData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      post: {
+        summary: "Create master portfolio item",
+        tags: ["master", "portfolio"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateMasterPortfolioInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/master/portfolio/{id}": {
+      delete: {
+        summary: "Delete master portfolio item",
+        tags: ["master", "portfolio"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/bookings/{id}/move": {
+      patch: {
+        summary: "Move booking between masters/time slots",
+        tags: ["studio", "bookings"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MoveStudioBookingInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Booking not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studio/bookings": {
+      post: {
+        summary: "Create booking from studio calendar",
+        tags: ["studio", "bookings"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateStudioBookingInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/StudioBookingCreatedData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/feed/portfolio": {
+      get: {
+        summary: "Inspiration portfolio feed",
+        tags: ["portfolio", "feed"],
+        parameters: [
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          { name: "q", in: "query", required: false, schema: { type: "string" } },
+          { name: "categoryId", in: "query", required: false, schema: { type: "string" } },
+          { name: "category", in: "query", required: false, schema: { type: "string" } },
+          { name: "tag", in: "query", required: false, schema: { type: "string" } },
+          { name: "near", in: "query", required: false, schema: { type: "string" } },
+          { name: "masterId", in: "query", required: false, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/PortfolioFeedData" }),
+          "400": errorResponse("Validation error"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/portfolio/{id}": {
+      get: {
+        summary: "Portfolio detail with prefill booking context",
+        tags: ["portfolio"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/PortfolioDetailData" }),
+          "400": errorResponse("Validation error"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/portfolio/{id}/favorite": {
+      post: {
+        summary: "Toggle portfolio favorite for current user",
+        tags: ["portfolio"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ToggleFavoriteData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Not found"),
           "500": errorResponse("Internal error"),
         },
       },

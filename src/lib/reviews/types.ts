@@ -2,7 +2,7 @@ import type { Review, ReviewTargetType } from "@prisma/client";
 
 export type ReviewDto = {
   id: string;
-  bookingId: string;
+  bookingId: string | null;
   authorId: string;
   authorName: string;
   targetType: ReviewTargetType;
@@ -13,13 +13,14 @@ export type ReviewDto = {
 };
 
 export function toReviewDto(
-  review: Review & { author: { displayName: string | null }; booking: { clientName: string } }
+  review: Review & { author: { displayName: string | null }; booking: { clientName: string } | null }
 ): ReviewDto {
+  const fallbackName = review.booking?.clientName?.trim() || "Client";
   return {
     id: review.id,
     bookingId: review.bookingId,
     authorId: review.authorId,
-    authorName: review.author.displayName?.trim() || review.booking.clientName,
+    authorName: review.author.displayName?.trim() || fallbackName,
     targetType: review.targetType,
     targetId: review.targetId,
     rating: review.rating,
@@ -27,4 +28,3 @@ export function toReviewDto(
     createdAt: review.createdAt.toISOString(),
   };
 }
-

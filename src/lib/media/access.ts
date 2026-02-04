@@ -40,7 +40,8 @@ export async function ensureCanManageMedia(
   kind: MediaKind
 ): Promise<void> {
   if (entityType === MediaEntityType.SITE) {
-    if (entityId !== "site" || kind !== MediaKind.AVATAR || !isSiteAdmin(user)) {
+    const isAllowedSiteKind = kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO;
+    if (entityId !== "site" || !isAllowedSiteKind || !isSiteAdmin(user)) {
       throw new AppError("Forbidden", 403, "FORBIDDEN");
     }
     return;

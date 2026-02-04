@@ -1,4 +1,9 @@
 import { AccountType, MembershipStatus, StudioRole } from "@prisma/client";
+import {
+  CLIENT_CABINET_PATH,
+  MASTER_CABINET_PATH,
+  STUDIO_CABINET_PATH,
+} from "@/lib/auth/cabinet-paths";
 import { prisma } from "@/lib/prisma";
 
 const ALLOWED_ROLE_ADDITIONS: ReadonlySet<AccountType> = new Set([
@@ -21,14 +26,16 @@ export function isAllowedAccountTypeSelection(type: AccountType): boolean {
 }
 
 export function roleRedirect(role: AccountType): string {
-  if (role === AccountType.MASTER) return "/cabinet/master";
-  if (role === AccountType.STUDIO) return "/cabinet/studio";
-  return "/roles";
+  if (role === AccountType.MASTER) return MASTER_CABINET_PATH;
+  if (role === AccountType.STUDIO || role === AccountType.STUDIO_ADMIN) return STUDIO_CABINET_PATH;
+  if (role === AccountType.CLIENT) return CLIENT_CABINET_PATH;
+  return "/cabinet";
 }
 
 export function accountTypeRedirect(type: AccountType): string {
-  if (type === AccountType.MASTER) return "/cabinet/master";
-  if (type === AccountType.STUDIO) return "/cabinet/studio";
+  if (type === AccountType.MASTER) return MASTER_CABINET_PATH;
+  if (type === AccountType.STUDIO || type === AccountType.STUDIO_ADMIN) return STUDIO_CABINET_PATH;
+  if (type === AccountType.CLIENT) return CLIENT_CABINET_PATH;
   return "/";
 }
 

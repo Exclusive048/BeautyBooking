@@ -1,6 +1,14 @@
 import type { ProviderType } from "@prisma/client";
 
-export type BookingStatusDto = "PENDING" | "CONFIRMED" | "CANCELLED";
+export type BookingStatusDto =
+  | "NEW"
+  | "PENDING"
+  | "CONFIRMED"
+  | "PREPAID"
+  | "STARTED"
+  | "FINISHED"
+  | "CANCELLED"
+  | "NO_SHOW";
 
 export type BookingServiceDto = {
   id: string;

@@ -1,83 +1,51 @@
-import { cookies } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
+import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/prisma";
-import { MembershipStatus } from "@prisma/client";
-import { serverApiFetch } from "@/lib/api/server-fetch";
-import type { ProviderProfileDto } from "@/lib/providers/dto";
-import { hasMasterProfile } from "@/lib/auth/roles";
-import { hasAnyStudioAccess } from "@/lib/auth/studio-guards";
 
-export default async function CabinetEntryPage(props: {
-  searchParams?: Promise<{ tab?: string }> | { tab?: string };
-}) {
+export default async function CabinetEntryPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  if (user.phone) {
-    const pendingInvite = await prisma.studioInvite.findFirst({
-      where: { phone: user.phone, status: MembershipStatus.PENDING },
-      select: { id: true },
-    });
-
-    if (pendingInvite) {
-      redirect("/cabinet/invites");
-    }
+  const decision = await resolveCabinetRedirect(user.id);
+  if (!decision.needsHub) {
+    redirect(decision.target);
   }
 
-  const sp =
-    props.searchParams instanceof Promise ? await props.searchParams : props.searchParams;
+  return (
+    <section className="mx-auto max-w-3xl space-y-4 p-4">
+      <header>
+        <h1 className="text-2xl font-semibold">My cabinet</h1>
+        <p className="text-sm text-neutral-600">Choose mode to continue.</p>
+      </header>
 
-  const tab = sp?.tab === "profile" ? "profile" : "bookings";
-  const tabQs = `?tab=${tab}`;
+      <div className="grid gap-3 md:grid-cols-2">
+        {decision.hasStudioMode ? (
+          <Link
+            href={STUDIO_CABINET_PATH}
+            className="rounded-2xl border p-5 transition hover:bg-neutral-50"
+          >
+            <div className="text-lg font-semibold">Studio</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Calendar, services, team and studio management.
+            </div>
+          </Link>
+        ) : null}
 
-  const jar = await cookies();
-  const last = jar.get("bh_last_role")?.value as "client" | "provider" | undefined;
+        {decision.hasMasterMode ? (
+          <Link
+            href={MASTER_CABINET_PATH}
+            className="rounded-2xl border p-5 transition hover:bg-neutral-50"
+          >
+            <div className="text-lg font-semibold">Master</div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Day plan, schedule and storefront profile.
+            </div>
+          </Link>
+        ) : null}
 
-  if (!last) redirect(`/cabinet/ensure-role?next=/cabinet${tabQs}`);
-
-  if (last === "client") {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  const hasStudio = await hasAnyStudioAccess(user.id);
-  const hasMaster = await hasMasterProfile(user.id);
-  if (!hasStudio && !hasMaster) {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  const providerResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-    "/api/providers/me"
+      </div>
+    </section>
   );
-
-  if (!providerResponse.ok) {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  let provider = providerResponse.data.provider;
-
-  if (!provider) {
-    const createResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-      "/api/providers/me",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
-      }
-    );
-
-    if (createResponse.ok) {
-      const reloadResponse = await serverApiFetch<{ provider: ProviderProfileDto | null }>(
-        "/api/providers/me"
-      );
-      if (reloadResponse.ok) provider = reloadResponse.data.provider ?? createResponse.data.provider;
-    }
-  }
-
-  if (!provider) {
-    redirect(`/cabinet/client${tabQs}`);
-  }
-
-  if (provider.type === "STUDIO") redirect(`/cabinet/studio${tabQs}`);
-  redirect(`/cabinet/master${tabQs}`);
 }

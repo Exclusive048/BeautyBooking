@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export function LogoutButton() {
         });
       }}
     >
-      {pending ? "Выход..." : "Выход"}
+      {pending ? UI_TEXT.auth.logoutPending : UI_TEXT.auth.logout}
     </Button>
   );
 }

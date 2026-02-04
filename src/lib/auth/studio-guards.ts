@@ -102,3 +102,28 @@ export async function hasAnyStudioAccess(userId: string): Promise<boolean> {
 
   return Boolean(membership);
 }
+
+export async function hasStudioAdminAccess(userId: string): Promise<boolean> {
+  const owned = await prisma.studio.findFirst({
+    where: {
+      OR: [
+        { ownerUserId: userId },
+        { provider: { ownerUserId: userId } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (owned) return true;
+
+  const membership = await prisma.studioMembership.findFirst({
+    where: {
+      userId,
+      status: MembershipStatus.ACTIVE,
+      roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(membership);
+}

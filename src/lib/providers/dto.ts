@@ -25,9 +25,12 @@ export type ProviderCardDto = {
 export type ProviderProfileDto = {
   id: string;
   type: ProviderTypeDto;
+  studioId: string | null;
   name: string;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   tagline: string;
+  description: string | null;
   rating: number;
   reviews: number;
   priceFrom: number;
@@ -35,5 +38,7 @@ export type ProviderProfileDto = {
   district: string;
   categories: string[];
   availableToday: boolean;
+  geoLat: number | null;
+  geoLng: number | null;
   services: ProviderServiceDto[];
 };

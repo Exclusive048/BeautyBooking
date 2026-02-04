@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getStorageProvider } from "@/lib/media/storage";
 import { MEDIA_ALLOWED_MIME_TYPES, MEDIA_MAX_FILE_SIZE_BYTES, MEDIA_PORTFOLIO_LIMIT, toMediaAssetDto, type MediaAssetDto } from "@/lib/media/types";
 import { ensureCanManageMedia, ensureCanReadMedia } from "@/lib/media/access";
+import { SITE_LOGIN_HERO_SETTING_KEY, SITE_LOGO_SETTING_KEY } from "@/lib/media/settings";
 
 type UploadMediaInput = {
   entityType: MediaEntityType;
@@ -33,6 +34,10 @@ function fileExtFromMime(mimeType: string): string {
 
 function normalizeEntityId(entityId: string): string {
   return entityId.trim();
+}
+
+function studioBannerSettingKey(studioProviderId: string): string {
+  return `studioBannerAssetId:${studioProviderId}`;
 }
 
 function validateUploadBasics(input: UploadMediaInput): void {
@@ -66,12 +71,35 @@ async function deleteAssetById(assetId: string): Promise<void> {
 }
 
 async function enforcePortfolioLimit(entityType: MediaEntityType, entityId: string): Promise<void> {
+  const excludedAssetIds: string[] = [];
+
+  if (entityType === MediaEntityType.STUDIO) {
+    const bannerSetting = await prisma.appSetting.findUnique({
+      where: { key: studioBannerSettingKey(entityId) },
+      select: { value: true },
+    });
+    if (bannerSetting?.value) {
+      excludedAssetIds.push(bannerSetting.value);
+    }
+  }
+
+  if (entityType === MediaEntityType.SITE && entityId === "site") {
+    const heroSetting = await prisma.appSetting.findUnique({
+      where: { key: SITE_LOGIN_HERO_SETTING_KEY },
+      select: { value: true },
+    });
+    if (heroSetting?.value) {
+      excludedAssetIds.push(heroSetting.value);
+    }
+  }
+
   const count = await prisma.mediaAsset.count({
     where: {
       entityType,
       entityId,
       kind: MediaKind.PORTFOLIO,
       deletedAt: null,
+      ...(excludedAssetIds.length > 0 ? { id: { notIn: excludedAssetIds } } : {}),
     },
   });
   if (count >= MEDIA_PORTFOLIO_LIMIT) {
@@ -167,9 +195,21 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
     input.kind === MediaKind.AVATAR
   ) {
     await prisma.appSetting.upsert({
-      where: { key: "siteLogoAssetId" },
+      where: { key: SITE_LOGO_SETTING_KEY },
       update: { value: created.id },
-      create: { key: "siteLogoAssetId", value: created.id },
+      create: { key: SITE_LOGO_SETTING_KEY, value: created.id },
+    });
+  }
+
+  if (
+    input.entityType === MediaEntityType.SITE &&
+    entityId === "site" &&
+    input.kind === MediaKind.PORTFOLIO
+  ) {
+    await prisma.appSetting.upsert({
+      where: { key: SITE_LOGIN_HERO_SETTING_KEY },
+      update: { value: created.id },
+      create: { key: SITE_LOGIN_HERO_SETTING_KEY, value: created.id },
     });
   }
 
@@ -204,7 +244,20 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
   ) {
     await prisma.appSetting.deleteMany({
       where: {
-        key: "siteLogoAssetId",
+        key: SITE_LOGO_SETTING_KEY,
+        value: asset.id,
+      },
+    });
+  }
+
+  if (
+    asset.entityType === MediaEntityType.SITE &&
+    asset.entityId === "site" &&
+    asset.kind === MediaKind.PORTFOLIO
+  ) {
+    await prisma.appSetting.deleteMany({
+      where: {
+        key: SITE_LOGIN_HERO_SETTING_KEY,
         value: asset.id,
       },
     });

@@ -29,7 +29,7 @@ export function RoleGuard({
               <Link href="/">На главную</Link>
             </Button>
             <Button asChild>
-              <Link href="/providers">В каталог</Link>
+              <Link href="/catalog">В каталог</Link>
             </Button>
           </div>
         </CardContent>

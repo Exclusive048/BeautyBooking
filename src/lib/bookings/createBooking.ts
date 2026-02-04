@@ -98,6 +98,7 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
   return prisma.$transaction(
     async (tx) => {
       let masterBufferMin: number | null = null;
+      let resolvedMasterProviderId: string | null = input.masterProviderId ?? null;
       const provider = await tx.provider.findUnique({
         where: { id: input.providerId },
         select: { id: true, type: true, bufferBetweenBookingsMin: true },
@@ -111,12 +112,12 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
       if (!service) throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
 
       if (provider.type === ProviderType.STUDIO) {
-        if (!input.masterProviderId) {
+        if (!resolvedMasterProviderId) {
           throw new AppError("Master is required", 400, "MASTER_REQUIRED");
         }
 
         const master = await tx.provider.findUnique({
-          where: { id: input.masterProviderId },
+          where: { id: resolvedMasterProviderId },
           select: { id: true, type: true, studioId: true, bufferBetweenBookingsMin: true },
         });
         if (!master || master.type !== ProviderType.MASTER || master.studioId !== provider.id) {
@@ -126,17 +127,23 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
         if (service.providerId !== provider.id) {
           throw new AppError("Service not in studio", 400, "SERVICE_INVALID");
         }
+        resolvedMasterProviderId = master.id;
         masterBufferMin = normalizeBufferMinutes(master.bufferBetweenBookingsMin);
+      } else if (provider.type === ProviderType.MASTER) {
+        if (service.providerId !== provider.id) {
+          throw new AppError("Service not in provider", 400, "SERVICE_INVALID");
+        }
+        resolvedMasterProviderId = provider.id;
       } else if (service.providerId !== provider.id) {
         throw new AppError("Service not in provider", 400, "SERVICE_INVALID");
       }
 
       let durationMin = service.durationMin;
-      if (provider.type === ProviderType.STUDIO && input.masterProviderId) {
+      if (provider.type === ProviderType.STUDIO && resolvedMasterProviderId) {
         const override = await tx.masterService.findUnique({
           where: {
             masterProviderId_serviceId: {
-              masterProviderId: input.masterProviderId,
+              masterProviderId: resolvedMasterProviderId,
               serviceId: service.id,
             },
           },
@@ -159,11 +166,11 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
         ? input.endAtUtc
         : new Date(startAtUtc.getTime() + durationMin * 60 * 1000);
 
-      if (provider.type === ProviderType.STUDIO && input.masterProviderId) {
+      if (provider.type === ProviderType.STUDIO && resolvedMasterProviderId) {
         const bufferMin = masterBufferMin ?? 0;
         await ensureNoConflicts(tx, {
           providerId: input.providerId,
-          masterProviderId: input.masterProviderId,
+          masterProviderId: resolvedMasterProviderId,
           startAtUtc,
           endAtUtc,
           bufferMin,
@@ -185,7 +192,8 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
         data: {
           providerId: input.providerId,
           serviceId: input.serviceId,
-          masterProviderId: input.masterProviderId ?? null,
+          masterProviderId: resolvedMasterProviderId,
+          masterId: resolvedMasterProviderId,
           startAtUtc,
           endAtUtc,
           slotLabel: input.slotLabel,

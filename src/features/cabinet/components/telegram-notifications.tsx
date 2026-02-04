@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { Button } from "@/components/ui/button";
-import { UI_TEXTS } from "@/lib/ui-texts/ru";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type TelegramStatus = {
   linked: boolean;
@@ -26,6 +26,7 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
 }
 
 export function TelegramNotificationsSection() {
+  const t = UI_TEXT.clientCabinet;
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -97,7 +98,7 @@ export function TelegramNotificationsSection() {
   if (loading) {
     return (
       <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-        {UI_TEXTS.common.loading}
+        {UI_TEXT.common.loading}
       </div>
     );
   }
@@ -108,16 +109,16 @@ export function TelegramNotificationsSection() {
   return (
     <div className="rounded-2xl border p-4 space-y-3">
       <div>
-        <div className="text-sm font-semibold">{UI_TEXTS.telegram.title}</div>
+        <div className="text-sm font-semibold">{t.telegram.title}</div>
         <div className="mt-1 text-sm text-neutral-600">
-          {linked ? UI_TEXTS.telegram.connected : UI_TEXTS.telegram.notConnected}
+          {linked ? t.telegram.connected : t.telegram.notConnected}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         {!linked ? (
           <Button type="button" onClick={onConnect} disabled={saving}>
-            {saving ? UI_TEXTS.common.loading : UI_TEXTS.telegram.connectButton}
+            {saving ? UI_TEXT.common.loading : t.telegram.connectButton}
           </Button>
         ) : null}
 
@@ -128,12 +129,12 @@ export function TelegramNotificationsSection() {
             onChange={(e) => onToggle(e.target.checked)}
             disabled={!linked || saving}
           />
-          {enabled ? UI_TEXTS.telegram.enabled : UI_TEXTS.telegram.disabled}
+          {enabled ? t.telegram.enabled : t.telegram.disabled}
         </label>
       </div>
 
       {linked ? (
-        <div className="text-xs text-neutral-500">{UI_TEXTS.telegram.hint}</div>
+        <div className="text-xs text-neutral-500">{t.telegram.hint}</div>
       ) : null}
 
       {error ? <div className="text-xs text-red-600">{error}</div> : null}

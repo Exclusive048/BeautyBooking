@@ -8,7 +8,7 @@ import {
   setProviderServiceEnabled,
   updateProviderService,
 } from "@/lib/providers/services";
-import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
+import { ensureStudioAdmin } from "@/lib/studios/access";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -33,7 +33,7 @@ const toggleSchema = z.object({
 });
 
 async function ensureStudioViewer(providerId: string, userId: string) {
-  return ensureStudioAccess(providerId, userId);
+  return ensureStudioAdmin(providerId, userId);
 }
 
 export async function GET(

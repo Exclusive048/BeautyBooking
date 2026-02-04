@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
-import { ensureStudioAccess, ensureStudioAdmin } from "@/lib/studios/access";
+import { ensureStudioAdmin } from "@/lib/studios/access";
 import { setWeeklySchedule } from "@/lib/schedule/usecases";
 import type { DayOfWeek } from "@/lib/domain/schedule";
 
@@ -22,7 +22,7 @@ const weeklySchema = z.array(
 );
 
 async function ensureStudioViewer(studioId: string, userId: string) {
-  return ensureStudioAccess(studioId, userId);
+  return ensureStudioAdmin(studioId, userId);
 }
 
 async function ensureMasterInStudio(masterId: string, studioId: string) {

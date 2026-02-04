@@ -4,6 +4,7 @@ import { createSessionToken } from "@/lib/auth/jwt";
 import { AccountType } from "@prisma/client";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
+import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
@@ -70,5 +71,6 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  return ok({});
+  const redirectDecision = await resolveCabinetRedirect(profile.id);
+  return ok({ redirect: redirectDecision.target });
 }

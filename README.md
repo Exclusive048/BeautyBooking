@@ -73,6 +73,8 @@ We design the architecture for **3 subscription tiers**, applicable for both sol
 - **TailwindCSS**
 - **Prisma ORM**
 - **PostgreSQL (Supabase)**
+
+Encoding note: keep source files in UTF-8 without BOM (especially UI text files).
 ---
 
 ## Smoke checklist

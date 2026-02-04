@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { createBookingNotifications } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 
@@ -104,6 +105,12 @@ export async function confirmBooking(bookingId: string): Promise<BookingStatusUp
     data: { status: "CONFIRMED" },
     select: { id: true, status: true },
   });
+
+  try {
+    await createBookingNotifications({ bookingId: updated.id, kind: "CONFIRMED" });
+  } catch (error) {
+    console.error("Failed to create booking notifications:", error);
+  }
 
   try {
     await sendBookingTelegramNotifications(updated.id, "CONFIRMED", { notifyMasterOnConfirm: false });
