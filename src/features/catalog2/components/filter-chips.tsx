@@ -1,6 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { Input } from "@/components/ui/input";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type FilterChipsProps = {
@@ -15,12 +18,6 @@ type FilterChipsProps = {
   onPriceApply: (nextMin: string, nextMax: string) => void;
   onPriceReset: () => void;
 };
-
-function chipClassName(active: boolean): string {
-  return active
-    ? "rounded-full border border-foreground bg-foreground px-4 py-2 text-sm text-background"
-    : "rounded-full border border-border bg-card/80 px-4 py-2 text-sm text-foreground hover:bg-card";
-}
 
 export function FilterChips({
   availableToday,
@@ -59,47 +56,48 @@ export function FilterChips({
   return (
     <div ref={rootRef} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
       <div className="relative">
-        <button
+        <Chip
           type="button"
           onClick={() => {
             setDraftMin(priceMin);
             setDraftMax(priceMax);
             setPriceOpen((prev) => !prev);
           }}
-          className={chipClassName(priceActive)}
+          variant={priceActive ? "active" : "default"}
         >
           {UI_TEXT.catalog.chips.price}
-        </button>
+        </Chip>
         {priceOpen ? (
-          <div className="absolute left-0 z-30 mt-2 w-56 rounded-xl border border-border bg-card p-3 shadow-md">
+          <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">
             <div className="grid grid-cols-2 gap-2">
-              <input
+              <Input
                 value={draftMin}
                 onChange={(event) => setDraftMin(event.target.value.replace(/[^0-9]/g, ""))}
                 placeholder={UI_TEXT.catalog.chips.priceMinPlaceholder}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+                className="h-9 rounded-lg px-3 text-sm"
                 inputMode="numeric"
               />
-              <input
+              <Input
                 value={draftMax}
                 onChange={(event) => setDraftMax(event.target.value.replace(/[^0-9]/g, ""))}
                 placeholder={UI_TEXT.catalog.chips.priceMaxPlaceholder}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+                className="h-9 rounded-lg px-3 text-sm"
                 inputMode="numeric"
               />
             </div>
             <div className="mt-3 flex gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   onPriceApply(draftMin, draftMax);
                   setPriceOpen(false);
                 }}
-                className="flex-1 rounded-lg bg-foreground px-3 py-2 text-sm text-background"
+                className="flex-1"
+                size="sm"
               >
                 {UI_TEXT.catalog.chips.apply}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => {
                   setDraftMin("");
@@ -107,35 +105,37 @@ export function FilterChips({
                   onPriceReset();
                   setPriceOpen(false);
                 }}
-                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                className="flex-1"
+                size="sm"
+                variant="secondary"
               >
                 {UI_TEXT.catalog.chips.reset}
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
       </div>
 
-      <button type="button" onClick={onToggleAvailableToday} className={chipClassName(availableToday)}>
+      <Chip type="button" onClick={onToggleAvailableToday} variant={availableToday ? "active" : "default"}>
         {UI_TEXT.catalog.chips.availableToday}
-      </button>
-      <button type="button" onClick={onToggleRating45plus} className={chipClassName(rating45plus)}>
+      </Chip>
+      <Chip type="button" onClick={onToggleRating45plus} variant={rating45plus ? "active" : "default"}>
         {UI_TEXT.catalog.chips.rating45plus}
-      </button>
-      <button
+      </Chip>
+      <Chip
         type="button"
         onClick={() => onEntityTypeChange(entityType === "studio" ? "all" : "studio")}
-        className={chipClassName(entityType === "studio")}
+        variant={entityType === "studio" ? "active" : "default"}
       >
         {UI_TEXT.catalog.chips.studios}
-      </button>
-      <button
+      </Chip>
+      <Chip
         type="button"
         onClick={() => onEntityTypeChange(entityType === "master" ? "all" : "master")}
-        className={chipClassName(entityType === "master")}
+        variant={entityType === "master" ? "active" : "default"}
       >
         {UI_TEXT.catalog.chips.privateMasters}
-      </button>
+      </Chip>
     </div>
   );
 }

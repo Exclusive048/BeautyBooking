@@ -224,24 +224,24 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
   }
 
   return (
-    <div className="rounded-2xl bg-neutral-900 p-5 text-white shadow-lg">
+    <div className="lux-card rounded-[26px] p-5 text-text-main">
       <div className="text-lg font-semibold">{UI_TEXT.publicProfile.booking.title}</div>
 
       {step === "summary" && isEmpty ? (
-        <div className="mt-4 rounded-xl bg-white/5 p-4">
+        <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/70 p-4">
           <div className="text-sm font-medium">{UI_TEXT.publicProfile.booking.emptyTitle}</div>
-          <div className="mt-2 text-sm text-white/70">{UI_TEXT.publicProfile.booking.emptyDesc}</div>
+          <div className="mt-2 text-sm text-text-sec">{UI_TEXT.publicProfile.booking.emptyDesc}</div>
         </div>
       ) : null}
 
       {step === "summary" && !isEmpty ? (
         <div className="mt-4 space-y-3">
           {selectedServices.map((service) => (
-            <div key={service.id} className="rounded-xl bg-white/5 p-3">
+            <div key={service.id} className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium">{service.name}</div>
-                  <div className="mt-1 text-xs text-white/75">
+                  <div className="mt-1 text-xs text-text-sec">
                     {service.price > 0
                       ? `${new Intl.NumberFormat("ru-RU").format(service.price)} ₽`
                       : UI_TEXT.publicProfile.services.priceOnRequest}
@@ -250,7 +250,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
                 <button
                   type="button"
                   onClick={() => onRemove(service.id)}
-                  className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
+                  className="rounded-md border border-border-subtle px-2 py-1 text-xs transition hover:bg-bg-card"
                 >
                   {UI_TEXT.publicProfile.services.remove}
                 </button>
@@ -258,13 +258,13 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
             </div>
           ))}
 
-          <div className="rounded-xl bg-white/5 p-3 text-sm">
+          <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-white/75">{UI_TEXT.publicProfile.booking.total}</span>
+              <span className="text-text-sec">{UI_TEXT.publicProfile.booking.total}</span>
               <span>{UI_FMT.totalLabel(totalPrice)}</span>
             </div>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-white/75">{UI_TEXT.publicProfile.booking.duration}</span>
+              <span className="text-text-sec">{UI_TEXT.publicProfile.booking.duration}</span>
               <span>{UI_FMT.durationLabel(totalDuration)}</span>
             </div>
           </div>
@@ -277,26 +277,26 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
             <button
               type="button"
               onClick={() => setRangeStart((prev) => addDays(prev, -7))}
-              className="rounded-lg border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
+              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
             >
               {UI_TEXT.publicProfile.slots.prevWeek}
             </button>
             <button
               type="button"
               onClick={() => setRangeStart((prev) => addDays(prev, 7))}
-              className="rounded-lg border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
+              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
             >
               {UI_TEXT.publicProfile.slots.nextWeek}
             </button>
           </div>
 
-          {slotsLoading ? <div className="text-sm text-white/70">{UI_TEXT.publicProfile.slots.loadingSlots}</div> : null}
-          {slotsError ? <div className="text-sm text-white/70">{slotsError}</div> : null}
+          {slotsLoading ? <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.slots.loadingSlots}</div> : null}
+          {slotsError ? <div className="text-sm text-text-sec">{slotsError}</div> : null}
 
           {!slotsLoading && !slotsError ? (
             <>
               <div>
-                <div className="mb-2 text-xs text-white/70">{UI_TEXT.publicProfile.slots.chooseDay}</div>
+                <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseDay}</div>
                 <div className="flex flex-wrap gap-2">
                   {dayKeys.map((dayKey) => {
                     const daySlots = slotsByDay.get(dayKey) ?? [];
@@ -309,8 +309,8 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
                           setSelectedDate(dayKey);
                           setSelectedSlotLabel("");
                         }}
-                        className={`rounded-lg border px-2 py-1 text-xs ${
-                          active ? "border-white bg-white text-neutral-900" : "border-white/20 hover:bg-white/10"
+                        className={`rounded-lg border px-2 py-1 text-xs transition ${
+                          active ? "border-primary/60 bg-primary text-[rgb(var(--accent-foreground))]" : "border-border-subtle bg-bg-input hover:bg-bg-card"
                         }`}
                       >
                         {new Date(dayKey).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })} ({daySlots.length})
@@ -321,7 +321,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
               </div>
 
               <div>
-                <div className="mb-2 text-xs text-white/70">{UI_TEXT.publicProfile.slots.chooseSlot}</div>
+                <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseSlot}</div>
                 {slotsForSelectedDate.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {slotsForSelectedDate.map((slot) => {
@@ -332,8 +332,8 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
                           key={slot.label}
                           type="button"
                           onClick={() => setSelectedSlotLabel(slot.label)}
-                          className={`rounded-lg border px-2 py-1 text-xs ${
-                            active ? "border-white bg-white text-neutral-900" : "border-white/20 hover:bg-white/10"
+                          className={`rounded-lg border px-2 py-1 text-xs transition ${
+                            active ? "border-primary/60 bg-primary text-[rgb(var(--accent-foreground))]" : "border-border-subtle bg-bg-input hover:bg-bg-card"
                           }`}
                         >
                           {time}
@@ -342,7 +342,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
                     })}
                   </div>
                 ) : (
-                  <div className="text-sm text-white/70">
+                  <div className="text-sm text-text-sec">
                     {slots.length > 0 ? UI_TEXT.publicProfile.slots.noSlotsForDay : UI_TEXT.publicProfile.slots.noSlots}
                   </div>
                 )}
@@ -354,27 +354,27 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
 
       {step === "checkout" ? (
         <div className="mt-4 space-y-3">
-          {meLoading ? <div className="text-sm text-white/70">{UI_TEXT.common.loading}</div> : null}
+          {meLoading ? <div className="text-sm text-text-sec">{UI_TEXT.common.loading}</div> : null}
           {!meLoading && me?.phone ? (
-            <div className="rounded-xl bg-white/5 p-3 text-sm">
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-sm">
               {UI_TEXT.publicProfile.booking.bookingOnPhone}: <span className="font-medium">{me.phone}</span>
             </div>
           ) : null}
 
           {!meLoading && !me ? (
-            <div className="rounded-xl bg-white/5 p-3 text-sm text-white/80">
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-sm text-text-main">
               <div className="font-medium">{UI_TEXT.publicProfile.booking.authRequiredTitle}</div>
-              <div className="mt-1 text-white/70">{UI_TEXT.publicProfile.booking.authRequiredHint}</div>
-              <label className="mt-3 block text-xs text-white/70">{UI_TEXT.publicProfile.booking.phoneLabel}</label>
+              <div className="mt-1 text-text-sec">{UI_TEXT.publicProfile.booking.authRequiredHint}</div>
+              <label className="mt-3 block text-xs text-text-sec">{UI_TEXT.publicProfile.booking.phoneLabel}</label>
               <input
                 value={guestPhone}
                 onChange={(event) => setGuestPhone(event.target.value)}
                 placeholder={UI_TEXT.publicProfile.booking.phonePlaceholder}
-                className="mt-1 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white outline-none placeholder:text-white/50"
+                className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
               />
               <a
                 href={buildLoginUrl()}
-                className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-neutral-900"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-border-subtle bg-bg-card px-3 py-2 text-sm font-semibold text-text-main transition hover:shadow-card"
               >
                 {UI_TEXT.publicProfile.booking.loginAndContinue}
               </a>
@@ -382,12 +382,12 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
           ) : null}
 
           <div>
-            <label className="mb-1 block text-xs text-white/70">{UI_TEXT.publicProfile.booking.comment}</label>
+            <label className="mb-1 block text-xs text-text-sec">{UI_TEXT.publicProfile.booking.comment}</label>
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
-              className="min-h-[84px] w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white outline-none placeholder:text-white/50"
+              className="lux-input min-h-[84px] w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
             />
           </div>
 
@@ -401,7 +401,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
           type="button"
           disabled={isEmpty}
           onClick={() => setStep("slots")}
-          className="mt-5 w-full rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           {UI_TEXT.publicProfile.booking.chooseTime}
         </button>
@@ -410,7 +410,7 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
           type="button"
           disabled={!selectedSlot}
           onClick={() => setStep("checkout")}
-          className="mt-5 w-full rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           {UI_TEXT.publicProfile.booking.continueToConfirm}
         </button>
@@ -420,14 +420,14 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
             type="button"
             disabled={submitLoading || !selectedSlot || (!me && !guestPhone.trim())}
             onClick={() => void onConfirmBooking()}
-            className="mt-5 w-full rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             {UI_TEXT.publicProfile.booking.confirm}
           </button>
           <button
             type="button"
             onClick={() => setStep("slots")}
-            className="mt-2 w-full rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            className="mt-2 w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm font-semibold text-text-main transition hover:bg-bg-card"
           >
             {UI_TEXT.publicProfile.booking.chooseTime}
           </button>

@@ -14,5 +14,5 @@ export default async function AdminLayout({
     redirect("/403");
   }
 
-  return <>{children}</>;
+  return <section className="space-y-4">{children}</section>;
 }

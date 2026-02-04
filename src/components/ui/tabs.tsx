@@ -23,7 +23,7 @@ export function Tabs({
   return (
     <div
       className={cn(
-        "inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-surface p-1 shadow-soft",
+        "inline-flex flex-wrap gap-1 rounded-2xl border border-border-subtle bg-bg-input p-1.5 shadow-card",
         className
       )}
     >
@@ -35,10 +35,10 @@ export function Tabs({
             type="button"
             onClick={() => onChange(t.id)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition",
+              "inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-all duration-300",
               active
-                ? "bg-text text-bg"
-                : "text-text-muted hover:bg-muted"
+                ? "bg-bg-card text-text-main shadow-[0_8px_18px_rgb(20_20_20/0.12)]"
+                : "text-text-sec hover:bg-bg-card/80 hover:text-text-main"
             )}
           >
             <span>{t.label}</span>
@@ -47,8 +47,8 @@ export function Tabs({
                 className={cn(
                   "rounded-xl px-2 py-0.5 text-xs",
                   active
-                    ? "bg-bg/15 text-bg"
-                    : "bg-muted text-text-muted"
+                    ? "bg-primary/15 text-text-main"
+                    : "bg-bg-page text-text-sec"
                 )}
               >
                 {t.badge}

@@ -63,10 +63,10 @@ function monthShift(month: string, delta: number): string {
 }
 
 function dayLoadClass(count: number): string {
-  if (count >= 6) return "bg-emerald-200";
-  if (count >= 3) return "bg-emerald-100";
-  if (count >= 1) return "bg-emerald-50";
-  return "bg-white";
+  if (count >= 6) return "bg-primary/24";
+  if (count >= 3) return "bg-primary/16";
+  if (count >= 1) return "bg-primary/10";
+  return "bg-bg-card";
 }
 
 function toIsoWithTime(dateKey: string, time: string): string {
@@ -119,7 +119,6 @@ export function MasterSchedulePage() {
   const [defaultEnd, setDefaultEnd] = useState("19:00");
   const [defaultBuffer, setDefaultBuffer] = useState(10);
   const [bufferError, setBufferError] = useState<string | null>(null);
-  const [bufferHint, setBufferHint] = useState<string | null>(null);
   const [savingDefaults, setSavingDefaults] = useState(false);
 
   const [breakDrafts, setBreakDrafts] = useState<BreakDraft[]>([
@@ -213,7 +212,6 @@ export function MasterSchedulePage() {
     const normalizedBuffer = Math.floor(defaultBuffer / 5) * 5;
     setDefaultBuffer(normalizedBuffer);
     setBufferError(null);
-    setBufferHint(normalizedBuffer !== defaultBuffer ? "Буфер нормализован до кратного 5 минутам." : "Буфер кратен 5 минутам.");
 
     setSavingDefaults(true);
     setError(null);
@@ -401,40 +399,41 @@ export function MasterSchedulePage() {
     <section className="space-y-4">
       <header>
         <h2 className="text-xl font-semibold">Мой график</h2>
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-text-sec">
           Управляйте временем: выходные, изменения рабочего времени и перерывы. {data.isSolo ? "SOLO: применяется сразу." : "STUDIO: отправляется запрос."}
         </p>
       </header>
 
-      <div className="rounded-2xl border p-4">
+      <div className="lux-card rounded-[24px] p-4">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setMonth((m) => monthShift(m, -1))} className="rounded-lg border px-3 py-2 text-sm">
+          <button type="button" onClick={() => setMonth((m) => monthShift(m, -1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
             &lt;
           </button>
           <input
             type="month"
             value={month}
             onChange={(event) => setMonth(event.target.value)}
-            className="rounded-lg border px-3 py-2 text-sm"
+            className="lux-input rounded-lg px-3 py-2 text-sm"
           />
-          <button type="button" onClick={() => setMonth((m) => monthShift(m, 1))} className="rounded-lg border px-3 py-2 text-sm">
+          <button type="button" onClick={() => setMonth((m) => monthShift(m, 1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
             &gt;
           </button>
-          <button type="button" onClick={() => void load()} className="rounded-lg border px-2.5 py-2 text-sm" aria-label="Обновить">
+          <button type="button" onClick={() => void load()} className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-2 text-sm" aria-label="Обновить">
             ↻
           </button>
         </div>
       </div>
 
-      {loading ? <div className="rounded-2xl border p-5 text-sm">Загрузка...</div> : null}
+      {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div> : null}
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {actionInfo ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{actionInfo}</div> : null}
 
       {!loading ? (
         <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-          <div className="rounded-2xl border p-4">
+          <div className="lux-card rounded-[24px] p-4">
             <h3 className="mb-3 text-sm font-semibold">Календарь месяца (нагрузка)</h3>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="rounded-2xl bg-border-subtle/35 p-2">
+              <div className="grid grid-cols-7 gap-2">
               {monthDays.map((day) => {
                 const count = dayLoadMap.get(day) ?? 0;
                 return (
@@ -442,31 +441,32 @@ export function MasterSchedulePage() {
                     key={day}
                     type="button"
                     onClick={() => setSelectedDate(day)}
-                    className={`rounded-lg border p-2 text-left text-xs ${dayLoadClass(count)} ${
-                      selectedDate === day ? "border-black" : "border-neutral-200"
+                    className={`rounded-xl border border-border-subtle/70 p-2 text-left text-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card ${dayLoadClass(count)} ${
+                      selectedDate === day ? "border-primary/60 ring-1 ring-primary/35" : ""
                     }`}
                   >
                     <div>{day.slice(8, 10)}</div>
-                    <div className="text-neutral-600">{count} записей</div>
+                    <div className="text-text-sec">{count > 0 ? `${count} записей` : ""}</div>
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <section className="rounded-2xl border p-4">
+            <section className="lux-card rounded-[24px] p-4">
               <h3 className="text-sm font-semibold">Рабочее время по умолчанию</h3>
               <div className="mt-2 grid grid-cols-3 gap-2">
-                <label className="text-xs text-muted-foreground">
+                <label className="text-xs text-text-sec">
                   Начало
-                  <input type="time" step={300} value={defaultStart} onChange={(event) => setDefaultStart(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" />
+                  <input type="time" step={300} value={defaultStart} onChange={(event) => setDefaultStart(event.target.value)} className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm" />
                 </label>
-                <label className="text-xs text-muted-foreground">
+                <label className="text-xs text-text-sec">
                   Конец
-                  <input type="time" step={300} value={defaultEnd} onChange={(event) => setDefaultEnd(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" />
+                  <input type="time" step={300} value={defaultEnd} onChange={(event) => setDefaultEnd(event.target.value)} className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm" />
                 </label>
-                <label className="text-xs text-muted-foreground">
+                <label className="text-xs text-text-sec">
                   Перерыв между записями
                   <input
                     type="number"
@@ -478,7 +478,6 @@ export function MasterSchedulePage() {
                       const parsed = Number(event.target.value);
                       setDefaultBuffer(Number.isFinite(parsed) ? parsed : 0);
                       setBufferError(null);
-                      setBufferHint("Буфер кратен 5 минутам.");
                     }}
                     onBlur={() => {
                       if (!Number.isFinite(defaultBuffer) || defaultBuffer < 0) {
@@ -488,73 +487,67 @@ export function MasterSchedulePage() {
                       const normalized = Math.floor(defaultBuffer / 5) * 5;
                       setDefaultBuffer(normalized);
                       setBufferError(null);
-                      setBufferHint(
-                        normalized !== defaultBuffer
-                          ? "Буфер нормализован до кратного 5 минутам."
-                          : "Буфер кратен 5 минутам."
-                      );
                     }}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm"
                     placeholder="10"
                   />
                 </label>
               </div>
               {bufferError ? <div className="mt-1 text-xs text-red-600">{bufferError}</div> : null}
-              {bufferHint ? <div className="mt-1 text-xs text-muted-foreground">{bufferHint}</div> : null}
               <button
                 type="button"
                 onClick={() => void saveDefaultWorkingTime()}
                 disabled={savingDefaults}
-                className="mt-2 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
+                className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm transition hover:bg-bg-card disabled:opacity-60"
               >
                 {savingDefaults ? "Сохраняем..." : "Сохранить рабочее время по умолчанию"}
               </button>
             </section>
 
-            <section className="rounded-2xl border p-4">
+            <section className="lux-card rounded-[24px] p-4">
               <h3 className="text-sm font-semibold">Действия</h3>
               <div className="mt-2 space-y-2">
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(event) => setSelectedDate(event.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  className="lux-input w-full rounded-lg px-3 py-2 text-sm"
                 />
-                <button type="button" onClick={() => void createOffday()} disabled={busy} className="w-full rounded-lg border px-3 py-2 text-sm">
+                <button type="button" onClick={() => void createOffday()} disabled={busy} className="w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm transition hover:bg-bg-card">
                   🏖️ Взять выходной
                 </button>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <input type="text" value={shiftStart} onChange={(event) => setShiftStart(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" placeholder="10:00" />
-                  <input type="text" value={shiftEnd} onChange={(event) => setShiftEnd(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" placeholder="19:00" />
+                  <input type="text" value={shiftStart} onChange={(event) => setShiftStart(event.target.value)} className="lux-input rounded-lg px-3 py-2 text-sm" placeholder="10:00" />
+                  <input type="text" value={shiftEnd} onChange={(event) => setShiftEnd(event.target.value)} className="lux-input rounded-lg px-3 py-2 text-sm" placeholder="19:00" />
                 </div>
-                <button type="button" onClick={() => void createShift()} disabled={busy} className="w-full rounded-lg border px-3 py-2 text-sm">
+                <button type="button" onClick={() => void createShift()} disabled={busy} className="w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm transition hover:bg-bg-card">
                   🌓 Изменить рабочее время
                 </button>
               </div>
             </section>
 
-            <section className="rounded-2xl border p-4">
+            <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Перерывы на выбранный день</h3>
-                <button type="button" onClick={addBreakDraft} className="rounded-lg border px-2 py-1 text-sm">
+                <button type="button" onClick={addBreakDraft} className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-sm">
                   +
                 </button>
               </div>
 
               <div className="space-y-3">
                 {breakDrafts.map((draft) => (
-                  <div key={draft.id} className="rounded-lg border p-2">
+                  <div key={draft.id} className="rounded-xl border border-border-subtle bg-bg-input/70 p-2">
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="text" value={draft.startTime} onChange={(event) => updateBreakDraft(draft.id, { startTime: event.target.value })} className="rounded border px-2 py-1 text-sm" placeholder="13:00" />
-                      <input type="text" value={draft.endTime} onChange={(event) => updateBreakDraft(draft.id, { endTime: event.target.value })} className="rounded border px-2 py-1 text-sm" placeholder="14:00" />
+                      <input type="text" value={draft.startTime} onChange={(event) => updateBreakDraft(draft.id, { startTime: event.target.value })} className="lux-input rounded px-2 py-1 text-sm" placeholder="13:00" />
+                      <input type="text" value={draft.endTime} onChange={(event) => updateBreakDraft(draft.id, { endTime: event.target.value })} className="lux-input rounded px-2 py-1 text-sm" placeholder="14:00" />
                     </div>
-                    <input type="text" value={draft.note} onChange={(event) => updateBreakDraft(draft.id, { note: event.target.value })} placeholder="Комментарий" className="mt-2 w-full rounded border px-2 py-1 text-sm" />
+                    <input type="text" value={draft.note} onChange={(event) => updateBreakDraft(draft.id, { note: event.target.value })} placeholder="Комментарий" className="lux-input mt-2 w-full rounded px-2 py-1 text-sm" />
                     <div className="mt-2 flex gap-2">
-                      <button type="button" onClick={() => void createBreak(draft)} disabled={busy} className="rounded border px-2 py-1 text-xs">
+                      <button type="button" onClick={() => void createBreak(draft)} disabled={busy} className="rounded border border-border-subtle bg-bg-card px-2 py-1 text-xs">
                         Сохранить перерыв
                       </button>
-                      <button type="button" onClick={() => removeBreakDraft(draft.id)} className="rounded border px-2 py-1 text-xs text-red-600">
+                      <button type="button" onClick={() => removeBreakDraft(draft.id)} className="rounded border border-border-subtle bg-bg-card px-2 py-1 text-xs text-red-600">
                         Удалить черновик
                       </button>
                     </div>
@@ -564,20 +557,20 @@ export function MasterSchedulePage() {
 
               <div className="mt-3 space-y-2 text-sm">
                 {selectedDayBreaks.length === 0 ? (
-                  <div className="text-neutral-500">На выбранный день перерывов нет.</div>
+                  <div className="text-text-sec">На выбранный день перерывов нет.</div>
                 ) : (
                   selectedDayBreaks.map((item) => {
                     const start = new Date(item.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                     const end = new Date(item.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                     return (
-                      <div key={item.id} className="rounded border px-2 py-2">
+                      <div key={item.id} className="rounded-xl border border-border-subtle bg-bg-input/60 px-2 py-2">
                         <div className="flex items-center justify-between">
                           <div>{start} — {end}</div>
                           <button type="button" onClick={() => void removeBlock(item.id)} className="text-red-600">
                             удалить
                           </button>
                         </div>
-                        <div className="text-xs text-neutral-500">{item.note || "Без комментария"}</div>
+                        <div className="text-xs text-text-sec">{item.note || "Без комментария"}</div>
                       </div>
                     );
                   })
@@ -585,14 +578,14 @@ export function MasterSchedulePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border p-4">
-              <h3 className="text-sm font-semibold">Исключения</h3>
+            <section className="lux-card rounded-[24px] p-4">
+              <h3 className="text-sm font-semibold">Изменения в графике</h3>
               <div className="mt-2 space-y-1 text-sm">
                 {data.exceptions.length === 0 ? (
-                  <div className="text-neutral-500">Нет исключений.</div>
+                  <div className="text-text-sec">Нет исключений.</div>
                 ) : (
                   data.exceptions.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded border px-2 py-1">
+                    <div key={item.id} className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-1">
                       <span>
                         {item.date} · {item.type}
                         {item.startTime && item.endTime ? ` (${item.startTime}-${item.endTime})` : ""}
@@ -609,14 +602,14 @@ export function MasterSchedulePage() {
             </section>
 
             {!data.isSolo ? (
-              <section className="rounded-2xl border p-4">
+              <section className="lux-card rounded-[24px] p-4">
                 <h3 className="text-sm font-semibold">Мои requests</h3>
                 <div className="mt-2 space-y-1 text-sm">
                   {data.requests.length === 0 ? (
-                    <div className="text-neutral-500">Запросов пока нет.</div>
+                    <div className="text-text-sec">Запросов пока нет.</div>
                   ) : (
                     data.requests.map((item) => (
-                      <div key={item.id} className="rounded border px-2 py-1">
+                      <div key={item.id} className="rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-1">
                         {item.type} · {item.status} · {new Date(item.createdAt).toLocaleString()}
                       </div>
                     ))

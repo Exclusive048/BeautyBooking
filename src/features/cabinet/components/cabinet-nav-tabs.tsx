@@ -13,9 +13,10 @@ export function CabinetNavTabs({
   items: CabinetNavItem[];
   activeId: string;
 }) {
-  const base = "rounded-xl px-3 py-2 text-sm font-medium whitespace-nowrap";
-  const on = "bg-black text-white";
-  const off = "border hover:bg-neutral-50";
+  const base = "relative rounded-xl px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-300";
+  const on =
+    "bg-bg-card pl-4 text-text-main shadow-card before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full before:bg-gradient-to-b before:from-primary before:to-primary-magenta";
+  const off = "text-text-sec hover:bg-bg-input hover:text-text-main";
 
   return (
     <div className="flex w-full items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide">

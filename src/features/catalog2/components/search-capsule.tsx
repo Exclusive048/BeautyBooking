@@ -1,5 +1,7 @@
-﻿"use client";
+"use client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type SearchCapsuleProps = {
@@ -22,36 +24,32 @@ export function SearchCapsule({
   onSubmit,
 }: SearchCapsuleProps) {
   return (
-    <div className="rounded-full border border-border bg-card/90 p-2 shadow-sm">
+    <div className="glass-panel rounded-full p-2">
       <div className="grid gap-2 md:grid-cols-[1.2fr_1fr_0.9fr_auto] md:items-center">
-        <input
+        <Input
           value={serviceQuery}
           onChange={(event) => onServiceQueryChange(event.target.value)}
           placeholder={UI_TEXT.catalog.capsule.servicePlaceholder}
-          className="h-10 rounded-full border border-border bg-background px-4 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          className="h-10 rounded-full bg-bg-input/90"
           aria-label={UI_TEXT.catalog.capsule.servicePlaceholder}
         />
-        <input
+        <Input
           value={district}
           onChange={(event) => onDistrictChange(event.target.value)}
           placeholder={UI_TEXT.catalog.capsule.districtPlaceholder}
-          className="h-10 rounded-full border border-border bg-background px-4 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          className="h-10 rounded-full bg-bg-input/90"
           aria-label={UI_TEXT.catalog.capsule.districtPlaceholder}
         />
-        <input
+        <Input
           value={date}
           onChange={(event) => onDateChange(event.target.value)}
           type="date"
-          className="h-10 rounded-full border border-border bg-background px-4 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          className="h-10 rounded-full bg-bg-input/90"
           aria-label={UI_TEXT.catalog.capsule.datePlaceholder}
         />
-        <button
-          type="button"
-          onClick={onSubmit}
-          className="h-10 rounded-full bg-foreground px-5 text-sm font-medium text-background transition hover:opacity-90"
-        >
+        <Button type="button" onClick={onSubmit} className="h-10 rounded-full px-5 text-sm">
           {UI_TEXT.catalog.capsule.find}
-        </button>
+        </Button>
       </div>
     </div>
   );

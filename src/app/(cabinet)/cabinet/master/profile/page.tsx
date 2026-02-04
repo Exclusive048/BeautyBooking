@@ -11,8 +11,8 @@ export default async function MasterProfileRoute() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-xl font-semibold">Профиль и витрина</h2>
-        <p className="text-sm text-neutral-600">О себе, портфолио и персональные параметры услуг.</p>
+        <h2 className="text-xl font-semibold">Профиль</h2>
+        <p className="text-sm text-neutral-600">О себе, услугах и портфолио.</p>
       </header>
       <MasterProfilePage />
     </section>

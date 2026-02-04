@@ -15,10 +15,15 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
   const current = hasPhotos ? safePhotos[index % safePhotos.length] : null;
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[24px] bg-muted">
       {current ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={current} alt={alt} className="h-full w-full object-cover" loading="lazy" />
+        <img
+          src={current}
+          alt={alt}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          loading="lazy"
+        />
       ) : null}
 
       {safePhotos.length > 1 ? (
@@ -27,21 +32,20 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
             type="button"
             aria-label={UI_TEXT.catalog.carouselPrev}
             onClick={() => setIndex((prev) => (prev - 1 + safePhotos.length) % safePhotos.length)}
-            className="absolute left-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full border border-border bg-background/90 text-sm text-foreground"
+            className="absolute left-3 top-1/2 z-10 h-9 w-9 -translate-y-1/2 rounded-full border border-white/40 bg-black/35 text-sm text-white backdrop-blur transition hover:bg-black/55"
           >
-            ‹
+            &lt;
           </button>
           <button
             type="button"
             aria-label={UI_TEXT.catalog.carouselNext}
             onClick={() => setIndex((prev) => (prev + 1) % safePhotos.length)}
-            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full border border-border bg-background/90 text-sm text-foreground"
+            className="absolute right-3 top-1/2 z-10 h-9 w-9 -translate-y-1/2 rounded-full border border-white/40 bg-black/35 text-sm text-white backdrop-blur transition hover:bg-black/55"
           >
-            ›
+            &gt;
           </button>
         </>
       ) : null}
     </div>
   );
 }
-

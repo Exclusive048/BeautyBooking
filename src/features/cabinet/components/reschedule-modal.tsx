@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
 import { timeToMinutes } from "@/lib/schedule/time";
@@ -199,85 +202,76 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border p-5 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold">{t.booking.moveBooking}</div>
-              <div className="text-sm text-neutral-600">{t.booking.moveBookingHint}</div>
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg px-2 py-1 text-neutral-600 hover:bg-neutral-100"
-              aria-label="Close"
-            >
-              X
-            </button>
-          </div>
-
-          {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
-
+    <ModalSurface open onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-medium">{t.booking.chooseDate}</div>
-            <div className="mt-2 flex gap-2 overflow-x-auto">
-              {dateOptions.map((date) => {
-                const active = date === selectedDate;
-                return (
-                  <button
-                    key={date}
-                    type="button"
-                    onClick={() => setSelectedDate(date)}
-                    className={`rounded-full border px-3 py-1 text-xs whitespace-nowrap ${
-                      active
-                        ? "border-neutral-900 bg-neutral-900 text-white"
-                        : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
-                    }`}
-                  >
-                    {formatDateLabel(date)}
-                  </button>
-                );
-              })}
-            </div>
+            <div className="text-lg font-semibold">{t.booking.moveBooking}</div>
+            <div className="text-sm text-text-sec">{t.booking.moveBookingHint}</div>
           </div>
+          <Button onClick={onClose} variant="icon" size="icon" aria-label={UI_TEXT.common.close}>
+            ×
+          </Button>
+        </div>
 
-          <div>
-            <div className="text-sm font-medium">{t.booking.chooseTime}</div>
-            {loadingSlots ? (
-              <div className="mt-2 text-sm text-neutral-600">{UI_TEXT.common.loading}</div>
-            ) : slotGroups.length === 0 ? (
-              <div className="mt-2 text-sm text-neutral-600">{t.booking.noSlots}</div>
-            ) : (
-              <div className="mt-3">
-                <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
-              </div>
-            )}
+        {error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
           </div>
+        ) : null}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
-            >
-              {UI_TEXT.common.cancel}
-            </button>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={loading || loadingSlots}
-              className="flex-1 rounded-xl bg-black text-white px-4 py-2 text-sm font-medium disabled:opacity-60"
-            >
-              {loading ? t.booking.moving : t.booking.moveConfirm}
-            </button>
+        <div>
+          <div className="text-sm font-medium">{t.booking.chooseDate}</div>
+          <div className="mt-2 flex gap-2 overflow-x-auto">
+            {dateOptions.map((date) => {
+              const active = date === selectedDate;
+              return (
+                <Chip
+                  key={date}
+                  type="button"
+                  onClick={() => setSelectedDate(date)}
+                  variant={active ? "active" : "default"}
+                  className="whitespace-nowrap"
+                >
+                  {formatDateLabel(date)}
+                </Chip>
+              );
+            })}
           </div>
         </div>
+
+        <div>
+          <div className="text-sm font-medium">{t.booking.chooseTime}</div>
+          {loadingSlots ? (
+            <div className="mt-2 text-sm text-text-sec">{UI_TEXT.common.loading}</div>
+          ) : slotGroups.length === 0 ? (
+            <div className="mt-2 text-sm text-text-sec">{t.booking.noSlots}</div>
+          ) : (
+            <div className="mt-3">
+              <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            onClick={onClose}
+            variant="secondary"
+            className="flex-1"
+          >
+            {UI_TEXT.common.cancel}
+          </Button>
+          <Button
+            type="button"
+            onClick={submit}
+            disabled={loading || loadingSlots}
+            className="flex-1"
+          >
+            {loading ? t.booking.moving : t.booking.moveConfirm}
+          </Button>
+        </div>
       </div>
-    </div>
+    </ModalSurface>
   );
 }

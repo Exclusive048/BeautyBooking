@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { Input } from "@/components/ui/input";
+import { ModalSurface } from "@/components/ui/modal-surface";
+import { Select } from "@/components/ui/select";
+import { TooltipHint } from "@/components/ui/tooltip-hint";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
-import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
+import {
+  normalizeStudioServiceDurationMin,
+  normalizeStudioServicePrice,
+} from "@/lib/studio/service-normalization";
+import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type StudioServiceAssignedMaster = {
   masterId: string;
@@ -44,7 +54,12 @@ type Props = {
   studioId: string;
 };
 
+function formatPrice(value: number, suffix: string): string {
+  return `${new Intl.NumberFormat("ru-RU").format(value)} ${suffix}`;
+}
+
 export function StudioServicesPage({ studioId }: Props) {
+  const t = UI_TEXT.studioCabinet.services;
   const [data, setData] = useState<ServicesData>({ categories: [] });
   const [masters, setMasters] = useState<StudioMaster[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +82,12 @@ export function StudioServicesPage({ studioId }: Props) {
     [data.categories]
   );
 
+  const summaryText = useMemo(() => {
+    return t.summary
+      .replace("{categories}", String(data.categories.length))
+      .replace("{services}", String(totalServices));
+  }, [data.categories.length, t.summary, totalServices]);
+
   async function load(): Promise<void> {
     setLoading(true);
     setError(null);
@@ -78,7 +99,9 @@ export function StudioServicesPage({ studioId }: Props) {
       const servicesJson = (await servicesRes.json().catch(() => null)) as ApiResponse<ServicesData> | null;
       if (!servicesRes.ok || !servicesJson || !servicesJson.ok) {
         throw new Error(
-          servicesJson && !servicesJson.ok ? servicesJson.error.message : `API error: ${servicesRes.status}`
+          servicesJson && !servicesJson.ok
+            ? servicesJson.error.message
+            : `${t.apiErrorPrefix}: ${servicesRes.status}`
         );
       }
       setData(servicesJson.data);
@@ -97,7 +120,7 @@ export function StudioServicesPage({ studioId }: Props) {
         setMasters([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load services");
+      setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -106,7 +129,7 @@ export function StudioServicesPage({ studioId }: Props) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studioId]);
+  }, [studioId, t.apiErrorPrefix, t.loadFailed]);
 
   const assignMaster = async (serviceId: string): Promise<void> => {
     const masterId = selectedMasterByService[serviceId];
@@ -120,11 +143,11 @@ export function StudioServicesPage({ studioId }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ serviceId: string; masterId: string }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assign master");
+      setError(err instanceof Error ? err.message : t.assignFailed);
     } finally {
       setAssigningServiceId(null);
     }
@@ -145,13 +168,13 @@ export function StudioServicesPage({ studioId }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
       }
       setShowCategoryModal(false);
       setNewCategoryTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create category");
+      setError(err instanceof Error ? err.message : t.createCategoryFailed);
     } finally {
       setSubmittingCategory(false);
     }
@@ -180,44 +203,39 @@ export function StudioServicesPage({ studioId }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
       }
       setShowServiceModal(false);
       setNewServiceTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create service");
+      setError(err instanceof Error ? err.message : t.createServiceFailed);
     } finally {
       setSubmittingService(false);
     }
   };
 
   if (loading) {
-    return <div className="rounded-2xl border p-5 text-sm">Loading services...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border p-4 text-sm text-neutral-600">
-        Categories: {data.categories.length} / Services: {totalServices}
-      </div>
+      <div className="lux-card rounded-[24px] p-4 text-sm text-text-sec">{summaryText}</div>
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setShowCategoryModal(true)}
-          className="rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50"
-        >
-          + Create category
-        </button>
-        <button
+        <Button type="button" onClick={() => setShowCategoryModal(true)} variant="secondary" size="sm">
+          + {t.createCategory}
+        </Button>
+        <Button
           type="button"
           onClick={() => setShowServiceModal(true)}
-          className="rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50"
+          variant="secondary"
+          size="sm"
           disabled={data.categories.length === 0}
         >
-          + Add service
-        </button>
+          + {t.addService}
+        </Button>
       </div>
 
       {error ? (
@@ -225,32 +243,42 @@ export function StudioServicesPage({ studioId }: Props) {
       ) : null}
 
       {totalServices === 0 ? (
-        <section className="rounded-2xl border p-5">
-          <h3 className="text-base font-semibold">No services yet</h3>
-          <p className="mt-1 text-sm text-neutral-600">
-            Create your first category and service to start taking bookings.
-          </p>
+        <section className="lux-card rounded-[24px] p-5">
+          <h3 className="text-base font-semibold text-text-main">{t.noServicesTitle}</h3>
+          <p className="mt-1 text-sm text-text-sec">{t.noServicesDescription}</p>
         </section>
       ) : null}
 
       {data.categories.map((category) => (
-        <section key={category.id} className="rounded-2xl border">
-          <header className="border-b p-4">
-            <h2 className="text-sm font-semibold">{category.title}</h2>
+        <section key={category.id} className="lux-card overflow-hidden rounded-[24px]">
+          <header className="border-b border-border-subtle/80 px-5 py-4">
+            <h2 className="text-sm font-semibold text-text-main">{category.title}</h2>
           </header>
-          <div className="divide-y">
+          <div className="space-y-2 p-3">
             {category.services.map((service) => (
-              <div key={service.id} className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <div key={service.id} className="rounded-2xl border border-border-subtle bg-bg-input/50 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium">{service.title}</div>
-                    <div className="mt-1 text-xs text-neutral-500">
-                      {service.baseDurationMin} min / {service.basePrice} KZT / {service.isActive ? "active" : "disabled"}
+                    <div className="font-medium text-text-main">{service.title}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-text-sec">
+                      <span>{service.baseDurationMin} {t.durationMin}</span>
+                      <span>•</span>
+                      <span>{formatPrice(service.basePrice, t.currency)}</span>
                     </div>
+                    <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
+                      <input
+                        type="checkbox"
+                        checked={service.isActive}
+                        readOnly
+                        className="h-4 w-4 rounded border-border-subtle accent-primary"
+                      />
+                      <span>{t.visibleInSearch}</span>
+                      <TooltipHint text={t.visibleInSearchHint} />
+                    </label>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      className="rounded-lg border px-2 py-1 text-sm"
+                    <Select
+                      className="min-w-[180px] rounded-xl px-2 py-1 text-sm"
                       value={selectedMasterByService[service.id] ?? ""}
                       onChange={(event) =>
                         setSelectedMasterByService((current) => ({
@@ -259,34 +287,34 @@ export function StudioServicesPage({ studioId }: Props) {
                         }))
                       }
                     >
-                      <option value="">Select master</option>
+                      <option value="">{t.selectMaster}</option>
                       {masters.map((master) => (
                         <option key={master.id} value={master.id}>
                           {master.name}
                         </option>
                       ))}
-                    </select>
-                    <button
+                    </Select>
+                    <Button
                       type="button"
                       onClick={() => void assignMaster(service.id)}
                       disabled={assigningServiceId === service.id}
-                      className="rounded-lg border px-3 py-1 text-sm disabled:opacity-60"
-                      title="Assign master"
+                      variant="secondary"
+                      size="sm"
+                      title={t.assignMaster}
                     >
-                      +
-                    </button>
+                      {t.assignMaster}
+                    </Button>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {service.masters.map((master) => (
-                    <button
+                    <Chip
                       key={`${service.id}-${master.masterId}`}
                       type="button"
                       onClick={() => setDrawerMasterId(master.masterId)}
-                      className="rounded-full border px-2 py-0.5 text-xs hover:bg-neutral-50"
                     >
                       {master.masterName}
-                    </button>
+                    </Chip>
                   ))}
                 </div>
               </div>
@@ -295,107 +323,80 @@ export function StudioServicesPage({ studioId }: Props) {
         </section>
       ))}
 
-      {showCategoryModal ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-4">
-            <h3 className="text-base font-semibold">Create category</h3>
-            <input
-              type="text"
-              value={newCategoryTitle}
-              onChange={(event) => setNewCategoryTitle(event.target.value)}
-              placeholder="Category title"
-              className="mt-3 w-full rounded-lg border px-3 py-2 text-sm"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCategoryModal(false)}
-                className="rounded-lg border px-3 py-2 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void submitCategory()}
-                disabled={submittingCategory}
-                className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-60"
-              >
-                {submittingCategory ? "Saving..." : "Create"}
-              </button>
-            </div>
+      <ModalSurface open={showCategoryModal} onClose={() => setShowCategoryModal(false)}>
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold text-text-main">{t.createCategoryTitle}</h3>
+          <Input
+            type="text"
+            value={newCategoryTitle}
+            onChange={(event) => setNewCategoryTitle(event.target.value)}
+            placeholder={t.categoryTitlePlaceholder}
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" onClick={() => setShowCategoryModal(false)} variant="secondary">
+              {t.cancel}
+            </Button>
+            <Button type="button" onClick={() => void submitCategory()} disabled={submittingCategory}>
+              {submittingCategory ? t.creating : t.save}
+            </Button>
           </div>
         </div>
-      ) : null}
+      </ModalSurface>
 
-      {showServiceModal ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-4">
-            <h3 className="text-base font-semibold">Add service</h3>
-            <div className="mt-3 space-y-2">
-              <select
-                value={newServiceCategoryId}
-                onChange={(event) => setNewServiceCategoryId(event.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              >
-                <option value="">Select category</option>
-                {data.categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.title}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={newServiceTitle}
-                onChange={(event) => setNewServiceTitle(event.target.value)}
-                placeholder="Service title"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                min={0}
-                step={100}
-                value={newServicePrice}
-                onChange={(event) => setNewServicePrice(event.target.value)}
-                onBlur={() => {
-                  setNewServicePrice((current) => String(normalizeStudioServicePrice(Number(current))));
-                }}
-                placeholder="Price"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                min={5}
-                step={5}
-                value={newServiceDuration}
-                onChange={(event) => setNewServiceDuration(event.target.value)}
-                onBlur={() => {
-                  setNewServiceDuration((current) => String(normalizeStudioServiceDurationMin(Number(current))));
-                }}
-                placeholder="Duration (min)"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowServiceModal(false)}
-                className="rounded-lg border px-3 py-2 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void submitService()}
-                disabled={submittingService}
-                className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-60"
-              >
-                {submittingService ? "Saving..." : "Create"}
-              </button>
-            </div>
+      <ModalSurface open={showServiceModal} onClose={() => setShowServiceModal(false)}>
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold text-text-main">{t.createServiceTitle}</h3>
+          <div className="space-y-2">
+            <Select
+              value={newServiceCategoryId}
+              onChange={(event) => setNewServiceCategoryId(event.target.value)}
+            >
+              <option value="">{t.selectCategory}</option>
+              {data.categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.title}
+                </option>
+              ))}
+            </Select>
+            <Input
+              type="text"
+              value={newServiceTitle}
+              onChange={(event) => setNewServiceTitle(event.target.value)}
+              placeholder={t.serviceTitlePlaceholder}
+            />
+            <Input
+              type="number"
+              min={0}
+              step={100}
+              value={newServicePrice}
+              onChange={(event) => setNewServicePrice(event.target.value)}
+              onBlur={() => {
+                setNewServicePrice((current) => String(normalizeStudioServicePrice(Number(current))));
+              }}
+              placeholder={t.pricePlaceholder}
+            />
+            <Input
+              type="number"
+              min={5}
+              step={5}
+              value={newServiceDuration}
+              onChange={(event) => setNewServiceDuration(event.target.value)}
+              onBlur={() => {
+                setNewServiceDuration((current) => String(normalizeStudioServiceDurationMin(Number(current))));
+              }}
+              placeholder={t.durationPlaceholder}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" onClick={() => setShowServiceModal(false)} variant="secondary">
+              {t.cancel}
+            </Button>
+            <Button type="button" onClick={() => void submitService()} disabled={submittingService}>
+              {submittingService ? t.creating : t.save}
+            </Button>
           </div>
         </div>
-      ) : null}
+      </ModalSurface>
 
       {drawerMasterId ? (
         <MasterCardDrawer

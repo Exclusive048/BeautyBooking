@@ -60,7 +60,7 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
     <Link
       href={href}
       aria-label={item.title}
-      className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+      className="group block overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card transition-all duration-300 hover:scale-[1.01] hover:shadow-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
     >
       <article>
         <PhotoCarousel photos={item.photos} alt={item.title} />
@@ -72,15 +72,15 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
               <img
                 src={item.avatarUrl}
                 alt={item.title}
-                className={`h-10 w-10 object-cover ${item.type === "master" ? "rounded-full" : "rounded-lg"}`}
+                className={`h-10 w-10 object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}
                 loading="lazy"
               />
             ) : (
-              <div className={`h-10 w-10 bg-muted ${item.type === "master" ? "rounded-full" : "rounded-lg"}`} />
+              <div className={`h-10 w-10 bg-muted ${item.type === "master" ? "rounded-full" : "rounded-xl"}`} />
             )}
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="truncate text-sm font-semibold text-text-main">{item.title}</div>
+              <div className="text-xs text-text-sec">
                 {showNew
                   ? UI_TEXT.catalog.newLabel
                   : `${item.ratingAvg.toFixed(1)} ? ${item.reviewsCount} ${UI_TEXT.catalog.reviewsLabel}`}
@@ -88,8 +88,8 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
             </div>
           </div>
 
-          <div className="text-sm text-foreground">{priceText}</div>
-          <div className="rounded-xl border border-border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+          <div className="text-sm text-text-main">{priceText}</div>
+          <div className="rounded-2xl border border-border-subtle bg-bg-input/80 px-3 py-2 text-xs text-text-sec">
             {slotText}
           </div>
         </div>

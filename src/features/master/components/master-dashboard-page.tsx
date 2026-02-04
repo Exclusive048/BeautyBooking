@@ -395,50 +395,50 @@ export function MasterDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border p-4">
+      <div className="lux-card rounded-[24px] p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setDate((d) => dateShift(d, -1))} className="rounded-lg border px-3 py-2 text-sm">
+          <button type="button" onClick={() => setDate((d) => dateShift(d, -1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
             &lt;
           </button>
           <input
             type="date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
-            className="rounded-lg border px-3 py-2 text-sm"
+            className="lux-input rounded-lg px-3 py-2 text-sm"
           />
-          <button type="button" onClick={() => setDate((d) => dateShift(d, 1))} className="rounded-lg border px-3 py-2 text-sm">
+          <button type="button" onClick={() => setDate((d) => dateShift(d, 1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
             &gt;
           </button>
-          <button type="button" onClick={() => void load()} className="rounded-lg border px-2.5 py-2 text-sm" aria-label="Обновить">
+          <button type="button" onClick={() => void load()} className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-2 text-sm" aria-label="Обновить">
             ↻
           </button>
         </div>
       </div>
 
-      {loading ? <div className="rounded-2xl border p-5 text-sm">Загрузка...</div> : null}
+      {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div> : null}
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       {!loading ? (
         <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-2xl border p-4">
+            <div className="lux-card rounded-[24px] p-4">
               <h3 className="text-sm font-semibold">Мой день</h3>
               <button
                 type="button"
                 onClick={() => setManualOpen(true)}
                 disabled={!data.isSolo}
-                className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm transition hover:bg-bg-card disabled:opacity-50"
                 title={data.isSolo ? "Добавить запись" : "Для студийного мастера пока недоступно"}
               >
                 + Записать клиента вручную
               </button>
             </div>
 
-            <div className="rounded-2xl border p-4 text-sm">
+            <div className="lux-card rounded-[24px] p-4 text-sm">
               {data.workingHours.isDayOff ? (
                 <div className="flex items-center justify-between gap-2">
                   <span>Сегодня выходной</span>
-                  <a href="/cabinet/master/schedule" className="text-xs underline">
+                    <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
                     Изменить
                   </a>
                 </div>
@@ -448,14 +448,14 @@ export function MasterDashboardPage() {
                     Рабочее время сегодня: {data.workingHours.startLocal}–{data.workingHours.endLocal} • буфер{" "}
                     {data.workingHours.bufferBetweenBookingsMin} мин
                   </span>
-                  <a href="/cabinet/master/schedule" className="text-xs underline">
+                    <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
                     Изменить
                   </a>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-2">
                   <span>Рабочее время не настроено</span>
-                  <a href="/cabinet/master/schedule" className="text-xs underline">
+                    <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
                     Настроить
                   </a>
                 </div>
@@ -465,19 +465,19 @@ export function MasterDashboardPage() {
             {sortedBookings.map((booking) => (
               <section
                 key={booking.id}
-                className={`rounded-2xl border p-4 ${
-                  booking.id === data.currentBookingId ? "border-emerald-300 bg-emerald-50" : ""
+                className={`rounded-[22px] border border-border-subtle bg-bg-card p-4 ${
+                  booking.id === data.currentBookingId ? "border-primary/55 bg-primary/10" : ""
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">{booking.clientName}</div>
-                    <div className="text-xs text-neutral-500">{booking.clientPhone}</div>
-                    <div className="text-xs text-neutral-500">{booking.serviceTitle}</div>
+                    <div className="text-xs text-text-sec">{booking.clientPhone}</div>
+                    <div className="text-xs text-text-sec">{booking.serviceTitle}</div>
                   </div>
-                  <div className="text-xs text-neutral-600">{getStatusLabel(booking.status)}</div>
+                  <div className="text-xs text-text-sec">{getStatusLabel(booking.status)}</div>
                 </div>
-                {booking.notes ? <div className="mt-2 text-sm text-neutral-700">{booking.notes}</div> : null}
+                {booking.notes ? <div className="mt-2 text-sm text-text-sec">{booking.notes}</div> : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(booking.rawStatus === "PENDING" || booking.rawStatus === "NEW") && (
                     <>
@@ -485,7 +485,7 @@ export function MasterDashboardPage() {
                         type="button"
                         disabled={actionId === booking.id}
                         onClick={() => void updateStatus(booking.id, "CONFIRMED")}
-                        className="rounded-lg border px-3 py-1 text-sm"
+                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
                         Подтвердить
                       </button>
@@ -493,7 +493,7 @@ export function MasterDashboardPage() {
                         type="button"
                         disabled={actionId === booking.id}
                         onClick={() => void updateStatus(booking.id, "CANCELLED")}
-                        className="rounded-lg border px-3 py-1 text-sm"
+                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
                         Отклонить
                       </button>
@@ -504,7 +504,7 @@ export function MasterDashboardPage() {
                       type="button"
                       disabled={actionId === booking.id}
                       onClick={() => void updateStatus(booking.id, "NO_SHOW")}
-                      className="rounded-lg border px-3 py-1 text-sm"
+                      className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                     >
                       ❌ Не пришла
                     </button>
@@ -514,15 +514,15 @@ export function MasterDashboardPage() {
             ))}
 
             {sortedBookings.length === 0 ? (
-              <div className="rounded-2xl border p-5">
+               <div className="lux-card rounded-[24px] p-5">
                 <div className="text-sm font-semibold">Пока нет записей</div>
-                <div className="mt-1 text-sm text-neutral-600">Проверьте график и настройте услуги.</div>
+                <div className="mt-1 text-sm text-text-sec">Проверьте график и настройте услуги.</div>
               </div>
             ) : null}
           </div>
 
           <div className="space-y-3">
-            <section className="rounded-2xl border p-4">
+            <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Мой баланс (месяц)</h3>
                 <button type="button" onClick={() => setBalanceVisible((v) => !v)} className="text-sm" aria-label="Скрыть или показать баланс">
@@ -534,19 +534,19 @@ export function MasterDashboardPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border p-4">
+            <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">Ближайшие свободные слоты</h3>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSlotsReloadTick((value) => value + 1)}
-                    className="rounded-lg border px-2 py-1 text-xs"
+                    className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
                     aria-label="Обновить слоты"
                   >
                     ↻
                   </button>
-                  <button type="button" onClick={() => setStoryOpen(true)} className="rounded-lg border px-2 py-1 text-xs">
+                  <button type="button" onClick={() => setStoryOpen(true)} className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs">
                     Опубликовать в Stories
                   </button>
                 </div>
@@ -556,7 +556,7 @@ export function MasterDashboardPage() {
                 <select
                   value={slotsServiceId}
                   onChange={(event) => setSlotsServiceId(event.target.value)}
-                  className="mb-3 w-full rounded-lg border px-2 py-1.5 text-xs"
+                  className="lux-input mb-3 w-full rounded-lg px-2 py-1.5 text-xs"
                 >
                   {data.services.map((service) => (
                     <option key={service.id} value={service.id}>
@@ -566,15 +566,15 @@ export function MasterDashboardPage() {
                 </select>
               ) : null}
 
-              {slotsLoading ? <div className="text-sm text-neutral-500">Загрузка слотов...</div> : null}
+              {slotsLoading ? <div className="text-sm text-text-sec">Загрузка слотов...</div> : null}
               {slotsError ? <div className="text-sm text-red-600">{slotsError}</div> : null}
               {!slotsLoading && !slotsError ? (
                 freeSlots.length === 0 ? (
-                  <div className="text-neutral-500">Свободных слотов нет.</div>
+                  <div className="text-text-sec">Свободных слотов нет.</div>
                 ) : (
-                  <div className="max-h-56 space-y-1 overflow-auto text-sm text-neutral-700">
+                  <div className="max-h-56 space-y-1 overflow-auto text-sm text-text-sec">
                     {freeSlots.map((slot) => (
-                      <div key={slot.label} className="rounded border px-2 py-1">
+                      <div key={slot.label} className="rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-1">
                         {formatAvailabilitySlot(slot)}
                       </div>
                     ))}
@@ -583,18 +583,18 @@ export function MasterDashboardPage() {
               ) : null}
             </section>
 
-            <section className="rounded-2xl border p-4">
+            <section className="lux-card rounded-[24px] p-4">
               <h3 className="mb-2 text-sm font-semibold">Уведомления (новые отзывы)</h3>
               <div className="space-y-2">
                 {data.latestReviews.length === 0 ? (
-                  <div className="text-sm text-neutral-500">Пока отзывов нет.</div>
+                    <div className="text-sm text-text-sec">Пока отзывов нет.</div>
                 ) : (
                   data.latestReviews.map((review) => (
-                    <div key={review.id} className="rounded-lg border p-2 text-sm">
+                    <div key={review.id} className="rounded-xl border border-border-subtle bg-bg-input/70 p-2 text-sm">
                       <div className="font-medium">
                         {review.authorName} · ⭐{review.rating}
                       </div>
-                      {review.text ? <div className="text-neutral-700">{review.text}</div> : null}
+                      {review.text ? <div className="text-text-sec">{review.text}</div> : null}
                     </div>
                   ))
                 )}
@@ -606,9 +606,9 @@ export function MasterDashboardPage() {
 
       {storyOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-4">
+          <div className="w-full max-w-md rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <h3 className="text-base font-semibold">Stories preview</h3>
-            <div className="mt-3 rounded-xl border bg-neutral-50 p-3 text-sm">
+            <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input p-3 text-sm">
               <div className="font-medium">Окна на {date}</div>
               <div className="mt-2 space-y-1">
                 {freeSlots.length === 0 ? <div>Свободных слотов нет</div> : null}
@@ -618,21 +618,21 @@ export function MasterDashboardPage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setStoryOpen(false)} className="rounded-lg border px-3 py-2 text-sm">
-                Закрыть
-              </button>
-              <button
-                type="button"
-                onClick={() => void uploadStoriesToMedia()}
-                disabled={storyGenerating}
-                className="rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
-              >
-                {storyGenerating ? "Сохранение..." : "Сохранить в медиа"}
-              </button>
-              <button type="button" onClick={downloadStory} className="rounded-lg bg-black px-3 py-2 text-sm text-white">
-                Скачать
-              </button>
-            </div>
+                <button type="button" onClick={() => setStoryOpen(false)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void uploadStoriesToMedia()}
+                  disabled={storyGenerating}
+                  className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm disabled:opacity-60"
+                >
+                  {storyGenerating ? "Сохранение..." : "Сохранить в медиа"}
+                </button>
+                <button type="button" onClick={downloadStory} className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))]">
+                  Скачать
+                </button>
+              </div>
             {storyError ? <div className="mt-3 text-sm text-red-600">{storyError}</div> : null}
             {storyAssets.length > 0 ? (
               <div className="mt-4 space-y-2">
@@ -644,7 +644,7 @@ export function MasterDashboardPage() {
                       href={asset.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="overflow-hidden rounded-lg border"
+                      className="overflow-hidden rounded-xl border border-border-subtle"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={asset.url} alt="Story card" className="h-40 w-full object-cover" />
@@ -659,19 +659,19 @@ export function MasterDashboardPage() {
 
       {manualOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-4">
+          <div className="w-full max-w-md rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <h3 className="text-base font-semibold">Ручная запись</h3>
             <div className="mt-3 space-y-2">
               <input
                 type="datetime-local"
                 value={manualStartAt}
                 onChange={(event) => setManualStartAt(event.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
               <select
                 value={manualServiceId}
                 onChange={(event) => setManualServiceId(event.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">Выберите услугу</option>
                 {data.services.map((service) => (
@@ -685,31 +685,31 @@ export function MasterDashboardPage() {
                 value={manualClientName}
                 onChange={(event) => setManualClientName(event.target.value)}
                 placeholder="Имя клиента"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 value={manualClientPhone}
                 onChange={(event) => setManualClientPhone(event.target.value)}
                 placeholder="Телефон"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
               <textarea
                 value={manualNotes}
                 onChange={(event) => setManualNotes(event.target.value)}
                 placeholder="Комментарий"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setManualOpen(false)} className="rounded-lg border px-3 py-2 text-sm">
+              <button type="button" onClick={() => setManualOpen(false)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
                 Отмена
               </button>
               <button
                 type="button"
                 onClick={() => void createManualBooking()}
                 disabled={savingManual}
-                className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-60"
+                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
               >
                 {savingManual ? "Сохраняем..." : "Создать"}
               </button>

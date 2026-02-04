@@ -122,34 +122,34 @@ export default function ProviderProfilePage() {
   }, [id, router]);
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.loading}</div>
-        </CardContent>
-      </Card>
-    );
+      return (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.loading}</div>
+          </CardContent>
+        </Card>
+      );
   }
 
   if (redirecting) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.redirecting}</div>
-        </CardContent>
-      </Card>
-    );
+      return (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.redirecting}</div>
+          </CardContent>
+        </Card>
+      );
   }
 
   if (error || !provider) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.loadFailedTitle}</div>
-          <div className="mt-2 text-sm text-neutral-600">{error ?? UI_TEXT.publicProfile.page.notFound}</div>
-        </CardContent>
-      </Card>
-    );
+      return (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.loadFailedTitle}</div>
+            <div className="mt-2 text-sm text-text-sec">{error ?? UI_TEXT.publicProfile.page.notFound}</div>
+          </CardContent>
+        </Card>
+      );
   }
 
   const studioBookingHref =
@@ -177,9 +177,9 @@ export default function ProviderProfilePage() {
             }
           />
 
-          <Card className="bg-white">
+          <Card>
             <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.categoriesTitle}</div>
+              <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.categoriesTitle}</div>
               <div className="mt-1 flex flex-wrap gap-2">
                 {provider.categories.map((category) => (
                   <Badge key={category}>{category}</Badge>
@@ -211,13 +211,13 @@ export default function ProviderProfilePage() {
 
         <div className="h-fit lg:sticky lg:top-6 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto">
           {studioBookingHref ? (
-            <Card className="bg-white">
+            <Card>
               <CardContent className="space-y-3 p-5">
-                <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.page.studioBookingTitle}</div>
-                <div className="text-sm text-neutral-600">{UI_TEXT.publicProfile.page.studioBookingDescription}</div>
+                <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.studioBookingTitle}</div>
+                <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.page.studioBookingDescription}</div>
                 <Link
                   href={studioBookingHref}
-                  className="inline-flex w-full items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-medium text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover"
                 >
                   {UI_TEXT.publicProfile.page.studioBookingCta}
                 </Link>

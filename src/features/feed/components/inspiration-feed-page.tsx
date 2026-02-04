@@ -321,92 +321,102 @@ export function InspirationFeedPage() {
     }
   }, []);
 
-  const headerShadow = initialLoadedRef.current ? "shadow-sm" : "";
+  const headerShadow = initialLoadedRef.current ? "shadow-card" : "";
 
   return (
     <div className="relative space-y-6">
-      <header className={`sticky top-0 z-20 -mx-4 border-b bg-accent/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 ${headerShadow}`}>
-        <div className="mx-auto max-w-7xl space-y-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-neutral-900 sm:text-xl">{UI_TEXT.feed.title}</h1>
-            <div className="text-xs text-neutral-500 sm:text-sm">{UI_TEXT.feed.subtitle}</div>
-          </div>
+      <header className={`sticky top-3 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8`}>
+        <div
+          className={`glass-panel mx-auto max-w-7xl overflow-hidden rounded-[28px] px-4 py-4 sm:px-5 ${headerShadow}`}
+        >
+          <div className="pointer-events-none absolute left-1/2 top-0 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 blur-3xl" />
+          <div className="pointer-events-none absolute right-10 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-primary-magenta/18 blur-3xl" />
 
-          <input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none ring-black/10 transition focus:ring"
-            placeholder={UI_TEXT.feed.searchPlaceholder}
-          />
+          <div className="relative space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-lg font-semibold text-text-main sm:text-xl">{UI_TEXT.feed.title}</h1>
+              <div className="text-xs text-text-sec sm:text-sm">{UI_TEXT.feed.subtitle}</div>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((option) => {
-              const active = selectedCategory === option.key;
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() =>
-                    replaceSearchParams({ category: active ? "" : option.key })
-                  }
-                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                    active
-                      ? "border-black bg-black text-white"
-                      : "border-neutral-200 bg-white text-neutral-800 hover:border-neutral-300"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              className="lux-input w-full rounded-full px-5 py-2.5 text-sm outline-none transition focus-visible:shadow-glow"
+              placeholder={UI_TEXT.feed.aiSearchPlaceholder}
+            />
 
-          <div className="flex flex-wrap gap-2">
-            {TAG_OPTIONS.map((option) => {
-              const active = selectedTag === option.key;
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => replaceSearchParams({ tag: active ? "" : option.key })}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                    active
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-700 hover:border-neutral-300"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_OPTIONS.map((option) => {
+                const active = selectedCategory === option.key;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() =>
+                      replaceSearchParams({ category: active ? "" : option.key })
+                    }
+                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300 ${
+                      active
+                        ? "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))] shadow-card"
+                        : "border border-border-subtle/85 bg-bg-card/65 text-text-main hover:bg-bg-card"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {TAG_OPTIONS.map((option) => {
+                const active = selectedTag === option.key;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => replaceSearchParams({ tag: active ? "" : option.key })}
+                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300 ${
+                      active
+                        ? "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))] shadow-card"
+                        : "border border-border-subtle/85 bg-bg-card/60 text-text-main hover:bg-bg-card"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </header>
 
-      {loading ? <div className="rounded-2xl border bg-white p-6 text-sm text-neutral-600">{UI_TEXT.feed.loading}</div> : null}
+      {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{UI_TEXT.feed.loading}</div> : null}
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {!loading && items.length === 0 ? (
-        <div className="rounded-2xl border bg-white p-8 text-center text-sm text-neutral-600">{UI_TEXT.feed.emptyFeed}</div>
+        <div className="lux-card rounded-[24px] p-8 text-center text-sm text-text-sec">{UI_TEXT.feed.emptyFeed}</div>
       ) : null}
 
       {!loading && items.length > 0 ? (
         <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
           {items.map((item) => (
-            <article key={item.id} className="group relative mb-4 break-inside-avoid overflow-hidden rounded-2xl bg-white shadow-sm">
+            <article
+              key={item.id}
+              className="group relative mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card transition-all duration-300 hover:scale-[1.012] hover:shadow-hover"
+            >
               <button type="button" onClick={() => setSelectedId(item.id)} className="block w-full text-left">
                 <img
                   src={item.mediaUrl}
                   alt={item.caption ?? item.primaryServiceTitle ?? item.masterName}
-                  className="h-auto w-full object-cover"
+                  className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                   loading="lazy"
                 />
               </button>
 
-              <div className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-xs font-medium text-white">
+              <div className="absolute left-3 top-3 rounded-full border border-white/30 bg-black/45 px-3 py-1 text-xs font-medium text-white backdrop-blur">
                 {item.totalPrice > 0 ? formatPrice(item.totalPrice) : "—"}
               </div>
 
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 opacity-0 transition group-hover:opacity-100">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/78 via-black/35 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
                 <div className="text-sm font-semibold text-white">{item.primaryServiceTitle ?? item.caption ?? item.masterName}</div>
                 <div className="mt-1 text-xs text-white/90">
                   {formatDuration(item.totalDurationMin)}{item.totalPrice > 0 ? ` • ${formatPrice(item.totalPrice)}` : ""}
@@ -418,14 +428,14 @@ export function InspirationFeedPage() {
                     type="button"
                     onClick={() => onToggleFavorite(item.id)}
                     title={item.isFavorited ? UI_TEXT.feed.removeFromFavorites : UI_TEXT.feed.addToFavorites}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-base text-neutral-900"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/88 text-base text-neutral-900 backdrop-blur"
                   >
                     {item.isFavorited ? "❤" : "♡"}
                   </button>
                   <span className="text-xs text-white/90">{item.favoritesCount > 0 ? `🔥 ${item.favoritesCount}` : ""}</span>
                   <Link
                     href={`/book?portfolioId=${item.id}`}
-                    className="ml-auto inline-flex items-center rounded-full bg-white px-3 py-2 text-xs font-semibold text-neutral-900"
+                    className="ml-auto inline-flex items-center rounded-full border border-white/35 bg-white/90 px-3 py-2 text-xs font-semibold text-neutral-900 backdrop-blur transition hover:bg-white"
                   >
                     {UI_TEXT.feed.bookNow}
                   </Link>
@@ -442,7 +452,7 @@ export function InspirationFeedPage() {
             type="button"
             onClick={loadMore}
             disabled={loadingMore}
-            className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-800 transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full border border-border-subtle bg-bg-card px-4 py-2 text-sm text-text-main transition-all duration-300 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loadingMore ? UI_TEXT.common.loading : UI_TEXT.feed.showMore}
           </button>

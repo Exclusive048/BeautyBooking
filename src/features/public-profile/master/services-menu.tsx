@@ -12,17 +12,20 @@ type Props = {
 
 export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
   return (
-    <section className="rounded-2xl bg-neutral-900 p-5 text-white shadow-lg">
-      <h2 className="text-lg font-semibold">{UI_TEXT.publicProfile.services.title}</h2>
+    <section className="lux-card rounded-[28px] p-5">
+      <h2 className="text-lg font-semibold text-text-main">{UI_TEXT.publicProfile.services.title}</h2>
       <div className="mt-4 space-y-3">
         {services.map((service) => {
           const isSelected = selectedServiceIds.includes(service.id);
           return (
-            <article key={service.id} className="rounded-xl bg-white/5 p-4">
+            <article
+              key={service.id}
+              className="group rounded-2xl border border-border-subtle bg-bg-input/70 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-bg-card hover:shadow-card"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium">{service.name}</div>
-                  <div className="mt-1 text-sm text-white/75">
+                  <div className="text-sm font-medium text-text-main">{service.name}</div>
+                  <div className="mt-1 text-sm text-text-sec">
                     {service.price > 0
                       ? `${new Intl.NumberFormat("ru-RU").format(service.price)} ₽ • ${UI_FMT.durationLabel(service.durationMin)}`
                       : UI_TEXT.publicProfile.services.priceOnRequest}
@@ -32,9 +35,12 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
                   type="button"
                   onClick={() => onAdd(service)}
                   disabled={isSelected}
-                  className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1.5 text-sm text-text-main transition-all duration-300 hover:border-primary/50 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {UI_TEXT.publicProfile.services.add}
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-bg-input text-xs">
+                    +
+                  </span>
+                  <span>{UI_TEXT.publicProfile.services.add}</span>
                 </button>
               </div>
             </article>
@@ -44,4 +50,3 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
     </section>
   );
 }
-

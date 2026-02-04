@@ -63,19 +63,19 @@ export function ReviewsPreview({
   }
 
   return (
-    <Card className="bg-white">
+    <Card>
       <CardContent className="p-5 md:p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.publicProfile.reviews.title}</div>
-            <div className="mt-1 text-xs text-neutral-500">{ratingLabel}</div>
+            <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.reviews.title}</div>
+            <div className="mt-1 text-xs text-text-sec">{ratingLabel}</div>
           </div>
           <div className="flex items-center gap-2">
             {hasMoreThanPreview ? (
               <button
                 type="button"
                 onClick={() => void openAllReviews()}
-                className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm transition hover:bg-bg-card"
               >
                 {UI_TEXT.publicProfile.reviews.all}
               </button>
@@ -84,7 +84,7 @@ export function ReviewsPreview({
               <button
                 type="button"
                 onClick={() => setShowReviewForm(true)}
-                className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm transition hover:bg-bg-card"
               >
                 {UI_TEXT.publicProfile.reviews.leaveReview}
               </button>
@@ -108,15 +108,15 @@ export function ReviewsPreview({
 
         <div className="mt-4 space-y-3">
           {reviews.length === 0 ? (
-            <div className="text-sm text-neutral-500">{UI_TEXT.publicProfile.reviews.noReviews}</div>
+            <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.reviews.noReviews}</div>
           ) : (
             reviews.map((review) => (
-              <div key={review.id} className="rounded-xl border p-3">
+              <div key={review.id} className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-medium">{review.authorName}</div>
-                  <div className="text-xs text-neutral-500">{reviewStars(review.rating)}</div>
+                  <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
                 </div>
-                {review.text ? <div className="mt-2 text-sm text-neutral-700">{review.text}</div> : null}
+                {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
               </div>
             ))
           )}
@@ -132,19 +132,19 @@ export function ReviewsPreview({
             aria-label={UI_TEXT.common.cancel}
           />
           <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="w-full max-w-2xl rounded-[26px] border border-border-subtle bg-bg-card p-5 shadow-hover">
               <div className="mb-3 text-lg font-semibold">{UI_TEXT.publicProfile.reviews.all}</div>
-              {allReviewsLoading ? <div className="text-sm text-neutral-600">{UI_TEXT.common.loading}</div> : null}
+              {allReviewsLoading ? <div className="text-sm text-text-sec">{UI_TEXT.common.loading}</div> : null}
               {allReviewsError ? <div className="text-sm text-red-600">{allReviewsError}</div> : null}
               {!allReviewsLoading && !allReviewsError ? (
                 <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
                   {(allReviews ?? []).map((review) => (
-                    <div key={review.id} className="rounded-xl border p-3">
+                    <div key={review.id} className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-sm font-medium">{review.authorName}</div>
-                        <div className="text-xs text-neutral-500">{reviewStars(review.rating)}</div>
+                        <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
                       </div>
-                      {review.text ? <div className="mt-2 text-sm text-neutral-700">{review.text}</div> : null}
+                      {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
                     </div>
                   ))}
                 </div>
