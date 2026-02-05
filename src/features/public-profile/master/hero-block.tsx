@@ -89,6 +89,19 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
                   <h1 className="text-2xl font-semibold md:text-3xl">{provider.name}</h1>
                   {specialization ? <div className="mt-1 text-sm text-white/85">{specialization}</div> : null}
                   <div className="mt-2 text-sm">{UI_FMT.ratingLabel(provider.rating, provider.reviews)}</div>
+                  {provider.superpowerBadges.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {provider.superpowerBadges.map((badge) => (
+                        <span
+                          key={badge.code}
+                          className="rounded-full border border-white/35 bg-black/25 px-2 py-1 text-[11px] text-white"
+                          title={`${badge.subtitle} · ${badge.count}`}
+                        >
+                          {badge.icon} {badge.title}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

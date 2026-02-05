@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
@@ -278,6 +278,19 @@ export default function StudioProfilePage() {
                       <div className="text-xs text-text-muted">{stars(review.rating)}</div>
                     </div>
                     {review.text ? <div className="mt-2 text-sm text-text-muted">{review.text}</div> : null}
+                    {review.publicTags.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {review.publicTags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="rounded-full border border-border bg-white/70 px-2 py-1 text-[11px] text-text-muted"
+                          >
+                            {tag.icon ? `${tag.icon} ` : ""}
+                            {tag.label}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}

@@ -5,6 +5,9 @@ import type { ApiResponse } from "@/lib/types/api";
 import type { ReviewDto } from "@/lib/reviews/types";
 import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
 
+// AUDIT (sections 4,7):
+// - Master cabinet renders both public tags and private "improve" tags.
+// - Top private-tag summary is shown in the stats area.
 type SortMode = "DATE_ASC" | "DATE_DESC" | "RATING_ASC" | "RATING_DESC";
 
 type Props = {
@@ -31,6 +34,24 @@ function canReportReview(review: ReviewDto): boolean {
 
 function updateReview(items: ReviewDto[], nextReview: ReviewDto): ReviewDto[] {
   return items.map((item) => (item.id === nextReview.id ? nextReview : item));
+}
+
+function collectTopPrivateTags(reviews: ReviewDto[]): Array<{ code: string; label: string; count: number }> {
+  const byCode = new Map<string, { code: string; label: string; count: number }>();
+  for (const review of reviews) {
+    const privateTags = review.privateTags ?? [];
+    for (const tag of privateTags) {
+      const current = byCode.get(tag.code);
+      if (current) {
+        current.count += 1;
+      } else {
+        byCode.set(tag.code, { code: tag.code, label: tag.label, count: 1 });
+      }
+    }
+  }
+  return Array.from(byCode.values())
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, 3);
 }
 
 export function MasterReviewsPage({ masterId }: Props) {
@@ -107,6 +128,8 @@ export function MasterReviewsPage({ masterId }: Props) {
     return items;
   }, [reviews, sortMode]);
 
+  const topPrivateTags = useMemo(() => collectTopPrivateTags(reviews), [reviews]);
+
   const replyToReview = async (review: ReviewDto): Promise<void> => {
     if (review.replyText) return;
 
@@ -170,6 +193,23 @@ export function MasterReviewsPage({ masterId }: Props) {
             <p className="mt-1 text-sm text-text-sec">
               Total: {reviews.length} - Avg: {averageRating.toFixed(1)}
             </p>
+            <div className="mt-2">
+              <div className="text-xs font-medium text-text-main">What can be improved</div>
+              {topPrivateTags.length === 0 ? (
+                <div className="mt-1 text-xs text-text-sec">No private tags yet</div>
+              ) : (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {topPrivateTags.map((tag) => (
+                    <span
+                      key={tag.code}
+                      className="rounded-full border border-border-subtle bg-white/70 px-2 py-1 text-[11px] text-text-sec"
+                    >
+                      {tag.label}: {tag.count}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <label className="text-sm text-text-sec">
             Sort
@@ -219,6 +259,36 @@ export function MasterReviewsPage({ masterId }: Props) {
                   <div className="mt-2 text-sm text-text-sec">
                     {review.text?.trim() ? review.text : "No comment"}
                   </div>
+                  {review.publicTags.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {review.publicTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="rounded-full border border-border-subtle bg-white/70 px-2 py-1 text-[11px] text-text-sec"
+                        >
+                          {tag.icon ? `${tag.icon} ` : ""}
+                          {tag.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {(review.privateTags?.length ?? 0) > 0 ? (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-2">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-amber-800">
+                        Can improve
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {(review.privateTags ?? []).map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="rounded-full border border-amber-300 bg-white/80 px-2 py-1 text-[11px] text-amber-900"
+                          >
+                            {tag.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {review.replyText ? (
                     <div className="mt-3 rounded-lg border border-border-subtle bg-white/70 p-2 text-sm text-text-main">

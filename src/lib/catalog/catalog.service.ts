@@ -1,7 +1,10 @@
 import { Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { CatalogEntityType } from "@/lib/catalog/schemas";
+import type { CatalogEntityType, CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 
+// AUDIT (section 6):
+// - Search supports smart tag presets via soft ranking.
+// - Strategy: boost providers with selected-tag count >= threshold, never hard-filter all others.
 type ServiceLite = {
   id: string;
   name: string;
@@ -43,10 +46,21 @@ type CatalogSearchInput = {
   priceMax?: number;
   availableToday?: boolean;
   ratingMin?: number;
+  smartTag?: CatalogSmartTagPreset;
   entityType?: CatalogEntityType;
   limit: number;
   cursor?: number;
 };
+
+const SMART_TAG_TO_REVIEW_CODE: Record<CatalogSmartTagPreset, string> = {
+  rush: "FAST",
+  relax: "ATMOSPHERE",
+  design: "DESIGN",
+  safe: "STERILE",
+  silent: "PLEASANT_SILENCE",
+};
+
+const SMART_TAG_MIN_COUNT = 3;
 
 function dedupeServices(services: ServiceLite[]): ServiceLite[] {
   const map = new Map<string, ServiceLite>();
@@ -162,6 +176,48 @@ function buildWhere(input: CatalogSearchInput): Prisma.ProviderWhereInput {
   return { AND: and };
 }
 
+async function loadSmartTagCounts(
+  providerIds: string[],
+  preset: CatalogSmartTagPreset | undefined
+): Promise<Map<string, number>> {
+  if (!preset || providerIds.length === 0) return new Map();
+  const tagCode = SMART_TAG_TO_REVIEW_CODE[preset];
+
+  const reviews = await prisma.review.findMany({
+    where: {
+      targetType: "provider",
+      targetId: { in: providerIds },
+      tags: {
+        some: {
+          tag: {
+            type: "PUBLIC",
+            code: tagCode,
+          },
+        },
+      },
+    },
+    select: {
+      targetId: true,
+      tags: {
+        where: {
+          tag: {
+            type: "PUBLIC",
+            code: tagCode,
+          },
+        },
+        select: { tagId: true },
+      },
+    },
+  });
+
+  const counts = new Map<string, number>();
+  for (const review of reviews) {
+    const current = counts.get(review.targetId) ?? 0;
+    counts.set(review.targetId, current + review.tags.length);
+  }
+  return counts;
+}
+
 export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogSearchResult> {
   const where = buildWhere(input);
   const skip = input.cursor ?? 0;
@@ -227,8 +283,29 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
 
   const hasMore = providers.length > take;
   const rows = hasMore ? providers.slice(0, -1) : providers;
+  const smartTagCounts = await loadSmartTagCounts(
+    rows.map((provider) => provider.id),
+    input.smartTag
+  );
 
-  const items: CatalogSearchItem[] = rows.map((provider) => {
+  const rankedRows = input.smartTag
+    ? [...rows]
+        .map((provider, index) => ({
+          provider,
+          index,
+          smartCount: smartTagCounts.get(provider.id) ?? 0,
+        }))
+        .sort((a, b) => {
+          const aBoost = a.smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
+          const bBoost = b.smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
+          if (aBoost !== bBoost) return bBoost - aBoost;
+          if (a.smartCount !== b.smartCount) return b.smartCount - a.smartCount;
+          return a.index - b.index;
+        })
+        .map((entry) => entry.provider)
+    : rows;
+
+  const items: CatalogSearchItem[] = rankedRows.map((provider) => {
     const directServices = provider.services.map(toServiceLite);
     const linkedServices = provider.masterServices.map((item) => toServiceLite(item.service));
     const services = dedupeServices([...directServices, ...linkedServices]);

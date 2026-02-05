@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,7 @@ import type { ApiResponse } from "@/lib/types/api";
 
 type EntityType = "all" | "master" | "studio";
 type ViewMode = "list" | "map";
+type SmartTagPreset = "rush" | "relax" | "design" | "safe" | "silent";
 
 type CatalogSearchItem = {
   type: "master" | "studio";
@@ -44,6 +45,13 @@ function parseEntityType(value: string | null): EntityType {
 
 function parseViewMode(value: string | null): ViewMode {
   return value === "map" ? "map" : "list";
+}
+
+function parseSmartTag(value: string | null): SmartTagPreset | null {
+  if (value === "rush" || value === "relax" || value === "design" || value === "safe" || value === "silent") {
+    return value;
+  }
+  return null;
 }
 
 function mergeUnique(prev: CatalogSearchItem[], next: CatalogSearchItem[]): CatalogSearchItem[] {
@@ -83,6 +91,7 @@ export function CatalogPage() {
   const priceMax = searchParams.get("priceMax") ?? "";
   const availableToday = searchParams.get("availableToday") === "true";
   const rating45plus = searchParams.get("ratingMin") === "4.5";
+  const smartTag = parseSmartTag(searchParams.get("smartTag"));
   const entityType = parseEntityType(searchParams.get("entityType"));
   const view = parseViewMode(searchParams.get("view"));
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -133,6 +142,7 @@ export function CatalogPage() {
       if (priceMax) params.set("priceMax", priceMax);
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (rating45plus) params.set("ratingMin", "4.5");
+      if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
       if (typeof cursor === "number") params.set("cursor", String(cursor));
 
@@ -143,7 +153,7 @@ export function CatalogPage() {
       }
       return json.data;
     },
-    [date, district, effectiveAvailableToday, entityType, priceMax, priceMin, rating45plus, serviceQuery]
+    [date, district, effectiveAvailableToday, entityType, priceMax, priceMin, rating45plus, serviceQuery, smartTag]
   );
 
   const fetchCatalog = useCallback(async () => {
@@ -215,11 +225,13 @@ export function CatalogPage() {
         <FilterChips
           availableToday={effectiveAvailableToday}
           rating45plus={rating45plus}
+          smartTag={smartTag}
           entityType={entityType}
           priceMin={priceMin}
           priceMax={priceMax}
           onToggleAvailableToday={() => updateParams({ availableToday: availableToday ? null : "true" })}
           onToggleRating45plus={() => updateParams({ ratingMin: rating45plus ? null : "4.5" })}
+          onSmartTagChange={(value) => updateParams({ smartTag: value })}
           onEntityTypeChange={(value) => updateParams({ entityType: value === "all" ? null : value })}
           onPriceApply={(nextMin, nextMax) =>
             updateParams({

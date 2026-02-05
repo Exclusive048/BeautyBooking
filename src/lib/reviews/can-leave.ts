@@ -2,6 +2,11 @@ import type { BookingStatus } from "@prisma/client";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { REVIEW_GRACE_MINUTES, REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
 
+// AUDIT (review eligibility constraints)
+// - only FINISHED + 3-day window: IMPLEMENTED server-side.
+// - booking ownership check (review author must be booking client): IMPLEMENTED.
+// - product rule semantics already match requirements.
+
 type BookingForReviewCheck = {
   clientUserId: string | null;
   status: BookingStatus;

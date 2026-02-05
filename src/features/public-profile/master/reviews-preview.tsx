@@ -8,6 +8,9 @@ import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
+// AUDIT (section 4):
+// - Public review cards render only public tags.
+// - Private tags are never shown in the public profile UI.
 type Props = {
   providerId: string;
   rating: number;
@@ -30,6 +33,19 @@ function ReviewCard({ review }: { review: ReviewDto }) {
         <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
       </div>
       {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
+      {review.publicTags.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {review.publicTags.map((tag) => (
+            <span
+              key={tag.id}
+              className="rounded-full border border-border-subtle bg-white/70 px-2 py-1 text-[11px] text-text-sec"
+            >
+              {tag.icon ? `${tag.icon} ` : ""}
+              {tag.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {review.replyText ? (
         <div className="mt-2 rounded-xl border border-border-subtle bg-white/60 p-2 text-sm text-text-main">
           <div className="text-xs uppercase text-text-sec">Master reply</div>

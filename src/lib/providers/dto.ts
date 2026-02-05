@@ -7,6 +7,14 @@ export type ProviderServiceDto = {
   price: number;
 };
 
+export type ProviderSuperpowerBadgeDto = {
+  code: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  count: number;
+};
+
 export type ProviderCardDto = {
   id: string;
   type: ProviderTypeDto;
@@ -40,5 +48,6 @@ export type ProviderProfileDto = {
   availableToday: boolean;
   geoLat: number | null;
   geoLng: number | null;
+  superpowerBadges: ProviderSuperpowerBadgeDto[];
   services: ProviderServiceDto[];
 };

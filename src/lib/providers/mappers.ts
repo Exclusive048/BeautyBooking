@@ -64,6 +64,7 @@ export function mapProviderProfile(provider: ProviderWithServices): ProviderProf
     availableToday: provider.availableToday,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
+    superpowerBadges: [],
     services: provider.services.map(mapProviderService),
   };
 }
