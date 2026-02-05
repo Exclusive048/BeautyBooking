@@ -3,6 +3,12 @@ import type { Result } from "@/lib/domain/result";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import type { BookingDto } from "@/lib/bookings/dto";
+import {
+  BOOKING_CHANGE_REQUEST_LIMIT,
+  ensureBookingActionWindow,
+  resolveBookingRuntimeStatus,
+  type BookingActor,
+} from "@/lib/bookings/flow";
 
 type RescheduleRecord = BookingDto;
 
@@ -44,7 +50,7 @@ async function ensureNoConflictsExcluding(
     where: {
       ...conflictWhere,
       id: { not: bookingId },
-      status: { not: "CANCELLED" },
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       startAtUtc: { not: null, lt: bufferedEnd },
       endAtUtc: { not: null, gt: bufferedStart },
     },
@@ -88,10 +94,12 @@ async function resolveBufferMinutes(
 export async function rescheduleBooking(input: {
   bookingId: string;
   actorUserId: string;
+  actor: BookingActor;
   startAtUtc: Date;
   endAtUtc: Date;
   slotLabel: string;
   silentMode?: boolean;
+  comment?: string;
 }): Promise<Result<RescheduleRecord>> {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
@@ -101,19 +109,58 @@ export async function rescheduleBooking(input: {
       providerId: true,
       masterProviderId: true,
       clientUserId: true,
+      startAtUtc: true,
+      endAtUtc: true,
+      clientChangeRequestsCount: true,
+      masterChangeRequestsCount: true,
     },
   });
   if (!booking) return { ok: false, status: 404, message: "Booking not found", code: "BOOKING_NOT_FOUND" };
 
-  if (booking.status === "CANCELLED") {
+  const runtimeStatus = resolveBookingRuntimeStatus({
+    status: booking.status,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
+
+  if (runtimeStatus === "REJECTED") {
     return { ok: false, status: 409, message: "Booking cancelled", code: "BOOKING_CANCELLED" };
   }
 
+  if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
+    return { ok: false, status: 409, message: "Booking already started", code: "CONFLICT" };
+  }
+
+  if (runtimeStatus === "CHANGE_REQUESTED") {
+    return {
+      ok: false,
+      status: 409,
+      message: "Booking already has a pending change request",
+      code: "CONFLICT",
+    };
+  }
+
+  if (runtimeStatus !== "PENDING" && runtimeStatus !== "CONFIRMED") {
+    return { ok: false, status: 409, message: "Booking cannot be rescheduled", code: "CONFLICT" };
+  }
+
+  if (runtimeStatus === "CONFIRMED" && input.actor === "MASTER") {
+    const comment = input.comment?.trim() ?? "";
+    if (comment.length === 0) {
+      return {
+        ok: false,
+        status: 400,
+        message: "Comment is required for master reschedule request",
+        code: "VALIDATION_ERROR",
+      };
+    }
+  }
+
   if (typeof input.silentMode === "boolean") {
-    if (!booking.clientUserId || booking.clientUserId !== input.actorUserId) {
+    if (input.actor !== "CLIENT" || !booking.clientUserId || booking.clientUserId !== input.actorUserId) {
       return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
     }
-    if (booking.status !== "PENDING") {
+    if (runtimeStatus !== "PENDING") {
       return {
         ok: false,
         status: 409,
@@ -127,6 +174,8 @@ export async function rescheduleBooking(input: {
     return { ok: false, status: 400, message: "Invalid booking time", code: "DATE_INVALID" };
   }
 
+  ensureBookingActionWindow(booking.startAtUtc);
+
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
   const conflict = await ensureNoConflictsExcluding(
     booking.id,
@@ -138,12 +187,46 @@ export async function rescheduleBooking(input: {
   );
   if (!conflict.ok) return conflict;
 
+  if (input.actor === "CLIENT" && booking.clientChangeRequestsCount >= BOOKING_CHANGE_REQUEST_LIMIT) {
+    return {
+      ok: false,
+      status: 409,
+      message: "Client change request limit reached",
+      code: "CONFLICT",
+    };
+  }
+
+  if (input.actor === "MASTER" && booking.masterChangeRequestsCount >= BOOKING_CHANGE_REQUEST_LIMIT) {
+    return {
+      ok: false,
+      status: 409,
+      message: "Master change request limit reached",
+      code: "CONFLICT",
+    };
+  }
+
+  if (input.actor === "MASTER" && runtimeStatus !== "CONFIRMED") {
+    return {
+      ok: false,
+      status: 409,
+      message: "Master can request reschedule only for confirmed bookings",
+      code: "CONFLICT",
+    };
+  }
+
   const updated = await prisma.booking.update({
     where: { id: booking.id },
     data: {
-      startAtUtc: input.startAtUtc,
-      endAtUtc: input.endAtUtc,
-      slotLabel: input.slotLabel,
+      status: "CHANGE_REQUESTED",
+      proposedStartAt: input.startAtUtc,
+      proposedEndAt: input.endAtUtc,
+      requestedBy: input.actor,
+      actionRequiredBy: input.actor === "CLIENT" ? "MASTER" : "CLIENT",
+      changeComment:
+        input.actor === "MASTER" ? input.comment?.trim() ?? null : null,
+      ...(input.actor === "CLIENT"
+        ? { clientChangeRequestsCount: { increment: 1 } }
+        : { masterChangeRequestsCount: { increment: 1 } }),
       ...(typeof input.silentMode === "boolean" ? { silentMode: input.silentMode } : {}),
     },
     select: {
@@ -158,6 +241,13 @@ export async function rescheduleBooking(input: {
       silentMode: true,
       startAtUtc: true,
       endAtUtc: true,
+      actionRequiredBy: true,
+      requestedBy: true,
+      changeComment: true,
+      proposedStartAt: true,
+      proposedEndAt: true,
+      clientChangeRequestsCount: true,
+      masterChangeRequestsCount: true,
       service: { select: { id: true, name: true } },
     },
   });

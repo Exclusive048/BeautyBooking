@@ -1,13 +1,20 @@
 import { AppError } from "@/lib/api/errors";
+import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { prisma } from "@/lib/prisma";
+import type { BookingStatus } from "@prisma/client";
 
 export type MasterDayBooking = {
   id: string;
   startAt: string | null;
   endAt: string | null;
+  proposedStartAt: string | null;
+  proposedEndAt: string | null;
   rawStatus: string;
   status: string;
   canNoShow: boolean;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
+  requestedBy: "CLIENT" | "MASTER" | null;
+  changeComment: string | null;
   clientName: string;
   clientPhone: string;
   notes: string | null;
@@ -124,35 +131,21 @@ function computeGaps(bookings: MasterDayBooking[], dateKey: string): MasterDayGa
 }
 
 function deriveBookingStatus(input: {
-  rawStatus: string;
+  rawStatus: BookingStatus;
   startAt: Date | null;
   endAt: Date | null;
-  nowMs: number;
+  now: Date;
 }): string {
-  if (input.rawStatus === "CANCELLED" || input.rawStatus === "NO_SHOW" || input.rawStatus === "FINISHED") {
-    return input.rawStatus;
-  }
-  if (!input.startAt || !input.endAt) return input.rawStatus;
-  const graceMs = 60 * 60 * 1000;
-  const startMs = input.startAt.getTime();
-  const finishAtMs = input.endAt.getTime() + graceMs;
-  if (input.nowMs >= finishAtMs) return "FINISHED";
-  if (input.rawStatus === "CONFIRMED" && input.nowMs >= startMs) return "STARTED";
-  return input.rawStatus;
+  return resolveBookingRuntimeStatus({
+    status: input.rawStatus,
+    startAtUtc: input.startAt,
+    endAtUtc: input.endAt,
+    now: input.now,
+  });
 }
 
-function canMarkNoShow(input: {
-  rawStatus: string;
-  startAt: Date | null;
-  endAt: Date | null;
-  nowMs: number;
-}): boolean {
-  if (input.rawStatus !== "CONFIRMED") return false;
-  if (!input.startAt || !input.endAt) return false;
-  const graceMs = 60 * 60 * 1000;
-  const startMs = input.startAt.getTime();
-  const finishAtMs = input.endAt.getTime() + graceMs;
-  return input.nowMs >= startMs && input.nowMs <= finishAtMs;
+function canMarkNoShow(): boolean {
+  return false;
 }
 
 export async function getMasterDay(input: {
@@ -191,6 +184,11 @@ export async function getMasterDay(input: {
         startAtUtc: true,
         endAtUtc: true,
         status: true,
+        proposedStartAt: true,
+        proposedEndAt: true,
+        actionRequiredBy: true,
+        requestedBy: true,
+        changeComment: true,
         clientName: true,
         clientPhone: true,
         notes: true,
@@ -205,10 +203,13 @@ export async function getMasterDay(input: {
           { masterProviderId: input.masterId },
           { masterProviderId: null, providerId: input.masterId },
         ],
-        status: "FINISHED",
         startAtUtc: { gte: monthStart, lt: monthEnd },
+        status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       },
       select: {
+        status: true,
+        startAtUtc: true,
+        endAtUtc: true,
         service: { select: { price: true } },
         serviceItems: { select: { priceSnapshot: true } },
       },
@@ -257,7 +258,8 @@ export async function getMasterDay(input: {
     }),
   ]);
 
-  const now = Date.now();
+  const nowDate = new Date();
+  const now = nowDate.getTime();
   const bookings: MasterDayBooking[] = bookingsRaw.map((item) => {
     const startAt = item.startAtUtc ? item.startAtUtc.toISOString() : null;
     const endAt = item.endAtUtc ? item.endAtUtc.toISOString() : null;
@@ -267,20 +269,20 @@ export async function getMasterDay(input: {
       rawStatus: item.status,
       startAt: startAtDate,
       endAt: endAtDate,
-      nowMs: now,
+      now: nowDate,
     });
     return {
       id: item.id,
       startAt,
       endAt,
+      proposedStartAt: item.proposedStartAt ? item.proposedStartAt.toISOString() : null,
+      proposedEndAt: item.proposedEndAt ? item.proposedEndAt.toISOString() : null,
       rawStatus: item.status,
       status,
-      canNoShow: canMarkNoShow({
-        rawStatus: item.status,
-        startAt: startAtDate,
-        endAt: endAtDate,
-        nowMs: now,
-      }),
+      canNoShow: canMarkNoShow(),
+      actionRequiredBy: item.actionRequiredBy ?? null,
+      requestedBy: item.requestedBy ?? null,
+      changeComment: item.changeComment ?? null,
       clientName: item.clientName,
       clientPhone: item.clientPhone,
       notes: item.notes ?? null,
@@ -291,7 +293,7 @@ export async function getMasterDay(input: {
 
   const current = bookings.find((item) => {
     if (!item.startAt || !item.endAt) return false;
-    if (item.status === "CANCELLED" || item.status === "NO_SHOW" || item.status === "FINISHED") return false;
+    if (item.status === "REJECTED" || item.status === "FINISHED") return false;
     const from = new Date(item.startAt).getTime();
     const to = new Date(item.endAt).getTime();
     return now >= from && now < to;
@@ -301,10 +303,16 @@ export async function getMasterDay(input: {
     return new Date(item.startAt).getTime() > now;
   });
 
-  const monthEarnings = finishedMonth.reduce(
-    (sum, item) => sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price }),
-    0
-  );
+  const monthEarnings = finishedMonth.reduce((sum, item) => {
+    const status = resolveBookingRuntimeStatus({
+      status: item.status,
+      startAtUtc: item.startAtUtc,
+      endAtUtc: item.endAtUtc,
+      now: nowDate,
+    });
+    if (status !== "FINISHED") return sum;
+    return sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price });
+  }, 0);
 
   const scheduleStart =
     override?.isDayOff
@@ -402,7 +410,8 @@ export async function createSoloMasterBooking(input: {
         clientPhone: input.clientPhone?.trim() || "",
         notes: input.notes?.trim() || null,
         source: "MANUAL",
-        status: "NEW",
+        status: "PENDING",
+        actionRequiredBy: "MASTER",
       },
       select: { id: true },
     });

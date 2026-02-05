@@ -14,9 +14,9 @@ export async function POST(
     const user = await getSessionUser(_req);
     userId = user.userId;
     const p = params instanceof Promise ? await params : params;
-    await requireBookingConfirmAccess(user, p.id);
+    const access = await requireBookingConfirmAccess(user, p.id);
 
-    const booking = await confirmBooking(p.id);
+    const booking = await confirmBooking(p.id, access.actor);
     return jsonOk({ booking });
   } catch (error) {
     const appError = toAppError(error);

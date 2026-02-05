@@ -79,6 +79,8 @@ export async function createClientBooking(
       comment: data.comment,
       silentMode: data.silentMode ?? false,
       clientUserId: userId,
+      status: "PENDING",
+      actionRequiredBy: "MASTER",
     },
     select: {
       id: true,
@@ -92,6 +94,13 @@ export async function createClientBooking(
       silentMode: true,
       startAtUtc: true,
       endAtUtc: true,
+      proposedStartAt: true,
+      proposedEndAt: true,
+      requestedBy: true,
+      actionRequiredBy: true,
+      changeComment: true,
+      clientChangeRequestsCount: true,
+      masterChangeRequestsCount: true,
       service: { select: { id: true, name: true } },
     },
   });

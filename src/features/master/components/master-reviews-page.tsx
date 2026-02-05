@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
-
-type MasterReview = {
-  id: string;
-  authorName: string;
-  rating: number;
-  text: string | null;
-  createdAt: string;
-};
+import type { ReviewDto } from "@/lib/reviews/types";
+import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
 
 type SortMode = "DATE_ASC" | "DATE_DESC" | "RATING_ASC" | "RATING_DESC";
 
@@ -27,49 +21,60 @@ function formatReviewDate(value: string): string {
   });
 }
 
+function canReportReview(review: ReviewDto): boolean {
+  if (review.reportedAt) return false;
+  const createdAtMs = new Date(review.createdAt).getTime();
+  if (!Number.isFinite(createdAtMs)) return false;
+  const deadlineMs = createdAtMs + REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return Date.now() <= deadlineMs;
+}
+
+function updateReview(items: ReviewDto[], nextReview: ReviewDto): ReviewDto[] {
+  return items.map((item) => (item.id === nextReview.id ? nextReview : item));
+}
+
 export function MasterReviewsPage({ masterId }: Props) {
-  const [reviews, setReviews] = useState<MasterReview[]>([]);
+  const [reviews, setReviews] = useState<ReviewDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("DATE_DESC");
+  const [actionId, setActionId] = useState<string | null>(null);
+
+  const loadReviews = useCallback(async (signal?: AbortSignal): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        targetType: "provider",
+        targetId: masterId,
+        limit: "100",
+        offset: "0",
+      });
+      const res = await fetch(`/api/reviews?${params.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      setReviews(json.data.reviews);
+    } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
+      setError(loadError instanceof Error ? loadError.message : "Failed to load reviews");
+    } finally {
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [masterId]);
 
   useEffect(() => {
     const controller = new AbortController();
-
-    const loadReviews = async (): Promise<void> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({
-          targetType: "provider",
-          targetId: masterId,
-          limit: "100",
-          offset: "0",
-        });
-        const res = await fetch(`/api/reviews?${params.toString()}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ reviews: MasterReview[] }>
-          | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-        }
-        setReviews(json.data.reviews);
-      } catch (loadError) {
-        if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-        setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить отзывы");
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void loadReviews();
+    void loadReviews(controller.signal);
     return () => controller.abort();
-  }, [masterId]);
+  }, [loadReviews]);
 
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
@@ -102,61 +107,150 @@ export function MasterReviewsPage({ masterId }: Props) {
     return items;
   }, [reviews, sortMode]);
 
+  const replyToReview = async (review: ReviewDto): Promise<void> => {
+    if (review.replyText) return;
+
+    const text = window.prompt("Reply to review");
+    const normalized = text?.trim() ?? "";
+    if (!normalized) return;
+
+    setActionError(null);
+    setActionId(review.id);
+    try {
+      const res = await fetch(`/api/reviews/${encodeURIComponent(review.id)}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: normalized }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      setReviews((prev) => updateReview(prev, json.data.review));
+    } catch (actionErrorValue) {
+      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : "Failed to reply");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const reportReview = async (review: ReviewDto): Promise<void> => {
+    if (!canReportReview(review)) return;
+
+    const comment = window.prompt("Report reason");
+    const normalized = comment?.trim() ?? "";
+    if (!normalized) return;
+
+    setActionError(null);
+    setActionId(review.id);
+    try {
+      const res = await fetch(`/api/reviews/${encodeURIComponent(review.id)}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: normalized }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      setReviews((prev) => updateReview(prev, json.data.review));
+    } catch (actionErrorValue) {
+      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : "Failed to report review");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <section className="lux-card rounded-[24px] p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold">Статистика отзывов</h3>
+            <h3 className="text-sm font-semibold">Review stats</h3>
             <p className="mt-1 text-sm text-text-sec">
-              Всего: {reviews.length} · Средняя оценка: {averageRating.toFixed(1)}
+              Total: {reviews.length} - Avg: {averageRating.toFixed(1)}
             </p>
           </div>
           <label className="text-sm text-text-sec">
-            Сортировка
+            Sort
             <select
               value={sortMode}
               onChange={(event) => setSortMode(event.target.value as SortMode)}
               className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm"
             >
-              <option value="DATE_ASC">По дате: от старых к новым</option>
-              <option value="DATE_DESC">По дате: от новых к старым</option>
-              <option value="RATING_ASC">По рейтингу: от 1 к 5</option>
-              <option value="RATING_DESC">По рейтингу: от 5 к 1</option>
+              <option value="DATE_ASC">Date: old to new</option>
+              <option value="DATE_DESC">Date: new to old</option>
+              <option value="RATING_ASC">Rating: 1 to 5</option>
+              <option value="RATING_DESC">Rating: 5 to 1</option>
             </select>
           </label>
         </div>
       </section>
 
       {loading ? (
-        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка отзывов...</div>
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Loading reviews...</div>
       ) : null}
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       ) : null}
+      {actionError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError}</div>
+      ) : null}
 
       {!loading && !error ? (
         <section className="lux-card rounded-[24px] p-4">
-          <h3 className="mb-3 text-sm font-semibold">Лента отзывов</h3>
+          <h3 className="mb-3 text-sm font-semibold">Reviews</h3>
           {sortedReviews.length === 0 ? (
             <div className="rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-sm text-text-sec">
-              Пока отзывов нет.
+              No reviews yet.
             </div>
           ) : (
             <div className="space-y-2">
               {sortedReviews.map((review) => (
-                <article
-                  key={review.id}
-                  className="rounded-xl border border-border-subtle bg-bg-input/70 p-3"
-                >
+                <article key={review.id} className="rounded-xl border border-border-subtle bg-bg-input/70 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm font-medium">{review.authorName}</div>
                     <div className="text-xs text-text-sec">
-                      ⭐{review.rating} · {formatReviewDate(review.createdAt)}
+                      {"*".repeat(review.rating)}
+                      {" "}
+                      {formatReviewDate(review.createdAt)}
                     </div>
                   </div>
                   <div className="mt-2 text-sm text-text-sec">
-                    {review.text?.trim() ? review.text : "Без комментария"}
+                    {review.text?.trim() ? review.text : "No comment"}
+                  </div>
+
+                  {review.replyText ? (
+                    <div className="mt-3 rounded-lg border border-border-subtle bg-white/70 p-2 text-sm text-text-main">
+                      <div className="text-xs uppercase tracking-wide text-text-sec">Master reply</div>
+                      <div className="mt-1">{review.replyText}</div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!review.replyText ? (
+                      <button
+                        type="button"
+                        onClick={() => void replyToReview(review)}
+                        disabled={actionId === review.id}
+                        className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs disabled:opacity-60"
+                      >
+                        Reply
+                      </button>
+                    ) : null}
+                    {canReportReview(review) ? (
+                      <button
+                        type="button"
+                        onClick={() => void reportReview(review)}
+                        disabled={actionId === review.id}
+                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-700 disabled:opacity-60"
+                      >
+                        Report
+                      </button>
+                    ) : null}
+                    {review.reportedAt ? (
+                      <div className="text-xs text-text-sec">Reported {formatReviewDate(review.reportedAt)}</div>
+                    ) : null}
                   </div>
                 </article>
               ))}

@@ -358,7 +358,7 @@ export async function listAvailabilitySlots(
     prisma.booking.findMany({
       where: {
         providerId,
-        status: { not: "CANCELLED" },
+        status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
         startAtUtc: { not: null, lte: addMinutes(to, 24 * 60) },
         endAtUtc: { not: null, gte: from },
       },

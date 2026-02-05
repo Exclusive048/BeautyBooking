@@ -9,6 +9,9 @@ export type ReviewDto = {
   targetId: string;
   rating: number;
   text: string | null;
+  replyText: string | null;
+  repliedAt: string | null;
+  reportedAt: string | null;
   createdAt: string;
 };
 
@@ -25,6 +28,9 @@ export function toReviewDto(
     targetId: review.targetId,
     rating: review.rating,
     text: review.text ?? null,
+    replyText: review.replyText ?? null,
+    repliedAt: review.repliedAt ? review.repliedAt.toISOString() : null,
+    reportedAt: review.reportedAt ? review.reportedAt.toISOString() : null,
     createdAt: review.createdAt.toISOString(),
   };
 }

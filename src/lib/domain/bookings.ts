@@ -1,4 +1,10 @@
-export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+export type BookingStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CHANGE_REQUESTED"
+  | "REJECTED"
+  | "IN_PROGRESS"
+  | "FINISHED";
 export type BookingCancelledBy = "CLIENT" | "PROVIDER" | "SYSTEM";
 
 export type BookingCreateInput = {

@@ -5,7 +5,8 @@ export const masterDayQuerySchema = z.object({
 });
 
 export const masterBookingStatusSchema = z.object({
-  status: z.enum(["CONFIRMED", "CANCELLED", "NO_SHOW"]),
+  status: z.enum(["CONFIRMED", "REJECTED", "CANCELLED", "NO_SHOW"]),
+  comment: z.string().trim().min(1).max(500).optional(),
 });
 
 export const createMasterBookingSchema = z.object({

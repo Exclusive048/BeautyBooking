@@ -22,10 +22,12 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     const body = await parseBody(req, masterBookingStatusSchema);
     const masterId = await getCurrentMasterProviderId(user.id);
+    const normalizedStatus = body.status === "CONFIRMED" ? "CONFIRMED" : "REJECTED";
     const result = await updateMasterBookingStatus({
       bookingId: id,
       masterId,
-      status: body.status,
+      status: normalizedStatus,
+      comment: body.comment,
     });
     return jsonOk(result);
   } catch (error) {

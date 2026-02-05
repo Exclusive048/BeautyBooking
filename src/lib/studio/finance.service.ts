@@ -82,7 +82,11 @@ export async function getStudioFinance(input: {
         lt: toDateExclusive,
       },
       status: {
-        notIn: [BookingStatus.CANCELLED, BookingStatus.NO_SHOW],
+        notIn: [
+          BookingStatus.REJECTED,
+          BookingStatus.CANCELLED,
+          BookingStatus.NO_SHOW,
+        ],
       },
     },
     select: {

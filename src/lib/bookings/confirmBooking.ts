@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
+import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 
 function shiftMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60 * 1000);
@@ -42,7 +43,10 @@ async function resolveBufferMinutes(
   return normalizeBufferMinutes(provider?.bufferBetweenBookingsMin);
 }
 
-export async function confirmBooking(bookingId: string): Promise<BookingStatusUpdateDto> {
+export async function confirmBooking(
+  bookingId: string,
+  actor: BookingActor
+): Promise<BookingStatusUpdateDto> {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     select: {
@@ -52,20 +56,53 @@ export async function confirmBooking(bookingId: string): Promise<BookingStatusUp
       masterProviderId: true,
       startAtUtc: true,
       endAtUtc: true,
+      startAt: true,
+      endAt: true,
+      proposedStartAt: true,
+      proposedEndAt: true,
+      actionRequiredBy: true,
+      requestedBy: true,
     },
   });
   if (!booking) throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
 
-  if (booking.status === "CANCELLED") {
-    throw new AppError("Booking cancelled", 409, "BOOKING_CANCELLED");
+  const runtimeStatus = resolveBookingRuntimeStatus({
+    status: booking.status,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
+
+  if (runtimeStatus === "REJECTED") {
+    throw new AppError("Booking rejected", 409, "BOOKING_CANCELLED");
   }
 
-  if (booking.status === "CONFIRMED") {
-    return { id: booking.id, status: booking.status };
+  if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
+    throw new AppError("Booking already started", 409, "CONFLICT");
   }
 
-  const startAtUtc = booking.startAtUtc;
-  const endAtUtc = booking.endAtUtc;
+  if (runtimeStatus === "CONFIRMED") {
+    return { id: booking.id, status: "CONFIRMED" };
+  }
+
+  let startAtUtc = booking.startAtUtc;
+  let endAtUtc = booking.endAtUtc;
+  let appliesRequestedChange = false;
+
+  if (runtimeStatus === "PENDING") {
+    if (actor !== "MASTER") {
+      throw new AppError("Forbidden", 403, "FORBIDDEN");
+    }
+  } else if (runtimeStatus === "CHANGE_REQUESTED") {
+    if (!booking.actionRequiredBy || booking.actionRequiredBy !== actor) {
+      throw new AppError("Action is required from another side", 409, "CONFLICT");
+    }
+    startAtUtc = booking.proposedStartAt;
+    endAtUtc = booking.proposedEndAt;
+    appliesRequestedChange = true;
+  } else {
+    throw new AppError("Booking cannot be confirmed in current state", 409, "CONFLICT");
+  }
+
   if (!isValidDate(startAtUtc) || !isValidDate(endAtUtc)) {
     throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
   }
@@ -82,7 +119,7 @@ export async function confirmBooking(bookingId: string): Promise<BookingStatusUp
     where: {
       ...conflictWhere,
       id: { not: booking.id },
-      status: { not: "CANCELLED" },
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       startAtUtc: { not: null, lt: bufferedEnd },
       endAtUtc: { not: null, gt: bufferedStart },
     },
@@ -102,7 +139,23 @@ export async function confirmBooking(bookingId: string): Promise<BookingStatusUp
 
   const updated = await prisma.booking.update({
     where: { id: bookingId },
-    data: { status: "CONFIRMED" },
+    data: {
+      status: "CONFIRMED",
+      actionRequiredBy: null,
+      requestedBy: null,
+      changeComment: null,
+      proposedStartAt: null,
+      proposedEndAt: null,
+      ...(appliesRequestedChange
+        ? {
+            startAtUtc,
+            endAtUtc,
+            startAt: startAtUtc,
+            endAt: endAtUtc,
+            slotLabel: startAtUtc.toISOString(),
+          }
+        : {}),
+    },
     select: { id: true, status: true },
   });
 

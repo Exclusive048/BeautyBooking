@@ -17,7 +17,7 @@ export async function POST(
     const user = await getSessionUser(req);
     userId = user.userId;
     const p = params instanceof Promise ? await params : params;
-    await requireBookingRescheduleAccess(user, p.id);
+    const access = await requireBookingRescheduleAccess(user, p.id);
 
     const parsed = await parseBody(req, bookingRescheduleSchema);
 
@@ -28,10 +28,12 @@ export async function POST(
     const result = await rescheduleBooking({
       bookingId: p.id,
       actorUserId: user.userId,
+      actor: access.actor,
       startAtUtc,
       endAtUtc,
       slotLabel: parsed.slotLabel,
       silentMode: parsed.silentMode,
+      comment: parsed.comment,
     });
     if (!result.ok) {
       return jsonFail(result.status, result.message, resolveErrorCode(result.code, "INTERNAL_ERROR"));

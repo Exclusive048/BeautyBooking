@@ -19,7 +19,18 @@ export type BookingWidgetProps = {
   defaultServiceId?: string;
 };
 
-export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+export type BookingStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CHANGE_REQUESTED"
+  | "REJECTED"
+  | "IN_PROGRESS"
+  | "FINISHED"
+  | "NEW"
+  | "PREPAID"
+  | "STARTED"
+  | "CANCELLED"
+  | "NO_SHOW";
 
 export type BookingItem = {
   id: string;

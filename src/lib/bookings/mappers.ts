@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { BookingClientDto, BookingDto, BookingStatusUpdateDto } from "@/lib/bookings/dto";
+import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { toISO } from "@/lib/time";
 
 type BookingWithServiceModel = Prisma.BookingGetPayload<{
@@ -17,7 +18,15 @@ type BookingWithServiceModel = Prisma.BookingGetPayload<{
     endAtUtc: true;
     service: { select: { id: true; name: true } };
   };
-}>;
+}> & {
+  proposedStartAt?: Date | null;
+  proposedEndAt?: Date | null;
+  requestedBy?: "CLIENT" | "MASTER" | null;
+  actionRequiredBy?: "CLIENT" | "MASTER" | null;
+  changeComment?: string | null;
+  clientChangeRequestsCount?: number;
+  masterChangeRequestsCount?: number;
+};
 
 type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
   select: {
@@ -35,7 +44,15 @@ type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
     service: { select: { id: true; name: true } };
     provider: { select: { id: true; name: true; district: true; address: true; type: true } };
   };
-}>;
+}> & {
+  proposedStartAt?: Date | null;
+  proposedEndAt?: Date | null;
+  requestedBy?: "CLIENT" | "MASTER" | null;
+  actionRequiredBy?: "CLIENT" | "MASTER" | null;
+  changeComment?: string | null;
+  clientChangeRequestsCount?: number;
+  masterChangeRequestsCount?: number;
+};
 
 type BookingStatusModel = { id: string; status: BookingStatusUpdateDto["status"] };
 
@@ -43,7 +60,11 @@ export function toBookingDto(model: BookingWithServiceModel): BookingDto {
   return {
     id: model.id,
     slotLabel: model.slotLabel,
-    status: model.status,
+    status: resolveBookingRuntimeStatus({
+      status: model.status,
+      startAtUtc: model.startAtUtc,
+      endAtUtc: model.endAtUtc,
+    }),
     providerId: model.providerId,
     masterProviderId: model.masterProviderId ?? null,
     service: {
@@ -56,6 +77,13 @@ export function toBookingDto(model: BookingWithServiceModel): BookingDto {
     silentMode: model.silentMode,
     startAtUtc: model.startAtUtc ? toISO(model.startAtUtc) : null,
     endAtUtc: model.endAtUtc ? toISO(model.endAtUtc) : null,
+    proposedStartAtUtc: model.proposedStartAt ? toISO(model.proposedStartAt) : null,
+    proposedEndAtUtc: model.proposedEndAt ? toISO(model.proposedEndAt) : null,
+    requestedBy: model.requestedBy ?? null,
+    actionRequiredBy: model.actionRequiredBy ?? null,
+    changeComment: model.changeComment ?? null,
+    clientChangeRequestsCount: model.clientChangeRequestsCount ?? 0,
+    masterChangeRequestsCount: model.masterChangeRequestsCount ?? 0,
   };
 }
 

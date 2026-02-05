@@ -17,3 +17,14 @@ export const canLeaveQuerySchema = z.object({
   bookingId: z.string().trim().min(1, "bookingId is required"),
 });
 
+export const reviewIdParamSchema = z.object({
+  id: z.string().trim().min(1, "id is required"),
+});
+
+export const reviewReplySchema = z.object({
+  text: z.string().trim().min(1, "text is required").max(1500),
+});
+
+export const reviewReportSchema = z.object({
+  comment: z.string().trim().min(1, "comment is required").max(1500),
+});

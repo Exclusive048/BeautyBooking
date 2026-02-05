@@ -2,37 +2,41 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { canLeaveQuerySchema } from "@/lib/reviews/schemas";
-import { getReviewAvailabilityForBooking } from "@/lib/reviews/service";
-import { parseQuery } from "@/lib/validation";
+import { reviewIdParamSchema } from "@/lib/reviews/schemas";
+import { deleteReview } from "@/lib/reviews/service";
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export async function DELETE(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) {
       return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
     }
 
-    const url = new URL(req.url);
-    const query = parseQuery(url, canLeaveQuerySchema);
-    const availability = await getReviewAvailabilityForBooking({
-      currentUserId: user.id,
-      bookingId: query.bookingId,
+    const params = await ctx.params;
+    const parsed = reviewIdParamSchema.safeParse(params);
+    if (!parsed.success) {
+      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    }
+
+    const result = await deleteReview({
+      reviewId: parsed.data.id,
+      currentUser: { id: user.id, roles: user.roles },
     });
-    return jsonOk({
-      canLeave: availability.canLeave,
-      reviewId: availability.reviewId,
-      canDelete: availability.canDelete,
-    });
+
+    return jsonOk(result);
   } catch (error) {
     const appError = toAppError(error);
     const requestId = getRequestId(req);
     if (appError.status >= 500) {
-      logError("GET /api/reviews/can-leave failed", {
+      logError("DELETE /api/reviews/[id] failed", {
         requestId,
-        route: "GET /api/reviews/can-leave",
+        route: "DELETE /api/reviews/{id}",
         stack: error instanceof Error ? error.stack : undefined,
       });
     }

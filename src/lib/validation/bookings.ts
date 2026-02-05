@@ -50,6 +50,7 @@ export const bookingRescheduleSchema = z
     endAtUtc: dateString,
     slotLabel: z.string().trim().min(1).max(120),
     silentMode: z.boolean().optional(),
+    comment: z.string().trim().min(1).max(500).optional(),
   })
   .superRefine((value, ctx) => {
     const start = Date.parse(value.startAtUtc);

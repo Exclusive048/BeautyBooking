@@ -126,15 +126,19 @@ export async function requireBookingCancelAccess(
 export async function requireBookingConfirmAccess(
   user: SessionUser,
   bookingId: string
-): Promise<void> {
+): Promise<{ actor: "CLIENT" | "MASTER" }> {
   const booking = await loadBookingAccess(bookingId);
 
+  if (isClientOwner(user.userId, booking)) {
+    return { actor: "CLIENT" };
+  }
+
   if (isProviderOwner(user.userId, booking.provider) || isMasterOwner(user.userId, booking)) {
-    return;
+    return { actor: "MASTER" };
   }
 
   const studioId = await resolveStudioIdForProvider(booking.provider);
-  if (studioId && (await isStudioAdmin(user.userId, studioId))) return;
+  if (studioId && (await isStudioAdmin(user.userId, studioId))) return { actor: "MASTER" };
 
   throw new AppError("Forbidden", 403, "FORBIDDEN");
 }
@@ -142,14 +146,16 @@ export async function requireBookingConfirmAccess(
 export async function requireBookingRescheduleAccess(
   user: SessionUser,
   bookingId: string
-): Promise<void> {
+): Promise<{ actor: "CLIENT" | "MASTER" }> {
   const booking = await loadBookingAccess(bookingId);
 
-  if (isClientOwner(user.userId, booking)) return;
-  if (isProviderOwner(user.userId, booking.provider) || isMasterOwner(user.userId, booking)) return;
+  if (isClientOwner(user.userId, booking)) return { actor: "CLIENT" };
+  if (isProviderOwner(user.userId, booking.provider) || isMasterOwner(user.userId, booking)) {
+    return { actor: "MASTER" };
+  }
 
   const studioId = await resolveStudioIdForProvider(booking.provider);
-  if (studioId && (await isStudioAdmin(user.userId, studioId))) return;
+  if (studioId && (await isStudioAdmin(user.userId, studioId))) return { actor: "MASTER" };
 
   throw new AppError("Forbidden", 403, "FORBIDDEN");
 }

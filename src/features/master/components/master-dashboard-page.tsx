@@ -10,9 +10,14 @@ type DayBooking = {
   id: string;
   startAt: string | null;
   endAt: string | null;
+  proposedStartAt: string | null;
+  proposedEndAt: string | null;
   rawStatus: string;
   status: string;
   canNoShow: boolean;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
+  requestedBy: "CLIENT" | "MASTER" | null;
+  changeComment: string | null;
   clientName: string;
   clientPhone: string;
   notes: string | null;
@@ -268,14 +273,31 @@ export function MasterDashboardPage() {
     return () => controller.abort();
   }, [data.masterId, date, slotsServiceId, slotsReloadTick]);
 
-  const updateStatus = async (bookingId: string, status: "CONFIRMED" | "CANCELLED" | "NO_SHOW"): Promise<void> => {
-    setActionId(bookingId);
+  const updateStatus = async (
+    booking: DayBooking,
+    status: "CONFIRMED" | "REJECTED"
+  ): Promise<void> => {
+    let comment: string | undefined;
+    if (status === "REJECTED") {
+      const requiresComment = booking.status !== "CHANGE_REQUESTED";
+      const value = window.prompt("Причина отклонения", booking.changeComment ?? "")?.trim();
+      if (requiresComment && !value) {
+        setError("Комментарий обязателен");
+        return;
+      }
+      comment = value || undefined;
+    }
+
+    setActionId(booking.id);
     setError(null);
     try {
-      const res = await fetch(`/api/master/bookings/${bookingId}/status`, {
+      const res = await fetch(`/api/master/bookings/${booking.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(comment ? { comment } : {}),
+        }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string; status: string }> | null;
       if (!res.ok || !json || !json.ok) {
@@ -290,12 +312,12 @@ export function MasterDashboardPage() {
   };
 
   const getStatusLabel = (status: string): string => {
-    if (status === "PENDING" || status === "NEW") return "Ожидает подтверждения";
-    if (status === "CONFIRMED") return "Подтверждена";
-    if (status === "STARTED") return "Началась";
-    if (status === "FINISHED") return "Завершена";
-    if (status === "CANCELLED") return "Отклонена";
-    if (status === "NO_SHOW") return "Не пришел";
+    if (status === "PENDING" || status === "NEW") return "Awaiting confirmation";
+    if (status === "CONFIRMED") return "Confirmed";
+    if (status === "CHANGE_REQUESTED") return "Awaiting other side";
+    if (status === "IN_PROGRESS" || status === "STARTED") return "In progress";
+    if (status === "FINISHED") return "Finished";
+    if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") return "Rejected";
     return status;
   };
 
@@ -521,36 +543,48 @@ export function MasterDashboardPage() {
                   <div className="mt-2 text-xs text-text-sec">Режим тишины включён</div>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {(booking.rawStatus === "PENDING" || booking.rawStatus === "NEW") && (
+                  {booking.status === "PENDING" && booking.actionRequiredBy === "MASTER" ? (
                     <>
                       <button
                         type="button"
                         disabled={actionId === booking.id}
-                        onClick={() => void updateStatus(booking.id, "CONFIRMED")}
+                        onClick={() => void updateStatus(booking, "CONFIRMED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Подтвердить
+                        Confirm
                       </button>
                       <button
                         type="button"
                         disabled={actionId === booking.id}
-                        onClick={() => void updateStatus(booking.id, "CANCELLED")}
+                        onClick={() => void updateStatus(booking, "REJECTED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Отклонить
+                        Reject
                       </button>
                     </>
-                  )}
-                  {booking.canNoShow && (
-                    <button
-                      type="button"
-                      disabled={actionId === booking.id}
-                      onClick={() => void updateStatus(booking.id, "NO_SHOW")}
-                      className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
-                    >
-                      ❌ Не пришла
-                    </button>
-                  )}
+                  ) : null}
+                  {booking.status === "CHANGE_REQUESTED" &&
+                  booking.actionRequiredBy === "MASTER" &&
+                  booking.requestedBy === "CLIENT" ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={actionId === booking.id}
+                        onClick={() => void updateStatus(booking, "CONFIRMED")}
+                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
+                      >
+                        Confirm move
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionId === booking.id}
+                        onClick={() => void updateStatus(booking, "REJECTED")}
+                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
+                      >
+                        Reject move
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </section>
             ))}

@@ -27,7 +27,18 @@ import {
 
 type ClientBooking = {
   id: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  status:
+    | "PENDING"
+    | "CONFIRMED"
+    | "CHANGE_REQUESTED"
+    | "REJECTED"
+    | "IN_PROGRESS"
+    | "FINISHED"
+    | "NEW"
+    | "PREPAID"
+    | "STARTED"
+    | "CANCELLED"
+    | "NO_SHOW";
   provider: { id: string };
 };
 

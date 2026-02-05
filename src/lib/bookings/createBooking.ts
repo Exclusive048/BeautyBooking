@@ -52,7 +52,7 @@ async function ensureNoConflicts(tx: Prisma.TransactionClient, input: ConflictCh
   const conflicts = await tx.booking.findMany({
     where: {
       ...conflictWhere,
-      status: { not: "CANCELLED" },
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       startAtUtc: { not: null, lt: bufferedEnd },
       endAtUtc: { not: null, gt: bufferedStart },
     },
@@ -203,6 +203,7 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
           silentMode: input.silentMode ?? false,
           clientUserId: input.clientUserId ?? null,
           status: "PENDING",
+          actionRequiredBy: "MASTER",
         },
         select: {
           id: true,
@@ -216,6 +217,13 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
           silentMode: true,
           startAtUtc: true,
           endAtUtc: true,
+          proposedStartAt: true,
+          proposedEndAt: true,
+          requestedBy: true,
+          actionRequiredBy: true,
+          changeComment: true,
+          clientChangeRequestsCount: true,
+          masterChangeRequestsCount: true,
           service: { select: { id: true, name: true } },
         },
       });

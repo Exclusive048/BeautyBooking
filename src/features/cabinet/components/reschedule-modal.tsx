@@ -6,6 +6,7 @@ import { Chip } from "@/components/ui/chip";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
 import { SlotPicker } from "@/features/booking/components/slot-picker";
+import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -27,14 +28,37 @@ type BookingInfo = {
   masterProviderId: string | null;
   serviceId: string;
   slotLabel: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  status:
+    | "PENDING"
+    | "CONFIRMED"
+    | "CHANGE_REQUESTED"
+    | "REJECTED"
+    | "IN_PROGRESS"
+    | "FINISHED"
+    | "NEW"
+    | "PREPAID"
+    | "STARTED"
+    | "CANCELLED"
+    | "NO_SHOW";
   silentMode: boolean;
+  startAtUtc: string | null;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
+  clientChangeRequestsCount: number;
+  masterChangeRequestsCount: number;
 };
 
 type Props = {
   booking: BookingInfo;
   onClose: () => void;
-  onSuccess: (next: { slotLabel: string; silentMode?: boolean }) => void;
+  onSuccess: (next?: {
+    slotLabel: string;
+    silentMode?: boolean;
+    status: BookingInfo["status"];
+    actionRequiredBy: BookingInfo["actionRequiredBy"];
+    requestedBy: "CLIENT" | "MASTER" | null;
+    proposedStartAtUtc: string | null;
+    proposedEndAtUtc: string | null;
+  }) => void;
 };
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
@@ -166,6 +190,13 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const slotGroups = useMemo(() => groupSlotsByDayPeriod(slots, selectedDate), [slots, selectedDate]);
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
   const canEditSilentMode = booking.status === "PENDING";
+  const canRescheduleNow = useMemo(() => {
+    if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
+    if (!booking.startAtUtc) return true;
+    const minutesLeft =
+      (new Date(booking.startAtUtc).getTime() - Date.now()) / 60000;
+    return Number.isFinite(minutesLeft) && minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
+  }, [booking.startAtUtc, booking.status]);
 
   useEffect(() => {
     setSilentMode(booking.silentMode);
@@ -173,6 +204,10 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
 
   const submit = async () => {
     setError(null);
+    if (!canRescheduleNow) {
+      setError("Отмена и перенос недоступны менее чем за 60 минут до начала");
+      return;
+    }
     if (!slotLabel) {
       setError(t.booking.chooseTime);
       return;
@@ -196,13 +231,28 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ booking: { slotLabel: string; silentMode: boolean } }>
+        | ApiResponse<{
+            booking: {
+              slotLabel: string;
+              silentMode: boolean;
+              status: BookingInfo["status"];
+              actionRequiredBy: BookingInfo["actionRequiredBy"];
+              requestedBy: "CLIENT" | "MASTER" | null;
+              proposedStartAtUtc: string | null;
+              proposedEndAtUtc: string | null;
+            };
+          }>
         | null;
       if (!res.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
 
       onSuccess({
         slotLabel: json.data.booking.slotLabel,
+        status: json.data.booking.status,
+        actionRequiredBy: json.data.booking.actionRequiredBy,
+        requestedBy: json.data.booking.requestedBy,
+        proposedStartAtUtc: json.data.booking.proposedStartAtUtc,
+        proposedEndAtUtc: json.data.booking.proposedEndAtUtc,
         ...(typeof json.data.booking.silentMode === "boolean"
           ? { silentMode: json.data.booking.silentMode }
           : {}),
@@ -313,7 +363,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           <Button
             type="button"
             onClick={submit}
-            disabled={loading || loadingSlots}
+            disabled={loading || loadingSlots || !canRescheduleNow}
             className="flex-1"
           >
             {loading ? t.booking.moving : t.booking.moveConfirm}

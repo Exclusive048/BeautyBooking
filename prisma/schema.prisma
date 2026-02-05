@@ -38,6 +38,9 @@ enum BookingStatus {
   NEW
   PENDING
   CONFIRMED
+  CHANGE_REQUESTED
+  REJECTED
+  IN_PROGRESS
   PREPAID
   STARTED
   FINISHED
@@ -49,6 +52,16 @@ enum BookingCancelledBy {
   CLIENT
   PROVIDER
   SYSTEM
+}
+
+enum BookingRequestedBy {
+  CLIENT
+  MASTER
+}
+
+enum BookingActionRequiredBy {
+  CLIENT
+  MASTER
 }
 
 enum ScheduleBreakKind {
@@ -390,6 +403,13 @@ model Booking {
   status       BookingStatus @default(PENDING)
   cancelledBy  BookingCancelledBy?
   cancelReason String?
+  proposedStartAt DateTime?
+  proposedEndAt DateTime?
+  requestedBy BookingRequestedBy?
+  changeComment String?
+  actionRequiredBy BookingActionRequiredBy?
+  clientChangeRequestsCount Int @default(0)
+  masterChangeRequestsCount Int @default(0)
 
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -562,6 +582,8 @@ model Review {
   text       String?
   replyText  String?
   repliedAt  DateTime?
+  reportComment String?
+  reportedAt DateTime?
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
