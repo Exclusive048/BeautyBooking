@@ -120,16 +120,6 @@ function buildMonthDays(monthKey: string): string[] {
   return days;
 }
 
-function buildYearDays(startMonth: string): string[] {
-  const result: string[] = [];
-  let monthKey = startMonth;
-  for (let i = 0; i < 12; i += 1) {
-    result.push(...buildMonthDays(monthKey));
-    monthKey = monthShift(monthKey, 1);
-  }
-  return result;
-}
-
 function isTemplateWorkingDay(input: {
   dateKey: string;
   cycleStartDate: string;
@@ -362,11 +352,11 @@ export function MasterSchedulePage() {
 
   const applyTemplate = async (scope: "MONTH" | "YEAR"): Promise<void> => {
     if (!isValidTime(templateStart) || !isValidTime(templateEnd)) {
-      setError("Некорректный формат времени.");
+      setError("Invalid time format.");
       return;
     }
     if (templateStart >= templateEnd) {
-      setError("Начало должно быть раньше конца.");
+      setError("Start time must be before end time.");
       return;
     }
 
@@ -374,71 +364,83 @@ export function MasterSchedulePage() {
     setError(null);
     setActionInfo(null);
     try {
-      const defaultsApplied = await applyDefaultWorkingTime({
-        start: templateStart,
-        end: templateEnd,
-        buffer: defaultBuffer,
-        successMessage: null,
+      const normalizedBuffer = Number.isFinite(defaultBuffer)
+        ? Math.max(0, Math.floor(defaultBuffer / 5) * 5)
+        : 0;
+      setDefaultBuffer(normalizedBuffer);
+
+      const workdayTemplate = {
+        isWorkday: true,
+        startLocal: templateStart,
+        endLocal: templateEnd,
+        breaks: [],
+      };
+      const dayOffTemplate = {
+        isWorkday: false,
+        startLocal: null,
+        endLocal: null,
+        breaks: [],
+      };
+
+      const body =
+        templateMode === "EVERY_DAY"
+          ? {
+              kind: "WEEKLY" as const,
+              bufferBetweenBookingsMin: normalizedBuffer,
+              payload: {
+                weekly: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+                  dayOfWeek,
+                  ...workdayTemplate,
+                })),
+              },
+            }
+          : {
+              kind: "CYCLE" as const,
+              anchorDate: cycleStartDate,
+              bufferBetweenBookingsMin: normalizedBuffer,
+              payload: {
+                cycle: {
+                  days:
+                    templateMode === "2_2"
+                      ? [workdayTemplate, workdayTemplate, dayOffTemplate, dayOffTemplate]
+                      : templateMode === "3_3"
+                        ? [
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            dayOffTemplate,
+                            dayOffTemplate,
+                            dayOffTemplate,
+                          ]
+                        : [
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            dayOffTemplate,
+                            dayOffTemplate,
+                          ],
+                },
+              },
+            };
+
+      const res = await fetch("/api/master/schedule/rule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
-      if (!defaultsApplied) return;
-
-      const days = scope === "MONTH" ? monthDays : buildYearDays(month);
-      const offDates = Array.from(
-        new Set(
-          days.filter(
-            (dateKey) =>
-              !isTemplateWorkingDay({
-                dateKey,
-                cycleStartDate,
-                mode: templateMode,
-              })
-          )
-        )
-      );
-      const existingOffDates = new Set(
-        data.exceptions.filter((item) => item.type === "OFF").map((item) => item.date)
-      );
-      const offDatesToApply =
-        scope === "MONTH" ? offDates.filter((dateKey) => !existingOffDates.has(dateKey)) : offDates;
-
-      let applied = 0;
-      let requested = 0;
-      for (const dateKey of offDatesToApply) {
-        const res = await fetch("/api/master/schedule/exceptions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: dateKey,
-            type: "OFF",
-          }),
-        });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ applied: boolean; requestId?: string; exceptionId?: string }>
-          | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-        }
-        if (json.data.applied) {
-          applied += 1;
-        } else {
-          requested += 1;
-        }
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
 
       await load();
-      const scopeLabel = scope === "MONTH" ? "текущий месяц" : "год";
-      if (offDatesToApply.length === 0) {
-        setActionInfo(`Шаблон применен на ${scopeLabel}: выходных в диапазоне нет.`);
-      } else if (requested > 0) {
-        setActionInfo(
-          `Шаблон применен на ${scopeLabel}: ${applied} исключений и ${requested} запросов.`
-        );
-      } else {
-        setActionInfo(`Шаблон применен на ${scopeLabel}: создано ${applied} исключений.`);
-      }
+      const scopeLabel = scope === "MONTH" ? "current month" : "year";
+      setActionInfo(`Template applied for ${scopeLabel}: active rule updated.`);
       setGeneratorOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось применить шаблон");
+      setError(err instanceof Error ? err.message : "Failed to apply template");
     } finally {
       setGeneratorBusy(false);
     }

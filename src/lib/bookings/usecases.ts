@@ -101,6 +101,11 @@ export async function rescheduleBooking(input: {
   silentMode?: boolean;
   comment?: string;
 }): Promise<Result<RescheduleRecord>> {
+  // AUDIT (переносы):
+  // - реализовано: только из PENDING/CONFIRMED, при CHANGE_REQUESTED повторный запрос блокируется.
+  // - реализовано: лимит 3 запроса для CLIENT/MASTER, инкремент в момент CHANGE_REQUESTED.
+  // - реализовано: actionRequiredBy/requestedBy выставляются по стороне запроса.
+  // - реализовано: 60 минут проверяется на сервере через ensureBookingActionWindow.
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
     select: {

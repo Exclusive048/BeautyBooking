@@ -47,6 +47,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   let userId: string | undefined;
   try {
+    // AUDIT (HTTP-обвязка создания):
+    // - реализовано: API остаётся thin wrapper, бизнес-логика в src/lib/bookings/*.
+    // - реализовано: путь без startAtUtc делегирует в createClientBooking (legacy slotLabel-path с вычислением UTC-времени).
     const user = await getSessionUser(req);
     userId = user.userId;
     const roleError = requireRole(user, [AccountType.CLIENT]);

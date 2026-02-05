@@ -67,6 +67,10 @@ function minutesUntilStart(booking: BookingItem): number | null {
 }
 
 function canManageByClient(booking: BookingItem): boolean {
+  // AUDIT (доступность кнопок клиента):
+  // - реализовано: кнопки отмены/переноса только для PENDING/CONFIRMED.
+  // - реализовано: проверка >= 60 минут до старта.
+  // - реализовано частично: исторические записи с startAtUtc=null остаются управляемыми до миграции данных.
   if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
   const minutesLeft = minutesUntilStart(booking);
   return minutesLeft === null || minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;

@@ -73,6 +73,9 @@ async function ensureNoConflicts(tx: Prisma.TransactionClient, input: ConflictCh
 }
 
 export async function createBooking(input: BookingCreateInput): Promise<BookingDto> {
+  // AUDIT (создание записи):
+  // - реализовано: создаётся PENDING + actionRequiredBy=MASTER, запись не удаляется.
+  // - реализовано: startAtUtc/endAtUtc сохраняются, что поддерживает серверные проверки 60 минут и runtime-статусы.
   if (input.clientUserId && input.idempotencyKey) {
     const key = buildCreateBookingIdempotencyKey(input.clientUserId, input.idempotencyKey);
     const allowed = await checkAndSetIdempotency(

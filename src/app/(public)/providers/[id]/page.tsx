@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { HeroBlock } from "@/features/public-profile/master/hero-block";
 import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
 import { ReviewsPreview } from "@/features/public-profile/master/reviews-preview";
@@ -187,17 +186,6 @@ export default function ProviderProfilePage() {
               setSelectedServices((prev) => (prev.some((item) => item.id === service.id) ? prev : [...prev, service]))
             }
           />
-
-          <Card>
-            <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.categoriesTitle}</div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {provider.categories.map((category) => (
-                  <Badge key={category}>{category}</Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           <PortfolioStrip items={portfolioItems} />
 

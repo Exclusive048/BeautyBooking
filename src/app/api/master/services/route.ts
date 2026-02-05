@@ -9,6 +9,41 @@ import { parseBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
+function extractFieldErrors(details: unknown): Record<string, string> | undefined {
+  if (typeof details !== "object" || details === null) return undefined;
+
+  const fromDetails = (details as { fieldErrors?: unknown }).fieldErrors;
+  if (typeof fromDetails === "object" && fromDetails !== null) {
+    const mapped = Object.entries(fromDetails as Record<string, unknown>).reduce<Record<string, string>>(
+      (acc, [key, value]) => {
+        if (typeof value === "string" && value.trim()) {
+          acc[key] = value;
+        } else if (Array.isArray(value)) {
+          const first = value.find((item): item is string => typeof item === "string" && item.trim().length > 0);
+          if (first) acc[key] = first;
+        }
+        return acc;
+      },
+      {}
+    );
+    if (Object.keys(mapped).length > 0) return mapped;
+  }
+
+  const issues = (details as { issues?: unknown }).issues;
+  if (!Array.isArray(issues)) return undefined;
+
+  const mapped = issues.reduce<Record<string, string>>((acc, issue) => {
+    if (typeof issue !== "object" || issue === null) return acc;
+    const path = (issue as { path?: unknown }).path;
+    const message = (issue as { message?: unknown }).message;
+    if (typeof path === "string" && path.trim() && typeof message === "string" && message.trim()) {
+      acc[path] = message;
+    }
+    return acc;
+  }, {});
+  return Object.keys(mapped).length > 0 ? mapped : undefined;
+}
+
 export async function PUT(req: Request) {
   try {
     const user = await getSessionUser();
@@ -26,7 +61,13 @@ export async function PUT(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    return jsonFail(
+      appError.status,
+      appError.message,
+      appError.code,
+      appError.details,
+      extractFieldErrors(appError.details)
+    );
   }
 }
 
@@ -47,6 +88,12 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    return jsonFail(
+      appError.status,
+      appError.message,
+      appError.code,
+      appError.details,
+      extractFieldErrors(appError.details)
+    );
   }
 }

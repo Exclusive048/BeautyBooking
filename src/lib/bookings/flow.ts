@@ -5,6 +5,11 @@ export const BOOKING_ACTION_WINDOW_MINUTES = 60;
 export const BOOKING_FINISH_GRACE_MINUTES = 60;
 export const BOOKING_CHANGE_REQUEST_LIMIT = 3;
 
+// AUDIT (booking flow):
+// - auto IN_PROGRESS/FINISHED: реализовано через resolveBookingRuntimeStatus (runtime-вычисление).
+// - правило 60 минут для отмены/переноса: реализовано через ensureBookingActionWindow в src/lib.
+// - замечание: статус в БД не персистится автоматически в IN_PROGRESS/FINISHED (частично относительно "авто-смена статуса").
+
 export type BookingActor = "CLIENT" | "MASTER";
 
 export type BookingRuntimeStatus =
@@ -61,8 +66,13 @@ export function minutesUntilStart(startAtUtc: Date | null, now: Date = new Date(
 }
 
 export function ensureBookingActionWindow(startAtUtc: Date | null, now: Date = new Date()): void {
+  if (!startAtUtc) {
+    throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
+  }
   const minutesLeft = minutesUntilStart(startAtUtc, now);
-  if (minutesLeft === null) return;
+  if (minutesLeft === null) {
+    throw new AppError("Booking time is invalid", 409, "BOOKING_TIME_REQUIRED");
+  }
   if (minutesLeft < BOOKING_ACTION_WINDOW_MINUTES) {
     throw new AppError(
       "Cancellation and reschedule are unavailable less than 60 minutes before start",

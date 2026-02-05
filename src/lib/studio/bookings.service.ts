@@ -216,6 +216,11 @@ export async function updateMasterBookingStatus(input: {
   status: "CONFIRMED" | "REJECTED";
   comment?: string;
 }): Promise<{ id: string; status: string }> {
+  // AUDIT (мастерские действия по статусу):
+  // - реализовано: подтверждение PENDING и подтверждение клиентского CHANGE_REQUESTED.
+  // - реализовано: отклонение initial booking -> REJECTED с обязательным комментарием.
+  // - реализовано: отклонение клиентского переноса оставляет CONFIRMED и очищает proposed*.
+  // - не реализовано в этом обработчике: мастерский запрос переноса (MASTER -> CHANGE_REQUESTED) выполняется другим usecase.
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
     select: {

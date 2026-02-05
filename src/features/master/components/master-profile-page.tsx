@@ -55,6 +55,7 @@ type ApiErrorShape = {
   error: {
     message: string;
     details?: unknown;
+    fieldErrors?: Record<string, string | string[]>;
   };
 };
 
@@ -113,6 +114,15 @@ function extractApiErrorMessage(
   return json.error.message || fallback;
 }
 
+function firstFieldError(value: string | string[] | undefined): string | null {
+  if (typeof value === "string" && value.trim()) return value;
+  if (Array.isArray(value)) {
+    const first = value.find((item): item is string => typeof item === "string" && item.trim().length > 0);
+    return first ?? null;
+  }
+  return null;
+}
+
 async function uploadMasterMedia(input: {
   file: File;
   masterId: string;
@@ -153,6 +163,11 @@ export function MasterProfilePage() {
   const [newSoloServiceTitle, setNewSoloServiceTitle] = useState("");
   const [newSoloServicePrice, setNewSoloServicePrice] = useState<number>(0);
   const [newSoloServiceDuration, setNewSoloServiceDuration] = useState<number>(60);
+  const [newSoloServiceFieldErrors, setNewSoloServiceFieldErrors] = useState<{
+    title?: string;
+    price?: string;
+    durationMin?: string;
+  }>({});
   const [showAddServicePanel, setShowAddServicePanel] = useState(false);
   const [selectedStudioServiceId, setSelectedStudioServiceId] = useState("");
   const [serviceFieldErrors, setServiceFieldErrors] = useState<
@@ -466,6 +481,7 @@ export function MasterProfilePage() {
     const normalizedDuration = normalizeDuration(newSoloServiceDuration);
     setNewSoloServicePrice(normalizedPrice);
     setNewSoloServiceDuration(normalizedDuration);
+    setNewSoloServiceFieldErrors({});
 
     setSaving(true);
     setError(null);
@@ -479,17 +495,38 @@ export function MasterProfilePage() {
           durationMin: normalizedDuration,
         }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ id: string }>
+        | ApiErrorShape
+        | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        const apiError = json && !json.ok ? json.error : null;
+        if (apiError?.fieldErrors) {
+          setNewSoloServiceFieldErrors({
+            title: firstFieldError(apiError.fieldErrors.title) ?? undefined,
+            price: firstFieldError(apiError.fieldErrors.price) ?? undefined,
+            durationMin: firstFieldError(
+              apiError.fieldErrors.durationMin ?? apiError.fieldErrors.duration
+            ) ?? undefined,
+          });
+        } else {
+          setNewSoloServiceFieldErrors({});
+        }
+        throw new Error(
+          extractApiErrorMessage(
+            json && !json.ok ? json : null,
+            `API error: ${res.status}`
+          )
+        );
       }
 
       setNewSoloServiceTitle("");
       setNewSoloServicePrice(0);
       setNewSoloServiceDuration(60);
+      setNewSoloServiceFieldErrors({});
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось добавить услугу");
+      setError(err instanceof Error ? err.message : "Failed to add service");
     } finally {
       setSaving(false);
     }
@@ -794,13 +831,17 @@ export function MasterProfilePage() {
         {showAddServicePanel ? (
           <div className="mt-3 rounded-xl border p-3">
             {data.master.isSolo ? (
+              <>
               <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_140px_150px_120px]">
                 <input
                   type="text"
                   value={newSoloServiceTitle}
-                  onChange={(event) => setNewSoloServiceTitle(event.target.value)}
+                  onChange={(event) => {
+                    setNewSoloServiceTitle(event.target.value);
+                    setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
+                  }}
                   className="h-9 rounded border px-2.5 text-sm"
-                  placeholder="Название"
+                  placeholder={"\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435"}
                 />
                 <input
                   type="number"
@@ -808,10 +849,13 @@ export function MasterProfilePage() {
                   step={100}
                   inputMode="numeric"
                   value={newSoloServicePrice}
-                  onChange={(event) => setNewSoloServicePrice(Number(event.target.value) || 0)}
+                  onChange={(event) => {
+                    setNewSoloServicePrice(Number(event.target.value) || 0);
+                    setNewSoloServiceFieldErrors((current) => ({ ...current, price: undefined }));
+                  }}
                   onBlur={() => setNewSoloServicePrice((value) => (value > 0 ? normalizePrice(value) : value))}
                   className="h-9 rounded border px-2.5 text-sm"
-                  placeholder="Цена (₽)"
+                  placeholder={"\u0426\u0435\u043d\u0430 (\u20BD)"}
                 />
                 <input
                   type="number"
@@ -819,17 +863,26 @@ export function MasterProfilePage() {
                   step={5}
                   inputMode="numeric"
                   value={newSoloServiceDuration}
-                  onChange={(event) => setNewSoloServiceDuration(Number(event.target.value) || 0)}
+                  onChange={(event) => {
+                    setNewSoloServiceDuration(Number(event.target.value) || 0);
+                    setNewSoloServiceFieldErrors((current) => ({ ...current, durationMin: undefined }));
+                  }}
                   onBlur={() =>
                     setNewSoloServiceDuration((value) => (value > 0 ? normalizeDuration(value) : value))
                   }
                   className="h-9 rounded border px-2.5 text-sm"
-                  placeholder="Длительность (мин)"
+                  placeholder={"\u0414\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c (\u043c\u0438\u043d)"}
                 />
                 <button type="button" onClick={() => void createSoloService()} disabled={saving} className="h-9 rounded border px-2.5 text-sm">
-                  Добавить
+                  {"\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c"}
                 </button>
               </div>
+              {newSoloServiceFieldErrors.title || newSoloServiceFieldErrors.price || newSoloServiceFieldErrors.durationMin ? (
+                <div className="mt-2 text-xs text-red-600">
+                  {newSoloServiceFieldErrors.title ?? newSoloServiceFieldErrors.price ?? newSoloServiceFieldErrors.durationMin}
+                </div>
+              ) : null}
+              </>
             ) : (
               <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                 <select

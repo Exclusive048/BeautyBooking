@@ -11,6 +11,11 @@ import {
 } from "@/lib/bookings/flow";
 
 export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
+  // AUDIT (отмена/отклонение):
+  // - реализовано: отмена/отклонение меняет статус, удаления записи нет.
+  // - реализовано: CLIENT/PROVIDER отмена -> REJECTED, requestedBy проставляется.
+  // - реализовано: клиентский отказ от мастерского переноса оставляет CONFIRMED и очищает proposed*.
+  // - реализовано: правило 60 минут проверяется на сервере для отмены (кроме reject ветки переноса).
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
     select: {

@@ -47,6 +47,10 @@ export async function confirmBooking(
   bookingId: string,
   actor: BookingActor
 ): Promise<BookingStatusUpdateDto> {
+  // AUDIT (подтверждение):
+  // - реализовано: MASTER подтверждает PENDING -> CONFIRMED.
+  // - реализовано: подтверждение CHANGE_REQUESTED только стороной из actionRequiredBy.
+  // - реализовано: при подтверждении переноса proposed* применяются в start/end и очищаются.
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     select: {

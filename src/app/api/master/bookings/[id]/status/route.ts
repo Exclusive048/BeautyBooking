@@ -15,6 +15,9 @@ export const runtime = "nodejs";
 
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
+    // AUDIT (HTTP-обвязка смены статуса мастером):
+    // - реализовано: endpoint передаёт подтверждение/отклонение в src/lib/studio/bookings.service.
+    // - реализовано частично: публично принимает CANCELLED/NO_SHOW, но нормализует их в REJECTED.
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
     const { id } = await ctx.params;
