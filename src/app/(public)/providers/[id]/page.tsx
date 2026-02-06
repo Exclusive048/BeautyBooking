@@ -225,6 +225,7 @@ export default function ProviderProfilePage() {
           ) : (
             <PublicBookingWidget
               providerId={provider.id}
+              providerTimezone={provider.timezone}
               selectedServices={selectedServices}
               onRemove={(serviceId) =>
                 setSelectedServices((prev) => prev.filter((service) => service.id !== serviceId))

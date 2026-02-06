@@ -46,6 +46,7 @@ export type ProviderProfileDto = {
   district: string;
   categories: string[];
   availableToday: boolean;
+  timezone: string;
   geoLat: number | null;
   geoLng: number | null;
   superpowerBadges: ProviderSuperpowerBadgeDto[];

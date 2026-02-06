@@ -20,6 +20,11 @@ type DateParts = {
 };
 
 function partsFromDate(date: Date, timeZone: string): DateParts {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    throw new Error(
+      `Invalid date in partsFromDate: ${String(date)} (type=${typeof date}, value=${JSON.stringify(date)})`
+    );
+  }
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
@@ -42,6 +47,11 @@ function partsFromDate(date: Date, timeZone: string): DateParts {
     minute: Number(lookup.minute),
     second: Number(lookup.second),
   };
+}
+
+export function getLocalTimeParts(date: Date, timeZone: string): { hour: number; minute: number } {
+  const parts = partsFromDate(date, timeZone);
+  return { hour: parts.hour, minute: parts.minute };
 }
 
 function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
@@ -77,8 +87,20 @@ export function toUtcFromLocalDateTime(
   return new Date(utcGuess.getTime() - offset);
 }
 
-export function toLocalDateKey(date: Date, timeZone: string): string {
-  const parts = partsFromDate(date, timeZone);
+function rejectDateKeyString(input: string): void {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    throw new Error(`Date key string is not allowed in toLocalDateKey: ${input}`);
+  }
+}
+
+export function toLocalDateKey(date: Date | number | string, timeZone: string): string {
+  const value =
+    typeof date === "string"
+      ? (rejectDateKeyString(date), new Date(date))
+      : typeof date === "number"
+        ? new Date(date)
+        : date;
+  const parts = partsFromDate(value, timeZone);
   const month = String(parts.month).padStart(2, "0");
   const day = String(parts.day).padStart(2, "0");
   return `${parts.year}-${month}-${day}`;

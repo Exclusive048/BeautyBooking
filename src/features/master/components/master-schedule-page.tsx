@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
+import { resolveDayPlanFromRule } from "@/lib/schedule/engine-core";
+import type { ScheduleRuleConfig } from "@/lib/schedule/rule-engine";
+import { dateFromKey } from "@/lib/schedule/time";
 
 type ScheduleDayLoad = {
   date: string;
@@ -36,6 +39,7 @@ type ScheduleData = {
   month: string;
   isSolo: boolean;
   dayLoads: ScheduleDayLoad[];
+  publishedUntilLocal: string;
   exceptions: ScheduleException[];
   blocks: ScheduleBlock[];
   requests: ScheduleRequest[];
@@ -105,10 +109,6 @@ const TEMPLATE_MODE_LABEL: Record<TemplateMode, string> = {
   EVERY_DAY: "Каждый день",
 };
 
-function positiveModulo(value: number, mod: number): number {
-  return ((value % mod) + mod) % mod;
-}
-
 function buildMonthDays(monthKey: string): string[] {
   const first = new Date(`${monthKey}-01T00:00:00.000Z`);
   const next = new Date(first);
@@ -120,25 +120,82 @@ function buildMonthDays(monthKey: string): string[] {
   return days;
 }
 
-function isTemplateWorkingDay(input: {
-  dateKey: string;
-  cycleStartDate: string;
+function buildPreviewRuleConfig(input: {
   mode: TemplateMode;
-}): boolean {
-  if (input.mode === "EVERY_DAY") return true;
+  cycleStartDate: string;
+  start: string;
+  end: string;
+}): ScheduleRuleConfig {
+  const workdayTemplate = {
+    isWorkday: true,
+    startLocal: input.start,
+    endLocal: input.end,
+    breaks: [],
+  };
+  const dayOffTemplate = {
+    isWorkday: false,
+    startLocal: null,
+    endLocal: null,
+    breaks: [],
+  };
 
-  const dateMs = new Date(`${input.dateKey}T00:00:00.000Z`).getTime();
-  const cycleStartMs = new Date(`${input.cycleStartDate}T00:00:00.000Z`).getTime();
-  if (!Number.isFinite(dateMs) || !Number.isFinite(cycleStartMs)) return true;
+  if (input.mode === "EVERY_DAY") {
+    return {
+      kind: "WEEKLY",
+      timezone: "UTC",
+      anchorDate: null,
+      payload: {
+        weekly: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+          dayOfWeek: dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+          ...workdayTemplate,
+        })),
+      },
+    };
+  }
 
-  const diffDays = Math.floor((dateMs - cycleStartMs) / (24 * 60 * 60 * 1000));
-  if (input.mode === "2_2") {
-    return positiveModulo(diffDays, 4) < 2;
-  }
-  if (input.mode === "3_3") {
-    return positiveModulo(diffDays, 6) < 3;
-  }
-  return positiveModulo(diffDays, 7) < 5;
+  const anchorDate = dateFromKey(input.cycleStartDate) ?? new Date(`${input.cycleStartDate}T00:00:00.000Z`);
+  const cycleDays =
+    input.mode === "2_2"
+      ? [workdayTemplate, workdayTemplate, dayOffTemplate, dayOffTemplate]
+      : input.mode === "3_3"
+        ? [
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            dayOffTemplate,
+            dayOffTemplate,
+            dayOffTemplate,
+          ]
+        : [
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            dayOffTemplate,
+            dayOffTemplate,
+          ];
+
+  return {
+    kind: "CYCLE",
+    timezone: "UTC",
+    anchorDate,
+    payload: {
+      cycle: { days: cycleDays },
+    },
+  };
+}
+
+function isPreviewWorkingDay(dateKey: string, rule: ScheduleRuleConfig): boolean {
+  const plan = resolveDayPlanFromRule({
+    dateKey,
+    rule,
+    overrides: [],
+    dateBreaks: [],
+    blockBreaks: [],
+    providerTimezone: rule.timezone,
+  });
+  return plan.isWorking;
 }
 
 function formatDateTitle(dateKey: string): string {
@@ -153,6 +210,7 @@ export function MasterSchedulePage() {
     month: currentMonthKey(),
     isSolo: true,
     dayLoads: [],
+    publishedUntilLocal: "",
     exceptions: [],
     blocks: [],
     requests: [],
@@ -190,13 +248,26 @@ export function MasterSchedulePage() {
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
 
+  const previewRule = useMemo(
+    () =>
+      buildPreviewRuleConfig({
+        mode: templateMode,
+        cycleStartDate,
+        start: templateStart,
+        end: templateEnd,
+      }),
+    [cycleStartDate, templateEnd, templateMode, templateStart]
+  );
+
   const previewByDay = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const day of monthDays) {
-      map.set(day, isTemplateWorkingDay({ dateKey: day, cycleStartDate, mode: templateMode }));
+      const withinPublish =
+        data.publishedUntilLocal && day > data.publishedUntilLocal ? false : isPreviewWorkingDay(day, previewRule);
+      map.set(day, withinPublish);
     }
     return map;
-  }, [cycleStartDate, monthDays, templateMode]);
+  }, [data.publishedUntilLocal, monthDays, previewRule]);
 
   const selectedDayBreaks = useMemo(() => {
     return data.blocks

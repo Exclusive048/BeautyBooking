@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { ScheduleEngine } from "@/lib/schedule/engine";
 
 type MasterContext = {
   masterId: string;
@@ -51,6 +52,7 @@ export type MasterScheduleData = {
   month: string;
   isSolo: boolean;
   dayLoads: MasterScheduleDayLoad[];
+  publishedUntilLocal: string;
   exceptions: Array<{
     id: string;
     date: string;
@@ -78,6 +80,13 @@ export async function getMasterSchedule(input: {
   month: string;
 }): Promise<MasterScheduleData> {
   const context = await getMasterContext(input.masterId);
+  const provider = await prisma.provider.findUnique({
+    where: { id: input.masterId },
+    select: { timezone: true },
+  });
+  if (!provider) {
+    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+  }
   const { from, to } = monthBounds(input.month);
 
   const [bookings, exceptions, blocks, requests] = await Promise.all([
@@ -128,11 +137,14 @@ export async function getMasterSchedule(input: {
 
   const dayLoads = Array.from(dayLoadMap.entries()).map(([date, count]) => ({ date, count }));
 
+  const scheduleWindow = await ScheduleEngine.getScheduleWindow(input.masterId, provider.timezone);
+
   return {
     masterId: input.masterId,
     month: input.month,
     isSolo: context.isSolo,
     dayLoads,
+    publishedUntilLocal: scheduleWindow.publishedUntilLocal,
     exceptions: exceptions.map((item) => ({
       id: item.id,
       date: item.date.toISOString().slice(0, 10),

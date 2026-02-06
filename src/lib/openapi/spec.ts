@@ -256,7 +256,7 @@ export const openApiSpec = {
           { $ref: "#/components/schemas/ProviderCard" },
           {
             type: "object",
-            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng"],
+            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng", "timezone"],
             properties: {
               services: {
                 type: "array",
@@ -265,6 +265,7 @@ export const openApiSpec = {
               studioId: { type: "string", nullable: true },
               bannerUrl: { type: "string", nullable: true },
               description: { type: "string", nullable: true },
+              timezone: { type: "string" },
               geoLat: { type: "number", nullable: true },
               geoLng: { type: "number", nullable: true },
             },
@@ -1190,7 +1191,7 @@ export const openApiSpec = {
       },
       MasterScheduleData: {
         type: "object",
-        required: ["month", "isSolo", "dayLoads", "exceptions", "blocks", "requests"],
+        required: ["month", "isSolo", "dayLoads", "exceptions", "blocks", "requests", "publishedUntilLocal"],
         properties: {
           month: { type: "string" },
           isSolo: { type: "boolean" },
@@ -1198,6 +1199,7 @@ export const openApiSpec = {
           exceptions: { type: "array", items: { $ref: "#/components/schemas/WorkException" } },
           blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
           requests: { type: "array", items: { $ref: "#/components/schemas/MasterScheduleRequest" } },
+          publishedUntilLocal: { type: "string" },
         },
       },
       CreateMasterScheduleExceptionInput: {

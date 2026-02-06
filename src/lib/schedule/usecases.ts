@@ -9,11 +9,12 @@ import type {
   ScheduleOverride,
   WeeklyScheduleItem,
 } from "@/lib/domain/schedule";
-import { addMinutes, dateFromKey, minutesToTime, timeToMinutes } from "@/lib/schedule/time";
-import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
-import { getCachedSlots, invalidateSlotsForMaster, setCachedSlots } from "@/lib/schedule/slotsCache";
-import { buildDateBreaksMap, buildScheduleRuleConfig, toScheduleOverrideConfigs } from "@/lib/schedule/rule-adapters";
-import { getProviderWorkday } from "@/lib/schedule/rule-engine";
+import { timeToMinutes } from "@/lib/schedule/time";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { buildSlotsCacheKey, getCachedSlots, invalidateSlotsForMaster, setCachedSlots } from "@/lib/schedule/slotsCache";
+import { ScheduleEngine } from "@/lib/schedule/engine";
+import { buildSlotsForDay } from "@/lib/schedule/slots";
+import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
 
 type RangeInput = {
   from: Date;
@@ -504,6 +505,7 @@ export async function saveScheduleRule(
 
 export async function listAvailabilitySlots(
   providerId: string,
+  serviceId: string,
   durationMin: number,
   range: RangeInput
 ): Promise<Result<AvailabilitySlot[]>> {
@@ -511,163 +513,84 @@ export async function listAvailabilitySlots(
     return { ok: false, status: 400, message: "Invalid duration", code: "DURATION_INVALID" };
   }
 
-  const cached = await getCachedSlots(providerId, range.from, durationMin);
-  if (cached) {
-    return { ok: true, data: cached };
+  if (!serviceId) {
+    return { ok: false, status: 400, message: "Service id is required", code: "SERVICE_REQUIRED" };
   }
 
-  const stepMin = range.stepMin ?? 15;
-  if (!Number.isInteger(stepMin) || stepMin <= 0) {
-    return { ok: false, status: 400, message: "Invalid step", code: "STEP_INVALID" };
-  }
-
-  const from = normalizeDate(range.from);
-  const to = normalizeDate(range.to);
+  const from = range.from;
+  const to = range.to;
   if (from > to) {
     return { ok: false, status: 400, message: "Invalid range", code: "RANGE_INVALID" };
   }
 
-  const scheduleQueryFrom = addMinutes(from, -24 * 60);
-  const scheduleQueryTo = addMinutes(to, 24 * 60);
-
-  const [provider, weeklyRows, overrides, blocks, bookings, breakRows] = await prisma.$transaction([
-    prisma.provider.findUnique({
-      where: { id: providerId },
-      select: {
-        id: true,
-        timezone: true,
-        bufferBetweenBookingsMin: true,
-        scheduleRules: {
-          where: { isActive: true },
-          orderBy: { updatedAt: "desc" },
-          take: 1,
-          select: {
-            kind: true,
-            timezone: true,
-            anchorDate: true,
-            payloadJson: true,
-            isActive: true,
-          },
-        },
-      },
-    }),
-    prisma.weeklySchedule.findMany({
-      where: { providerId },
-      select: { dayOfWeek: true, startLocal: true, endLocal: true },
-      orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
-    }),
-    prisma.scheduleOverride.findMany({
-      where: { providerId, date: { gte: scheduleQueryFrom, lte: scheduleQueryTo } },
-      select: { date: true, kind: true, isDayOff: true, startLocal: true, endLocal: true, note: true, reason: true },
-    }),
-    prisma.scheduleBlock.findMany({
-      where: { providerId, date: { gte: scheduleQueryFrom, lte: scheduleQueryTo } },
-      select: { date: true, startLocal: true, endLocal: true },
-    }),
-    prisma.booking.findMany({
-      where: {
-        providerId,
-        status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-        startAtUtc: { not: null, lte: addMinutes(to, 24 * 60) },
-        endAtUtc: { not: null, gte: from },
-      },
-      select: { id: true, startAtUtc: true, endAtUtc: true },
-    }),
-    prisma.scheduleBreak.findMany({
-      where: {
-        providerId,
-        OR: [{ kind: "WEEKLY" }, { kind: "OVERRIDE", date: { gte: scheduleQueryFrom, lte: scheduleQueryTo } }],
-      },
-      select: { kind: true, dayOfWeek: true, date: true, startLocal: true, endLocal: true },
-    }),
-  ]);
-
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { id: true, timezone: true, bufferBetweenBookingsMin: true },
+  });
   if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
 
-  const rule = buildScheduleRuleConfig({
-    providerTimezone: provider.timezone,
-    activeRule: provider.scheduleRules[0] ?? null,
-    weeklyRows,
-    breakRows,
-  });
-
-  const timezone = rule?.timezone ?? provider.timezone;
-  const overrideConfigs = toScheduleOverrideConfigs(overrides);
-  const dateBreaksMap = buildDateBreaksMap(breakRows, timezone);
-  const blocksByDate = new Map<string, typeof blocks>();
-  for (const block of blocks) {
-    const key = toLocalDateKey(block.date, timezone);
-    const list = blocksByDate.get(key) ?? [];
-    list.push(block);
-    blocksByDate.set(key, list);
-  }
-
+  const timezone = provider.timezone;
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
+  const scheduleWindow = await ScheduleEngine.getScheduleWindow(providerId, timezone);
+
+  const bookings = await prisma.booking.findMany({
+    where: {
+      providerId,
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+      startAtUtc: { not: null, lte: to },
+      endAtUtc: { not: null, gte: from },
+    },
+    select: { id: true, startAtUtc: true, endAtUtc: true },
+  });
+  const bookingRanges = bookings
+    .map((booking) =>
+      booking.startAtUtc && booking.endAtUtc
+        ? { startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc }
+        : null
+    )
+    .filter((item): item is { startAtUtc: Date; endAtUtc: Date } => item !== null);
+
+  const startKey = toLocalDateKey(from, timezone);
+  const endKey = toLocalDateKey(to, timezone);
 
   const slots: AvailabilitySlot[] = [];
-  for (let cursor = new Date(from); cursor <= to; cursor = addMinutes(cursor, 24 * 60)) {
-    const localKey = toLocalDateKey(cursor, timezone);
-    const dateForLocal = dateFromKey(localKey) ?? cursor;
-    const workday = getProviderWorkday({
-      date: dateForLocal,
-      rule,
-      overrides: overrideConfigs,
-      dateBreaks: dateBreaksMap.get(localKey) ?? [],
+  let cursorKey = startKey;
+  while (compareDateKeys(cursorKey, endKey) <= 0) {
+    const cacheKey = buildSlotsCacheKey({
+      masterId: providerId,
+      dateKey: cursorKey,
+      serviceId,
+      serviceDuration: durationMin,
+      bufferMin,
+      timeZone: timezone,
+      scheduleVersion: scheduleWindow.scheduleVersion,
+      publishedUntilLocal: scheduleWindow.publishedUntilLocal,
     });
-    if (!workday.isWorkday || !workday.startLocal || !workday.endLocal) continue;
+    const cached = await getCachedSlots(cacheKey);
+    const daySlots =
+      cached ??
+      buildSlotsForDay({
+        dayPlan: await ScheduleEngine.getDayPlan({ masterId: providerId, date: cursorKey, timezone }),
+        dateKey: cursorKey,
+        timeZone: timezone,
+        serviceDurationMin: durationMin,
+        bufferMin,
+        bookings: bookingRanges,
+        now: new Date(),
+      });
 
-    const dayBlocks = blocksByDate.get(localKey) ?? [];
-    const blockIntervals = dayBlocks
-      .map((b) => {
-        const start = timeToMinutes(b.startLocal);
-        const end = timeToMinutes(b.endLocal);
-        if (start === null || end === null) return null;
-        return { start, end };
-      })
-      .filter((b): b is { start: number; end: number } => b !== null);
-
-    for (const br of workday.breaks) {
-      const start = timeToMinutes(br.startLocal);
-      const end = timeToMinutes(br.endLocal);
-      if (start === null || end === null) continue;
-      blockIntervals.push({ start, end });
+    if (!cached) {
+      await setCachedSlots(cacheKey, daySlots);
     }
 
-    const windowStart = timeToMinutes(workday.startLocal);
-    const windowEnd = timeToMinutes(workday.endLocal);
-    if (windowStart === null || windowEnd === null) continue;
-
-    for (let t = windowStart; t + durationMin <= windowEnd; t += stepMin) {
-      const startUtc = toUtcFromLocalDateTime(
-        dateForLocal,
-        Math.floor(t / 60),
-        t % 60,
-        workday.timezone
-      );
-      const endUtc = addMinutes(startUtc, durationMin);
-
-      if (startUtc < range.from || endUtc > range.to) continue;
-
-      const blocked = blockIntervals.some((b) => t < b.end && t + durationMin > b.start);
-      if (blocked) continue;
-
-      const hasConflict = bookings.some((b) => {
-        if (!b.startAtUtc || !b.endAtUtc) return false;
-        const bufferedStart = bufferMin ? addMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
-        const bufferedEnd = bufferMin ? addMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
-        return startUtc < bufferedEnd && endUtc > bufferedStart;
-      });
-      if (hasConflict) continue;
-
-      slots.push({
-        startAtUtc: startUtc,
-        endAtUtc: endUtc,
-        label: `${localKey} ${minutesToTime(t)}`,
-      });
+    for (const slot of daySlots) {
+      if (slot.startAtUtc < range.from || slot.endAtUtc > range.to) continue;
+      slots.push(slot);
     }
+
+    cursorKey = addDaysToDateKey(cursorKey, 1);
   }
 
-  await setCachedSlots(providerId, range.from, durationMin, slots);
   return { ok: true, data: slots };
 }
 

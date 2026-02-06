@@ -2,10 +2,7 @@ import { AppError } from "@/lib/api/errors";
 import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBookingDto";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { prisma } from "@/lib/prisma";
-import { buildDateBreaksMap, buildScheduleRuleConfig, toScheduleOverrideConfigs } from "@/lib/schedule/rule-adapters";
-import { getProviderWorkday } from "@/lib/schedule/rule-engine";
-import { dateFromKey } from "@/lib/schedule/time";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { ScheduleEngine } from "@/lib/schedule/engine";
 import type { BookingStatus } from "@prisma/client";
 
 export type MasterDayBooking = {
@@ -180,30 +177,13 @@ export async function getMasterDay(input: {
       masterProfile: {
         select: { lastBookingsSeenAt: true },
       },
-      scheduleRules: {
-        where: { isActive: true },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-        select: {
-          kind: true,
-          timezone: true,
-          anchorDate: true,
-          payloadJson: true,
-          isActive: true,
-        },
-      },
     },
   });
   if (!master) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
   }
 
-  const scheduleQueryFrom = new Date(start);
-  scheduleQueryFrom.setUTCDate(scheduleQueryFrom.getUTCDate() - 1);
-  const scheduleQueryTo = new Date(end);
-  scheduleQueryTo.setUTCDate(scheduleQueryTo.getUTCDate() + 1);
-
-  const [bookingsRaw, finishedMonth, reviews, services, weeklyRows, overrides, breakRows, newBookingsCount] = await prisma.$transaction([
+  const [bookingsRaw, finishedMonth, reviews, services, newBookingsCount] = await prisma.$transaction([
     prisma.booking.findMany({
       where: {
         OR: [
@@ -273,25 +253,6 @@ export async function getMasterDay(input: {
         durationMin: true,
       },
       orderBy: { sortOrder: "asc" },
-    }),
-    prisma.weeklySchedule.findMany({
-      where: { providerId: input.masterId },
-      select: { dayOfWeek: true, startLocal: true, endLocal: true },
-      orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
-    }),
-    prisma.scheduleOverride.findMany({
-      where: {
-        providerId: input.masterId,
-        date: { gte: scheduleQueryFrom, lte: scheduleQueryTo },
-      },
-      select: { date: true, kind: true, isDayOff: true, startLocal: true, endLocal: true, note: true, reason: true },
-    }),
-    prisma.scheduleBreak.findMany({
-      where: {
-        providerId: input.masterId,
-        OR: [{ kind: "WEEKLY" }, { kind: "OVERRIDE", date: { gte: scheduleQueryFrom, lte: scheduleQueryTo } }],
-      },
-      select: { kind: true, dayOfWeek: true, date: true, startLocal: true, endLocal: true },
     }),
     prisma.booking.count({
       where: {
@@ -374,21 +335,10 @@ export async function getMasterDay(input: {
     return sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price });
   }, 0);
 
-  const rule = buildScheduleRuleConfig({
-    providerTimezone: master.timezone,
-    activeRule: master.scheduleRules[0] ?? null,
-    weeklyRows,
-    breakRows,
-  });
-  const timezone = rule?.timezone ?? master.timezone;
-  const localDateKey = toLocalDateKey(start, timezone);
-  const dateForLocal = dateFromKey(localDateKey) ?? start;
-  const dateBreaksMap = buildDateBreaksMap(breakRows, timezone);
-  const workday = getProviderWorkday({
-    date: dateForLocal,
-    rule,
-    overrides: toScheduleOverrideConfigs(overrides),
-    dateBreaks: dateBreaksMap.get(localDateKey) ?? [],
+  const dayPlan = await ScheduleEngine.getDayPlan({
+    masterId: input.masterId,
+    date: input.date,
+    timezone: master.timezone,
   });
 
   return {
@@ -396,11 +346,11 @@ export async function getMasterDay(input: {
     date: input.date,
     isSolo: master.studioId == null,
     workingHours: {
-      isDayOff: !workday.isWorkday,
-      startLocal: workday.startLocal,
-      endLocal: workday.endLocal,
+      isDayOff: !dayPlan.isWorking,
+      startLocal: dayPlan.workingIntervals[0]?.start ?? null,
+      endLocal: dayPlan.workingIntervals[0]?.end ?? null,
       bufferBetweenBookingsMin: master.bufferBetweenBookingsMin,
-      timezone: workday.timezone,
+      timezone: master.timezone,
     },
     newBookingsCount,
     bookings,
