@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { createBookingNotifications } from "@/lib/notifications/service";
+import {
+  createBookingConfirmedNotifications,
+  createBookingRequestNotifications,
+  publishNotifications,
+  type NotificationRecord,
+} from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
 import { ProviderType } from "@prisma/client";
@@ -77,7 +82,7 @@ export async function createClientBooking(
     }),
     prisma.provider.findUnique({
       where: { id: data.providerId },
-      select: { id: true, type: true, timezone: true },
+      select: { id: true, type: true, timezone: true, studioId: true, autoConfirmBookings: true },
     }),
   ]);
 
@@ -96,52 +101,72 @@ export async function createClientBooking(
   }
   const endAtUtc = new Date(startAtUtc.getTime() + service.durationMin * 60 * 1000);
 
-  const booking = await prisma.booking.create({
-    data: {
-      providerId: data.providerId,
-      serviceId: data.serviceId,
-      masterProviderId: resolvedMasterProviderId,
-      masterId: resolvedMasterProviderId,
-      startAtUtc,
-      endAtUtc,
-      startAt: startAtUtc,
-      endAt: endAtUtc,
-      slotLabel: data.slotLabel,
-      clientName: data.clientName,
-      clientPhone: data.clientPhone,
-      comment: data.comment,
-      silentMode: data.silentMode ?? false,
-      clientUserId: userId,
-      status: "PENDING",
-      actionRequiredBy: "MASTER",
-    },
-    select: {
-      id: true,
-      slotLabel: true,
-      status: true,
-      providerId: true,
-      masterProviderId: true,
-      clientName: true,
-      clientPhone: true,
-      comment: true,
-      silentMode: true,
-      startAtUtc: true,
-      endAtUtc: true,
-      proposedStartAt: true,
-      proposedEndAt: true,
-      requestedBy: true,
-      actionRequiredBy: true,
-      changeComment: true,
-      clientChangeRequestsCount: true,
-      masterChangeRequestsCount: true,
-      service: { select: { id: true, name: true } },
-    },
+  const shouldAutoConfirm =
+    provider.type === ProviderType.MASTER && !provider.studioId && provider.autoConfirmBookings;
+
+  const { booking, notifications } = await prisma.$transaction(async (tx) => {
+    const created = await tx.booking.create({
+      data: {
+        providerId: data.providerId,
+        serviceId: data.serviceId,
+        masterProviderId: resolvedMasterProviderId,
+        masterId: resolvedMasterProviderId,
+        startAtUtc,
+        endAtUtc,
+        startAt: startAtUtc,
+        endAt: endAtUtc,
+        slotLabel: data.slotLabel,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        comment: data.comment,
+        silentMode: data.silentMode ?? false,
+        clientUserId: userId,
+        status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
+        actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
+      },
+      select: {
+        id: true,
+        slotLabel: true,
+        status: true,
+        providerId: true,
+        masterProviderId: true,
+        clientName: true,
+        clientPhone: true,
+        comment: true,
+        silentMode: true,
+        startAtUtc: true,
+        endAtUtc: true,
+        proposedStartAt: true,
+        proposedEndAt: true,
+        requestedBy: true,
+        actionRequiredBy: true,
+        changeComment: true,
+        clientChangeRequestsCount: true,
+        masterChangeRequestsCount: true,
+        service: { select: { id: true, name: true } },
+      },
+    });
+
+    let notifications: NotificationRecord[] = [];
+    try {
+      notifications = shouldAutoConfirm
+        ? await createBookingConfirmedNotifications({
+            bookingId: created.id,
+            notifyClient: true,
+            notifyMaster: true,
+            masterMode: "AUTO",
+            db: tx,
+          })
+        : await createBookingRequestNotifications({ bookingId: created.id, db: tx });
+    } catch (error) {
+      console.error("Failed to create booking notifications:", error);
+    }
+
+    return { booking: created, notifications };
   });
 
-  try {
-    await createBookingNotifications({ bookingId: booking.id, kind: "CREATED" });
-  } catch (error) {
-    console.error("Failed to create booking notifications:", error);
+  if (notifications.length > 0) {
+    publishNotifications(notifications);
   }
 
   try {

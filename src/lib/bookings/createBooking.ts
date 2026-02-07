@@ -2,7 +2,12 @@ import { Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { BookingCreateInput } from "@/lib/domain/bookings";
 import { AppError } from "@/lib/api/errors";
-import { createBookingNotifications } from "@/lib/notifications/service";
+import {
+  createBookingConfirmedNotifications,
+  createBookingRequestNotifications,
+  publishNotifications,
+  type NotificationRecord,
+} from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
@@ -98,13 +103,27 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
     }
   }
 
-  return prisma.$transaction(
+  let transactionCommitted = false;
+  const publishAfterCommit = (notifications: NotificationRecord[]) => {
+    if (process.env.NODE_ENV !== "production" && !transactionCommitted) {
+      throw new Error("Notifications published before transaction commit");
+    }
+    publishNotifications(notifications);
+  };
+
+  const { created, sideEffects } = await prisma.$transaction(
     async (tx) => {
       let masterBufferMin: number | null = null;
       let resolvedMasterProviderId: string | null = input.masterProviderId ?? null;
       const provider = await tx.provider.findUnique({
         where: { id: input.providerId },
-        select: { id: true, type: true, bufferBetweenBookingsMin: true },
+        select: {
+          id: true,
+          type: true,
+          studioId: true,
+          autoConfirmBookings: true,
+          bufferBetweenBookingsMin: true,
+        },
       });
       if (!provider) throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
 
@@ -191,6 +210,9 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
         });
       }
 
+      const shouldAutoConfirm =
+        provider.type === ProviderType.MASTER && !provider.studioId && provider.autoConfirmBookings;
+
       const created = await tx.booking.create({
         data: {
           providerId: input.providerId,
@@ -205,8 +227,8 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
           comment: input.comment ?? null,
           silentMode: input.silentMode ?? false,
           clientUserId: input.clientUserId ?? null,
-          status: "PENDING",
-          actionRequiredBy: "MASTER",
+          status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
+          actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
         },
         select: {
           id: true,
@@ -214,6 +236,7 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
           status: true,
           providerId: true,
           masterProviderId: true,
+          clientUserId: true,
           clientName: true,
           clientPhone: true,
           comment: true,
@@ -231,20 +254,52 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
         },
       });
 
+      let notifications: NotificationRecord[] = [];
+      let notificationError: Error | null = null;
       try {
-        await createBookingNotifications({ bookingId: created.id, kind: "CREATED" });
+        notifications = shouldAutoConfirm
+          ? await createBookingConfirmedNotifications({
+              bookingId: created.id,
+              notifyClient: true,
+              notifyMaster: true,
+              masterMode: "AUTO",
+              db: tx,
+            })
+          : await createBookingRequestNotifications({ bookingId: created.id, db: tx });
       } catch (error) {
-        console.error("Failed to create booking notifications:", error);
+        notificationError =
+          error instanceof Error ? error : new Error("Failed to create booking notifications");
       }
 
-      try {
-        await sendBookingTelegramNotifications(created.id, "CREATED", { notifyClientOnCreate: true });
-      } catch (error) {
-        console.error("Failed to send Telegram booking notifications:", error);
-      }
-
-      return toBookingDto(created);
+      return {
+        created,
+        sideEffects: {
+          bookingId: created.id,
+          providerId: created.providerId,
+          clientUserId: created.clientUserId ?? null,
+          notifications,
+          notificationError,
+        },
+      };
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   );
+
+  transactionCommitted = true;
+
+  if (sideEffects.notificationError) {
+    console.error("Failed to create booking notifications:", sideEffects.notificationError);
+  }
+
+  if (sideEffects.notifications.length > 0) {
+    publishAfterCommit(sideEffects.notifications);
+  }
+
+  try {
+    await sendBookingTelegramNotifications(created.id, "CREATED", { notifyClientOnCreate: true });
+  } catch (error) {
+    console.error("Failed to send Telegram booking notifications:", error);
+  }
+
+  return toBookingDto(created);
 }

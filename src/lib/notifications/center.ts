@@ -1,4 +1,4 @@
-import { MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import { MembershipStatus, NotificationType, ProviderType, StudioRole } from "@prisma/client";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 
@@ -16,11 +16,13 @@ export type NotificationCenterInviteItem = {
 export type NotificationCenterNotificationItem = {
   id: string;
   title: string;
-  body: string | null;
-  type: "BOOKING_CREATED" | "BOOKING_CANCELLED" | "BOOKING_RESCHEDULED" | "SCHEDULE_REQUEST";
+  body: string;
+  type: NotificationType | "SCHEDULE_REQUEST";
   channel: NotificationChannel;
+  isRead: boolean;
   readAt: string | null;
   createdAt: string;
+  payloadJson: unknown | null;
   openHref?: string;
 };
 
@@ -169,6 +171,8 @@ export async function getNotificationCenterData(input: {
         title: true,
         body: true,
         type: true,
+        payloadJson: true,
+        isRead: true,
         readAt: true,
         createdAt: true,
         booking: {
@@ -192,7 +196,7 @@ export async function getNotificationCenterData(input: {
       take: 100,
     }),
     prisma.notification.count({
-      where: { userId: input.userId, readAt: null },
+      where: { userId: input.userId, isRead: false },
     }),
   ]);
 
@@ -257,8 +261,10 @@ export async function getNotificationCenterData(input: {
         body: `${masterName} · ${details} · Статус: ${item.status} · Студия: ${item.studio.provider.name}`,
         type: "SCHEDULE_REQUEST",
         channel: "STUDIO",
+        isRead: false,
         readAt: null,
         createdAt: item.createdAt.toISOString(),
+        payloadJson: null,
         openHref: "/cabinet/studio/team",
       };
     });
@@ -274,11 +280,16 @@ export async function getNotificationCenterData(input: {
         studioIds,
         booking: item.booking,
       }),
+      isRead: item.isRead,
       readAt: item.readAt ? item.readAt.toISOString() : null,
       createdAt: item.createdAt.toISOString(),
+      payloadJson: item.payloadJson ?? null,
     })),
     ...scheduleRequestNotifications,
-  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  ].sort((a, b) => {
+    if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 
   return {
     invites: invites.map((invite) => ({

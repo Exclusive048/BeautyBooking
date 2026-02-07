@@ -1,0 +1,172 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import type { ApiResponse } from "@/lib/types/api";
+import type { NotificationEvent } from "@/lib/notifications/notifier";
+import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
+
+type Props = {
+  ariaLabel: string;
+};
+
+type ToastItem = NotificationEvent;
+
+type BookingPayload = {
+  bookingId?: unknown;
+  bookingStatus?: unknown;
+};
+
+function parseBookingPayload(payload: unknown): { bookingId: string; bookingStatus?: string } | null {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as BookingPayload;
+  if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
+  const bookingStatus = typeof record.bookingStatus === "string" ? record.bookingStatus : undefined;
+  return { bookingId: record.bookingId, bookingStatus };
+}
+
+export function NotificationsBell({ ariaLabel }: Props) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timersRef = useRef<Map<string, number>>(new Map());
+  const seenToastIdsRef = useRef<Map<string, number>>(new Map());
+
+  const handleToast = useCallback((payload: NotificationEvent) => {
+    const timers = timersRef.current;
+    const seen = seenToastIdsRef.current;
+    if (seen.has(payload.id)) return;
+    const seenTimeout = window.setTimeout(() => {
+      seen.delete(payload.id);
+    }, 5 * 60 * 1000);
+    seen.set(payload.id, seenTimeout);
+
+    setToasts((current) => {
+      const filtered = current.filter((item) => item.id !== payload.id);
+      const next = [payload, ...filtered];
+      return next.slice(0, 3);
+    });
+    const existing = timers.get(payload.id);
+    if (existing) {
+      window.clearTimeout(existing);
+      timers.delete(payload.id);
+    }
+    const timeoutId = window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== payload.id));
+      timers.delete(payload.id);
+    }, 6000);
+    timers.set(payload.id, timeoutId);
+  }, []);
+
+  const { hasUnread, unreadCount, refresh } = useNotificationsBell({ onEvent: handleToast });
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    const seen = seenToastIdsRef.current;
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+      seen.forEach((timer) => window.clearTimeout(timer));
+      seen.clear();
+    };
+  }, []);
+
+  const markRead = async (notificationId: string) => {
+    try {
+      await fetch(`/api/notifications/${notificationId}/read`, { method: "POST" });
+    } catch {
+      // ignore
+    } finally {
+      refresh();
+    }
+  };
+
+  const handleConfirm = async (notificationId: string, payload: unknown) => {
+    const booking = parseBookingPayload(payload);
+    if (!booking) return;
+    try {
+      const res = await fetch(`/api/bookings/${booking.bookingId}/confirm`, { method: "POST" });
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      await markRead(notificationId);
+    } catch (error) {
+      console.error("Failed to confirm booking from toast", error);
+    }
+  };
+
+  const handleDecline = async (notificationId: string, payload: unknown) => {
+    const booking = parseBookingPayload(payload);
+    if (!booking) return;
+    try {
+      const res = await fetch(`/api/bookings/${booking.bookingId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Отклонено" }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      await markRead(notificationId);
+    } catch (error) {
+      console.error("Failed to decline booking from toast", error);
+    }
+  };
+
+  return (
+    <>
+      <Button asChild variant="secondary" className="relative">
+        <Link
+          href="/notifications"
+          aria-label={unreadCount > 0 ? `${ariaLabel} (${unreadCount})` : ariaLabel}
+          title={unreadCount > 0 ? `${ariaLabel} (${unreadCount})` : ariaLabel}
+        >
+          <span aria-hidden>🔔</span>
+          {hasUnread ? (
+            <span className="absolute -right-1 -top-1 inline-flex h-3 w-3 rounded-full bg-red-500" />
+          ) : null}
+        </Link>
+      </Button>
+
+      {toasts.length > 0 ? (
+        <div className="fixed right-4 top-4 z-50 flex w-[min(360px,90vw)] flex-col gap-3">
+          {toasts.map((toast) => {
+            const booking = parseBookingPayload(toast.payloadJson);
+            const canAct =
+              toast.type === "BOOKING_REQUEST" &&
+              booking?.bookingId &&
+              (!booking.bookingStatus || booking.bookingStatus === "PENDING");
+
+            return (
+              <div
+                key={toast.id}
+                className="rounded-2xl border border-border-subtle bg-bg-card/90 p-4 shadow-card"
+              >
+                <div className="text-sm font-semibold text-text-main">У вас новое уведомление</div>
+                <div className="mt-1 text-sm text-text-sec">{toast.body}</div>
+                {canAct ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => void handleConfirm(toast.id, toast.payloadJson)}>
+                      Подтвердить
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void handleDecline(toast.id, toast.payloadJson)}
+                    >
+                      Отклонить
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="mt-2 text-[11px] text-text-sec">
+                  {new Date(toast.createdAt).toLocaleString("ru-RU")}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </>
+  );
+}

@@ -293,6 +293,11 @@ async function createReviewCreatedNotifications(input: {
       title: "New review",
       body,
       bookingId: input.bookingId,
+      payloadJson: {
+        bookingId: input.bookingId,
+        authorId: input.authorId,
+        rating: input.rating,
+      },
     })),
   });
 }

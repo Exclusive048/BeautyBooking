@@ -29,12 +29,14 @@ export default async function StudioCabinetLayout({
         <div className="lux-card rounded-[22px] p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h1 className="text-sm font-semibold">Studio cabinet</h1>
-            <Link
-              href="/cabinet/studio/profile"
-              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
-            >
-              Profile
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/cabinet/studio/profile"
+                className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
+              >
+                Profile
+              </Link>
+            </div>
           </div>
           <CabinetSideNav items={STUDIO_NAV} />
         </div>

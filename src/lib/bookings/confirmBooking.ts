@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { createBookingNotifications } from "@/lib/notifications/service";
+import {
+  createBookingConfirmedNotifications,
+  publishNotifications,
+  type NotificationRecord,
+} from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
@@ -141,32 +145,47 @@ export async function confirmBooking(
     throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
   }
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: "CONFIRMED",
-      actionRequiredBy: null,
-      requestedBy: null,
-      changeComment: null,
-      proposedStartAt: null,
-      proposedEndAt: null,
-      ...(appliesRequestedChange
-        ? {
-            startAtUtc,
-            endAtUtc,
-            startAt: startAtUtc,
-            endAt: endAtUtc,
-            slotLabel: startAtUtc.toISOString(),
-          }
-        : {}),
-    },
-    select: { id: true, status: true },
+  const { updated, notifications } = await prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: "CONFIRMED",
+        actionRequiredBy: null,
+        requestedBy: null,
+        changeComment: null,
+        proposedStartAt: null,
+        proposedEndAt: null,
+        ...(appliesRequestedChange
+          ? {
+              startAtUtc,
+              endAtUtc,
+              startAt: startAtUtc,
+              endAt: endAtUtc,
+              slotLabel: startAtUtc.toISOString(),
+            }
+          : {}),
+      },
+      select: { id: true, status: true },
+    });
+
+    let notifications: NotificationRecord[] = [];
+    try {
+      notifications = await createBookingConfirmedNotifications({
+        bookingId: updated.id,
+        notifyClient: actor === "MASTER",
+        notifyMaster: actor === "CLIENT",
+        masterMode: "MANUAL",
+        db: tx,
+      });
+    } catch (error) {
+      console.error("Failed to create booking notifications:", error);
+    }
+
+    return { updated, notifications };
   });
 
-  try {
-    await createBookingNotifications({ bookingId: updated.id, kind: "CONFIRMED" });
-  } catch (error) {
-    console.error("Failed to create booking notifications:", error);
+  if (notifications.length > 0) {
+    publishNotifications(notifications);
   }
 
   try {

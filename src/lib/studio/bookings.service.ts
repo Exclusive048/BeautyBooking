@@ -2,7 +2,12 @@ import { AppError } from "@/lib/api/errors";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { prisma } from "@/lib/prisma";
-import { createBookingNotifications } from "@/lib/notifications/service";
+import {
+  createBookingDeclinedNotifications,
+  createBookingNotifications,
+  publishNotifications,
+  type NotificationRecord,
+} from "@/lib/notifications/service";
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
@@ -113,7 +118,10 @@ export async function createStudioBooking(input: {
   });
 
   try {
-    await createBookingNotifications({ bookingId: created.id, kind: "CREATED" });
+    const notifications = await createBookingNotifications({ bookingId: created.id, kind: "CREATED" });
+    if (notifications.length > 0) {
+      publishNotifications(notifications);
+    }
   } catch (error) {
     console.error("Failed to create booking notifications:", error);
   }
@@ -277,34 +285,45 @@ export async function updateMasterBookingStatus(input: {
     throw new AppError("Comment is required", 400, "VALIDATION_ERROR");
   }
 
-  const updated = await prisma.booking.update({
-    where: { id: booking.id },
-    data: rejectsChangeRequest
-      ? {
-          status: "CONFIRMED",
-          proposedStartAt: null,
-          proposedEndAt: null,
-          requestedBy: null,
-          actionRequiredBy: null,
-          changeComment: null,
-        }
-      : {
-          status: "REJECTED",
-          cancelledBy: "PROVIDER",
-          cancelReason: comment,
-          requestedBy: "MASTER",
-          actionRequiredBy: null,
-          proposedStartAt: null,
-          proposedEndAt: null,
-          changeComment: comment,
-        },
-    select: { id: true, status: true },
+  const { updated, notifications } = await prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: booking.id },
+      data: rejectsChangeRequest
+        ? {
+            status: "CONFIRMED",
+            proposedStartAt: null,
+            proposedEndAt: null,
+            requestedBy: null,
+            actionRequiredBy: null,
+            changeComment: null,
+          }
+        : {
+            status: "REJECTED",
+            cancelledBy: "PROVIDER",
+            cancelReason: comment,
+            requestedBy: "MASTER",
+            actionRequiredBy: null,
+            proposedStartAt: null,
+            proposedEndAt: null,
+            changeComment: comment,
+          },
+      select: { id: true, status: true },
+    });
+
+    let notifications: NotificationRecord[] = [];
+    try {
+      notifications = rejectsChangeRequest
+        ? await createBookingNotifications({ bookingId: updated.id, kind: "CONFIRMED" }, tx)
+        : await createBookingDeclinedNotifications({ bookingId: updated.id, db: tx });
+    } catch (error) {
+      console.error("Failed to create booking notifications:", error);
+    }
+
+    return { updated, notifications };
   });
 
-  try {
-    await createBookingNotifications({ bookingId: updated.id, kind: "REJECTED" });
-  } catch (error) {
-    console.error("Failed to create booking notifications:", error);
+  if (notifications.length > 0) {
+    publishNotifications(notifications);
   }
 
   return { id: updated.id, status: updated.status };
