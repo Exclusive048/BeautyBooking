@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
 import { resolveDayPlanFromRule } from "@/lib/schedule/engine-core";
+import { dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import type { ScheduleRuleConfig } from "@/lib/schedule/rule-engine";
 import { dateFromKey } from "@/lib/schedule/time";
 
@@ -32,6 +34,22 @@ type ScheduleRequest = {
   type: "OFF" | "SHIFT" | "BLOCK";
   status: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
+};
+
+type DayAppointment = {
+  id: string;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  clientName: string;
+  serviceName: string;
+  rawStatus: string;
+  status: string;
+};
+
+type DayAppointmentsData = {
+  date: string;
+  timezone: string;
+  items: DayAppointment[];
 };
 
 type ScheduleData = {
@@ -203,6 +221,45 @@ function formatDateTitle(dateKey: string): string {
   return value.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
+function formatDateTitleWithTimezone(dateKey: string, timezone: string): string {
+  const value = dateFromLocalDateKey(dateKey, timezone);
+  return value.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: timezone });
+}
+
+function formatAppointmentTime(value: string | null, timezone: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timezone,
+  });
+}
+
+function formatAppointmentStatus(value: string): string {
+  switch (value) {
+    case "PENDING":
+      return "Ожидает";
+    case "CONFIRMED":
+      return "Подтверждено";
+    case "CHANGE_REQUESTED":
+      return "Запрошен перенос";
+    case "IN_PROGRESS":
+      return "Идет";
+    case "FINISHED":
+      return "Завершено";
+    case "REJECTED":
+      return "Отклонено";
+    case "CANCELLED":
+      return "Отменено";
+    case "NO_SHOW":
+      return "Не пришел";
+    default:
+      return value;
+  }
+}
+
 export function MasterSchedulePage() {
   const [month, setMonth] = useState(currentMonthKey());
   const [data, setData] = useState<ScheduleData>({
@@ -222,6 +279,10 @@ export function MasterSchedulePage() {
   const [shiftStart, setShiftStart] = useState("10:00");
   const [shiftEnd, setShiftEnd] = useState("19:00");
   const [busy, setBusy] = useState(false);
+  const [appointmentsOpen, setAppointmentsOpen] = useState(false);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
+  const [appointmentsData, setAppointmentsData] = useState<DayAppointmentsData | null>(null);
 
   const [defaultStart, setDefaultStart] = useState("10:00");
   const [defaultEnd, setDefaultEnd] = useState("19:00");
@@ -274,6 +335,31 @@ export function MasterSchedulePage() {
       .filter((item) => item.type === "BREAK" && item.startAt.slice(0, 10) === selectedDate)
       .sort((a, b) => a.startAt.localeCompare(b.startAt));
   }, [data.blocks, selectedDate]);
+
+  const loadAppointments = async (dateKey: string): Promise<void> => {
+    setAppointmentsLoading(true);
+    setAppointmentsError(null);
+    try {
+      const query = new URLSearchParams({ date: dateKey });
+      const res = await fetch(`/api/providers/me/appointments?${query.toString()}`, { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as ApiResponse<DayAppointmentsData> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      setAppointmentsData(json.data);
+    } catch (err) {
+      setAppointmentsError(err instanceof Error ? err.message : "Не удалось загрузить записи");
+      setAppointmentsData(null);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  const openDayDetails = async (dateKey: string): Promise<void> => {
+    setSelectedDate(dateKey);
+    setAppointmentsOpen(true);
+    await loadAppointments(dateKey);
+  };
 
   const load = async (): Promise<void> => {
     setLoading(true);
@@ -653,6 +739,12 @@ export function MasterSchedulePage() {
 
   const templateSummary = `Текущий график: ${TEMPLATE_MODE_LABEL[templateMode]}, ${templateStart}–${templateEnd}`;
   const selectedDateTitle = formatDateTitle(selectedDate);
+  const appointmentsDateKey = appointmentsData?.date ?? selectedDate;
+  const appointmentsTimezone = appointmentsData?.timezone ?? "UTC";
+  const appointmentsTitle = appointmentsData?.timezone
+    ? formatDateTitleWithTimezone(appointmentsDateKey, appointmentsTimezone)
+    : formatDateTitle(appointmentsDateKey);
+  const manualBookingHref = `/cabinet/master/dashboard?manual=1&date=${appointmentsDateKey}`;
 
   return (
     <section className="space-y-4">
@@ -883,7 +975,7 @@ export function MasterSchedulePage() {
                       <button
                         key={day}
                         type="button"
-                        onClick={() => setSelectedDate(day)}
+                        onClick={() => void openDayDetails(day)}
                         className={`rounded-xl border border-border-subtle/70 p-2 text-left text-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card ${dayLoadClass(count)} ${
                           selectedDate === day ? "border-primary/60 ring-1 ring-primary/35" : ""
                         } ${isTemplateWorkday ? "shadow-[inset_0_0_0_1px_rgba(16,185,129,0.25)]" : "shadow-[inset_0_0_0_1px_rgba(244,63,94,0.25)]"}`}
@@ -1098,6 +1190,70 @@ export function MasterSchedulePage() {
                 </div>
               </section>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {appointmentsOpen ? (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setAppointmentsOpen(false)}
+          />
+          <div className="absolute right-0 top-0 h-full w-full max-w-xl overflow-auto border-l border-border-subtle bg-bg-card p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-base font-semibold text-text-main">{appointmentsTitle}</div>
+                <div className="text-xs text-text-sec">Записи за выбранный день</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAppointmentsOpen(false)}
+                className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-1 text-xs"
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {appointmentsLoading ? (
+                <div className="text-sm text-text-sec">Загружаем записи...</div>
+              ) : appointmentsError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {appointmentsError}
+                </div>
+              ) : appointmentsData && appointmentsData.items.length > 0 ? (
+                appointmentsData.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-text-main">
+                          {formatAppointmentTime(item.startAtUtc, appointmentsTimezone)} · {item.clientName || "Клиент"}
+                        </div>
+                        <div className="mt-1 text-xs text-text-sec">{item.serviceName}</div>
+                      </div>
+                      <div className="text-xs text-text-sec">{formatAppointmentStatus(item.status)}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-border-subtle p-3 text-sm text-text-sec">
+                  Записей нет
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5">
+              <Link
+                href={manualBookingHref}
+                className="inline-flex items-center justify-center rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card"
+              >
+                Записать клиента вручную
+              </Link>
+            </div>
           </div>
         </div>
       ) : null}

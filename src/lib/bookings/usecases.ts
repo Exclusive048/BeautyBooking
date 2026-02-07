@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
-import { createBookingNotifications } from "@/lib/notifications/service";
+import { createBookingNotifications, publishNotifications } from "@/lib/notifications/service";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import type { BookingDto } from "@/lib/bookings/dto";
 import {
@@ -258,7 +258,10 @@ export async function rescheduleBooking(input: {
   });
 
   try {
-    await createBookingNotifications({ bookingId: updated.id, kind: "RESCHEDULED" });
+    const notifications = await createBookingNotifications({ bookingId: updated.id, kind: "RESCHEDULED" });
+    if (notifications.length > 0) {
+      publishNotifications(notifications);
+    }
   } catch (error) {
     console.error("Failed to create booking notifications:", error);
   }

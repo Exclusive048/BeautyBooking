@@ -5,11 +5,11 @@ import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
 import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { hasAdminRole } from "@/lib/auth/guards";
 import { getSessionUser } from "@/lib/auth/session";
 import { getSiteLogoUrl } from "@/lib/media/queries";
-import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -94,7 +94,6 @@ export async function Topbar() {
   const user = await getSessionUser();
   const siteLogoUrl = await getSiteLogoUrl();
 
-  let notificationsCount = 0;
   let userLabel: string = UI_TEXT.auth.menu;
   let showAdminLink = false;
   let workspaceLinks: { master: WorkspaceLink | null; studio: WorkspaceLink | null } = {
@@ -103,18 +102,7 @@ export async function Topbar() {
   };
 
   if (user) {
-    const userPhone = user.phone ? normalizeRussianPhone(user.phone) : null;
-    const [invitesCount, unreadNotificationsCount, links] = await Promise.all([
-      userPhone
-        ? prisma.studioInvite.count({
-            where: { phone: userPhone, status: MembershipStatus.PENDING },
-          })
-        : Promise.resolve(0),
-      prisma.notification.count({ where: { userId: user.id, readAt: null } }),
-      loadWorkspaceLinks(user.id),
-    ]);
-
-    notificationsCount = invitesCount + unreadNotificationsCount;
+    const links = await loadWorkspaceLinks(user.id);
     userLabel = user.displayName?.trim() || user.phone || UI_TEXT.auth.menu;
     showAdminLink = hasAdminRole(user);
     workspaceLinks = links;
@@ -142,16 +130,7 @@ export async function Topbar() {
 
           {user ? (
             <>
-              <Button asChild variant="secondary" className="relative">
-                <Link href="/notifications" aria-label={UI_TEXT.nav.notifications}>
-                  <span aria-hidden>🔔</span>
-                  {notificationsCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                      {notificationsCount > 9 ? "9+" : notificationsCount}
-                    </span>
-                  ) : null}
-                </Link>
-              </Button>
+              <NotificationsBell ariaLabel={UI_TEXT.nav.notifications} />
               <ThemeToggle />
 
               <div className="hidden items-center gap-2 md:flex">

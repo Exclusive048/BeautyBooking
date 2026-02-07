@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
+import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -151,6 +152,9 @@ export function MasterProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [autosaveInfo, setAutosaveInfo] = useState<string | null>(null);
   const [pendingInvites, setPendingInvites] = useState<NotificationCenterInviteItem[]>([]);
+  const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
+  const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
+  const [autoConfirmSaving, setAutoConfirmSaving] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -240,6 +244,40 @@ export function MasterProfilePage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!data?.master.isSolo) {
+      setAutoConfirmBookings(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setAutoConfirmLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/providers/me/settings", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ autoConfirmBookings: boolean }>
+          | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        }
+        setAutoConfirmBookings(json.data.autoConfirmBookings);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setAutoConfirmBookings(null);
+      } finally {
+        if (!controller.signal.aborted) {
+          setAutoConfirmLoading(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [data?.master.isSolo]);
 
   useEffect(() => {
     const loadInvites = async () => {
@@ -412,6 +450,36 @@ export function MasterProfilePage() {
       setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateAutoConfirm = async (nextValue: boolean): Promise<void> => {
+    if (!data?.master.isSolo) return;
+    setAutoConfirmSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/providers/me/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoConfirmBookings: nextValue }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ autoConfirmBookings: boolean }>
+        | ApiErrorShape
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(
+          extractApiErrorMessage(
+            json && !json.ok ? json : null,
+            `API error: ${res.status}`
+          )
+        );
+      }
+      setAutoConfirmBookings(json.data.autoConfirmBookings);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обновить настройки");
+    } finally {
+      setAutoConfirmSaving(false);
     }
   };
 
@@ -813,6 +881,34 @@ export function MasterProfilePage() {
           </div>
         </div>
       </div>
+
+      {data.master.isSolo ? (
+        <div className="rounded-2xl border p-4">
+          <h3 className="text-sm font-semibold">Автоматизация</h3>
+          <p className="mt-1 text-xs text-neutral-500">Настройки</p>
+          <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input/40 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Автоподтверждение записи</div>
+                <div className="mt-1 text-xs text-neutral-500">
+                  Если включено, новые записи будут подтверждаться автоматически.
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={autoConfirmBookings ?? false}
+                  disabled={autoConfirmLoading || autoConfirmSaving}
+                  onChange={(event) => void updateAutoConfirm(event.target.checked)}
+                />
+                {autoConfirmLoading ? "Загрузка..." : autoConfirmBookings ? "Включено" : "Выключено"}
+              </label>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <ConnectedAccountsSection />
 
       <div className="rounded-2xl border p-4">
         <div className="flex items-center justify-between gap-3">

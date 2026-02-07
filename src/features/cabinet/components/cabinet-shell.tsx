@@ -13,6 +13,7 @@ export function CabinetShell({
   right?: ReactNode;
   children: ReactNode;
 }) {
+  const rightNode = right ?? null;
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -20,7 +21,7 @@ export function CabinetShell({
           <h1 className="text-2xl font-semibold">{title}</h1>
           {subtitle ? <p className="mt-1 text-sm text-text-sec">{subtitle}</p> : null}
         </div>
-        {right ? <div className="shrink-0">{right}</div> : null}
+        {rightNode ? <div className="shrink-0">{rightNode}</div> : null}
       </div>
 
       {children}

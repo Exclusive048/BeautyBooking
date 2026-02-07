@@ -83,6 +83,9 @@ enum NotificationType {
   BOOKING_CREATED
   BOOKING_CANCELLED
   BOOKING_RESCHEDULED
+  BOOKING_REQUEST
+  BOOKING_CONFIRMED
+  BOOKING_DECLINED
 }
 
 enum MediaEntityType {
@@ -290,6 +293,7 @@ model Provider {
   availableToday           Boolean      @default(false)
   timezone                 String       @default("Asia/Almaty")
   bufferBetweenBookingsMin Int          @default(0)
+  autoConfirmBookings      Boolean      @default(false)
 
   studioId String?
   studio   Provider?  @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)
@@ -452,14 +456,17 @@ model Notification {
 
   type      NotificationType
   title     String
-  body      String?
+  body      String
+  payloadJson Json
+  isRead    Boolean      @default(false)
   bookingId String?
   booking   Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   readAt    DateTime?
 
   createdAt DateTime @default(now())
 
-  @@index([userId, readAt])
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
   @@index([bookingId])
 }
 

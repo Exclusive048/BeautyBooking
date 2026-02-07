@@ -59,7 +59,9 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
         </div>
 
         <div className="flex items-center gap-3 text-sm text-text-sec">
-          {studioName ? <span className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5">{studioName}</span> : null}
+          {studioName ? (
+            <span className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5">{studioName}</span>
+          ) : null}
         </div>
       </div>
     </header>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -181,6 +181,8 @@ export function MasterDashboardPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const bookingsSeenSentRef = useRef(false);
+  const manualQueryHandledRef = useRef(false);
+  const searchParams = useSearchParams();
   const [manualStartAt, setManualStartAt] = useState(`${todayDateKey()}T10:00`);
   const [manualServiceId, setManualServiceId] = useState("");
   const [manualClientName, setManualClientName] = useState("");
@@ -257,6 +259,19 @@ export function MasterDashboardPage() {
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
+
+  useEffect(() => {
+    if (manualQueryHandledRef.current) return;
+    const manual = searchParams.get("manual");
+    if (manual !== "1") return;
+    manualQueryHandledRef.current = true;
+    const dateParam = searchParams.get("date");
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setDate(dateParam);
+      setManualStartAt(`${dateParam}T10:00`);
+    }
+    setManualOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!data.masterId || bookingsSeenSentRef.current) return;
