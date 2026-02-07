@@ -15,6 +15,7 @@ import { buildSlotsCacheKey, getCachedSlots, invalidateSlotsForMaster, setCached
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
 import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
+import { createScheduleContext } from "@/lib/schedule/engine-context";
 
 type RangeInput = {
   from: Date;
@@ -531,7 +532,13 @@ export async function listAvailabilitySlots(
 
   const timezone = provider.timezone;
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
-  const scheduleWindow = await ScheduleEngine.getScheduleWindow(providerId, timezone);
+  const startKey = toLocalDateKey(from, timezone);
+  const endKeyExclusive = toLocalDateKey(to, timezone);
+  const ctx = await createScheduleContext({
+    providerId,
+    timezoneHint: timezone,
+    range: { fromKey: startKey, toKeyExclusive: endKeyExclusive },
+  });
 
   const bookings = await prisma.booking.findMany({
     where: {
@@ -550,12 +557,24 @@ export async function listAvailabilitySlots(
     )
     .filter((item): item is { startAtUtc: Date; endAtUtc: Date } => item !== null);
 
-  const startKey = toLocalDateKey(from, timezone);
-  const endKey = toLocalDateKey(to, timezone);
+  const bookingsByDateKey = new Map<string, Array<{ startAtUtc: Date; endAtUtc: Date }>>();
+  for (const booking of bookingRanges) {
+    const startBookingKey = toLocalDateKey(booking.startAtUtc, timezone);
+    const endBookingKey = toLocalDateKey(booking.endAtUtc, timezone);
+    let cursor = startBookingKey;
+    while (compareDateKeys(cursor, endBookingKey) <= 0) {
+      const list = bookingsByDateKey.get(cursor) ?? [];
+      list.push(booking);
+      bookingsByDateKey.set(cursor, list);
+      if (cursor === endBookingKey) break;
+      cursor = addDaysToDateKey(cursor, 1);
+    }
+  }
 
   const slots: AvailabilitySlot[] = [];
   let cursorKey = startKey;
-  while (compareDateKeys(cursorKey, endKey) <= 0) {
+  const now = new Date();
+  while (compareDateKeys(cursorKey, endKeyExclusive) < 0) {
     const cacheKey = buildSlotsCacheKey({
       masterId: providerId,
       dateKey: cursorKey,
@@ -563,28 +582,32 @@ export async function listAvailabilitySlots(
       serviceDuration: durationMin,
       bufferMin,
       timeZone: timezone,
-      scheduleVersion: scheduleWindow.scheduleVersion,
-      publishedUntilLocal: scheduleWindow.publishedUntilLocal,
+      scheduleVersion: ctx.scheduleWindow.scheduleVersion,
+      publishedUntilLocal: ctx.scheduleWindow.publishedUntilLocal,
     });
     const cached = await getCachedSlots(cacheKey);
-    const daySlots =
-      cached ??
-      buildSlotsForDay({
-        dayPlan: await ScheduleEngine.getDayPlan({ masterId: providerId, date: cursorKey, timezone }),
+    let daySlots: AvailabilitySlot[];
+    if (cached) {
+      daySlots = cached;
+    } else {
+      const dayPlan = await ScheduleEngine.getDayPlanFromContext(ctx, cursorKey);
+      daySlots = buildSlotsForDay({
+        dayPlan,
         dateKey: cursorKey,
         timeZone: timezone,
         serviceDurationMin: durationMin,
         bufferMin,
-        bookings: bookingRanges,
-        now: new Date(),
+        bookings: bookingsByDateKey.get(cursorKey) ?? [],
+        now,
       });
-
-    if (!cached) {
       await setCachedSlots(cacheKey, daySlots);
     }
 
     for (const slot of daySlots) {
-      if (slot.startAtUtc < range.from || slot.endAtUtc > range.to) continue;
+      const slotKey = toLocalDateKey(slot.startAtUtc, timezone);
+      if (compareDateKeys(slotKey, startKey) < 0 || compareDateKeys(slotKey, endKeyExclusive) >= 0) {
+        continue;
+      }
       slots.push(slot);
     }
 

@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { listAvailabilitySlots } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { dateFromLocalDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
-import { filterSlotsByDateKey } from "@/lib/schedule/slots-range";
 
 function isDateKey(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -40,12 +39,5 @@ export async function GET(
   const result = await listAvailabilitySlots(provider.id, serviceId, duration.data, { from, to });
   if (!result.ok) return fail(result.message, result.status, result.code);
 
-  const filtered = filterSlotsByDateKey({
-    slots: result.data,
-    fromKey,
-    toKey,
-    timeZone: provider.timezone,
-  });
-
-  return ok({ timezone: provider.timezone, slots: filtered });
+  return ok({ timezone: provider.timezone, slots: result.data });
 }

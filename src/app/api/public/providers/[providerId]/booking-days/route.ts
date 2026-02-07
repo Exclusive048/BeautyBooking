@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { findWorkingDays } from "@/lib/schedule/booking-days";
 import * as cache from "@/lib/cache/cache";
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { createScheduleContext } from "@/lib/schedule/engine-context";
 
 const MAX_SCAN_DAYS = 60;
 const CACHE_TTL_SECONDS = 120;
@@ -36,8 +38,13 @@ export async function GET(
     return fail("Master not found", 404, "MASTER_NOT_FOUND");
   }
 
-  const scheduleWindow = await ScheduleEngine.getScheduleWindow(provider.id, provider.timezone);
-  const cacheKey = `bookingDays:${provider.id}:${fromKey}:${limit}:${provider.timezone}:${scheduleWindow.scheduleVersion}:${scheduleWindow.publishedUntilLocal}`;
+  const scanToKeyExclusive = addDaysToDateKey(fromKey, MAX_SCAN_DAYS);
+  const ctx = await createScheduleContext({
+    providerId: provider.id,
+    timezoneHint: provider.timezone,
+    range: { fromKey, toKeyExclusive: scanToKeyExclusive },
+  });
+  const cacheKey = `bookingDays:${provider.id}:${fromKey}:${limit}:${provider.timezone}:${ctx.scheduleWindow.scheduleVersion}:${ctx.scheduleWindow.publishedUntilLocal}`;
   const cached = await cache.get<{ timezone: string; days: Array<{ date: string }>; nextFrom: string }>(cacheKey);
   if (cached) {
     return ok(cached);
@@ -47,8 +54,7 @@ export async function GET(
     fromKey,
     limit,
     maxScan: MAX_SCAN_DAYS,
-    getDayPlan: async (dateKey) =>
-      ScheduleEngine.getDayPlan({ masterId: provider.id, date: dateKey, timezone: provider.timezone }),
+    getDayPlan: async (dateKey) => ScheduleEngine.getDayPlanFromContext(ctx, dateKey),
   });
 
   const payload = {

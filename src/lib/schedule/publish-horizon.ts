@@ -9,8 +9,12 @@ export function resolvePublishedUntilLocal(input: {
   nowUtc: Date;
   timeZone: string;
 }): string {
-  const base = input.changeAtUtc ?? input.nowUtc;
-  const baseKey = toLocalDateKey(base, input.timeZone);
+  if (!input.changeAtUtc) {
+    const baseLocalDateKey = toLocalDateKey(input.nowUtc, input.timeZone);
+    return addDaysToDateKey(baseLocalDateKey, PUBLISH_HORIZON_WEEKS * 7);
+  }
+
+  const baseKey = toLocalDateKey(input.changeAtUtc, input.timeZone);
   return addDaysToDateKey(baseKey, PUBLISH_HORIZON_WEEKS * 7);
 }
 
