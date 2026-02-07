@@ -78,7 +78,7 @@ export async function getStudioClients(studioId: string): Promise<StudioClientsD
   const bookings = await prisma.booking.findMany({
     where: {
       OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
-      status: { not: "CANCELLED" },
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
     },
     select: {
       id: true,

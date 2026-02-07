@@ -6,14 +6,18 @@ import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { UI_TEXT } from "@/lib/ui/text";
 
+// AUDIT (section 6 UI):
+// - Smart preset chips are implemented and map to review-tag intents.
 type FilterChipsProps = {
   availableToday: boolean;
   rating45plus: boolean;
+  smartTag: "rush" | "relax" | "design" | "safe" | "silent" | null;
   entityType: "all" | "master" | "studio";
   priceMin: string;
   priceMax: string;
   onToggleAvailableToday: () => void;
   onToggleRating45plus: () => void;
+  onSmartTagChange: (value: "rush" | "relax" | "design" | "safe" | "silent" | null) => void;
   onEntityTypeChange: (value: "all" | "master" | "studio") => void;
   onPriceApply: (nextMin: string, nextMax: string) => void;
   onPriceReset: () => void;
@@ -22,11 +26,13 @@ type FilterChipsProps = {
 export function FilterChips({
   availableToday,
   rating45plus,
+  smartTag,
   entityType,
   priceMin,
   priceMax,
   onToggleAvailableToday,
   onToggleRating45plus,
+  onSmartTagChange,
   onEntityTypeChange,
   onPriceApply,
   onPriceReset,
@@ -52,6 +58,13 @@ export function FilterChips({
   }, [priceOpen]);
 
   const priceActive = priceMin.length > 0 || priceMax.length > 0;
+  const smartPresets: Array<{ value: "rush" | "relax" | "design" | "safe" | "silent"; label: string }> = [
+    { value: "rush", label: "Спешу" },
+    { value: "relax", label: "Хочу расслабиться" },
+    { value: "design", label: "Сложный дизайн" },
+    { value: "safe", label: "Безопасность" },
+    { value: "silent", label: "Комфортно молча" },
+  ];
 
   return (
     <div ref={rootRef} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -122,6 +135,16 @@ export function FilterChips({
       <Chip type="button" onClick={onToggleRating45plus} variant={rating45plus ? "active" : "default"}>
         {UI_TEXT.catalog.chips.rating45plus}
       </Chip>
+      {smartPresets.map((preset) => (
+        <Chip
+          key={preset.value}
+          type="button"
+          onClick={() => onSmartTagChange(smartTag === preset.value ? null : preset.value)}
+          variant={smartTag === preset.value ? "active" : "default"}
+        >
+          {preset.label}
+        </Chip>
+      ))}
       <Chip
         type="button"
         onClick={() => onEntityTypeChange(entityType === "studio" ? "all" : "studio")}

@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 type MasterContext = {
   id: string;
@@ -369,25 +370,58 @@ export async function createSoloMasterService(
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
 
+  const normalizedTitle = input.title.trim();
+  if (!normalizedTitle) {
+    throw new AppError("Validation error", 400, "VALIDATION_ERROR", {
+      fieldErrors: { title: "Title is required" },
+    });
+  }
+
+  const duplicate = await prisma.service.findFirst({
+    where: {
+      providerId: masterId,
+      OR: [
+        { name: { equals: normalizedTitle, mode: "insensitive" } },
+        { title: { equals: normalizedTitle, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new AppError("Service already added", 409, "ALREADY_EXISTS", {
+      fieldErrors: { title: "Service with this name already exists" },
+    });
+  }
+
   const last = await prisma.service.findFirst({
     where: { providerId: masterId },
     orderBy: { sortOrder: "desc" },
     select: { sortOrder: true },
   });
 
-  const created = await prisma.service.create({
-    data: {
-      providerId: masterId,
-      title: input.title.trim(),
-      name: input.title.trim(),
-      price: input.price,
-      durationMin: input.durationMin,
-      isEnabled: true,
-      isActive: true,
-      sortOrder: (last?.sortOrder ?? -1) + 1,
-    },
-    select: { id: true },
-  });
+  let created: { id: string };
+  try {
+    created = await prisma.service.create({
+      data: {
+        providerId: masterId,
+        title: normalizedTitle,
+        name: normalizedTitle,
+        price: input.price,
+        durationMin: input.durationMin,
+        isEnabled: true,
+        isActive: true,
+        sortOrder: (last?.sortOrder ?? -1) + 1,
+      },
+      select: { id: true },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new AppError("Service already added", 409, "ALREADY_EXISTS", {
+        fieldErrors: { title: "Service with this name already exists" },
+      });
+    }
+    throw error;
+  }
 
   return { id: created.id };
 }

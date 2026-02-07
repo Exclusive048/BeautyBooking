@@ -8,6 +8,9 @@ import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
+// AUDIT (section 4):
+// - Public review cards render only public tags.
+// - Private tags are never shown in the public profile UI.
 type Props = {
   providerId: string;
   rating: number;
@@ -19,7 +22,38 @@ type Props = {
 
 function reviewStars(value: number): string {
   const rounded = Math.max(0, Math.min(5, Math.round(value)));
-  return "★".repeat(rounded) + "☆".repeat(5 - rounded);
+  return "*".repeat(rounded) + "-".repeat(5 - rounded);
+}
+
+function ReviewCard({ review }: { review: ReviewDto }) {
+  return (
+    <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-medium">{review.authorName}</div>
+        <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
+      </div>
+      {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
+      {review.publicTags.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {review.publicTags.map((tag) => (
+            <span
+              key={tag.id}
+              className="rounded-full border border-border-subtle bg-white/70 px-2 py-1 text-[11px] text-text-sec"
+            >
+              {tag.icon ? `${tag.icon} ` : ""}
+              {tag.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {review.replyText ? (
+        <div className="mt-2 rounded-xl border border-border-subtle bg-white/60 p-2 text-sm text-text-main">
+          <div className="text-xs uppercase text-text-sec">Master reply</div>
+          <div className="mt-1">{review.replyText}</div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function ReviewsPreview({
@@ -110,15 +144,7 @@ export function ReviewsPreview({
           {reviews.length === 0 ? (
             <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.reviews.noReviews}</div>
           ) : (
-            reviews.map((review) => (
-              <div key={review.id} className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-medium">{review.authorName}</div>
-                  <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
-                </div>
-                {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
-              </div>
-            ))
+            reviews.map((review) => <ReviewCard key={review.id} review={review} />)
           )}
         </div>
       </CardContent>
@@ -139,13 +165,7 @@ export function ReviewsPreview({
               {!allReviewsLoading && !allReviewsError ? (
                 <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
                   {(allReviews ?? []).map((review) => (
-                    <div key={review.id} className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-medium">{review.authorName}</div>
-                        <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
-                      </div>
-                      {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
-                    </div>
+                    <ReviewCard key={review.id} review={review} />
                   ))}
                 </div>
               ) : null}
@@ -156,4 +176,3 @@ export function ReviewsPreview({
     </Card>
   );
 }
-

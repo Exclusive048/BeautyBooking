@@ -62,8 +62,10 @@ export function mapProviderProfile(provider: ProviderWithServices): ProviderProf
     district: provider.district,
     categories: provider.categories,
     availableToday: provider.availableToday,
+    timezone: provider.timezone,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
+    superpowerBadges: [],
     services: provider.services.map(mapProviderService),
   };
 }

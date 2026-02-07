@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
+import { resolveDayPlanFromRule } from "@/lib/schedule/engine-core";
+import type { ScheduleRuleConfig } from "@/lib/schedule/rule-engine";
+import { dateFromKey } from "@/lib/schedule/time";
 
 type ScheduleDayLoad = {
   date: string;
@@ -36,6 +39,7 @@ type ScheduleData = {
   month: string;
   isSolo: boolean;
   dayLoads: ScheduleDayLoad[];
+  publishedUntilLocal: string;
   exceptions: ScheduleException[];
   blocks: ScheduleBlock[];
   requests: ScheduleRequest[];
@@ -105,10 +109,6 @@ const TEMPLATE_MODE_LABEL: Record<TemplateMode, string> = {
   EVERY_DAY: "Каждый день",
 };
 
-function positiveModulo(value: number, mod: number): number {
-  return ((value % mod) + mod) % mod;
-}
-
 function buildMonthDays(monthKey: string): string[] {
   const first = new Date(`${monthKey}-01T00:00:00.000Z`);
   const next = new Date(first);
@@ -120,35 +120,82 @@ function buildMonthDays(monthKey: string): string[] {
   return days;
 }
 
-function buildYearDays(startMonth: string): string[] {
-  const result: string[] = [];
-  let monthKey = startMonth;
-  for (let i = 0; i < 12; i += 1) {
-    result.push(...buildMonthDays(monthKey));
-    monthKey = monthShift(monthKey, 1);
+function buildPreviewRuleConfig(input: {
+  mode: TemplateMode;
+  cycleStartDate: string;
+  start: string;
+  end: string;
+}): ScheduleRuleConfig {
+  const workdayTemplate = {
+    isWorkday: true,
+    startLocal: input.start,
+    endLocal: input.end,
+    breaks: [],
+  };
+  const dayOffTemplate = {
+    isWorkday: false,
+    startLocal: null,
+    endLocal: null,
+    breaks: [],
+  };
+
+  if (input.mode === "EVERY_DAY") {
+    return {
+      kind: "WEEKLY",
+      timezone: "UTC",
+      anchorDate: null,
+      payload: {
+        weekly: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+          dayOfWeek: dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+          ...workdayTemplate,
+        })),
+      },
+    };
   }
-  return result;
+
+  const anchorDate = dateFromKey(input.cycleStartDate) ?? new Date(`${input.cycleStartDate}T00:00:00.000Z`);
+  const cycleDays =
+    input.mode === "2_2"
+      ? [workdayTemplate, workdayTemplate, dayOffTemplate, dayOffTemplate]
+      : input.mode === "3_3"
+        ? [
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            dayOffTemplate,
+            dayOffTemplate,
+            dayOffTemplate,
+          ]
+        : [
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            workdayTemplate,
+            dayOffTemplate,
+            dayOffTemplate,
+          ];
+
+  return {
+    kind: "CYCLE",
+    timezone: "UTC",
+    anchorDate,
+    payload: {
+      cycle: { days: cycleDays },
+    },
+  };
 }
 
-function isTemplateWorkingDay(input: {
-  dateKey: string;
-  cycleStartDate: string;
-  mode: TemplateMode;
-}): boolean {
-  if (input.mode === "EVERY_DAY") return true;
-
-  const dateMs = new Date(`${input.dateKey}T00:00:00.000Z`).getTime();
-  const cycleStartMs = new Date(`${input.cycleStartDate}T00:00:00.000Z`).getTime();
-  if (!Number.isFinite(dateMs) || !Number.isFinite(cycleStartMs)) return true;
-
-  const diffDays = Math.floor((dateMs - cycleStartMs) / (24 * 60 * 60 * 1000));
-  if (input.mode === "2_2") {
-    return positiveModulo(diffDays, 4) < 2;
-  }
-  if (input.mode === "3_3") {
-    return positiveModulo(diffDays, 6) < 3;
-  }
-  return positiveModulo(diffDays, 7) < 5;
+function isPreviewWorkingDay(dateKey: string, rule: ScheduleRuleConfig): boolean {
+  const plan = resolveDayPlanFromRule({
+    dateKey,
+    rule,
+    overrides: [],
+    dateBreaks: [],
+    blockBreaks: [],
+    providerTimezone: rule.timezone,
+  });
+  return plan.isWorking;
 }
 
 function formatDateTitle(dateKey: string): string {
@@ -163,6 +210,7 @@ export function MasterSchedulePage() {
     month: currentMonthKey(),
     isSolo: true,
     dayLoads: [],
+    publishedUntilLocal: "",
     exceptions: [],
     blocks: [],
     requests: [],
@@ -200,13 +248,26 @@ export function MasterSchedulePage() {
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
 
+  const previewRule = useMemo(
+    () =>
+      buildPreviewRuleConfig({
+        mode: templateMode,
+        cycleStartDate,
+        start: templateStart,
+        end: templateEnd,
+      }),
+    [cycleStartDate, templateEnd, templateMode, templateStart]
+  );
+
   const previewByDay = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const day of monthDays) {
-      map.set(day, isTemplateWorkingDay({ dateKey: day, cycleStartDate, mode: templateMode }));
+      const withinPublish =
+        data.publishedUntilLocal && day > data.publishedUntilLocal ? false : isPreviewWorkingDay(day, previewRule);
+      map.set(day, withinPublish);
     }
     return map;
-  }, [cycleStartDate, monthDays, templateMode]);
+  }, [data.publishedUntilLocal, monthDays, previewRule]);
 
   const selectedDayBreaks = useMemo(() => {
     return data.blocks
@@ -362,11 +423,11 @@ export function MasterSchedulePage() {
 
   const applyTemplate = async (scope: "MONTH" | "YEAR"): Promise<void> => {
     if (!isValidTime(templateStart) || !isValidTime(templateEnd)) {
-      setError("Некорректный формат времени.");
+      setError("Invalid time format.");
       return;
     }
     if (templateStart >= templateEnd) {
-      setError("Начало должно быть раньше конца.");
+      setError("Start time must be before end time.");
       return;
     }
 
@@ -374,71 +435,83 @@ export function MasterSchedulePage() {
     setError(null);
     setActionInfo(null);
     try {
-      const defaultsApplied = await applyDefaultWorkingTime({
-        start: templateStart,
-        end: templateEnd,
-        buffer: defaultBuffer,
-        successMessage: null,
+      const normalizedBuffer = Number.isFinite(defaultBuffer)
+        ? Math.max(0, Math.floor(defaultBuffer / 5) * 5)
+        : 0;
+      setDefaultBuffer(normalizedBuffer);
+
+      const workdayTemplate = {
+        isWorkday: true,
+        startLocal: templateStart,
+        endLocal: templateEnd,
+        breaks: [],
+      };
+      const dayOffTemplate = {
+        isWorkday: false,
+        startLocal: null,
+        endLocal: null,
+        breaks: [],
+      };
+
+      const body =
+        templateMode === "EVERY_DAY"
+          ? {
+              kind: "WEEKLY" as const,
+              bufferBetweenBookingsMin: normalizedBuffer,
+              payload: {
+                weekly: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+                  dayOfWeek,
+                  ...workdayTemplate,
+                })),
+              },
+            }
+          : {
+              kind: "CYCLE" as const,
+              anchorDate: cycleStartDate,
+              bufferBetweenBookingsMin: normalizedBuffer,
+              payload: {
+                cycle: {
+                  days:
+                    templateMode === "2_2"
+                      ? [workdayTemplate, workdayTemplate, dayOffTemplate, dayOffTemplate]
+                      : templateMode === "3_3"
+                        ? [
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            dayOffTemplate,
+                            dayOffTemplate,
+                            dayOffTemplate,
+                          ]
+                        : [
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            workdayTemplate,
+                            dayOffTemplate,
+                            dayOffTemplate,
+                          ],
+                },
+              },
+            };
+
+      const res = await fetch("/api/master/schedule/rule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
-      if (!defaultsApplied) return;
-
-      const days = scope === "MONTH" ? monthDays : buildYearDays(month);
-      const offDates = Array.from(
-        new Set(
-          days.filter(
-            (dateKey) =>
-              !isTemplateWorkingDay({
-                dateKey,
-                cycleStartDate,
-                mode: templateMode,
-              })
-          )
-        )
-      );
-      const existingOffDates = new Set(
-        data.exceptions.filter((item) => item.type === "OFF").map((item) => item.date)
-      );
-      const offDatesToApply =
-        scope === "MONTH" ? offDates.filter((dateKey) => !existingOffDates.has(dateKey)) : offDates;
-
-      let applied = 0;
-      let requested = 0;
-      for (const dateKey of offDatesToApply) {
-        const res = await fetch("/api/master/schedule/exceptions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: dateKey,
-            type: "OFF",
-          }),
-        });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ applied: boolean; requestId?: string; exceptionId?: string }>
-          | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-        }
-        if (json.data.applied) {
-          applied += 1;
-        } else {
-          requested += 1;
-        }
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
 
       await load();
-      const scopeLabel = scope === "MONTH" ? "текущий месяц" : "год";
-      if (offDatesToApply.length === 0) {
-        setActionInfo(`Шаблон применен на ${scopeLabel}: выходных в диапазоне нет.`);
-      } else if (requested > 0) {
-        setActionInfo(
-          `Шаблон применен на ${scopeLabel}: ${applied} исключений и ${requested} запросов.`
-        );
-      } else {
-        setActionInfo(`Шаблон применен на ${scopeLabel}: создано ${applied} исключений.`);
-      }
+      const scopeLabel = scope === "MONTH" ? "current month" : "year";
+      setActionInfo(`Template applied for ${scopeLabel}: active rule updated.`);
       setGeneratorOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось применить шаблон");
+      setError(err instanceof Error ? err.message : "Failed to apply template");
     } finally {
       setGeneratorBusy(false);
     }

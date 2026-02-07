@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { HeroBlock } from "@/features/public-profile/master/hero-block";
 import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
 import { ReviewsPreview } from "@/features/public-profile/master/reviews-preview";
@@ -16,7 +15,18 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 type ClientBooking = {
   id: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  status:
+    | "PENDING"
+    | "CONFIRMED"
+    | "CHANGE_REQUESTED"
+    | "REJECTED"
+    | "IN_PROGRESS"
+    | "FINISHED"
+    | "NEW"
+    | "PREPAID"
+    | "STARTED"
+    | "CANCELLED"
+    | "NO_SHOW";
   provider: { id: string };
 };
 
@@ -177,17 +187,6 @@ export default function ProviderProfilePage() {
             }
           />
 
-          <Card>
-            <CardContent className="p-5 md:p-6">
-              <div className="text-sm font-semibold text-text-main">{UI_TEXT.publicProfile.page.categoriesTitle}</div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {provider.categories.map((category) => (
-                  <Badge key={category}>{category}</Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           <PortfolioStrip items={portfolioItems} />
 
           <ReviewsPreview
@@ -226,6 +225,7 @@ export default function ProviderProfilePage() {
           ) : (
             <PublicBookingWidget
               providerId={provider.id}
+              providerTimezone={provider.timezone}
               selectedServices={selectedServices}
               onRemove={(serviceId) =>
                 setSelectedServices((prev) => prev.filter((service) => service.id !== serviceId))

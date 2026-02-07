@@ -256,7 +256,7 @@ export const openApiSpec = {
           { $ref: "#/components/schemas/ProviderCard" },
           {
             type: "object",
-            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng"],
+            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng", "timezone"],
             properties: {
               services: {
                 type: "array",
@@ -265,6 +265,7 @@ export const openApiSpec = {
               studioId: { type: "string", nullable: true },
               bannerUrl: { type: "string", nullable: true },
               description: { type: "string", nullable: true },
+              timezone: { type: "string" },
               geoLat: { type: "number", nullable: true },
               geoLng: { type: "number", nullable: true },
             },
@@ -356,7 +357,14 @@ export const openApiSpec = {
       },
       BookingStatus: {
         type: "string",
-        enum: ["PENDING", "CONFIRMED", "CANCELLED"],
+        enum: [
+          "PENDING",
+          "CONFIRMED",
+          "CHANGE_REQUESTED",
+          "REJECTED",
+          "IN_PROGRESS",
+          "FINISHED",
+        ],
       },
       BookingCancelledBy: {
         type: "string",
@@ -664,17 +672,23 @@ export const openApiSpec = {
           "targetId",
           "rating",
           "text",
+          "replyText",
+          "repliedAt",
+          "reportedAt",
           "createdAt",
         ],
         properties: {
           id: { type: "string" },
-          bookingId: { type: "string" },
+          bookingId: { type: "string", nullable: true },
           authorId: { type: "string" },
           authorName: { type: "string" },
           targetType: { $ref: "#/components/schemas/ReviewTargetType" },
           targetId: { type: "string" },
           rating: { type: "integer", minimum: 1, maximum: 5 },
           text: { type: "string", nullable: true },
+          replyText: { type: "string", nullable: true },
+          repliedAt: { type: "string", format: "date-time", nullable: true },
+          reportedAt: { type: "string", format: "date-time", nullable: true },
           createdAt: { type: "string", format: "date-time" },
         },
       },
@@ -685,6 +699,20 @@ export const openApiSpec = {
           bookingId: { type: "string" },
           rating: { type: "integer", minimum: 1, maximum: 5 },
           text: { type: "string", maxLength: 1000 },
+        },
+      },
+      ReviewReplyInput: {
+        type: "object",
+        required: ["text"],
+        properties: {
+          text: { type: "string", maxLength: 1500 },
+        },
+      },
+      ReviewReportInput: {
+        type: "object",
+        required: ["comment"],
+        properties: {
+          comment: { type: "string", maxLength: 1500 },
         },
       },
       ReviewData: {
@@ -703,9 +731,11 @@ export const openApiSpec = {
       },
       CanLeaveReviewData: {
         type: "object",
-        required: ["canLeave"],
+        required: ["canLeave", "reviewId", "canDelete"],
         properties: {
           canLeave: { type: "boolean" },
+          reviewId: { type: "string", nullable: true },
+          canDelete: { type: "boolean" },
         },
       },
       CalendarMaster: {
@@ -1134,7 +1164,11 @@ export const openApiSpec = {
         type: "object",
         required: ["status"],
         properties: {
-          status: { type: "string", enum: ["CONFIRMED", "CANCELLED", "NO_SHOW"] },
+          status: {
+            type: "string",
+            enum: ["CONFIRMED", "REJECTED", "CANCELLED", "NO_SHOW"],
+          },
+          comment: { type: "string", maxLength: 500 },
         },
       },
       MasterScheduleDayLoad: {
@@ -1157,7 +1191,7 @@ export const openApiSpec = {
       },
       MasterScheduleData: {
         type: "object",
-        required: ["month", "isSolo", "dayLoads", "exceptions", "blocks", "requests"],
+        required: ["month", "isSolo", "dayLoads", "exceptions", "blocks", "requests", "publishedUntilLocal"],
         properties: {
           month: { type: "string" },
           isSolo: { type: "boolean" },
@@ -1165,6 +1199,7 @@ export const openApiSpec = {
           exceptions: { type: "array", items: { $ref: "#/components/schemas/WorkException" } },
           blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
           requests: { type: "array", items: { $ref: "#/components/schemas/MasterScheduleRequest" } },
+          publishedUntilLocal: { type: "string" },
         },
       },
       CreateMasterScheduleExceptionInput: {
@@ -2284,6 +2319,87 @@ export const openApiSpec = {
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "404": errorResponse("Booking not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/reviews/{id}": {
+      delete: {
+        summary: "Delete review (author before reply, or admin after report)",
+        tags: ["reviews"],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/reviews/{id}/reply": {
+      post: {
+        summary: "Reply to review (master once)",
+        tags: ["reviews"],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReviewReplyInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ReviewData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/reviews/{id}/report": {
+      post: {
+        summary: "Report review (master within 3 days)",
+        tags: ["reviews"],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReviewReportInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ReviewData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "409": errorResponse("Conflict"),
           "500": errorResponse("Internal error"),
         },
       },

@@ -6,12 +6,15 @@ export type ApiSuccess<T> = {
   data: T;
 };
 
+export type ApiFieldErrors = Record<string, string | string[]>;
+
 export type ApiError = {
   ok: false;
   error: {
     message: string;
     code?: ErrorCode;
     details?: unknown;
+    fieldErrors?: ApiFieldErrors;
   };
 };
 
@@ -25,9 +28,18 @@ export function fail(
   status: number,
   message: string,
   code: ErrorCode,
-  details?: unknown
+  details?: unknown,
+  fieldErrors?: ApiFieldErrors
 ): { response: ApiError; status: number } {
-  const errorPayload: ApiError["error"] = details === undefined ? { message, code } : { message, code, details };
+  const errorPayload: ApiError["error"] =
+    details === undefined && fieldErrors === undefined
+      ? { message, code }
+      : {
+          message,
+          code,
+          ...(details === undefined ? {} : { details }),
+          ...(fieldErrors === undefined ? {} : { fieldErrors }),
+        };
   return { response: { ok: false, error: errorPayload }, status };
 }
 
@@ -39,8 +51,9 @@ export function jsonFail(
   status: number,
   message: string,
   code: ErrorCode,
-  details?: unknown
+  details?: unknown,
+  fieldErrors?: ApiFieldErrors
 ) {
-  const payload = fail(status, message, code, details);
+  const payload = fail(status, message, code, details, fieldErrors);
   return NextResponse.json<ApiError>(payload.response, { status: payload.status });
 }

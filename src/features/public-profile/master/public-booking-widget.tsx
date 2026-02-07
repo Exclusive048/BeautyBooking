@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 type SlotItem = {
   startAtUtc: string;
@@ -13,6 +15,7 @@ type SlotItem = {
 
 type Props = {
   providerId: string;
+  providerTimezone: string;
   selectedServices: ProviderServiceDto[];
   onRemove: (serviceId: string) => void;
 };
@@ -22,32 +25,19 @@ type MeUser = {
   phone: string | null;
 };
 
-function toDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function addDays(base: Date, days: number): Date {
-  const copy = new Date(base);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function startOfDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-export function PublicBookingWidget({ providerId, selectedServices, onRemove }: Props) {
+export function PublicBookingWidget({ providerId, providerTimezone, selectedServices, onRemove }: Props) {
+  const timezone = providerTimezone.trim() ? providerTimezone.trim() : "UTC";
   const isEmpty = selectedServices.length <= 0;
   const totalPrice = selectedServices.reduce((sum, service) => sum + Math.max(0, service.price), 0);
   const totalDuration = selectedServices.reduce((sum, service) => sum + Math.max(0, service.durationMin), 0);
 
   const [step, setStep] = useState<"summary" | "slots" | "checkout">("summary");
-  const [rangeStart, setRangeStart] = useState<Date>(() => startOfDay(new Date()));
+  const [anchorKey, setAnchorKey] = useState<string>(() => toLocalDateKey(new Date(), timezone));
+  const [anchorStack, setAnchorStack] = useState<string[]>([]);
+  const [days, setDays] = useState<Array<{ date: string }>>([]);
+  const [nextFrom, setNextFrom] = useState<string>("");
+  const [daysLoading, setDaysLoading] = useState(false);
+  const [daysError, setDaysError] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -61,9 +51,10 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const hasPrev = anchorStack.length > 0;
 
   const slotServiceId = selectedServices[0]?.id ?? null;
-  const dayKeys = useMemo(() => [0, 1, 2].map((offset) => toDateKey(addDays(rangeStart, offset))), [rangeStart]);
+  const dayKeys = useMemo(() => days.map((day) => day.date), [days]);
 
   const slotsByDay = useMemo(() => {
     const map = new Map<string, SlotItem[]>();
@@ -118,52 +109,87 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
     if (step !== "slots" || !slotServiceId) return;
 
     let cancelled = false;
-    async function loadSlots() {
+    async function loadDaysAndSlots() {
+      setDaysLoading(true);
+      setDaysError(null);
       setSlotsLoading(true);
       setSlotsError(null);
       try {
-        const from = startOfDay(rangeStart);
-        const to = addDays(from, 3);
-        const url = new URL(`/api/masters/${providerId}/availability`, window.location.origin);
-        url.searchParams.set("serviceId", slotServiceId);
-        url.searchParams.set("from", from.toISOString());
-        url.searchParams.set("to", to.toISOString());
+        const daysUrl = new URL(`/api/public/providers/${providerId}/booking-days`, window.location.origin);
+        daysUrl.searchParams.set("from", anchorKey);
+        daysUrl.searchParams.set("limit", "3");
 
-        const res = await fetch(url.toString(), { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | { ok: true; data: { slots: SlotItem[] } }
+        const daysRes = await fetch(daysUrl.toString(), { cache: "no-store" });
+        const daysJson = (await daysRes.json().catch(() => null)) as
+          | { ok: true; data: { timezone: string; days: Array<{ date: string }>; nextFrom: string } }
           | { ok: false; error: { message: string } }
           | null;
 
-        if (!res.ok || !json || !json.ok) {
+        if (!daysRes.ok || !daysJson || !daysJson.ok) {
           throw new Error(UI_TEXT.publicProfile.slots.loadFailed);
         }
 
         if (cancelled) return;
 
-        const loadedSlots = json.data.slots;
-        setSlots(loadedSlots);
+        const loadedDays = daysJson.data.days;
+        setDays(loadedDays);
+        setNextFrom(daysJson.data.nextFrom);
 
-        const firstDayWithSlots = dayKeys.find((key) =>
-          loadedSlots.some((slot) => slot.label.startsWith(`${key} `))
-        );
-        setSelectedDate(firstDayWithSlots ?? dayKeys[0] ?? "");
+        const fromKey = loadedDays[0]?.date ?? anchorKey;
+        const toKey = daysJson.data.nextFrom || addDaysToDateKey(fromKey, 3);
+
+        if (loadedDays.length === 0) {
+          setSlots([]);
+          setSelectedDate("");
+          setSelectedSlotLabel("");
+          return;
+        }
+
+        const slotsUrl = new URL(`/api/public/providers/${providerId}/slots`, window.location.origin);
+        slotsUrl.searchParams.set("serviceId", slotServiceId);
+        slotsUrl.searchParams.set("from", fromKey);
+        slotsUrl.searchParams.set("to", toKey);
+
+        const slotsRes = await fetch(slotsUrl.toString(), { cache: "no-store" });
+        const slotsJson = (await slotsRes.json().catch(() => null)) as
+          | { ok: true; data: { timezone: string; slots: SlotItem[] } }
+          | { ok: false; error: { message: string } }
+          | null;
+
+        if (!slotsRes.ok || !slotsJson || !slotsJson.ok) {
+          throw new Error(UI_TEXT.publicProfile.slots.loadFailed);
+        }
+
+        if (cancelled) return;
+
+        const loadedSlots = slotsJson.data.slots.filter((slot) => {
+          const slotDateKey = toLocalDateKey(new Date(slot.startAtUtc), timezone);
+          return compareDateKeys(slotDateKey, fromKey) >= 0 && compareDateKeys(slotDateKey, toKey) < 0;
+        });
+
+        setSlots(loadedSlots);
+        setSelectedDate(fromKey);
         setSelectedSlotLabel("");
       } catch {
         if (!cancelled) {
+          setDays([]);
           setSlots([]);
+          setDaysError(UI_TEXT.publicProfile.slots.loadFailed);
           setSlotsError(UI_TEXT.publicProfile.slots.loadFailed);
         }
       } finally {
-        if (!cancelled) setSlotsLoading(false);
+        if (!cancelled) {
+          setDaysLoading(false);
+          setSlotsLoading(false);
+        }
       }
     }
 
-    void loadSlots();
+    void loadDaysAndSlots();
     return () => {
       cancelled = true;
     };
-  }, [dayKeys, providerId, rangeStart, slotServiceId, step]);
+  }, [anchorKey, providerId, slotServiceId, step, timezone]);
 
   useEffect(() => {
     if (isEmpty && (step === "slots" || step === "checkout")) {
@@ -278,22 +304,38 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={() => setRangeStart((prev) => addDays(prev, -7))}
+              onClick={() =>
+                setAnchorStack((prev) => {
+                  const next = prev.slice(0, -1);
+                  const last = prev[prev.length - 1];
+                  if (last) setAnchorKey(last);
+                  return next;
+                })
+              }
+              disabled={!hasPrev}
               className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
             >
               {UI_TEXT.publicProfile.slots.prevWeek}
             </button>
             <button
               type="button"
-              onClick={() => setRangeStart((prev) => addDays(prev, 7))}
+              onClick={() => {
+                if (!nextFrom) return;
+                setAnchorStack((prev) => [...prev, anchorKey]);
+                setAnchorKey(nextFrom);
+              }}
               className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
             >
               {UI_TEXT.publicProfile.slots.nextWeek}
             </button>
           </div>
 
-          {slotsLoading ? <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.slots.loadingSlots}</div> : null}
-          {slotsError ? <div className="text-sm text-text-sec">{slotsError}</div> : null}
+          {daysLoading || slotsLoading ? (
+            <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.slots.loadingSlots}</div>
+          ) : null}
+          {daysError || slotsError ? (
+            <div className="text-sm text-text-sec">{daysError ?? slotsError}</div>
+          ) : null}
 
           {!slotsLoading && !slotsError ? (
             <>
@@ -345,7 +387,11 @@ export function PublicBookingWidget({ providerId, selectedServices, onRemove }: 
                   </div>
                 ) : (
                   <div className="text-sm text-text-sec">
-                    {slots.length > 0 ? UI_TEXT.publicProfile.slots.noSlotsForDay : UI_TEXT.publicProfile.slots.noSlots}
+                    {selectedDate
+                      ? "Всё занято"
+                      : slots.length > 0
+                        ? UI_TEXT.publicProfile.slots.noSlotsForDay
+                        : UI_TEXT.publicProfile.slots.noSlots}
                   </div>
                 )}
               </div>

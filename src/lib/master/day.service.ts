@@ -1,18 +1,31 @@
 import { AppError } from "@/lib/api/errors";
+import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBookingDto";
+import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { prisma } from "@/lib/prisma";
+import { ScheduleEngine } from "@/lib/schedule/engine";
+import type { BookingStatus } from "@prisma/client";
 
 export type MasterDayBooking = {
   id: string;
   startAt: string | null;
   endAt: string | null;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  proposedStartAt: string | null;
+  proposedEndAt: string | null;
   rawStatus: string;
   status: string;
   canNoShow: boolean;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
+  requestedBy: "CLIENT" | "MASTER" | null;
+  changeComment: string | null;
   clientName: string;
   clientPhone: string;
   notes: string | null;
   silentMode: boolean;
   serviceTitle: string;
+  serviceName: string;
+  durationMin: number;
 };
 
 export type MasterDayGap = {
@@ -41,6 +54,7 @@ export type MasterDayWorkingHours = {
   startLocal: string | null;
   endLocal: string | null;
   bufferBetweenBookingsMin: number;
+  timezone: string;
 };
 
 type BaseDayData = {
@@ -48,6 +62,7 @@ type BaseDayData = {
   date: string;
   isSolo: boolean;
   workingHours: MasterDayWorkingHours;
+  newBookingsCount: number;
   bookings: MasterDayBooking[];
   currentBookingId: string | null;
   nextBookingId: string | null;
@@ -63,11 +78,6 @@ function parseDateKey(date: string): Date {
     throw new AppError("Invalid date", 400, "DATE_INVALID");
   }
   return parsed;
-}
-
-function getDayOfWeekUtc(date: Date): number {
-  const value = date.getUTCDay();
-  return value === 0 ? 6 : value - 1;
 }
 
 function sumBookingPrice(input: { serviceItems: Array<{ priceSnapshot: number }>; servicePrice: number }): number {
@@ -124,41 +134,30 @@ function computeGaps(bookings: MasterDayBooking[], dateKey: string): MasterDayGa
 }
 
 function deriveBookingStatus(input: {
-  rawStatus: string;
+  rawStatus: BookingStatus;
   startAt: Date | null;
   endAt: Date | null;
-  nowMs: number;
+  now: Date;
 }): string {
-  if (input.rawStatus === "CANCELLED" || input.rawStatus === "NO_SHOW" || input.rawStatus === "FINISHED") {
-    return input.rawStatus;
-  }
-  if (!input.startAt || !input.endAt) return input.rawStatus;
-  const graceMs = 60 * 60 * 1000;
-  const startMs = input.startAt.getTime();
-  const finishAtMs = input.endAt.getTime() + graceMs;
-  if (input.nowMs >= finishAtMs) return "FINISHED";
-  if (input.rawStatus === "CONFIRMED" && input.nowMs >= startMs) return "STARTED";
-  return input.rawStatus;
+  return resolveBookingRuntimeStatus({
+    status: input.rawStatus,
+    startAtUtc: input.startAt,
+    endAtUtc: input.endAt,
+    now: input.now,
+  });
 }
 
-function canMarkNoShow(input: {
-  rawStatus: string;
-  startAt: Date | null;
-  endAt: Date | null;
-  nowMs: number;
-}): boolean {
-  if (input.rawStatus !== "CONFIRMED") return false;
-  if (!input.startAt || !input.endAt) return false;
-  const graceMs = 60 * 60 * 1000;
-  const startMs = input.startAt.getTime();
-  const finishAtMs = input.endAt.getTime() + graceMs;
-  return input.nowMs >= startMs && input.nowMs <= finishAtMs;
+function canMarkNoShow(): boolean {
+  return false;
 }
 
 export async function getMasterDay(input: {
   masterId: string;
   date: string;
 }): Promise<BaseDayData> {
+  // AUDIT (in-app индикатор новых записей):
+  // - реализовано: newBookingsCount считается по createdAt > lastBookingsSeenAt.
+  // - реализовано: при lastBookingsSeenAt=null считаются все записи как новые.
   const start = parseDateKey(input.date);
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
@@ -170,14 +169,21 @@ export async function getMasterDay(input: {
 
   const master = await prisma.provider.findUnique({
     where: { id: input.masterId },
-    select: { id: true, studioId: true, bufferBetweenBookingsMin: true },
+    select: {
+      id: true,
+      studioId: true,
+      timezone: true,
+      bufferBetweenBookingsMin: true,
+      masterProfile: {
+        select: { lastBookingsSeenAt: true },
+      },
+    },
   });
   if (!master) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
   }
 
-  const dayOfWeek = getDayOfWeekUtc(start);
-  const [bookingsRaw, finishedMonth, reviews, services, weekly, override] = await Promise.all([
+  const [bookingsRaw, finishedMonth, reviews, services, newBookingsCount] = await prisma.$transaction([
     prisma.booking.findMany({
       where: {
         OR: [
@@ -191,11 +197,16 @@ export async function getMasterDay(input: {
         startAtUtc: true,
         endAtUtc: true,
         status: true,
+        proposedStartAt: true,
+        proposedEndAt: true,
+        actionRequiredBy: true,
+        requestedBy: true,
+        changeComment: true,
         clientName: true,
         clientPhone: true,
         notes: true,
         silentMode: true,
-        service: { select: { name: true, title: true } },
+        service: { select: { name: true, title: true, durationMin: true } },
       },
       orderBy: { startAtUtc: "asc" },
     }),
@@ -205,10 +216,13 @@ export async function getMasterDay(input: {
           { masterProviderId: input.masterId },
           { masterProviderId: null, providerId: input.masterId },
         ],
-        status: "FINISHED",
         startAtUtc: { gte: monthStart, lt: monthEnd },
+        status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       },
       select: {
+        status: true,
+        startAtUtc: true,
+        endAtUtc: true,
         service: { select: { price: true } },
         serviceItems: { select: { priceSnapshot: true } },
       },
@@ -240,58 +254,67 @@ export async function getMasterDay(input: {
       },
       orderBy: { sortOrder: "asc" },
     }),
-    prisma.weeklySchedule.findMany({
+    prisma.booking.count({
       where: {
-        providerId: input.masterId,
-        dayOfWeek,
+        OR: [
+          { masterProviderId: input.masterId },
+          { masterProviderId: null, providerId: input.masterId },
+        ],
+        ...(master.masterProfile?.lastBookingsSeenAt
+          ? { createdAt: { gt: master.masterProfile.lastBookingsSeenAt } }
+          : {}),
       },
-      select: { startLocal: true, endLocal: true },
-      orderBy: { startLocal: "asc" },
-    }),
-    prisma.scheduleOverride.findFirst({
-      where: {
-        providerId: input.masterId,
-        date: start,
-      },
-      select: { isDayOff: true, startLocal: true, endLocal: true },
     }),
   ]);
 
-  const now = Date.now();
+  const nowDate = new Date();
+  const now = nowDate.getTime();
   const bookings: MasterDayBooking[] = bookingsRaw.map((item) => {
-    const startAt = item.startAtUtc ? item.startAtUtc.toISOString() : null;
-    const endAt = item.endAtUtc ? item.endAtUtc.toISOString() : null;
     const startAtDate = item.startAtUtc ?? null;
     const endAtDate = item.endAtUtc ?? null;
+    const baseDto = toNormalizedBookingDto({
+      id: item.id,
+      status: item.status,
+      startAtUtc: startAtDate,
+      endAtUtc: endAtDate,
+      clientName: item.clientName,
+      clientPhone: item.clientPhone,
+      serviceName: item.service.title?.trim() || item.service.name,
+      durationMin: item.service.durationMin,
+    });
     const status = deriveBookingStatus({
       rawStatus: item.status,
       startAt: startAtDate,
       endAt: endAtDate,
-      nowMs: now,
+      now: nowDate,
     });
     return {
-      id: item.id,
-      startAt,
-      endAt,
+      id: baseDto.id,
+      startAt: baseDto.startAtUtc,
+      endAt: baseDto.endAtUtc,
+      startAtUtc: baseDto.startAtUtc,
+      endAtUtc: baseDto.endAtUtc,
+      proposedStartAt: item.proposedStartAt ? item.proposedStartAt.toISOString() : null,
+      proposedEndAt: item.proposedEndAt ? item.proposedEndAt.toISOString() : null,
       rawStatus: item.status,
       status,
-      canNoShow: canMarkNoShow({
-        rawStatus: item.status,
-        startAt: startAtDate,
-        endAt: endAtDate,
-        nowMs: now,
-      }),
+      canNoShow: canMarkNoShow(),
+      actionRequiredBy: item.actionRequiredBy ?? null,
+      requestedBy: item.requestedBy ?? null,
+      changeComment: item.changeComment ?? null,
       clientName: item.clientName,
       clientPhone: item.clientPhone,
       notes: item.notes ?? null,
       silentMode: item.silentMode,
-      serviceTitle: item.service.title?.trim() || item.service.name,
+      serviceTitle: baseDto.serviceName,
+      serviceName: baseDto.serviceName,
+      durationMin: baseDto.durationMin,
     };
   });
 
   const current = bookings.find((item) => {
     if (!item.startAt || !item.endAt) return false;
-    if (item.status === "CANCELLED" || item.status === "NO_SHOW" || item.status === "FINISHED") return false;
+    if (item.status === "REJECTED" || item.status === "FINISHED") return false;
     const from = new Date(item.startAt).getTime();
     const to = new Date(item.endAt).getTime();
     return now >= from && now < to;
@@ -301,30 +324,35 @@ export async function getMasterDay(input: {
     return new Date(item.startAt).getTime() > now;
   });
 
-  const monthEarnings = finishedMonth.reduce(
-    (sum, item) => sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price }),
-    0
-  );
+  const monthEarnings = finishedMonth.reduce((sum, item) => {
+    const status = resolveBookingRuntimeStatus({
+      status: item.status,
+      startAtUtc: item.startAtUtc,
+      endAtUtc: item.endAtUtc,
+      now: nowDate,
+    });
+    if (status !== "FINISHED") return sum;
+    return sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price });
+  }, 0);
 
-  const scheduleStart =
-    override?.isDayOff
-      ? null
-      : override?.startLocal ?? (weekly.length > 0 ? weekly[0].startLocal : null);
-  const scheduleEnd =
-    override?.isDayOff
-      ? null
-      : override?.endLocal ?? (weekly.length > 0 ? weekly[weekly.length - 1].endLocal : null);
+  const dayPlan = await ScheduleEngine.getDayPlan({
+    masterId: input.masterId,
+    date: input.date,
+    timezone: master.timezone,
+  });
 
   return {
     masterId: input.masterId,
     date: input.date,
     isSolo: master.studioId == null,
     workingHours: {
-      isDayOff: Boolean(override?.isDayOff),
-      startLocal: scheduleStart,
-      endLocal: scheduleEnd,
+      isDayOff: !dayPlan.isWorking,
+      startLocal: dayPlan.workingIntervals[0]?.start ?? null,
+      endLocal: dayPlan.workingIntervals[0]?.end ?? null,
       bufferBetweenBookingsMin: master.bufferBetweenBookingsMin,
+      timezone: master.timezone,
     },
+    newBookingsCount,
     bookings,
     currentBookingId: current?.id ?? null,
     nextBookingId: next?.id ?? null,
@@ -402,7 +430,8 @@ export async function createSoloMasterBooking(input: {
         clientPhone: input.clientPhone?.trim() || "",
         notes: input.notes?.trim() || null,
         source: "MANUAL",
-        status: "NEW",
+        status: "PENDING",
+        actionRequiredBy: "MASTER",
       },
       select: { id: true },
     });

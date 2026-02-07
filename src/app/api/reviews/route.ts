@@ -5,11 +5,22 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { createReviewSchema, listReviewsQuerySchema } from "@/lib/reviews/schemas";
 import { createReview, listReviews } from "@/lib/reviews/service";
 import { parseBody, parseQuery } from "@/lib/validation";
+import type { ApiFieldErrors } from "@/lib/api/contracts";
 
+// AUDIT (section 4):
+// - GET resolves caller visibility and exposes privateTags only to master owner/admin.
 export const runtime = "nodejs";
+
+function extractFieldErrors(details: unknown): ApiFieldErrors | undefined {
+  if (typeof details !== "object" || details === null) return undefined;
+  const maybe = (details as { fieldErrors?: unknown }).fieldErrors;
+  if (typeof maybe !== "object" || maybe === null) return undefined;
+  return maybe as ApiFieldErrors;
+}
 
 export async function GET(req: Request) {
   try {
+    const user = await getSessionUser();
     const url = new URL(req.url);
     const query = parseQuery(url, listReviewsQuerySchema);
     const reviews = await listReviews({
@@ -17,6 +28,7 @@ export async function GET(req: Request) {
       targetId: query.targetId,
       limit: query.limit,
       offset: query.offset,
+      currentUser: user ? { id: user.id, roles: user.roles } : null,
     });
     return jsonOk({ reviews });
   } catch (error) {
@@ -29,7 +41,13 @@ export async function GET(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    return jsonFail(
+      appError.status,
+      appError.message,
+      appError.code,
+      appError.details,
+      extractFieldErrors(appError.details)
+    );
   }
 }
 
@@ -46,6 +64,8 @@ export async function POST(req: Request) {
       bookingId: body.bookingId,
       rating: body.rating,
       text: body.text,
+      publicTagIds: body.publicTagIds,
+      privateTagIds: body.privateTagIds,
     });
     return jsonOk({ review }, { status: 201 });
   } catch (error) {
@@ -58,7 +78,12 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    return jsonFail(
+      appError.status,
+      appError.message,
+      appError.code,
+      appError.details,
+      extractFieldErrors(appError.details)
+    );
   }
 }
-

@@ -4,11 +4,16 @@ export type BookingStatusDto =
   | "NEW"
   | "PENDING"
   | "CONFIRMED"
+  | "CHANGE_REQUESTED"
+  | "REJECTED"
+  | "IN_PROGRESS"
   | "PREPAID"
   | "STARTED"
   | "FINISHED"
   | "CANCELLED"
   | "NO_SHOW";
+
+export type BookingActorDto = "CLIENT" | "MASTER";
 
 export type BookingServiceDto = {
   id: string;
@@ -36,6 +41,13 @@ export type BookingDto = {
   silentMode: boolean;
   startAtUtc: string | null;
   endAtUtc: string | null;
+  proposedStartAtUtc: string | null;
+  proposedEndAtUtc: string | null;
+  requestedBy: BookingActorDto | null;
+  actionRequiredBy: BookingActorDto | null;
+  changeComment: string | null;
+  clientChangeRequestsCount: number;
+  masterChangeRequestsCount: number;
 };
 
 export type BookingClientDto = BookingDto & {

@@ -1,23 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
+import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 
 type DayBooking = {
   id: string;
   startAt: string | null;
   endAt: string | null;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  proposedStartAt: string | null;
+  proposedEndAt: string | null;
   rawStatus: string;
   status: string;
   canNoShow: boolean;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
+  requestedBy: "CLIENT" | "MASTER" | null;
+  changeComment: string | null;
   clientName: string;
   clientPhone: string;
   notes: string | null;
   silentMode: boolean;
   serviceTitle: string;
+  serviceName?: string;
+  durationMin?: number;
 };
 
 type DayGap = {
@@ -46,6 +56,7 @@ type DayWorkingHours = {
   startLocal: string | null;
   endLocal: string | null;
   bufferBetweenBookingsMin: number;
+  timezone: string;
 };
 
 type DayData = {
@@ -53,6 +64,7 @@ type DayData = {
   date: string;
   isSolo: boolean;
   workingHours: DayWorkingHours;
+  newBookingsCount: number;
   bookings: DayBooking[];
   currentBookingId: string | null;
   nextBookingId: string | null;
@@ -99,6 +111,27 @@ function formatSlotLabel(value: string): string {
   });
 }
 
+function formatBookingStart(value: string | null, timezone: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timezone,
+  });
+}
+
+function canMasterRequestMove(booking: DayBooking): boolean {
+  if (booking.status !== "CONFIRMED") return false;
+  if (booking.actionRequiredBy !== null) return false;
+  if (!booking.startAtUtc) return false;
+  const minutesLeft = (new Date(booking.startAtUtc).getTime() - Date.now()) / 60000;
+  return Number.isFinite(minutesLeft) && minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
+}
+
 function formatAvailabilitySlot(slot: AvailabilitySlot): string {
   const [datePart, timePart] = slot.label.split(" ");
   if (!datePart || !timePart) {
@@ -126,7 +159,9 @@ export function MasterDashboardPage() {
       startLocal: null,
       endLocal: null,
       bufferBetweenBookingsMin: 0,
+      timezone: "Europe/Moscow",
     },
+    newBookingsCount: 0,
     bookings: [],
     currentBookingId: null,
     nextBookingId: null,
@@ -145,6 +180,7 @@ export function MasterDashboardPage() {
   const [storyError, setStoryError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
+  const bookingsSeenSentRef = useRef(false);
   const [manualStartAt, setManualStartAt] = useState(`${todayDateKey()}T10:00`);
   const [manualServiceId, setManualServiceId] = useState("");
   const [manualClientName, setManualClientName] = useState("");
@@ -223,6 +259,25 @@ export function MasterDashboardPage() {
   }, [date]);
 
   useEffect(() => {
+    if (!data.masterId || bookingsSeenSentRef.current) return;
+    bookingsSeenSentRef.current = true;
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/master/bookings/seen", { method: "POST" });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ lastBookingsSeenAt: string }>
+          | null;
+        if (res.ok && json && json.ok) {
+          setData((prev) => ({ ...prev, newBookingsCount: 0 }));
+        }
+      } catch {
+        // Keep dashboard usable even if seen marker update fails.
+      }
+    })();
+  }, [data.masterId]);
+
+  useEffect(() => {
     const controller = new AbortController();
     const loadSlots = async (): Promise<void> => {
       if (!data.masterId || !slotsServiceId) {
@@ -268,14 +323,31 @@ export function MasterDashboardPage() {
     return () => controller.abort();
   }, [data.masterId, date, slotsServiceId, slotsReloadTick]);
 
-  const updateStatus = async (bookingId: string, status: "CONFIRMED" | "CANCELLED" | "NO_SHOW"): Promise<void> => {
-    setActionId(bookingId);
+  const updateStatus = async (
+    booking: DayBooking,
+    status: "CONFIRMED" | "REJECTED"
+  ): Promise<void> => {
+    let comment: string | undefined;
+    if (status === "REJECTED") {
+      const requiresComment = booking.status !== "CHANGE_REQUESTED";
+      const value = window.prompt("Причина отклонения", booking.changeComment ?? "")?.trim();
+      if (requiresComment && !value) {
+        setError("Комментарий обязателен");
+        return;
+      }
+      comment = value || undefined;
+    }
+
+    setActionId(booking.id);
     setError(null);
     try {
-      const res = await fetch(`/api/master/bookings/${bookingId}/status`, {
+      const res = await fetch(`/api/master/bookings/${booking.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(comment ? { comment } : {}),
+        }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string; status: string }> | null;
       if (!res.ok || !json || !json.ok) {
@@ -289,13 +361,68 @@ export function MasterDashboardPage() {
     }
   };
 
+  const requestReschedule = async (booking: DayBooking): Promise<void> => {
+    if (!canMasterRequestMove(booking)) return;
+    if (!booking.durationMin || booking.durationMin <= 0) {
+      setError("Booking duration is missing");
+      return;
+    }
+
+    const defaultStart = booking.startAtUtc
+      ? new Date(booking.startAtUtc).toISOString().slice(0, 16)
+      : "";
+    const startInput = window.prompt("New start (YYYY-MM-DDTHH:mm)", defaultStart)?.trim();
+    if (!startInput) return;
+
+    const startAt = new Date(startInput);
+    if (Number.isNaN(startAt.getTime())) {
+      setError("Invalid start time");
+      return;
+    }
+
+    const comment = window.prompt("Comment for client", booking.changeComment ?? "")?.trim();
+    if (!comment) {
+      setError("Comment is required");
+      return;
+    }
+
+    const startAtUtc = startAt.toISOString();
+    const endAtUtc = new Date(startAt.getTime() + booking.durationMin * 60 * 1000).toISOString();
+
+    setActionId(booking.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startAtUtc,
+          endAtUtc,
+          slotLabel: startAtUtc,
+          comment,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ booking: { id: string } }>
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to request reschedule");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const getStatusLabel = (status: string): string => {
-    if (status === "PENDING" || status === "NEW") return "Ожидает подтверждения";
-    if (status === "CONFIRMED") return "Подтверждена";
-    if (status === "STARTED") return "Началась";
-    if (status === "FINISHED") return "Завершена";
-    if (status === "CANCELLED") return "Отклонена";
-    if (status === "NO_SHOW") return "Не пришел";
+    if (status === "PENDING" || status === "NEW") return "Awaiting confirmation";
+    if (status === "CONFIRMED") return "Confirmed";
+    if (status === "CHANGE_REQUESTED") return "Awaiting other side";
+    if (status === "IN_PROGRESS" || status === "STARTED") return "In progress";
+    if (status === "FINISHED") return "Finished";
+    if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") return "Rejected";
     return status;
   };
 
@@ -456,7 +583,12 @@ export function MasterDashboardPage() {
         <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
           <div className="space-y-3">
             <div className="lux-card rounded-[24px] p-4">
-              <h3 className="text-sm font-semibold">Мой день</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Мой день</h3>
+                {data.newBookingsCount > 0 ? (
+                  <Badge className="px-2 py-0.5 text-[11px]">{"\u041d\u043e\u0432\u044b\u0435"}: {data.newBookingsCount}</Badge>
+                ) : null}
+              </div>
               <button
                 type="button"
                 onClick={() => setManualOpen(true)}
@@ -513,6 +645,17 @@ export function MasterDashboardPage() {
                     </div>
                     <div className="text-xs text-text-sec">{booking.clientPhone}</div>
                     <div className="text-xs text-text-sec">{booking.serviceTitle}</div>
+                    {formatBookingStart(
+                      booking.startAtUtc ?? booking.startAt,
+                      data.workingHours.timezone
+                    ) ? (
+                      <div className="text-xs text-text-sec">
+                        {formatBookingStart(
+                          booking.startAtUtc ?? booking.startAt,
+                          data.workingHours.timezone
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="text-xs text-text-sec">{getStatusLabel(booking.status)}</div>
                 </div>
@@ -521,36 +664,61 @@ export function MasterDashboardPage() {
                   <div className="mt-2 text-xs text-text-sec">Режим тишины включён</div>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {(booking.rawStatus === "PENDING" || booking.rawStatus === "NEW") && (
+                  {/* AUDIT (кнопки мастера):
+                      - реализовано: PENDING + actionRequiredBy=MASTER => Confirm/Reject.
+                      - реализовано: CHANGE_REQUESTED от CLIENT => Confirm move/Reject move.
+                      - реализовано частично: в карточке нет ссылки на профиль клиента (только имя/телефон). */}
+                  {booking.status === "PENDING" && booking.actionRequiredBy === "MASTER" ? (
                     <>
                       <button
                         type="button"
                         disabled={actionId === booking.id}
-                        onClick={() => void updateStatus(booking.id, "CONFIRMED")}
+                        onClick={() => void updateStatus(booking, "CONFIRMED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Подтвердить
+                        Confirm
                       </button>
                       <button
                         type="button"
                         disabled={actionId === booking.id}
-                        onClick={() => void updateStatus(booking.id, "CANCELLED")}
+                        onClick={() => void updateStatus(booking, "REJECTED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Отклонить
+                        Reject
                       </button>
                     </>
-                  )}
-                  {booking.canNoShow && (
+                  ) : null}
+                  {booking.status === "CHANGE_REQUESTED" &&
+                  booking.actionRequiredBy === "MASTER" ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={actionId === booking.id}
+                        onClick={() => void updateStatus(booking, "CONFIRMED")}
+                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
+                      >
+                        Confirm move
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionId === booking.id}
+                        onClick={() => void updateStatus(booking, "REJECTED")}
+                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
+                      >
+                        Reject move
+                      </button>
+                    </>
+                  ) : null}
+                  {canMasterRequestMove(booking) ? (
                     <button
                       type="button"
                       disabled={actionId === booking.id}
-                      onClick={() => void updateStatus(booking.id, "NO_SHOW")}
+                      onClick={() => void requestReschedule(booking)}
                       className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                     >
-                      ❌ Не пришла
+                      Request move
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </section>
             ))}

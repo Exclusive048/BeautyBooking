@@ -12,6 +12,26 @@ import {
 } from "@/lib/bookings/idempotency";
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
+import { dateFromKey } from "@/lib/schedule/time";
+import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+
+function parseSlotStartAtUtc(slotLabel: string, timezone: string): Date | null {
+  const normalized = slotLabel.trim();
+  const direct = new Date(normalized);
+  if (!Number.isNaN(direct.getTime())) {
+    return direct;
+  }
+
+  const match = /^(\d{4}-\d{2}-\d{2})\s+([01]\d|2[0-3]):([0-5]\d)$/.exec(normalized);
+  if (!match) return null;
+
+  const date = dateFromKey(match[1]);
+  if (!date) return null;
+
+  const hours = Number(match[2]);
+  const minutes = Number(match[3]);
+  return toUtcFromLocalDateTime(date, hours, minutes, timezone);
+}
 
 export async function createClientBooking(
   userId: string,
@@ -26,6 +46,10 @@ export async function createClientBooking(
   },
   idempotencyKey?: string | null
 ): Promise<BookingDto> {
+  // AUDIT (создание записи):
+  // - реализовано: создаётся PENDING + actionRequiredBy=MASTER.
+  // - исправлено после аудита: startAtUtc/endAtUtc теперь вычисляются из slotLabel + timezone.
+  // - реализовано частично: legacy path мягче по проверкам конфликтов, чем createBooking().
   if (idempotencyKey) {
     const key = buildCreateBookingIdempotencyKey(userId, idempotencyKey);
     const allowed = await checkAndSetIdempotency(
@@ -49,11 +73,11 @@ export async function createClientBooking(
   const [service, provider] = await Promise.all([
     prisma.service.findUnique({
       where: { id: data.serviceId },
-      select: { id: true, providerId: true, name: true },
+      select: { id: true, providerId: true, name: true, durationMin: true },
     }),
     prisma.provider.findUnique({
       where: { id: data.providerId },
-      select: { id: true, type: true },
+      select: { id: true, type: true, timezone: true },
     }),
   ]);
 
@@ -66,6 +90,11 @@ export async function createClientBooking(
   }
 
   const resolvedMasterProviderId = provider.type === ProviderType.MASTER ? provider.id : null;
+  const startAtUtc = parseSlotStartAtUtc(data.slotLabel, provider.timezone);
+  if (!startAtUtc) {
+    throw new AppError("Invalid slot label", 400, "DATE_INVALID");
+  }
+  const endAtUtc = new Date(startAtUtc.getTime() + service.durationMin * 60 * 1000);
 
   const booking = await prisma.booking.create({
     data: {
@@ -73,12 +102,18 @@ export async function createClientBooking(
       serviceId: data.serviceId,
       masterProviderId: resolvedMasterProviderId,
       masterId: resolvedMasterProviderId,
+      startAtUtc,
+      endAtUtc,
+      startAt: startAtUtc,
+      endAt: endAtUtc,
       slotLabel: data.slotLabel,
       clientName: data.clientName,
       clientPhone: data.clientPhone,
       comment: data.comment,
       silentMode: data.silentMode ?? false,
       clientUserId: userId,
+      status: "PENDING",
+      actionRequiredBy: "MASTER",
     },
     select: {
       id: true,
@@ -92,6 +127,13 @@ export async function createClientBooking(
       silentMode: true,
       startAtUtc: true,
       endAtUtc: true,
+      proposedStartAt: true,
+      proposedEndAt: true,
+      requestedBy: true,
+      actionRequiredBy: true,
+      changeComment: true,
+      clientChangeRequestsCount: true,
+      masterChangeRequestsCount: true,
       service: { select: { id: true, name: true } },
     },
   });

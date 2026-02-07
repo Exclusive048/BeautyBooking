@@ -1,5 +1,11 @@
 import type { BookingStatus } from "@prisma/client";
-import { REVIEW_GRACE_MINUTES } from "@/lib/reviews/constants";
+import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import { REVIEW_GRACE_MINUTES, REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
+
+// AUDIT (review eligibility constraints)
+// - only FINISHED + 3-day window: IMPLEMENTED server-side.
+// - booking ownership check (review author must be booking client): IMPLEMENTED.
+// - product rule semantics already match requirements.
 
 type BookingForReviewCheck = {
   clientUserId: string | null;
@@ -23,15 +29,25 @@ export function canLeaveReview(input: {
 }): boolean {
   const { booking, currentUserId, nowUtc } = input;
   if (!booking.clientUserId || booking.clientUserId !== currentUserId) return false;
-  if (booking.status === "CANCELLED") return false;
   if (!booking.startAtUtc) return false;
+
+  const runtimeStatus = resolveBookingRuntimeStatus({
+    status: booking.status,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+    now: nowUtc,
+  });
+  if (runtimeStatus !== "FINISHED") return false;
 
   const durationMinutes = resolveDurationMinutes(booking);
   if (durationMinutes <= 0) return false;
 
-  const eligibleAt = new Date(
+  const finishedAt = new Date(
     booking.startAtUtc.getTime() + (durationMinutes + REVIEW_GRACE_MINUTES) * 60 * 1000
   );
-  return nowUtc >= eligibleAt;
-}
+  const deadline = new Date(
+    finishedAt.getTime() + REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000
+  );
 
+  return nowUtc >= finishedAt && nowUtc <= deadline;
+}
