@@ -67,14 +67,6 @@ export function todayKey() {
   return toDateKey(new Date());
 }
 
-export function buildAvailabilityRange(dateKey: string) {
-  const date = parseDateKey(dateKey);
-  if (!date) return null;
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-  return { from: date, to: endOfDay };
-}
-
 async function safeJson<T>(res: Response) {
   return (await res.json().catch(() => null)) as T | null;
 }
@@ -126,18 +118,17 @@ export async function fetchMasterAvailability(
   serviceId: string,
   dateKey: string
 ): Promise<AvailabilityResult> {
-  const range = buildAvailabilityRange(dateKey);
-  if (!range) {
+  if (!parseDateKey(dateKey)) {
     return { ok: false, error: "Некорректная дата", code: "DATE_INVALID" };
   }
 
   const url = new URL(`/api/masters/${masterId}/availability`, window.location.origin);
   url.searchParams.set("serviceId", serviceId);
-  url.searchParams.set("from", range.from.toISOString());
-  url.searchParams.set("to", range.to.toISOString());
+  url.searchParams.set("from", dateKey);
+  url.searchParams.set("limit", "1");
 
   const res = await fetch(url.toString(), { cache: "no-store" });
-  const json = await safeJson<ApiResponse<{ slots: SlotItem[] }>>(res);
+  const json = await safeJson<ApiResponse<{ slots: SlotItem[]; meta: { toDateExclusive: string } }>>(res);
 
   if (!res.ok) {
     return {

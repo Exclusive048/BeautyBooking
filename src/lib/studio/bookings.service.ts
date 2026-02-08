@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
 import {
   createBookingDeclinedNotifications,
@@ -126,6 +127,13 @@ export async function createStudioBooking(input: {
     console.error("Failed to create booking notifications:", error);
   }
 
+  await invalidateSlotsForBookingRange({
+    providerId: studio.providerId,
+    masterProviderId: master.id,
+    startAtUtc: input.startAt,
+    endAtUtc: endAt,
+  });
+
   return { id: created.id };
 }
 
@@ -163,6 +171,9 @@ export async function moveStudioBooking(input: {
   );
   const safeDuration = durationMin > 0 ? durationMin : 60;
   const endAt = new Date(input.targetStartAt.getTime() + safeDuration * 60 * 1000);
+  const previousStartAtUtc = booking.startAtUtc;
+  const previousEndAtUtc = booking.endAtUtc;
+  const previousMasterProviderId = booking.masterProviderId;
 
   await prisma.$transaction(async (tx) => {
     await tx.booking.update({
@@ -213,6 +224,21 @@ export async function moveStudioBooking(input: {
         });
       }
     }
+  });
+
+  await invalidateSlotsForBookingMove({
+    previous: {
+      providerId: booking.providerId,
+      masterProviderId: previousMasterProviderId ?? null,
+      startAtUtc: previousStartAtUtc,
+      endAtUtc: previousEndAtUtc,
+    },
+    next: {
+      providerId: booking.providerId,
+      masterProviderId: input.targetMasterId,
+      startAtUtc: input.targetStartAt,
+      endAtUtc: endAt,
+    },
   });
 
   return { id: booking.id };
@@ -324,6 +350,15 @@ export async function updateMasterBookingStatus(input: {
 
   if (notifications.length > 0) {
     publishNotifications(notifications);
+  }
+
+  if (!rejectsChangeRequest) {
+    await invalidateSlotsForBookingRange({
+      providerId: booking.providerId,
+      masterProviderId: booking.masterProviderId ?? null,
+      startAtUtc: booking.startAtUtc,
+      endAtUtc: booking.endAtUtc,
+    });
   }
 
   return { id: updated.id, status: updated.status };

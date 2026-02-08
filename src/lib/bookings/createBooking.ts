@@ -18,6 +18,7 @@ import {
 } from "@/lib/bookings/idempotency";
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
+import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 
 function normalizeBufferMinutes(value: number | null | undefined): number {
   if (!Number.isFinite(value)) return 0;
@@ -300,6 +301,13 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
   } catch (error) {
     console.error("Failed to send Telegram booking notifications:", error);
   }
+
+  await invalidateSlotsForBookingRange({
+    providerId: created.providerId,
+    masterProviderId: created.masterProviderId ?? null,
+    startAtUtc: created.startAtUtc,
+    endAtUtc: created.endAtUtc,
+  });
 
   return toBookingDto(created);
 }

@@ -19,6 +19,7 @@ import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import { dateFromKey } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 
 function parseSlotStartAtUtc(slotLabel: string, timezone: string): Date | null {
   const normalized = slotLabel.trim();
@@ -174,6 +175,13 @@ export async function createClientBooking(
   } catch (error) {
     console.error("Failed to send Telegram booking notifications:", error);
   }
+
+  await invalidateSlotsForBookingRange({
+    providerId: booking.providerId,
+    masterProviderId: booking.masterProviderId ?? null,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
 
   return toBookingDto(booking);
 }

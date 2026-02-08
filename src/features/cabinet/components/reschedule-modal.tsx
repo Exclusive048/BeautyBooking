@@ -146,17 +146,15 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
       setLoadingSlots(true);
       setError(null);
       try {
-        const date = new Date(selectedDate);
-        const from = new Date(date);
-        const to = new Date(date);
-        to.setDate(to.getDate() + 1);
         const url = new URL(`/api/masters/${masterId}/availability`, window.location.origin);
         url.searchParams.set("serviceId", booking.serviceId);
-        url.searchParams.set("from", from.toISOString());
-        url.searchParams.set("to", to.toISOString());
+        url.searchParams.set("from", selectedDate);
+        url.searchParams.set("limit", "1");
 
         const res = await fetch(url.toString(), { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ slots: SlotItem[] }> | null;
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ slots: SlotItem[]; meta: { toDateExclusive: string } }>
+          | null;
         if (!res.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
         if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
 

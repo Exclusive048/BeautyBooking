@@ -118,14 +118,24 @@ const fromQuery: ParameterObject = {
   name: "from",
   in: "query",
   required: true,
-  schema: { type: "string", format: "date-time" },
+  schema: { type: "string", format: "date" },
+  description: "Local date key (YYYY-MM-DD) in provider timezone, start inclusive.",
 };
 
 const toQuery: ParameterObject = {
   name: "to",
   in: "query",
-  required: true,
-  schema: { type: "string", format: "date-time" },
+  required: false,
+  schema: { type: "string", format: "date" },
+  description: "Local date key (YYYY-MM-DD), end exclusive.",
+};
+
+const limitQuery: ParameterObject = {
+  name: "limit",
+  in: "query",
+  required: false,
+  schema: { type: "integer", minimum: 1, maximum: 14 },
+  description: "Page size (days).",
 };
 
 export const openApiSpec = {
@@ -420,6 +430,18 @@ export const openApiSpec = {
           label: { type: "string" },
         },
       },
+      AvailabilitySlotsMeta: {
+        type: "object",
+        required: ["fromDate", "toDateExclusive", "totalDays", "hasMore", "pageSize"],
+        properties: {
+          fromDate: { type: "string", format: "date" },
+          toDateExclusive: { type: "string", format: "date" },
+          totalDays: { type: "integer" },
+          hasMore: { type: "boolean" },
+          pageSize: { type: "integer" },
+          stale: { type: "boolean" },
+        },
+      },
       ScheduleBreak: {
         type: "object",
         required: ["startLocal", "endLocal"],
@@ -543,9 +565,10 @@ export const openApiSpec = {
       },
       AvailabilitySlotsData: {
         type: "object",
-        required: ["slots"],
+        required: ["slots", "meta"],
         properties: {
           slots: { type: "array", items: { $ref: "#/components/schemas/AvailabilitySlot" } },
+          meta: { $ref: "#/components/schemas/AvailabilitySlotsMeta" },
         },
       },
       WeeklyScheduleData: {
@@ -2038,7 +2061,7 @@ export const openApiSpec = {
       get: {
         summary: "List available slots for master",
         tags: ["schedule", "masters"],
-        parameters: [masterIdParam, serviceIdQuery, fromQuery, toQuery],
+        parameters: [masterIdParam, serviceIdQuery, fromQuery, toQuery, limitQuery],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/AvailabilitySlotsData" }),
           "400": errorResponse("Validation error"),

@@ -40,3 +40,34 @@ export function compareDateKeys(a: string, b: string): number {
   if (a === b) return 0;
   return a < b ? -1 : 1;
 }
+
+export function isDateKey(value: string): boolean {
+  return parseDateKeyParts(value) !== null;
+}
+
+export function diffDateKeys(fromKey: string, toKeyExclusive: string): number {
+  const from = parseDateKeyToUtc(fromKey);
+  const to = parseDateKeyToUtc(toKeyExclusive);
+  const diffMs = to.getTime() - from.getTime();
+  return Math.round(diffMs / (24 * 60 * 60 * 1000));
+}
+
+export function listDateKeysExclusive(fromKey: string, toKeyExclusive: string): string[] {
+  const keys: string[] = [];
+  let cursor = fromKey;
+  while (compareDateKeys(cursor, toKeyExclusive) < 0) {
+    keys.push(cursor);
+    cursor = addDaysToDateKey(cursor, 1);
+  }
+  return keys;
+}
+
+export function listDateKeysInclusive(fromKey: string, toKeyInclusive: string): string[] {
+  const keys: string[] = [];
+  let cursor = fromKey;
+  while (compareDateKeys(cursor, toKeyInclusive) <= 0) {
+    keys.push(cursor);
+    cursor = addDaysToDateKey(cursor, 1);
+  }
+  return keys;
+}

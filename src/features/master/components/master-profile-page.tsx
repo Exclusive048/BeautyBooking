@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
@@ -63,6 +64,22 @@ type ApiErrorShape = {
 type AddressSuggestResponse = {
   suggestions: string[];
 };
+
+type ProfileTab = "main" | "services" | "portfolio" | "settings";
+
+const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
+  { id: "main", label: "Основное" },
+  { id: "services", label: "Услуги и прайс" },
+  { id: "portfolio", label: "Портфолио" },
+  { id: "settings", label: "Настройки" },
+];
+
+const SERVICE_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
+
+function buildDurationOptions(value: number): number[] {
+  if (!Number.isFinite(value) || value <= 0) return SERVICE_DURATION_OPTIONS;
+  return SERVICE_DURATION_OPTIONS.includes(value) ? SERVICE_DURATION_OPTIONS : [value, ...SERVICE_DURATION_OPTIONS];
+}
 
 function parseMediaAssetId(url: string): string | null {
   const match = url.match(/\/api\/media\/file\/([^/?#]+)/);
@@ -155,6 +172,11 @@ export function MasterProfilePage() {
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
   const [autoConfirmSaving, setAutoConfirmSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("main");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [profileSaveStatus, setProfileSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [profileFieldErrors, setProfileFieldErrors] = useState<{ displayName?: string }>({});
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -178,6 +200,9 @@ export function MasterProfilePage() {
     Record<string, { price?: string; duration?: string }>
   >({});
 
+  const [dropActive, setDropActive] = useState(false);
+  const [brokenPortfolio, setBrokenPortfolio] = useState<Record<string, boolean>>({});
+
   const [pendingPortfolioMeta, setPendingPortfolioMeta] = useState<PendingPortfolioMeta | null>(null);
   const [portfolioCaption, setPortfolioCaption] = useState("");
   const [portfolioServiceIds, setPortfolioServiceIds] = useState<string[]>([]);
@@ -192,9 +217,12 @@ export function MasterProfilePage() {
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
   const addressSuggestAbortRef = useRef<AbortController | null>(null);
   const serviceAutosaveTimer = useRef<number | null>(null);
+  const profileAutosaveTimer = useRef<number | null>(null);
+  const profileHydratedRef = useRef(false);
+  const profileSavingRef = useRef(false);
   const hydratedRef = useRef(false);
 
-  const load = async (): Promise<void> => {
+  const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
@@ -211,6 +239,9 @@ export function MasterProfilePage() {
       setAddress(profileData.master.address);
       setBio(profileData.master.bio ?? "");
       setAvatarUrl(profileData.master.avatarUrl ?? "");
+      setIsPublished(profileData.master.isPublished);
+      setProfileSaveStatus("idle");
+      setProfileFieldErrors({});
       setServicesDraft(Object.fromEntries(profileData.services.map((item) => [item.serviceId, item])));
 
       const [avatarRes, portfolioRes] = await Promise.all([
@@ -233,17 +264,18 @@ export function MasterProfilePage() {
       }
 
       hydratedRef.current = false;
+      profileHydratedRef.current = false;
       setAutosaveInfo(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить профиль");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (!data?.master.isSolo) {
@@ -372,6 +404,10 @@ export function MasterProfilePage() {
     () => serviceList.filter((service) => !service.isEnabled),
     [serviceList]
   );
+  const serviceTitleById = useMemo(
+    () => new Map(serviceList.map((service) => [service.serviceId, service.title])),
+    [serviceList]
+  );
 
   function normalizePrice(value: number): number {
     return Math.ceil(value / 100) * 100;
@@ -381,12 +417,10 @@ export function MasterProfilePage() {
     return Math.ceil(value / 5) * 5;
   }
 
-  const saveProfile = async (): Promise<void> => {
-    if (!data) return;
+  const saveProfile = useCallback(
+    async (options?: { refresh?: boolean }): Promise<boolean> => {
+      if (!data || profileSavingRef.current) return false;
 
-    setSaving(true);
-    setError(null);
-    try {
       const currentMaster = data.master;
       const payload: {
         displayName?: string;
@@ -394,9 +428,16 @@ export function MasterProfilePage() {
         address?: string;
         bio?: string | null;
         avatarUrl?: string | null;
+        isPublished?: boolean;
       } = {};
 
       const nextDisplayName = displayName.trim();
+      if (!nextDisplayName) {
+        setProfileFieldErrors({ displayName: "Укажите имя" });
+        setProfileSaveStatus("error");
+        return false;
+      }
+
       if (nextDisplayName !== currentMaster.displayName) {
         payload.displayName = nextDisplayName;
       }
@@ -423,35 +464,103 @@ export function MasterProfilePage() {
         payload.avatarUrl = nextAvatarUrl;
       }
 
-      if (Object.keys(payload).length === 0) {
-        setAutosaveInfo("Нет изменений");
-        return;
+      if (isPublished !== currentMaster.isPublished) {
+        payload.isPublished = isPublished;
       }
 
-      const res = await fetch("/api/master/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ id: string }>
-        | ApiErrorShape
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(
-          extractApiErrorMessage(
-            json && !json.ok ? json : null,
-            `API error: ${res.status}`
-          )
-        );
+      if (Object.keys(payload).length === 0) {
+        setProfileSaveStatus("saved");
+        return true;
       }
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
-    } finally {
-      setSaving(false);
+
+      profileSavingRef.current = true;
+      setProfileSaveStatus("saving");
+      setError(null);
+      try {
+        const res = await fetch("/api/master/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ id: string }>
+          | ApiErrorShape
+          | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(
+            extractApiErrorMessage(
+              json && !json.ok ? json : null,
+              `API error: ${res.status}`
+            )
+          );
+        }
+
+        if (options?.refresh) {
+          await load();
+        } else {
+          setData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  master: {
+                    ...prev.master,
+                    displayName: payload.displayName ?? prev.master.displayName,
+                    tagline: payload.tagline ?? prev.master.tagline,
+                    address: payload.address ?? prev.master.address,
+                    bio: payload.bio ?? prev.master.bio,
+                    avatarUrl: payload.avatarUrl ?? prev.master.avatarUrl,
+                    isPublished: payload.isPublished ?? prev.master.isPublished,
+                  },
+                }
+              : prev
+          );
+        }
+
+        setProfileSaveStatus("saved");
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
+        setProfileSaveStatus("error");
+        return false;
+      } finally {
+        profileSavingRef.current = false;
+      }
+    },
+    [address, avatarUrl, bio, data, displayName, isPublished, load, tagline]
+  );
+
+  useEffect(() => {
+    if (!data) return;
+    if (!profileHydratedRef.current) {
+      profileHydratedRef.current = true;
+      return;
     }
-  };
+
+    if (!displayName.trim()) {
+      setProfileFieldErrors({ displayName: "Укажите имя" });
+      setProfileSaveStatus("error");
+      return;
+    }
+
+    if (profileSavingRef.current) {
+      return;
+    }
+
+    if (profileAutosaveTimer.current) {
+      window.clearTimeout(profileAutosaveTimer.current);
+    }
+
+    setProfileSaveStatus("saving");
+    profileAutosaveTimer.current = window.setTimeout(() => {
+      void saveProfile({ refresh: false });
+    }, 600);
+
+    return () => {
+      if (profileAutosaveTimer.current) {
+        window.clearTimeout(profileAutosaveTimer.current);
+      }
+    };
+  }, [address, avatarUrl, bio, data, displayName, isPublished, saveProfile, tagline]);
 
   const updateAutoConfirm = async (nextValue: boolean): Promise<void> => {
     if (!data?.master.isSolo) return;
@@ -544,7 +653,17 @@ export function MasterProfilePage() {
 
   const createSoloService = async (): Promise<void> => {
     if (!data?.master.isSolo) return;
-    if (!newSoloServiceTitle.trim() || newSoloServiceDuration <= 0 || newSoloServicePrice < 0) return;
+    const nextTitle = newSoloServiceTitle.trim();
+    const errors: { title?: string; price?: string; durationMin?: string } = {};
+    if (!nextTitle) errors.title = "Укажите название";
+    if (!Number.isFinite(newSoloServicePrice) || newSoloServicePrice <= 0) errors.price = "Укажите цену";
+    if (!Number.isFinite(newSoloServiceDuration) || newSoloServiceDuration <= 0) {
+      errors.durationMin = "Выберите длительность";
+    }
+    if (Object.keys(errors).length > 0) {
+      setNewSoloServiceFieldErrors(errors);
+      return;
+    }
     const normalizedPrice = normalizePrice(newSoloServicePrice);
     const normalizedDuration = normalizeDuration(newSoloServiceDuration);
     setNewSoloServicePrice(normalizedPrice);
@@ -680,6 +799,24 @@ export function MasterProfilePage() {
     }
   };
 
+  const handlePortfolioDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDropActive(true);
+  };
+
+  const handlePortfolioDragLeave = () => {
+    setDropActive(false);
+  };
+
+  const handlePortfolioDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDropActive(false);
+    const file = event.dataTransfer.files?.[0] ?? null;
+    if (file) {
+      void uploadPortfolioFile(file);
+    }
+  };
+
   const commitPendingPortfolio = async (): Promise<void> => {
     if (!pendingPortfolioMeta) return;
     setSaving(true);
@@ -776,440 +913,758 @@ export function MasterProfilePage() {
     }
   };
 
+  const profileStatusText =
+    profileSaveStatus === "saving"
+      ? "Сохраняем..."
+      : profileSaveStatus === "saved"
+        ? "✓ Изменения сохранены"
+        : profileSaveStatus === "error"
+          ? "Не удалось сохранить"
+          : "";
+
+  const profileStatusTone =
+    profileSaveStatus === "saved"
+      ? "text-emerald-500"
+      : profileSaveStatus === "error"
+        ? "text-rose-500"
+        : "text-text-sec";
+
+  const previewName = displayName.trim() || "Имя мастера";
+  const previewTagline = tagline.trim() || "Добавьте короткий слоган";
+  const previewAddress = address.trim() || "Адрес пока не указан";
+  const previewBio = bio.trim();
+  const inputBaseClass =
+    "mt-1 w-full rounded-lg border border-transparent bg-bg-input px-3 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle";
+  const inputErrorClass = "border-rose-500 focus:border-rose-500";
+  const selectBaseClass =
+    "w-full rounded-lg border border-transparent bg-bg-input px-2.5 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle disabled:opacity-60";
+  const previewAvatar = avatarUrl ? (
+    <img src={avatarUrl} alt="avatar" className="h-full w-full rounded-2xl object-cover" />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center rounded-2xl bg-bg-input text-xs text-text-sec">
+      Нет фото
+    </div>
+  );
+
+  const previewPanel = (
+    <div className="rounded-[36px] bg-[#0f0f0f] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+      <div className="rounded-[28px] bg-bg-card p-4">
+        <div className="flex items-start gap-3">
+          <div className="h-16 w-16 overflow-hidden rounded-2xl bg-bg-input">{previewAvatar}</div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-text-main">{previewName}</div>
+            <div className="mt-0.5 text-xs text-text-sec">{previewTagline}</div>
+            <div className="mt-1 text-[11px] text-text-sec">
+              ⭐ {data?.master.ratingAvg.toFixed(1)} · {data?.master.ratingCount} отзывов
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-xl bg-bg-input/70 p-3 text-xs text-text-sec">
+          <div className="text-[11px] font-medium uppercase text-text-sec">Адрес</div>
+          <div className="mt-1 text-sm text-text-main">{previewAddress}</div>
+        </div>
+
+        <div className="mt-3 text-xs text-text-sec">
+          {previewBio || "Добавьте описание, чтобы клиенты лучше узнали о вас."}
+        </div>
+
+        <div
+          className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] ${
+            isPublished ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"
+          }`}
+        >
+          <span className={`h-2 w-2 rounded-full ${isPublished ? "bg-emerald-400" : "bg-rose-400"}`} />
+          {isPublished ? "Профиль опубликован" : "Не опубликован"}
+        </div>
+      </div>
+    </div>
+  );
+
   if (loading || !data) {
-    return <div className="rounded-2xl border p-5 text-sm">Загрузка профиля...</div>;
+    return <div className="rounded-2xl bg-bg-card/90 p-5 text-sm text-text-sec">Загрузка профиля...</div>;
   }
 
   return (
-    <section className="space-y-4">
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+    <section className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Профиль</h2>
+          <p className="text-sm text-text-sec">Управляйте витриной, услугами и настройками.</p>
+        </div>
+        {profileStatusText ? <div className={`text-xs ${profileStatusTone}`}>{profileStatusText}</div> : null}
+      </header>
+
+      {error ? <div className="rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
 
       {pendingInvites.length > 0 ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
-          <h3 className="text-sm font-semibold text-amber-900">Приглашение в студию</h3>
-          <p className="mt-1 text-xs text-amber-800">Примите или отклоните приглашение, чтобы начать работать в студии.</p>
+        <div className="rounded-2xl bg-amber-500/10 p-4">
+          <h3 className="text-sm font-semibold text-amber-200">Приглашение в студию</h3>
+          <p className="mt-1 text-xs text-amber-200/80">
+            Примите или отклоните приглашение, чтобы начать работать в студии.
+          </p>
           <div className="mt-3">
             <StudioInviteCards invites={pendingInvites} onChanged={setPendingInvites} />
           </div>
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-        <div className="rounded-2xl border p-4">
-          <h3 className="text-sm font-semibold">Профиль и витрина</h3>
-          <div className="mt-3 space-y-3">
-            <div className="relative h-24 w-24 rounded-2xl border bg-neutral-100">
-              {avatarUrl ? <img src={avatarUrl} alt="avatar" className="h-full w-full rounded-2xl object-cover" /> : null}
-              <div className="absolute right-1 top-1 flex gap-1">
-                <button type="button" onClick={openAvatarFileDialog} className="rounded-md bg-black/60 px-1.5 py-1 text-xs text-white" aria-label="Заменить аватар">
-                  ✏️
-                </button>
-                {avatarAssetId ? (
-                  <button type="button" onClick={() => void deleteAvatar()} className="rounded-md bg-black/60 px-1.5 py-1 text-xs text-white" aria-label="Удалить аватар">
-                    ✖️
-                  </button>
-                ) : null}
+      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+        <nav className="flex gap-2 overflow-x-auto rounded-2xl bg-bg-card/70 p-2 lg:flex-col lg:p-3">
+          {PROFILE_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm transition ${
+                  isActive ? "bg-bg-input text-text-main shadow-card" : "text-text-sec hover:text-text-main"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="min-w-0">
+          {activeTab === "main" ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="space-y-6">
+                <div className="rounded-2xl bg-bg-card/90 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Профиль и витрина</h3>
+                      <p className="mt-1 text-xs text-text-sec">То, что видят клиенты в поиске и на витрине.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewOpen(true)}
+                      className="rounded-full border border-border-subtle px-3 py-1 text-xs text-text-sec transition hover:text-text-main lg:hidden"
+                    >
+                      Посмотреть как клиент
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-bg-input">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="avatar" className="h-full w-full rounded-2xl object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-text-sec">
+                            Нет фото
+                          </div>
+                        )}
+                        <div className="absolute right-1 top-1 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={openAvatarFileDialog}
+                            className="rounded-lg bg-black/60 px-2 py-1 text-xs text-white"
+                            aria-label="Заменить аватар"
+                          >
+                            ✏️
+                          </button>
+                          {avatarAssetId ? (
+                            <button
+                              type="button"
+                              onClick={() => void deleteAvatar()}
+                              className="rounded-lg bg-black/60 px-2 py-1 text-xs text-white"
+                              aria-label="Удалить аватар"
+                            >
+                              ✖️
+                            </button>
+                          ) : null}
+                        </div>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            if (file) {
+                              void onAvatarFileSelected(file);
+                              event.currentTarget.value = "";
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2 text-xs text-text-sec">
+                        <button
+                          type="button"
+                          onClick={openAvatarFileDialog}
+                          className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-left text-sm text-text-main transition hover:bg-bg-card"
+                        >
+                          Заменить фото
+                        </button>
+                        {avatarAssetId ? (
+                          <button
+                            type="button"
+                            onClick={() => void deleteAvatar()}
+                            className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-left text-sm text-rose-400 transition hover:bg-bg-card"
+                          >
+                            Удалить фото
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs text-text-sec">
+                        Имя
+                        <input
+                          className={`${inputBaseClass} ${profileFieldErrors.displayName ? inputErrorClass : ""}`}
+                          value={displayName}
+                          onChange={(event) => {
+                            setDisplayName(event.target.value);
+                            if (event.target.value.trim()) {
+                              setProfileFieldErrors({});
+                            }
+                          }}
+                          onBlur={() => {
+                            if (!displayName.trim()) {
+                              setProfileFieldErrors({ displayName: "Укажите имя" });
+                            }
+                          }}
+                          placeholder="Имя"
+                        />
+                        {profileFieldErrors.displayName ? (
+                          <div className="mt-1 text-xs text-rose-400">{profileFieldErrors.displayName}</div>
+                        ) : null}
+                      </label>
+
+                      <label className="text-xs text-text-sec">
+                        Тэглайн
+                        <input
+                          className={inputBaseClass}
+                          value={tagline}
+                          onChange={(event) => setTagline(event.target.value)}
+                          placeholder="Например, свадебный макияж"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="relative" ref={addressSuggestRootRef}>
+                      <label className="text-xs text-text-sec">
+                        Адрес
+                        <textarea
+                          className={inputBaseClass}
+                          value={address}
+                          rows={2}
+                          onChange={(event) => setAddress(event.target.value)}
+                          onFocus={() => setAddressSuggestFocused(true)}
+                          placeholder="Адрес приёма"
+                        />
+                      </label>
+                      {addressSuggestFocused ? (
+                        <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-border-subtle bg-bg-card shadow-sm">
+                          {addressSuggestLoading ? (
+                            <div className="px-3 py-2 text-xs text-text-sec">Ищем адрес...</div>
+                          ) : addressSuggestions.length > 0 ? (
+                            addressSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion}
+                                type="button"
+                                className="block w-full border-b border-border-subtle px-3 py-2 text-left text-sm last:border-b-0 hover:bg-bg-input/80"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                  setAddress(suggestion);
+                                  setAddressSuggestFocused(false);
+                                }}
+                              >
+                                {suggestion}
+                              </button>
+                            ))
+                          ) : address.trim().length >= 3 ? (
+                            <div className="px-3 py-2 text-xs text-text-sec">Совпадений не найдено</div>
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-text-sec">Введите минимум 3 символа</div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <label className="text-xs text-text-sec">
+                      Описание
+                      <textarea
+                        className={inputBaseClass}
+                        value={bio}
+                        rows={4}
+                        onChange={(event) => setBio(event.target.value)}
+                        placeholder="О себе"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-bg-card/90 p-4">
+                  <h3 className="text-sm font-semibold">Публикация профиля</h3>
+                  <p className="mt-1 text-xs text-text-sec">
+                    Без публикации профиль не отображается в поиске и витрине.
+                  </p>
+                  <label className="mt-3 inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isPublished}
+                      onChange={(event) => setIsPublished(event.target.checked)}
+                    />
+                    Опубликовать профиль
+                  </label>
+                </div>
               </div>
+
+              <aside className="sticky top-6 hidden lg:block">
+                <div className="mb-2 text-xs text-text-sec">Предпросмотр витрины</div>
+                {previewPanel}
+              </aside>
+            </div>
+          ) : null}
+
+          {activeTab === "settings" ? (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold">Настройки</h3>
+                <p className="mt-1 text-xs text-text-sec">Автоматизация и внешние каналы уведомлений.</p>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {data.master.isSolo ? (
+                  <div className="rounded-2xl bg-bg-card/90 p-4">
+                    <h4 className="text-sm font-semibold">Автоматизация</h4>
+                    <p className="mt-1 text-xs text-text-sec">Настройки подтверждения записей.</p>
+                    <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium">Автоподтверждение записи</div>
+                          <div className="mt-1 text-xs text-text-sec">
+                            Если включено, новые записи будут подтверждаться автоматически.
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={autoConfirmBookings ?? false}
+                            disabled={autoConfirmLoading || autoConfirmSaving}
+                            onChange={(event) => void updateAutoConfirm(event.target.checked)}
+                          />
+                          {autoConfirmLoading ? "Загрузка..." : autoConfirmBookings ? "Включено" : "Выключено"}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                <ConnectedAccountsSection />
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === "services" ? (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Услуги и прайс</h3>
+                  <p className="mt-1 text-xs text-text-sec">
+                    Управляйте стоимостью, длительностью и доступностью услуг.
+                  </p>
+                </div>
+                {autosaveInfo ? <div className="text-xs text-text-sec">{autosaveInfo}</div> : null}
+              </div>
+
+        {showAddServicePanel ? (
+          <div className="rounded-2xl bg-bg-card/90 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold">Новая услуга</h4>
+              <button
+                type="button"
+                onClick={() => setShowAddServicePanel(false)}
+                className="text-xs text-text-sec"
+              >
+                Скрыть
+              </button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {data.master.isSolo ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_140px_150px]">
+                    <label className="text-xs text-text-sec">
+                      Название услуги
+                      <input
+                        type="text"
+                        value={newSoloServiceTitle}
+                        onChange={(event) => {
+                          setNewSoloServiceTitle(event.target.value);
+                          setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
+                        }}
+                        className={`${inputBaseClass} ${newSoloServiceFieldErrors.title ? inputErrorClass : ""}`}
+                        placeholder="Название"
+                      />
+                    </label>
+                    <label className="text-xs text-text-sec">
+                      Цена
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          step={100}
+                          inputMode="numeric"
+                          value={newSoloServicePrice}
+                          onChange={(event) => {
+                            setNewSoloServicePrice(Number(event.target.value) || 0);
+                            setNewSoloServiceFieldErrors((current) => ({ ...current, price: undefined }));
+                          }}
+                          onBlur={() =>
+                            setNewSoloServicePrice((value) => (value > 0 ? normalizePrice(value) : value))
+                          }
+                          className={`${selectBaseClass} ${newSoloServiceFieldErrors.price ? inputErrorClass : ""}`}
+                          placeholder="0"
+                        />
+                        <span className="text-xs text-text-sec">₽</span>
+                      </div>
+                    </label>
+                    <label className="text-xs text-text-sec">
+                      Длительность
+                      <div className="mt-1 flex items-center gap-2">
+                        <select
+                          value={newSoloServiceDuration}
+                          onChange={(event) => {
+                            setNewSoloServiceDuration(Number(event.target.value) || 0);
+                            setNewSoloServiceFieldErrors((current) => ({ ...current, durationMin: undefined }));
+                          }}
+                          className={`${selectBaseClass} ${newSoloServiceFieldErrors.durationMin ? inputErrorClass : ""}`}
+                        >
+                          {SERVICE_DURATION_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-text-sec">мин</span>
+                      </div>
+                    </label>
+                  </div>
+                  {newSoloServiceFieldErrors.title ||
+                  newSoloServiceFieldErrors.price ||
+                  newSoloServiceFieldErrors.durationMin ? (
+                    <div className="text-xs text-rose-400">
+                      {newSoloServiceFieldErrors.title ??
+                        newSoloServiceFieldErrors.price ??
+                        newSoloServiceFieldErrors.durationMin}
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void createSoloService()}
+                    disabled={saving}
+                    className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
+                  >
+                    {saving ? "Сохраняем..." : "Добавить услугу"}
+                  </button>
+                </>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <select
+                    value={selectedStudioServiceId}
+                    onChange={(event) => setSelectedStudioServiceId(event.target.value)}
+                    className={selectBaseClass}
+                  >
+                    <option value="">Выберите услугу из каталога студии</option>
+                    {disabledServices.map((service) => (
+                      <option key={service.serviceId} value={service.serviceId}>
+                        {service.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={addStudioService}
+                    className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card"
+                  >
+                    Добавить
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="rounded-2xl bg-bg-card/90 p-4">
+          <div className="grid grid-cols-[minmax(0,2fr)_150px_150px_90px] items-center gap-3 border-b border-border-subtle pb-2 text-xs text-text-sec">
+            <div>Название услуги</div>
+            <div>Цена</div>
+            <div>Длительность</div>
+            <div className="text-center">Вкл.</div>
+          </div>
+          <div className="divide-y divide-border-subtle">
+            {serviceList.map((service) => {
+              const durationOptions = buildDurationOptions(service.effectiveDurationMin);
+              return (
+                <div key={service.serviceId} className="grid grid-cols-[minmax(0,2fr)_150px_150px_90px] items-center gap-3 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-text-main">{service.title}</div>
+                    {!service.canEditPrice ? (
+                      <div className="mt-1 text-xs text-text-sec">Цена управляется студией, доступен только тайминг.</div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className={`${selectBaseClass} ${
+                        serviceFieldErrors[service.serviceId]?.price ? inputErrorClass : ""
+                      }`}
+                      value={service.effectivePrice}
+                      disabled={!service.canEditPrice}
+                      placeholder="0"
+                      inputMode="numeric"
+                      step={100}
+                      min={0}
+                      onChange={(event) => {
+                        const raw = Number(event.target.value);
+                        setServicesDraft((current) => ({
+                          ...current,
+                          [service.serviceId]: {
+                            ...current[service.serviceId],
+                            effectivePrice: Number.isFinite(raw) ? raw : 0,
+                            priceOverride: Number.isFinite(raw) ? raw : null,
+                          },
+                        }));
+                        setServiceFieldErrors((current) => ({
+                          ...current,
+                          [service.serviceId]: { ...current[service.serviceId], price: undefined },
+                        }));
+                      }}
+                      onBlur={() => {
+                        if (!service.canEditPrice) return;
+                        const currentValue = servicesDraft[service.serviceId]?.effectivePrice ?? 0;
+                        if (!Number.isFinite(currentValue) || currentValue <= 0) {
+                          setServiceFieldErrors((current) => ({
+                            ...current,
+                            [service.serviceId]: { ...current[service.serviceId], price: "Введите цену больше 0." },
+                          }));
+                          return;
+                        }
+                        const normalized = normalizePrice(currentValue);
+                        setServicesDraft((current) => ({
+                          ...current,
+                          [service.serviceId]: {
+                            ...current[service.serviceId],
+                            effectivePrice: normalized,
+                            priceOverride: normalized,
+                          },
+                        }));
+                      }}
+                    />
+                    <span className="text-xs text-text-sec">₽</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className={`${selectBaseClass} ${
+                        serviceFieldErrors[service.serviceId]?.duration ? inputErrorClass : ""
+                      }`}
+                      value={service.effectiveDurationMin}
+                      onChange={(event) => {
+                        const raw = Number(event.target.value);
+                        setServicesDraft((current) => ({
+                          ...current,
+                          [service.serviceId]: {
+                            ...current[service.serviceId],
+                            effectiveDurationMin: Number.isFinite(raw) ? raw : 0,
+                            durationOverrideMin: Number.isFinite(raw) ? raw : null,
+                          },
+                        }));
+                        setServiceFieldErrors((current) => ({
+                          ...current,
+                          [service.serviceId]: { ...current[service.serviceId], duration: undefined },
+                        }));
+                      }}
+                    >
+                      {durationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-text-sec">мин</span>
+                  </div>
+                  <label className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={service.isEnabled}
+                      onChange={(event) =>
+                        setServicesDraft((current) => ({
+                          ...current,
+                          [service.serviceId]: { ...current[service.serviceId], isEnabled: event.target.checked },
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowAddServicePanel(true)}
+          className="w-full rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 px-4 py-3 text-sm text-text-main transition hover:bg-bg-card"
+        >
+          + Добавить услугу
+        </button>
+      </div>
+          ) : null}
+
+          {activeTab === "portfolio" ? (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold">Портфолио</h3>
+                <p className="mt-1 text-xs text-text-sec">Добавляйте работы и связывайте их с услугами.</p>
+              </div>
+
               <input
-                ref={avatarInputRef}
+                ref={newPortfolioInputRef}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0] ?? null;
                   if (file) {
-                    void onAvatarFileSelected(file);
+                    void uploadPortfolioFile(file);
                     event.currentTarget.value = "";
                   }
                 }}
               />
-            </div>
+              <div
+                className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 text-center text-sm transition ${
+                  dropActive ? "border-primary bg-primary/10" : "border-border-subtle bg-bg-card/80"
+                }`}
+                onClick={() => newPortfolioInputRef.current?.click()}
+                onDragOver={handlePortfolioDragOver}
+                onDragLeave={handlePortfolioDragLeave}
+                onDrop={handlePortfolioDrop}
+              >
+                <div className="text-sm font-medium text-text-main">Перетащите фото сюда</div>
+                <div className="mt-1 text-xs text-text-sec">
+                  или нажмите, чтобы выбрать файл {saving ? "— загружаем..." : ""}
+                </div>
+              </div>
 
-            <input className="w-full rounded-lg border px-3 py-2 text-sm" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Имя" />
-            <input className="w-full rounded-lg border px-3 py-2 text-sm" value={tagline} onChange={(event) => setTagline(event.target.value)} placeholder="Тэглайн" />
-            <div className="relative" ref={addressSuggestRootRef}>
-              <input
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                onFocus={() => setAddressSuggestFocused(true)}
-                placeholder="Адрес приёма"
-              />
-              {addressSuggestFocused ? (
-                <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border bg-white shadow-sm">
-                  {addressSuggestLoading ? (
-                    <div className="px-3 py-2 text-xs text-neutral-500">Ищем адреса...</div>
-                  ) : addressSuggestions.length > 0 ? (
-                    addressSuggestions.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        className="block w-full border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-neutral-50"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          setAddress(suggestion);
-                          setAddressSuggestFocused(false);
-                        }}
-                      >
-                        {suggestion}
-                      </button>
-                    ))
-                  ) : address.trim().length >= 3 ? (
-                    <div className="px-3 py-2 text-xs text-neutral-500">Совпадений не найдено</div>
-                  ) : (
-                    <div className="px-3 py-2 text-xs text-neutral-500">Введите минимум 3 символа</div>
-                  )}
+              {pendingPortfolioMeta ? (
+                <div className="rounded-2xl bg-bg-card/90 p-4">
+                  <div className="text-xs text-text-sec">Черновик загрузки</div>
+                  <img
+                    src={pendingPortfolioMeta.mediaUrl}
+                    alt="pending"
+                    className="mt-3 h-48 w-full rounded-2xl object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPortfolioMetaOpen(true)}
+                    className="mt-3 rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main transition hover:bg-bg-card"
+                  >
+                    Добавить описание
+                  </button>
                 </div>
               ) : null}
-            </div>
-            <textarea className="w-full rounded-lg border px-3 py-2 text-sm" value={bio} onChange={(event) => setBio(event.target.value)} placeholder="О себе" />
-            <button type="button" onClick={() => void saveProfile()} disabled={saving} className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-60">
-              {saving ? "Сохраняем..." : "Сохранить профиль"}
-            </button>
-          </div>
-        </div>
 
-        <div className="rounded-2xl border p-4">
-          <h3 className="text-sm font-semibold">Предпросмотр витрины</h3>
-          <div className="mt-3 rounded-xl border p-3">
-            {avatarUrl ? <img src={avatarUrl} alt="avatar" className="h-24 w-24 rounded-2xl object-cover" /> : <div className="h-24 w-24 rounded-2xl bg-neutral-100" />}
-            <div className="mt-2 font-semibold">{displayName || "Без имени"}</div>
-            <div className="text-sm text-neutral-600">{tagline}</div>
-            <div className="text-sm text-neutral-600">{address}</div>
-            <div className="text-sm text-neutral-600">{bio}</div>
-            <div className="mt-2 text-xs text-neutral-500">⭐ {data.master.ratingAvg.toFixed(1)} · {data.master.ratingCount} отзывов</div>
-          </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {data.portfolio.map((item) => {
+                  const linkedServices = item.serviceIds
+                    .map((id) => serviceTitleById.get(id))
+                    .filter((value): value is string => Boolean(value));
+                  const isBroken = brokenPortfolio[item.id];
+                  return (
+                    <div key={item.id} className="relative overflow-hidden rounded-2xl bg-bg-card/90 p-3">
+                      {isBroken ? (
+                        <div className="flex h-40 w-full items-center justify-center rounded-xl bg-bg-input text-xs text-text-sec">
+                          Фото недоступно
+                        </div>
+                      ) : (
+                        <img
+                          src={item.mediaUrl}
+                          alt="portfolio"
+                          className="h-40 w-full rounded-xl object-cover"
+                          onError={() =>
+                            setBrokenPortfolio((current) => ({
+                              ...current,
+                              [item.id]: true,
+                            }))
+                          }
+                        />
+                      )}
+
+                      <div className="absolute right-3 top-3 flex gap-2">
+                        <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-sm text-white" title="Заменить">
+                          ✏️
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              if (file) {
+                                void replacePortfolio(item, file);
+                                event.currentTarget.value = "";
+                              }
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void removePortfolio(item)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm text-white"
+                          title="Удалить"
+                        >
+                          ✖️
+                        </button>
+                      </div>
+
+                      {item.caption ? <div className="mt-2 text-xs text-text-sec">{item.caption}</div> : null}
+                      <div className="mt-2 text-xs text-text-sec">Привязано к услугам</div>
+                      {linkedServices.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {linkedServices.map((title) => (
+                            <span
+                              key={`${item.id}-${title}`}
+                              className="rounded-full bg-bg-input px-2 py-0.5 text-[11px] text-text-main"
+                            >
+                              {title}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-xs text-text-sec">Не указано</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {data.master.isSolo ? (
-        <div className="rounded-2xl border p-4">
-          <h3 className="text-sm font-semibold">Автоматизация</h3>
-          <p className="mt-1 text-xs text-neutral-500">Настройки</p>
-          <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input/40 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium">Автоподтверждение записи</div>
-                <div className="mt-1 text-xs text-neutral-500">
-                  Если включено, новые записи будут подтверждаться автоматически.
-                </div>
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={autoConfirmBookings ?? false}
-                  disabled={autoConfirmLoading || autoConfirmSaving}
-                  onChange={(event) => void updateAutoConfirm(event.target.checked)}
-                />
-                {autoConfirmLoading ? "Загрузка..." : autoConfirmBookings ? "Включено" : "Выключено"}
-              </label>
-            </div>
-          </div>
-        </div>
+      {previewOpen ? (
+        <ModalSurface open onClose={() => setPreviewOpen(false)} title="Предпросмотр витрины">
+          <div className="flex justify-center">{previewPanel}</div>
+        </ModalSurface>
       ) : null}
-
-      <ConnectedAccountsSection />
-
-      <div className="rounded-2xl border p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold">Мои услуги</h3>
-          <button
-            type="button"
-            onClick={() => setShowAddServicePanel((value) => !value)}
-            className="rounded-lg border px-2 py-1 text-sm"
-            aria-label="Добавить услугу"
-          >
-            +
-          </button>
-        </div>
-        {autosaveInfo ? <div className="mt-1 text-xs text-neutral-500">{autosaveInfo}</div> : null}
-
-        {showAddServicePanel ? (
-          <div className="mt-3 rounded-xl border p-3">
-            {data.master.isSolo ? (
-              <>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_140px_150px_120px]">
-                <input
-                  type="text"
-                  value={newSoloServiceTitle}
-                  onChange={(event) => {
-                    setNewSoloServiceTitle(event.target.value);
-                    setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
-                  }}
-                  className="h-9 rounded border px-2.5 text-sm"
-                  placeholder={"\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435"}
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step={100}
-                  inputMode="numeric"
-                  value={newSoloServicePrice}
-                  onChange={(event) => {
-                    setNewSoloServicePrice(Number(event.target.value) || 0);
-                    setNewSoloServiceFieldErrors((current) => ({ ...current, price: undefined }));
-                  }}
-                  onBlur={() => setNewSoloServicePrice((value) => (value > 0 ? normalizePrice(value) : value))}
-                  className="h-9 rounded border px-2.5 text-sm"
-                  placeholder={"\u0426\u0435\u043d\u0430 (\u20BD)"}
-                />
-                <input
-                  type="number"
-                  min={5}
-                  step={5}
-                  inputMode="numeric"
-                  value={newSoloServiceDuration}
-                  onChange={(event) => {
-                    setNewSoloServiceDuration(Number(event.target.value) || 0);
-                    setNewSoloServiceFieldErrors((current) => ({ ...current, durationMin: undefined }));
-                  }}
-                  onBlur={() =>
-                    setNewSoloServiceDuration((value) => (value > 0 ? normalizeDuration(value) : value))
-                  }
-                  className="h-9 rounded border px-2.5 text-sm"
-                  placeholder={"\u0414\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c (\u043c\u0438\u043d)"}
-                />
-                <button type="button" onClick={() => void createSoloService()} disabled={saving} className="h-9 rounded border px-2.5 text-sm">
-                  {"\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c"}
-                </button>
-              </div>
-              {newSoloServiceFieldErrors.title || newSoloServiceFieldErrors.price || newSoloServiceFieldErrors.durationMin ? (
-                <div className="mt-2 text-xs text-red-600">
-                  {newSoloServiceFieldErrors.title ?? newSoloServiceFieldErrors.price ?? newSoloServiceFieldErrors.durationMin}
-                </div>
-              ) : null}
-              </>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <select
-                  value={selectedStudioServiceId}
-                  onChange={(event) => setSelectedStudioServiceId(event.target.value)}
-                  className="h-9 rounded border px-2.5 text-sm"
-                >
-                  <option value="">Выберите услугу из каталога студии</option>
-                  {disabledServices.map((service) => (
-                    <option key={service.serviceId} value={service.serviceId}>
-                      {service.title}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={addStudioService} className="h-9 rounded border px-2.5 text-sm">
-                  Добавить
-                </button>
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        <div className="mt-3 overflow-x-auto rounded-xl border">
-          <div className="min-w-[640px]">
-          <div className="grid grid-cols-[minmax(0,2fr)_130px_160px_90px] items-center gap-3 border-b bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600">
-            <div>Название</div>
-            <div>Цена</div>
-            <div>Продолжительность</div>
-            <div className="text-center">Включено</div>
-          </div>
-          {serviceList.map((service) => (
-            <div key={service.serviceId} className="border-b px-3 py-2 last:border-b-0">
-              <div className="grid grid-cols-[minmax(0,2fr)_130px_160px_90px] items-start gap-3">
-                <div className="truncate pt-2 text-sm">{service.title}</div>
-                <div>
-                  <input
-                    type="number"
-                    className="h-9 w-full rounded border px-2.5 text-sm"
-                    value={service.effectivePrice}
-                    disabled={!service.canEditPrice}
-                    placeholder="Цена (₽)"
-                    inputMode="numeric"
-                    step={100}
-                    min={0}
-                    onChange={(event) => {
-                      const raw = Number(event.target.value);
-                      setServicesDraft((current) => ({
-                        ...current,
-                        [service.serviceId]: {
-                          ...current[service.serviceId],
-                          effectivePrice: Number.isFinite(raw) ? raw : 0,
-                          priceOverride: Number.isFinite(raw) ? raw : null,
-                        },
-                      }));
-                      setServiceFieldErrors((current) => ({
-                        ...current,
-                        [service.serviceId]: { ...current[service.serviceId], price: undefined },
-                      }));
-                    }}
-                    onBlur={() => {
-                      if (!service.canEditPrice) return;
-                      const currentValue = servicesDraft[service.serviceId]?.effectivePrice ?? 0;
-                      if (!Number.isFinite(currentValue) || currentValue <= 0) {
-                        setServiceFieldErrors((current) => ({
-                          ...current,
-                          [service.serviceId]: { ...current[service.serviceId], price: "Введите цену больше 0." },
-                        }));
-                        return;
-                      }
-                      const normalized = normalizePrice(currentValue);
-                      setServicesDraft((current) => ({
-                        ...current,
-                        [service.serviceId]: {
-                          ...current[service.serviceId],
-                          effectivePrice: normalized,
-                          priceOverride: normalized,
-                        },
-                      }));
-                    }}
-                  />
-                  {serviceFieldErrors[service.serviceId]?.price ? (
-                    <div className="mt-1 text-xs text-red-600">{serviceFieldErrors[service.serviceId]?.price}</div>
-                  ) : null}
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    className="h-9 w-full rounded border px-2.5 text-sm"
-                    value={service.effectiveDurationMin}
-                    placeholder="Длительность (мин)"
-                    inputMode="numeric"
-                    step={5}
-                    min={5}
-                    onChange={(event) => {
-                      const raw = Number(event.target.value);
-                      setServicesDraft((current) => ({
-                        ...current,
-                        [service.serviceId]: {
-                          ...current[service.serviceId],
-                          effectiveDurationMin: Number.isFinite(raw) ? raw : 0,
-                          durationOverrideMin: Number.isFinite(raw) ? raw : null,
-                        },
-                      }));
-                      setServiceFieldErrors((current) => ({
-                        ...current,
-                        [service.serviceId]: { ...current[service.serviceId], duration: undefined },
-                      }));
-                    }}
-                    onBlur={() => {
-                      const currentValue = servicesDraft[service.serviceId]?.effectiveDurationMin ?? 0;
-                      if (!Number.isFinite(currentValue) || currentValue <= 0) {
-                        setServiceFieldErrors((current) => ({
-                          ...current,
-                          [service.serviceId]: { ...current[service.serviceId], duration: "Введите длительность больше 0." },
-                        }));
-                        return;
-                      }
-                      const normalized = normalizeDuration(currentValue);
-                      setServicesDraft((current) => ({
-                        ...current,
-                        [service.serviceId]: {
-                          ...current[service.serviceId],
-                          effectiveDurationMin: normalized,
-                          durationOverrideMin: normalized,
-                        },
-                      }));
-                    }}
-                  />
-                  {serviceFieldErrors[service.serviceId]?.duration ? (
-                    <div className="mt-1 text-xs text-red-600">{serviceFieldErrors[service.serviceId]?.duration}</div>
-                  ) : null}
-                </div>
-                <label className="pt-1 text-xs">
-                  <div className="flex h-9 items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={service.isEnabled}
-                    onChange={(event) =>
-                      setServicesDraft((current) => ({
-                        ...current,
-                        [service.serviceId]: { ...current[service.serviceId], isEnabled: event.target.checked },
-                      }))
-                    }
-                  />
-                  </div>
-                </label>
-              </div>
-              {!service.canEditPrice ? (
-                <div className="mt-1 text-xs text-neutral-500">Цена управляется студией, доступен только тайминг.</div>
-              ) : null}
-            </div>
-          ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border p-4">
-        <h3 className="text-sm font-semibold">Портфолио</h3>
-
-        <div className="mt-3">
-          <input
-            ref={newPortfolioInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              if (file) {
-                void uploadPortfolioFile(file);
-                event.currentTarget.value = "";
-              }
-            }}
-          />
-          <button type="button" onClick={() => newPortfolioInputRef.current?.click()} className="rounded-lg border px-3 py-2 text-sm">
-            + Добавить фото
-          </button>
-        </div>
-
-        {pendingPortfolioMeta ? (
-          <div className="mt-3 rounded-xl border p-3">
-            <img src={pendingPortfolioMeta.mediaUrl} alt="pending" className="h-40 w-full rounded-lg object-cover" />
-            <button type="button" onClick={() => setPortfolioMetaOpen(true)} className="mt-2 rounded border px-2 py-1 text-xs">
-              Описание
-            </button>
-          </div>
-        ) : null}
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {data.portfolio.map((item) => (
-            <div key={item.id} className="relative rounded-xl border p-2">
-              <img src={item.mediaUrl} alt="portfolio" className="h-40 w-full rounded-lg object-cover" />
-              <div className="absolute right-3 top-3 flex gap-1">
-                <label className="cursor-pointer rounded-md bg-black/60 px-1.5 py-1 text-xs text-white" title="Заменить">
-                  ✏️
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null;
-                      if (file) {
-                        void replacePortfolio(item, file);
-                        event.currentTarget.value = "";
-                      }
-                    }}
-                  />
-                </label>
-                <button type="button" onClick={() => void removePortfolio(item)} className="rounded-md bg-black/60 px-1.5 py-1 text-xs text-white" title="Удалить">
-                  ✖️
-                </button>
-              </div>
-              {item.caption ? <div className="mt-1 text-xs text-neutral-600">{item.caption}</div> : null}
-              <div className="mt-1 text-[11px] text-neutral-500">Услуг: {item.serviceIds.length}</div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {portfolioMetaOpen && pendingPortfolioMeta ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-4">
+          <div className="w-full max-w-md rounded-2xl bg-bg-card p-4">
             <h3 className="text-base font-semibold">Описание фото</h3>
             <div className="mt-3 space-y-2">
               <input
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className={inputBaseClass}
                 value={portfolioCaption}
                 onChange={(event) => setPortfolioCaption(event.target.value)}
                 placeholder="Подпись (необязательно)"
               />
-              <div className="rounded-lg border p-2">
-                <div className="mb-1 text-xs text-neutral-600">Какая это услуга? (необязательно)</div>
+              <div className="rounded-lg bg-bg-input/70 p-3">
+                <div className="mb-1 text-xs text-text-sec">Какая это услуга? (необязательно)</div>
                 <div className="flex flex-wrap gap-2">
                   {serviceList.map((service) => (
                     <label key={`portfolio-${service.serviceId}`} className="text-xs">
@@ -1231,10 +1686,19 @@ export function MasterProfilePage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setPortfolioMetaOpen(false)} className="rounded-lg border px-3 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setPortfolioMetaOpen(false)}
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+              >
                 Закрыть
               </button>
-              <button type="button" onClick={() => void commitPendingPortfolio()} disabled={saving} className="rounded-lg bg-black px-3 py-2 text-sm text-white">
+              <button
+                type="button"
+                onClick={() => void commitPendingPortfolio()}
+                disabled={saving}
+                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+              >
                 Сохранить
               </button>
             </div>
