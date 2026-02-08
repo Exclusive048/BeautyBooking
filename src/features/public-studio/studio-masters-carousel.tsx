@@ -10,6 +10,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 export type StudioMasterCard = {
   id: string;
   name: string;
+  publicUsername: string | null;
 };
 
 type PortfolioFeedItem = {
@@ -132,9 +133,13 @@ export function StudioMastersCarousel({ studioId, masters }: Props) {
               <div className="text-sm font-semibold text-text">{master.name}</div>
               {master.specialization ? <div className="text-xs text-text-muted">{master.specialization}</div> : null}
               <div className="flex items-center gap-2">
-                <Link href={`/providers/${master.id}`} className="text-xs font-medium text-text underline underline-offset-2">
-                  {UI_TEXT.publicStudio.openMaster}
-                </Link>
+                {master.publicUsername ? (
+                  <Link href={`/u/${master.publicUsername}`} className="text-xs font-medium text-text underline underline-offset-2">
+                    {UI_TEXT.publicStudio.openMaster}
+                  </Link>
+                ) : (
+                  <span className="text-xs text-text-muted">Ссылка временно недоступна</span>
+                )}
                 <Link
                   href={`/studios/${studioId}/booking?masterId=${master.id}`}
                   className="ml-auto rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900"

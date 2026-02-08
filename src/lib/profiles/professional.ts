@@ -1,6 +1,7 @@
 import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addRoleToUser } from "@/lib/auth/roles";
+import { ensureUniqueUsername, generateDefaultUsername } from "@/lib/publicUsername";
 
 type MasterProfileCreateResult =
   | { status: "created"; masterProfileId: string; providerId: string }
@@ -18,6 +19,11 @@ type CreateProfileInput = {
 export async function createMasterProfile(
   input: CreateProfileInput
 ): Promise<MasterProfileCreateResult> {
+  const userProfile = await prisma.userProfile.findUnique({
+    where: { id: input.userId },
+    select: { firstName: true, lastName: true },
+  });
+
   const existingProfile = await prisma.masterProfile.findUnique({
     where: { userId: input.userId },
     select: { id: true, providerId: true },
@@ -39,6 +45,13 @@ export async function createMasterProfile(
   });
 
   if (!provider) {
+    const baseUsername = generateDefaultUsername({
+      providerType: ProviderType.MASTER,
+      firstName: userProfile?.firstName ?? null,
+      lastName: userProfile?.lastName ?? null,
+      allowLastName: false,
+    });
+    const uniqueUsername = await ensureUniqueUsername(prisma, baseUsername);
     provider = await prisma.provider.create({
       data: {
         ownerUserId: input.userId,
@@ -52,6 +65,8 @@ export async function createMasterProfile(
         district: "District not set",
         categories: [],
         availableToday: false,
+        publicUsername: uniqueUsername,
+        publicUsernameUpdatedAt: new Date(),
       },
       select: { id: true },
     });
@@ -72,6 +87,11 @@ export async function createMasterProfile(
 export async function createStudioProfile(
   input: CreateProfileInput
 ): Promise<StudioProfileCreateResult> {
+  const userProfile = await prisma.userProfile.findUnique({
+    where: { id: input.userId },
+    select: { firstName: true, lastName: true },
+  });
+
   const existingProvider = await prisma.provider.findFirst({
     where: { ownerUserId: input.userId, type: ProviderType.STUDIO },
     select: { id: true, studioProfile: { select: { id: true } } },
@@ -102,6 +122,17 @@ export async function createStudioProfile(
         district: "District not set",
         categories: [],
         availableToday: false,
+        publicUsername: await ensureUniqueUsername(
+          prisma,
+          generateDefaultUsername({
+            providerType: ProviderType.STUDIO,
+            studioName: "New studio",
+            firstName: userProfile?.firstName ?? null,
+            lastName: userProfile?.lastName ?? null,
+            allowLastName: false,
+          })
+        ),
+        publicUsernameUpdatedAt: new Date(),
       },
       select: { id: true },
     }));

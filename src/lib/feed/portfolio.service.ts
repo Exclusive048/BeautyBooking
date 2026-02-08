@@ -16,6 +16,7 @@ export type PortfolioFeedItem = {
   height: number | null;
   masterId: string;
   masterName: string;
+  masterPublicUsername: string | null;
   masterAvatarUrl: string | null;
   studioName: string | null;
   serviceIds: string[];
@@ -156,6 +157,7 @@ export async function listPortfolioFeed(input: {
         select: {
           id: true,
           name: true,
+          publicUsername: true,
           avatarUrl: true,
           studio: { select: { name: true } },
         },
@@ -210,6 +212,7 @@ export async function listPortfolioFeed(input: {
       height: row.height ?? null,
       masterId: row.master.id,
       masterName: row.master.name,
+      masterPublicUsername: row.master.publicUsername ?? null,
       masterAvatarUrl: row.master.avatarUrl ?? null,
       studioName: row.master.studio?.name ?? null,
       serviceIds: snapshot.serviceIds,
@@ -238,6 +241,7 @@ export async function getPortfolioDetail(
         select: {
           id: true,
           name: true,
+          publicUsername: true,
           avatarUrl: true,
           studio: { select: { name: true } },
         },
@@ -345,6 +349,7 @@ export async function getPortfolioDetail(
     height: item.height ?? null,
     masterId: item.master.id,
     masterName: item.master.name,
+    masterPublicUsername: item.master.publicUsername ?? null,
     masterAvatarUrl: item.master.avatarUrl ?? null,
     studioName: item.master.studio?.name ?? null,
     serviceIds: snapshot.serviceIds,

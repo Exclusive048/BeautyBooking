@@ -10,6 +10,7 @@ type PortfolioDetail = {
   id: string;
   masterId: string;
   masterName: string;
+  masterPublicUsername: string | null;
   serviceIds: string[];
   serviceOptions: Array<{
     serviceId: string;
@@ -67,9 +68,10 @@ export default function BookFromPortfolioClient() {
   }, [portfolioId]);
 
   const bookLink = useMemo(() => {
-    if (!detail) return "#";
-    return `/providers/${detail.masterId}?prefillMasterId=${detail.masterId}&prefillServiceIds=${detail.serviceIds.join(",")}`;
+    if (!detail?.masterPublicUsername) return "#";
+    return detail.masterPublicUsername ? `/u/${detail.masterPublicUsername}` : "#";
   }, [detail]);
+  const canOpenProfile = Boolean(detail?.masterPublicUsername);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
@@ -130,7 +132,12 @@ export default function BookFromPortfolioClient() {
 
           <Link
             href={bookLink}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+            aria-disabled={!canOpenProfile}
+            className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold ${
+              canOpenProfile
+                ? "bg-black text-white"
+                : "cursor-default bg-neutral-200 text-neutral-500 pointer-events-none"
+            }`}
           >
             {UI_TEXT.feed.bookNow}
           </Link>

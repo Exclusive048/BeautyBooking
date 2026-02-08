@@ -29,14 +29,14 @@ export async function GET(_req: Request, ctx: RouteContext) {
     if (provider.type === ProviderType.MASTER) {
       const master = await prisma.provider.findUnique({
         where: { id },
-        select: { id: true, name: true },
+        select: { id: true, name: true, publicUsername: true },
       });
       return ok({ masters: master ? [master] : [] });
     }
 
     const masters = await prisma.provider.findMany({
       where: { studioId: id, type: ProviderType.MASTER },
-      select: { id: true, name: true },
+      select: { id: true, name: true, publicUsername: true },
       orderBy: { createdAt: "asc" },
     });
 
