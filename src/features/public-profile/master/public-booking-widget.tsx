@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
-import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
+import { listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import {
+  SlotPickerOptimized,
+  groupSlotsByTimeOfDay,
+  type SlotItem as SlotPickerItem,
+} from "@/features/booking/components/slot-picker/slot-picker";
 
-type SlotItem = {
+type SlotItem = SlotPickerItem & {
   startAtUtc: string;
   endAtUtc: string;
-  label: string;
+  dayKey: string;
 };
 
 type Props = {
@@ -25,22 +30,56 @@ type MeUser = {
   phone: string | null;
 };
 
+const INITIAL_PAGE_SIZE = 5;
+const LOAD_MORE_SIZE = 7;
+const SLOT_LOAD_DEBOUNCE_MS = 200;
+const PREFETCH_DELAY_MS = 900;
+const SLOT_LABEL_DATE_LENGTH = 10;
+const SLOT_LABEL_TIME_START = 11;
+const SLOT_LABEL_TIME_LENGTH = 5;
+const PROFILER_THRESHOLD_MS = 16;
+const SLOT_REMOVED_MESSAGE = "Выбранный слот больше недоступен.";
+const SLOT_NOTICE_TTL_MS = 3000;
+
+function getSlotDayKey(label: string): string {
+  if (label.length >= SLOT_LABEL_DATE_LENGTH) {
+    return label.slice(0, SLOT_LABEL_DATE_LENGTH);
+  }
+  return label;
+}
+
+function getSlotTimeText(label: string): string {
+  if (label.length >= SLOT_LABEL_TIME_START + SLOT_LABEL_TIME_LENGTH) {
+    return label.slice(SLOT_LABEL_TIME_START, SLOT_LABEL_TIME_START + SLOT_LABEL_TIME_LENGTH);
+  }
+  const parts = label.split(" ");
+  return parts[1] ?? label;
+}
+
 export function PublicBookingWidget({ providerId, providerTimezone, selectedServices, onRemove }: Props) {
   const timezone = providerTimezone.trim() ? providerTimezone.trim() : "UTC";
   const isEmpty = selectedServices.length <= 0;
   const totalPrice = selectedServices.reduce((sum, service) => sum + Math.max(0, service.price), 0);
   const totalDuration = selectedServices.reduce((sum, service) => sum + Math.max(0, service.durationMin), 0);
+  const isDev = process.env.NODE_ENV !== "production";
+  const renderCount = useRef(0);
+  useEffect(() => {
+    if (!isDev) return;
+    renderCount.current += 1;
+    console.debug(`[render] PublicBookingWidget #${renderCount.current}`);
+  }, [isDev]);
 
   const [step, setStep] = useState<"summary" | "slots" | "checkout">("summary");
   const [anchorKey, setAnchorKey] = useState<string>(() => toLocalDateKey(new Date(), timezone));
-  const [anchorStack, setAnchorStack] = useState<string[]>([]);
-  const [days, setDays] = useState<Array<{ date: string }>>([]);
-  const [nextFrom, setNextFrom] = useState<string>("");
-  const [daysLoading, setDaysLoading] = useState(false);
-  const [daysError, setDaysError] = useState<string | null>(null);
+  const [loadedUntilExclusive, setLoadedUntilExclusive] = useState<string>("");
+  const [loadedBatches, setLoadedBatches] = useState<
+    Array<{ from: string; toExclusive: string; loadedAt: string }>
+  >([]);
+  const [hasMore, setHasMore] = useState(true);
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [slotNotice, setSlotNotice] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedSlotLabel, setSelectedSlotLabel] = useState("");
   const [me, setMe] = useState<MeUser | null>(null);
@@ -51,28 +90,228 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const hasPrev = anchorStack.length > 0;
 
+  const activeRequestIdRef = useRef(0);
+  const activeRequestControllerRef = useRef<AbortController | null>(null);
+  const prefetchControllerRef = useRef<AbortController | null>(null);
+  const prefetchTimerRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
   const slotServiceId = selectedServices[0]?.id ?? null;
-  const dayKeys = useMemo(() => days.map((day) => day.date), [days]);
+  const dayKeys = useMemo(() => {
+    const keys: string[] = [];
+    const seen: Record<string, boolean> = {};
+    for (const batch of loadedBatches) {
+      for (const key of listDateKeysExclusive(batch.from, batch.toExclusive)) {
+        if (seen[key]) continue;
+        seen[key] = true;
+        keys.push(key);
+      }
+    }
+    return keys;
+  }, [loadedBatches]);
 
   const slotsByDay = useMemo(() => {
-    const map = new Map<string, SlotItem[]>();
-    for (const day of dayKeys) map.set(day, []);
-
-    for (const slot of slots) {
-      const [day] = slot.label.split(" ");
-      if (!day) continue;
-      const current = map.get(day) ?? [];
-      current.push(slot);
-      map.set(day, current);
+    const buckets: Record<string, SlotItem[]> = {};
+    for (const day of dayKeys) {
+      buckets[day] = [];
     }
-
-    return map;
+    for (const slot of slots) {
+      const list = buckets[slot.dayKey];
+      if (!list) continue;
+      list.push(slot);
+    }
+    return buckets;
   }, [dayKeys, slots]);
 
-  const slotsForSelectedDate = selectedDate ? slotsByDay.get(selectedDate) ?? [] : [];
-  const selectedSlot = useMemo(() => slots.find((slot) => slot.label === selectedSlotLabel) ?? null, [selectedSlotLabel, slots]);
+  const slotsForSelectedDate = useMemo(
+    () => (selectedDate ? slotsByDay[selectedDate] ?? [] : []),
+    [selectedDate, slotsByDay]
+  );
+  const slotGroups = useMemo(() => groupSlotsByTimeOfDay(slotsForSelectedDate), [slotsForSelectedDate]);
+  const selectedSlot = useMemo(
+    () => slots.find((slot) => slot.label === selectedSlotLabel) ?? null,
+    [selectedSlotLabel, slots]
+  );
+  const dayItems = useMemo(
+    () =>
+      dayKeys.map((dayKey) => ({
+        dayKey,
+        label: new Date(dayKey).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }),
+        count: slotsByDay[dayKey]?.length ?? 0,
+      })),
+    [dayKeys, slotsByDay]
+  );
+
+  const abortActiveRequest = useCallback(() => {
+    activeRequestControllerRef.current?.abort();
+    activeRequestControllerRef.current = null;
+  }, []);
+
+  const abortPrefetchRequest = useCallback(() => {
+    prefetchControllerRef.current?.abort();
+    prefetchControllerRef.current = null;
+  }, []);
+
+  const clearPrefetchTimer = useCallback(() => {
+    if (prefetchTimerRef.current !== null) {
+      window.clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
+  }, []);
+
+  const clearDebounceTimer = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, []);
+
+  const handleSelectDate = useCallback((dayKey: string) => {
+    setSelectedDate(dayKey);
+    setSelectedSlotLabel("");
+  }, []);
+
+  const handleSelectSlot = useCallback((label: string) => {
+    setSelectedSlotLabel(label);
+  }, []);
+
+  const resetSlotsState = useCallback(
+    (fromKey: string) => {
+      abortActiveRequest();
+      abortPrefetchRequest();
+      clearPrefetchTimer();
+      clearDebounceTimer();
+      setSlots([]);
+      setSlotsError(null);
+      setSlotNotice(null);
+      setLoadedBatches([]);
+      setLoadedUntilExclusive(fromKey);
+      setHasMore(true);
+      setSelectedDate("");
+      setSelectedSlotLabel("");
+    },
+    [abortActiveRequest, abortPrefetchRequest, clearDebounceTimer, clearPrefetchTimer]
+  );
+
+  const prefetchSlotsPage = useCallback(
+    async (fromKey: string, limit: number) => {
+      if (!slotServiceId) return;
+      abortPrefetchRequest();
+      const controller = new AbortController();
+      prefetchControllerRef.current = controller;
+      try {
+        const slotsUrl = new URL(`/api/public/providers/${providerId}/slots`, window.location.origin);
+        slotsUrl.searchParams.set("serviceId", slotServiceId);
+        slotsUrl.searchParams.set("from", fromKey);
+        slotsUrl.searchParams.set("limit", String(limit));
+        await fetch(slotsUrl.toString(), { cache: "no-store", signal: controller.signal });
+      } catch {
+        if (controller.signal.aborted) return;
+      }
+    },
+    [abortPrefetchRequest, providerId, slotServiceId]
+  );
+
+  const schedulePrefetch = useCallback(
+    (fromKey: string) => {
+      if (!slotServiceId) return;
+      clearPrefetchTimer();
+      prefetchTimerRef.current = window.setTimeout(() => {
+        void prefetchSlotsPage(fromKey, LOAD_MORE_SIZE);
+      }, PREFETCH_DELAY_MS);
+    },
+    [clearPrefetchTimer, prefetchSlotsPage, slotServiceId]
+  );
+
+  const loadSlotsPage = useCallback(
+    async (fromKey: string, limit: number, append: boolean) => {
+      if (!slotServiceId) return;
+      const requestId = activeRequestIdRef.current + 1;
+      activeRequestIdRef.current = requestId;
+      abortActiveRequest();
+      const controller = new AbortController();
+      activeRequestControllerRef.current = controller;
+      setSlotsLoading(true);
+      setSlotsError(null);
+      setSlotNotice(null);
+      try {
+        const slotsUrl = new URL(`/api/public/providers/${providerId}/slots`, window.location.origin);
+        slotsUrl.searchParams.set("serviceId", slotServiceId);
+        slotsUrl.searchParams.set("from", fromKey);
+        slotsUrl.searchParams.set("limit", String(limit));
+
+        const slotsRes = await fetch(slotsUrl.toString(), { cache: "no-store", signal: controller.signal });
+        const slotsJson = (await slotsRes.json().catch(() => null)) as
+          | {
+              ok: true;
+              data: {
+                timezone: string;
+                slots: Array<{ startAtUtc: string; endAtUtc: string; label: string }>;
+                meta: { fromDate: string; toDateExclusive: string; hasMore: boolean };
+              };
+            }
+          | { ok: false; error: { message: string } }
+          | null;
+
+        if (!slotsRes.ok || !slotsJson || !slotsJson.ok) {
+          throw new Error(UI_TEXT.publicProfile.slots.loadFailed);
+        }
+        if (controller.signal.aborted || requestId !== activeRequestIdRef.current) return;
+
+        const normalizedSlots: SlotItem[] = (slotsJson.data.slots ?? []).map((slot) => {
+          const label = slot.label;
+          return {
+            id: label,
+            label,
+            timeText: getSlotTimeText(label),
+            dayKey: getSlotDayKey(label),
+            startAtUtc: slot.startAtUtc,
+            endAtUtc: slot.endAtUtc,
+          };
+        });
+        const meta = slotsJson.data.meta;
+
+        setSlots((prev) => (append ? [...prev, ...normalizedSlots] : normalizedSlots));
+        setLoadedUntilExclusive(meta.toDateExclusive);
+        setHasMore(meta.hasMore);
+        setLoadedBatches((prev) => {
+          const batch = {
+            from: meta.fromDate,
+            toExclusive: meta.toDateExclusive,
+            loadedAt: new Date().toISOString(),
+          };
+          return append ? [...prev, batch] : [batch];
+        });
+        if (!append) {
+          setSelectedDate(meta.fromDate);
+          setSelectedSlotLabel("");
+          if (meta.hasMore) {
+            schedulePrefetch(meta.toDateExclusive);
+          }
+        } else {
+          setSelectedDate((current) => current || meta.fromDate);
+        }
+      } catch {
+        if (controller.signal.aborted || requestId !== activeRequestIdRef.current) return;
+        if (!append) {
+          setSlots([]);
+          setSelectedDate("");
+          setSelectedSlotLabel("");
+          setLoadedBatches([]);
+        }
+        setSlotsError(UI_TEXT.publicProfile.slots.loadFailed);
+      } finally {
+        if (!controller.signal.aborted && requestId === activeRequestIdRef.current) {
+          setSlotsLoading(false);
+        }
+      }
+    },
+    [abortActiveRequest, providerId, schedulePrefetch, slotServiceId]
+  );
+
+  useEffect(() => {
+    setAnchorKey(toLocalDateKey(new Date(), timezone));
+  }, [timezone, providerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,88 +347,41 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
   useEffect(() => {
     if (step !== "slots" || !slotServiceId) return;
 
-    let cancelled = false;
-    async function loadDaysAndSlots() {
-      setDaysLoading(true);
-      setDaysError(null);
-      setSlotsLoading(true);
-      setSlotsError(null);
-      try {
-        const daysUrl = new URL(`/api/public/providers/${providerId}/booking-days`, window.location.origin);
-        daysUrl.searchParams.set("from", anchorKey);
-        daysUrl.searchParams.set("limit", "3");
-
-        const daysRes = await fetch(daysUrl.toString(), { cache: "no-store" });
-        const daysJson = (await daysRes.json().catch(() => null)) as
-          | { ok: true; data: { timezone: string; days: Array<{ date: string }>; nextFrom: string } }
-          | { ok: false; error: { message: string } }
-          | null;
-
-        if (!daysRes.ok || !daysJson || !daysJson.ok) {
-          throw new Error(UI_TEXT.publicProfile.slots.loadFailed);
-        }
-
-        if (cancelled) return;
-
-        const loadedDays = daysJson.data.days;
-        setDays(loadedDays);
-        setNextFrom(daysJson.data.nextFrom);
-
-        const fromKey = loadedDays[0]?.date ?? anchorKey;
-        const toKey = daysJson.data.nextFrom || addDaysToDateKey(fromKey, 3);
-
-        if (loadedDays.length === 0) {
-          setSlots([]);
-          setSelectedDate("");
-          setSelectedSlotLabel("");
-          return;
-        }
-
-        const slotsUrl = new URL(`/api/public/providers/${providerId}/slots`, window.location.origin);
-        slotsUrl.searchParams.set("serviceId", slotServiceId);
-        slotsUrl.searchParams.set("from", fromKey);
-        slotsUrl.searchParams.set("to", toKey);
-
-        const slotsRes = await fetch(slotsUrl.toString(), { cache: "no-store" });
-        const slotsJson = (await slotsRes.json().catch(() => null)) as
-          | { ok: true; data: { timezone: string; slots: SlotItem[] } }
-          | { ok: false; error: { message: string } }
-          | null;
-
-        if (!slotsRes.ok || !slotsJson || !slotsJson.ok) {
-          throw new Error(UI_TEXT.publicProfile.slots.loadFailed);
-        }
-
-        if (cancelled) return;
-
-        const loadedSlots = slotsJson.data.slots.filter((slot) => {
-          const slotDateKey = toLocalDateKey(new Date(slot.startAtUtc), timezone);
-          return compareDateKeys(slotDateKey, fromKey) >= 0 && compareDateKeys(slotDateKey, toKey) < 0;
-        });
-
-        setSlots(loadedSlots);
-        setSelectedDate(fromKey);
-        setSelectedSlotLabel("");
-      } catch {
-        if (!cancelled) {
-          setDays([]);
-          setSlots([]);
-          setDaysError(UI_TEXT.publicProfile.slots.loadFailed);
-          setSlotsError(UI_TEXT.publicProfile.slots.loadFailed);
-        }
-      } finally {
-        if (!cancelled) {
-          setDaysLoading(false);
-          setSlotsLoading(false);
-        }
-      }
-    }
-
-    void loadDaysAndSlots();
+    resetSlotsState(anchorKey);
+    clearDebounceTimer();
+    debounceTimerRef.current = window.setTimeout(() => {
+      void loadSlotsPage(anchorKey, INITIAL_PAGE_SIZE, false);
+    }, SLOT_LOAD_DEBOUNCE_MS);
     return () => {
-      cancelled = true;
+      clearDebounceTimer();
     };
-  }, [anchorKey, providerId, slotServiceId, step, timezone]);
+  }, [anchorKey, clearDebounceTimer, loadSlotsPage, resetSlotsState, slotServiceId, step]);
+
+  useEffect(() => {
+    if (step === "slots") return;
+    abortActiveRequest();
+    abortPrefetchRequest();
+    clearPrefetchTimer();
+    clearDebounceTimer();
+  }, [abortActiveRequest, abortPrefetchRequest, clearDebounceTimer, clearPrefetchTimer, step]);
+
+  useEffect(() => {
+    if (!selectedSlotLabel) return;
+    const stillAvailable = slots.some((slot) => slot.label === selectedSlotLabel);
+    if (stillAvailable) return;
+    setSelectedSlotLabel("");
+    setSlotNotice(SLOT_REMOVED_MESSAGE);
+  }, [selectedSlotLabel, slots]);
+
+  useEffect(() => {
+    if (!slotNotice) return;
+    const timer = window.setTimeout(() => {
+      setSlotNotice(null);
+    }, SLOT_NOTICE_TTL_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [slotNotice]);
 
   useEffect(() => {
     if (isEmpty && (step === "slots" || step === "checkout")) {
@@ -304,60 +496,52 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={() =>
-                setAnchorStack((prev) => {
-                  const next = prev.slice(0, -1);
-                  const last = prev[prev.length - 1];
-                  if (last) setAnchorKey(last);
-                  return next;
-                })
-              }
-              disabled={!hasPrev}
-              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
+              onClick={() => {
+                const nextAnchor = toLocalDateKey(new Date(), timezone);
+                setAnchorKey(nextAnchor);
+                resetSlotsState(nextAnchor);
+                void loadSlotsPage(nextAnchor, INITIAL_PAGE_SIZE, false);
+              }}
+              disabled={slotsLoading}
+              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card disabled:opacity-60"
             >
-              {UI_TEXT.publicProfile.slots.prevWeek}
+              Обновить
             </button>
             <button
               type="button"
               onClick={() => {
-                if (!nextFrom) return;
-                setAnchorStack((prev) => [...prev, anchorKey]);
-                setAnchorKey(nextFrom);
+                if (!loadedUntilExclusive || !hasMore) return;
+                void loadSlotsPage(loadedUntilExclusive, LOAD_MORE_SIZE, true);
               }}
-              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
+              disabled={!loadedUntilExclusive || !hasMore || slotsLoading}
+              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card disabled:opacity-60"
             >
-              {UI_TEXT.publicProfile.slots.nextWeek}
+              Показать ещё неделю
             </button>
           </div>
 
-          {daysLoading || slotsLoading ? (
+          {slotsLoading ? (
             <div className="text-sm text-text-sec">{UI_TEXT.publicProfile.slots.loadingSlots}</div>
           ) : null}
-          {daysError || slotsError ? (
-            <div className="text-sm text-text-sec">{daysError ?? slotsError}</div>
-          ) : null}
+          {slotsError ? <div className="text-sm text-text-sec">{slotsError}</div> : null}
 
           {!slotsLoading && !slotsError ? (
             <>
               <div>
                 <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseDay}</div>
                 <div className="flex flex-wrap gap-2">
-                  {dayKeys.map((dayKey) => {
-                    const daySlots = slotsByDay.get(dayKey) ?? [];
-                    const active = selectedDate === dayKey;
+                  {dayItems.map((item) => {
+                    const active = selectedDate === item.dayKey;
                     return (
                       <button
-                        key={dayKey}
+                        key={item.dayKey}
                         type="button"
-                        onClick={() => {
-                          setSelectedDate(dayKey);
-                          setSelectedSlotLabel("");
-                        }}
+                        onClick={() => handleSelectDate(item.dayKey)}
                         className={`rounded-lg border px-2 py-1 text-xs transition ${
                           active ? "border-primary/60 bg-primary text-[rgb(var(--accent-foreground))]" : "border-border-subtle bg-bg-input hover:bg-bg-card"
                         }`}
                       >
-                        {new Date(dayKey).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })} ({daySlots.length})
+                        {item.label} ({item.count})
                       </button>
                     );
                   })}
@@ -366,25 +550,36 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
 
               <div>
                 <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseSlot}</div>
+                {slotNotice ? <div className="mb-2 text-xs text-amber-600">{slotNotice}</div> : null}
                 {slotsForSelectedDate.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {slotsForSelectedDate.map((slot) => {
-                      const active = selectedSlotLabel === slot.label;
-                      const time = slot.label.split(" ")[1] ?? slot.label;
-                      return (
-                        <button
-                          key={slot.label}
-                          type="button"
-                          onClick={() => setSelectedSlotLabel(slot.label)}
-                          className={`rounded-lg border px-2 py-1 text-xs transition ${
-                            active ? "border-primary/60 bg-primary text-[rgb(var(--accent-foreground))]" : "border-border-subtle bg-bg-input hover:bg-bg-card"
-                          }`}
-                        >
-                          {time}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <>
+                    {isDev ? (
+                      <Profiler
+                        id="SlotPickerOptimized"
+                        onRender={(_id, _phase, actualDuration) => {
+                          if (actualDuration > PROFILER_THRESHOLD_MS) {
+                            console.info(
+                              `[profiler] SlotPickerOptimized commit ${Math.round(actualDuration)}ms`
+                            );
+                          }
+                        }}
+                      >
+                        <SlotPickerOptimized
+                          groups={slotGroups}
+                          value={selectedSlotLabel}
+                          onChange={handleSelectSlot}
+                          disabled={slotsLoading}
+                        />
+                      </Profiler>
+                    ) : (
+                      <SlotPickerOptimized
+                        groups={slotGroups}
+                        value={selectedSlotLabel}
+                        onChange={handleSelectSlot}
+                        disabled={slotsLoading}
+                      />
+                    )}
+                  </>
                 ) : (
                   <div className="text-sm text-text-sec">
                     {selectedDate

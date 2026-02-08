@@ -303,20 +303,18 @@ export function MasterDashboardPage() {
       setSlotsLoading(true);
       setSlotsError(null);
       try {
-        const from = new Date(`${date}T00:00:00.000Z`);
-        const to = new Date(from);
-        to.setUTCDate(to.getUTCDate() + 7);
-
         const params = new URLSearchParams({
           serviceId: slotsServiceId,
-          from: from.toISOString(),
-          to: to.toISOString(),
+          from: date,
+          limit: "7",
         });
         const res = await fetch(`/api/masters/${data.masterId}/availability?${params.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
         });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ slots: AvailabilitySlot[] }> | null;
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ slots: AvailabilitySlot[]; meta: { toDateExclusive: string } }>
+          | null;
 
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);

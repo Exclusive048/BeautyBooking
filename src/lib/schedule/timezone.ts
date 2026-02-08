@@ -105,3 +105,18 @@ export function toLocalDateKey(date: Date | number | string, timeZone: string): 
   const day = String(parts.day).padStart(2, "0");
   return `${parts.year}-${month}-${day}`;
 }
+
+export function toLocalDateKeyExclusive(date: Date, timeZone: string): string {
+  const parts = partsFromDate(date, timeZone);
+  const month = String(parts.month).padStart(2, "0");
+  const day = String(parts.day).padStart(2, "0");
+  const dateKey = `${parts.year}-${month}-${day}`;
+  const isLocalMidnight =
+    parts.hour === 0 && parts.minute === 0 && parts.second === 0 && date.getUTCMilliseconds() === 0;
+  if (isLocalMidnight) {
+    return dateKey;
+  }
+  const next = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}

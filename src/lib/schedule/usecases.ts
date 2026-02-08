@@ -10,18 +10,42 @@ import type {
   WeeklyScheduleItem,
 } from "@/lib/domain/schedule";
 import { timeToMinutes } from "@/lib/schedule/time";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { buildSlotsCacheKey, getCachedSlots, invalidateSlotsForMaster, setCachedSlots } from "@/lib/schedule/slotsCache";
+import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
+import {
+  buildSlotsCacheKey,
+  getCachedSlots,
+  invalidateSlotsForMaster,
+  setCachedSlotsForDate,
+} from "@/lib/schedule/slotsCache";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
-import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
+import {
+  addDaysToDateKey,
+  compareDateKeys,
+  dateFromLocalDateKey,
+  diffDateKeys,
+  isDateKey,
+} from "@/lib/schedule/dateKey";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
+import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 
 type RangeInput = {
   from: Date;
   to: Date;
   stepMin?: number;
 };
+
+export const MAX_BOOKING_WINDOW_DAYS = 60;
+export const DEFAULT_PAGE_SIZE = 5;
+export const MAX_PAGE_SIZE = 14;
+
+function clampPageSize(value: number | null | undefined): number {
+  if (!Number.isFinite(value)) return DEFAULT_PAGE_SIZE;
+  const safe = Math.floor(value as number);
+  if (safe < 1) return 1;
+  if (safe > MAX_PAGE_SIZE) return MAX_PAGE_SIZE;
+  return safe;
+}
 
 type ScheduleRuleDay = {
   isWorkday: boolean;
@@ -504,6 +528,188 @@ export async function saveScheduleRule(
   return { ok: true, data: { id: created.id } };
 }
 
+export type AvailabilitySlotsPageMeta = {
+  fromDate: string;
+  toDateExclusive: string;
+  totalDays: number;
+  hasMore: boolean;
+  pageSize: number;
+  stale?: boolean;
+};
+
+export type AvailabilitySlotsPageResult = {
+  slots: AvailabilitySlot[];
+  meta: AvailabilitySlotsPageMeta;
+};
+
+export async function listAvailabilitySlotsPaginated(
+  providerId: string,
+  serviceId: string,
+  durationMin: number,
+  input: { fromKey: string; toKeyExclusive?: string; limit?: number }
+): Promise<Result<AvailabilitySlotsPageResult>> {
+  const startedAt = Date.now();
+
+  if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
+    return { ok: false, status: 400, message: "Invalid duration", code: "DURATION_INVALID" };
+  }
+
+  if (!serviceId) {
+    return { ok: false, status: 400, message: "Service id is required", code: "SERVICE_REQUIRED" };
+  }
+
+  const requestedStartKey = input.fromKey;
+  if (!isDateKey(requestedStartKey)) {
+    return { ok: false, status: 400, message: "Invalid from", code: "DATE_INVALID" };
+  }
+
+  if (input.toKeyExclusive && !isDateKey(input.toKeyExclusive)) {
+    return { ok: false, status: 400, message: "Invalid to", code: "DATE_INVALID" };
+  }
+
+  const maxEndKeyExclusive = addDaysToDateKey(requestedStartKey, MAX_BOOKING_WINDOW_DAYS);
+  const requestedEndKeyExclusive = input.toKeyExclusive ?? maxEndKeyExclusive;
+
+  if (compareDateKeys(requestedEndKeyExclusive, requestedStartKey) < 0) {
+    return { ok: false, status: 400, message: "Invalid range", code: "RANGE_INVALID" };
+  }
+
+  if (compareDateKeys(requestedEndKeyExclusive, maxEndKeyExclusive) > 0) {
+    return { ok: false, status: 400, message: "Range too large", code: "RANGE_INVALID" };
+  }
+
+  const pageSize = clampPageSize(input.limit);
+  const limitedEndKeyExclusive = addDaysToDateKey(requestedStartKey, pageSize);
+  const actualEndKeyExclusive =
+    compareDateKeys(limitedEndKeyExclusive, requestedEndKeyExclusive) < 0
+      ? limitedEndKeyExclusive
+      : requestedEndKeyExclusive;
+
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { id: true, timezone: true, bufferBetweenBookingsMin: true },
+  });
+  if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+
+  const timezone = provider.timezone;
+  const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
+
+  const ctx = await createScheduleContext({
+    providerId,
+    timezoneHint: timezone,
+    range: { fromKey: requestedStartKey, toKeyExclusive: actualEndKeyExclusive },
+  });
+
+  const rangeFromUtc = dateFromLocalDateKey(requestedStartKey, timezone, 0, 0);
+  const rangeToExclusiveUtc = dateFromLocalDateKey(actualEndKeyExclusive, timezone, 0, 0);
+
+  const bookings = await prisma.booking.findMany({
+    where: {
+      OR: [
+        { masterProviderId: providerId },
+        { masterProviderId: null, providerId },
+      ],
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+      ...buildBookingOverlapWhere(rangeFromUtc, rangeToExclusiveUtc),
+    },
+    select: { startAtUtc: true, endAtUtc: true },
+    orderBy: { startAtUtc: "asc" },
+  });
+
+  const bookingRanges = bookings
+    .map((booking) =>
+      booking.startAtUtc && booking.endAtUtc
+        ? { startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc }
+        : null
+    )
+    .filter((item): item is { startAtUtc: Date; endAtUtc: Date } => item !== null);
+
+  const bookingsByDateKey = new Map<string, Array<{ startAtUtc: Date; endAtUtc: Date }>>();
+
+  for (const booking of bookingRanges) {
+    const startBookingKey = toLocalDateKey(booking.startAtUtc, timezone);
+    const endBookingKeyExclusive = toLocalDateKeyExclusive(booking.endAtUtc, timezone);
+    const clampedStart =
+      compareDateKeys(startBookingKey, requestedStartKey) < 0 ? requestedStartKey : startBookingKey;
+    const clampedEndExclusive =
+      compareDateKeys(endBookingKeyExclusive, actualEndKeyExclusive) > 0
+        ? actualEndKeyExclusive
+        : endBookingKeyExclusive;
+
+    if (compareDateKeys(clampedStart, clampedEndExclusive) >= 0) continue;
+
+    let cursor = clampedStart;
+    while (compareDateKeys(cursor, clampedEndExclusive) < 0) {
+      const list = bookingsByDateKey.get(cursor) ?? [];
+      list.push(booking);
+      bookingsByDateKey.set(cursor, list);
+      cursor = addDaysToDateKey(cursor, 1);
+    }
+  }
+
+  const slots: AvailabilitySlot[] = [];
+  let cursorKey = requestedStartKey;
+  const now = new Date();
+
+  while (compareDateKeys(cursorKey, actualEndKeyExclusive) < 0) {
+    const cacheKey = buildSlotsCacheKey({
+      masterId: providerId,
+      dateKey: cursorKey,
+      serviceId,
+      serviceDuration: durationMin,
+      bufferMin,
+      timeZone: timezone,
+      scheduleVersion: ctx.scheduleWindow.scheduleVersion,
+      publishedUntilLocal: ctx.scheduleWindow.publishedUntilLocal,
+    });
+    const cached = await getCachedSlots(cacheKey);
+    let daySlots: AvailabilitySlot[];
+
+    if (cached) {
+      daySlots = cached;
+    } else {
+      const dayPlan = await ScheduleEngine.getDayPlanFromContext(ctx, cursorKey);
+      daySlots = buildSlotsForDay({
+        dayPlan,
+        dateKey: cursorKey,
+        timeZone: timezone,
+        serviceDurationMin: durationMin,
+        bufferMin,
+        bookings: bookingsByDateKey.get(cursorKey) ?? [],
+        now,
+      });
+      await setCachedSlotsForDate({
+        key: cacheKey,
+        masterId: providerId,
+        dateKey: cursorKey,
+        slots: daySlots,
+      });
+    }
+
+    slots.push(...daySlots);
+    cursorKey = addDaysToDateKey(cursorKey, 1);
+  }
+
+  const totalDays = Math.max(0, diffDateKeys(requestedStartKey, actualEndKeyExclusive));
+  const hasMore = compareDateKeys(actualEndKeyExclusive, requestedEndKeyExclusive) < 0;
+  const meta: AvailabilitySlotsPageMeta = {
+    fromDate: requestedStartKey,
+    toDateExclusive: actualEndKeyExclusive,
+    totalDays,
+    hasMore,
+    pageSize,
+  };
+
+  if (process.env.NODE_ENV !== "production") {
+    const durationMs = Date.now() - startedAt;
+    console.info(
+      `[availability] provider=${providerId} days=${totalDays} bookings=${bookingRanges.length} slots=${slots.length} ms=${durationMs}`
+    );
+  }
+
+  return { ok: true, data: { slots, meta } };
+}
+
 export async function listAvailabilitySlots(
   providerId: string,
   serviceId: string,
@@ -542,10 +748,12 @@ export async function listAvailabilitySlots(
 
   const bookings = await prisma.booking.findMany({
     where: {
-      providerId,
+      OR: [
+        { masterProviderId: providerId },
+        { masterProviderId: null, providerId },
+      ],
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null, lte: to },
-      endAtUtc: { not: null, gte: from },
+      ...buildBookingOverlapWhere(from, to),
     },
     select: { id: true, startAtUtc: true, endAtUtc: true },
   });
@@ -560,13 +768,12 @@ export async function listAvailabilitySlots(
   const bookingsByDateKey = new Map<string, Array<{ startAtUtc: Date; endAtUtc: Date }>>();
   for (const booking of bookingRanges) {
     const startBookingKey = toLocalDateKey(booking.startAtUtc, timezone);
-    const endBookingKey = toLocalDateKey(booking.endAtUtc, timezone);
+    const endBookingKeyExclusive = toLocalDateKeyExclusive(booking.endAtUtc, timezone);
     let cursor = startBookingKey;
-    while (compareDateKeys(cursor, endBookingKey) <= 0) {
+    while (compareDateKeys(cursor, endBookingKeyExclusive) < 0) {
       const list = bookingsByDateKey.get(cursor) ?? [];
       list.push(booking);
       bookingsByDateKey.set(cursor, list);
-      if (cursor === endBookingKey) break;
       cursor = addDaysToDateKey(cursor, 1);
     }
   }
@@ -600,7 +807,12 @@ export async function listAvailabilitySlots(
         bookings: bookingsByDateKey.get(cursorKey) ?? [],
         now,
       });
-      await setCachedSlots(cacheKey, daySlots);
+      await setCachedSlotsForDate({
+        key: cacheKey,
+        masterId: providerId,
+        dateKey: cursorKey,
+        slots: daySlots,
+      });
     }
 
     for (const slot of daySlots) {

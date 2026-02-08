@@ -14,6 +14,7 @@ import {
   ensureBookingActionWindow,
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
+import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 
 export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
   // AUDIT (отмена/отклонение):
@@ -26,6 +27,8 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     select: {
       id: true,
       status: true,
+      providerId: true,
+      masterProviderId: true,
       startAtUtc: true,
       endAtUtc: true,
       proposedStartAt: true,
@@ -125,6 +128,15 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     } catch (error) {
       console.error("Failed to send Telegram booking notifications:", error);
     }
+  }
+
+  if (!declinesMasterChange) {
+    await invalidateSlotsForBookingRange({
+      providerId: booking.providerId,
+      masterProviderId: booking.masterProviderId ?? null,
+      startAtUtc: booking.startAtUtc,
+      endAtUtc: booking.endAtUtc,
+    });
   }
 
   return { id: updated.id, status: updated.status };

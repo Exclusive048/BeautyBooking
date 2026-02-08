@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBookingDto";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import type { BookingStatus } from "@prisma/client";
@@ -447,6 +448,13 @@ export async function createSoloMasterBooking(input: {
     });
 
     return booking;
+  });
+
+  await invalidateSlotsForBookingRange({
+    providerId: input.masterId,
+    masterProviderId: input.masterId,
+    startAtUtc: input.startAt,
+    endAtUtc: endAt,
   });
 
   return { id: created.id };

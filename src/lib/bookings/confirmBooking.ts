@@ -8,6 +8,7 @@ import {
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
+import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 
 function shiftMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60 * 1000);
@@ -91,6 +92,9 @@ export async function confirmBooking(
   if (runtimeStatus === "CONFIRMED") {
     return { id: booking.id, status: "CONFIRMED" };
   }
+
+  const previousStartAtUtc = booking.startAtUtc;
+  const previousEndAtUtc = booking.endAtUtc;
 
   let startAtUtc = booking.startAtUtc;
   let endAtUtc = booking.endAtUtc;
@@ -192,6 +196,23 @@ export async function confirmBooking(
     await sendBookingTelegramNotifications(updated.id, "CONFIRMED", { notifyMasterOnConfirm: false });
   } catch (error) {
     console.error("Failed to send Telegram booking notifications:", error);
+  }
+
+  if (appliesRequestedChange) {
+    await invalidateSlotsForBookingMove({
+      previous: {
+        providerId: booking.providerId,
+        masterProviderId: booking.masterProviderId ?? null,
+        startAtUtc: previousStartAtUtc,
+        endAtUtc: previousEndAtUtc,
+      },
+      next: {
+        providerId: booking.providerId,
+        masterProviderId: booking.masterProviderId ?? null,
+        startAtUtc,
+        endAtUtc,
+      },
+    });
   }
 
   return { id: updated.id, status: updated.status };

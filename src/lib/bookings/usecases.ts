@@ -9,6 +9,7 @@ import {
   resolveBookingRuntimeStatus,
   type BookingActor,
 } from "@/lib/bookings/flow";
+import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 
 type RescheduleRecord = BookingDto;
 
@@ -265,6 +266,21 @@ export async function rescheduleBooking(input: {
   } catch (error) {
     console.error("Failed to create booking notifications:", error);
   }
+
+  await invalidateSlotsForBookingMove({
+    previous: {
+      providerId: booking.providerId,
+      masterProviderId: booking.masterProviderId ?? null,
+      startAtUtc: booking.startAtUtc,
+      endAtUtc: booking.endAtUtc,
+    },
+    next: {
+      providerId: booking.providerId,
+      masterProviderId: booking.masterProviderId ?? null,
+      startAtUtc: input.startAtUtc,
+      endAtUtc: input.endAtUtc,
+    },
+  });
 
   return { ok: true, data: toBookingDto(updated) };
 }
