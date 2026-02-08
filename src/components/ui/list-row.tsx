@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 
 type Props = {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   icon?: ReactNode;
   right?: ReactNode;
   className?: string;

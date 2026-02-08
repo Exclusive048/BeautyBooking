@@ -114,8 +114,11 @@ export function ConnectedAccountsSection() {
   const linked = Boolean(status?.linked);
   const enabled = Boolean(status?.enabled);
 
+  const statusLabel = linked ? "Подключено" : "Не подключено";
+  const statusDotClass = linked ? "bg-emerald-500" : "bg-rose-500";
+
   return (
-    <div className="rounded-2xl border p-4">
+    <div className="rounded-2xl bg-bg-card/90 p-4">
       <h3 className="text-sm font-semibold">Подключенные аккаунты</h3>
       <p className="mt-1 text-xs text-text-sec">Управляйте внешними каналами уведомлений.</p>
 
@@ -123,7 +126,12 @@ export function ConnectedAccountsSection() {
         <ListRow
           icon="TG"
           title="Уведомления в Telegram"
-          subtitle={linked ? "Подключено" : "Не подключено"}
+          subtitle={
+            <span className="inline-flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${statusDotClass}`} aria-hidden />
+              {statusLabel}
+            </span>
+          }
           right={
             loading ? (
               <div className="text-xs text-text-sec">{UI_TEXT.common.loading}</div>
