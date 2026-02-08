@@ -17,6 +17,7 @@ type ServiceLite = {
 export type CatalogSearchItem = {
   type: "master" | "studio";
   id: string;
+  publicUsername: string | null;
   title: string;
   avatarUrl: string | null;
   ratingAvg: number;
@@ -232,6 +233,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       id: true,
       type: true,
       name: true,
+      publicUsername: true,
       avatarUrl: true,
       ratingAvg: true,
       reviews: true,
@@ -322,6 +324,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     return {
       type: provider.type === ProviderType.STUDIO ? "studio" : "master",
       id: provider.id,
+      publicUsername: provider.publicUsername ?? null,
       title: provider.name,
       avatarUrl: provider.avatarUrl,
       ratingAvg: provider.ratingAvg,

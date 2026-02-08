@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
-import { SlotPicker } from "@/features/booking/components/slot-picker";
+import { SlotPicker } from "@/features/booking/components/slot-picker/";
 import {
   buildDateBounds,
   createBooking,

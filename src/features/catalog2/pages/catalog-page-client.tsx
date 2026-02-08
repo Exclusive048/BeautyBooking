@@ -16,6 +16,7 @@ type SmartTagPreset = "rush" | "relax" | "design" | "safe" | "silent";
 type CatalogSearchItem = {
   type: "master" | "studio";
   id: string;
+  publicUsername: string | null;
   title: string;
   avatarUrl: string | null;
   ratingAvg: number;

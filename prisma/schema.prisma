@@ -308,6 +308,8 @@ model Provider {
   geoLat       Float?
   geoLng       Float?
   isPublished  Boolean @default(false)
+  publicUsername          String?   @unique
+  publicUsernameUpdatedAt DateTime?
 
   ownerUserId String?
   owner       UserProfile? @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
@@ -326,12 +328,23 @@ model Provider {
   masterProfile  MasterProfile?  @relation("MasterProvider")
   reviewsAbout   Review[]
   portfolioItems PortfolioItem[]
+  publicUsernameAliases PublicUsernameAlias[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerUserId])
   @@index([studioId])
+}
+
+model PublicUsernameAlias {
+  id         String   @id @default(cuid())
+  username   String   @unique
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([providerId])
 }
 
 model Service {

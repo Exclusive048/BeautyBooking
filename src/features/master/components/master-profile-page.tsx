@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
+import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -1229,6 +1230,7 @@ export function MasterProfilePage() {
                 <h3 className="text-sm font-semibold">Настройки</h3>
                 <p className="mt-1 text-xs text-text-sec">Автоматизация и внешние каналы уведомлений.</p>
               </div>
+              <PublicUsernameCard endpoint="/api/cabinet/master/public-username" />
               <div className="grid gap-4 lg:grid-cols-2">
                 {data.master.isSolo ? (
                   <div className="rounded-2xl bg-bg-card/90 p-4">

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UploaderSurface } from "@/components/ui/uploader-surface";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { PortfolioEditor } from "@/features/media/components/portfolio-editor";
+import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
 import type { MediaAssetDto } from "@/lib/media/types";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -243,6 +244,8 @@ export function StudioProfilePage({ providerId }: Props) {
     <div className="space-y-4">
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {info ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{info}</div> : null}
+
+      <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
 
       <section className="lux-card rounded-[24px] p-4">
         <h3 className="text-sm font-semibold">{t.sectionTitle}</h3>

@@ -1,7 +1,7 @@
 import type { ApiResponse } from "@/lib/types/api";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 
-export type StudioMaster = { id: string; name: string };
+export type StudioMaster = { id: string; name: string; publicUsername: string | null };
 export type SlotItem = { startAtUtc: string; endAtUtc: string; label: string };
 export type BookingUser = {
   id: string;
