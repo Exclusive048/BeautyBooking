@@ -19,6 +19,19 @@ export type StudioFinanceData = {
   hasCategories: boolean;
 };
 
+export type StudioFinanceSummary = {
+  todayAmount: number;
+  last7DaysAmount: number;
+  last30DaysAmount: number;
+  recentBookings: Array<{
+    id: string;
+    startAtUtc: string | null;
+    clientName: string;
+    masterName: string | null;
+    amount: number;
+  }>;
+};
+
 function startOfDayUtc(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
@@ -27,6 +40,22 @@ function nextDayUtc(value: string): Date {
   const next = new Date(`${value}T00:00:00.000Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   return next;
+}
+
+function startOfDayUtcDate(value: Date): Date {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+}
+
+function addUtcDays(value: Date, days: number): Date {
+  const next = new Date(value);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function resolveBookingAmount(input: { serviceItems: Array<{ priceSnapshot: number }>; servicePrice: number }): number {
+  const snapshotSum = input.serviceItems.reduce((sum, item) => sum + Math.max(0, item.priceSnapshot), 0);
+  if (snapshotSum > 0) return snapshotSum;
+  return Math.max(0, input.servicePrice);
 }
 
 type AggregationBucket = {
@@ -175,5 +204,100 @@ export async function getStudioFinance(input: {
     totalVisits,
     totalAmount,
     hasCategories,
+  };
+}
+
+export async function getStudioFinanceSummary(studioId: string): Promise<StudioFinanceSummary> {
+  const studio = await prisma.studio.findUnique({
+    where: { id: studioId },
+    select: { id: true, providerId: true },
+  });
+  if (!studio) {
+    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+  }
+
+  const now = new Date();
+  const todayStart = startOfDayUtcDate(now);
+  const todayEnd = addUtcDays(todayStart, 1);
+  const last7DaysStart = addUtcDays(todayStart, -6);
+  const last30DaysStart = addUtcDays(todayStart, -29);
+
+  const [summaryBookings, recentBookings] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
+        startAtUtc: { gte: last30DaysStart, lt: todayEnd },
+        status: {
+          notIn: [BookingStatus.REJECTED, BookingStatus.CANCELLED, BookingStatus.NO_SHOW],
+        },
+      },
+      select: {
+        startAtUtc: true,
+        createdAt: true,
+        service: { select: { price: true } },
+        serviceItems: { select: { priceSnapshot: true } },
+      },
+    }),
+    prisma.booking.findMany({
+      where: {
+        OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
+        status: {
+          notIn: [BookingStatus.REJECTED, BookingStatus.CANCELLED, BookingStatus.NO_SHOW],
+        },
+      },
+      select: {
+        id: true,
+        startAtUtc: true,
+        createdAt: true,
+        clientName: true,
+        clientNameSnapshot: true,
+        masterProvider: { select: { name: true } },
+        service: { select: { price: true } },
+        serviceItems: {
+          select: { priceSnapshot: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: [{ startAtUtc: "desc" }, { createdAt: "desc" }],
+      take: 10,
+    }),
+  ]);
+
+  let todayAmount = 0;
+  let last7DaysAmount = 0;
+  let last30DaysAmount = 0;
+
+  for (const booking of summaryBookings) {
+    const moment = booking.startAtUtc ?? booking.createdAt;
+    const amount = resolveBookingAmount({
+      serviceItems: booking.serviceItems,
+      servicePrice: booking.service.price,
+    });
+
+    if (moment >= todayStart && moment < todayEnd) {
+      todayAmount += amount;
+    }
+    if (moment >= last7DaysStart && moment < todayEnd) {
+      last7DaysAmount += amount;
+    }
+    if (moment >= last30DaysStart && moment < todayEnd) {
+      last30DaysAmount += amount;
+    }
+  }
+
+  return {
+    todayAmount,
+    last7DaysAmount,
+    last30DaysAmount,
+    recentBookings: recentBookings.map((booking) => ({
+      id: booking.id,
+      startAtUtc: booking.startAtUtc ? booking.startAtUtc.toISOString() : null,
+      clientName: booking.clientNameSnapshot?.trim() || booking.clientName.trim() || "Клиент",
+      masterName: booking.masterProvider?.name ?? null,
+      amount: resolveBookingAmount({
+        serviceItems: booking.serviceItems,
+        servicePrice: booking.service.price,
+      }),
+    })),
   };
 }

@@ -37,11 +37,11 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       const res = await fetch(buildListUrl(entityType, entityId), { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Failed to load portfolio");
+        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить портфолио");
       }
       setAssets(json.data.assets);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load portfolio");
+      setError(e instanceof Error ? e.message : "Не удалось загрузить портфолио");
     }
   }, [entityType, entityId]);
 
@@ -64,11 +64,11 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         const res = await fetch("/api/media", { method: "POST", body: form });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Failed to upload image");
+          throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить фото");
         }
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to upload image");
+        setError(e instanceof Error ? e.message : "Не удалось загрузить фото");
       } finally {
         setBusy(false);
       }
@@ -84,11 +84,11 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         const res = await fetch(`/api/media/${id}`, { method: "DELETE" });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Failed to delete image");
+          throw new Error(json && !json.ok ? json.error.message : "Не удалось удалить фото");
         }
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to delete image");
+        setError(e instanceof Error ? e.message : "Не удалось удалить фото");
       } finally {
         setBusy(false);
       }
@@ -124,7 +124,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
                     setReplaceTargetId(asset.id);
                     replaceInputRef.current?.click();
                   }}
-                  aria-label="Replace photo"
+                  aria-label="Заменить фото"
                   disabled={busy}
                   className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
                 >
@@ -133,7 +133,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
                 <button
                   type="button"
                   onClick={() => void remove(asset.id)}
-                  aria-label="Delete photo"
+                  aria-label="Удалить фото"
                   disabled={busy}
                   className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
                 >
@@ -149,7 +149,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
       {previewUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <button className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label="Close preview" />
+          <button className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label="Закрыть предпросмотр" />
           <img src={previewUrl} alt="" className="relative max-h-[90vh] max-w-[90vw] rounded-2xl bg-white object-contain" />
         </div>
       ) : null}

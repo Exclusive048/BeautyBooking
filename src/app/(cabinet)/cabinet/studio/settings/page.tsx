@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function StudioProfileRoute() {
+export default function StudioSettingsIndexPage() {
   redirect("/cabinet/studio/settings/profile");
 }

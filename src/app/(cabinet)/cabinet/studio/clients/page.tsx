@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { StudioClientsPage } from "@/features/studio/components/studio-clients-page";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { UI_TEXT } from "@/lib/ui/text";
 
 export default async function StudioClientsRoute() {
   const user = await getSessionUser();
@@ -14,14 +13,11 @@ export default async function StudioClientsRoute() {
   } catch {
     redirect("/403");
   }
-  const t = UI_TEXT.studioCabinet.routes;
 
   return (
     <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold">{t.clientsTitle}</h2>
-        <p className="text-sm text-text-sec">{t.clientsSubtitle}</p>
-      </header>
+      <h1 className="text-xl font-semibold text-text-main">Клиенты</h1>
+      <p className="text-sm text-text-sec">База клиентов студии</p>
       <StudioClientsPage studioId={studioId} />
     </section>
   );

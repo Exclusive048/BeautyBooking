@@ -9,6 +9,7 @@ export type StudioClientListItem = {
   lastBookingAt: string;
   lastServiceName: string;
   visitsCount: number;
+  totalAmount: number;
 };
 
 export type StudioClientsData = {
@@ -22,6 +23,7 @@ type GroupedClient = {
   lastBookingAt: Date;
   lastServiceName: string;
   visitsCount: number;
+  totalAmount: number;
 };
 
 type BookingRow = {
@@ -36,9 +38,11 @@ type BookingRow = {
   service: {
     name: string;
     title: string | null;
+    price: number;
   };
   serviceItems: Array<{
     titleSnapshot: string;
+    priceSnapshot: number;
   }>;
 };
 
@@ -58,6 +62,12 @@ function resolveServiceTitle(booking: BookingRow): string {
   return booking.service.title?.trim() || booking.service.name;
 }
 
+function resolveBookingAmount(booking: BookingRow): number {
+  const snapshotSum = booking.serviceItems.reduce((sum, item) => sum + Math.max(0, item.priceSnapshot), 0);
+  if (snapshotSum > 0) return snapshotSum;
+  return Math.max(0, booking.service.price);
+}
+
 function bookingSortDate(booking: BookingRow): Date {
   return booking.startAtUtc ?? booking.createdAt;
 }
@@ -66,7 +76,10 @@ function clientSortDate(client: GroupedClient): number {
   return client.lastBookingAt.getTime();
 }
 
-export async function getStudioClients(studioId: string): Promise<StudioClientsData> {
+export async function getStudioClients(
+  studioId: string,
+  sort?: "newest"
+): Promise<StudioClientsData> {
   const studio = await prisma.studio.findUnique({
     where: { id: studioId },
     select: { id: true, providerId: true },
@@ -93,12 +106,12 @@ export async function getStudioClients(studioId: string): Promise<StudioClientsD
         select: {
           name: true,
           title: true,
+          price: true,
         },
       },
       serviceItems: {
-        select: { titleSnapshot: true },
+        select: { titleSnapshot: true, priceSnapshot: true },
         orderBy: { createdAt: "asc" },
-        take: 1,
       },
     },
     orderBy: [{ startAtUtc: "desc" }, { createdAt: "desc" }],
@@ -115,6 +128,7 @@ export async function getStudioClients(studioId: string): Promise<StudioClientsD
     const serviceTitle = resolveServiceTitle(booking);
     const displayName = resolveBookingName(booking);
     const safePhone = phone ?? "Unknown";
+    const bookingAmount = resolveBookingAmount(booking);
 
     const current = grouped.get(key);
     if (!current) {
@@ -125,11 +139,13 @@ export async function getStudioClients(studioId: string): Promise<StudioClientsD
         lastBookingAt: visitDate,
         lastServiceName: serviceTitle,
         visitsCount: 1,
+        totalAmount: bookingAmount,
       });
       continue;
     }
 
     current.visitsCount += 1;
+    current.totalAmount += bookingAmount;
     if (visitDate.getTime() > current.lastBookingAt.getTime()) {
       current.lastBookingAt = visitDate;
       current.lastServiceName = serviceTitle;
@@ -139,7 +155,12 @@ export async function getStudioClients(studioId: string): Promise<StudioClientsD
   }
 
   const clients = Array.from(grouped.values())
-    .sort((a, b) => clientSortDate(b) - clientSortDate(a))
+    .sort((a, b) => {
+      if (sort === "newest" || !sort) {
+        return clientSortDate(b) - clientSortDate(a);
+      }
+      return clientSortDate(b) - clientSortDate(a);
+    })
     .map((item) => ({
       key: item.key,
       displayName: item.displayName,
@@ -147,6 +168,7 @@ export async function getStudioClients(studioId: string): Promise<StudioClientsD
       lastBookingAt: item.lastBookingAt.toISOString(),
       lastServiceName: item.lastServiceName,
       visitsCount: item.visitsCount,
+      totalAmount: item.totalAmount,
     }));
 
   return { clients };

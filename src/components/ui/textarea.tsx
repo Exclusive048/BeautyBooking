@@ -3,9 +3,10 @@ import { cn } from "@/lib/cn";
 
 type Props = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-export function Textarea({ className, ...props }: Props) {
+export const Textarea = React.forwardRef<HTMLTextAreaElement, Props>(({ className, ...props }, ref) => {
   return (
     <textarea
+      ref={ref}
       className={cn(
         "lux-input min-h-[110px] w-full rounded-2xl px-4 py-3 text-sm text-text-main placeholder:text-text-placeholder outline-none",
         className
@@ -13,4 +14,6 @@ export function Textarea({ className, ...props }: Props) {
       {...props}
     />
   );
-}
+});
+
+Textarea.displayName = "Textarea";

@@ -24,6 +24,7 @@ export const studioServicesQuerySchema = z.object({
 
 export const studioClientsQuerySchema = z.object({
   studioId: z.string().trim().min(1),
+  sort: z.enum(["newest"]).optional(),
 });
 
 export const studioFinanceQuerySchema = z.object({
@@ -31,6 +32,10 @@ export const studioFinanceQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   groupBy: z.enum(["masters", "categories", "services"]).default("masters"),
+});
+
+export const studioFinanceSummaryQuerySchema = z.object({
+  studioId: z.string().trim().min(1),
 });
 
 export const createStudioCategorySchema = z.object({

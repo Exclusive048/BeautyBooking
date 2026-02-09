@@ -55,6 +55,8 @@ export function mapProviderProfile(provider: ProviderWithServices): ProviderProf
     bannerUrl: null,
     tagline: provider.tagline,
     description: provider.description ?? null,
+    publicUsername: provider.publicUsername ?? null,
+    isPublished: provider.isPublished,
     rating: provider.rating,
     reviews: provider.reviews,
     priceFrom: provider.priceFrom,

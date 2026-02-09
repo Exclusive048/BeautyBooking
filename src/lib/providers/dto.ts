@@ -39,6 +39,8 @@ export type ProviderProfileDto = {
   bannerUrl: string | null;
   tagline: string;
   description: string | null;
+  publicUsername: string | null;
+  isPublished: boolean;
   rating: number;
   reviews: number;
   priceFrom: number;

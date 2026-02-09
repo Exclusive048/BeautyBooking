@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+storage/media/studio/cmlfneyte0009vl7wh7agwhvz/avatar-1770674626437-67eb1ce8-b425-42d9-8c25-070e170d4c59.jpg
+storage/media/studio/cmlfneyte0009vl7wh7agwhvz/portfolio-1770674622395-2b867d8e-93f4-4d57-84e1-cd2fbe21933b.png
+storage/media/studio/cmlfneyte0009vl7wh7agwhvz/portfolio-1770678374979-11248525-9084-4b36-a734-c4119d6b9017.jpg
+storage/media/studio/cmlfneyte0009vl7wh7agwhvz/portfolio-1770678384509-6ec07500-f380-48e5-ab34-a75c483415de.png
