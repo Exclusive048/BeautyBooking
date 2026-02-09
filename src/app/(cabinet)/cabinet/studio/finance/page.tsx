@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { StudioFinancePage } from "@/features/studio/components/studio-finance-page";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { UI_TEXT } from "@/lib/ui/text";
 
 export default async function StudioFinanceRoute() {
   const user = await getSessionUser();
@@ -14,14 +13,11 @@ export default async function StudioFinanceRoute() {
   } catch {
     redirect("/403");
   }
-  const t = UI_TEXT.studioCabinet.routes;
 
   return (
     <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold">{t.financeTitle}</h2>
-        <p className="text-sm text-text-sec">{t.financeSubtitle}</p>
-      </header>
+      <h1 className="text-xl font-semibold text-text-main">Финансы</h1>
+      <p className="text-sm text-text-sec">Отчёты и показатели студии</p>
       <StudioFinancePage studioId={studioId} />
     </section>
   );

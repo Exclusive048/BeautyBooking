@@ -1,16 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
-import { CabinetSideNav, type CabinetNavItem } from "@/features/cabinet/components/cabinet-side-nav";
-
-const STUDIO_NAV: CabinetNavItem[] = [
-  { href: "/cabinet/studio/calendar", label: "Calendar" },
-  { href: "/cabinet/studio/services", label: "Services" },
-  { href: "/cabinet/studio/team", label: "Team" },
-  { href: "/cabinet/studio/clients", label: "Clients" },
-  { href: "/cabinet/studio/finance", label: "Finance" },
-];
+import { resolveCurrentStudioAccess } from "@/lib/studio/current";
+import { serverApiFetch } from "@/lib/api/server-fetch";
+import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
 
 export default async function StudioCabinetLayout({
   children,
@@ -23,25 +16,26 @@ export default async function StudioCabinetLayout({
   const hasAccess = await hasStudioAdminAccess(user.id);
   if (!hasAccess) redirect("/403");
 
+  let studioId: string;
+  try {
+    ({ studioId } = await resolveCurrentStudioAccess(user.id));
+  } catch {
+    redirect("/403");
+  }
+
+  const providerRes = await serverApiFetch<{
+    provider: { id: string; name: string; publicUsername: string | null } | null;
+  }>(`/api/providers/me?studioId=${encodeURIComponent(studioId)}`);
+
+  const studioName = providerRes.ok && providerRes.data.provider ? providerRes.data.provider.name : "Студия";
+  const publicUsername = providerRes.ok ? providerRes.data.provider?.publicUsername ?? null : null;
+  const publicHref = publicUsername ? `/u/${publicUsername}` : "/cabinet/studio/settings/profile";
+  const publicHint = publicUsername ? null : "Задайте публичный username, чтобы получить ссылку";
+
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:flex-row">
-      <aside className="md:w-64 md:shrink-0">
-        <div className="lux-card rounded-[22px] p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h1 className="text-sm font-semibold">Studio cabinet</h1>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/cabinet/studio/profile"
-                className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card"
-              >
-                Profile
-              </Link>
-            </div>
-          </div>
-          <CabinetSideNav items={STUDIO_NAV} />
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1">{children}</main>
-    </section>
+    <div className="min-h-dvh bg-bg-page">
+      <StudioNavbar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
+      <div className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6">{children}</div>
+    </div>
   );
 }

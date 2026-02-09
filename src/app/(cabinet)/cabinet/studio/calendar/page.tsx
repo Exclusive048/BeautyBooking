@@ -17,8 +17,8 @@ export default async function StudioCalendarRoute() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-xl font-semibold">Calendar</h2>
-        <p className="text-sm text-neutral-600">Unified calendar for bookings and blocks.</p>
+        <h2 className="text-xl font-semibold">Календарь</h2>
+        <p className="text-sm text-text-sec">Записи и блоки студии в одном месте.</p>
       </header>
       <StudioCalendarPage studioId={studioId} />
     </section>

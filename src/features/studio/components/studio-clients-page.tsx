@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -11,6 +12,7 @@ type ClientItem = {
   lastBookingAt: string;
   lastServiceName: string;
   visitsCount: number;
+  totalAmount: number;
 };
 
 type ClientsData = {
@@ -31,8 +33,14 @@ function formatDateTime(value: string): string {
   });
 }
 
+function formatMoney(value: number, suffix: string): string {
+  return `${new Intl.NumberFormat("ru-RU").format(value)} ${suffix}`;
+}
+
 export function StudioClientsPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.clients;
+  const searchParams = useSearchParams();
+  const sort = searchParams.get("sort") === "newest" ? "newest" : undefined;
   const [data, setData] = useState<ClientsData>({ clients: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +51,9 @@ export function StudioClientsPage({ studioId }: Props) {
       setError(null);
       try {
         const params = new URLSearchParams({ studioId });
+        if (sort) {
+          params.set("sort", sort);
+        }
         const res = await fetch(`/api/studio/clients?${params.toString()}`, { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<ClientsData> | null;
         if (!res.ok || !json || !json.ok) {
@@ -57,7 +68,7 @@ export function StudioClientsPage({ studioId }: Props) {
     };
 
     void load();
-  }, [studioId, t.apiErrorPrefix, t.loadFailed]);
+  }, [sort, studioId, t.apiErrorPrefix, t.loadFailed]);
 
   if (loading) {
     return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
@@ -79,6 +90,7 @@ export function StudioClientsPage({ studioId }: Props) {
                 <th className="px-4 py-3 text-left">{t.columns.lastBooking}</th>
                 <th className="px-4 py-3 text-left">{t.columns.service}</th>
                 <th className="px-4 py-3 text-left">{t.columns.visits}</th>
+                <th className="px-4 py-3 text-left">{t.columns.amount}</th>
               </tr>
             </thead>
             <tbody>
@@ -89,6 +101,7 @@ export function StudioClientsPage({ studioId }: Props) {
                   <td className="px-4 py-3 text-sm text-text-sec">{formatDateTime(client.lastBookingAt)}</td>
                   <td className="px-4 py-3 text-sm text-text-sec">{client.lastServiceName}</td>
                   <td className="px-4 py-3 text-sm font-medium text-text-main">{client.visitsCount}</td>
+                  <td className="px-4 py-3 text-sm text-text-main">{formatMoney(client.totalAmount, t.moneySuffix)}</td>
                 </tr>
               ))}
             </tbody>

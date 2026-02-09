@@ -52,11 +52,13 @@ export async function acceptStudioInvite(
     return { ok: false, status: 409, message: "Invite already rejected", code: "INVITE_ALREADY_REJECTED" };
   }
 
+  const normalizedInvitePhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
+
   const stagedMaster = await prisma.provider.findFirst({
     where: {
       type: ProviderType.MASTER,
       studioId: invite.studio.providerId,
-      contactPhone: invite.phone,
+      contactPhone: normalizedInvitePhone,
     },
     select: { id: true, ownerUserId: true, isPublished: true },
     orderBy: { createdAt: "asc" },
@@ -71,23 +73,48 @@ export async function acceptStudioInvite(
     };
   }
 
-  if (stagedMaster && (!stagedMaster.ownerUserId || !stagedMaster.isPublished)) {
-    await prisma.provider.update({
-      where: { id: stagedMaster.id },
-      data: {
-        ownerUserId: user.id,
-        isPublished: true,
-      },
-      select: { id: true },
-    });
-  }
-
-  const masterProfile = await createMasterProfile({
-    userId: user.id,
-    roles: user.roles,
+  const existingMasterProfile = await prisma.masterProfile.findUnique({
+    where: { userId: user.id },
+    select: { id: true, providerId: true },
   });
 
-  const attached = await attachMasterToStudio(invite.studio.providerId, masterProfile.providerId);
+  let masterProviderId: string;
+  if (existingMasterProfile) {
+    masterProviderId = existingMasterProfile.providerId;
+    if (stagedMaster && stagedMaster.id !== masterProviderId) {
+      await prisma.provider.update({
+        where: { id: stagedMaster.id },
+        data: { studioId: null, ownerUserId: null, isPublished: false },
+        select: { id: true },
+      });
+    }
+  } else if (stagedMaster) {
+    if (!stagedMaster.ownerUserId || !stagedMaster.isPublished) {
+      await prisma.provider.update({
+        where: { id: stagedMaster.id },
+        data: {
+          ownerUserId: user.id,
+          isPublished: true,
+          contactPhone: normalizedInvitePhone,
+        },
+        select: { id: true },
+      });
+    }
+
+    const createdProfile = await prisma.masterProfile.create({
+      data: { userId: user.id, providerId: stagedMaster.id },
+      select: { providerId: true },
+    });
+    masterProviderId = createdProfile.providerId;
+  } else {
+    const masterProfile = await createMasterProfile({
+      userId: user.id,
+      roles: user.roles,
+    });
+    masterProviderId = masterProfile.providerId;
+  }
+
+  const attached = await attachMasterToStudio(invite.studio.providerId, masterProviderId);
   if (!attached.ok) {
     return { ok: false, status: attached.status, message: attached.message, code: attached.code };
   }
@@ -137,7 +164,7 @@ export async function acceptStudioInvite(
       inviteId: invite.id,
       studioId: invite.studioId,
       memberId,
-      masterProviderId: masterProfile.providerId,
+      masterProviderId,
     },
   };
 }
