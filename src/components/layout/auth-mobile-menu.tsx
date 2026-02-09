@@ -108,14 +108,21 @@ export function AuthMobileMenu({
 
           <div className="mt-2 space-y-1">
             <Link
-              href="/cabinet/client/bookings"
+              href="/cabinet/profile"
               className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
               onClick={closeMenu}
             >
-              {UI_TEXT.nav.myBookings}
+              {UI_TEXT.nav.profile}
             </Link>
             <Link
-              href="/cabinet/client/profile"
+              href="/cabinet/roles"
+              className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
+              onClick={closeMenu}
+            >
+              {UI_TEXT.nav.professionalRoles}
+            </Link>
+            <Link
+              href="/cabinet/settings"
               className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
               onClick={closeMenu}
             >

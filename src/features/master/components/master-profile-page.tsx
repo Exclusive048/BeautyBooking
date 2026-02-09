@@ -989,10 +989,6 @@ export function MasterProfilePage() {
   return (
     <section className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">Профиль</h2>
-          <p className="text-sm text-text-sec">Управляйте витриной, услугами и настройками.</p>
-        </div>
         {profileStatusText ? <div className={`text-xs ${profileStatusTone}`}>{profileStatusText}</div> : null}
       </header>
 

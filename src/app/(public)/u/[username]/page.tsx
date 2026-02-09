@@ -5,29 +5,36 @@ import { PublicMasterProfileClient } from "@/features/public-profile/master/publ
 import { PublicStudioProfileClient } from "@/features/public-studio/public-studio-profile-client";
 
 type Props = {
-  params: { username: string };
+  params: Promise<{ username: string }> | { username: string };
 };
 
+function normalizeUsername(input: string) {
+  return input.trim().toLowerCase();
+}
+
 export default async function PublicUsernamePage({ params }: Props) {
+  const { username: raw } = await Promise.resolve(params);
+  const username = normalizeUsername(raw);
+
   const result = await resolvePublicUsername(
     {
-      findProviderByUsername: async (username) =>
+      findProviderByUsername: async (username: string) =>
         prisma.provider.findUnique({
           where: { publicUsername: username },
           select: { id: true, publicUsername: true, isPublished: true, type: true },
         }),
-      findAlias: async (username) =>
+      findAlias: async (username: string) =>
         prisma.publicUsernameAlias.findUnique({
           where: { username },
           select: { providerId: true },
         }),
-      findProviderById: async (id) =>
+      findProviderById: async (id: string) =>
         prisma.provider.findUnique({
           where: { id },
-          select: { publicUsername: true, isPublished: true },
+          select: { publicUsername: true, isPublished: true, type: true },
         }),
     },
-    params.username
+    username
   );
 
   if (result.status === "not-found") {
@@ -35,6 +42,8 @@ export default async function PublicUsernamePage({ params }: Props) {
   }
 
   if (result.status === "redirect") {
+    // защита от редиректа в себя (на случай)
+    if (result.username === username) notFound();
     permanentRedirect(`/u/${result.username}`);
   }
 
