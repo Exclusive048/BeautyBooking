@@ -42,6 +42,7 @@ export const UI_TEXT = {
     catalog: "Каталог",
     myBookings: "Мои записи",
     profile: "Профиль",
+    professionalRoles: "Профессиональные роли",
     settings: "Настройки",
     adminPanel: "Админка сайта",
     masterWorkspace: "Мастер",

@@ -140,7 +140,7 @@ export function generateDefaultUsername(params: GenerateDefaultUsernameParams): 
 
 export async function isUsernameTaken(prismaTx: PrismaTx, username: string): Promise<boolean> {
   const [provider, alias] = await Promise.all([
-    prismaTx.provider.findFirst({
+    prismaTx.provider.findUnique({
       where: { publicUsername: username },
       select: { id: true },
     }),

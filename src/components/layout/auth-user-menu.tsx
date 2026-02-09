@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -54,14 +54,21 @@ export function AuthUserMenu({ userLabel, showAdminLink }: Props) {
       {open ? (
         <div className="absolute right-0 z-40 mt-2 w-56 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur">
           <Link
-            href="/cabinet/client/bookings"
+            href="/cabinet/profile"
             className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
             onClick={closeMenu}
           >
-            {UI_TEXT.nav.myBookings}
+            {UI_TEXT.nav.profile}
           </Link>
           <Link
-            href="/cabinet/client/profile"
+            href="/cabinet/roles"
+            className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
+            onClick={closeMenu}
+          >
+            {UI_TEXT.nav.professionalRoles}
+          </Link>
+          <Link
+            href="/cabinet/settings"
             className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
             onClick={closeMenu}
           >

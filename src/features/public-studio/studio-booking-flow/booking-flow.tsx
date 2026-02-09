@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
-import { SlotPicker } from "@/features/booking/components/slot-picker/";
+import {
+  SlotPickerOptimized,
+  groupSlotsByTimeOfDay,
+  type SlotItem as SlotPickerItem,
+} from "@/features/booking/components/slot-picker/slot-picker";
 import {
   buildDateBounds,
   createBooking,
@@ -17,7 +21,6 @@ import {
   type SlotItem,
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
-import { groupSlotsByDayPeriod } from "@/features/booking/lib/slot-groups";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -89,7 +92,19 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
     () => (resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.slots ?? [] : []),
     [availabilityByMaster, resolvedMasterId]
   );
-  const slotGroups = useMemo(() => groupSlotsByDayPeriod(slots), [slots]);
+  const slotItems = useMemo<SlotPickerItem[]>(
+    () =>
+      slots.map((slot) => {
+        const [, timeText] = slot.label.split(" ");
+        return {
+          id: slot.label,
+          label: slot.label,
+          timeText: timeText ?? slot.label,
+        };
+      }),
+    [slots]
+  );
+  const slotGroups = useMemo(() => groupSlotsByTimeOfDay(slotItems), [slotItems]);
   const slotByLabel = useMemo(() => new Map(slots.map((slot) => [slot.label, slot])), [slots]);
 
   const nextPath =
@@ -358,7 +373,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
           ) : slots.length === 0 ? (
             <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.noSlots}</div>
           ) : (
-            <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+            <SlotPickerOptimized groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
           )}
         </section>
 

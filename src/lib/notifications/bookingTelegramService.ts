@@ -97,7 +97,7 @@ async function loadBookingContext(bookingId: string): Promise<BookingTelegramCon
     clientPhone: booking.clientPhone ?? null,
     masterName: booking.masterProvider?.name ?? booking.provider.name ?? null,
     masterUrl: `${appUrl}/cabinet/master`,
-    clientUrl: `${appUrl}/cabinet/client/bookings`,
+    clientUrl: `${appUrl}/cabinet/profile`,
     masterUserId,
     clientUserId: booking.clientUserId ?? null,
   };
