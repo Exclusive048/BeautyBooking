@@ -128,6 +128,7 @@ export const createMasterServiceSchema = z.object({
   title: z.string().trim().min(1).max(240),
   price: z.number().int().min(0),
   durationMin: z.number().int().min(1).max(24 * 60),
+  globalCategoryId: z.string().trim().min(1).optional(),
 });
 
 export const createMasterPortfolioSchema = z.object({

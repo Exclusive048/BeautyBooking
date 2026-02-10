@@ -787,7 +787,8 @@ model GlobalCategory {
   id              String      @id @default(cuid())
   name            String
   slug            String      @unique
-  icon            String
+  icon            String?
+  isActive        Boolean     @default(true)
   isValidated     Boolean     @default(false)
   isRejected      Boolean     @default(false)
   usageCount      Int         @default(0)
@@ -800,6 +801,7 @@ model GlobalCategory {
   services        Service[]
   tags            Tag[]
 
+  @@index([isActive])
   @@index([isValidated, isRejected])
   @@index([createdByUserId])
   @@index([createdByProviderId])

@@ -16,11 +16,18 @@ export async function GET() {
 
   await prisma.globalCategory.upsert({
     where: { slug: "hot" },
-    update: { isValidated: true, isRejected: false, icon: "🔥", name: "Горящие" },
+    update: {
+      isActive: true,
+      isValidated: true,
+      isRejected: false,
+      icon: "🔥",
+      name: "Горящие",
+    },
     create: {
       name: "Горящие",
       slug: "hot",
       icon: "🔥",
+      isActive: true,
       isValidated: true,
       isRejected: false,
     },
@@ -33,6 +40,7 @@ export async function GET() {
       name: true,
       slug: true,
       icon: true,
+      isActive: true,
       isValidated: true,
       isRejected: true,
       usageCount: true,
@@ -86,9 +94,9 @@ export async function PATCH(req: Request) {
       where: { id },
       data:
         action === "approve"
-          ? { isValidated: true, isRejected: false }
-          : { isValidated: false, isRejected: true },
-      select: { id: true, isValidated: true, isRejected: true },
+          ? { isActive: true, isValidated: true, isRejected: false }
+          : { isActive: false, isValidated: false, isRejected: true },
+      select: { id: true, isActive: true, isValidated: true, isRejected: true },
     });
 
     return ok({ category: updated });

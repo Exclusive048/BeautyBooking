@@ -32,6 +32,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       studioId: body.studioId,
       serviceId: id,
       categoryId: body.categoryId,
+      globalCategoryId: body.globalCategoryId,
       title: body.title,
       description: body.description,
       basePrice: body.basePrice,

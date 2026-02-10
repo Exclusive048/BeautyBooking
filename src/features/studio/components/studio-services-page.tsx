@@ -35,6 +35,13 @@ type StudioCategoryView = {
   services: StudioServiceView[];
 };
 
+type GlobalCategoryOption = {
+  id: string;
+  title: string;
+  slug: string;
+  icon: string | null;
+};
+
 type ServicesData = {
   categories: StudioCategoryView[];
 };
@@ -74,8 +81,10 @@ export function StudioServicesPage({ studioId }: Props) {
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [newServiceTitle, setNewServiceTitle] = useState("");
   const [newServiceCategoryId, setNewServiceCategoryId] = useState("");
+  const [newServiceGlobalCategoryId, setNewServiceGlobalCategoryId] = useState("");
   const [newServicePrice, setNewServicePrice] = useState("10000");
   const [newServiceDuration, setNewServiceDuration] = useState("60");
+  const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
 
   const totalServices = useMemo(
     () => data.categories.reduce((sum, category) => sum + category.services.length, 0),
@@ -109,15 +118,23 @@ export function StudioServicesPage({ studioId }: Props) {
         setNewServiceCategoryId(servicesJson.data.categories[0].id);
       }
 
-      const mastersParams = new URLSearchParams({ studioId });
-      const mastersRes = await fetch(`/api/studio/masters?${mastersParams.toString()}`, {
-        cache: "no-store",
-      });
+      const [mastersRes, categoriesRes] = await Promise.all([
+        fetch(`/api/studio/masters?${servicesParams.toString()}`, { cache: "no-store" }),
+        fetch("/api/catalog/global-categories", { cache: "no-store" }),
+      ]);
       const mastersJson = (await mastersRes.json().catch(() => null)) as ApiResponse<MastersData> | null;
       if (mastersRes.ok && mastersJson && mastersJson.ok) {
         setMasters(mastersJson.data.masters);
       } else {
         setMasters([]);
+      }
+      const categoriesJson = (await categoriesRes.json().catch(() => null)) as
+        | ApiResponse<{ categories: GlobalCategoryOption[] }>
+        | null;
+      if (categoriesRes.ok && categoriesJson && categoriesJson.ok) {
+        setGlobalCategories(categoriesJson.data.categories);
+      } else {
+        setGlobalCategories([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loadFailed);
@@ -197,6 +214,7 @@ export function StudioServicesPage({ studioId }: Props) {
           studioId,
           categoryId: newServiceCategoryId,
           title: newServiceTitle.trim(),
+          globalCategoryId: newServiceGlobalCategoryId || undefined,
           basePrice: normalizedPrice,
           baseDurationMin: normalizedDuration,
         }),
@@ -207,6 +225,7 @@ export function StudioServicesPage({ studioId }: Props) {
       }
       setShowServiceModal(false);
       setNewServiceTitle("");
+      setNewServiceGlobalCategoryId("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.createServiceFailed);
@@ -358,6 +377,22 @@ export function StudioServicesPage({ studioId }: Props) {
                 </option>
               ))}
             </Select>
+            <Select
+              value={newServiceGlobalCategoryId}
+              onChange={(event) => setNewServiceGlobalCategoryId(event.target.value)}
+            >
+              <option value="">Глобальная категория</option>
+              {globalCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.icon ? `${category.icon} ` : ""}{category.title}
+                </option>
+              ))}
+            </Select>
+            {!newServiceGlobalCategoryId ? (
+              <div className="text-xs text-text-sec">
+                Выберите категорию, чтобы услуга отображалась на сайте.
+              </div>
+            ) : null}
             <Input
               type="text"
               value={newServiceTitle}

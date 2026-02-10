@@ -5,6 +5,44 @@ import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
 import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
 
+function toIso(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function mapSlotsError(code?: string): string {
+  switch (code) {
+    case "SERVICE_REQUIRED":
+      return "Не указана услуга.";
+    case "DURATION_INVALID":
+      return "Некорректная длительность услуги.";
+    case "DATE_INVALID":
+      return "Некорректная дата.";
+    case "RANGE_INVALID":
+      return "Некорректный диапазон.";
+    case "PROVIDER_NOT_FOUND":
+    case "MASTER_NOT_FOUND":
+      return "Мастер не найден.";
+    case "SERVICE_NOT_FOUND":
+      return "Услуга не найдена.";
+    case "SERVICE_INVALID":
+      return "Услуга недоступна для мастера.";
+    case "SERVICE_DISABLED":
+      return "Услуга недоступна.";
+    default:
+      return "Не удалось загрузить слоты.";
+  }
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ providerId: string }> | { providerId: string } }
@@ -16,13 +54,13 @@ export async function GET(
   const toKey = url.searchParams.get("to") ?? "";
   const limitRaw = url.searchParams.get("limit");
 
-  if (!serviceId) return fail("Service id is required", 400, "SERVICE_REQUIRED");
-  if (!isDateKey(fromKey)) return fail("Invalid from", 400, "DATE_INVALID");
-  if (toKey && !isDateKey(toKey)) return fail("Invalid to", 400, "DATE_INVALID");
+  if (!serviceId) return fail("Не указана услуга.", 400, "SERVICE_REQUIRED");
+  if (!isDateKey(fromKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
+  if (toKey && !isDateKey(toKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
 
   const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
   if (limitRaw && !Number.isFinite(limit)) {
-    return fail("Invalid limit", 400, "LIMIT_INVALID");
+    return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
   }
 
   const provider = await prisma.provider.findUnique({
@@ -30,24 +68,28 @@ export async function GET(
     select: { id: true, type: true, timezone: true },
   });
   if (!provider || provider.type !== "MASTER") {
-    return fail("Master not found", 404, "MASTER_NOT_FOUND");
+    return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const duration = await resolveServiceDuration(provider.id, serviceId);
-  if (!duration.ok) return fail(duration.message, duration.status, duration.code);
+  if (!duration.ok) {
+    return fail(mapSlotsError(duration.code), duration.status, duration.code);
+  }
 
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
     select: { id: true, price: true },
   });
-  if (!service) return fail("Service not found", 404, "SERVICE_NOT_FOUND");
+  if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
 
   const result = await listAvailabilitySlotsPaginated(provider.id, serviceId, duration.data, {
     fromKey,
     toKeyExclusive: toKey || undefined,
     limit,
   });
-  if (!result.ok) return fail(result.message, result.status, result.code);
+  if (!result.ok) {
+    return fail(mapSlotsError(result.code), result.status, result.code);
+  }
 
   const rule = await prisma.discountRule.findUnique({
     where: { providerId: provider.id },
@@ -56,18 +98,25 @@ export async function GET(
 
   const isServiceEligible = isServiceEligibleForHotRule(rule, serviceId, service.price);
 
-  let slots = result.data.slots;
-  if (isServiceEligible && slots.length > 0) {
+  const baseSlots = result.data.slots;
+  type SlotLike = (typeof baseSlots)[number] & {
+    isHot?: boolean;
+    discountType?: string;
+    discountValue?: number;
+  };
+  let decoratedSlots: SlotLike[] = baseSlots;
+
+  if (isServiceEligible && baseSlots.length > 0) {
     const now = new Date();
-    const startAtUtc = slots[0]?.startAtUtc ?? null;
-    const endAtUtc = slots[slots.length - 1]?.endAtUtc ?? null;
-    if (startAtUtc && endAtUtc) {
+    const rangeStart = toDate(baseSlots[0]?.startAtUtc ?? null);
+    const rangeEnd = toDate(baseSlots[baseSlots.length - 1]?.endAtUtc ?? null);
+    if (rangeStart && rangeEnd) {
       const hotSlots = await prisma.hotSlot.findMany({
         where: {
           providerId: provider.id,
           isActive: true,
           expiresAtUtc: { gt: now },
-          startAtUtc: { gte: startAtUtc, lte: endAtUtc },
+          startAtUtc: { gte: rangeStart, lte: rangeEnd },
         },
         select: {
           startAtUtc: true,
@@ -80,16 +129,20 @@ export async function GET(
       const exactMap = new Map<string, (typeof hotSlots)[number]>();
       const startMap = new Map<string, (typeof hotSlots)[number]>();
       for (const slot of hotSlots) {
-        const startKey = slot.startAtUtc.toISOString();
+        const startKey = toIso(slot.startAtUtc);
+        const endKey = toIso(slot.endAtUtc);
+        if (!startKey || !endKey) continue;
         if (slot.serviceId) {
-          exactMap.set(`${startKey}:${slot.endAtUtc.toISOString()}`, slot);
+          exactMap.set(`${startKey}:${endKey}`, slot);
         } else {
           startMap.set(startKey, slot);
         }
       }
-      slots = slots.map((slot) => {
-        const startKey = slot.startAtUtc.toISOString();
-        const key = `${startKey}:${slot.endAtUtc.toISOString()}`;
+      decoratedSlots = baseSlots.map((slot) => {
+        const startKey = toIso(slot.startAtUtc);
+        const endKey = toIso(slot.endAtUtc);
+        if (!startKey || !endKey) return { ...slot, isHot: false };
+        const key = `${startKey}:${endKey}`;
         const hot = exactMap.get(key) ?? startMap.get(startKey);
         return hot
           ? {
@@ -103,5 +156,11 @@ export async function GET(
     }
   }
 
-  return ok({ timezone: provider.timezone, slots, meta: result.data.meta });
+  const serializedSlots = decoratedSlots.map((slot) => ({
+    ...slot,
+    startAtUtc: toIso(slot.startAtUtc),
+    endAtUtc: toIso(slot.endAtUtc),
+  }));
+
+  return ok({ timezone: provider.timezone, slots: serializedSlots, meta: result.data.meta });
 }

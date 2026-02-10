@@ -12,7 +12,7 @@ type HomeCategory = {
   id: string;
   name: string;
   slug: string;
-  icon: string;
+  icon: string | null;
   usageCount: number;
 };
 

@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import {
   createBookingConfirmedNotifications,
   createBookingRequestNotifications,
+  loadBookingSnapshot,
   publishNotifications,
   type NotificationRecord,
 } from "@/lib/notifications/service";
@@ -66,7 +67,7 @@ export async function createClientBooking(
       CREATE_BOOKING_IDEMPOTENCY_TTL_SECONDS
     );
     if (!allowed) {
-      throw new AppError("Duplicate request", 409, "DUPLICATE_REQUEST");
+      throw new AppError("Повторный запрос.", 409, "DUPLICATE_REQUEST");
     }
   }
 
@@ -76,7 +77,7 @@ export async function createClientBooking(
     CREATE_BOOKING_RATE_LIMIT.windowSeconds
   );
   if (!allowed) {
-    throw new AppError("Rate limit exceeded", 429, "RATE_LIMITED");
+    throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
   const [service, provider] = await Promise.all([
@@ -91,66 +92,67 @@ export async function createClientBooking(
   ]);
 
   if (!provider) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Провайдер не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   if (!service || service.providerId !== data.providerId) {
-    throw new AppError("Service does not belong to provider", 400, "SERVICE_NOT_BELONGS_TO_PROVIDER");
+    throw new AppError("Услуга не принадлежит провайдеру.", 400, "SERVICE_NOT_BELONGS_TO_PROVIDER");
   }
 
   const resolvedMasterProviderId = provider.type === ProviderType.MASTER ? provider.id : null;
   const startAtUtc = parseSlotStartAtUtc(data.slotLabel, provider.timezone);
   if (!startAtUtc) {
-    throw new AppError("Invalid slot label", 400, "DATE_INVALID");
+    throw new AppError("Некорректный слот.", 400, "DATE_INVALID");
   }
   const endAtUtc = new Date(startAtUtc.getTime() + service.durationMin * 60 * 1000);
 
   const shouldAutoConfirm =
     provider.type === ProviderType.MASTER && !provider.studioId && provider.autoConfirmBookings;
 
-  const { booking, notifications } = await prisma.$transaction(async (tx) => {
-    const hotProviderId = provider.type === ProviderType.MASTER ? provider.id : resolvedMasterProviderId;
-    if (hotProviderId) {
-      const rule = await tx.discountRule.findUnique({
-        where: { providerId: hotProviderId },
-        select: { isEnabled: true, applyMode: true, minPriceFrom: true, serviceIds: true },
+  const hotProviderId = provider.type === ProviderType.MASTER ? provider.id : resolvedMasterProviderId;
+  if (hotProviderId) {
+    const rule = await prisma.discountRule.findUnique({
+      where: { providerId: hotProviderId },
+      select: { isEnabled: true, applyMode: true, minPriceFrom: true, serviceIds: true },
+    });
+    const isEligible = isServiceEligibleForHotRule(rule, service.id, service.price);
+    if (isEligible) {
+      const hotSlot = await prisma.hotSlot.findFirst({
+        where: {
+          providerId: hotProviderId,
+          startAtUtc,
+          isActive: true,
+          expiresAtUtc: { gt: new Date() },
+          OR: [{ endAtUtc }, { serviceId: null }],
+        },
+        select: { id: true },
       });
-      const isEligible = isServiceEligibleForHotRule(rule, service.id, service.price);
-      if (isEligible) {
-        const hotSlot = await tx.hotSlot.findFirst({
+      if (hotSlot) {
+        const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
+        const recentCancel = await prisma.booking.findFirst({
           where: {
-            providerId: hotProviderId,
+            providerId: data.providerId,
+            clientUserId: userId,
+            status: { in: ["REJECTED", "CANCELLED"] },
             startAtUtc,
-            isActive: true,
-            expiresAtUtc: { gt: new Date() },
-            OR: [{ endAtUtc }, { serviceId: null }],
+            cancelledAtUtc: { gt: cutoff },
           },
-          select: { id: true },
+          select: { id: true, cancelledAtUtc: true },
         });
-        if (hotSlot) {
-          const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
-          const recentCancel = await tx.booking.findFirst({
-            where: {
-              providerId: data.providerId,
-              clientUserId: userId,
-              status: { in: ["REJECTED", "CANCELLED"] },
-              startAtUtc,
-              cancelledAtUtc: { gt: cutoff },
-            },
-            select: { id: true, cancelledAtUtc: true },
-          });
-          if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
-            throw new AppError(
-              "Нельзя повторно записаться на этот слот со скидкой после отмены. Выберите другое время.",
-              409,
-              "BOOKING_CONFLICT"
-            );
-          }
+        if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
+          throw new AppError(
+            "Нельзя повторно записаться на этот слот со скидкой после отмены. Выберите другое время.",
+            409,
+            "BOOKING_CONFLICT"
+          );
         }
       }
     }
+  }
 
-    const created = await tx.booking.create({
+  const transactionStartedAt = Date.now();
+  const booking = await prisma.$transaction(async (tx) => {
+    return tx.booking.create({
       data: {
         providerId: data.providerId,
         serviceId: data.serviceId,
@@ -191,24 +193,30 @@ export async function createClientBooking(
         service: { select: { id: true, name: true } },
       },
     });
+  });
+  const transactionMs = Date.now() - transactionStartedAt;
+  console.info(`[booking:create] transaction ms=${transactionMs}`);
 
-    let notifications: NotificationRecord[] = [];
-    try {
+  let notifications: NotificationRecord[] = [];
+  const snapshotStartedAt = Date.now();
+  try {
+    const snapshot = await loadBookingSnapshot(booking.id);
+    const snapshotMs = Date.now() - snapshotStartedAt;
+    console.info(`[booking:create] snapshot ms=${snapshotMs}`);
+    if (snapshot) {
       notifications = shouldAutoConfirm
         ? await createBookingConfirmedNotifications({
-            bookingId: created.id,
+            bookingId: booking.id,
             notifyClient: true,
             notifyMaster: true,
             masterMode: "AUTO",
-            db: tx,
+            snapshot,
           })
-        : await createBookingRequestNotifications({ bookingId: created.id, db: tx });
-    } catch (error) {
-      console.error("Failed to create booking notifications:", error);
+        : await createBookingRequestNotifications({ bookingId: booking.id, snapshot });
     }
-
-    return { booking: created, notifications };
-  });
+  } catch (error) {
+    console.error("Не удалось создать уведомления по записи:", error);
+  }
 
   if (notifications.length > 0) {
     publishNotifications(notifications);
@@ -217,7 +225,7 @@ export async function createClientBooking(
   try {
     await sendBookingTelegramNotifications(booking.id, "CREATED", { notifyClientOnCreate: true });
   } catch (error) {
-    console.error("Failed to send Telegram booking notifications:", error);
+    console.error("Не удалось отправить Telegram-уведомления о записи:", error);
   }
 
   await invalidateSlotsForBookingRange({

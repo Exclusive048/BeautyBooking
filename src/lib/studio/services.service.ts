@@ -188,12 +188,14 @@ export async function createStudioService(input: {
   categoryId: string;
   title: string;
   description?: string;
+  globalCategoryId?: string;
   basePrice: number;
   baseDurationMin: number;
 }): Promise<{ id: string }> {
   const studio = await getStudioContext(input.studioId);
   const normalizedPrice = normalizeStudioServicePrice(input.basePrice);
   const normalizedDurationMin = normalizeStudioServiceDurationMin(input.baseDurationMin);
+  const globalCategoryId = input.globalCategoryId?.trim() || null;
 
   const category = await prisma.serviceCategory.findUnique({
     where: { id: input.categoryId },
@@ -203,30 +205,52 @@ export async function createStudioService(input: {
     throw new AppError("Category not found", 404, "NOT_FOUND");
   }
 
+  if (globalCategoryId) {
+    const globalCategory = await prisma.globalCategory.findUnique({
+      where: { id: globalCategoryId },
+      select: { id: true, isActive: true },
+    });
+    if (!globalCategory || !globalCategory.isActive) {
+      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    }
+  }
+
   const last = await prisma.service.findFirst({
     where: { studioId: studio.id, categoryId: input.categoryId },
     orderBy: { sortOrder: "desc" },
     select: { sortOrder: true },
   });
 
-  const created = await prisma.service.create({
-    data: {
-      providerId: studio.providerId,
-      studioId: studio.id,
-      categoryId: input.categoryId,
-      name: input.title.trim(),
-      title: input.title.trim(),
-      description: input.description?.trim() || null,
-      durationMin: normalizedDurationMin,
-      price: normalizedPrice,
-      baseDurationMin: normalizedDurationMin,
-      basePrice: normalizedPrice,
-      sortOrder: (last?.sortOrder ?? -1) + 1,
-      isActive: true,
-      isEnabled: true,
-    },
-    select: { id: true },
+  const created = await prisma.$transaction(async (tx) => {
+    const service = await tx.service.create({
+      data: {
+        providerId: studio.providerId,
+        studioId: studio.id,
+        categoryId: input.categoryId,
+        globalCategoryId,
+        name: input.title.trim(),
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        durationMin: normalizedDurationMin,
+        price: normalizedPrice,
+        baseDurationMin: normalizedDurationMin,
+        basePrice: normalizedPrice,
+        sortOrder: (last?.sortOrder ?? -1) + 1,
+        isActive: true,
+        isEnabled: true,
+      },
+      select: { id: true },
+    });
+
+    if (globalCategoryId) {
+      await tx.globalCategory.update({
+        where: { id: globalCategoryId },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+    return service;
   });
+
   return created;
 }
 
@@ -234,6 +258,7 @@ export async function updateStudioService(input: {
   studioId: string;
   serviceId: string;
   categoryId?: string;
+  globalCategoryId?: string | null;
   title?: string;
   description?: string;
   basePrice?: number;
@@ -242,7 +267,7 @@ export async function updateStudioService(input: {
 }): Promise<{ id: string }> {
   const service = await prisma.service.findUnique({
     where: { id: input.serviceId },
-    select: { id: true, studioId: true },
+    select: { id: true, studioId: true, globalCategoryId: true },
   });
   if (!service) {
     throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
@@ -261,6 +286,21 @@ export async function updateStudioService(input: {
     }
   }
 
+  let nextGlobalCategoryId: string | null | undefined;
+  if (input.globalCategoryId !== undefined) {
+    const trimmed = typeof input.globalCategoryId === "string" ? input.globalCategoryId.trim() : "";
+    nextGlobalCategoryId = trimmed.length > 0 ? trimmed : null;
+    if (nextGlobalCategoryId) {
+      const globalCategory = await prisma.globalCategory.findUnique({
+        where: { id: nextGlobalCategoryId },
+        select: { id: true, isActive: true },
+      });
+      if (!globalCategory || !globalCategory.isActive) {
+        throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+      }
+    }
+  }
+
   const nextTitle = input.title?.trim();
   const normalizedPrice =
     typeof input.basePrice === "number" ? normalizeStudioServicePrice(input.basePrice) : undefined;
@@ -268,18 +308,43 @@ export async function updateStudioService(input: {
     typeof input.baseDurationMin === "number"
       ? normalizeStudioServiceDurationMin(input.baseDurationMin)
       : undefined;
-  await prisma.service.update({
-    where: { id: input.serviceId },
-    data: {
-      ...(input.categoryId ? { categoryId: input.categoryId } : {}),
-      ...(nextTitle ? { name: nextTitle, title: nextTitle } : {}),
-      ...(typeof input.description === "string" ? { description: input.description.trim() || null } : {}),
-      ...(typeof normalizedPrice === "number" ? { price: normalizedPrice, basePrice: normalizedPrice } : {}),
-      ...(typeof normalizedDurationMin === "number"
-        ? { durationMin: normalizedDurationMin, baseDurationMin: normalizedDurationMin }
-        : {}),
-      ...(typeof input.isActive === "boolean" ? { isActive: input.isActive } : {}),
-    },
+
+  const nextCategoryId =
+    nextGlobalCategoryId !== undefined ? nextGlobalCategoryId : service.globalCategoryId ?? null;
+  const shouldUpdateUsage =
+    nextGlobalCategoryId !== undefined && nextCategoryId !== (service.globalCategoryId ?? null);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.service.update({
+      where: { id: input.serviceId },
+      data: {
+        ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+        ...(nextTitle ? { name: nextTitle, title: nextTitle } : {}),
+        ...(typeof input.description === "string" ? { description: input.description.trim() || null } : {}),
+        ...(typeof normalizedPrice === "number" ? { price: normalizedPrice, basePrice: normalizedPrice } : {}),
+        ...(typeof normalizedDurationMin === "number"
+          ? { durationMin: normalizedDurationMin, baseDurationMin: normalizedDurationMin }
+          : {}),
+        ...(typeof input.isActive === "boolean" ? { isActive: input.isActive } : {}),
+        ...(nextGlobalCategoryId !== undefined ? { globalCategoryId: nextGlobalCategoryId } : {}),
+      },
+    });
+
+    if (shouldUpdateUsage) {
+      const previous = service.globalCategoryId;
+      if (previous) {
+        await tx.globalCategory.updateMany({
+          where: { id: previous, usageCount: { gt: 0 } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+      if (nextCategoryId) {
+        await tx.globalCategory.update({
+          where: { id: nextCategoryId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+    }
   });
   return { id: input.serviceId };
 }

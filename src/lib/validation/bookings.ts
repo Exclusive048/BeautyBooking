@@ -4,18 +4,18 @@ const dateString = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid date" });
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Некорректная дата." });
 
 export const bookingCreateSchema = z
   .object({
-    providerId: z.string().trim().min(1, "Provider id is required"),
-    serviceId: z.string().trim().min(1, "Service id is required"),
+    providerId: z.string().trim().min(1, "Не указан провайдер."),
+    serviceId: z.string().trim().min(1, "Не указана услуга."),
     masterProviderId: z.string().trim().min(1).optional(),
     startAtUtc: dateString.optional(),
     endAtUtc: dateString.optional(),
-    slotLabel: z.string().trim().min(1, "Slot is required").max(120),
-    clientName: z.string().trim().min(1, "Client name is required").max(120),
-    clientPhone: z.string().trim().min(1, "Client phone is required").max(40),
+    slotLabel: z.string().trim().min(1, "Не указан слот.").max(120),
+    clientName: z.string().trim().min(1, "Не указано имя клиента.").max(120),
+    clientPhone: z.string().trim().min(1, "Не указан телефон клиента.").max(40),
     comment: z.string().trim().max(500).nullable().optional(),
     silentMode: z.boolean().optional(),
   })
@@ -23,7 +23,7 @@ export const bookingCreateSchema = z
     if (value.endAtUtc && !value.startAtUtc) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "startAtUtc is required when endAtUtc is provided",
+        message: "startAtUtc обязателен, если указан endAtUtc.",
         path: ["startAtUtc"],
       });
     }
@@ -33,7 +33,7 @@ export const bookingCreateSchema = z
       if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "endAtUtc must be greater than startAtUtc",
+          message: "endAtUtc должен быть позже startAtUtc.",
           path: ["endAtUtc"],
         });
       }
@@ -58,7 +58,7 @@ export const bookingRescheduleSchema = z
     if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "endAtUtc must be greater than startAtUtc",
+        message: "endAtUtc должен быть позже startAtUtc.",
         path: ["endAtUtc"],
       });
     }

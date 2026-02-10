@@ -363,7 +363,7 @@ export async function upsertMasterServices(
 
 export async function createSoloMasterService(
   masterId: string,
-  input: { title: string; price: number; durationMin: number }
+  input: { title: string; price: number; durationMin: number; globalCategoryId?: string }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
   if (!context.isSolo) {
@@ -375,6 +375,17 @@ export async function createSoloMasterService(
     throw new AppError("Validation error", 400, "VALIDATION_ERROR", {
       fieldErrors: { title: "Title is required" },
     });
+  }
+
+  const globalCategoryId = input.globalCategoryId?.trim() || null;
+  if (globalCategoryId) {
+    const globalCategory = await prisma.globalCategory.findUnique({
+      where: { id: globalCategoryId },
+      select: { id: true, isActive: true },
+    });
+    if (!globalCategory || !globalCategory.isActive) {
+      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    }
   }
 
   const duplicate = await prisma.service.findFirst({
@@ -401,18 +412,30 @@ export async function createSoloMasterService(
 
   let created: { id: string };
   try {
-    created = await prisma.service.create({
-      data: {
-        providerId: masterId,
-        title: normalizedTitle,
-        name: normalizedTitle,
-        price: input.price,
-        durationMin: input.durationMin,
-        isEnabled: true,
-        isActive: true,
-        sortOrder: (last?.sortOrder ?? -1) + 1,
-      },
-      select: { id: true },
+    created = await prisma.$transaction(async (tx) => {
+      const service = await tx.service.create({
+        data: {
+          providerId: masterId,
+          title: normalizedTitle,
+          name: normalizedTitle,
+          price: input.price,
+          durationMin: input.durationMin,
+          globalCategoryId,
+          isEnabled: true,
+          isActive: true,
+          sortOrder: (last?.sortOrder ?? -1) + 1,
+        },
+        select: { id: true },
+      });
+
+      if (globalCategoryId) {
+        await tx.globalCategory.update({
+          where: { id: globalCategoryId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
+      return service;
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
