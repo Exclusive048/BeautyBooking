@@ -4,14 +4,12 @@ import { AppError } from "@/lib/api/errors";
 export type VkLinkSummary = {
   linked: boolean;
   enabled: boolean;
-  username: string | null;
-  avatarUrl: string | null;
 };
 
 export async function getVkLinkSummary(userId: string): Promise<VkLinkSummary> {
   const link = await prisma.vkLink.findUnique({
     where: { userId },
-    select: { vkUserId: true, isEnabled: true, username: true, avatarUrl: true },
+    select: { vkUserId: true, isEnabled: true },
   });
 
   const linked = Boolean(link?.vkUserId);
@@ -20,15 +18,10 @@ export async function getVkLinkSummary(userId: string): Promise<VkLinkSummary> {
   return {
     linked,
     enabled,
-    username: link?.username ?? null,
-    avatarUrl: link?.avatarUrl ?? null,
   };
 }
 
-export async function setVkLinkEnabled(
-  userId: string,
-  enabled: boolean
-): Promise<{ enabled: boolean }> {
+export async function setVkLinkEnabled(userId: string, enabled: boolean): Promise<{ enabled: boolean }> {
   const link = await prisma.vkLink.findUnique({
     where: { userId },
     select: { id: true, vkUserId: true, isEnabled: true },

@@ -290,6 +290,7 @@ export const UI_TEXT = {
       disabled: "Уведомления выключены",
       hint: "Если уведомления не приходят, переподключите VK.",
       connectButton: "Подключить",
+      disconnectButton: "Отключить VK",
       loadFailed: "Не удалось загрузить статус VK",
       linkFailed: "Не удалось подключить VK",
       settingsFailed: "Не удалось обновить настройки",

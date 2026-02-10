@@ -169,6 +169,8 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/TelegramStatusData" },
               { $ref: "#/components/schemas/TelegramSettingsData" },
               { $ref: "#/components/schemas/TelegramWebhookData" },
+              { $ref: "#/components/schemas/VkStatusData" },
+              { $ref: "#/components/schemas/VkDisableData" },
               { $ref: "#/components/schemas/MediaAssetData" },
               { $ref: "#/components/schemas/MediaAssetListData" },
               { $ref: "#/components/schemas/ReviewData" },
@@ -632,6 +634,21 @@ export const openApiSpec = {
         type: "object",
         nullable: true,
         description: "Empty webhook response",
+      },
+      VkStatusData: {
+        type: "object",
+        required: ["linked", "enabled"],
+        properties: {
+          linked: { type: "boolean" },
+          enabled: { type: "boolean" },
+        },
+      },
+      VkDisableData: {
+        type: "object",
+        required: ["enabled"],
+        properties: {
+          enabled: { type: "boolean" },
+        },
       },
       MediaEntityType: {
         type: "string",
@@ -2125,6 +2142,75 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/TelegramWebhookData" }),
           "403": errorResponse("Forbidden"),
+        },
+      },
+    },
+    "/api/auth/vk/start": {
+      get: {
+        summary: "Start VK ID authorization flow",
+        tags: ["auth", "vk"],
+        responses: {
+          "307": { description: "Redirect to VK ID" },
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/auth/vk/callback": {
+      get: {
+        summary: "VK ID authorization callback",
+        tags: ["auth", "vk"],
+        responses: {
+          "307": { description: "Redirect to cabinet" },
+          "400": errorResponse("Validation error"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/integrations/vk/start": {
+      get: {
+        summary: "Start VK ID integration linking",
+        tags: ["integrations", "vk"],
+        responses: {
+          "307": { description: "Redirect to VK ID" },
+          "401": errorResponse("Unauthorized"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/integrations/vk/callback": {
+      get: {
+        summary: "VK ID integration callback",
+        tags: ["integrations", "vk"],
+        responses: {
+          "307": { description: "Redirect to cabinet" },
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/integrations/vk/status": {
+      get: {
+        summary: "Get VK integration status",
+        tags: ["integrations", "vk"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/VkStatusData" }),
+          "401": errorResponse("Unauthorized"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/integrations/vk/disable": {
+      post: {
+        summary: "Disable VK integration",
+        tags: ["integrations", "vk"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/VkDisableData" }),
+          "401": errorResponse("Unauthorized"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
         },
       },
     },

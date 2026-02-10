@@ -1,6 +1,6 @@
-const CLIENT_ID_ENV = "VK_CLIENT_ID";
-const CLIENT_SECRET_ENV = "VK_CLIENT_SECRET";
-const REDIRECT_URI_ENV = "VK_REDIRECT_URI";
+const CLIENT_ID_ENV = "VK_ID_CLIENT_ID";
+const CLIENT_SECRET_ENV = "VK_ID_CLIENT_SECRET";
+const REDIRECT_URI_ENV = "VK_ID_REDIRECT_URI";
 
 function normalize(value: string | undefined): string | null {
   if (!value) return null;

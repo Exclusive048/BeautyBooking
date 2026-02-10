@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { nextRedirect } from "@/lib/http/origin";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +15,7 @@ export async function GET(req: Request) {
     maxAge: 0,
   });
 
-  const url = new URL("/", req.url);
-  const res = NextResponse.redirect(url);
+  const res = nextRedirect(req, "/");
   res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
   return res;
 }
