@@ -4,7 +4,7 @@ import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
-import { listDateKeysExclusive } from "@/lib/schedule/dateKey";
+import { compareDateKeys, listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import {
   SlotPickerOptimized,
@@ -22,6 +22,7 @@ type Props = {
   providerId: string;
   providerTimezone: string;
   selectedServices: ProviderServiceDto[];
+  initialSlotStartAt?: string | null;
   onRemove: (serviceId: string) => void;
 };
 
@@ -38,7 +39,7 @@ const SLOT_LABEL_DATE_LENGTH = 10;
 const SLOT_LABEL_TIME_START = 11;
 const SLOT_LABEL_TIME_LENGTH = 5;
 const PROFILER_THRESHOLD_MS = 16;
-const SLOT_REMOVED_MESSAGE = "Выбранный слот больше недоступен.";
+const SLOT_REMOVED_MESSAGE = UI_TEXT.publicProfile.slots.slotTaken;
 const SLOT_NOTICE_TTL_MS = 3000;
 
 function getSlotDayKey(label: string): string {
@@ -56,7 +57,13 @@ function getSlotTimeText(label: string): string {
   return parts[1] ?? label;
 }
 
-export function PublicBookingWidget({ providerId, providerTimezone, selectedServices, onRemove }: Props) {
+export function PublicBookingWidget({
+  providerId,
+  providerTimezone,
+  selectedServices,
+  initialSlotStartAt,
+  onRemove,
+}: Props) {
   const timezone = providerTimezone.trim() ? providerTimezone.trim() : "UTC";
   const isEmpty = selectedServices.length <= 0;
   const totalPrice = selectedServices.reduce((sum, service) => sum + Math.max(0, service.price), 0);
@@ -96,6 +103,8 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
   const prefetchControllerRef = useRef<AbortController | null>(null);
   const prefetchTimerRef = useRef<number | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
+  const initialSlotPendingRef = useRef<string | null>(null);
+  const initialSlotHandledRef = useRef(false);
   const slotServiceId = selectedServices[0]?.id ?? null;
   const dayKeys = useMemo(() => {
     const keys: string[] = [];
@@ -366,6 +375,46 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
       clearDebounceTimer();
     };
   }, [anchorKey, clearDebounceTimer, loadSlotsPage, resetSlotsState, slotServiceId, step]);
+
+  useEffect(() => {
+    if (!initialSlotStartAt || initialSlotHandledRef.current || !slotServiceId) return;
+    const parsed = new Date(initialSlotStartAt);
+    if (Number.isNaN(parsed.getTime())) {
+      initialSlotHandledRef.current = true;
+      return;
+    }
+    const targetKey = toLocalDateKey(parsed, timezone);
+    initialSlotPendingRef.current = initialSlotStartAt;
+    initialSlotHandledRef.current = true;
+    setAnchorKey(targetKey);
+    setStep("slots");
+  }, [initialSlotStartAt, slotServiceId, timezone]);
+
+  useEffect(() => {
+    const pending = initialSlotPendingRef.current;
+    if (!pending) return;
+    const pendingDate = new Date(pending);
+    if (Number.isNaN(pendingDate.getTime())) {
+      initialSlotPendingRef.current = null;
+      return;
+    }
+    const pendingKey = toLocalDateKey(pendingDate, timezone);
+    const dayLoaded = loadedBatches.some(
+      (batch) =>
+        compareDateKeys(pendingKey, batch.from) >= 0 &&
+        compareDateKeys(pendingKey, batch.toExclusive) < 0
+    );
+    if (!dayLoaded) return;
+
+    const match = slots.find((slot) => slot.startAtUtc === pending) ?? null;
+    if (match) {
+      setSelectedDate(match.dayKey);
+      setSelectedSlotLabel(match.label);
+    } else {
+      setSlotNotice(UI_TEXT.publicProfile.slots.slotTaken);
+    }
+    initialSlotPendingRef.current = null;
+  }, [loadedBatches, slots, timezone]);
 
   useEffect(() => {
     if (step === "slots") return;
