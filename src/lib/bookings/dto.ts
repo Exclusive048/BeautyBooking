@@ -26,6 +26,7 @@ export type BookingProviderDto = {
   district: string;
   address: string;
   type: ProviderType;
+  publicUsername: string | null;
 };
 
 export type BookingDto = {
@@ -52,6 +53,7 @@ export type BookingDto = {
 
 export type BookingClientDto = BookingDto & {
   provider: BookingProviderDto;
+  masterProvider: BookingProviderDto | null;
 };
 
 export type BookingStatusUpdateDto = {

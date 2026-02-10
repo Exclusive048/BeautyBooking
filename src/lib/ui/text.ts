@@ -317,7 +317,7 @@ export const UI_TEXT = {
     bookingsPanel: {
       loading: "Загружаем записи",
       empty: "Записей пока нет.",
-      apiErrorPrefix: "API error:",
+      apiErrorPrefix: "Ошибка API:",
       unknownError: "Неизвестная ошибка",
       failedToLoad: "Не удалось загрузить записи",
       failedToCancel: "Не удалось отменить запись",

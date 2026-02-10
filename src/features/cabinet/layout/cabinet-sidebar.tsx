@@ -6,6 +6,7 @@ import { LogoutButton } from "@/features/auth/components/logout-button";
 
 const NAV_ITEMS = [
   { label: "Профиль", href: "/cabinet/profile" },
+  { label: "Мои записи", href: "/cabinet/bookings" },
   { label: "Профессиональные роли", href: "/cabinet/roles" },
   { label: "Настройки", href: "/cabinet/settings" },
 ];

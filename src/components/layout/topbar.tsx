@@ -127,6 +127,9 @@ export async function Topbar() {
           <Button asChild variant="secondary">
             <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
           </Button>
+          <Button asChild variant="secondary">
+            <Link href="/cabinet/bookings">{UI_TEXT.nav.myBookings}</Link>
+          </Button>
 
           {user ? (
             <>
