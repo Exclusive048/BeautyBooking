@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
+import VkLoginButton from "@/components/auth/vk-login-button";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -218,6 +219,8 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
             <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
               <div className="text-sm font-medium">{UI_TEXT.auth.loginPage.telegramSectionTitle}</div>
               <TelegramLoginButton />
+              <div className="pt-2 text-sm font-medium">{UI_TEXT.auth.loginPage.vkSectionTitle}</div>
+              <VkLoginButton />
             </div>
 
             <p className="mt-6 text-center text-xs text-muted-foreground">{UI_TEXT.auth.loginPage.noAccountHint}</p>
