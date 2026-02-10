@@ -10,6 +10,7 @@ export type NotificationCenterInviteItem = {
   studioName: string;
   studioTagline: string | null;
   studioAvatarUrl: string | null;
+  studioPublicUsername: string | null;
   createdAt: string;
 };
 
@@ -144,22 +145,23 @@ export async function getNotificationCenterData(input: {
             phone: normalizedPhone,
             status: MembershipStatus.PENDING,
           },
-          select: {
-            id: true,
-            createdAt: true,
-            studio: {
-              select: {
-                id: true,
-                provider: {
-                  select: {
-                    name: true,
-                    tagline: true,
-                    avatarUrl: true,
+            select: {
+              id: true,
+              createdAt: true,
+              studio: {
+                select: {
+                  id: true,
+                  provider: {
+                    select: {
+                      name: true,
+                      tagline: true,
+                      avatarUrl: true,
+                      publicUsername: true,
+                    },
                   },
                 },
               },
             },
-          },
           orderBy: { createdAt: "desc" },
           take: 30,
         })
@@ -295,11 +297,12 @@ export async function getNotificationCenterData(input: {
     invites: invites.map((invite) => ({
       id: invite.id,
       studioId: invite.studio.id,
-      studioName: invite.studio.provider.name,
-      studioTagline: invite.studio.provider.tagline,
-      studioAvatarUrl: invite.studio.provider.avatarUrl,
-      createdAt: invite.createdAt.toISOString(),
-    })),
+        studioName: invite.studio.provider.name,
+        studioTagline: invite.studio.provider.tagline,
+        studioAvatarUrl: invite.studio.provider.avatarUrl,
+        studioPublicUsername: invite.studio.provider.publicUsername ?? null,
+        createdAt: invite.createdAt.toISOString(),
+      })),
     notifications: timelineNotifications,
     unreadCount: unreadCount + scheduleRequestNotifications.length,
     hasPhone: Boolean(normalizedPhone),

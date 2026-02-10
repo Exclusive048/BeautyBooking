@@ -159,10 +159,13 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/ProviderProfileData" },
               { $ref: "#/components/schemas/ProviderServicesData" },
               { $ref: "#/components/schemas/ProviderServiceData" },
-              { $ref: "#/components/schemas/BookingListData" },
-              { $ref: "#/components/schemas/BookingData" },
-              { $ref: "#/components/schemas/AvailabilitySlotsData" },
-              { $ref: "#/components/schemas/WeeklyScheduleData" },
+                { $ref: "#/components/schemas/BookingListData" },
+                { $ref: "#/components/schemas/BookingData" },
+                { $ref: "#/components/schemas/AvailabilitySlotsData" },
+                { $ref: "#/components/schemas/HotSlotRuleData" },
+                { $ref: "#/components/schemas/HotSlotsData" },
+                { $ref: "#/components/schemas/HotSlotsRunData" },
+                { $ref: "#/components/schemas/WeeklyScheduleData" },
               { $ref: "#/components/schemas/CountData" },
               { $ref: "#/components/schemas/DeleteResult" },
               { $ref: "#/components/schemas/TelegramLinkData" },
@@ -367,21 +370,29 @@ export const openApiSpec = {
           updatedAt: { type: "string", format: "date-time" },
         },
       },
-      BookingStatus: {
-        type: "string",
-        enum: [
-          "PENDING",
-          "CONFIRMED",
-          "CHANGE_REQUESTED",
-          "REJECTED",
-          "IN_PROGRESS",
-          "FINISHED",
-        ],
-      },
-      BookingCancelledBy: {
-        type: "string",
-        enum: ["CLIENT", "PROVIDER", "SYSTEM"],
-      },
+        BookingStatus: {
+          type: "string",
+          enum: [
+            "PENDING",
+            "CONFIRMED",
+            "CHANGE_REQUESTED",
+            "REJECTED",
+            "IN_PROGRESS",
+            "FINISHED",
+          ],
+        },
+        DiscountType: {
+          type: "string",
+          enum: ["PERCENT", "FIXED"],
+        },
+        DiscountApplyMode: {
+          type: "string",
+          enum: ["ALL_SERVICES", "PRICE_FROM", "MANUAL"],
+        },
+        BookingCancelledBy: {
+          type: "string",
+          enum: ["CLIENT", "PROVIDER", "SYSTEM"],
+        },
       BookingStatusUpdate: {
         type: "object",
         required: ["id", "status"],
@@ -423,15 +434,18 @@ export const openApiSpec = {
           service: { $ref: "#/components/schemas/BookingService" },
         },
       },
-      AvailabilitySlot: {
-        type: "object",
-        required: ["startAtUtc", "endAtUtc", "label"],
-        properties: {
-          startAtUtc: { type: "string", format: "date-time" },
-          endAtUtc: { type: "string", format: "date-time" },
-          label: { type: "string" },
+        AvailabilitySlot: {
+          type: "object",
+          required: ["startAtUtc", "endAtUtc", "label"],
+          properties: {
+            startAtUtc: { type: "string", format: "date-time" },
+            endAtUtc: { type: "string", format: "date-time" },
+            label: { type: "string" },
+            isHot: { type: "boolean" },
+            discountType: { $ref: "#/components/schemas/DiscountType" },
+            discountValue: { type: "integer" },
+          },
         },
-      },
       AvailabilitySlotsMeta: {
         type: "object",
         required: ["fromDate", "toDateExclusive", "totalDays", "hasMore", "pageSize"],
@@ -565,18 +579,144 @@ export const openApiSpec = {
           slotLabel: { type: "string" },
         },
       },
-      AvailabilitySlotsData: {
-        type: "object",
-        required: ["slots", "meta"],
-        properties: {
-          slots: { type: "array", items: { $ref: "#/components/schemas/AvailabilitySlot" } },
-          meta: { $ref: "#/components/schemas/AvailabilitySlotsMeta" },
+        AvailabilitySlotsData: {
+          type: "object",
+          required: ["slots", "meta"],
+          properties: {
+            slots: { type: "array", items: { $ref: "#/components/schemas/AvailabilitySlot" } },
+            meta: { $ref: "#/components/schemas/AvailabilitySlotsMeta" },
+          },
         },
-      },
-      WeeklyScheduleData: {
-        type: "object",
-        required: ["items"],
-        properties: {
+        HotSlotRule: {
+          type: "object",
+          required: [
+            "isEnabled",
+            "triggerHours",
+            "discountType",
+            "discountValue",
+            "applyMode",
+            "serviceIds",
+          ],
+          properties: {
+            isEnabled: { type: "boolean" },
+            triggerHours: { type: "integer" },
+            discountType: { $ref: "#/components/schemas/DiscountType" },
+            discountValue: { type: "integer" },
+            applyMode: { $ref: "#/components/schemas/DiscountApplyMode" },
+            minPriceFrom: { type: "integer", nullable: true },
+            serviceIds: { type: "array", items: { type: "string" } },
+          },
+        },
+        HotSlotRuleData: {
+          type: "object",
+          required: ["rule"],
+          properties: {
+            rule: { $ref: "#/components/schemas/HotSlotRule" },
+          },
+        },
+        HotSlotRuleInput: {
+          type: "object",
+          required: [
+            "isEnabled",
+            "triggerHours",
+            "discountType",
+            "discountValue",
+            "applyMode",
+            "serviceIds",
+          ],
+          properties: {
+            isEnabled: { type: "boolean" },
+            triggerHours: { type: "integer" },
+            discountType: { $ref: "#/components/schemas/DiscountType" },
+            discountValue: { type: "integer" },
+            applyMode: { $ref: "#/components/schemas/DiscountApplyMode" },
+            minPriceFrom: { type: "integer", nullable: true },
+            serviceIds: { type: "array", items: { type: "string" } },
+          },
+        },
+        HotSlotProvider: {
+          type: "object",
+          required: [
+            "id",
+            "publicUsername",
+            "name",
+            "avatarUrl",
+            "address",
+            "district",
+            "ratingAvg",
+            "ratingCount",
+            "timezone",
+          ],
+          properties: {
+            id: { type: "string" },
+            publicUsername: { type: "string" },
+            name: { type: "string" },
+            avatarUrl: { type: "string", nullable: true },
+            address: { type: "string" },
+            district: { type: "string" },
+            ratingAvg: { type: "number" },
+            ratingCount: { type: "integer" },
+            timezone: { type: "string" },
+          },
+        },
+        HotSlotSlot: {
+          type: "object",
+          required: ["startAtUtc", "endAtUtc", "discountType", "discountValue", "isActive"],
+          properties: {
+            startAtUtc: { type: "string", format: "date-time" },
+            endAtUtc: { type: "string", format: "date-time" },
+            discountType: { $ref: "#/components/schemas/DiscountType" },
+            discountValue: { type: "integer" },
+            isActive: { type: "boolean" },
+          },
+        },
+        HotSlotService: {
+          type: "object",
+          required: ["id", "title", "price", "durationMin"],
+          properties: {
+            id: { type: "string" },
+            title: { type: "string" },
+            price: { type: "integer" },
+            durationMin: { type: "integer" },
+          },
+        },
+        HotSlotItem: {
+          type: "object",
+          required: ["id", "provider", "slot"],
+          properties: {
+            id: { type: "string" },
+            provider: { $ref: "#/components/schemas/HotSlotProvider" },
+            slot: { $ref: "#/components/schemas/HotSlotSlot" },
+            service: { allOf: [{ $ref: "#/components/schemas/HotSlotService" }], nullable: true },
+          },
+        },
+        HotSlotsData: {
+          type: "object",
+          required: ["items"],
+          properties: {
+            items: { type: "array", items: { $ref: "#/components/schemas/HotSlotItem" } },
+          },
+        },
+        HotSlotsJobStats: {
+          type: "object",
+          required: ["processed", "skipped", "activated"],
+          properties: {
+            processed: { type: "integer" },
+            skipped: { type: "integer" },
+            activated: { type: "integer" },
+          },
+        },
+        HotSlotsRunData: {
+          type: "object",
+          required: ["stats"],
+          properties: {
+            stats: { $ref: "#/components/schemas/HotSlotsJobStats" },
+          },
+        },
+        WeeklyScheduleData: {
+          type: "object",
+          required: ["items"],
+          properties: {
           items: { type: "array", items: { $ref: "#/components/schemas/WeeklyScheduleItem" } },
         },
       },
@@ -1786,10 +1926,11 @@ export const openApiSpec = {
           { name: "serviceQuery", in: "query", required: false, schema: { type: "string" } },
           { name: "district", in: "query", required: false, schema: { type: "string" } },
           { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
-          { name: "priceMin", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
-          { name: "priceMax", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
-          { name: "availableToday", in: "query", required: false, schema: { type: "boolean" } },
-          { name: "ratingMin", in: "query", required: false, schema: { type: "number", minimum: 0, maximum: 5 } },
+            { name: "priceMin", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+            { name: "priceMax", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+            { name: "availableToday", in: "query", required: false, schema: { type: "boolean" } },
+            { name: "hot", in: "query", required: false, schema: { type: "boolean" } },
+            { name: "ratingMin", in: "query", required: false, schema: { type: "number", minimum: 0, maximum: 5 } },
           { name: "entityType", in: "query", required: false, schema: { type: "string", enum: ["all", "master", "studio"] } },
           { name: "view", in: "query", required: false, schema: { type: "string", enum: ["list", "map"] } },
           { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 40 } },
@@ -3386,6 +3527,65 @@ export const openApiSpec = {
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/hot-slots": {
+      get: {
+        summary: "List active hot slots",
+        tags: ["hot-slots"],
+        parameters: [
+          { name: "from", in: "query", required: false, schema: { type: "string", format: "date-time" } },
+          { name: "to", in: "query", required: false, schema: { type: "string", format: "date-time" } },
+          { name: "category", in: "query", required: false, schema: { type: "string" } },
+          { name: "tag", in: "query", required: false, schema: { type: "string" } },
+          { name: "geo", in: "query", required: false, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/HotSlotsData" }),
+          "400": errorResponse("Validation error"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/provider/hot-slots/rule": {
+      get: {
+        summary: "Get hot slots rule for current provider",
+        tags: ["hot-slots"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/HotSlotRuleData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      post: {
+        summary: "Update hot slots rule",
+        tags: ["hot-slots"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/HotSlotRuleInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/HotSlotRuleData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/admin/hot-slots/run": {
+      post: {
+        summary: "Run hot slots job",
+        tags: ["hot-slots", "admin"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/HotSlotsRunData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
           "500": errorResponse("Internal error"),
         },
       },

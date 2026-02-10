@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { HeroBlock } from "@/features/public-profile/master/hero-block";
 import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
@@ -45,6 +45,9 @@ type Props = {
 
 export function PublicMasterProfileClient({ providerId }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialServiceId = searchParams.get("serviceId");
+  const initialServiceAppliedRef = useRef(false);
 
   const [provider, setProvider] = useState<ProviderProfileDto | null>(null);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItemPreview[]>([]);
@@ -72,16 +75,26 @@ export function PublicMasterProfileClient({ providerId }: Props) {
         }
 
         const loaded = json.data.provider;
-        if (loaded?.type === "STUDIO") {
-          if (alive) {
+          if (loaded?.type === "STUDIO") {
+            if (!alive) return;
+            if (!loaded.publicUsername) {
+              setError(UI_TEXT.publicProfile.page.loadFailedTitle);
+              return;
+            }
             setRedirecting(true);
-            router.replace(`/studios/${loaded.id}`);
+            router.replace(`/u/${loaded.publicUsername}`);
+            return;
           }
-          return;
-        }
 
         if (!alive) return;
         setProvider(loaded);
+        if (!initialServiceAppliedRef.current && initialServiceId && loaded?.type === "MASTER") {
+          const match = loaded.services.find((service) => service.id === initialServiceId);
+          if (match) {
+            setSelectedServices([match]);
+            initialServiceAppliedRef.current = true;
+          }
+        }
 
         if (loaded?.type === "MASTER") {
           const [portfolioRes, reviewsRes] = await Promise.all([
@@ -133,7 +146,7 @@ export function PublicMasterProfileClient({ providerId }: Props) {
     return () => {
       alive = false;
     };
-  }, [providerId, router]);
+  }, [initialServiceId, providerId, router]);
 
   if (loading) {
     return (

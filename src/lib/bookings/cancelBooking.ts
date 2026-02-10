@@ -88,6 +88,7 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
             status: "REJECTED",
             cancelledBy: input.cancelledBy,
             cancelReason: input.reason?.trim() || null,
+            cancelledAtUtc: new Date(),
             requestedBy: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
             actionRequiredBy: null,
             proposedStartAt: null,

@@ -64,6 +64,17 @@ enum BookingActionRequiredBy {
   MASTER
 }
 
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum DiscountApplyMode {
+  ALL_SERVICES
+  PRICE_FROM
+  MANUAL
+}
+
 enum ScheduleBreakKind {
   WEEKLY
   OVERRIDE
@@ -332,6 +343,8 @@ model Provider {
   scheduleOverrides ScheduleOverride[]
   scheduleBlocks    ScheduleBlock[]
   scheduleBreaks    ScheduleBreak[]
+  discountRule DiscountRule?
+  hotSlots      HotSlot[]
 
   studioProfile  Studio?         @relation("StudioProvider")
   masterProfile  MasterProfile?  @relation("MasterProvider")
@@ -380,6 +393,7 @@ model Service {
   masterServices MasterService[]
   portfolioItems PortfolioItemService[]
   bookingItems   BookingServiceItem[]
+  hotSlots       HotSlot[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -408,6 +422,42 @@ model MasterService {
   @@unique([masterProviderId, serviceId])
   @@index([masterProviderId])
   @@index([serviceId])
+}
+
+model DiscountRule {
+  id            String             @id @default(cuid())
+  providerId    String             @unique
+  provider      Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  isEnabled     Boolean            @default(false)
+  triggerHours  Int
+  discountType  DiscountType
+  discountValue Int
+  applyMode     DiscountApplyMode
+  minPriceFrom  Int?
+  serviceIds    String[]           @default([])
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model HotSlot {
+  id            String        @id @default(cuid())
+  providerId    String
+  provider      Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceId     String?
+  service       Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  startAtUtc    DateTime
+  endAtUtc      DateTime
+  discountType  DiscountType
+  discountValue Int
+  isActive      Boolean       @default(true)
+  activatedAt   DateTime      @default(now())
+  expiresAtUtc  DateTime
+  reason        String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([providerId, startAtUtc])
+  @@unique([providerId, startAtUtc, endAtUtc])
 }
 
 model Booking {
@@ -446,6 +496,7 @@ model Booking {
   status                    BookingStatus            @default(PENDING)
   cancelledBy               BookingCancelledBy?
   cancelReason              String?
+  cancelledAtUtc            DateTime?
   proposedStartAt           DateTime?
   proposedEndAt             DateTime?
   requestedBy               BookingRequestedBy?

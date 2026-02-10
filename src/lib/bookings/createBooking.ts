@@ -19,6 +19,9 @@ import {
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
+import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
+import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
 
 function normalizeBufferMinutes(value: number | null | undefined): number {
   if (!Number.isFinite(value)) return 0;
@@ -130,7 +133,7 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
 
       const service = await tx.service.findUnique({
         where: { id: input.serviceId },
-        select: { id: true, providerId: true, durationMin: true },
+        select: { id: true, providerId: true, durationMin: true, price: true },
       });
       if (!service) throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
 
@@ -188,6 +191,50 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingD
       const endAtUtc = isValidDate(input.endAtUtc)
         ? input.endAtUtc
         : new Date(startAtUtc.getTime() + durationMin * 60 * 1000);
+
+      if (input.clientUserId) {
+        const hotProviderId =
+          provider.type === ProviderType.STUDIO ? resolvedMasterProviderId : provider.id;
+        if (hotProviderId) {
+          const rule = await tx.discountRule.findUnique({
+            where: { providerId: hotProviderId },
+            select: { isEnabled: true, applyMode: true, minPriceFrom: true, serviceIds: true },
+          });
+          const isEligible = isServiceEligibleForHotRule(rule, service.id, service.price);
+          if (isEligible) {
+            const hotSlot = await tx.hotSlot.findFirst({
+              where: {
+                providerId: hotProviderId,
+                startAtUtc,
+                isActive: true,
+                expiresAtUtc: { gt: new Date() },
+                OR: [{ endAtUtc }, { serviceId: null }],
+              },
+              select: { id: true },
+            });
+            if (hotSlot) {
+              const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
+              const recentCancel = await tx.booking.findFirst({
+                where: {
+                  providerId: input.providerId,
+                  clientUserId: input.clientUserId,
+                  status: { in: ["REJECTED", "CANCELLED"] },
+                  startAtUtc,
+                  cancelledAtUtc: { gt: cutoff },
+                },
+                select: { id: true, cancelledAtUtc: true },
+              });
+              if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
+                throw new AppError(
+                  "Нельзя повторно записаться на этот слот со скидкой после отмены. Выберите другое время.",
+                  409,
+                  "BOOKING_CONFLICT"
+                );
+              }
+            }
+          }
+        }
+      }
 
       if (provider.type === ProviderType.STUDIO && resolvedMasterProviderId) {
         const bufferMin = masterBufferMin ?? 0;

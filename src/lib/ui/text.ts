@@ -163,6 +163,7 @@ export const UI_TEXT = {
       price: "Цена",
       availableToday: "Свободно сегодня",
       rating45plus: "⭐ 4.5+",
+        hot: "Горящее",
       studios: "Студии",
       privateMasters: "Частные мастера",
       priceMinPlaceholder: "Мин",
@@ -679,3 +680,4 @@ export const UI_TEXT = {
     reviewsCountLabel: "отзывов",
   },
 } as const;
+

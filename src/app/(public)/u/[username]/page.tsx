@@ -37,6 +37,24 @@ export default async function PublicUsernamePage({ params }: Props) {
     username
   );
 
+  if (process.env.NODE_ENV !== "production") {
+    if (result.status === "not-found") {
+      const reason =
+        result.reason === "unpublished"
+          ? "найден, но профиль не опубликован"
+          : result.reason === "alias-unpublished"
+            ? "найден алиас, но профиль не опубликован"
+            : result.reason === "invalid"
+              ? "некорректный username"
+              : "username не найден";
+      console.info(`[public] /u/${username} -> ${reason}`);
+    }
+
+    if (result.status === "redirect") {
+      console.info(`[public] /u/${username} -> редирект по алиасу на /u/${result.username}`);
+    }
+  }
+
   if (result.status === "not-found") {
     notFound();
   }

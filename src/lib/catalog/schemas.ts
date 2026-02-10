@@ -16,6 +16,7 @@ export const catalogSearchQuerySchema = z.object({
   priceMin: z.coerce.number().int().min(0).optional(),
   priceMax: z.coerce.number().int().min(0).optional(),
   availableToday: z.coerce.boolean().optional(),
+  hot: z.coerce.boolean().optional(),
   ratingMin: z.coerce.number().min(0).max(5).optional(),
   smartTag: catalogSmartTagPresetSchema.optional(),
   entityType: catalogEntityTypeSchema.optional(),
