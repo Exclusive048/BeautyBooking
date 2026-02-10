@@ -134,4 +134,5 @@ export const createMasterPortfolioSchema = z.object({
   mediaUrl: z.string().url().max(2000),
   caption: z.string().trim().max(2000).optional(),
   serviceIds: z.array(z.string().trim().min(1)).max(20),
+  tagIds: z.array(z.string().trim().min(1)).max(20).optional(),
 });

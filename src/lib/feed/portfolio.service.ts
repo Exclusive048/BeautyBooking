@@ -230,6 +230,113 @@ export async function listPortfolioFeed(input: {
   };
 }
 
+export async function listHomePortfolioFeed(input: {
+  limit: number;
+  cursor?: string;
+  categoryId?: string;
+  tagId?: string;
+  currentUserId?: string;
+}): Promise<{ items: PortfolioFeedItem[]; nextCursor: string | null }> {
+  const pageSize = Math.max(1, Math.min(50, input.limit));
+
+  const rows = await prisma.portfolioItem.findMany({
+    where: {
+      isPublic: true,
+      ...(input.categoryId
+        ? {
+            services: {
+              some: {
+                service: { globalCategoryId: input.categoryId },
+              },
+            },
+          }
+        : {}),
+      ...(input.tagId
+        ? {
+            tags: {
+              some: { tagId: input.tagId },
+            },
+          }
+        : {}),
+    },
+    include: {
+      master: {
+        select: {
+          id: true,
+          name: true,
+          publicUsername: true,
+          avatarUrl: true,
+          studio: { select: { name: true } },
+        },
+      },
+      services: {
+        include: {
+          service: {
+            select: {
+              id: true,
+              name: true,
+              title: true,
+              price: true,
+              durationMin: true,
+              masterServices: {
+                select: {
+                  masterProviderId: true,
+                  isEnabled: true,
+                  priceOverride: true,
+                  durationOverrideMin: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      favorites: input.currentUserId
+        ? {
+            where: { userId: input.currentUserId },
+            select: { id: true },
+          }
+        : false,
+      _count: { select: { favorites: true } },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: pageSize + 1,
+    ...(input.cursor
+      ? {
+          skip: 1,
+          cursor: { id: input.cursor },
+        }
+      : {}),
+  });
+
+  const hasMore = rows.length > pageSize;
+  const items = (hasMore ? rows.slice(0, -1) : rows).map((row) => {
+    const snapshot = buildPortfolioSnapshot({ masterId: row.master.id, services: row.services });
+    return {
+      id: row.id,
+      mediaUrl: row.mediaUrl,
+      caption: row.caption ?? null,
+      width: row.width ?? null,
+      height: row.height ?? null,
+      masterId: row.master.id,
+      masterName: row.master.name,
+      masterPublicUsername: row.master.publicUsername ?? null,
+      masterAvatarUrl: row.master.avatarUrl ?? null,
+      studioName: row.master.studio?.name ?? null,
+      serviceIds: snapshot.serviceIds,
+      primaryServiceTitle: snapshot.primaryServiceTitle,
+      totalDurationMin: snapshot.totalDurationMin,
+      totalPrice: snapshot.totalPrice,
+      favoritesCount: row._count.favorites,
+      isFavorited: Array.isArray(row.favorites) ? row.favorites.length > 0 : false,
+    } satisfies PortfolioFeedItem;
+  });
+
+  return {
+    items,
+    nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
+  };
+}
+
 export async function getPortfolioDetail(
   portfolioId: string,
   currentUserId?: string

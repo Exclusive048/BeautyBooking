@@ -14,6 +14,18 @@ export async function GET() {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
+  await prisma.globalCategory.upsert({
+    where: { slug: "hot" },
+    update: { isValidated: true, isRejected: false, icon: "🔥", name: "Горящие" },
+    create: {
+      name: "Горящие",
+      slug: "hot",
+      icon: "🔥",
+      isValidated: true,
+      isRejected: false,
+    },
+  });
+
   const categories = await prisma.globalCategory.findMany({
     orderBy: { createdAt: "desc" },
     select: {
