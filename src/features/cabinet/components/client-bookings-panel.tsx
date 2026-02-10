@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
@@ -36,7 +37,22 @@ type BookingItem = {
   changeComment: string | null;
   clientChangeRequestsCount: number;
   masterChangeRequestsCount: number;
-  provider: { id: string; name: string; district: string; address: string; type: "MASTER" | "STUDIO" };
+  provider: {
+    id: string;
+    name: string;
+    district: string;
+    address: string;
+    type: "MASTER" | "STUDIO";
+    publicUsername: string | null;
+  };
+  masterProvider: {
+    id: string;
+    name: string;
+    district: string;
+    address: string;
+    type: "MASTER" | "STUDIO";
+    publicUsername: string | null;
+  } | null;
   service: { id: string; name: string };
 };
 
@@ -74,6 +90,25 @@ function canManageByClient(booking: BookingItem): boolean {
   if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
   const minutesLeft = minutesUntilStart(booking);
   return minutesLeft === null || minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
+}
+
+function isExcludedStatus(status: BookingItem["status"]): boolean {
+  return status === "REJECTED" || status === "NO_SHOW";
+}
+
+function sortBookings(items: BookingItem[]): BookingItem[] {
+  const now = Date.now();
+  return [...items].sort((a, b) => {
+    const aTs = a.startAtUtc ? new Date(a.startAtUtc).getTime() : null;
+    const bTs = b.startAtUtc ? new Date(b.startAtUtc).getTime() : null;
+    const aPast = aTs !== null && aTs < now;
+    const bPast = bTs !== null && bTs < now;
+
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    if (aTs === null || bTs === null) return 0;
+    if (!aPast) return aTs - bTs;
+    return bTs - aTs;
+  });
 }
 
 export function ClientBookingsPanel() {
@@ -130,8 +165,9 @@ export function ClientBookingsPanel() {
       const json = (await res.json().catch(() => null)) as ApiResponse<{ bookings: BookingItem[] }> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, `${t.bookingsPanel.apiErrorPrefix} ${res.status}`));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.bookingsPanel.failedToLoad));
-      setItems(json.data.bookings);
-      await loadCanLeave(json.data.bookings);
+      const prepared = sortBookings(json.data.bookings.filter((item) => !isExcludedStatus(item.status)));
+      setItems(prepared);
+      await loadCanLeave(prepared);
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
     } finally {
@@ -142,6 +178,8 @@ export function ClientBookingsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const sortedItems = useMemo(() => sortBookings(items), [items]);
 
   const cancelBooking = async (id: string) => {
     setActionId(id);
@@ -188,7 +226,7 @@ export function ClientBookingsPanel() {
       const res = await fetch(`/api/reviews/${reviewId}`, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(getErrorMessage(json, "Failed to delete review"));
+        throw new Error(getErrorMessage(json, "Не удалось удалить отзыв"));
       }
       await load();
     } catch (e) {
@@ -234,12 +272,19 @@ export function ClientBookingsPanel() {
   return (
     <>
       <div className="space-y-3">
-        {items.map((b) => {
+        {sortedItems.map((b) => {
           const canManage = canManageByClient(b);
           const waitsClientDecision =
             b.status === "CHANGE_REQUESTED" && b.actionRequiredBy === "CLIENT";
           const waitsMasterDecision =
             b.status === "CHANGE_REQUESTED" && b.actionRequiredBy === "MASTER";
+          const studioName = b.provider.type === "STUDIO" ? b.provider.name : null;
+          const masterName =
+            b.masterProvider?.name ?? (b.provider.type === "MASTER" ? b.provider.name : null);
+          const studioUsername = b.provider.type === "STUDIO" ? b.provider.publicUsername : null;
+          const masterUsername =
+            b.masterProvider?.publicUsername ?? (b.provider.type === "MASTER" ? b.provider.publicUsername : null);
+          const addressLine = [b.provider.district, b.provider.address].filter(Boolean).join(" / ");
 
           return (
             <div key={b.id} className="lux-card rounded-[22px] p-4">
@@ -250,14 +295,24 @@ export function ClientBookingsPanel() {
               <div className="mt-1 text-sm text-text-main">
                 {b.slotLabel} / {b.service.name}
               </div>
-              <div className="mt-1 text-sm text-text-sec">
-                {b.provider.district} / {b.provider.address}
-              </div>
+              {masterName ? <div className="mt-1 text-sm text-text-sec">Мастер: {masterName}</div> : null}
+              {studioName ? <div className="mt-1 text-sm text-text-sec">Студия: {studioName}</div> : null}
+              {addressLine ? <div className="mt-1 text-sm text-text-sec">{addressLine}</div> : null}
               {b.comment ? <div className="mt-2 text-sm text-text-sec">{b.comment}</div> : null}
               {waitsMasterDecision ? (
                 <div className="mt-2 text-xs text-text-sec">Ожидает подтверждения мастера</div>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
+                {masterUsername ? (
+                  <Button asChild type="button" variant="secondary" size="sm">
+                    <Link href={`/u/${masterUsername}`}>Перейти к мастеру</Link>
+                  </Button>
+                ) : null}
+                {studioUsername ? (
+                  <Button asChild type="button" variant="secondary" size="sm">
+                    <Link href={`/u/${studioUsername}`}>Перейти в студию</Link>
+                  </Button>
+                ) : null}
                 {canManage ? (
                   <>
                     <Button
@@ -320,7 +375,7 @@ export function ClientBookingsPanel() {
                     variant="danger"
                     size="sm"
                   >
-                    Delete review
+                    Удалить отзыв
                   </Button>
                 ) : null}
               </div>

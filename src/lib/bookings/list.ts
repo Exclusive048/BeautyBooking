@@ -146,6 +146,17 @@ export async function listClientBookings(userId: string): Promise<BookingClientD
           district: true,
           address: true,
           type: true,
+          publicUsername: true,
+        },
+      },
+      masterProvider: {
+        select: {
+          id: true,
+          name: true,
+          district: true,
+          address: true,
+          type: true,
+          publicUsername: true,
         },
       },
     },

@@ -42,7 +42,12 @@ type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
     startAtUtc: true;
     endAtUtc: true;
     service: { select: { id: true; name: true } };
-    provider: { select: { id: true; name: true; district: true; address: true; type: true } };
+    provider: {
+      select: { id: true; name: true; district: true; address: true; type: true; publicUsername: true };
+    };
+    masterProvider: {
+      select: { id: true; name: true; district: true; address: true; type: true; publicUsername: true };
+    };
   };
 }> & {
   proposedStartAt?: Date | null;
@@ -96,7 +101,18 @@ export function toClientBookingDto(model: BookingWithServiceProviderModel): Book
       district: model.provider.district,
       address: model.provider.address,
       type: model.provider.type,
+      publicUsername: model.provider.publicUsername ?? null,
     },
+    masterProvider: model.masterProvider
+      ? {
+          id: model.masterProvider.id,
+          name: model.masterProvider.name,
+          district: model.masterProvider.district,
+          address: model.masterProvider.address,
+          type: model.masterProvider.type,
+          publicUsername: model.masterProvider.publicUsername ?? null,
+        }
+      : null,
   };
 }
 
