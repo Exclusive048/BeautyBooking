@@ -152,6 +152,18 @@ export const UI_TEXT = {
     byMaster: "Мастер",
     byStudio: "Студия",
   },
+  home: {
+    filters: {
+      categoriesTitle: "Что ищем?",
+      tagsTitle: "Какой стиль?",
+    },
+    loading: "Загрузка ленты…",
+    loadFailed: "Не удалось загрузить ленту",
+    empty: "Пока нет работ",
+    detailsFailed: "Не удалось загрузить работу",
+    bookService: "Записаться на услугу",
+    goToMaster: "К мастеру",
+  },
   catalog: {
     capsule: {
       servicePlaceholder: "Услуга",

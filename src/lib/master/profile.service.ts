@@ -447,10 +447,12 @@ export async function listMasterPortfolio(masterId: string): Promise<{ items: Ma
 
 export async function createMasterPortfolioItem(
   masterId: string,
-  input: { mediaUrl: string; caption?: string; serviceIds: string[] }
+  input: { mediaUrl: string; caption?: string; serviceIds: string[]; tagIds?: string[] }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
   const uniqueServiceIds = uniqueIds(input.serviceIds);
+  const uniqueTagIds = uniqueIds(input.tagIds ?? []);
+  let categoryIds: string[] = [];
 
   if (uniqueServiceIds.length > 0) {
     const services = await prisma.service.findMany({
@@ -458,10 +460,25 @@ export async function createMasterPortfolioItem(
         id: { in: uniqueServiceIds },
         providerId: context.isSolo ? masterId : context.studioProviderId!,
       },
-      select: { id: true },
+      select: { id: true, globalCategoryId: true },
     });
     if (services.length !== uniqueServiceIds.length) {
       throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    }
+    categoryIds = uniqueIds(
+      services
+        .map((service) => service.globalCategoryId)
+        .filter((value): value is string => Boolean(value))
+    );
+  }
+
+  if (uniqueTagIds.length > 0) {
+    const tags = await prisma.tag.findMany({
+      where: { id: { in: uniqueTagIds } },
+      select: { id: true },
+    });
+    if (tags.length !== uniqueTagIds.length) {
+      throw new AppError("Тег не найден", 404, "NOT_FOUND");
     }
   }
 
@@ -486,6 +503,29 @@ export async function createMasterPortfolioItem(
       });
     }
 
+    if (uniqueTagIds.length > 0) {
+      await tx.portfolioItemTag.createMany({
+        data: uniqueTagIds.map((tagId) => ({
+          portfolioItemId: item.id,
+          tagId,
+        })),
+      });
+    }
+
+    if (categoryIds.length > 0) {
+      await tx.globalCategory.updateMany({
+        where: { id: { in: categoryIds } },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+
+    if (uniqueTagIds.length > 0) {
+      await tx.tag.updateMany({
+        where: { id: { in: uniqueTagIds } },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+
     return item;
   });
 
@@ -498,11 +538,37 @@ export async function deleteMasterPortfolioItem(
 ): Promise<{ id: string }> {
   const item = await prisma.portfolioItem.findUnique({
     where: { id: portfolioId },
-    select: { id: true, masterId: true },
+    select: {
+      id: true,
+      masterId: true,
+      services: { select: { service: { select: { globalCategoryId: true } } } },
+      tags: { select: { tagId: true } },
+    },
   });
   if (!item || item.masterId !== masterId) {
     throw new AppError("Not found", 404, "NOT_FOUND");
   }
-  await prisma.portfolioItem.delete({ where: { id: item.id } });
+  const categoryIds = uniqueIds(
+    item.services
+      .map((link) => link.service.globalCategoryId)
+      .filter((value): value is string => Boolean(value))
+  );
+  const tagIds = uniqueIds(item.tags.map((link) => link.tagId));
+
+  await prisma.$transaction(async (tx) => {
+    await tx.portfolioItem.delete({ where: { id: item.id } });
+    if (categoryIds.length > 0) {
+      await tx.globalCategory.updateMany({
+        where: { id: { in: categoryIds }, usageCount: { gt: 0 } },
+        data: { usageCount: { decrement: 1 } },
+      });
+    }
+    if (tagIds.length > 0) {
+      await tx.tag.updateMany({
+        where: { id: { in: tagIds }, usageCount: { gt: 0 } },
+        data: { usageCount: { decrement: 1 } },
+      });
+    }
+  });
   return { id: item.id };
 }

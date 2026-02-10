@@ -351,6 +351,7 @@ model Provider {
   reviewsAbout   Review[]
   portfolioItems PortfolioItem[]
   publicUsernameAliases PublicUsernameAlias[]
+  createdGlobalCategories GlobalCategory[] @relation("GlobalCategoryCreatorProvider")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -377,6 +378,8 @@ model Service {
   studio     Studio?          @relation(fields: [studioId], references: [id], onDelete: SetNull)
   categoryId String?
   category   ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  globalCategoryId String?
+  globalCategory   GlobalCategory? @relation(fields: [globalCategoryId], references: [id], onDelete: SetNull)
 
   name            String
   title           String?
@@ -790,11 +793,31 @@ model GlobalCategory {
   usageCount      Int         @default(0)
   createdByUserId String?
   createdBy       UserProfile? @relation("GlobalCategoryCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByProviderId String?
+  createdByProvider   Provider? @relation("GlobalCategoryCreatorProvider", fields: [createdByProviderId], references: [id], onDelete: SetNull)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  services        Service[]
+  tags            Tag[]
 
   @@index([isValidated, isRejected])
   @@index([createdByUserId])
+  @@index([createdByProviderId])
+}
+
+model Tag {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  usageCount        Int         @default(0)
+  isFeatured        Boolean     @default(false)
+  relatedCategoryId String?
+  relatedCategory   GlobalCategory? @relation(fields: [relatedCategoryId], references: [id], onDelete: SetNull)
+  portfolioItems    PortfolioItemTag[]
+  createdAt         DateTime    @default(now())
+
+  @@index([isFeatured, usageCount])
+  @@index([relatedCategoryId])
 }
 
 model BillingPlan {
@@ -933,6 +956,7 @@ model PortfolioItem {
   width     Int?
   height    Int?
   services  PortfolioItemService[]
+  tags      PortfolioItemTag[]
   favorites Favorite[]
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
@@ -950,6 +974,17 @@ model PortfolioItemService {
 
   @@id([portfolioItemId, serviceId])
   @@index([serviceId])
+}
+
+model PortfolioItemTag {
+  portfolioItemId String
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  tagId           String
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@id([portfolioItemId, tagId])
+  @@index([tagId])
 }
 
 model Favorite {
