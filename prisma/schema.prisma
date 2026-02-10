@@ -113,6 +113,12 @@ enum StudioMemberStatus {
   DISABLED
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
 enum BookingSource {
   MANUAL
   WEB
@@ -162,6 +168,9 @@ model UserProfile {
   externalPhotoUrl   String?
   telegramLink       TelegramLink?
   telegramLinkTokens TelegramLinkToken[]
+  vkLink             VkLink?
+  createdCategories  GlobalCategory[] @relation("GlobalCategoryCreator")
+  subscriptions      UserSubscription[]
 
   // NEW (optional profile fields)
   firstName  String?
@@ -586,6 +595,18 @@ model TelegramLink {
   user           UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model VkLink {
+  id        String      @id @default(cuid())
+  userId    String      @unique
+  vkUserId  String      @unique
+  username  String?
+  avatarUrl String?
+  isEnabled Boolean     @default(true)
+  linkedAt  DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model TelegramLinkToken {
   id        String      @id @default(cuid())
   userId    String
@@ -705,6 +726,51 @@ model ServiceCategory {
   updatedAt DateTime  @updatedAt
 
   @@index([studioId, sortOrder])
+}
+
+model GlobalCategory {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique
+  icon            String
+  isValidated     Boolean     @default(false)
+  isRejected      Boolean     @default(false)
+  usageCount      Int         @default(0)
+  createdByUserId String?
+  createdBy       UserProfile? @relation("GlobalCategoryCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([isValidated, isRejected])
+  @@index([createdByUserId])
+}
+
+model BillingPlan {
+  id        String             @id @default(cuid())
+  code      String             @unique
+  name      String
+  price     Int
+  features  Json
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  subscriptions UserSubscription[]
+}
+
+model UserSubscription {
+  id        String             @id @default(cuid())
+  userId    String             @unique
+  planId    String
+  status    SubscriptionStatus @default(ACTIVE)
+  startsAt  DateTime           @default(now())
+  endsAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      UserProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      BillingPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([planId])
 }
 
 model BookingServiceItem {
