@@ -71,7 +71,7 @@ export function FilterChips({
   ];
 
   return (
-    <div ref={rootRef} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+    <div ref={rootRef} className="flex w-full flex-wrap items-center gap-2">
       <div className="relative">
         <Chip
           type="button"

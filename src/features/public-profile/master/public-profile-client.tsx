@@ -47,6 +47,7 @@ export function PublicMasterProfileClient({ providerId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialServiceId = searchParams.get("serviceId");
+  const initialSlotStartAt = searchParams.get("slotStartAt");
   const initialServiceAppliedRef = useRef(false);
 
   const [provider, setProvider] = useState<ProviderProfileDto | null>(null);
@@ -244,6 +245,7 @@ export function PublicMasterProfileClient({ providerId }: Props) {
               providerId={provider.id}
               providerTimezone={provider.timezone}
               selectedServices={selectedServices}
+              initialSlotStartAt={initialSlotStartAt}
               onRemove={(serviceId) =>
                 setSelectedServices((prev) => prev.filter((service) => service.id !== serviceId))
               }

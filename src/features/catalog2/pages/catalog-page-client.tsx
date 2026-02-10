@@ -1,17 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Input } from "@/components/ui/input";
 import { CatalogCard } from "@/features/catalog2/components/catalog-card";
 import { FilterChips } from "@/features/catalog2/components/filter-chips";
 import { MapPlaceholder } from "@/features/catalog2/components/map-placeholder";
-import { SearchCapsule } from "@/features/catalog2/components/search-capsule";
+import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
+import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
+import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
+import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
 type EntityType = "all" | "master" | "studio";
 type ViewMode = "list" | "map";
 type SmartTagPreset = "rush" | "relax" | "design" | "safe" | "silent";
+type TimePresetValue = "morning" | "day" | "evening";
 
 type CatalogSearchItem = {
   type: "master" | "studio";
@@ -37,7 +42,16 @@ type CatalogSearchData = {
   nextCursor: number | null;
 };
 
+type AvailabilitySearchData = AvailabilitySearchResponse;
+
 const DEBOUNCE_MS = 400;
+const TIME_SEARCH_DEBOUNCE_MS = 200;
+
+const TIME_PRESET_RANGES: Record<TimePresetValue, { from: string; to: string }> = {
+  morning: { from: "09:00", to: "12:00" },
+  day: { from: "12:00", to: "18:00" },
+  evening: { from: "18:00", to: "22:00" },
+};
 
 function parseEntityType(value: string | null): EntityType {
   if (value === "master" || value === "studio") return value;
@@ -52,6 +66,11 @@ function parseSmartTag(value: string | null): SmartTagPreset | null {
   if (value === "rush" || value === "relax" || value === "design" || value === "safe" || value === "silent") {
     return value;
   }
+  return null;
+}
+
+function parseTimePreset(value: string | null): TimePresetValue | null {
+  if (value === "morning" || value === "day" || value === "evening") return value;
   return null;
 }
 
@@ -86,8 +105,12 @@ export default function CatalogPageClient() {
   const searchParams = useSearchParams();
 
   const serviceQuery = searchParams.get("serviceQuery") ?? "";
+  const serviceId = searchParams.get("serviceId") ?? "";
   const district = searchParams.get("district") ?? "";
   const date = searchParams.get("date") ?? "";
+  const timePresetRaw = parseTimePreset(searchParams.get("timePreset"));
+  const timeFrom = searchParams.get("timeFrom") ?? "";
+  const timeTo = searchParams.get("timeTo") ?? "";
   const priceMin = searchParams.get("priceMin") ?? "";
   const priceMax = searchParams.get("priceMax") ?? "";
   const availableToday = searchParams.get("availableToday") === "true";
@@ -99,6 +122,15 @@ export default function CatalogPageClient() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const isTodaySelected = date === todayIso;
   const effectiveAvailableToday = availableToday || isTodaySelected;
+  const presetRange = timePresetRaw ? TIME_PRESET_RANGES[timePresetRaw] : null;
+  const effectiveTimeFrom = timeFrom || presetRange?.from || "";
+  const effectiveTimeTo = timeTo || presetRange?.to || "";
+  const timePreset: TimePreset | null =
+    timePresetRaw ?? (effectiveTimeFrom && effectiveTimeTo ? "custom" : null);
+  const hasTimeRange = Boolean(effectiveTimeFrom && effectiveTimeTo);
+  const needsService = hasTimeRange && !serviceId;
+  const needsDate = hasTimeRange && !date;
+  const timeModeActive = hasTimeRange && !needsService && !needsDate;
 
   const [draftServiceQuery, setDraftServiceQuery] = useState(serviceQuery);
   const [loading, setLoading] = useState(true);
@@ -106,6 +138,12 @@ export default function CatalogPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [data, setData] = useState<CatalogSearchData>({ items: [], nextCursor: null });
+
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [availabilityData, setAvailabilityData] = useState<AvailabilitySearchData>({ items: [] });
+  const availabilityAbortRef = useRef<AbortController | null>(null);
+  const availabilityRequestIdRef = useRef(0);
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -129,9 +167,23 @@ export default function CatalogPageClient() {
     return () => window.clearTimeout(timer);
   }, [draftServiceQuery, serviceQuery, updateParams]);
 
+  useEffect(() => {
+    setDraftServiceQuery(serviceQuery);
+  }, [serviceQuery]);
+
   const onSubmit = useCallback(() => {
     updateParams({ serviceQuery: draftServiceQuery, district, date });
   }, [date, district, draftServiceQuery, updateParams]);
+
+  const onServiceQueryInput = useCallback(
+    (value: string) => {
+      setDraftServiceQuery(value);
+      if (serviceId) {
+        updateParams({ serviceId: null });
+      }
+    },
+    [serviceId, updateParams]
+  );
 
   const requestCatalog = useCallback(
     async (cursor?: number): Promise<CatalogSearchData> => {
@@ -159,6 +211,49 @@ export default function CatalogPageClient() {
     [date, district, effectiveAvailableToday, entityType, hot, priceMax, priceMin, rating45plus, serviceQuery, smartTag]
   );
 
+  const requestAvailability = useCallback(
+    async (signal?: AbortSignal): Promise<AvailabilitySearchData> => {
+      const params = new URLSearchParams();
+      params.set("limit", "30");
+      if (serviceId) params.set("serviceId", serviceId);
+      if (date) params.set("date", date);
+      if (effectiveTimeFrom) params.set("timeFrom", effectiveTimeFrom);
+      if (effectiveTimeTo) params.set("timeTo", effectiveTimeTo);
+      if (district) params.set("district", district);
+      if (priceMin) params.set("priceMin", priceMin);
+      if (priceMax) params.set("priceMax", priceMax);
+      if (effectiveAvailableToday) params.set("availableToday", "true");
+      if (rating45plus) params.set("ratingMin", "4.5");
+      if (hot) params.set("hot", "true");
+      if (smartTag) params.set("smartTag", smartTag);
+      if (entityType !== "all") params.set("entityType", entityType);
+
+      const res = await fetch(`/api/search/availability?${params.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<AvailabilitySearchData> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.catalog.timeSearch.loadFailed);
+      }
+      return json.data;
+    },
+    [
+      date,
+      district,
+      effectiveAvailableToday,
+      effectiveTimeFrom,
+      effectiveTimeTo,
+      entityType,
+      hot,
+      priceMax,
+      priceMin,
+      rating45plus,
+      serviceId,
+      smartTag,
+    ]
+  );
+
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -173,6 +268,30 @@ export default function CatalogPageClient() {
       setLoading(false);
     }
   }, [requestCatalog]);
+
+  const fetchAvailability = useCallback(async () => {
+    const requestId = availabilityRequestIdRef.current + 1;
+    availabilityRequestIdRef.current = requestId;
+    availabilityAbortRef.current?.abort();
+    const controller = new AbortController();
+    availabilityAbortRef.current = controller;
+
+    setAvailabilityLoading(true);
+    setAvailabilityError(null);
+    try {
+      const next = await requestAvailability(controller.signal);
+      if (controller.signal.aborted || requestId !== availabilityRequestIdRef.current) return;
+      setAvailabilityData(next);
+    } catch (e) {
+      if (controller.signal.aborted || requestId !== availabilityRequestIdRef.current) return;
+      setAvailabilityError(e instanceof Error ? e.message : UI_TEXT.catalog.timeSearch.loadFailed);
+      setAvailabilityData({ items: [] });
+    } finally {
+      if (!controller.signal.aborted && requestId === availabilityRequestIdRef.current) {
+        setAvailabilityLoading(false);
+      }
+    }
+  }, [requestAvailability]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || data.nextCursor === null) return;
@@ -194,59 +313,105 @@ export default function CatalogPageClient() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (cancelled) return;
+      if (cancelled || timeModeActive) return;
       await fetchCatalog();
     })();
     return () => {
       cancelled = true;
     };
-  }, [fetchCatalog]);
+  }, [fetchCatalog, timeModeActive]);
 
-  const resultCount = useMemo(() => data.items.length, [data.items.length]);
+  useEffect(() => {
+    if (!timeModeActive) return;
+    const timer = window.setTimeout(() => {
+      void fetchAvailability();
+    }, TIME_SEARCH_DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [fetchAvailability, timeModeActive]);
+
+  const currentItems = timeModeActive ? availabilityData.items : data.items;
+  const currentLoading = timeModeActive ? availabilityLoading : loading;
+  const currentError = timeModeActive ? availabilityError : error;
+
+  const resultCount = useMemo(() => currentItems.length, [currentItems.length]);
   const mapPoints = useMemo(
     () =>
-      data.items.map((item) => ({
-        id: item.id,
-        title: item.title,
-        type: item.type,
+      currentItems.map((item) => ({
+        id: "providerId" in item ? item.providerId : item.id,
+        title: "name" in item ? item.name : item.title,
+        type: "providerType" in item ? (item.providerType === "STUDIO" ? "studio" : "master") : item.type,
       })),
-    [data.items]
+    [currentItems]
   );
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      <div className="sticky top-16 z-20 space-y-3 rounded-2xl border border-border bg-background/95 p-3 backdrop-blur">
-        <SearchCapsule
+      <div className="sticky top-16 z-20 mx-auto w-full max-w-5xl space-y-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
+        <DateTimeFilterBar
           serviceQuery={draftServiceQuery}
+          serviceId={serviceId}
           district={district}
           date={date}
-          onServiceQueryChange={setDraftServiceQuery}
+          timePreset={timePreset}
+          timeFrom={effectiveTimeFrom}
+          timeTo={effectiveTimeTo}
+          onServiceQueryChange={onServiceQueryInput}
+          onServiceSelect={(service) => {
+            setDraftServiceQuery(service.title);
+            updateParams({ serviceQuery: service.title, serviceId: service.id });
+          }}
           onDistrictChange={(value) => updateParams({ district: value })}
           onDateChange={(value) => updateParams({ date: value })}
+          onPresetChange={(preset, from, to) =>
+            updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
+          }
+          onCustomTimeChange={(from, to) => updateParams({ timePreset: null, timeFrom: from, timeTo: to })}
+          onClearTime={() => updateParams({ timePreset: null, timeFrom: null, timeTo: null })}
           onSubmit={onSubmit}
         />
-        <FilterChips
-          availableToday={effectiveAvailableToday}
-          rating45plus={rating45plus}
-          hot={hot}
-          smartTag={smartTag}
-          entityType={entityType}
-          priceMin={priceMin}
-          priceMax={priceMax}
-          onToggleAvailableToday={() => updateParams({ availableToday: availableToday ? null : "true" })}
-          onToggleRating45plus={() => updateParams({ ratingMin: rating45plus ? null : "4.5" })}
-          onToggleHot={() => updateParams({ hot: hot ? null : "true" })}
-          onSmartTagChange={(value) => updateParams({ smartTag: value })}
-          onEntityTypeChange={(value) => updateParams({ entityType: value === "all" ? null : value })}
-          onPriceApply={(nextMin, nextMax) =>
-            updateParams({
-              priceMin: nextMin.length > 0 ? nextMin : null,
-              priceMax: nextMax.length > 0 ? nextMax : null,
-            })
-          }
-          onPriceReset={() => updateParams({ priceMin: null, priceMax: null })}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full md:max-w-[260px]">
+            <Input
+              value={district}
+              onChange={(event) => updateParams({ district: event.target.value })}
+              placeholder={UI_TEXT.catalog.capsule.districtPlaceholder}
+              className="h-10 rounded-full bg-bg-input/90"
+              aria-label={UI_TEXT.catalog.capsule.districtPlaceholder}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <FilterChips
+              availableToday={effectiveAvailableToday}
+              rating45plus={rating45plus}
+              hot={hot}
+              smartTag={smartTag}
+              entityType={entityType}
+              priceMin={priceMin}
+              priceMax={priceMax}
+              onToggleAvailableToday={() => updateParams({ availableToday: availableToday ? null : "true" })}
+              onToggleRating45plus={() => updateParams({ ratingMin: rating45plus ? null : "4.5" })}
+              onToggleHot={() => updateParams({ hot: hot ? null : "true" })}
+              onSmartTagChange={(value) => updateParams({ smartTag: value })}
+              onEntityTypeChange={(value) => updateParams({ entityType: value === "all" ? null : value })}
+              onPriceApply={(nextMin, nextMax) =>
+                updateParams({
+                  priceMin: nextMin.length > 0 ? nextMin : null,
+                  priceMax: nextMax.length > 0 ? nextMax : null,
+                })
+              }
+              onPriceReset={() => updateParams({ priceMin: null, priceMax: null })}
+            />
+          </div>
+        </div>
       </div>
+
+      {needsService || needsDate ? (
+        <div className="rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
+          {needsService ? UI_TEXT.catalog.timeSearch.selectServiceFirst : UI_TEXT.catalog.timeSearch.selectDateFirst}
+        </div>
+      ) : null}
 
       <div className="flex items-center justify-between rounded-xl border border-border bg-card/80 px-4 py-3">
         <div className="text-sm text-muted-foreground">
@@ -278,30 +443,42 @@ export default function CatalogPageClient() {
         </div>
       </div>
 
-      {loading ? <CatalogSkeletonGrid /> : null}
+      {currentLoading ? <CatalogSkeletonGrid /> : null}
 
-      {error ? (
+      {currentError ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
-          <div>{error}</div>
-          <button type="button" onClick={() => void fetchCatalog()} className="mt-3 rounded-full border border-red-300 px-4 py-2 text-sm">
+          <div>{currentError}</div>
+          <button
+            type="button"
+            onClick={() => void (timeModeActive ? fetchAvailability() : fetchCatalog())}
+            className="mt-3 rounded-full border border-red-300 px-4 py-2 text-sm"
+          >
             {UI_TEXT.catalog.retry}
           </button>
         </div>
       ) : null}
 
-      {!loading && !error && data.items.length === 0 ? (
+      {!currentLoading && !currentError && currentItems.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card/70 p-8 text-center">
-          <div className="text-base font-semibold text-foreground">{UI_TEXT.catalog.emptyTitle}</div>
-          <div className="mt-2 text-sm text-muted-foreground">{UI_TEXT.catalog.emptyDesc}</div>
+          <div className="text-base font-semibold text-foreground">
+            {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyTitle : UI_TEXT.catalog.emptyTitle}
+          </div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyDesc : UI_TEXT.catalog.emptyDesc}
+          </div>
         </div>
       ) : null}
 
-      {!loading && !error && data.items.length > 0 ? (
+      {!currentLoading && !currentError && currentItems.length > 0 ? (
         <div className={view === "map" ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]" : ""}>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {data.items.map((item) => (
-              <CatalogCard key={item.id} item={item} serviceQuery={serviceQuery} />
-            ))}
+            {timeModeActive
+              ? availabilityData.items.map((item) => (
+                  <ProviderResultCard key={item.providerId} item={item} />
+                ))
+              : data.items.map((item) => (
+                  <CatalogCard key={item.id} item={item} serviceQuery={serviceQuery} />
+                ))}
           </div>
           {view === "map" ? (
             <aside className="hidden lg:block">
@@ -313,7 +490,7 @@ export default function CatalogPageClient() {
         </div>
       ) : null}
 
-      {!loading && !error && data.nextCursor !== null ? (
+      {!timeModeActive && !loading && !error && data.nextCursor !== null ? (
         <div className="space-y-2 pt-2 text-center">
           <button
             type="button"
