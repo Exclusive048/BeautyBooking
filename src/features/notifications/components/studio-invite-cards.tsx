@@ -99,9 +99,15 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
                 >
                   {savingId === invite.id ? t.rejecting : t.reject}
                 </Button>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href={`/studios/${invite.studioId}`}>{t.studioProfile}</Link>
-                </Button>
+                {invite.studioPublicUsername ? (
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/u/${invite.studioPublicUsername}`}>{t.studioProfile}</Link>
+                  </Button>
+                ) : (
+                  <Button type="button" variant="ghost" size="sm" disabled>
+                    {t.studioProfile}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

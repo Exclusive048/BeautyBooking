@@ -327,6 +327,7 @@ export async function updateMasterBookingStatus(input: {
             status: "REJECTED",
             cancelledBy: "PROVIDER",
             cancelReason: comment,
+            cancelledAtUtc: new Date(),
             requestedBy: "MASTER",
             actionRequiredBy: null,
             proposedStartAt: null,

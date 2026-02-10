@@ -11,12 +11,14 @@ import { UI_TEXT } from "@/lib/ui/text";
 type FilterChipsProps = {
   availableToday: boolean;
   rating45plus: boolean;
+  hot: boolean;
   smartTag: "rush" | "relax" | "design" | "safe" | "silent" | null;
   entityType: "all" | "master" | "studio";
   priceMin: string;
   priceMax: string;
   onToggleAvailableToday: () => void;
   onToggleRating45plus: () => void;
+  onToggleHot: () => void;
   onSmartTagChange: (value: "rush" | "relax" | "design" | "safe" | "silent" | null) => void;
   onEntityTypeChange: (value: "all" | "master" | "studio") => void;
   onPriceApply: (nextMin: string, nextMax: string) => void;
@@ -26,12 +28,14 @@ type FilterChipsProps = {
 export function FilterChips({
   availableToday,
   rating45plus,
+  hot,
   smartTag,
   entityType,
   priceMin,
   priceMax,
   onToggleAvailableToday,
   onToggleRating45plus,
+  onToggleHot,
   onSmartTagChange,
   onEntityTypeChange,
   onPriceApply,
@@ -134,6 +138,9 @@ export function FilterChips({
       </Chip>
       <Chip type="button" onClick={onToggleRating45plus} variant={rating45plus ? "active" : "default"}>
         {UI_TEXT.catalog.chips.rating45plus}
+      </Chip>
+      <Chip type="button" onClick={onToggleHot} variant={hot ? "active" : "default"}>
+        🔥 {UI_TEXT.catalog.chips.hot}
       </Chip>
       {smartPresets.map((preset) => (
         <Chip

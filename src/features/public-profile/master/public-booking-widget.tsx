@@ -246,7 +246,14 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
               ok: true;
               data: {
                 timezone: string;
-                slots: Array<{ startAtUtc: string; endAtUtc: string; label: string }>;
+                slots: Array<{
+                  startAtUtc: string;
+                  endAtUtc: string;
+                  label: string;
+                  isHot?: boolean;
+                  discountType?: "PERCENT" | "FIXED";
+                  discountValue?: number;
+                }>;
                 meta: { fromDate: string; toDateExclusive: string; hasMore: boolean };
               };
             }
@@ -267,6 +274,9 @@ export function PublicBookingWidget({ providerId, providerTimezone, selectedServ
             dayKey: getSlotDayKey(label),
             startAtUtc: slot.startAtUtc,
             endAtUtc: slot.endAtUtc,
+            isHot: slot.isHot ?? false,
+            discountType: slot.discountType,
+            discountValue: slot.discountValue,
           };
         });
         const meta = slotsJson.data.meta;

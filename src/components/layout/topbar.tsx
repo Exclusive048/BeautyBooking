@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { hasAdminRole } from "@/lib/auth/guards";
+import { hasMasterProfile } from "@/lib/auth/roles";
 import { getSessionUser } from "@/lib/auth/session";
+import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { getSiteLogoUrl } from "@/lib/media/queries";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -41,49 +43,60 @@ async function loadWorkspaceLinks(userId: string): Promise<{
   master: WorkspaceLink | null;
   studio: WorkspaceLink | null;
 }> {
+  const [hasMaster, hasStudio] = await Promise.all([
+    hasMasterProfile(userId),
+    hasStudioAdminAccess(userId),
+  ]);
+
   const [masterProfile, ownedStudio, adminMembership] = await Promise.all([
-    prisma.masterProfile.findUnique({
-      where: { userId },
-      select: { provider: { select: { avatarUrl: true } } },
-    }),
-    prisma.studio.findFirst({
-      where: {
-        OR: [{ ownerUserId: userId }, { provider: { ownerUserId: userId } }],
-      },
-      select: { provider: { select: { avatarUrl: true } } },
-    }),
-    prisma.studioMembership.findFirst({
-      where: {
-        userId,
-        status: MembershipStatus.ACTIVE,
-        roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
-      },
-      select: {
-        studio: {
+    hasMaster
+      ? prisma.masterProfile.findUnique({
+          where: { userId },
           select: { provider: { select: { avatarUrl: true } } },
-        },
-      },
-    }),
+        })
+      : Promise.resolve(null),
+    hasStudio
+      ? prisma.studio.findFirst({
+          where: {
+            OR: [{ ownerUserId: userId }, { provider: { ownerUserId: userId } }],
+          },
+          select: { provider: { select: { avatarUrl: true } } },
+        })
+      : Promise.resolve(null),
+    hasStudio
+      ? prisma.studioMembership.findFirst({
+          where: {
+            userId,
+            status: MembershipStatus.ACTIVE,
+            roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
+          },
+          select: {
+            studio: {
+              select: { provider: { select: { avatarUrl: true } } },
+            },
+          },
+        })
+      : Promise.resolve(null),
   ]);
 
   const studioProvider = ownedStudio?.provider ?? adminMembership?.studio.provider ?? null;
 
   return {
-    master: masterProfile
+    master: hasMaster
       ? {
           href: MASTER_CABINET_PATH,
           label: UI_TEXT.nav.masterWorkspace,
           ariaLabel: UI_TEXT.nav.openMasterWorkspace,
-          avatarUrl: masterProfile.provider.avatarUrl ?? null,
+          avatarUrl: masterProfile?.provider.avatarUrl ?? null,
           fallbackIcon: "✂️",
         }
       : null,
-    studio: studioProvider
+    studio: hasStudio
       ? {
           href: STUDIO_CABINET_PATH,
           label: UI_TEXT.nav.studioWorkspace,
           ariaLabel: UI_TEXT.nav.openStudioWorkspace,
-          avatarUrl: studioProvider.avatarUrl ?? null,
+          avatarUrl: studioProvider?.avatarUrl ?? null,
           fallbackIcon: "🏢",
         }
       : null,

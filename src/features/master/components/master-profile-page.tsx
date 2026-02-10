@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
+import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
@@ -221,24 +222,51 @@ export function MasterProfilePage() {
   const profileAutosaveTimer = useRef<number | null>(null);
   const profileHydratedRef = useRef(false);
   const profileSavingRef = useRef(false);
+  const profilePendingRef = useRef(false);
+  const servicesSavingRef = useRef(false);
+  const servicesPendingRef = useRef(false);
+  const profileSnapshotRef = useRef({
+    displayName: "",
+    tagline: "",
+    address: "",
+    bio: "",
+    avatarUrl: "",
+    isPublished: false,
+  });
+  const servicesSnapshotRef = useRef<MasterServiceItem[]>([]);
+  const dataRef = useRef<MasterProfileData | null>(null);
   const hydratedRef = useRef(false);
 
-  const load = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/master/profile", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<MasterProfileData> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-      }
+    const load = useCallback(async (): Promise<void> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/master/profile", { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as ApiResponse<MasterProfileData> | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        }
 
-      const profileData = json.data;
-      setData(profileData);
-      setDisplayName(profileData.master.displayName);
-      setTagline(profileData.master.tagline);
-      setAddress(profileData.master.address);
-      setBio(profileData.master.bio ?? "");
+        const profileData = json.data;
+        dataRef.current = profileData;
+        profileSnapshotRef.current = {
+          displayName: profileData.master.displayName,
+          tagline: profileData.master.tagline,
+          address: profileData.master.address,
+          bio: profileData.master.bio ?? "",
+          avatarUrl: profileData.master.avatarUrl ?? "",
+          isPublished: profileData.master.isPublished,
+        };
+        servicesSnapshotRef.current = profileData.services;
+        profileSavingRef.current = false;
+        profilePendingRef.current = false;
+        servicesSavingRef.current = false;
+        servicesPendingRef.current = false;
+        setData(profileData);
+        setDisplayName(profileData.master.displayName);
+        setTagline(profileData.master.tagline);
+        setAddress(profileData.master.address);
+        setBio(profileData.master.bio ?? "");
       setAvatarUrl(profileData.master.avatarUrl ?? "");
       setIsPublished(profileData.master.isPublished);
       setProfileSaveStatus("idle");
@@ -274,9 +302,28 @@ export function MasterProfilePage() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+    useEffect(() => {
+      void load();
+    }, [load]);
+
+    useEffect(() => {
+      dataRef.current = data;
+    }, [data]);
+
+    useEffect(() => {
+      profileSnapshotRef.current = {
+        displayName,
+        tagline,
+        address,
+        bio,
+        avatarUrl,
+        isPublished,
+      };
+    }, [displayName, tagline, address, avatarUrl, bio, isPublished]);
+
+    useEffect(() => {
+      servicesSnapshotRef.current = Object.values(servicesDraft);
+    }, [servicesDraft]);
 
   useEffect(() => {
     if (!data?.master.isSolo) {
@@ -418,117 +465,129 @@ export function MasterProfilePage() {
     return Math.ceil(value / 5) * 5;
   }
 
-  const saveProfile = useCallback(
-    async (options?: { refresh?: boolean }): Promise<boolean> => {
-      if (!data || profileSavingRef.current) return false;
+    const saveProfile = useCallback(
+      async (options?: { refresh?: boolean }): Promise<boolean> => {
+        const currentData = dataRef.current;
+        if (!currentData) return false;
 
-      const currentMaster = data.master;
-      const payload: {
-        displayName?: string;
-        tagline?: string;
-        address?: string;
-        bio?: string | null;
-        avatarUrl?: string | null;
-        isPublished?: boolean;
-      } = {};
-
-      const nextDisplayName = displayName.trim();
-      if (!nextDisplayName) {
-        setProfileFieldErrors({ displayName: "Укажите имя" });
-        setProfileSaveStatus("error");
-        return false;
-      }
-
-      if (nextDisplayName !== currentMaster.displayName) {
-        payload.displayName = nextDisplayName;
-      }
-
-      const nextTagline = tagline.trim();
-      if (nextTagline !== currentMaster.tagline) {
-        payload.tagline = nextTagline;
-      }
-
-      const nextAddress = address.trim();
-      if (nextAddress !== currentMaster.address.trim()) {
-        payload.address = nextAddress;
-      }
-
-      const nextBio = bio.trim();
-      const currentBio = (currentMaster.bio ?? "").trim();
-      if (nextBio !== currentBio) {
-        payload.bio = nextBio;
-      }
-
-      const nextAvatarUrl = avatarUrl.trim() || null;
-      const currentAvatarUrl = (currentMaster.avatarUrl ?? "").trim() || null;
-      if (nextAvatarUrl !== currentAvatarUrl) {
-        payload.avatarUrl = nextAvatarUrl;
-      }
-
-      if (isPublished !== currentMaster.isPublished) {
-        payload.isPublished = isPublished;
-      }
-
-      if (Object.keys(payload).length === 0) {
-        setProfileSaveStatus("saved");
-        return true;
-      }
-
-      profileSavingRef.current = true;
-      setProfileSaveStatus("saving");
-      setError(null);
-      try {
-        const res = await fetch("/api/master/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ id: string }>
-          | ApiErrorShape
-          | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(
-            extractApiErrorMessage(
-              json && !json.ok ? json : null,
-              `API error: ${res.status}`
-            )
-          );
+        if (profileSavingRef.current) {
+          profilePendingRef.current = true;
+          return false;
         }
 
-        if (options?.refresh) {
-          await load();
-        } else {
-          setData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  master: {
-                    ...prev.master,
-                    displayName: payload.displayName ?? prev.master.displayName,
-                    tagline: payload.tagline ?? prev.master.tagline,
-                    address: payload.address ?? prev.master.address,
-                    bio: payload.bio ?? prev.master.bio,
-                    avatarUrl: payload.avatarUrl ?? prev.master.avatarUrl,
-                    isPublished: payload.isPublished ?? prev.master.isPublished,
-                  },
-                }
-              : prev
-          );
+        const snapshot = profileSnapshotRef.current;
+        const currentMaster = currentData.master;
+        const payload: {
+          displayName?: string;
+          tagline?: string;
+          address?: string;
+          bio?: string | null;
+          avatarUrl?: string | null;
+          isPublished?: boolean;
+        } = {};
+
+        const nextDisplayName = snapshot.displayName.trim();
+        if (!nextDisplayName) {
+          setProfileFieldErrors({ displayName: "Укажите имя" });
+          setProfileSaveStatus("error");
+          return false;
         }
 
-        setProfileSaveStatus("saved");
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
-        setProfileSaveStatus("error");
-        return false;
-      } finally {
-        profileSavingRef.current = false;
-      }
-    },
-    [address, avatarUrl, bio, data, displayName, isPublished, load, tagline]
-  );
+        if (nextDisplayName !== currentMaster.displayName) {
+          payload.displayName = nextDisplayName;
+        }
+
+        const nextTagline = snapshot.tagline.trim();
+        if (nextTagline !== currentMaster.tagline) {
+          payload.tagline = nextTagline;
+        }
+
+        const nextAddress = snapshot.address.trim();
+        if (nextAddress !== currentMaster.address.trim()) {
+          payload.address = nextAddress;
+        }
+
+        const nextBio = snapshot.bio.trim();
+        const currentBio = (currentMaster.bio ?? "").trim();
+        if (nextBio !== currentBio) {
+          payload.bio = nextBio;
+        }
+
+        const nextAvatarUrl = snapshot.avatarUrl.trim() || null;
+        const currentAvatarUrl = (currentMaster.avatarUrl ?? "").trim() || null;
+        if (nextAvatarUrl !== currentAvatarUrl) {
+          payload.avatarUrl = nextAvatarUrl;
+        }
+
+        if (snapshot.isPublished !== currentMaster.isPublished) {
+          payload.isPublished = snapshot.isPublished;
+        }
+
+        if (Object.keys(payload).length === 0) {
+          setProfileSaveStatus("saved");
+          return true;
+        }
+
+        profileSavingRef.current = true;
+        profilePendingRef.current = false;
+        setProfileSaveStatus("saving");
+        setError(null);
+        try {
+          const res = await fetch("/api/master/profile", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const json = (await res.json().catch(() => null)) as
+            | ApiResponse<{ id: string }>
+            | ApiErrorShape
+            | null;
+          if (!res.ok || !json || !json.ok) {
+            throw new Error(
+              extractApiErrorMessage(
+                json && !json.ok ? json : null,
+                `API error: ${res.status}`
+              )
+            );
+          }
+
+          if (options?.refresh) {
+            await load();
+          } else {
+            setData((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    master: {
+                      ...prev.master,
+                      displayName: payload.displayName ?? prev.master.displayName,
+                      tagline: payload.tagline ?? prev.master.tagline,
+                      address: payload.address ?? prev.master.address,
+                      bio: payload.bio ?? prev.master.bio,
+                      avatarUrl: payload.avatarUrl ?? prev.master.avatarUrl,
+                      isPublished: payload.isPublished ?? prev.master.isPublished,
+                    },
+                  }
+                : prev
+            );
+          }
+
+          setProfileSaveStatus("saved");
+          return true;
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
+          setProfileSaveStatus("error");
+          return false;
+        } finally {
+          profileSavingRef.current = false;
+          if (profilePendingRef.current) {
+            profilePendingRef.current = false;
+            void saveProfile({ refresh: false });
+          }
+        }
+      },
+      [load]
+    );
 
   useEffect(() => {
     if (!data) return;
@@ -543,9 +602,10 @@ export function MasterProfilePage() {
       return;
     }
 
-    if (profileSavingRef.current) {
-      return;
-    }
+      if (profileSavingRef.current) {
+        profilePendingRef.current = true;
+        return;
+      }
 
     if (profileAutosaveTimer.current) {
       window.clearTimeout(profileAutosaveTimer.current);
@@ -593,25 +653,43 @@ export function MasterProfilePage() {
     }
   };
 
-  const saveServices = useCallback(async (items: MasterServiceItem[]): Promise<void> => {
-    const payloadItems = items.map((item) => ({
-      serviceId: item.serviceId,
-      isEnabled: item.isEnabled,
-      durationOverrideMin: item.isEnabled ? normalizeDuration(item.effectiveDurationMin) : item.durationOverrideMin,
-      priceOverride:
-        item.canEditPrice && item.isEnabled ? normalizePrice(item.effectivePrice) : undefined,
-    }));
+    const saveServices = useCallback(async (items?: MasterServiceItem[]): Promise<void> => {
+      if (servicesSavingRef.current) {
+        servicesPendingRef.current = true;
+        return;
+      }
 
-    const res = await fetch("/api/master/services", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: payloadItems }),
-    });
-    const json = (await res.json().catch(() => null)) as ApiResponse<{ updated: number }> | null;
-    if (!res.ok || !json || !json.ok) {
-      throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-    }
-  }, []);
+      const snapshot = items ?? servicesSnapshotRef.current;
+      if (snapshot.length === 0) return;
+
+      servicesSavingRef.current = true;
+      servicesPendingRef.current = false;
+      const payloadItems = snapshot.map((item) => ({
+        serviceId: item.serviceId,
+        isEnabled: item.isEnabled,
+        durationOverrideMin: item.isEnabled ? normalizeDuration(item.effectiveDurationMin) : item.durationOverrideMin,
+        priceOverride:
+          item.canEditPrice && item.isEnabled ? normalizePrice(item.effectivePrice) : undefined,
+      }));
+
+      try {
+        const res = await fetch("/api/master/services", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: payloadItems }),
+        });
+        const json = (await res.json().catch(() => null)) as ApiResponse<{ updated: number }> | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        }
+      } finally {
+        servicesSavingRef.current = false;
+        if (servicesPendingRef.current) {
+          servicesPendingRef.current = false;
+          void saveServices();
+        }
+      }
+    }, []);
 
   useEffect(() => {
     const items = Object.values(servicesDraft);
@@ -646,6 +724,11 @@ export function MasterProfilePage() {
     }, 700);
 
     return () => {
+      if (servicesSavingRef.current) {
+        servicesPendingRef.current = true;
+        return;
+      }
+
       if (serviceAutosaveTimer.current) {
         window.clearTimeout(serviceAutosaveTimer.current);
       }
@@ -1252,12 +1335,13 @@ export function MasterProfilePage() {
                       </div>
                     </div>
                   </div>
-                ) : null}
+                  ) : null}
 
-                <ConnectedAccountsSection />
+                  <ConnectedAccountsSection />
+                  <HotSlotsSettingsSection services={serviceList} />
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
           {activeTab === "services" ? (
             <div className="space-y-6">

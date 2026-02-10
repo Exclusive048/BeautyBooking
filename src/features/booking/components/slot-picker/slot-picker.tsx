@@ -15,6 +15,9 @@ export type SlotItem = {
   label: string;
   timeText: string;
   disabled?: boolean;
+  isHot?: boolean;
+  discountType?: "PERCENT" | "FIXED";
+  discountValue?: number;
 };
 
 export type SlotGroup = {
@@ -171,6 +174,9 @@ const SlotGroupRow = memo(function SlotGroupRow({
                   timeText={slot.timeText}
                   active={activeLabel === slot.label}
                   disabled={disabled || slot.disabled}
+                  isHot={slot.isHot}
+                  discountType={slot.discountType}
+                  discountValue={slot.discountValue}
                   onChange={onChange}
                 />
               ))}
@@ -201,6 +207,9 @@ type SlotButtonProps = {
   disabled?: boolean;
   onChange: (label: string) => void;
   className?: string;
+  isHot?: boolean;
+  discountType?: "PERCENT" | "FIXED";
+  discountValue?: number;
 };
 
 const SlotButton = memo(function SlotButton({
@@ -210,8 +219,17 @@ const SlotButton = memo(function SlotButton({
   disabled,
   onChange,
   className,
+  isHot,
+  discountType,
+  discountValue,
 }: SlotButtonProps) {
   const handleClick = useCallback(() => onChange(label), [label, onChange]);
+  const hotLabel =
+    isHot && typeof discountValue === "number"
+      ? discountType === "FIXED"
+        ? `-${discountValue} ₽`
+        : `-${discountValue}%`
+      : null;
 
   return (
     <button
@@ -222,12 +240,21 @@ const SlotButton = memo(function SlotButton({
         "rounded-2xl border px-3 py-2 text-sm transition",
         active
           ? "border-neutral-900 bg-neutral-900 text-white"
-          : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50",
+          : isHot
+            ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+            : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50",
         disabled && "cursor-not-allowed opacity-60",
         className
       )}
     >
-      {timeText}
+      <span className="inline-flex items-center gap-2">
+        {timeText}
+        {hotLabel ? (
+          <span className="rounded-full bg-amber-200/60 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+            {hotLabel}
+          </span>
+        ) : null}
+      </span>
     </button>
   );
 });
@@ -271,6 +298,9 @@ const VirtualizedSlotList = memo(function VirtualizedSlotList({
                 active={activeLabel === slot.label}
                 disabled={disabled || slot.disabled}
                 onChange={onChange}
+                isHot={slot.isHot}
+                discountType={slot.discountType}
+                discountValue={slot.discountValue}
                 className="flex w-full items-center justify-between text-left"
               />
             </div>

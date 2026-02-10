@@ -46,6 +46,7 @@ type CatalogSearchInput = {
   priceMin?: number;
   priceMax?: number;
   availableToday?: boolean;
+  hot?: boolean;
   ratingMin?: number;
   smartTag?: CatalogSmartTagPreset;
   entityType?: CatalogEntityType;
@@ -115,7 +116,7 @@ function resolveMinPrice(services: ServiceLite[]): number | null {
   return Math.min(...prices);
 }
 
-function buildWhere(input: CatalogSearchInput): Prisma.ProviderWhereInput {
+function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prisma.ProviderWhereInput {
   const and: Prisma.ProviderWhereInput[] = [];
   const serviceQuery = input.serviceQuery?.trim();
 
@@ -148,6 +149,10 @@ function buildWhere(input: CatalogSearchInput): Prisma.ProviderWhereInput {
 
   if (typeof input.priceMax === "number") {
     and.push({ priceFrom: { lte: input.priceMax } });
+  }
+
+  if (hotProviderIds) {
+    and.push({ id: { in: hotProviderIds } });
   }
 
   if (serviceQuery) {
@@ -219,8 +224,27 @@ async function loadSmartTagCounts(
   return counts;
 }
 
+async function loadHotProviderIds(): Promise<string[]> {
+  const now = new Date();
+  const to = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  const items = await prisma.hotSlot.findMany({
+    where: {
+      isActive: true,
+      expiresAtUtc: { gt: now },
+      startAtUtc: { gte: now, lt: to },
+    },
+    distinct: ["providerId"],
+    select: { providerId: true },
+  });
+  return items.map((item) => item.providerId);
+}
+
 export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogSearchResult> {
-  const where = buildWhere(input);
+  const hotProviderIds = input.hot ? await loadHotProviderIds() : null;
+  if (input.hot && (!hotProviderIds || hotProviderIds.length === 0)) {
+    return { items: [], nextCursor: null };
+  }
+  const where = buildWhere(input, hotProviderIds ?? undefined);
   const skip = input.cursor ?? 0;
   const take = Math.min(Math.max(input.limit, 1), 40);
 

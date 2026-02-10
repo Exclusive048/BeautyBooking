@@ -45,7 +45,10 @@ export type ResolvePublicUsernameDeps = {
 export type ResolvePublicUsernameResult =
   | { status: "found"; providerId: string; providerType: ProviderType }
   | { status: "redirect"; username: string }
-  | { status: "not-found" };
+  | {
+      status: "not-found";
+      reason: "invalid" | "missing" | "unpublished" | "alias-unpublished";
+    };
 
 type PrismaTx = Prisma.TransactionClient | PrismaClient;
 
@@ -181,25 +184,25 @@ export async function resolvePublicUsername(
 ): Promise<ResolvePublicUsernameResult> {
   const normalized = slugifyUsername(rawUsername);
   if (!normalized || !validateUsername(normalized).ok) {
-    return { status: "not-found" };
+    return { status: "not-found", reason: "invalid" };
   }
 
   const provider = await deps.findProviderByUsername(normalized);
   if (provider) {
     if (!provider.isPublished) {
-      return { status: "not-found" };
+      return { status: "not-found", reason: "unpublished" };
     }
     return { status: "found", providerId: provider.id, providerType: provider.type };
   }
 
   const alias = await deps.findAlias(normalized);
   if (!alias) {
-    return { status: "not-found" };
+    return { status: "not-found", reason: "missing" };
   }
 
   const aliasProvider = await deps.findProviderById(alias.providerId);
   if (!aliasProvider || !aliasProvider.isPublished || !aliasProvider.publicUsername) {
-    return { status: "not-found" };
+    return { status: "not-found", reason: "alias-unpublished" };
   }
 
   return { status: "redirect", username: aliasProvider.publicUsername };

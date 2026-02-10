@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
+import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
 
 export async function GET(
   req: Request,
@@ -35,6 +36,12 @@ export async function GET(
   const duration = await resolveServiceDuration(provider.id, serviceId);
   if (!duration.ok) return fail(duration.message, duration.status, duration.code);
 
+  const service = await prisma.service.findUnique({
+    where: { id: serviceId },
+    select: { id: true, price: true },
+  });
+  if (!service) return fail("Service not found", 404, "SERVICE_NOT_FOUND");
+
   const result = await listAvailabilitySlotsPaginated(provider.id, serviceId, duration.data, {
     fromKey,
     toKeyExclusive: toKey || undefined,
@@ -42,5 +49,59 @@ export async function GET(
   });
   if (!result.ok) return fail(result.message, result.status, result.code);
 
-  return ok({ timezone: provider.timezone, slots: result.data.slots, meta: result.data.meta });
+  const rule = await prisma.discountRule.findUnique({
+    where: { providerId: provider.id },
+    select: { isEnabled: true, applyMode: true, minPriceFrom: true, serviceIds: true },
+  });
+
+  const isServiceEligible = isServiceEligibleForHotRule(rule, serviceId, service.price);
+
+  let slots = result.data.slots;
+  if (isServiceEligible && slots.length > 0) {
+    const now = new Date();
+    const startAtUtc = slots[0]?.startAtUtc ?? null;
+    const endAtUtc = slots[slots.length - 1]?.endAtUtc ?? null;
+    if (startAtUtc && endAtUtc) {
+      const hotSlots = await prisma.hotSlot.findMany({
+        where: {
+          providerId: provider.id,
+          isActive: true,
+          expiresAtUtc: { gt: now },
+          startAtUtc: { gte: startAtUtc, lte: endAtUtc },
+        },
+        select: {
+          startAtUtc: true,
+          endAtUtc: true,
+          discountType: true,
+          discountValue: true,
+          serviceId: true,
+        },
+      });
+      const exactMap = new Map<string, (typeof hotSlots)[number]>();
+      const startMap = new Map<string, (typeof hotSlots)[number]>();
+      for (const slot of hotSlots) {
+        const startKey = slot.startAtUtc.toISOString();
+        if (slot.serviceId) {
+          exactMap.set(`${startKey}:${slot.endAtUtc.toISOString()}`, slot);
+        } else {
+          startMap.set(startKey, slot);
+        }
+      }
+      slots = slots.map((slot) => {
+        const startKey = slot.startAtUtc.toISOString();
+        const key = `${startKey}:${slot.endAtUtc.toISOString()}`;
+        const hot = exactMap.get(key) ?? startMap.get(startKey);
+        return hot
+          ? {
+              ...slot,
+              isHot: true,
+              discountType: hot.discountType,
+              discountValue: hot.discountValue,
+            }
+          : { ...slot, isHot: false };
+      });
+    }
+  }
+
+  return ok({ timezone: provider.timezone, slots, meta: result.data.meta });
 }

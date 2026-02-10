@@ -92,6 +92,7 @@ export default function CatalogPageClient() {
   const priceMax = searchParams.get("priceMax") ?? "";
   const availableToday = searchParams.get("availableToday") === "true";
   const rating45plus = searchParams.get("ratingMin") === "4.5";
+  const hot = searchParams.get("hot") === "true";
   const smartTag = parseSmartTag(searchParams.get("smartTag"));
   const entityType = parseEntityType(searchParams.get("entityType"));
   const view = parseViewMode(searchParams.get("view"));
@@ -143,6 +144,7 @@ export default function CatalogPageClient() {
       if (priceMax) params.set("priceMax", priceMax);
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (rating45plus) params.set("ratingMin", "4.5");
+      if (hot) params.set("hot", "true");
       if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
       if (typeof cursor === "number") params.set("cursor", String(cursor));
@@ -154,7 +156,7 @@ export default function CatalogPageClient() {
       }
       return json.data;
     },
-    [date, district, effectiveAvailableToday, entityType, priceMax, priceMin, rating45plus, serviceQuery, smartTag]
+    [date, district, effectiveAvailableToday, entityType, hot, priceMax, priceMin, rating45plus, serviceQuery, smartTag]
   );
 
   const fetchCatalog = useCallback(async () => {
@@ -226,12 +228,14 @@ export default function CatalogPageClient() {
         <FilterChips
           availableToday={effectiveAvailableToday}
           rating45plus={rating45plus}
+          hot={hot}
           smartTag={smartTag}
           entityType={entityType}
           priceMin={priceMin}
           priceMax={priceMax}
           onToggleAvailableToday={() => updateParams({ availableToday: availableToday ? null : "true" })}
           onToggleRating45plus={() => updateParams({ ratingMin: rating45plus ? null : "4.5" })}
+          onToggleHot={() => updateParams({ hot: hot ? null : "true" })}
           onSmartTagChange={(value) => updateParams({ smartTag: value })}
           onEntityTypeChange={(value) => updateParams({ entityType: value === "all" ? null : value })}
           onPriceApply={(nextMin, nextMax) =>
