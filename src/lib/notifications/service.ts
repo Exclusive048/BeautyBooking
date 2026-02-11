@@ -163,7 +163,7 @@ function buildBookingPayload(snapshot: BookingNotificationSnapshot): BookingNoti
   };
 }
 
-async function loadBookingSnapshot(
+export async function loadBookingSnapshot(
   bookingId: string,
   db: DbClient = prisma
 ): Promise<BookingNotificationSnapshot | null> {
@@ -292,9 +292,10 @@ export function buildBookingDeclinedBody(snapshot: BookingNotificationSnapshot):
 export async function createBookingRequestNotifications(input: {
   bookingId: string;
   db?: DbClient;
+  snapshot?: BookingNotificationSnapshot | null;
 }): Promise<NotificationRecord[]> {
   const db = input.db ?? prisma;
-  const snapshot = await loadBookingSnapshot(input.bookingId, db);
+  const snapshot = input.snapshot ?? (await loadBookingSnapshot(input.bookingId, db));
   if (!snapshot) return [];
 
   const recipients = new Set<string>();
@@ -334,9 +335,10 @@ export async function createBookingConfirmedNotifications(input: {
   notifyMaster?: boolean;
   masterMode?: BookingConfirmMode;
   db?: DbClient;
+  snapshot?: BookingNotificationSnapshot | null;
 }): Promise<NotificationRecord[]> {
   const db = input.db ?? prisma;
-  const snapshot = await loadBookingSnapshot(input.bookingId, db);
+  const snapshot = input.snapshot ?? (await loadBookingSnapshot(input.bookingId, db));
   if (!snapshot) return [];
 
   const payload = buildBookingPayload(snapshot);
@@ -377,9 +379,10 @@ export async function createBookingConfirmedNotifications(input: {
 export async function createBookingDeclinedNotifications(input: {
   bookingId: string;
   db?: DbClient;
+  snapshot?: BookingNotificationSnapshot | null;
 }): Promise<NotificationRecord[]> {
   const db = input.db ?? prisma;
-  const snapshot = await loadBookingSnapshot(input.bookingId, db);
+  const snapshot = input.snapshot ?? (await loadBookingSnapshot(input.bookingId, db));
   if (!snapshot || !snapshot.clientUserId) return [];
 
   const payload = buildBookingPayload(snapshot);

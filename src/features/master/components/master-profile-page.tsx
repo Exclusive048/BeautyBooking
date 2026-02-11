@@ -49,6 +49,13 @@ type MasterProfileData = {
   portfolio: PortfolioItem[];
 };
 
+type GlobalCategoryOption = {
+  id: string;
+  title: string;
+  slug: string;
+  icon: string | null;
+};
+
 type PendingPortfolioMeta = {
   assetId: string;
   mediaUrl: string;
@@ -191,6 +198,8 @@ export function MasterProfilePage() {
   const [newSoloServiceTitle, setNewSoloServiceTitle] = useState("");
   const [newSoloServicePrice, setNewSoloServicePrice] = useState<number>(0);
   const [newSoloServiceDuration, setNewSoloServiceDuration] = useState<number>(60);
+  const [newSoloServiceGlobalCategoryId, setNewSoloServiceGlobalCategoryId] = useState("");
+  const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
   const [newSoloServiceFieldErrors, setNewSoloServiceFieldErrors] = useState<{
     title?: string;
     price?: string;
@@ -272,6 +281,16 @@ export function MasterProfilePage() {
       setProfileSaveStatus("idle");
       setProfileFieldErrors({});
       setServicesDraft(Object.fromEntries(profileData.services.map((item) => [item.serviceId, item])));
+
+      const categoriesRes = await fetch("/api/catalog/global-categories", { cache: "no-store" });
+      const categoriesJson = (await categoriesRes.json().catch(() => null)) as
+        | ApiResponse<{ categories: GlobalCategoryOption[] }>
+        | null;
+      if (categoriesRes.ok && categoriesJson && categoriesJson.ok) {
+        setGlobalCategories(categoriesJson.data.categories);
+      } else {
+        setGlobalCategories([]);
+      }
 
       const [avatarRes, portfolioRes] = await Promise.all([
         fetch(`/api/media?entityType=MASTER&entityId=${encodeURIComponent(profileData.master.id)}&kind=AVATAR`, { cache: "no-store" }),
@@ -750,6 +769,7 @@ export function MasterProfilePage() {
     }
     const normalizedPrice = normalizePrice(newSoloServicePrice);
     const normalizedDuration = normalizeDuration(newSoloServiceDuration);
+    const selectedGlobalCategoryId = newSoloServiceGlobalCategoryId.trim();
     setNewSoloServicePrice(normalizedPrice);
     setNewSoloServiceDuration(normalizedDuration);
     setNewSoloServiceFieldErrors({});
@@ -764,6 +784,7 @@ export function MasterProfilePage() {
           title: newSoloServiceTitle.trim(),
           price: normalizedPrice,
           durationMin: normalizedDuration,
+          globalCategoryId: selectedGlobalCategoryId || undefined,
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -794,6 +815,7 @@ export function MasterProfilePage() {
       setNewSoloServiceTitle("");
       setNewSoloServicePrice(0);
       setNewSoloServiceDuration(60);
+      setNewSoloServiceGlobalCategoryId("");
       setNewSoloServiceFieldErrors({});
       await load();
     } catch (err) {
@@ -1370,6 +1392,28 @@ export function MasterProfilePage() {
             <div className="mt-3 space-y-3">
               {data.master.isSolo ? (
                 <>
+                  <div className="space-y-2">
+                    <label className="text-xs text-text-sec">
+                      Глобальная категория
+                      <select
+                        value={newSoloServiceGlobalCategoryId}
+                        onChange={(event) => setNewSoloServiceGlobalCategoryId(event.target.value)}
+                        className={selectBaseClass}
+                      >
+                        <option value="">Выберите категорию</option>
+                        {globalCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.icon ? `${category.icon} ` : ""}{category.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {!newSoloServiceGlobalCategoryId ? (
+                      <div className="text-xs text-text-sec">
+                        Выберите категорию, чтобы услуга отображалась на сайте.
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_140px_150px]">
                     <label className="text-xs text-text-sec">
                       Название услуги

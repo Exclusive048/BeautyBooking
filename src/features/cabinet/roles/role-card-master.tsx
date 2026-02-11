@@ -52,9 +52,15 @@ export function RoleCardMaster(props: Props) {
       : data.isActive
         ? "Принимаю заказы"
         : "Не работаю");
+  const isPublished =
+    statusText !== null &&
+    statusText !== undefined &&
+    statusText.includes("опубликован") &&
+    !statusText.includes("не опубликован");
   const ratingAvg = typeof data.ratingAvg === "number" ? data.ratingAvg : null;
   const ratingCount = typeof data.ratingCount === "number" ? data.ratingCount : 0;
   const showRating = ratingAvg !== null && ratingCount > 0;
+  const ratingLabel = showRating ? `★ ${ratingAvg.toFixed(1)} (${ratingCount} отзывов)` : null;
 
   return (
     <Card
@@ -66,9 +72,9 @@ export function RoleCardMaster(props: Props) {
       }
     >
       {data.coverUrl ? <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" /> : null}
-      <CardContent className="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-        <div className="flex items-center gap-4">
-          <div className="h-20 w-20 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
+      <CardContent className="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:gap-6 md:p-6">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={data.avatarUrl} alt={data.name} className="h-full w-full object-cover" />
@@ -78,28 +84,43 @@ export function RoleCardMaster(props: Props) {
               </div>
             )}
           </div>
-          <div>
-            <div className="text-lg font-semibold text-text-main">{data.name}</div>
-            {data.specialization ? (
-              <div className="text-sm text-text-sec">{data.specialization}</div>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="truncate text-base font-semibold text-text-main">{data.name}</div>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-sec">
+              {data.specialization ? (
+                <span className="truncate">{data.specialization}</span>
+              ) : null}
+              {data.specialization && statusText ? <span className="text-text-sec/80">•</span> : null}
+              {statusText ? (
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className={cn(
+                      "text-xs",
+                      isPublished ? "text-emerald-300" : "text-text-sec"
+                    )}
+                  >
+                    ●
+                  </span>
+                  <span>{statusText}</span>
+                </span>
+              ) : null}
+            </div>
+            {ratingLabel ? (
+              <div className="mt-2 text-xs text-text-sec">{ratingLabel}</div>
             ) : null}
-            {showRating ? (
-              <div className="mt-2 text-sm text-text-sec">
-                ★ {ratingAvg.toFixed(1)} ({ratingCount} отзывов)
-              </div>
-            ) : null}
-            {statusText ? <div className="mt-1 text-sm text-text-sec">{statusText}</div> : null}
           </div>
         </div>
-        {data.actionHref ? (
-          <Button asChild className="self-start md:self-center">
-            <Link href={data.actionHref}>{data.actionLabel ?? "Открыть кабинет"}</Link>
-          </Button>
-        ) : (
-          <Button className="self-start md:self-center">
-            {data.actionLabel ?? "Открыть кабинет"}
-          </Button>
-        )}
+        <div className="md:ml-6">
+          {data.actionHref ? (
+            <Button asChild className="w-full md:w-auto">
+              <Link href={data.actionHref}>{data.actionLabel ?? "Открыть кабинет"}</Link>
+            </Button>
+          ) : (
+            <Button className="w-full md:w-auto">{data.actionLabel ?? "Открыть кабинет"}</Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

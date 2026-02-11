@@ -58,6 +58,7 @@ export const createStudioServiceSchema = z.object({
   categoryId: z.string().trim().min(1),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(1000).optional(),
+  globalCategoryId: z.string().trim().min(1).optional(),
   basePrice: z.number().int().min(0).transform((value) => normalizeStudioServicePrice(value)),
   baseDurationMin: z
     .number()
@@ -72,6 +73,7 @@ export const updateStudioServiceSchema = z.object({
   categoryId: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(1000).optional(),
+  globalCategoryId: z.string().trim().min(1).nullable().optional(),
   basePrice: z
     .number()
     .int()

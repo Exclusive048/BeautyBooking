@@ -12,10 +12,10 @@ async function ensureHotCategory() {
     where: { slug: HOT_CATEGORY.slug },
   });
   if (existing) {
-    if (!existing.isValidated || existing.isRejected) {
+    if (!existing.isActive) {
       return prisma.globalCategory.update({
         where: { id: existing.id },
-        data: { isValidated: true, isRejected: false },
+        data: { isActive: true, isValidated: true, isRejected: false },
       });
     }
     return existing;
@@ -27,6 +27,7 @@ async function ensureHotCategory() {
         name: HOT_CATEGORY.name,
         slug: HOT_CATEGORY.slug,
         icon: HOT_CATEGORY.icon,
+        isActive: true,
         isValidated: true,
         isRejected: false,
       },
@@ -45,7 +46,7 @@ async function ensureHotCategory() {
 export async function listHomeCategories() {
   await ensureHotCategory();
   return prisma.globalCategory.findMany({
-    where: { isValidated: true, isRejected: false },
+    where: { isActive: true },
     select: {
       id: true,
       name: true,

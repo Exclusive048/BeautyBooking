@@ -6,7 +6,7 @@ type CategoryItem = {
   id: string;
   name: string;
   slug: string;
-  icon: string;
+  icon: string | null;
   usageCount: number;
 };
 

@@ -120,6 +120,32 @@ function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prism
   const and: Prisma.ProviderWhereInput[] = [];
   const serviceQuery = input.serviceQuery?.trim();
 
+  and.push({
+    OR: [
+      {
+        services: {
+          some: {
+            isEnabled: true,
+            isActive: true,
+            globalCategoryId: { not: null },
+          },
+        },
+      },
+      {
+        masterServices: {
+          some: {
+            isEnabled: true,
+            service: {
+              isEnabled: true,
+              isActive: true,
+              globalCategoryId: { not: null },
+            },
+          },
+        },
+      },
+    ],
+  });
+
   if (input.entityType === "master") {
     and.push({ type: ProviderType.MASTER });
   } else if (input.entityType === "studio") {
@@ -157,6 +183,9 @@ function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prism
 
   if (serviceQuery) {
     const serviceFilters: Prisma.ServiceWhereInput = {
+      isEnabled: true,
+      isActive: true,
+      globalCategoryId: { not: null },
       OR: [
         { name: { contains: serviceQuery, mode: "insensitive" } },
         { title: { contains: serviceQuery, mode: "insensitive" } },
@@ -264,6 +293,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       priceFrom: true,
       availableToday: true,
       services: {
+        where: { isEnabled: true, isActive: true, globalCategoryId: { not: null } },
         select: {
           id: true,
           name: true,
@@ -274,7 +304,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
         },
       },
       masterServices: {
-        where: { isEnabled: true },
+        where: { isEnabled: true, service: { isEnabled: true, isActive: true, globalCategoryId: { not: null } } },
         select: {
           service: {
             select: {

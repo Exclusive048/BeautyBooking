@@ -4,7 +4,7 @@ type CategoryItem = {
   id: string;
   name: string;
   slug: string;
-  icon: string;
+  icon: string | null;
   usageCount: number;
 };
 
@@ -24,7 +24,7 @@ export function CategoryChips({ categories, selectedId, onSelect }: Props) {
           onClick={() => onSelect(category.id)}
           variant={selectedId === category.id ? "active" : "default"}
         >
-          {category.icon} {category.name}
+          {category.icon ? `${category.icon} ` : ""}{category.name}
         </Chip>
       ))}
     </div>
