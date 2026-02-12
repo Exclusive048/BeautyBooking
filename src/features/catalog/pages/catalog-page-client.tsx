@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { CatalogCard } from "@/features/catalog2/components/catalog-card";
-import { FilterChips } from "@/features/catalog2/components/filter-chips";
-import { MapPlaceholder } from "@/features/catalog2/components/map-placeholder";
+import { CatalogCard } from "@/features/catalog/components/catalog-card";
+import { FilterChips } from "@/features/catalog/components/filter-chips";
+import { CatalogMap } from "@/features/catalog/components/catalog-map";
+import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
 import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
@@ -27,6 +28,8 @@ type CatalogSearchItem = {
   ratingAvg: number;
   reviewsCount: number;
   photos: string[];
+  geoLat: number | null;
+  geoLng: number | null;
   minPrice: number | null;
   primaryService: {
     title: string;
@@ -43,6 +46,35 @@ type CatalogSearchData = {
 };
 
 type AvailabilitySearchData = AvailabilitySearchResponse;
+
+type MapSearchState = {
+  bbox: string;
+  center: { lat: number; lng: number };
+} | null;
+
+type MapSearchSource = "auto" | "manual";
+
+type CatalogMapPoint = {
+  id: string;
+  title: string;
+  type: "master" | "studio";
+  avatarUrl: string | null;
+  ratingAvg: number;
+  priceFrom: number | null;
+  publicUsername: string | null;
+  geoLat: number;
+  geoLng: number;
+};
+
+type MapSidebarItem = {
+  id: string;
+  title: string;
+  type: "master" | "studio";
+  avatarUrl: string | null;
+  ratingAvg: number;
+  priceFrom: number | null;
+  href: string | null;
+};
 
 const DEBOUNCE_MS = 400;
 const TIME_SEARCH_DEBOUNCE_MS = 200;
@@ -79,6 +111,50 @@ function mergeUnique(prev: CatalogSearchItem[], next: CatalogSearchItem[]): Cata
   for (const item of prev) map.set(item.id, item);
   for (const item of next) map.set(item.id, item);
   return Array.from(map.values());
+}
+
+function toMapPoint(
+  item: CatalogSearchItem | AvailabilitySearchData["items"][number]
+): CatalogMapPoint | null {
+  if ("providerId" in item) {
+    if (typeof item.geoLat !== "number" || typeof item.geoLng !== "number") return null;
+    return {
+      id: item.providerId,
+      title: item.name,
+      type: item.providerType === "STUDIO" ? "studio" : "master",
+      avatarUrl: item.avatarUrl,
+      ratingAvg: item.ratingAvg,
+      priceFrom: item.priceFrom,
+      publicUsername: item.publicUsername ?? null,
+      geoLat: item.geoLat,
+      geoLng: item.geoLng,
+    };
+  }
+
+  if (typeof item.geoLat !== "number" || typeof item.geoLng !== "number") return null;
+  return {
+    id: item.id,
+    title: item.title,
+    type: item.type,
+    avatarUrl: item.avatarUrl,
+    ratingAvg: item.ratingAvg,
+    priceFrom: item.minPrice,
+    publicUsername: item.publicUsername ?? null,
+    geoLat: item.geoLat,
+    geoLng: item.geoLng,
+  };
+}
+
+function toSidebarItem(point: CatalogMapPoint): MapSidebarItem {
+  return {
+    id: point.id,
+    title: point.title,
+    type: point.type,
+    avatarUrl: point.avatarUrl,
+    ratingAvg: point.ratingAvg,
+    priceFrom: point.priceFrom,
+    href: point.publicUsername ? `/u/${point.publicUsername}` : null,
+  };
 }
 
 function CatalogSkeletonGrid() {
@@ -138,12 +214,18 @@ export default function CatalogPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [data, setData] = useState<CatalogSearchData>({ items: [], nextCursor: null });
+  const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
+  const [mapSearchApplied, setMapSearchApplied] = useState(false);
+  const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
+  const [mapSidebarOpen, setMapSidebarOpen] = useState(false);
+  const [activeMapId, setActiveMapId] = useState<string | null>(null);
 
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [availabilityData, setAvailabilityData] = useState<AvailabilitySearchData>({ items: [] });
   const availabilityAbortRef = useRef<AbortController | null>(null);
   const availabilityRequestIdRef = useRef(0);
+  const skipCatalogFetchRef = useRef(false);
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -186,8 +268,9 @@ export default function CatalogPageClient() {
   );
 
   const requestCatalog = useCallback(
-    async (cursor?: number): Promise<CatalogSearchData> => {
+    async (cursor?: number, overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
       const params = new URLSearchParams();
+      const activeMapSearch = overrideMapSearch ?? mapSearch;
       params.set("limit", "20");
       if (serviceQuery) params.set("serviceQuery", serviceQuery);
       if (district) params.set("district", district);
@@ -200,6 +283,11 @@ export default function CatalogPageClient() {
       if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
       if (typeof cursor === "number") params.set("cursor", String(cursor));
+      if (activeMapSearch) {
+        params.set("lat", String(activeMapSearch.center.lat));
+        params.set("lng", String(activeMapSearch.center.lng));
+        params.set("bbox", activeMapSearch.bbox);
+      }
 
       const res = await fetch(`/api/catalog/search?${params.toString()}`, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<CatalogSearchData> | null;
@@ -208,7 +296,19 @@ export default function CatalogPageClient() {
       }
       return json.data;
     },
-    [date, district, effectiveAvailableToday, entityType, hot, priceMax, priceMin, rating45plus, serviceQuery, smartTag]
+    [
+      date,
+      district,
+      effectiveAvailableToday,
+      entityType,
+      hot,
+      mapSearch,
+      priceMax,
+      priceMin,
+      rating45plus,
+      serviceQuery,
+      smartTag,
+    ]
   );
 
   const requestAvailability = useCallback(
@@ -252,6 +352,27 @@ export default function CatalogPageClient() {
       serviceId,
       smartTag,
     ]
+  );
+
+  const applyMapSearch = useCallback(
+    async (nextMapSearch: MapSearchState, source: MapSearchSource) => {
+      skipCatalogFetchRef.current = true;
+      setMapSearch(nextMapSearch);
+      setMapSearchApplied(source === "manual");
+      setLoading(true);
+      setError(null);
+      setLoadMoreError(null);
+      try {
+        const next = await requestCatalog(undefined, nextMapSearch);
+        setData(next);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
+        setData({ items: [], nextCursor: null });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [requestCatalog]
   );
 
   const fetchCatalog = useCallback(async () => {
@@ -314,6 +435,10 @@ export default function CatalogPageClient() {
     let cancelled = false;
     (async () => {
       if (cancelled || timeModeActive) return;
+      if (skipCatalogFetchRef.current) {
+        skipCatalogFetchRef.current = false;
+        return;
+      }
       await fetchCatalog();
     })();
     return () => {
@@ -338,13 +463,29 @@ export default function CatalogPageClient() {
   const resultCount = useMemo(() => currentItems.length, [currentItems.length]);
   const mapPoints = useMemo(
     () =>
-      currentItems.map((item) => ({
-        id: "providerId" in item ? item.providerId : item.id,
-        title: "name" in item ? item.name : item.title,
-        type: "providerType" in item ? (item.providerType === "STUDIO" ? "studio" : "master") : item.type,
-      })),
+      currentItems
+        .map((item) => toMapPoint(item))
+        .filter((item): item is CatalogMapPoint => Boolean(item)),
     [currentItems]
   );
+  const missingMapCount = currentItems.length - mapPoints.length;
+
+  const handleClusterSelect = useCallback((items: CatalogMapPoint[]) => {
+    setMapSidebarItems(items.map(toSidebarItem));
+    setMapSidebarOpen(true);
+  }, []);
+
+  const closeMapSidebar = useCallback(() => {
+    setMapSidebarOpen(false);
+    setMapSidebarItems([]);
+    setActiveMapId(null);
+  }, []);
+
+  useEffect(() => {
+    if (view !== "map") {
+      closeMapSidebar();
+    }
+  }, [closeMapSidebar, view]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
@@ -443,7 +584,7 @@ export default function CatalogPageClient() {
         </div>
       </div>
 
-      {currentLoading ? <CatalogSkeletonGrid /> : null}
+      {currentLoading && view === "list" ? <CatalogSkeletonGrid /> : null}
 
       {currentError ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
@@ -458,7 +599,7 @@ export default function CatalogPageClient() {
         </div>
       ) : null}
 
-      {!currentLoading && !currentError && currentItems.length === 0 ? (
+      {!currentLoading && !currentError && view === "list" && currentItems.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card/70 p-8 text-center">
           <div className="text-base font-semibold text-foreground">
             {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyTitle : UI_TEXT.catalog.emptyTitle}
@@ -469,28 +610,42 @@ export default function CatalogPageClient() {
         </div>
       ) : null}
 
-      {!currentLoading && !currentError && currentItems.length > 0 ? (
-        <div className={view === "map" ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]" : ""}>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {timeModeActive
-              ? availabilityData.items.map((item) => (
-                  <ProviderResultCard key={item.providerId} item={item} />
-                ))
-              : data.items.map((item) => (
-                  <CatalogCard key={item.id} item={item} serviceQuery={serviceQuery} />
-                ))}
-          </div>
-          {view === "map" ? (
-            <aside className="hidden lg:block">
-              <div className="sticky top-36">
-                <MapPlaceholder points={mapPoints} />
-              </div>
-            </aside>
-          ) : null}
+      {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {timeModeActive
+            ? availabilityData.items.map((item) => <ProviderResultCard key={item.providerId} item={item} />)
+            : data.items.map((item) => <CatalogCard key={item.id} item={item} serviceQuery={serviceQuery} />)}
         </div>
       ) : null}
 
-      {!timeModeActive && !loading && !error && data.nextCursor !== null ? (
+      {!currentError && view === "map" ? (
+        <div className="relative min-h-[60vh] overflow-hidden rounded-2xl border border-border bg-card/60 lg:min-h-[620px]">
+          <CatalogMap
+            points={mapPoints}
+            itemsCount={currentItems.length}
+            missingCount={missingMapCount}
+            activeId={activeMapId}
+            searchEnabled={!timeModeActive}
+            loadingResults={currentLoading}
+            showEmptySearchNote={
+              mapSearchApplied && !currentLoading && currentItems.length === 0 && !currentError && view === "map"
+            }
+            onSearchArea={(payload, source) => {
+              if (timeModeActive) return;
+              void applyMapSearch(payload, source);
+            }}
+            onClusterSelect={handleClusterSelect}
+          />
+          <CatalogMapSidebar
+            open={mapSidebarOpen}
+            items={mapSidebarItems}
+            onClose={closeMapSidebar}
+            onHover={setActiveMapId}
+          />
+        </div>
+      ) : null}
+
+      {!timeModeActive && !loading && !error && data.nextCursor !== null && view === "list" ? (
         <div className="space-y-2 pt-2 text-center">
           <button
             type="button"
@@ -501,26 +656,6 @@ export default function CatalogPageClient() {
             {loadingMore ? UI_TEXT.common.loading : UI_TEXT.catalog.loadMore}
           </button>
           {loadMoreError ? <div className="text-xs text-red-600">{loadMoreError}</div> : null}
-        </div>
-      ) : null}
-
-      {view === "map" ? (
-        <div className="fixed inset-0 z-40 bg-black/50 p-4 lg:hidden">
-          <div className="mx-auto flex h-full max-w-lg flex-col rounded-2xl border border-border bg-background">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div className="text-sm font-semibold text-foreground">{UI_TEXT.catalog.viewMap}</div>
-              <button
-                type="button"
-                onClick={() => updateParams({ view: "list" })}
-                className="rounded-full border border-border px-3 py-1 text-sm text-foreground"
-              >
-                {UI_TEXT.common.cancel}
-              </button>
-            </div>
-            <div className="overflow-y-auto p-4">
-              <MapPlaceholder points={mapPoints} />
-            </div>
-          </div>
         </div>
       ) : null}
     </div>

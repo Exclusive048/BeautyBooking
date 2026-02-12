@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PhotoCarousel } from "@/features/catalog2/components/photo-carousel";
+import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { moneyRUB } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 

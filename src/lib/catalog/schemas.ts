@@ -22,6 +22,9 @@ export const catalogSearchQuerySchema = z.object({
   entityType: catalogEntityTypeSchema.optional(),
   modelOffers: z.coerce.boolean().optional(),
   view: catalogViewSchema.optional(),
+  lat: z.coerce.number().optional(),
+  lng: z.coerce.number().optional(),
+  bbox: z.string().trim().optional(),
   limit: z.coerce.number().int().min(1).max(40).default(20),
   cursor: z.coerce.number().int().min(0).optional(),
 });

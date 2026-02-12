@@ -226,6 +226,8 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
       priceFrom: true,
       address: true,
       district: true,
+      geoLat: true,
+      geoLng: true,
       timezone: true,
       services: {
         where: { id: serviceId, isEnabled: true, isActive: true },
@@ -331,6 +333,8 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
             : provider.portfolioItems.map((item) => item.mediaUrl).slice(0, 8),
         address: provider.address || null,
         district: provider.district || null,
+        geoLat: provider.geoLat ?? null,
+        geoLng: provider.geoLng ?? null,
         service: {
           id: baseService.id,
           title: serviceTitle,

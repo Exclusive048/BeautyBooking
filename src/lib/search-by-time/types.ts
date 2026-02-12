@@ -18,6 +18,8 @@ export type AvailabilityProviderItem = {
   photos: string[];
   address: string | null;
   district: string | null;
+  geoLat: number | null;
+  geoLng: number | null;
   service: {
     id: string;
     title: string;

@@ -12,12 +12,14 @@ type FilterChipsProps = {
   availableToday: boolean;
   rating45plus: boolean;
   hot: boolean;
+  smartTag?: "rush" | "relax" | "design" | "safe" | "silent" | null;
   entityType: "all" | "master" | "studio";
   priceMin: string;
   priceMax: string;
   onToggleAvailableToday: () => void;
   onToggleRating45plus: () => void;
   onToggleHot: () => void;
+  onSmartTagChange?: (value: "rush" | "relax" | "design" | "safe" | "silent" | null) => void;
   onEntityTypeChange: (value: "all" | "master" | "studio") => void;
   onPriceApply: (nextMin: string, nextMax: string) => void;
   onPriceReset: () => void;

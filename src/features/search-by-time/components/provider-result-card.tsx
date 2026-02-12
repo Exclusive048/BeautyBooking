@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PhotoCarousel } from "@/features/catalog2/components/photo-carousel";
+import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { SlotBubblesRow } from "@/features/search-by-time/components/slot-bubbles-row";
 import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
 import { moneyRUB } from "@/lib/format";

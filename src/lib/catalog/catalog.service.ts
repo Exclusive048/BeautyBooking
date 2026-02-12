@@ -24,6 +24,8 @@ export type CatalogProviderItem = {
   reviewsCount: number;
   distanceMeters: number | null;
   photos: string[];
+  geoLat: number | null;
+  geoLng: number | null;
   primaryService: {
     title: string;
     price: number;
@@ -72,6 +74,9 @@ type CatalogSearchInput = {
   modelOffers?: boolean;
   limit: number;
   cursor?: number;
+  lat?: number;
+  lng?: number;
+  bbox?: string;
 };
 
 const SMART_TAG_TO_REVIEW_CODE: Record<CatalogSmartTagPreset, string> = {
@@ -136,9 +141,34 @@ function resolveMinPrice(services: ServiceLite[]): number | null {
   return Math.min(...prices);
 }
 
-function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prisma.ProviderWhereInput {
+type MapBounds = {
+  minLat: number;
+  minLng: number;
+  maxLat: number;
+  maxLng: number;
+};
+
+function parseBbox(value: string | undefined): MapBounds | null {
+  if (!value) return null;
+  const parts = value
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((part) => Number.isFinite(part));
+  if (parts.length !== 4) return null;
+  const [minLat, minLng, maxLat, maxLng] = parts;
+  if (minLat > maxLat || minLng > maxLng) return null;
+  return { minLat, minLng, maxLat, maxLng };
+}
+
+function buildWhere(
+  input: CatalogSearchInput,
+  hotProviderIds?: string[],
+  bounds?: MapBounds | null
+): Prisma.ProviderWhereInput {
   const and: Prisma.ProviderWhereInput[] = [];
   const serviceQuery = input.serviceQuery?.trim();
+
+  and.push({ isPublished: true });
 
   and.push({
     OR: [
@@ -147,7 +177,6 @@ function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prism
           some: {
             isEnabled: true,
             isActive: true,
-            globalCategoryId: { not: null },
           },
         },
       },
@@ -158,7 +187,6 @@ function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prism
             service: {
               isEnabled: true,
               isActive: true,
-              globalCategoryId: { not: null },
             },
           },
         },
@@ -201,11 +229,19 @@ function buildWhere(input: CatalogSearchInput, hotProviderIds?: string[]): Prism
     and.push({ id: { in: hotProviderIds } });
   }
 
+  if (bounds) {
+    and.push({
+      geoLat: { gte: bounds.minLat, lte: bounds.maxLat },
+    });
+    and.push({
+      geoLng: { gte: bounds.minLng, lte: bounds.maxLng },
+    });
+  }
+
   if (serviceQuery) {
     const serviceFilters: Prisma.ServiceWhereInput = {
       isEnabled: true,
       isActive: true,
-      globalCategoryId: { not: null },
       OR: [
         { name: { contains: serviceQuery, mode: "insensitive" } },
         { title: { contains: serviceQuery, mode: "insensitive" } },
@@ -297,7 +333,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   if (input.hot && (!hotProviderIds || hotProviderIds.length === 0)) {
     return { items: [], nextCursor: null };
   }
-  const where = buildWhere(input, hotProviderIds ?? undefined);
+  const where = buildWhere(input, hotProviderIds ?? undefined, parseBbox(input.bbox));
   const skip = input.cursor ?? 0;
   const take = Math.min(Math.max(input.limit, 1), 40);
 
@@ -315,9 +351,11 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       ratingAvg: true,
       reviews: true,
       priceFrom: true,
+      geoLat: true,
+      geoLng: true,
       availableToday: true,
       services: {
-        where: { isEnabled: true, isActive: true, globalCategoryId: { not: null } },
+        where: { isEnabled: true, isActive: true },
         select: {
           id: true,
           name: true,
@@ -328,7 +366,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
         },
       },
       masterServices: {
-        where: { isEnabled: true, service: { isEnabled: true, isActive: true, globalCategoryId: { not: null } } },
+        where: { isEnabled: true, service: { isEnabled: true, isActive: true } },
         select: {
           service: {
             select: {
@@ -409,6 +447,8 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       reviewsCount: provider.reviews,
       distanceMeters: null,
       photos,
+      geoLat: provider.geoLat ?? null,
+      geoLng: provider.geoLng ?? null,
       primaryService: primaryService
         ? {
             title: primaryService.title?.trim() || primaryService.name,
