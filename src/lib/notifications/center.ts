@@ -72,6 +72,30 @@ function parseJsonPayload(payloadJson: unknown): unknown {
   return payloadJson ?? null;
 }
 
+function resolveModelOpenHref(type: NotificationCenterNotificationItem["type"], payloadJson: unknown): string | undefined {
+  if (type !== "MODEL_NEW_APPLICATION" && type !== "MODEL_TIME_PROPOSED" && type !== "MODEL_APPLICATION_REJECTED" && type !== "MODEL_BOOKING_CREATED") {
+    return undefined;
+  }
+  const payload = parseJsonPayload(payloadJson);
+  if (!payload || typeof payload !== "object") return undefined;
+  const record = payload as { offerId?: unknown; applicationId?: unknown };
+  if (type === "MODEL_TIME_PROPOSED" || type === "MODEL_APPLICATION_REJECTED") {
+    if (typeof record.applicationId === "string" && record.applicationId.trim().length > 0) {
+      return `/cabinet/model-applications?applicationId=${record.applicationId}`;
+    }
+  }
+  if (typeof record.offerId === "string" && record.offerId.trim().length > 0) {
+    return `/cabinet/master/model-offers?offerId=${record.offerId}`;
+  }
+  return undefined;
+}
+
+function resolveModelChannel(type: NotificationCenterNotificationItem["type"]): NotificationChannel | null {
+  if (type === "MODEL_NEW_APPLICATION" || type === "MODEL_BOOKING_CREATED") return "MASTER";
+  if (type === "MODEL_TIME_PROPOSED" || type === "MODEL_APPLICATION_REJECTED") return "SYSTEM";
+  return null;
+}
+
 function toIsoDateLabel(value: unknown): string | null {
   if (typeof value !== "string" || value.length < 10) return null;
   const parsed = new Date(value);
@@ -240,15 +264,18 @@ export async function getNotificationCenterData(input: {
       title: item.title,
       body: item.body,
       type: item.type,
-      channel: classifyNotificationChannel({
-        userId: input.userId,
-        studioIds,
-        booking: item.booking,
-      }),
+      channel:
+        resolveModelChannel(item.type) ??
+        classifyNotificationChannel({
+          userId: input.userId,
+          studioIds,
+          booking: item.booking,
+        }),
       isRead: item.isRead,
       readAt: item.readAt ? item.readAt.toISOString() : null,
       createdAt: item.createdAt.toISOString(),
       payloadJson: item.payloadJson ?? null,
+      openHref: resolveModelOpenHref(item.type, item.payloadJson),
     })),
     ...scheduleRequestNotifications,
   ].sort((a, b) => {

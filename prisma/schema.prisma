@@ -98,6 +98,10 @@ enum NotificationType {
   BOOKING_REQUEST
   BOOKING_CONFIRMED
   BOOKING_DECLINED
+  MODEL_NEW_APPLICATION
+  MODEL_APPLICATION_REJECTED
+  MODEL_TIME_PROPOSED
+  MODEL_BOOKING_CREATED
 }
 
 enum MediaEntityType {
@@ -105,11 +109,13 @@ enum MediaEntityType {
   MASTER
   STUDIO
   SITE
+  MODEL_APPLICATION
 }
 
 enum MediaKind {
   AVATAR
   PORTFOLIO
+  MODEL_APPLICATION_PHOTO
 }
 
 enum StudioMemberRole {
@@ -163,6 +169,19 @@ enum ReviewTagType {
   PRIVATE
 }
 
+enum ModelOfferStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum ModelApplicationStatus {
+  PENDING
+  REJECTED
+  APPROVED_WAITING_CLIENT
+  CONFIRMED
+}
+
 model UserProfile {
   id                 String              @id @default(cuid())
   roles              AccountType[]       @default([CLIENT])
@@ -198,6 +217,7 @@ model UserProfile {
   mediaAssetsCreated MediaAsset[]       @relation("MediaAssetCreatedBy")
   reviewsAuthored    Review[]           @relation("ReviewAuthor")
   favorites          Favorite[]
+  modelApplications  ModelApplication[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -350,6 +370,7 @@ model Provider {
   portfolioItems PortfolioItem[]
   publicUsernameAliases PublicUsernameAlias[]
   createdGlobalCategories GlobalCategory[] @relation("GlobalCategoryCreatorProvider")
+  modelOffers ModelOffer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -411,6 +432,7 @@ model MasterService {
   masterId         String?
   serviceId        String
   service          Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  modelOffers      ModelOffer[]
 
   priceOverride       Int?
   durationOverrideMin Int?
@@ -512,6 +534,7 @@ model Booking {
   notifications Notification[]
   review        Review?
   serviceItems  BookingServiceItem[]
+  modelApplication ModelApplication? @relation("ModelApplicationBooking")
 
   @@index([providerId])
   @@index([masterProviderId])
@@ -749,6 +772,51 @@ model MediaAsset {
   @@index([entityType, entityId, kind, deletedAt])
   @@index([storageKey])
   @@index([createdByUserId])
+}
+
+model ModelOffer {
+  id                 String          @id @default(cuid())
+  masterId           String
+  master             Provider        @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  masterServiceId    String
+  masterService      MasterService   @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
+  dateLocal          String
+  timeRangeStartLocal String
+  timeRangeEndLocal   String
+  price              Decimal?
+  requirements       String[]        @default([])
+  extraBusyMin       Int             @default(0)
+  status             ModelOfferStatus @default(ACTIVE)
+  applications       ModelApplication[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([masterId])
+  @@index([status])
+  @@index([dateLocal])
+  @@index([masterServiceId])
+}
+
+model ModelApplication {
+  id               String                 @id @default(cuid())
+  offerId          String
+  offer            ModelOffer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  clientUserId     String
+  clientUser       UserProfile            @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+  status           ModelApplicationStatus @default(PENDING)
+  clientNote       String?
+  consentToShoot   Boolean
+  proposedTimeLocal String?
+  confirmedStartAt DateTime?
+  bookingId        String?                @unique
+  booking          Booking?               @relation("ModelApplicationBooking", fields: [bookingId], references: [id], onDelete: SetNull)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([offerId, clientUserId])
+  @@index([offerId])
+  @@index([status])
+  @@index([clientUserId])
 }
 
 model AppSetting {

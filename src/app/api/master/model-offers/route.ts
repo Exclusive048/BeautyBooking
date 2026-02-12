@@ -1,0 +1,257 @@
+import { z } from "zod";
+import { AccountType, Prisma } from "@prisma/client";
+import { jsonFail, jsonOk } from "@/lib/api/contracts";
+import { toAppError } from "@/lib/api/errors";
+import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { resolveMasterAccess } from "@/lib/model-offers/access";
+import { createModelOfferSchema, normalizePrice, normalizeRequirements } from "@/lib/model-offers/schemas";
+import { prisma } from "@/lib/prisma";
+import { parseBody, parseQuery } from "@/lib/validation";
+import { getRequestId, logError } from "@/lib/logging/logger";
+
+const querySchema = z.object({
+  masterId: z.string().trim().min(1).optional(),
+});
+
+export const runtime = "nodejs";
+
+function canAccessMasterOffers(roles: AccountType[]): boolean {
+  return roles.some((role) =>
+    role === AccountType.MASTER || role === AccountType.STUDIO || role === AccountType.STUDIO_ADMIN
+  );
+}
+
+function resolveServiceDuration(input: {
+  durationOverrideMin: number | null;
+  baseDurationMin: number | null;
+  durationMin: number;
+}): number {
+  return input.durationOverrideMin ?? input.baseDurationMin ?? input.durationMin;
+}
+
+function toPriceNumber(value: Prisma.Decimal | null): number | null {
+  if (!value) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+export async function GET(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!canAccessMasterOffers(user.roles)) {
+      return jsonFail(403, "Forbidden", "FORBIDDEN");
+    }
+
+    const query = parseQuery(new URL(req.url), querySchema);
+    const masterId = query.masterId
+      ? (await resolveMasterAccess(query.masterId, user.id)).id
+      : await getCurrentMasterProviderId(user.id);
+
+    const [offers, services] = await Promise.all([
+      prisma.modelOffer.findMany({
+        where: { masterId },
+        orderBy: [{ createdAt: "desc" }],
+        select: {
+          id: true,
+          masterId: true,
+          dateLocal: true,
+          timeRangeStartLocal: true,
+          timeRangeEndLocal: true,
+          price: true,
+          requirements: true,
+          extraBusyMin: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          master: { select: { id: true, name: true, avatarUrl: true } },
+          masterService: {
+            select: {
+              id: true,
+              durationOverrideMin: true,
+              service: {
+                select: {
+                  id: true,
+                  name: true,
+                  title: true,
+                  durationMin: true,
+                  baseDurationMin: true,
+                  category: { select: { title: true } },
+                },
+              },
+            },
+          },
+          _count: { select: { applications: true } },
+        },
+      }),
+      prisma.masterService.findMany({
+        where: {
+          masterProviderId: masterId,
+          isEnabled: true,
+          service: { isEnabled: true, isActive: true },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          durationOverrideMin: true,
+          service: {
+            select: {
+              id: true,
+              name: true,
+              title: true,
+              durationMin: true,
+              baseDurationMin: true,
+              category: { select: { title: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const offerItems = offers.map((offer) => ({
+      id: offer.id,
+      masterId: offer.masterId,
+      masterName: offer.master?.name ?? "Master",
+      masterAvatarUrl: offer.master?.avatarUrl ?? null,
+      masterServiceId: offer.masterService.id,
+      serviceId: offer.masterService.service.id,
+      serviceTitle: offer.masterService.service.title?.trim() || offer.masterService.service.name,
+      serviceCategory: offer.masterService.service.category?.title ?? null,
+      durationMin: resolveServiceDuration({
+        durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
+        baseDurationMin: offer.masterService.service.baseDurationMin ?? null,
+        durationMin: offer.masterService.service.durationMin,
+      }),
+      dateLocal: offer.dateLocal,
+      timeRangeStartLocal: offer.timeRangeStartLocal,
+      timeRangeEndLocal: offer.timeRangeEndLocal,
+      price: toPriceNumber(offer.price),
+      requirements: offer.requirements,
+      extraBusyMin: offer.extraBusyMin,
+      status: offer.status,
+      applicationsCount: offer._count.applications,
+      createdAt: offer.createdAt.toISOString(),
+      updatedAt: offer.updatedAt.toISOString(),
+    }));
+
+    const serviceItems = services.map((item) => ({
+      id: item.id,
+      serviceId: item.service.id,
+      title: item.service.title?.trim() || item.service.name,
+      categoryTitle: item.service.category?.title ?? null,
+      durationMin: resolveServiceDuration({
+        durationOverrideMin: item.durationOverrideMin ?? null,
+        baseDurationMin: item.service.baseDurationMin ?? null,
+        durationMin: item.service.durationMin,
+      }),
+    }));
+
+    return jsonOk({ offers: offerItems, services: serviceItems });
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.status >= 500) {
+      logError("GET /api/master/model-offers failed", {
+        requestId: getRequestId(req),
+        route: "GET /api/master/model-offers",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!canAccessMasterOffers(user.roles)) {
+      return jsonFail(403, "Forbidden", "FORBIDDEN");
+    }
+
+    const body = await parseBody(req, createModelOfferSchema);
+    const masterService = await prisma.masterService.findUnique({
+      where: { id: body.masterServiceId },
+      select: {
+        id: true,
+        isEnabled: true,
+        masterProviderId: true,
+        durationOverrideMin: true,
+        service: {
+          select: {
+            id: true,
+            name: true,
+            title: true,
+            durationMin: true,
+            baseDurationMin: true,
+            isEnabled: true,
+            isActive: true,
+            category: { select: { title: true } },
+          },
+        },
+      },
+    });
+    if (!masterService || !masterService.isEnabled || !masterService.service.isEnabled || !masterService.service.isActive) {
+      return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+    }
+
+    const master = await resolveMasterAccess(masterService.masterProviderId, user.id);
+    const requirements = normalizeRequirements(body.requirements);
+    const priceValue = normalizePrice(body.price);
+
+    const created = await prisma.modelOffer.create({
+      data: {
+        masterId: master.id,
+        masterServiceId: masterService.id,
+        dateLocal: body.dateLocal,
+        timeRangeStartLocal: body.timeRangeStartLocal,
+        timeRangeEndLocal: body.timeRangeEndLocal,
+        price: typeof priceValue === "number" ? new Prisma.Decimal(priceValue) : null,
+        requirements,
+        extraBusyMin: body.extraBusyMin ?? 0,
+      },
+      select: {
+        id: true,
+        masterId: true,
+        dateLocal: true,
+        timeRangeStartLocal: true,
+        timeRangeEndLocal: true,
+        price: true,
+        requirements: true,
+        extraBusyMin: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return jsonOk(
+      {
+        offer: {
+          id: created.id,
+          masterId: created.masterId,
+          dateLocal: created.dateLocal,
+          timeRangeStartLocal: created.timeRangeStartLocal,
+          timeRangeEndLocal: created.timeRangeEndLocal,
+          price: toPriceNumber(created.price),
+          requirements: created.requirements,
+          extraBusyMin: created.extraBusyMin,
+          status: created.status,
+          createdAt: created.createdAt.toISOString(),
+          updatedAt: created.updatedAt.toISOString(),
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.status >= 500) {
+      logError("POST /api/master/model-offers failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/master/model-offers",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+  }
+}

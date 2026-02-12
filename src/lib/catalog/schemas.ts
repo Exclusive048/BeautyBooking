@@ -20,6 +20,7 @@ export const catalogSearchQuerySchema = z.object({
   ratingMin: z.coerce.number().min(0).max(5).optional(),
   smartTag: catalogSmartTagPresetSchema.optional(),
   entityType: catalogEntityTypeSchema.optional(),
+  modelOffers: z.coerce.boolean().optional(),
   view: catalogViewSchema.optional(),
   limit: z.coerce.number().int().min(1).max(40).default(20),
   cursor: z.coerce.number().int().min(0).optional(),
