@@ -61,12 +61,15 @@ function classifyNotificationChannel(input: {
   return "SYSTEM";
 }
 
-function parseJsonPayload(payloadJson: string): unknown {
-  try {
-    return JSON.parse(payloadJson) as unknown;
-  } catch {
-    return null;
+function parseJsonPayload(payloadJson: unknown): unknown {
+  if (typeof payloadJson === "string") {
+    try {
+      return JSON.parse(payloadJson) as unknown;
+    } catch {
+      return null;
+    }
   }
+  return payloadJson ?? null;
 }
 
 function toIsoDateLabel(value: unknown): string | null {
@@ -76,50 +79,14 @@ function toIsoDateLabel(value: unknown): string | null {
   return parsed.toISOString().slice(0, 10);
 }
 
-function toIsoDateTimeLabel(value: unknown): string | null {
-  if (typeof value !== "string" || value.length === 0) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toISOString().replace("T", " ").slice(0, 16);
-}
-
-function describeScheduleRequest(input: {
-  type: "OFF" | "SHIFT" | "BLOCK";
-  payloadJson: string;
-}): string {
-  const payload = parseJsonPayload(input.payloadJson);
+function describeScheduleRequest(payloadJson: unknown): string {
+  const payload = parseJsonPayload(payloadJson);
   if (!payload || typeof payload !== "object") {
-    return input.type === "OFF"
-      ? "Запрос на выходной"
-      : input.type === "SHIFT"
-        ? "Запрос на изменение рабочего времени"
-        : "Запрос на блок времени";
+    return "Запрос на изменение графика";
   }
-
-  if (input.type === "OFF") {
-    const date = toIsoDateLabel((payload as { date?: unknown }).date);
-    return date ? `Выходной на ${date}` : "Запрос на выходной";
-  }
-
-  if (input.type === "SHIFT") {
-    const date = toIsoDateLabel((payload as { date?: unknown }).date);
-    const startTime = (payload as { startTime?: unknown }).startTime;
-    const endTime = (payload as { endTime?: unknown }).endTime;
-    const shiftTime =
-      typeof startTime === "string" && typeof endTime === "string"
-        ? `${startTime}-${endTime}`
-        : null;
-    if (date && shiftTime) return `Смена на ${date} (${shiftTime})`;
-    if (date) return `Смена на ${date}`;
-    return "Запрос на изменение рабочего времени";
-  }
-
-  const startAt = toIsoDateTimeLabel((payload as { startAt?: unknown }).startAt);
-  const endAt = toIsoDateTimeLabel((payload as { endAt?: unknown }).endAt);
-  const blockType = (payload as { type?: unknown }).type;
-  const blockLabel = blockType === "BREAK" ? "Перерыв" : "Блок";
-  if (startAt && endAt) return `${blockLabel}: ${startAt} - ${endAt}`;
-  return "Запрос на блок времени";
+  const range = (payload as { month?: unknown }).month;
+  const date = toIsoDateLabel((payload as { date?: unknown }).date ?? range);
+  return date ? `Изменение графика на ${date}` : "Запрос на изменение графика";
 }
 
 export async function getNotificationCenterData(input: {
@@ -221,8 +188,7 @@ export async function getNotificationCenterData(input: {
           select: {
             id: true,
             studioId: true,
-            masterId: true,
-            type: true,
+            providerId: true,
             status: true,
             payloadJson: true,
             createdAt: true,
@@ -238,7 +204,7 @@ export async function getNotificationCenterData(input: {
           take: 50,
         });
 
-  const masterIds = Array.from(new Set(pendingScheduleRequests.map((item) => item.masterId)));
+  const masterIds = Array.from(new Set(pendingScheduleRequests.map((item) => item.providerId)));
   const masters =
     masterIds.length === 0
       ? []
@@ -252,15 +218,12 @@ export async function getNotificationCenterData(input: {
 
   const scheduleRequestNotifications: NotificationCenterNotificationItem[] =
     pendingScheduleRequests.map((item) => {
-      const masterName = masterNameById.get(item.masterId) ?? "Master";
-      const details = describeScheduleRequest({
-        type: item.type,
-        payloadJson: item.payloadJson,
-      });
+      const masterName = masterNameById.get(item.providerId) ?? "Мастер";
+      const details = describeScheduleRequest(item.payloadJson);
       return {
         id: `schedule-request:${item.id}`,
         title: "Запрос на изменение графика",
-        body: `${masterName} · ${details} · Статус: ${item.status} · Студия: ${item.studio.provider.name}`,
+        body: `${masterName} · ${details} · Статус: ${item.status} · Студия: ${item.studio?.provider.name ?? "Студия"}`,
         type: "SCHEDULE_REQUEST",
         channel: "STUDIO",
         isRead: false,

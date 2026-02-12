@@ -69,7 +69,6 @@ export type MasterScheduleData = {
   }>;
   requests: Array<{
     id: string;
-    type: "OFF" | "SHIFT" | "BLOCK";
     status: "PENDING" | "APPROVED" | "REJECTED";
     createdAt: string;
   }>;
@@ -119,10 +118,10 @@ export async function getMasterSchedule(input: {
       : prisma.scheduleChangeRequest.findMany({
           where: {
             studioId: context.studioProfileId,
-            masterId: input.masterId,
+            providerId: input.masterId,
             createdAt: { gte: from, lt: to },
           },
-          select: { id: true, type: true, status: true, createdAt: true },
+          select: { id: true, status: true, createdAt: true },
           orderBy: { createdAt: "desc" },
           take: 20,
         }),
@@ -161,7 +160,6 @@ export async function getMasterSchedule(input: {
     })),
     requests: requests.map((item) => ({
       id: item.id,
-      type: item.type,
       status: item.status,
       createdAt: item.createdAt.toISOString(),
     })),
@@ -196,21 +194,11 @@ export async function createMasterException(input: {
     return { applied: true, exceptionId: created.id };
   }
 
-  const created = await prisma.scheduleChangeRequest.create({
-    data: {
-      studioId: context.studioProfileId!,
-      masterId: input.masterId,
-      type: input.type,
-      payloadJson: JSON.stringify({
-        date: input.date,
-        type: input.type,
-        startTime: input.startTime ?? null,
-        endTime: input.endTime ?? null,
-      }),
-    },
-    select: { id: true },
-  });
-  return { applied: false, requestId: created.id };
+  throw new AppError(
+    "Изменения графика отправляются на согласование через новый конструктор.",
+    403,
+    "FORBIDDEN"
+  );
 }
 
 export async function deleteMasterException(input: {
@@ -260,21 +248,11 @@ export async function createMasterBlock(input: {
     return { applied: true, blockId: created.id };
   }
 
-  const created = await prisma.scheduleChangeRequest.create({
-    data: {
-      studioId: context.studioProfileId!,
-      masterId: input.masterId,
-      type: "BLOCK",
-      payloadJson: JSON.stringify({
-        startAt: input.startAt.toISOString(),
-        endAt: input.endAt.toISOString(),
-        type: input.type,
-        note: input.note?.trim() || null,
-      }),
-    },
-    select: { id: true },
-  });
-  return { applied: false, requestId: created.id };
+  throw new AppError(
+    "Изменения графика отправляются на согласование через новый конструктор.",
+    403,
+    "FORBIDDEN"
+  );
 }
 
 export async function updateMasterBlock(input: {

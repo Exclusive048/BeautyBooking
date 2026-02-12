@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check": "npm run lint && npx tsc --noEmit",
+    "check": "npm run lint && npx tsc --noEmit && npx prisma validate && npx prisma generate && npm run check:utf8 && npm run smoke",
+    "check:utf8": "node scripts/check-utf8-no-bom.mjs",
     "check:mojibake": "rg -n -F \"???\" src README.md && exit 1 || exit 0",
     "db:reset:dev": "npx prisma migrate reset --force && npm run redis:flush:dev",
     "redis:flush:dev": "node scripts/dev-redis-flush.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "worker:build": "npx tsc --noEmit",
     "worker": "npx --yes tsx src/worker.ts"
   },

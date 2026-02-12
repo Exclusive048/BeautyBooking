@@ -23,11 +23,18 @@ export const ScheduleEngine = {
     if (cached) return cached;
 
     const overrides = ctx.overridesByDateKey.get(dateKey) ?? [];
-    const overrideConfigs = toScheduleOverrideConfigs(overrides);
-    const dateBreaks = (ctx.breaksOverrideByDateKey.get(dateKey) ?? []).map((row) => ({
-      startLocal: row.startLocal,
-      endLocal: row.endLocal,
-    }));
+    const breaksByDateKey = new Map(
+      Array.from(ctx.breaksOverrideByDateKey.entries()).map(([key, list]) => [
+        key,
+        list.map((row) => ({ startLocal: row.startLocal, endLocal: row.endLocal })),
+      ])
+    );
+    const overrideConfigs = toScheduleOverrideConfigs(overrides, {
+      timezone: ctx.timezone,
+      templatesById: ctx.templatesById,
+      breaksByDateKey,
+    });
+    const dateBreaks = breaksByDateKey.get(dateKey) ?? [];
     const blockBreaks = (ctx.blocksByDateKey.get(dateKey) ?? []).map((row) => ({
       start: row.startLocal,
       end: row.endLocal,

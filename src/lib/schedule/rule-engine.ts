@@ -42,6 +42,7 @@ export type ScheduleOverrideConfig = {
   kind: ScheduleOverrideKindValue;
   startLocal: string | null;
   endLocal: string | null;
+  breaks?: ScheduleBreakInterval[];
   note?: string | null;
 };
 
@@ -215,7 +216,7 @@ export function getProviderWorkday(input: {
         isWorkday: true,
         startLocal: override.startLocal,
         endLocal: override.endLocal,
-        breaks: base.breaks,
+        breaks: override.breaks ?? base.breaks,
       })
     : base;
 
@@ -239,7 +240,8 @@ export function getProviderWorkday(input: {
     if (breakStart === null || breakEnd === null) return false;
     return breakStart > startMinutes && breakEnd < endMinutes;
   });
-  const allBreaks = [...result.breaks, ...dateBreaks];
+  const useDateBreaks = !(override?.kind === "TIME_RANGE" && override.breaks && override.breaks.length > 0);
+  const allBreaks = useDateBreaks ? [...result.breaks, ...dateBreaks] : result.breaks;
 
   return {
     dateKey,

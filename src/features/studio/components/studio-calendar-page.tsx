@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Tabs } from "@/components/ui/tabs";
+import { ScheduleBuilder } from "@/features/schedule/components/schedule-builder";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -111,6 +113,7 @@ function dayLabel(dateKey: string): string {
 
 export function StudioCalendarPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.calendar;
+  const [panel, setPanel] = useState<"calendar" | "schedule">("calendar");
   const [view, setView] = useState<CalendarView>("week");
   const [date, setDate] = useState(() => toDateKey(new Date()));
   const [data, setData] = useState<CalendarData>({ masters: [], bookings: [], blocks: [] });
@@ -283,90 +286,110 @@ export function StudioCalendarPage({ studioId }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="lux-card rounded-[24px] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-xl px-3 py-2 text-sm" />
-          <div className="inline-flex rounded-2xl border border-border-subtle bg-bg-input p-1">
-            {(["day", "week", "month"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setView(item)}
-                className={`rounded-xl px-3 py-2 text-sm transition-all ${
-                  view === item
-                    ? "bg-bg-card text-text-main shadow-card"
-                    : "text-text-sec hover:bg-bg-card/80 hover:text-text-main"
-                }`}
-              >
-                {item === "day" ? t.day : item === "week" ? t.week : t.month}
-              </button>
-            ))}
-          </div>
-          <Input
-            type="search"
-            placeholder={t.searchPlaceholder}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="min-w-[220px] rounded-xl px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Select
-            value={masterFilter}
-            onChange={(event) => setMasterFilter(event.target.value)}
-            className="rounded-xl px-3 py-1.5 text-sm"
-          >
-            <option value="all">{t.allMasters}</option>
-            {data.masters.map((master) => (
-              <option key={master.id} value={master.id}>
-                {master.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
-            className="rounded-xl px-3 py-1.5 text-sm"
-          >
-            <option value="all">{t.allCategories}</option>
-            {servicesData.categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.title}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={serviceFilter}
-            onChange={(event) => setServiceFilter(event.target.value)}
-            className="rounded-xl px-3 py-1.5 text-sm"
-          >
-            <option value="all">{t.allServices}</option>
-            {serviceOptions.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.title}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-xl px-3 py-1.5 text-sm"
-          >
-            <option value="all">{t.allStatuses}</option>
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          items={[
+            { id: "calendar", label: "Календарь" },
+            { id: "schedule", label: "График" },
+          ]}
+          value={panel}
+          onChange={(value) => setPanel(value as "calendar" | "schedule")}
+        />
       </div>
+
+      {panel === "schedule" ? (
+        <ScheduleBuilder />
+      ) : (
+        <>
+          <div className="lux-card rounded-[24px] p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="rounded-xl px-3 py-2 text-sm"
+              />
+              <div className="inline-flex rounded-2xl border border-border-subtle bg-bg-input p-1">
+                {(["day", "week", "month"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setView(item)}
+                    className={`rounded-xl px-3 py-2 text-sm transition-all ${
+                      view === item
+                        ? "bg-bg-card text-text-main shadow-card"
+                        : "text-text-sec hover:bg-bg-card/80 hover:text-text-main"
+                    }`}
+                  >
+                    {item === "day" ? t.day : item === "week" ? t.week : t.month}
+                  </button>
+                ))}
+              </div>
+              <Input
+                type="search"
+                placeholder={t.searchPlaceholder}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="min-w-[220px] rounded-xl px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Select
+                value={masterFilter}
+                onChange={(event) => setMasterFilter(event.target.value)}
+                className="rounded-xl px-3 py-1.5 text-sm"
+              >
+                <option value="all">{t.allMasters}</option>
+                {data.masters.map((master) => (
+                  <option key={master.id} value={master.id}>
+                    {master.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                className="rounded-xl px-3 py-1.5 text-sm"
+              >
+                <option value="all">{t.allCategories}</option>
+                {servicesData.categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.title}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={serviceFilter}
+                onChange={(event) => setServiceFilter(event.target.value)}
+                className="rounded-xl px-3 py-1.5 text-sm"
+              >
+                <option value="all">{t.allServices}</option>
+                {serviceOptions.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.title}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="rounded-xl px-3 py-1.5 text-sm"
+              >
+                <option value="all">{t.allStatuses}</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
 
       {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{t.loading}</div> : null}
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
-      {!loading && data.masters.length === 0 ? (
+          {!loading && data.masters.length === 0 ? (
         <div className="lux-card rounded-[24px] p-5">
           <h3 className="text-base font-semibold">{t.noMasters}</h3>
           <p className="mt-1 text-sm text-text-sec">{t.noMastersHint}</p>
@@ -376,7 +399,7 @@ export function StudioCalendarPage({ studioId }: Props) {
         </div>
       ) : null}
 
-      {!loading && data.masters.length > 0 && view === "month" ? (
+          {!loading && data.masters.length > 0 && view === "month" ? (
         <div className="lux-card rounded-[24px] p-3">
           <div className="grid grid-cols-7 gap-2 text-center text-xs text-text-sec">
             {[t.weekdays.mon, t.weekdays.tue, t.weekdays.wed, t.weekdays.thu, t.weekdays.fri, t.weekdays.sat, t.weekdays.sun].map((day) => (
@@ -417,7 +440,7 @@ export function StudioCalendarPage({ studioId }: Props) {
         </div>
       ) : null}
 
-      {!loading && data.masters.length > 0 && view !== "month" ? (
+          {!loading && data.masters.length > 0 && view !== "month" ? (
         <div className="space-y-3">
           {dayKeys.map((dayKey) => {
             const bookings = (bookingsByDay.get(dayKey) ?? []).slice().sort((a, b) => {
@@ -463,7 +486,7 @@ export function StudioCalendarPage({ studioId }: Props) {
         </div>
       ) : null}
 
-      {monthDetailsDay ? (
+          {monthDetailsDay ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <div className="flex items-center justify-between gap-2">
@@ -498,7 +521,9 @@ export function StudioCalendarPage({ studioId }: Props) {
             </div>
           </div>
         </div>
-      ) : null}
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

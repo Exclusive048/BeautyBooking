@@ -88,6 +88,7 @@ enum ScheduleRuleKind {
 enum ScheduleOverrideKind {
   OFF
   TIME_RANGE
+  TEMPLATE
 }
 
 enum NotificationType {
@@ -144,12 +145,6 @@ enum TimeBlockType {
 enum WorkExceptionType {
   OFF
   SHIFT
-}
-
-enum ScheduleChangeRequestType {
-  OFF
-  SHIFT
-  BLOCK
 }
 
 enum ScheduleChangeRequestStatus {
@@ -343,6 +338,9 @@ model Provider {
   scheduleOverrides ScheduleOverride[]
   scheduleBlocks    ScheduleBlock[]
   scheduleBreaks    ScheduleBreak[]
+  scheduleTemplates ScheduleTemplate[]
+  weeklyScheduleConfig WeeklyScheduleConfig?
+  scheduleChangeRequests ScheduleChangeRequest[]
   discountRule DiscountRule?
   hotSlots      HotSlot[]
 
@@ -590,6 +588,9 @@ model ScheduleOverride {
   isDayOff   Boolean              @default(false)
   startLocal String?
   endLocal   String?
+  templateId String?
+  template   ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  isActive   Boolean?
   note       String?
   reason     String?
 
@@ -636,6 +637,63 @@ model ScheduleBreak {
   @@index([providerId, kind])
   @@index([providerId, kind, dayOfWeek])
   @@index([providerId, date])
+}
+
+model ScheduleTemplate {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  name       String
+  startLocal String
+  endLocal   String
+  color      String?
+
+  breaks     ScheduleTemplateBreak[]
+  scheduleOverrides ScheduleOverride[]
+  weeklyScheduleDays WeeklyScheduleDay[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@unique([providerId, name])
+}
+
+model ScheduleTemplateBreak {
+  id         String           @id @default(cuid())
+  templateId String
+  template   ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  startLocal String
+  endLocal   String
+  sortOrder  Int @default(0)
+
+  @@index([templateId])
+}
+
+model WeeklyScheduleConfig {
+  id         String   @id @default(cuid())
+  providerId String   @unique
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  days       WeeklyScheduleDay[]
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model WeeklyScheduleDay {
+  id         String   @id @default(cuid())
+  configId   String
+  config     WeeklyScheduleConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  weekday    Int
+  templateId String?
+  template   ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  isActive   Boolean @default(false)
+
+  @@unique([configId, weekday])
+  @@index([templateId])
 }
 
 model TelegramLink {
@@ -933,17 +991,18 @@ model TimeBlock {
 
 model ScheduleChangeRequest {
   id          String                      @id @default(cuid())
-  studioId    String
-  studio      Studio                      @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  masterId    String
-  type        ScheduleChangeRequestType
-  payloadJson String
+  studioId    String?
+  studio      Studio?                     @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  providerId  String
+  provider    Provider                    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  comment     String?
+  payloadJson Json
   status      ScheduleChangeRequestStatus @default(PENDING)
   createdAt   DateTime                    @default(now())
   updatedAt   DateTime                    @updatedAt
 
-  @@index([studioId, masterId, createdAt])
-  @@index([masterId, status, createdAt])
+  @@index([providerId, status, createdAt])
+  @@index([studioId, status, createdAt])
 }
 
 model PortfolioItem {

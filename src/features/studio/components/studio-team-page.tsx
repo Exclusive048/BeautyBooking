@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { ScheduleRequestsPanel } from "@/features/schedule/components/schedule-requests-panel";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import type { ApiResponse } from "@/lib/types/api";
@@ -108,6 +109,7 @@ export function StudioTeamPage({ studioId }: Props) {
 
   return (
     <section className="space-y-3">
+      <ScheduleRequestsPanel />
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm text-text-sec">{mastersCountText}</div>
         <Button type="button" onClick={() => setShowCreateModal(true)} variant="secondary" size="sm">

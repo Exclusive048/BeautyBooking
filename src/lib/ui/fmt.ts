@@ -1,4 +1,4 @@
-﻿import { UI_TEXT } from "@/lib/ui/text";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const UI_FMT = {
   inviteTitle(studioName: string): string {

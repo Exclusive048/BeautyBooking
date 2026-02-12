@@ -1,4 +1,4 @@
-﻿import { jsonFail, jsonOk } from "@/lib/api/contracts";
+import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { togglePortfolioFavorite } from "@/lib/feed/portfolio.service";
