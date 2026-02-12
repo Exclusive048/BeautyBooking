@@ -5,6 +5,7 @@ import { buildScheduleRuleConfig } from "@/lib/schedule/rule-adapters";
 import { resolvePublishedUntilLocal } from "@/lib/schedule/publish-horizon";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import type { DayOfWeek, ScheduleBreakInterval } from "@/lib/domain/schedule";
 
 type ScheduleVersion = {
   value: string;
@@ -32,6 +33,8 @@ export type OverrideRow = {
   isDayOff: boolean;
   startLocal: string | null;
   endLocal: string | null;
+  templateId: string | null;
+  isActive: boolean | null;
   note: string | null;
   reason: string | null;
 };
@@ -65,6 +68,7 @@ export type ScheduleContext = {
   blocksByDateKey: Map<string, BlockRow[]>;
   breaksWeekly: BreakRow[];
   breaksOverrideByDateKey: Map<string, BreakRow[]>;
+  templatesById: Map<string, { startLocal: string; endLocal: string; breaks: ScheduleBreakInterval[] }>;
 };
 
 function maxDate(dates: Array<Date | null | undefined>): Date | null {
@@ -83,6 +87,44 @@ function normalizeTimezone(value: string | null | undefined, fallback: string): 
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
+function buildRuleFromWeeklyConfig(input: {
+  timezone: string;
+  days: Array<{ weekday: number; templateId: string | null; isActive: boolean }>;
+  templatesById: Map<string, { startLocal: string; endLocal: string; breaks: ScheduleBreakInterval[] }>;
+}): ReturnType<typeof buildScheduleRuleConfig> {
+  if (input.days.length === 0) return null;
+  const dayByWeekday = new Map<number, { templateId: string | null; isActive: boolean }>();
+  for (const day of input.days) {
+    dayByWeekday.set(day.weekday, { templateId: day.templateId, isActive: day.isActive });
+  }
+
+  const weekly = Array.from({ length: 7 }, (_, index) => {
+    const systemDay = index as DayOfWeek;
+    const scheduleWeekday = systemDay === 0 ? 7 : systemDay;
+    const day = dayByWeekday.get(scheduleWeekday) ?? null;
+    const template = day?.templateId ? input.templatesById.get(day.templateId) ?? null : null;
+    const isWorkday = Boolean(day?.isActive && template);
+
+    return {
+      dayOfWeek: systemDay,
+      isWorkday,
+      startLocal: isWorkday ? template?.startLocal ?? null : null,
+      endLocal: isWorkday ? template?.endLocal ?? null : null,
+      breaks: isWorkday ? template?.breaks ?? [] : [],
+    };
+  });
+
+  const hasAnyWorkday = weekly.some((item) => item.isWorkday);
+  if (!hasAnyWorkday) return null;
+
+  return {
+    kind: "WEEKLY",
+    timezone: input.timezone,
+    anchorDate: null,
+    payload: { weekly },
+  };
+}
+
 function dateKeyToUtcStart(dateKey: string): Date {
   const parts = parseDateKeyParts(dateKey);
   if (!parts) {
@@ -92,7 +134,8 @@ function dateKeyToUtcStart(dateKey: string): Date {
 }
 
 async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion> {
-  const [provider, rule, weeklyMax, overrideMax, breakMax, blockMax] = await prisma.$transaction([
+  const [provider, rule, weeklyMax, overrideMax, breakMax, blockMax, templateMax, weeklyConfigMax] =
+    await prisma.$transaction([
     prisma.provider.findUnique({
       where: { id: masterId },
       select: { updatedAt: true },
@@ -118,6 +161,14 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
       where: { providerId: masterId },
       _max: { updatedAt: true },
     }),
+    prisma.scheduleTemplate.aggregate({
+      where: { providerId: masterId },
+      _max: { updatedAt: true },
+    }),
+    prisma.weeklyScheduleConfig.aggregate({
+      where: { providerId: masterId },
+      _max: { updatedAt: true },
+    }),
   ]);
 
   const latest = maxDate([
@@ -127,6 +178,8 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
     overrideMax._max.updatedAt ?? null,
     breakMax._max.updatedAt ?? null,
     blockMax._max.updatedAt ?? null,
+    templateMax._max.updatedAt ?? null,
+    weeklyConfigMax._max.updatedAt ?? null,
   ]);
 
   const value = latest ? String(latest.getTime()) : "0";
@@ -163,7 +216,7 @@ export async function createScheduleContext(input: {
   const timezone = normalizeTimezone(input.timezoneHint, provider.timezone);
   const scheduleWindow = await getScheduleWindow(provider.id, timezone);
 
-  const [rule, weeklyRows, weeklyBreaks] = await prisma.$transaction([
+  const [rule, weeklyRows, weeklyBreaks, weeklyConfig, templates] = await prisma.$transaction([
     prisma.scheduleRule.findFirst({
       where: { providerId: provider.id, isActive: true },
       orderBy: { updatedAt: "desc" },
@@ -186,9 +239,50 @@ export async function createScheduleContext(input: {
       where: { providerId: provider.id, kind: "WEEKLY" },
       select: { kind: true, dayOfWeek: true, date: true, startLocal: true, endLocal: true },
     }),
+    prisma.weeklyScheduleConfig.findUnique({
+      where: { providerId: provider.id },
+      select: {
+        id: true,
+        days: { select: { weekday: true, templateId: true, isActive: true } },
+      },
+    }),
+    prisma.scheduleTemplate.findMany({
+      where: { providerId: provider.id },
+      select: {
+        id: true,
+        startLocal: true,
+        endLocal: true,
+        breaks: { select: { startLocal: true, endLocal: true, sortOrder: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
-  const ruleConfig = buildScheduleRuleConfig({
+  const templatesById = new Map<string, { startLocal: string; endLocal: string; breaks: ScheduleBreakInterval[] }>();
+  templates.forEach((template) => {
+    templatesById.set(template.id, {
+      startLocal: template.startLocal,
+      endLocal: template.endLocal,
+      breaks: template.breaks
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((item) => ({ startLocal: item.startLocal, endLocal: item.endLocal })),
+    });
+  });
+
+  const unifiedRuleConfig = weeklyConfig
+    ? buildRuleFromWeeklyConfig({
+        timezone,
+        days: weeklyConfig.days.map((day) => ({
+          weekday: day.weekday,
+          templateId: day.templateId,
+          isActive: day.isActive,
+        })),
+        templatesById,
+      })
+    : null;
+
+  const ruleConfig = unifiedRuleConfig ?? buildScheduleRuleConfig({
     providerTimezone: timezone,
     activeRule: (rule as ActiveRuleRecord | null) ?? null,
     weeklyRows: weeklyRows as WeeklyRow[],
@@ -212,6 +306,8 @@ export async function createScheduleContext(input: {
           isDayOff: true,
           startLocal: true,
           endLocal: true,
+          templateId: true,
+          isActive: true,
           note: true,
           reason: true,
         },
@@ -269,5 +365,6 @@ export async function createScheduleContext(input: {
     blocksByDateKey,
     breaksWeekly: weeklyBreaks as BreakRow[],
     breaksOverrideByDateKey,
+    templatesById,
   };
 }

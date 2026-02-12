@@ -364,9 +364,12 @@ export async function setScheduleOverride(
       ? prisma.scheduleOverride.update({
           where: { id: existing.id },
           data: {
+            kind: validated.data.isDayOff ? "OFF" : "TIME_RANGE",
             isDayOff: validated.data.isDayOff,
             startLocal: validated.data.isDayOff ? null : validated.data.startLocal ?? null,
             endLocal: validated.data.isDayOff ? null : validated.data.endLocal ?? null,
+            templateId: null,
+            isActive: null,
             reason: validated.data.reason ?? null,
           },
         })
@@ -374,9 +377,12 @@ export async function setScheduleOverride(
           data: {
             providerId,
             date,
+            kind: validated.data.isDayOff ? "OFF" : "TIME_RANGE",
             isDayOff: validated.data.isDayOff,
             startLocal: validated.data.isDayOff ? null : validated.data.startLocal ?? null,
             endLocal: validated.data.isDayOff ? null : validated.data.endLocal ?? null,
+            templateId: null,
+            isActive: null,
             reason: validated.data.reason ?? null,
           },
         }),

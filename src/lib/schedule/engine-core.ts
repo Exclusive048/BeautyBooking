@@ -1,8 +1,7 @@
 import type { ScheduleBreakInterval } from "@/lib/domain/schedule";
 import type { ScheduleOverrideConfig, ScheduleRuleConfig } from "@/lib/schedule/rule-engine";
-import { getProviderWorkday } from "@/lib/schedule/rule-engine";
-import { dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { resolveDayScheduleFromRule } from "@/lib/schedule/resolve";
 import type { DayPlan } from "@/lib/schedule/types";
 
 type ResolveInput = {
@@ -26,18 +25,18 @@ function resolveMetaSource(input: { rule: ScheduleRuleConfig | null; hasOverride
 
 export function resolveDayPlanFromRule(input: ResolveInput): DayPlan {
   const timezone = input.rule?.timezone ?? input.providerTimezone;
-  const dateForLocal = dateFromLocalDateKey(input.dateKey, timezone);
-  const workday = getProviderWorkday({
-    date: dateForLocal,
+  const workday = resolveDayScheduleFromRule({
+    dateKey: input.dateKey,
     rule: input.rule,
     overrides: input.overrides,
     dateBreaks: input.dateBreaks ?? [],
+    providerTimezone: input.providerTimezone,
   });
 
   const hasOverride = input.overrides.some((item) => toLocalDateKey(item.date, timezone) === input.dateKey);
   const extraBreaks = input.blockBreaks ?? [];
 
-  if (!workday.isWorkday || !workday.startLocal || !workday.endLocal) {
+  if (!workday.isWorking || !workday.startLocal || !workday.endLocal) {
     return {
       isWorking: false,
       workingIntervals: [],
@@ -49,10 +48,7 @@ export function resolveDayPlanFromRule(input: ResolveInput): DayPlan {
   return {
     isWorking: true,
     workingIntervals: [{ start: workday.startLocal, end: workday.endLocal }],
-    breaks: [
-      ...workday.breaks.map((item) => ({ start: item.startLocal, end: item.endLocal })),
-      ...extraBreaks,
-    ],
+    breaks: [...workday.breaks.map((item) => ({ start: item.startLocal, end: item.endLocal })), ...extraBreaks],
     meta: resolveMetaSource({ rule: input.rule, hasOverride }),
   };
 }

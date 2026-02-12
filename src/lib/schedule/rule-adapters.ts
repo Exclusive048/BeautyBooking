@@ -36,6 +36,8 @@ type OverrideRow = {
   isDayOff: boolean;
   startLocal: string | null;
   endLocal: string | null;
+  templateId: string | null;
+  isActive: boolean | null;
   note: string | null;
   reason: string | null;
 };
@@ -113,14 +115,70 @@ export function buildScheduleRuleConfig(input: {
   };
 }
 
-export function toScheduleOverrideConfigs(rows: OverrideRow[]): ScheduleOverrideConfig[] {
-  return rows.map((row) => ({
-    date: row.date,
-    kind: row.kind === "OFF" || row.isDayOff ? "OFF" : "TIME_RANGE",
-    startLocal: row.startLocal ?? null,
-    endLocal: row.endLocal ?? null,
-    note: row.note ?? row.reason ?? null,
-  }));
+type TemplateInfo = {
+  startLocal: string;
+  endLocal: string;
+  breaks: ScheduleBreakInterval[];
+};
+
+export function toScheduleOverrideConfigs(
+  rows: OverrideRow[],
+  input?: {
+    timezone?: string;
+    templatesById?: Map<string, TemplateInfo>;
+    breaksByDateKey?: Map<string, ScheduleBreakInterval[]>;
+  }
+): ScheduleOverrideConfig[] {
+  const timezone = input?.timezone ?? "Europe/Moscow";
+  const templatesById = input?.templatesById ?? new Map<string, TemplateInfo>();
+  const breaksByDateKey = input?.breaksByDateKey ?? new Map<string, ScheduleBreakInterval[]>();
+
+  return rows.map((row) => {
+    const dateKey = toLocalDateKey(row.date, timezone);
+    const overrideBreaks = breaksByDateKey.get(dateKey);
+
+    if (row.kind === "OFF" || row.isDayOff) {
+      return {
+        date: row.date,
+        kind: "OFF",
+        startLocal: null,
+        endLocal: null,
+        note: row.note ?? row.reason ?? null,
+      };
+    }
+
+    if (row.kind === "TEMPLATE") {
+      if (row.isActive === false) {
+        return {
+          date: row.date,
+          kind: "OFF",
+          startLocal: null,
+          endLocal: null,
+          note: row.note ?? row.reason ?? null,
+        };
+      }
+      const template = row.templateId ? templatesById.get(row.templateId) ?? null : null;
+      if (template) {
+        return {
+          date: row.date,
+          kind: "TIME_RANGE",
+          startLocal: template.startLocal,
+          endLocal: template.endLocal,
+          breaks: template.breaks,
+          note: row.note ?? row.reason ?? null,
+        };
+      }
+    }
+
+    return {
+      date: row.date,
+      kind: "TIME_RANGE",
+      startLocal: row.startLocal ?? null,
+      endLocal: row.endLocal ?? null,
+      breaks: overrideBreaks,
+      note: row.note ?? row.reason ?? null,
+    };
+  });
 }
 
 export function buildDateBreaksMap(
