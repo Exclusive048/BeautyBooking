@@ -1,6 +1,7 @@
 import { AccountType, MediaEntityType, MediaKind, MembershipStatus, ProviderType, StudioRole, type UserProfile } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { resolveMasterAccess } from "@/lib/model-offers/access";
 
 function isSiteAdmin(user: UserProfile): boolean {
   return user.roles.includes(AccountType.ADMIN) || user.roles.includes(AccountType.SUPERADMIN);
@@ -48,9 +49,23 @@ export async function ensureCanManageMedia(
   }
 
   if (entityType === MediaEntityType.USER) {
-    if (kind !== MediaKind.AVATAR || entityId !== user.id) {
+    const isAllowedUserKind = kind === MediaKind.AVATAR || kind === MediaKind.MODEL_APPLICATION_PHOTO;
+    if (!isAllowedUserKind || entityId !== user.id) {
       throw new AppError("Forbidden", 403, "FORBIDDEN");
     }
+    return;
+  }
+
+  if (entityType === MediaEntityType.MODEL_APPLICATION) {
+    const application = await prisma.modelApplication.findUnique({
+      where: { id: entityId },
+      select: { id: true, clientUserId: true, offer: { select: { masterId: true } } },
+    });
+    if (!application) {
+      throw new AppError("Not found", 404, "NOT_FOUND");
+    }
+    if (application.clientUserId === user.id) return;
+    await resolveMasterAccess(application.offer.masterId, user.id);
     return;
   }
 
@@ -90,5 +105,19 @@ export async function ensureCanReadMedia(
 
   if (entityType === MediaEntityType.SITE && entityId !== "site") {
     throw new AppError("Not found", 404, "NOT_FOUND");
+  }
+
+  if (entityType === MediaEntityType.MODEL_APPLICATION) {
+    if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    const application = await prisma.modelApplication.findUnique({
+      where: { id: entityId },
+      select: { id: true, clientUserId: true, offer: { select: { masterId: true } } },
+    });
+    if (!application) {
+      throw new AppError("Not found", 404, "NOT_FOUND");
+    }
+    if (application.clientUserId === user.id) return;
+    await resolveMasterAccess(application.offer.masterId, user.id);
+    return;
   }
 }

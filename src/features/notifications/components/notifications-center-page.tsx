@@ -27,10 +27,32 @@ function resolveIncomingChannel(event: NotificationEvent): NotificationChannel {
     if (providerType === "MASTER") return "MASTER";
   }
   if (event.type === "BOOKING_REQUEST") return "MASTER";
+  if (event.type === "MODEL_NEW_APPLICATION" || event.type === "MODEL_BOOKING_CREATED") return "MASTER";
   return "SYSTEM";
 }
 
 function toCenterItem(event: NotificationEvent): NotificationCenterNotificationItem {
+  const resolveOpenHref = (): string | undefined => {
+    if (
+      event.type !== "MODEL_NEW_APPLICATION" &&
+      event.type !== "MODEL_TIME_PROPOSED" &&
+      event.type !== "MODEL_APPLICATION_REJECTED" &&
+      event.type !== "MODEL_BOOKING_CREATED"
+    ) {
+      return undefined;
+    }
+    const payload = event.payloadJson;
+    if (!payload || typeof payload !== "object") return undefined;
+    const record = payload as { offerId?: unknown; applicationId?: unknown };
+    if ((event.type === "MODEL_TIME_PROPOSED" || event.type === "MODEL_APPLICATION_REJECTED") && typeof record.applicationId === "string") {
+      return `/cabinet/model-applications?applicationId=${record.applicationId}`;
+    }
+    if (typeof record.offerId === "string") {
+      return `/cabinet/master/model-offers?offerId=${record.offerId}`;
+    }
+    return undefined;
+  };
+
   return {
     id: event.id,
     title: event.title,
@@ -41,6 +63,7 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
     readAt: null,
     createdAt: event.createdAt,
     payloadJson: event.payloadJson ?? null,
+    openHref: resolveOpenHref(),
   };
 }
 

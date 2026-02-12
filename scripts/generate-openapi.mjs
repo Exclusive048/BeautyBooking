@@ -30,7 +30,7 @@ async function main() {
     res = await fetchWithTimeout(url, timeoutMs);
   } catch (error) {
     if (error instanceof Error && error.name === "FetchUnreachableError") {
-      console.warn("openapi: skipped (server not reachable)");
+      console.warn("WARNING: openapi: skipped (server not reachable)");
       return;
     }
     throw error;

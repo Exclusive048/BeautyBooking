@@ -14,7 +14,7 @@ type ServiceLite = {
   categoryTitle: string | null;
 };
 
-export type CatalogSearchItem = {
+export type CatalogProviderItem = {
   type: "master" | "studio";
   id: string;
   publicUsername: string | null;
@@ -34,6 +34,25 @@ export type CatalogSearchItem = {
   todaySlotsCount?: number;
 };
 
+export type CatalogModelOfferItem = {
+  type: "modelOffer";
+  id: string;
+  masterId: string;
+  masterName: string;
+  masterAvatarUrl: string | null;
+  masterPublicUsername: string | null;
+  serviceTitle: string;
+  categoryTitle: string | null;
+  durationMin: number;
+  dateLocal: string;
+  timeRangeStartLocal: string;
+  timeRangeEndLocal: string;
+  price: number | null;
+  requirements: string[];
+};
+
+export type CatalogSearchItem = CatalogProviderItem | CatalogModelOfferItem;
+
 export type CatalogSearchResult = {
   items: CatalogSearchItem[];
   nextCursor: number | null;
@@ -50,6 +69,7 @@ type CatalogSearchInput = {
   ratingMin?: number;
   smartTag?: CatalogSmartTagPreset;
   entityType?: CatalogEntityType;
+  modelOffers?: boolean;
   limit: number;
   cursor?: number;
 };
@@ -269,6 +289,10 @@ async function loadHotProviderIds(): Promise<string[]> {
 }
 
 export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogSearchResult> {
+  if (input.modelOffers) {
+    return searchModelOffers(input);
+  }
+
   const hotProviderIds = input.hot ? await loadHotProviderIds() : null;
   if (input.hot && (!hotProviderIds || hotProviderIds.length === 0)) {
     return { items: [], nextCursor: null };
@@ -361,7 +385,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
         .map((entry) => entry.provider)
     : rows;
 
-  const items: CatalogSearchItem[] = rankedRows.map((provider) => {
+  const items: CatalogProviderItem[] = rankedRows.map((provider) => {
     const directServices = provider.services.map(toServiceLite);
     const linkedServices = provider.masterServices.map((item) => toServiceLite(item.service));
     const services = dedupeServices([...directServices, ...linkedServices]);
@@ -395,6 +419,141 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       minPrice,
       nextSlot: null,
       ...(provider.availableToday ? { todaySlotsCount: 1 } : {}),
+    };
+  });
+
+  return {
+    items,
+    nextCursor: hasMore ? skip + take : null,
+  };
+}
+
+function resolveOfferDuration(input: {
+  durationOverrideMin: number | null;
+  baseDurationMin: number | null;
+  durationMin: number;
+}): number {
+  return input.durationOverrideMin ?? input.baseDurationMin ?? input.durationMin;
+}
+
+function toPriceNumber(value: Prisma.Decimal | null): number | null {
+  if (!value) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSearchResult> {
+  const and: Prisma.ModelOfferWhereInput[] = [{ status: "ACTIVE" }];
+
+  const serviceQuery = input.serviceQuery?.trim();
+  if (serviceQuery) {
+    and.push({
+      masterService: {
+        service: {
+          OR: [
+            { name: { contains: serviceQuery, mode: "insensitive" } },
+            { title: { contains: serviceQuery, mode: "insensitive" } },
+            { category: { is: { title: { contains: serviceQuery, mode: "insensitive" } } } },
+          ],
+        },
+      },
+    });
+  }
+
+  if (input.district) {
+    and.push({ master: { district: { contains: input.district, mode: "insensitive" } } });
+  }
+
+  if (input.date) {
+    and.push({ dateLocal: input.date });
+  } else if (input.availableToday) {
+    const today = new Date().toISOString().slice(0, 10);
+    and.push({ dateLocal: today });
+  }
+
+  if (typeof input.priceMin === "number") {
+    and.push({ price: { gte: input.priceMin } });
+  }
+
+  if (typeof input.priceMax === "number") {
+    const allowFree = typeof input.priceMin !== "number" || input.priceMin <= 0;
+    and.push({
+      OR: [
+        { price: { lte: input.priceMax } },
+        ...(allowFree ? [{ price: null }] : []),
+      ],
+    });
+  }
+
+  const where: Prisma.ModelOfferWhereInput =
+    and.length > 0 ? { AND: and, master: { isPublished: true } } : { master: { isPublished: true } };
+
+  const skip = input.cursor ?? 0;
+  const take = Math.min(Math.max(input.limit, 1), 40);
+
+  const offers = await prisma.modelOffer.findMany({
+    where,
+    orderBy: [{ dateLocal: "asc" }, { timeRangeStartLocal: "asc" }, { createdAt: "desc" }],
+    skip,
+    take: take + 1,
+    select: {
+      id: true,
+      masterId: true,
+      dateLocal: true,
+      timeRangeStartLocal: true,
+      timeRangeEndLocal: true,
+      price: true,
+      requirements: true,
+      master: {
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true,
+          publicUsername: true,
+        },
+      },
+      masterService: {
+        select: {
+          durationOverrideMin: true,
+          service: {
+            select: {
+              id: true,
+              name: true,
+              title: true,
+              durationMin: true,
+              baseDurationMin: true,
+              category: { select: { title: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const hasMore = offers.length > take;
+  const rows = hasMore ? offers.slice(0, -1) : offers;
+
+  const items: CatalogModelOfferItem[] = rows.map((offer) => {
+    const service = offer.masterService.service;
+    return {
+      type: "modelOffer",
+      id: offer.id,
+      masterId: offer.masterId,
+      masterName: offer.master?.name ?? "Master",
+      masterAvatarUrl: offer.master?.avatarUrl ?? null,
+      masterPublicUsername: offer.master?.publicUsername ?? null,
+      serviceTitle: service.title?.trim() || service.name,
+      categoryTitle: service.category?.title ?? null,
+      durationMin: resolveOfferDuration({
+        durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
+        baseDurationMin: service.baseDurationMin ?? null,
+        durationMin: service.durationMin,
+      }),
+      dateLocal: offer.dateLocal,
+      timeRangeStartLocal: offer.timeRangeStartLocal,
+      timeRangeEndLocal: offer.timeRangeEndLocal,
+      price: toPriceNumber(offer.price),
+      requirements: offer.requirements,
     };
   });
 

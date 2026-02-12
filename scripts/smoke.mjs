@@ -34,7 +34,7 @@ async function main() {
     console.log("smoke: ok");
   } catch (error) {
     if (error instanceof Error && error.name === "FetchUnreachableError") {
-      console.warn("smoke: skipped (server not reachable)");
+      console.warn("WARNING: smoke: skipped (server not reachable)");
       return;
     }
     throw error;
