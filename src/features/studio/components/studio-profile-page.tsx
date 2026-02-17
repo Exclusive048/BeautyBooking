@@ -6,6 +6,7 @@ import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
 import { StudioProfileHero } from "@/features/studio-cabinet/components/studio-profile-hero";
 import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-profile-form";
 import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-bar";
@@ -16,6 +17,8 @@ type StudioProfileData = {
     name: string;
     tagline: string;
     address: string;
+    geoLat: number | null;
+    geoLng: number | null;
     district: string;
     categories: string[];
     contactName: string | null;
@@ -27,10 +30,6 @@ type StudioProfileData = {
     bannerAssetId: string | null;
     bannerUrl: string | null;
   };
-};
-
-type AddressSuggestResponse = {
-  suggestions: string[];
 };
 
 type Props = {
@@ -47,7 +46,6 @@ export function StudioProfilePage({ providerId }: Props) {
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
   const [district, setDistrict] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -58,15 +56,24 @@ export function StudioProfilePage({ providerId }: Props) {
   const [instagram, setInstagram] = useState("");
   const [vk, setVk] = useState("");
 
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
-  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
-  const [addressSuggestFocused, setAddressSuggestFocused] = useState(false);
+  const {
+    inputRef: addressInputRef,
+    addressText,
+    addressCoords,
+    addressStatus,
+    suggestions: addressSuggestions,
+    isSuggestOpen: isAddressSuggestOpen,
+    setIsSuggestOpen: setIsAddressSuggestOpen,
+    selectSuggestion: selectAddressSuggestion,
+    activeIndex: addressSuggestIndex,
+    setActiveIndex: setAddressSuggestIndex,
+    setAddressSnapshot,
+    handleAddressChange,
+  } = useAddressWithGeocode();
 
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
-  const addressSuggestAbortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -86,7 +93,14 @@ export function StudioProfilePage({ providerId }: Props) {
       setName(studio.name);
       setTagline(studio.tagline);
       setDescription(studio.description ?? "");
-      setAddress(studio.address);
+      const coords =
+        typeof studio.geoLat === "number" &&
+        Number.isFinite(studio.geoLat) &&
+        typeof studio.geoLng === "number" &&
+        Number.isFinite(studio.geoLng)
+          ? { lat: studio.geoLat, lng: studio.geoLng }
+          : null;
+      setAddressSnapshot({ text: studio.address, coords });
       setDistrict(studio.district);
       setContactName(studio.contactName ?? "");
       setContactPhone(studio.contactPhone ?? "");
@@ -104,77 +118,6 @@ export function StudioProfilePage({ providerId }: Props) {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!addressSuggestRootRef.current) return;
-      if (addressSuggestRootRef.current.contains(event.target as Node)) return;
-      setAddressSuggestFocused(false);
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      if (addressSuggestAbortRef.current) {
-        addressSuggestAbortRef.current.abort();
-        addressSuggestAbortRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!addressSuggestFocused) {
-      setAddressSuggestLoading(false);
-      return;
-    }
-
-    const query = address.trim();
-    if (query.length < 3) {
-      if (addressSuggestAbortRef.current) {
-        addressSuggestAbortRef.current.abort();
-        addressSuggestAbortRef.current = null;
-      }
-      setAddressSuggestions([]);
-      setAddressSuggestLoading(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      const controller = new AbortController();
-      if (addressSuggestAbortRef.current) {
-        addressSuggestAbortRef.current.abort();
-      }
-      addressSuggestAbortRef.current = controller;
-      setAddressSuggestLoading(true);
-
-      void (async () => {
-        try {
-          const params = new URLSearchParams({ q: query, limit: "6" });
-          const res = await fetch(`/api/address/suggest?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const json = (await res.json().catch(() => null)) as ApiResponse<AddressSuggestResponse> | null;
-          if (!res.ok || !json || !json.ok) {
-            setAddressSuggestions([]);
-            return;
-          }
-          setAddressSuggestions(json.data.suggestions);
-        } catch (suggestError) {
-          if (suggestError instanceof DOMException && suggestError.name === "AbortError") return;
-          setAddressSuggestions([]);
-        } finally {
-          if (!controller.signal.aborted) {
-            setAddressSuggestLoading(false);
-          }
-        }
-      })();
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [address, addressSuggestFocused]);
-
   const resizeDescription = useCallback(() => {
     if (!descriptionRef.current) return;
     descriptionRef.current.style.height = "auto";
@@ -190,24 +133,51 @@ export function StudioProfilePage({ providerId }: Props) {
     setError(null);
     setInfo(null);
     try {
+      const trimmedAddress = addressText.trim();
+      const coordsReady =
+        !trimmedAddress ||
+        (addressCoords &&
+          Number.isFinite(addressCoords.lat) &&
+          Number.isFinite(addressCoords.lng));
+      const payload: Record<string, unknown> = {
+        name: name.trim(),
+        tagline: tagline.trim(),
+        description: description.trim() || null,
+        district: district.trim(),
+        contactName: contactName.trim() || null,
+        contactPhone: contactPhone.trim() || null,
+        contactEmail: contactEmail.trim() || null,
+        isPublished,
+      };
+
+      if (!trimmedAddress) {
+        payload.address = "";
+        payload.geoLat = null;
+        payload.geoLng = null;
+      } else if (coordsReady && addressCoords) {
+        payload.address = trimmedAddress;
+        payload.geoLat = addressCoords.lat;
+        payload.geoLng = addressCoords.lng;
+      }
+
       const res = await fetch(`/api/studios/${providerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          tagline: tagline.trim(),
-          description: description.trim() || null,
-          address: address.trim(),
-          district: district.trim(),
-          contactName: contactName.trim() || null,
-          contactPhone: contactPhone.trim() || null,
-          contactEmail: contactEmail.trim() || null,
-          isPublished,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+        const errorValue = json && !json.ok ? (json as { error?: unknown }).error : null;
+        const message =
+          typeof errorValue === "string"
+            ? errorValue
+            : errorValue &&
+                typeof errorValue === "object" &&
+                "message" in errorValue &&
+                typeof (errorValue as { message?: unknown }).message === "string"
+              ? String((errorValue as { message?: unknown }).message)
+              : `${t.apiErrorPrefix}: ${res.status}`;
+        throw new Error(message);
       }
       setInfo(t.profileSaved);
     } catch (err) {
@@ -329,28 +299,27 @@ export function StudioProfilePage({ providerId }: Props) {
       <StudioProfileForm
         name={name}
         description={description}
-        address={address}
+        address={addressText}
         phone={contactPhone}
         email={contactEmail}
         telegram={telegram}
         instagram={instagram}
         vk={vk}
+        addressInputRef={addressInputRef}
+        addressStatus={addressStatus}
         addressSuggestions={addressSuggestions}
-        addressSuggestLoading={addressSuggestLoading}
-        addressSuggestFocused={addressSuggestFocused}
-        addressSuggestRootRef={addressSuggestRootRef}
+        isAddressSuggestOpen={isAddressSuggestOpen}
+        setIsAddressSuggestOpen={setIsAddressSuggestOpen}
+        selectAddressSuggestion={selectAddressSuggestion}
+        addressSuggestIndex={addressSuggestIndex}
+        setAddressSuggestIndex={setAddressSuggestIndex}
         onNameChange={setName}
         onDescriptionChange={setDescription}
         onDescriptionInput={() => {
           resizeDescription();
         }}
         descriptionRef={descriptionRef}
-        onAddressChange={setAddress}
-        onAddressFocus={() => setAddressSuggestFocused(true)}
-        onAddressSuggestionSelect={(value) => {
-          setAddress(value);
-          setAddressSuggestFocused(false);
-        }}
+        onAddressChange={handleAddressChange}
         onPhoneChange={setContactPhone}
         onEmailChange={setContactEmail}
         onTelegramChange={setTelegram}

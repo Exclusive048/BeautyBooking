@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
 import { ensureStudioAdmin } from "@/lib/studios/access";
 import { getStudioProviderById, updateStudioProviderProfile } from "@/lib/studios/studio";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 
 type RouteContext = {
@@ -46,6 +47,10 @@ const updateSchema = z
     { message: "At least one field is required" }
   );
 
+function coordsRequired() {
+  return NextResponse.json({ ok: false, error: "ADDRESS_COORDS_REQUIRED" }, { status: 400 });
+}
+
 export async function GET(_req: Request, ctx: RouteContext) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
@@ -85,8 +90,27 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   if (!parsedBody.success) {
     return fail(formatZodError(parsedBody.error), 400, "VALIDATION_ERROR");
   }
+  const payload = parsedBody.data;
+  const addressProvided = payload.address !== undefined;
+  const hasGeoLat = payload.geoLat !== undefined;
+  const hasGeoLng = payload.geoLng !== undefined;
+  if (hasGeoLat !== hasGeoLng) {
+    return coordsRequired();
+  }
+  if (addressProvided) {
+    const trimmed = payload.address?.trim() ?? "";
+    if (trimmed) {
+      if (!hasGeoLat || payload.geoLat === null || payload.geoLng === null) {
+        return coordsRequired();
+      }
+    } else {
+      if (!hasGeoLat || payload.geoLat !== null || payload.geoLng !== null) {
+        return coordsRequired();
+      }
+    }
+  }
 
-  const updated = await updateStudioProviderProfile(id, parsedBody.data);
+  const updated = await updateStudioProviderProfile(id, payload);
   if (!updated) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
 
   return ok({ studio: updated });

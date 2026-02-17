@@ -10,6 +10,8 @@ type MasterContext = {
   name: string;
   tagline: string;
   address: string;
+  geoLat: number | null;
+  geoLng: number | null;
   description: string | null;
   avatarUrl: string | null;
   isPublished: boolean;
@@ -27,6 +29,8 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
       name: true,
       tagline: true,
       address: true,
+      geoLat: true,
+      geoLng: true,
       description: true,
       avatarUrl: true,
       isPublished: true,
@@ -47,6 +51,8 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
       name: master.name,
       tagline: master.tagline,
       address: master.address,
+      geoLat: master.geoLat,
+      geoLng: master.geoLng,
       description: master.description,
       avatarUrl: master.avatarUrl,
       isPublished: master.isPublished,
@@ -71,6 +77,8 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
     name: master.name,
     tagline: master.tagline,
     address: master.address,
+    geoLat: master.geoLat,
+    geoLng: master.geoLng,
     description: master.description,
     avatarUrl: master.avatarUrl,
     isPublished: master.isPublished,
@@ -106,6 +114,8 @@ export type MasterProfileData = {
     displayName: string;
     tagline: string;
     address: string;
+    geoLat: number | null;
+    geoLng: number | null;
     bio: string | null;
     avatarUrl: string | null;
     isPublished: boolean;
@@ -148,6 +158,8 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         displayName: context.name,
         tagline: context.tagline,
         address: context.address,
+        geoLat: context.geoLat,
+        geoLng: context.geoLng,
         bio: context.description,
         avatarUrl: context.avatarUrl,
         isPublished: context.isPublished,
@@ -209,6 +221,8 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       displayName: context.name,
       tagline: context.tagline,
       address: context.address,
+      geoLat: context.geoLat,
+      geoLng: context.geoLng,
       bio: context.description,
       avatarUrl: context.avatarUrl,
       isPublished: context.isPublished,
@@ -252,6 +266,8 @@ export async function updateMasterProfile(
     displayName?: string;
     tagline?: string;
     address?: string;
+    geoLat?: number | null;
+    geoLng?: number | null;
     bio?: string | null;
     avatarUrl?: string | null;
     isPublished?: boolean;
@@ -264,6 +280,8 @@ export async function updateMasterProfile(
       ...(input.displayName ? { name: input.displayName.trim() } : {}),
       ...(typeof input.tagline === "string" ? { tagline: input.tagline.trim() } : {}),
       ...(typeof input.address === "string" ? { address: input.address.trim() } : {}),
+      ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
+      ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
       ...(input.bio !== undefined
         ? { description: typeof input.bio === "string" ? input.bio.trim() || null : null }
         : {}),

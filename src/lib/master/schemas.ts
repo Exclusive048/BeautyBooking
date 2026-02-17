@@ -106,6 +106,8 @@ export const updateMasterProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
   tagline: z.string().trim().max(240).optional(),
   address: z.string().trim().max(240).optional(),
+  geoLat: z.number().finite().nullable().optional(),
+  geoLng: z.number().finite().nullable().optional(),
   bio: z.string().trim().max(4000).nullable().optional(),
   avatarUrl: avatarUrlSchema.nullable().optional(),
   isPublished: z.boolean().optional(),

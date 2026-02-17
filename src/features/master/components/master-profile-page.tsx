@@ -1,12 +1,18 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import {
+  useAddressWithGeocode,
+  type AddressCoords,
+  type AddressSource,
+  type GeoStatus,
+} from "@/lib/maps/use-address-with-geocode";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -38,6 +44,8 @@ type MasterProfileData = {
     displayName: string;
     tagline: string;
     address: string;
+    geoLat: number | null;
+    geoLng: number | null;
     bio: string | null;
     avatarUrl: string | null;
     isPublished: boolean;
@@ -63,15 +71,14 @@ type PendingPortfolioMeta = {
 
 type ApiErrorShape = {
   ok: false;
-  error: {
-    message: string;
-    details?: unknown;
-    fieldErrors?: Record<string, string | string[]>;
-  };
-};
-
-type AddressSuggestResponse = {
-  suggestions: string[];
+  error:
+    | {
+        message: string;
+        details?: unknown;
+        fieldErrors?: Record<string, string | string[]>;
+      }
+    | string;
+  code?: string;
 };
 
 type ProfileTab = "main" | "services" | "portfolio" | "settings";
@@ -84,6 +91,7 @@ const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
 ];
 
 const SERVICE_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
+const SAVE_ADDRESS_ERROR_MESSAGE = "Не удалось сохранить адрес. Попробуйте ещё раз.";
 
 function buildDurationOptions(value: number): number[] {
   if (!Number.isFinite(value) || value <= 0) return SERVICE_DURATION_OPTIONS;
@@ -101,11 +109,16 @@ function toAbsoluteMediaUrl(url: string): string {
   return new URL(url, window.location.origin).toString();
 }
 
+
+
 function extractApiErrorMessage(
   json: ApiErrorShape | null,
   fallback: string
 ): string {
   if (!json || json.ok) return fallback;
+  if (typeof json.error === "string") {
+    return json.error.trim() || fallback;
+  }
   const details = json.error.details;
   if (typeof details === "string" && details.trim()) {
     return `${json.error.message}: ${details}`;
@@ -139,6 +152,39 @@ function extractApiErrorMessage(
     }
   }
   return json.error.message || fallback;
+}
+
+function parseApiErrorMessage(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const error = record.error;
+  if (typeof error === "string" && error.trim()) return error.trim();
+  if (error && typeof error === "object") {
+    const message = (error as Record<string, unknown>).message;
+    if (typeof message === "string" && message.trim()) return message.trim();
+  }
+  const message = record.message;
+  if (typeof message === "string" && message.trim()) return message.trim();
+  return null;
+}
+
+async function readErrorMessage(
+  res: Response,
+  parsed?: unknown,
+  fallback = SAVE_ADDRESS_ERROR_MESSAGE
+): Promise<string> {
+  const parsedMessage = parseApiErrorMessage(parsed);
+  if (parsedMessage) return parsedMessage;
+
+  try {
+    const data = await res.json();
+    const message = parseApiErrorMessage(data);
+    if (message) return message;
+  } catch {
+    // ignore read errors
+  }
+
+  return fallback;
 }
 
 function firstFieldError(value: string | string[] | undefined): string | null {
@@ -189,7 +235,22 @@ export function MasterProfilePage() {
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [address, setAddress] = useState("");
+  const {
+    inputRef: addressInputRef,
+    addressText,
+    addressCoords,
+    addressSource,
+    geoStatus,
+    addressStatus,
+    suggestions: addressSuggestions,
+    isSuggestOpen: isAddressSuggestOpen,
+    setIsSuggestOpen: setIsAddressSuggestOpen,
+    selectSuggestion: selectAddressSuggestion,
+    activeIndex: addressSuggestIndex,
+    setActiveIndex: setAddressSuggestIndex,
+    setAddressSnapshot,
+    handleAddressChange,
+  } = useAddressWithGeocode();
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarAssetId, setAvatarAssetId] = useState<string | null>(null);
@@ -219,14 +280,10 @@ export function MasterProfilePage() {
   const [portfolioServiceIds, setPortfolioServiceIds] = useState<string[]>([]);
   const [portfolioMetaOpen, setPortfolioMetaOpen] = useState(false);
   const [portfolioAssetIdsByUrl, setPortfolioAssetIdsByUrl] = useState<Record<string, string>>({});
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
-  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
-  const [addressSuggestFocused, setAddressSuggestFocused] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const newPortfolioInputRef = useRef<HTMLInputElement | null>(null);
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
-  const addressSuggestAbortRef = useRef<AbortController | null>(null);
+  const newPortfolioInputRef = useRef<HTMLInputElement | null>(null);
   const serviceAutosaveTimer = useRef<number | null>(null);
   const profileAutosaveTimer = useRef<number | null>(null);
   const profileHydratedRef = useRef(false);
@@ -237,14 +294,18 @@ export function MasterProfilePage() {
   const profileSnapshotRef = useRef({
     displayName: "",
     tagline: "",
-    address: "",
+    addressText: "",
     bio: "",
     avatarUrl: "",
     isPublished: false,
+    addressCoords: null as AddressCoords | null,
+    addressSource: "manual" as AddressSource,
+    geoStatus: "idle" as GeoStatus,
   });
   const servicesSnapshotRef = useRef<MasterServiceItem[]>([]);
   const dataRef = useRef<MasterProfileData | null>(null);
   const hydratedRef = useRef(false);
+  const isMountedRef = useRef(true);
 
     const load = useCallback(async (): Promise<void> => {
       setLoading(true);
@@ -258,13 +319,26 @@ export function MasterProfilePage() {
 
         const profileData = json.data;
         dataRef.current = profileData;
+        const hasCoords =
+          typeof profileData.master.geoLat === "number" &&
+          Number.isFinite(profileData.master.geoLat) &&
+          typeof profileData.master.geoLng === "number" &&
+          Number.isFinite(profileData.master.geoLng);
+        const coords = hasCoords
+          ? { lat: profileData.master.geoLat!, lng: profileData.master.geoLng! }
+          : null;
+        const nextGeoStatus: GeoStatus = "idle";
+
         profileSnapshotRef.current = {
           displayName: profileData.master.displayName,
           tagline: profileData.master.tagline,
-          address: profileData.master.address,
+          addressText: profileData.master.address,
           bio: profileData.master.bio ?? "",
           avatarUrl: profileData.master.avatarUrl ?? "",
           isPublished: profileData.master.isPublished,
+          addressCoords: coords,
+          addressSource: "manual",
+          geoStatus: nextGeoStatus,
         };
         servicesSnapshotRef.current = profileData.services;
         profileSavingRef.current = false;
@@ -274,7 +348,7 @@ export function MasterProfilePage() {
         setData(profileData);
         setDisplayName(profileData.master.displayName);
         setTagline(profileData.master.tagline);
-        setAddress(profileData.master.address);
+        setAddressSnapshot({ text: profileData.master.address, coords });
         setBio(profileData.master.bio ?? "");
       setAvatarUrl(profileData.master.avatarUrl ?? "");
       setIsPublished(profileData.master.isPublished);
@@ -326,19 +400,58 @@ export function MasterProfilePage() {
     }, [load]);
 
     useEffect(() => {
+      isMountedRef.current = true;
+      return () => {
+        isMountedRef.current = false;
+      };
+    }, []);
+
+    useEffect(() => {
       dataRef.current = data;
     }, [data]);
+
+    useEffect(() => {
+      if (!isAddressSuggestOpen) return;
+      const handleDocumentClick = (event: MouseEvent | TouchEvent) => {
+        const target = event.target;
+        if (!(target instanceof Node)) return;
+        if (!addressSuggestRootRef.current) return;
+        if (!addressSuggestRootRef.current.contains(target)) {
+          setIsAddressSuggestOpen(false);
+        }
+      };
+
+      document.addEventListener("mousedown", handleDocumentClick);
+      document.addEventListener("touchstart", handleDocumentClick);
+      return () => {
+        document.removeEventListener("mousedown", handleDocumentClick);
+        document.removeEventListener("touchstart", handleDocumentClick);
+      };
+    }, [isAddressSuggestOpen, setIsAddressSuggestOpen]);
 
     useEffect(() => {
       profileSnapshotRef.current = {
         displayName,
         tagline,
-        address,
+        addressText,
         bio,
         avatarUrl,
         isPublished,
+        addressCoords,
+        addressSource,
+        geoStatus,
       };
-    }, [displayName, tagline, address, avatarUrl, bio, isPublished]);
+    }, [
+      displayName,
+      tagline,
+      addressText,
+      avatarUrl,
+      bio,
+      isPublished,
+      addressCoords,
+      addressSource,
+      geoStatus,
+    ]);
 
     useEffect(() => {
       servicesSnapshotRef.current = Object.values(servicesDraft);
@@ -395,77 +508,6 @@ export function MasterProfilePage() {
     void loadInvites();
   }, []);
 
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!addressSuggestRootRef.current) return;
-      if (addressSuggestRootRef.current.contains(event.target as Node)) return;
-      setAddressSuggestFocused(false);
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      if (addressSuggestAbortRef.current) {
-        addressSuggestAbortRef.current.abort();
-        addressSuggestAbortRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!addressSuggestFocused) {
-      setAddressSuggestLoading(false);
-      return;
-    }
-
-    const query = address.trim();
-    if (query.length < 3) {
-      if (addressSuggestAbortRef.current) {
-        addressSuggestAbortRef.current.abort();
-        addressSuggestAbortRef.current = null;
-      }
-      setAddressSuggestions([]);
-      setAddressSuggestLoading(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      const controller = new AbortController();
-      if (addressSuggestAbortRef.current) {
-        addressSuggestAbortRef.current.abort();
-      }
-      addressSuggestAbortRef.current = controller;
-      setAddressSuggestLoading(true);
-
-      void (async () => {
-        try {
-          const params = new URLSearchParams({ q: query, limit: "6" });
-          const res = await fetch(`/api/address/suggest?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const json = (await res.json().catch(() => null)) as ApiResponse<AddressSuggestResponse> | null;
-          if (!res.ok || !json || !json.ok) {
-            setAddressSuggestions([]);
-            return;
-          }
-          setAddressSuggestions(json.data.suggestions);
-        } catch (suggestError) {
-          if (suggestError instanceof DOMException && suggestError.name === "AbortError") return;
-          setAddressSuggestions([]);
-        } finally {
-          if (!controller.signal.aborted) {
-            setAddressSuggestLoading(false);
-          }
-        }
-      })();
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [address, addressSuggestFocused]);
-
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
   const disabledServices = useMemo(
     () => serviceList.filter((service) => !service.isEnabled),
@@ -484,7 +526,7 @@ export function MasterProfilePage() {
     return Math.ceil(value / 5) * 5;
   }
 
-    const saveProfile = useCallback(
+  const saveProfile = useCallback(
       async (options?: { refresh?: boolean }): Promise<boolean> => {
         const currentData = dataRef.current;
         if (!currentData) return false;
@@ -503,6 +545,8 @@ export function MasterProfilePage() {
           bio?: string | null;
           avatarUrl?: string | null;
           isPublished?: boolean;
+          geoLat?: number | null;
+          geoLng?: number | null;
         } = {};
 
         const nextDisplayName = snapshot.displayName.trim();
@@ -521,10 +565,9 @@ export function MasterProfilePage() {
           payload.tagline = nextTagline;
         }
 
-        const nextAddress = snapshot.address.trim();
-        if (nextAddress !== currentMaster.address.trim()) {
-          payload.address = nextAddress;
-        }
+        const nextAddress = snapshot.addressText.trim();
+        const currentAddress = currentMaster.address.trim();
+        const addressChanged = nextAddress !== currentAddress;
 
         const nextBio = snapshot.bio.trim();
         const currentBio = (currentMaster.bio ?? "").trim();
@@ -542,6 +585,41 @@ export function MasterProfilePage() {
           payload.isPublished = snapshot.isPublished;
         }
 
+        const nextCoords =
+          snapshot.addressCoords &&
+          Number.isFinite(snapshot.addressCoords.lat) &&
+          Number.isFinite(snapshot.addressCoords.lng)
+            ? snapshot.addressCoords
+            : null;
+        const currentCoords =
+          typeof currentMaster.geoLat === "number" &&
+          Number.isFinite(currentMaster.geoLat) &&
+          typeof currentMaster.geoLng === "number" &&
+          Number.isFinite(currentMaster.geoLng)
+            ? { lat: currentMaster.geoLat, lng: currentMaster.geoLng }
+            : null;
+
+        const coordsChanged =
+          (nextCoords?.lat ?? null) !== (currentCoords?.lat ?? null) ||
+          (nextCoords?.lng ?? null) !== (currentCoords?.lng ?? null);
+
+        const coordsReady = !nextAddress || Boolean(nextCoords);
+
+        if (addressChanged) {
+          if (!nextAddress) {
+            payload.address = "";
+            payload.geoLat = null;
+            payload.geoLng = null;
+          } else if (coordsReady && nextCoords) {
+            payload.address = nextAddress;
+            payload.geoLat = nextCoords.lat;
+            payload.geoLng = nextCoords.lng;
+          }
+        } else if (coordsChanged && coordsReady && nextCoords) {
+          payload.geoLat = nextCoords.lat;
+          payload.geoLng = nextCoords.lng;
+        }
+
         if (Object.keys(payload).length === 0) {
           setProfileSaveStatus("saved");
           return true;
@@ -557,17 +635,18 @@ export function MasterProfilePage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
+          const errorRes = res.clone();
           const json = (await res.json().catch(() => null)) as
             | ApiResponse<{ id: string }>
             | ApiErrorShape
             | null;
           if (!res.ok || !json || !json.ok) {
-            throw new Error(
-              extractApiErrorMessage(
-                json && !json.ok ? json : null,
-                `API error: ${res.status}`
-              )
+            const message = await readErrorMessage(
+              errorRes,
+              json && !json.ok ? json : null,
+              SAVE_ADDRESS_ERROR_MESSAGE
             );
+            throw new Error(message);
           }
 
           if (options?.refresh) {
@@ -582,6 +661,8 @@ export function MasterProfilePage() {
                       displayName: payload.displayName ?? prev.master.displayName,
                       tagline: payload.tagline ?? prev.master.tagline,
                       address: payload.address ?? prev.master.address,
+                      geoLat: payload.geoLat !== undefined ? payload.geoLat : prev.master.geoLat,
+                      geoLng: payload.geoLng !== undefined ? payload.geoLng : prev.master.geoLng,
                       bio: payload.bio ?? prev.master.bio,
                       avatarUrl: payload.avatarUrl ?? prev.master.avatarUrl,
                       isPublished: payload.isPublished ?? prev.master.isPublished,
@@ -594,7 +675,7 @@ export function MasterProfilePage() {
           setProfileSaveStatus("saved");
           return true;
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
+          setError(err instanceof Error ? err.message : SAVE_ADDRESS_ERROR_MESSAGE);
           setProfileSaveStatus("error");
           return false;
         } finally {
@@ -621,10 +702,34 @@ export function MasterProfilePage() {
       return;
     }
 
-      if (profileSavingRef.current) {
-        profilePendingRef.current = true;
-        return;
-      }
+    const nextAddress = addressText.trim();
+    const currentAddress = data.master.address.trim();
+    const addressChanged = nextAddress !== currentAddress;
+    const coordsReady =
+      !nextAddress ||
+      (addressCoords &&
+        Number.isFinite(addressCoords.lat) &&
+        Number.isFinite(addressCoords.lng));
+
+    const nextBio = bio.trim();
+    const currentBio = (data.master.bio ?? "").trim();
+    const nextAvatarUrl = avatarUrl.trim() || null;
+    const currentAvatarUrl = (data.master.avatarUrl ?? "").trim() || null;
+    const otherFieldsChanged =
+      displayName.trim() !== data.master.displayName ||
+      tagline.trim() !== data.master.tagline ||
+      nextBio !== currentBio ||
+      nextAvatarUrl !== currentAvatarUrl ||
+      isPublished !== data.master.isPublished;
+
+    if (addressChanged && !coordsReady && !otherFieldsChanged) {
+      return;
+    }
+
+    if (profileSavingRef.current) {
+      profilePendingRef.current = true;
+      return;
+    }
 
     if (profileAutosaveTimer.current) {
       window.clearTimeout(profileAutosaveTimer.current);
@@ -640,7 +745,19 @@ export function MasterProfilePage() {
         window.clearTimeout(profileAutosaveTimer.current);
       }
     };
-  }, [address, avatarUrl, bio, data, displayName, isPublished, saveProfile, tagline]);
+  }, [
+    addressText,
+    avatarUrl,
+    bio,
+    data,
+    displayName,
+    addressCoords,
+    addressSource,
+    geoStatus,
+    isPublished,
+    saveProfile,
+    tagline,
+  ]);
 
   const updateAutoConfirm = async (nextValue: boolean): Promise<void> => {
     if (!data?.master.isSolo) return;
@@ -793,12 +910,16 @@ export function MasterProfilePage() {
         | null;
       if (!res.ok || !json || !json.ok) {
         const apiError = json && !json.ok ? json.error : null;
-        if (apiError?.fieldErrors) {
+        const fieldErrors =
+          apiError && typeof apiError === "object" && "fieldErrors" in apiError
+            ? (apiError as { fieldErrors?: Record<string, string | string[]> }).fieldErrors
+            : undefined;
+        if (fieldErrors) {
           setNewSoloServiceFieldErrors({
-            title: firstFieldError(apiError.fieldErrors.title) ?? undefined,
-            price: firstFieldError(apiError.fieldErrors.price) ?? undefined,
+            title: firstFieldError(fieldErrors.title) ?? undefined,
+            price: firstFieldError(fieldErrors.price) ?? undefined,
             durationMin: firstFieldError(
-              apiError.fieldErrors.durationMin ?? apiError.fieldErrors.duration
+              fieldErrors.durationMin ?? fieldErrors.duration
             ) ?? undefined,
           });
         } else {
@@ -1035,9 +1156,72 @@ export function MasterProfilePage() {
         ? "text-rose-500"
         : "text-text-sec";
 
+  const addressStatusTone =
+    addressStatus?.tone === "success"
+      ? "text-emerald-500"
+      : addressStatus?.tone === "error"
+        ? "text-rose-400"
+        : "text-text-sec";
+
+  const handleAddressKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (addressSuggestions.length === 0) return;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (!isAddressSuggestOpen) {
+          setIsAddressSuggestOpen(true);
+          setAddressSuggestIndex(0);
+          return;
+        }
+        setAddressSuggestIndex((prev) =>
+          prev < addressSuggestions.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!isAddressSuggestOpen) {
+          setIsAddressSuggestOpen(true);
+          setAddressSuggestIndex(addressSuggestions.length - 1);
+          return;
+        }
+        setAddressSuggestIndex((prev) =>
+          prev <= 0 ? addressSuggestions.length - 1 : prev - 1
+        );
+        return;
+      }
+
+      if (event.key === "Enter" && isAddressSuggestOpen) {
+        if (
+          addressSuggestIndex >= 0 &&
+          addressSuggestIndex < addressSuggestions.length
+        ) {
+          event.preventDefault();
+          selectAddressSuggestion(addressSuggestions[addressSuggestIndex]);
+        }
+        return;
+      }
+
+      if (event.key === "Escape" && isAddressSuggestOpen) {
+        setIsAddressSuggestOpen(false);
+        return;
+      }
+    },
+    [
+      addressSuggestions,
+      addressSuggestIndex,
+      isAddressSuggestOpen,
+      selectAddressSuggestion,
+      setAddressSuggestIndex,
+      setIsAddressSuggestOpen,
+    ]
+  );
+
   const previewName = displayName.trim() || "Имя мастера";
   const previewTagline = tagline.trim() || "Добавьте короткий слоган";
-  const previewAddress = address.trim() || "Адрес пока не указан";
+  const previewAddress = addressText.trim() || "Адрес пока не указан";
   const previewBio = bio.trim();
   const inputBaseClass =
     "mt-1 w-full rounded-lg border border-transparent bg-bg-input px-3 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle";
@@ -1249,43 +1433,51 @@ export function MasterProfilePage() {
                       </label>
                     </div>
 
-                    <div className="relative" ref={addressSuggestRootRef}>
+                    <div ref={addressSuggestRootRef} className="relative">
                       <label className="text-xs text-text-sec">
                         Адрес
                         <textarea
+                          ref={addressInputRef}
                           className={inputBaseClass}
-                          value={address}
+                          value={addressText}
                           rows={2}
-                          onChange={(event) => setAddress(event.target.value)}
-                          onFocus={() => setAddressSuggestFocused(true)}
+                          onChange={(event) => {
+                            handleAddressChange(event.target.value);
+                            setError(null);
+                          }}
+                          onKeyDown={handleAddressKeyDown}
+                          onFocus={() => {
+                            if (addressSuggestions.length > 0) {
+                              setIsAddressSuggestOpen(true);
+                            }
+                          }}
+                          onBlur={() => {
+                            setIsAddressSuggestOpen(false);
+                          }}
                           placeholder="Адрес приёма"
                         />
                       </label>
-                      {addressSuggestFocused ? (
-                        <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-border-subtle bg-bg-card shadow-sm">
-                          {addressSuggestLoading ? (
-                            <div className="px-3 py-2 text-xs text-text-sec">Ищем адрес...</div>
-                          ) : addressSuggestions.length > 0 ? (
-                            addressSuggestions.map((suggestion) => (
-                              <button
-                                key={suggestion}
-                                type="button"
-                                className="block w-full border-b border-border-subtle px-3 py-2 text-left text-sm last:border-b-0 hover:bg-bg-input/80"
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => {
-                                  setAddress(suggestion);
-                                  setAddressSuggestFocused(false);
-                                }}
-                              >
-                                {suggestion}
-                              </button>
-                            ))
-                          ) : address.trim().length >= 3 ? (
-                            <div className="px-3 py-2 text-xs text-text-sec">Совпадений не найдено</div>
-                          ) : (
-                            <div className="px-3 py-2 text-xs text-text-sec">Введите минимум 3 символа</div>
-                          )}
+                      {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
+                        <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
+                          {addressSuggestions.map((item, index) => (
+                            <button
+                              type="button"
+                              key={`${item.value}-${index}`}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onMouseEnter={() => setAddressSuggestIndex(index)}
+                              onClick={() => selectAddressSuggestion(item)}
+                              className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
+                                index === addressSuggestIndex ? "bg-bg-input" : ""
+                              }`}
+                              aria-label={`Выбрать адрес ${item.value}`}
+                            >
+                              <span className="whitespace-normal break-words">{item.value}</span>
+                            </button>
+                          ))}
                         </div>
+                      ) : null}
+                      {addressStatus ? (
+                        <div className={`mt-1 text-xs ${addressStatusTone}`}>{addressStatus.text}</div>
                       ) : null}
                     </div>
 

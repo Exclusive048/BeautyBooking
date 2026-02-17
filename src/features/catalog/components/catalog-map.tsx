@@ -101,11 +101,7 @@ type YMapsApi = {
   geocode: (request: number[] | string, options?: Record<string, unknown>) => Promise<YGeocodeResult>;
 };
 
-declare global {
-  interface Window {
-    ymaps?: YMapsApi;
-  }
-}
+type YMapsWindow = Window & { ymaps?: YMapsApi };
 
 const DEFAULT_CENTER = { lat: 43.238949, lng: 76.889709 };
 const DEFAULT_ZOOM = 11;
@@ -168,8 +164,9 @@ function loadYmaps(): Promise<YMapsApi> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Yandex Maps is not available on the server"));
   }
-  if (window.ymaps) {
-    return new Promise((resolve) => window.ymaps?.ready(() => resolve(window.ymaps!)));
+  const ymapsWindow = window as YMapsWindow;
+  if (ymapsWindow.ymaps) {
+    return new Promise((resolve) => ymapsWindow.ymaps?.ready(() => resolve(ymapsWindow.ymaps!)));
   }
   if (ymapsLoader) return ymapsLoader;
 
@@ -177,7 +174,8 @@ function loadYmaps(): Promise<YMapsApi> {
     const existing = document.getElementById(YMAPS_SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener("load", () => {
-        window.ymaps?.ready(() => resolve(window.ymaps!));
+        const loadedWindow = window as YMapsWindow;
+        loadedWindow.ymaps?.ready(() => resolve(loadedWindow.ymaps!));
       });
       existing.addEventListener("error", () => {
         ymapsLoader = null;
@@ -191,12 +189,13 @@ function loadYmaps(): Promise<YMapsApi> {
     script.src = getYmapsUrl();
     script.async = true;
     script.onload = () => {
-      if (!window.ymaps) {
+      const loadedWindow = window as YMapsWindow;
+      if (!loadedWindow.ymaps) {
         ymapsLoader = null;
         reject(new Error("Yandex Maps API is not available"));
         return;
       }
-      window.ymaps.ready(() => resolve(window.ymaps!));
+      loadedWindow.ymaps.ready(() => resolve(loadedWindow.ymaps!));
     };
     script.onerror = () => {
       ymapsLoader = null;
@@ -511,7 +510,7 @@ export function CatalogMap({
     const map = mapRef.current;
     const clusterer = clustererRef.current;
     const layouts = layoutRef.current;
-    const ymaps = window.ymaps;
+    const ymaps = (window as YMapsWindow).ymaps;
 
     if (!map || !clusterer || !layouts || !ymaps) return;
 
@@ -596,7 +595,7 @@ export function CatalogMap({
     }
 
     const layouts = layoutRef.current;
-    const ymaps = window.ymaps;
+    const ymaps = (window as YMapsWindow).ymaps;
     if (!layouts || !ymaps) return;
 
     const userPlacemark = new ymaps.Placemark(
@@ -679,7 +678,7 @@ export function CatalogMap({
 
       {mapStatus === "ready" && missingCount > 0 ? (
         <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-full border border-border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-          Не отображены {missingCount} профилей без адреса
+          Не отображены {missingCount} профилей без координат
         </div>
       ) : null}
 

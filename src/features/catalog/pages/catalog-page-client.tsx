@@ -468,7 +468,20 @@ export default function CatalogPageClient() {
         .filter((item): item is CatalogMapPoint => Boolean(item)),
     [currentItems]
   );
-  const missingMapCount = currentItems.length - mapPoints.length;
+  const missingMapCount = useMemo(
+    () =>
+      currentItems.reduce((count, item) => {
+        const lat = item.geoLat;
+        const lng = item.geoLng;
+        const hasCoords =
+          typeof lat === "number" &&
+          Number.isFinite(lat) &&
+          typeof lng === "number" &&
+          Number.isFinite(lng);
+        return count + (hasCoords ? 0 : 1);
+      }, 0),
+    [currentItems]
+  );
 
   const handleClusterSelect = useCallback((items: CatalogMapPoint[]) => {
     setMapSidebarItems(items.map(toSidebarItem));
@@ -489,7 +502,7 @@ export default function CatalogPageClient() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      <div className="sticky top-16 z-20 mx-auto w-full max-w-5xl space-y-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
+      <div className="top-16 z-20 mx-auto w-full max-w-5xl space-y-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
         <DateTimeFilterBar
           serviceQuery={draftServiceQuery}
           serviceId={serviceId}
