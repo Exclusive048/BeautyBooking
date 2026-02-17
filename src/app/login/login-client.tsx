@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
+import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -16,6 +17,11 @@ function normalizePhone(input: string) {
   if (!cleaned) return "";
   if (cleaned.startsWith("+")) return cleaned;
   return `+${cleaned}`;
+}
+
+function isPhoneValid(input: string) {
+  const normalized = normalizePhone(input);
+  return normalized.length >= 8;
 }
 
 function safeNext(nextRaw: string | null) {
@@ -35,6 +41,9 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  const phoneValid = isPhoneValid(phone);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
@@ -57,6 +66,11 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
   async function sendCode() {
     setErrorText(null);
     const normalized = normalizePhone(phone);
+
+    if (normalized.length >= 8 && !agreedToTerms) {
+      setErrorText("Необходимо согласие с условиями и политикой конфиденциальности.");
+      return;
+    }
 
     if (!normalized || normalized.length < 8) {
       setErrorText(UI_TEXT.auth.loginPage.invalidPhone);
@@ -161,10 +175,18 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
                   aria-label={UI_TEXT.auth.loginPage.phoneLabel}
                 />
 
+                {phoneValid ? (
+                  <LegalConsentCheckbox
+                    checked={agreedToTerms}
+                    onCheckedChange={setAgreedToTerms}
+                    variant="short"
+                  />
+                ) : null}
+
                 <button
                   type="button"
                   onClick={sendCode}
-                  disabled={loading}
+                  disabled={loading || (phoneValid && !agreedToTerms)}
                   className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
                 >
                   {loading ? UI_TEXT.auth.loginPage.sending : UI_TEXT.auth.loginPage.sendCode}

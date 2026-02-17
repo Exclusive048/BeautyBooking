@@ -1,6 +1,8 @@
 import { FooterLink } from "@/components/layout/footer/FooterLink";
 
-const COPYRIGHT_TEXT = "© 2026 BeautyHub";
+const CURRENT_YEAR = new Date().getFullYear();
+const COPYRIGHT_TEXT = `© ${CURRENT_YEAR} BeautyHub`;
+// TODO: Replace legal entity details before production launch.
 const LEGAL_ENTITY_TEXT = "ИП Иванов Иван Иванович, ИНН 1234567890";
 
 const LEGAL_LINKS = [

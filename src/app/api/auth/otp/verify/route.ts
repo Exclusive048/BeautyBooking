@@ -1,13 +1,15 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken } from "@/lib/auth/jwt";
-import { AccountType } from "@prisma/client";
+import { AccountType, ConsentType } from "@prisma/client";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
+
+const CONSENT_DOCUMENT_VERSION = "1.0";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -53,6 +55,34 @@ export async function POST(req: Request) {
     if (nextRoles !== profile.roles) {
       profile = { ...profile, roles: nextRoles };
     }
+  }
+
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  const ipAddress = forwardedFor?.split(",")[0]?.trim() ?? null;
+  const userAgent = req.headers.get("user-agent");
+
+  try {
+    await prisma.userConsent.createMany({
+      data: [
+        {
+          userId: profile.id,
+          consentType: ConsentType.TERMS,
+          documentVersion: CONSENT_DOCUMENT_VERSION,
+          ipAddress,
+          userAgent,
+        },
+        {
+          userId: profile.id,
+          consentType: ConsentType.PRIVACY,
+          documentVersion: CONSENT_DOCUMENT_VERSION,
+          ipAddress,
+          userAgent,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  } catch (error) {
+    console.error("Failed to save user consents", { userId: profile.id, error });
   }
 
   const token = createSessionToken(

@@ -34,6 +34,13 @@ enum AccountType {
   SUPERADMIN
 }
 
+enum ConsentType {
+  TERMS
+  PRIVACY
+  MARKETING
+  PUBLIC_PROFILE
+}
+
 enum BookingStatus {
   NEW
   PENDING
@@ -214,6 +221,7 @@ model UserProfile {
   studioInvites      StudioInvite[]     @relation("StudioInvitedBy")
   bookings           Booking[]          @relation("BookingClient")
   notifications      Notification[]
+  consents           UserConsent[]
   mediaAssetsCreated MediaAsset[]       @relation("MediaAssetCreatedBy")
   reviewsAuthored    Review[]           @relation("ReviewAuthor")
   favorites          Favorite[]
@@ -221,6 +229,27 @@ model UserProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserConsent {
+  id              String      @id @default(cuid())
+  userId          String
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  consentType     ConsentType
+  documentVersion String
+
+  agreedAt        DateTime    @default(now())
+  ipAddress       String?
+  userAgent       String?
+
+  revokedAt       DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, consentType])
+  @@index([userId])
 }
 
 model Studio {
