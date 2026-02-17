@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
+import { ViewerTimeZoneProvider } from "@/components/providers/viewer-timezone-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <AppShell>{children}</AppShell>
+          <ViewerTimeZoneProvider>
+            <AppShell>{children}</AppShell>
+          </ViewerTimeZoneProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
@@ -35,6 +36,7 @@ function formatDuration(min: number): string {
 
 export default function BookFromPortfolioClient() {
   const params = useSearchParams();
+  const viewerTimeZone = useViewerTimeZoneContext();
   const portfolioId = params.get("portfolioId");
   const hasPortfolioId = Boolean(portfolioId);
 
@@ -116,12 +118,7 @@ export default function BookFromPortfolioClient() {
               ) : (
                 detail.nearestSlots.map((slot) => (
                   <span key={slot.startAt} className="rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700">
-                    {new Date(slot.startAt).toLocaleString("ru-RU", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {UI_FMT.dateTimeShort(slot.startAt, { timeZone: viewerTimeZone })}
                   </span>
                 ))
               )}

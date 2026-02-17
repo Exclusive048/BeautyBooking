@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -55,6 +56,7 @@ function money(value: number, suffix: string): string {
 
 export function StudioFinancePage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.finance;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const today = useMemo(() => new Date(), []);
   const monthStart = useMemo(() => new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)), [today]);
 
@@ -186,7 +188,9 @@ export function StudioFinancePage({ studioId }: Props) {
                   <tr key={booking.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
                     <td className="px-4 py-3 text-sm text-text-main">{booking.clientName}</td>
                     <td className="px-4 py-3 text-sm text-text-sec">{booking.masterName ?? "—"}</td>
-                    <td className="px-4 py-3 text-sm text-text-sec">{UI_FMT.dateTimeShort(booking.startAtUtc ?? "")}</td>
+                    <td className="px-4 py-3 text-sm text-text-sec">
+                      {UI_FMT.dateTimeShort(booking.startAtUtc ?? "", { timeZone: viewerTimeZone })}
+                    </td>
                     <td className="px-4 py-3 text-sm font-medium text-text-main">
                       {money(booking.amount, t.moneySuffix)}
                     </td>

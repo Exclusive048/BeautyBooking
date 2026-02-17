@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { moneyRUB } from "@/lib/format";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -29,6 +32,7 @@ type CatalogCardProps = {
 };
 
 export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const hasServiceQuery = serviceQuery.trim().length > 0;
   const href = item.publicUsername ? `/u/${item.publicUsername}` : null;
 
@@ -40,7 +44,9 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
         : UI_TEXT.catalog.priceOnRequest;
 
   const slotText = item.nextSlot
-    ? `${UI_TEXT.catalog.nextSlotLabel}: ${UI_FMT.dateTimeShort(item.nextSlot.startAt)}`
+    ? `${UI_TEXT.catalog.nextSlotLabel}: ${UI_FMT.dateTimeShort(item.nextSlot.startAt, {
+        timeZone: viewerTimeZone,
+      })}`
     : item.todaySlotsCount && item.todaySlotsCount > 0
       ? `${item.todaySlotsCount} ${UI_TEXT.catalog.todaySlotsLabel}`
       : UI_TEXT.catalog.noSlots;

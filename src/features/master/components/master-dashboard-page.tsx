@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type DayBooking = {
   id: string;
@@ -101,27 +103,15 @@ function formatMoney(value: number): string {
   return `${moneyFormatter.format(value)} ₽`;
 }
 
-function formatSlotLabel(value: string): string {
-  const date = new Date(value);
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatSlotLabel(value: string, timeZone: string): string {
+  return UI_FMT.dateTimeShort(value, { timeZone });
 }
 
 function formatBookingStart(value: string | null, timezone: string): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  });
+  return UI_FMT.dateTimeShort(value, { timeZone: timezone });
 }
 
 function canMasterRequestMove(booking: DayBooking): boolean {
@@ -132,16 +122,8 @@ function canMasterRequestMove(booking: DayBooking): boolean {
   return Number.isFinite(minutesLeft) && minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
 }
 
-function formatAvailabilitySlot(slot: AvailabilitySlot): string {
-  const [datePart, timePart] = slot.label.split(" ");
-  if (!datePart || !timePart) {
-    return formatSlotLabel(slot.startAtUtc);
-  }
-  const [year, month, day] = datePart.split("-");
-  if (!year || !month || !day) {
-    return formatSlotLabel(slot.startAtUtc);
-  }
-  return `${day}.${month} ${timePart}`;
+function formatAvailabilitySlot(slot: AvailabilitySlot, timeZone: string): string {
+  return UI_FMT.dateTimeShort(slot.startAtUtc, { timeZone });
 }
 
 const STORIES_SLOTS_PER_CARD = 10;
@@ -149,6 +131,7 @@ const DISPLAY_SLOT_STEP_MS = 60 * 60 * 1000;
 
 export function MasterDashboardPage() {
   const router = useRouter();
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [date, setDate] = useState(todayDateKey());
   const [data, setData] = useState<DayData>({
     masterId: "",
@@ -197,8 +180,9 @@ export function MasterDashboardPage() {
 
   const sortedBookings = useMemo(() => {
     return [...data.bookings].sort((a, b) => {
-      if (!a.startAt || !b.startAt) return 0;
-      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+      const aTime = a.startAtUtc ? new Date(a.startAtUtc).getTime() : 0;
+      const bTime = b.startAtUtc ? new Date(b.startAtUtc).getTime() : 0;
+      return aTime - bTime;
     });
   }, [data.bookings]);
 
@@ -218,13 +202,13 @@ export function MasterDashboardPage() {
       const roundedIso = new Date(roundedStartMs).toISOString();
       result.push({
         key: `${slot.startAtUtc}-${roundedStartMs}`,
-        label: formatSlotLabel(roundedIso),
+        label: formatSlotLabel(roundedIso, viewerTimeZone),
       });
       lastSlotStartMs = roundedStartMs;
     }
 
     return result;
-  }, [freeSlots]);
+  }, [freeSlots, viewerTimeZone]);
 
   const load = async (signal?: AbortSignal): Promise<void> => {
     setLoading(true);
@@ -484,7 +468,7 @@ export function MasterDashboardPage() {
   };
 
   const generateStoryCards = (): HTMLCanvasElement[] => {
-    const labels = freeSlots.map((slot) => formatAvailabilitySlot(slot));
+    const labels = freeSlots.map((slot) => formatAvailabilitySlot(slot, viewerTimeZone));
     const chunks: string[][] = [];
     for (let i = 0; i < labels.length; i += STORIES_SLOTS_PER_CARD) {
       chunks.push(labels.slice(i, i + STORIES_SLOTS_PER_CARD));
@@ -658,15 +642,9 @@ export function MasterDashboardPage() {
                     </div>
                     <div className="text-xs text-text-sec">{booking.clientPhone}</div>
                     <div className="text-xs text-text-sec">{booking.serviceTitle}</div>
-                    {formatBookingStart(
-                      booking.startAtUtc ?? booking.startAt,
-                      data.workingHours.timezone
-                    ) ? (
+                    {formatBookingStart(booking.startAtUtc, viewerTimeZone) ? (
                       <div className="text-xs text-text-sec">
-                        {formatBookingStart(
-                          booking.startAtUtc ?? booking.startAt,
-                          data.workingHours.timezone
-                        )}
+                        {formatBookingStart(booking.startAtUtc, viewerTimeZone)}
                       </div>
                     ) : null}
                   </div>
@@ -841,7 +819,7 @@ export function MasterDashboardPage() {
               <div className="mt-2 space-y-1">
                 {freeSlots.length === 0 ? <div>Свободных слотов нет</div> : null}
                 {freeSlots.slice(0, STORIES_SLOTS_PER_CARD).map((slot) => (
-                  <div key={slot.startAtUtc}>{formatAvailabilitySlot(slot)}</div>
+                  <div key={slot.startAtUtc}>{formatAvailabilitySlot(slot, viewerTimeZone)}</div>
                 ))}
               </div>
             </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
   SlotPickerOptimized,
   groupSlotsByTimeOfDay,
@@ -45,6 +46,7 @@ function buildLoginUrl(nextPath: string): string {
 }
 
 export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId }: Props) {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [studio, setStudio] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<StudioMaster[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,17 +97,20 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
   const slotItems = useMemo<SlotPickerItem[]>(
     () =>
       slots.map((slot) => {
-        const [, timeText] = slot.label.split(" ");
         return {
           id: slot.label,
           label: slot.label,
-          timeText: timeText ?? slot.label,
+          timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
         };
       }),
-    [slots]
+    [slots, viewerTimeZone]
   );
   const slotGroups = useMemo(() => groupSlotsByTimeOfDay(slotItems), [slotItems]);
   const slotByLabel = useMemo(() => new Map(slots.map((slot) => [slot.label, slot])), [slots]);
+  const selectedSlot = slotLabel ? slotByLabel.get(slotLabel) ?? null : null;
+  const selectedTimeLabel = selectedSlot
+    ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: viewerTimeZone })
+    : UI_TEXT.publicStudio.fallbackValue;
 
   const nextPath =
     typeof window !== "undefined"
@@ -397,7 +402,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
             </div>
             <div className="flex items-center justify-between">
               <span className="text-text-muted">{UI_TEXT.publicStudio.selectedTime}</span>
-              <span className="font-medium text-text">{slotLabel.split(" ")[1] ?? UI_TEXT.publicStudio.fallbackValue}</span>
+              <span className="font-medium text-text">{selectedTimeLabel}</span>
             </div>
             <div className="flex items-center justify-between border-t border-border pt-2">
               <span className="text-text-muted">{UI_TEXT.publicStudio.total}</span>

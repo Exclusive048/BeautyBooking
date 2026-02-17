@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { NotificationEvent } from "@/lib/notifications/notifier";
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Props = {
   ariaLabel: string;
@@ -28,6 +30,7 @@ function parseBookingPayload(payload: unknown): { bookingId: string; bookingStat
 
 export function NotificationsBell({ ariaLabel }: Props) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const viewerTimeZone = useViewerTimeZoneContext();
   const timersRef = useRef<Map<string, number>>(new Map());
   const seenToastIdsRef = useRef<Map<string, number>>(new Map());
 
@@ -160,7 +163,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
                   </div>
                 ) : null}
                 <div className="mt-2 text-[11px] text-text-sec">
-                  {new Date(toast.createdAt).toLocaleString("ru-RU")}
+                  {UI_FMT.dateTimeLong(toast.createdAt, { timeZone: viewerTimeZone })}
                 </div>
               </div>
             );

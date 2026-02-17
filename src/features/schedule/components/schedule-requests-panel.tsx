@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type RequestItem = {
   id: string;
@@ -144,6 +146,7 @@ function resolveDay(input: {
 }
 
 export function ScheduleRequestsPanel() {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -320,7 +323,7 @@ export function ScheduleRequestsPanel() {
                 </span>
               </div>
               <div className="mt-1 text-xs text-text-sec">
-                {new Date(item.createdAt).toLocaleString("ru-RU")}
+                {UI_FMT.dateTimeLong(item.createdAt, { timeZone: viewerTimeZone })}
               </div>
             </button>
           ))}
@@ -332,7 +335,8 @@ export function ScheduleRequestsPanel() {
           <div className="space-y-1">
             <h3 className="text-base font-semibold text-text-main">Согласование графика</h3>
             <p className="text-xs text-text-sec">
-              {details?.request.provider.name ?? "Мастер"} · {details ? new Date(details.request.createdAt).toLocaleString("ru-RU") : ""}
+              {details?.request.provider.name ?? "Мастер"} ·{" "}
+              {details ? UI_FMT.dateTimeLong(details.request.createdAt, { timeZone: viewerTimeZone }) : ""}
             </p>
           </div>
 

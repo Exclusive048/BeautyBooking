@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type ScheduleBreak = {
   startLocal: string;
@@ -69,9 +70,9 @@ function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-function monthTitle(monthKey: string): string {
+function monthTitle(monthKey: string, timeZone: string): string {
   const date = new Date(`${monthKey}-01T00:00:00.000Z`);
-  return date.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  return date.toLocaleDateString("ru-RU", { month: "long", year: "numeric", timeZone });
 }
 
 function monthShift(monthKey: string, delta: number): string {
@@ -129,6 +130,7 @@ function normalizeBreaks(input: ScheduleBreak[]): ScheduleBreak[] {
 }
 
 export function ScheduleBuilder() {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [status, setStatus] = useState<StatusPayload>({ mode: "solo" });
   const [tab, setTab] = useState<"templates" | "week" | "overrides">("templates");
   const [month, setMonth] = useState(currentMonthKey());
@@ -995,7 +997,9 @@ export function ScheduleBuilder() {
                 >
                   ◀
                 </button>
-                <div className="min-w-[140px] text-center text-sm font-medium text-text-main">{monthTitle(month)}</div>
+                <div className="min-w-[140px] text-center text-sm font-medium text-text-main">
+                  {monthTitle(month, viewerTimeZone)}
+                </div>
                 <button
                   type="button"
                   className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-sm"
