@@ -64,7 +64,7 @@ export function Footer() {
     <footer
       role="contentinfo"
       className="bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100"
-      itemsScope
+      itemScope
       itemType="https://schema.org/WPFooter"
     >
       <div className="mx-auto max-w-[1280px] space-y-8 px-4 py-12 md:py-16">
