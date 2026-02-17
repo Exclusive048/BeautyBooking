@@ -6,6 +6,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { compareDateKeys, listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
   SlotPickerOptimized,
   groupSlotsByTimeOfDay,
@@ -35,28 +36,15 @@ const INITIAL_PAGE_SIZE = 5;
 const LOAD_MORE_SIZE = 7;
 const SLOT_LOAD_DEBOUNCE_MS = 200;
 const PREFETCH_DELAY_MS = 900;
-const SLOT_LABEL_DATE_LENGTH = 10;
-const SLOT_LABEL_TIME_START = 11;
-const SLOT_LABEL_TIME_LENGTH = 5;
 const PROFILER_THRESHOLD_MS = 16;
 const SLOT_REMOVED_MESSAGE = UI_TEXT.publicProfile.slots.slotTaken;
 const SLOT_NOTICE_TTL_MS = 3000;
 
-function getSlotDayKey(label: string): string {
-  if (label.length >= SLOT_LABEL_DATE_LENGTH) {
-    return label.slice(0, SLOT_LABEL_DATE_LENGTH);
-  }
-  return label;
+function formatDateKeyShort(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-");
+  if (!year || !month || !day) return dateKey;
+  return `${day}.${month}`;
 }
-
-function getSlotTimeText(label: string): string {
-  if (label.length >= SLOT_LABEL_TIME_START + SLOT_LABEL_TIME_LENGTH) {
-    return label.slice(SLOT_LABEL_TIME_START, SLOT_LABEL_TIME_START + SLOT_LABEL_TIME_LENGTH);
-  }
-  const parts = label.split(" ");
-  return parts[1] ?? label;
-}
-
 export function PublicBookingWidget({
   providerId,
   providerTimezone,
@@ -64,7 +52,8 @@ export function PublicBookingWidget({
   initialSlotStartAt,
   onRemove,
 }: Props) {
-  const timezone = providerTimezone.trim() ? providerTimezone.trim() : "UTC";
+  const viewerTimeZone = useViewerTimeZoneContext();
+  const providerTimeZone = providerTimezone.trim() ? providerTimezone.trim() : "UTC";
   const isEmpty = selectedServices.length <= 0;
   const totalPrice = selectedServices.reduce((sum, service) => sum + Math.max(0, service.price), 0);
   const totalDuration = selectedServices.reduce((sum, service) => sum + Math.max(0, service.durationMin), 0);
@@ -77,7 +66,7 @@ export function PublicBookingWidget({
   }, [isDev]);
 
   const [step, setStep] = useState<"summary" | "slots" | "checkout">("summary");
-  const [anchorKey, setAnchorKey] = useState<string>(() => toLocalDateKey(new Date(), timezone));
+  const [anchorKey, setAnchorKey] = useState<string>(() => toLocalDateKey(new Date(), providerTimeZone));
   const [loadedUntilExclusive, setLoadedUntilExclusive] = useState<string>("");
   const [loadedBatches, setLoadedBatches] = useState<
     Array<{ from: string; toExclusive: string; loadedAt: string }>
@@ -145,7 +134,7 @@ export function PublicBookingWidget({
     () =>
       dayKeys.map((dayKey) => ({
         dayKey,
-        label: new Date(dayKey).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }),
+        label: formatDateKeyShort(dayKey),
         count: slotsByDay[dayKey]?.length ?? 0,
       })),
     [dayKeys, slotsByDay]
@@ -279,8 +268,8 @@ export function PublicBookingWidget({
           return {
             id: label,
             label,
-            timeText: getSlotTimeText(label),
-            dayKey: getSlotDayKey(label),
+            timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
+            dayKey: toLocalDateKey(slot.startAtUtc, providerTimeZone),
             startAtUtc: slot.startAtUtc,
             endAtUtc: slot.endAtUtc,
             isHot: slot.isHot ?? false,
@@ -325,12 +314,12 @@ export function PublicBookingWidget({
         }
       }
     },
-    [abortActiveRequest, providerId, schedulePrefetch, slotServiceId]
+    [abortActiveRequest, providerId, providerTimeZone, schedulePrefetch, slotServiceId, viewerTimeZone]
   );
 
   useEffect(() => {
-    setAnchorKey(toLocalDateKey(new Date(), timezone));
-  }, [timezone, providerId]);
+    setAnchorKey(toLocalDateKey(new Date(), providerTimeZone));
+  }, [providerId, providerTimeZone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,12 +372,12 @@ export function PublicBookingWidget({
       initialSlotHandledRef.current = true;
       return;
     }
-    const targetKey = toLocalDateKey(parsed, timezone);
+    const targetKey = toLocalDateKey(parsed, providerTimeZone);
     initialSlotPendingRef.current = initialSlotStartAt;
     initialSlotHandledRef.current = true;
     setAnchorKey(targetKey);
     setStep("slots");
-  }, [initialSlotStartAt, slotServiceId, timezone]);
+  }, [initialSlotStartAt, providerTimeZone, slotServiceId]);
 
   useEffect(() => {
     const pending = initialSlotPendingRef.current;
@@ -398,7 +387,7 @@ export function PublicBookingWidget({
       initialSlotPendingRef.current = null;
       return;
     }
-    const pendingKey = toLocalDateKey(pendingDate, timezone);
+    const pendingKey = toLocalDateKey(pendingDate, providerTimeZone);
     const dayLoaded = loadedBatches.some(
       (batch) =>
         compareDateKeys(pendingKey, batch.from) >= 0 &&
@@ -414,7 +403,7 @@ export function PublicBookingWidget({
       setSlotNotice(UI_TEXT.publicProfile.slots.slotTaken);
     }
     initialSlotPendingRef.current = null;
-  }, [loadedBatches, slots, timezone]);
+  }, [loadedBatches, providerTimeZone, slots]);
 
   useEffect(() => {
     if (step === "slots") return;
@@ -556,7 +545,7 @@ export function PublicBookingWidget({
             <button
               type="button"
               onClick={() => {
-                const nextAnchor = toLocalDateKey(new Date(), timezone);
+                const nextAnchor = toLocalDateKey(new Date(), providerTimeZone);
                 setAnchorKey(nextAnchor);
                 resetSlotsState(nextAnchor);
                 void loadSlotsPage(nextAnchor, INITIAL_PAGE_SIZE, false);

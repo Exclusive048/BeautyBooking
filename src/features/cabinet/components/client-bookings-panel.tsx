@@ -7,6 +7,8 @@ import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type BookingItem = {
@@ -113,6 +115,7 @@ function sortBookings(items: BookingItem[]): BookingItem[] {
 
 export function ClientBookingsPanel() {
   const t = UI_TEXT.clientCabinet;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [items, setItems] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -285,6 +288,7 @@ export function ClientBookingsPanel() {
           const masterUsername =
             b.masterProvider?.publicUsername ?? (b.provider.type === "MASTER" ? b.provider.publicUsername : null);
           const addressLine = [b.provider.district, b.provider.address].filter(Boolean).join(" / ");
+          const slotLabel = UI_FMT.dateTimeShort(b.startAtUtc ?? "", { timeZone: viewerTimeZone });
 
           return (
             <div key={b.id} className="lux-card rounded-[22px] p-4">
@@ -293,7 +297,7 @@ export function ClientBookingsPanel() {
                 <div className="text-sm text-text-sec">{statusLabel(b.status)}</div>
               </div>
               <div className="mt-1 text-sm text-text-main">
-                {b.slotLabel} / {b.service.name}
+                {slotLabel} / {b.service.name}
               </div>
               {masterName ? <div className="mt-1 text-sm text-text-sec">Мастер: {masterName}</div> : null}
               {studioName ? <div className="mt-1 text-sm text-text-sec">Студия: {studioName}</div> : null}

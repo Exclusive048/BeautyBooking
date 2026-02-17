@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
@@ -98,6 +99,7 @@ export default function InspirationFeedClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const viewerTimeZone = useViewerTimeZoneContext();
 
   const selectedCategory = searchParams.get("category") ?? "";
   const selectedTag = searchParams.get("tag") ?? "";
@@ -505,12 +507,7 @@ export default function InspirationFeedClient() {
                         ) : (
                           selectedItem.nearestSlots.map((slot) => (
                             <span key={slot.startAt} className="rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700">
-                              {new Date(slot.startAt).toLocaleString("ru-RU", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {UI_FMT.dateTimeShort(slot.startAt, { timeZone: viewerTimeZone })}
                             </span>
                           ))
                         )}

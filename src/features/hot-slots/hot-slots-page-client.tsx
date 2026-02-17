@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 
 type HotSlotItem = {
@@ -84,6 +85,7 @@ function calculateDiscountedPrice(type: "PERCENT" | "FIXED", value: number, pric
 
 export function HotSlotsPageClient() {
   const [items, setItems] = useState<HotSlotItem[]>([]);
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,7 +147,7 @@ export function HotSlotsPageClient() {
       {!loading && !error && items.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
-            const slotLabel = formatSlotTime(item.slot.startAtUtc, item.provider.timezone);
+            const slotLabel = formatSlotTime(item.slot.startAtUtc, viewerTimeZone);
             const hasService = Boolean(item.service);
             const discountText = formatDiscountText(item.slot.discountType, item.slot.discountValue);
             const originalPrice = item.service?.price ?? null;

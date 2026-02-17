@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type TelegramStatus = {
@@ -27,14 +29,13 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
 
-function formatExpiresAt(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+function formatExpiresAt(value: string, timeZone: string): string {
+  return UI_FMT.dateTimeShort(value, { timeZone });
 }
 
 export function ConnectedAccountsSection() {
   const t = UI_TEXT.clientCabinet.telegram;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -161,7 +162,7 @@ export function ConnectedAccountsSection() {
           <div className="space-y-3 text-sm text-text-sec">
             <p>Нажмите «Открыть Telegram», затем нажмите Start у бота, чтобы связать уведомления.</p>
             {connectExpiresAt ? (
-              <p className="text-xs text-text-sec">Ссылка действует до {formatExpiresAt(connectExpiresAt)}.</p>
+              <p className="text-xs text-text-sec">Ссылка действует до {formatExpiresAt(connectExpiresAt, viewerTimeZone)}.</p>
             ) : null}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">

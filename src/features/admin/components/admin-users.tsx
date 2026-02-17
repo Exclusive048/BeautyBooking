@@ -6,6 +6,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type PlanInfo = {
   id: string;
@@ -42,13 +43,14 @@ type BillingResponse = {
   plans: PlanInfo[];
 };
 
-function formatDate(value: string) {
+function formatDate(value: string, timeZone: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone,
   });
 }
 
@@ -64,6 +66,7 @@ function typeLabel(type: UserItem["type"]) {
 }
 
 export function AdminUsers() {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [filter, setFilter] = useState("all");
   const [data, setData] = useState<UsersResponse | null>(null);
   const [plans, setPlans] = useState<PlanInfo[]>([]);
@@ -198,7 +201,9 @@ export function AdminUsers() {
                     <td className="px-4 py-3 text-sm text-text-sec">{user.email || "—"}</td>
                     <td className="px-4 py-3 text-sm text-text-sec">{formatRoles(user.roles)}</td>
                     <td className="px-4 py-3 text-sm text-text-sec">{typeLabel(user.type)}</td>
-                    <td className="px-4 py-3 text-sm text-text-sec">{formatDate(user.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-text-sec">
+                      {formatDate(user.createdAt, viewerTimeZone)}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-2">
                         <span className="text-xs text-text-sec">

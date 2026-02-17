@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -31,6 +32,7 @@ function formatMoney(value: number, suffix: string): string {
 
 export function StudioClientsPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.clients;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const searchParams = useSearchParams();
   const sort = searchParams.get("sort") === "newest" ? "newest" : undefined;
   const [data, setData] = useState<ClientsData>({ clients: [] });
@@ -90,7 +92,9 @@ export function StudioClientsPage({ studioId }: Props) {
                 <tr key={client.key} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
                   <td className="px-4 py-3 text-sm text-text-main">{client.displayName}</td>
                   <td className="px-4 py-3 text-sm text-text-sec">{client.phone}</td>
-                  <td className="px-4 py-3 text-sm text-text-sec">{UI_FMT.dateTimeShort(client.lastBookingAt)}</td>
+                  <td className="px-4 py-3 text-sm text-text-sec">
+                    {UI_FMT.dateTimeShort(client.lastBookingAt, { timeZone: viewerTimeZone })}
+                  </td>
                   <td className="px-4 py-3 text-sm text-text-sec">{client.lastServiceName}</td>
                   <td className="px-4 py-3 text-sm font-medium text-text-main">{client.visitsCount}</td>
                   <td className="px-4 py-3 text-sm text-text-main">{formatMoney(client.totalAmount, t.moneySuffix)}</td>

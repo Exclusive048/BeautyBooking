@@ -497,12 +497,14 @@ model Booking {
   clientUserId String?
   clientUser   UserProfile? @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
 
+  // UTC instants only. Use these for all scheduling logic and UI formatting.
   startAtUtc DateTime?
   endAtUtc   DateTime?
   studioId   String?
   studio     Studio?   @relation(fields: [studioId], references: [id], onDelete: SetNull)
   masterId   String?
   clientId   String?
+  // Legacy fields (deprecated). Do not use for formatting or logic.
   startAt    DateTime?
   endAt      DateTime?
 

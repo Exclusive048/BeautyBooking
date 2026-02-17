@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
   SlotPickerOptimized,
   groupSlotsByTimeOfDay,
   type SlotItem as SlotPickerItem,
 } from "@/features/booking/components/slot-picker/slot-picker";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 type ApiSlot = {
   startAtUtc: string;
@@ -69,16 +72,16 @@ function toDateKey(d: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDateLabel(dateKey: string) {
+function formatDateLabel(dateKey: string, timeZone: string) {
   const [y, m, d] = dateKey.split("-").map(Number);
   const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
   return dt.toLocaleDateString("ru-RU", {
     weekday: "short",
     day: "2-digit",
     month: "short",
+    timeZone,
   });
 }
-
 function buildDateRange(days: number) {
   const start = new Date();
   const items: string[] = [];
@@ -90,13 +93,10 @@ function buildDateRange(days: number) {
   return items;
 }
 
-function getSlotTimeText(label: string) {
-  const [, time] = label.split(" ");
-  return time ?? label;
-}
 
 export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const t = UI_TEXT.clientCabinet;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange(7)[0] ?? "");
   const [slots, setSlots] = useState<ApiSlot[]>([]);
   const [slotLabel, setSlotLabel] = useState<string>(booking.slotLabel);
@@ -158,13 +158,13 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const slotItemsForDate = useMemo<SlotPickerItem[]>(
     () =>
       slots
-        .filter((slot) => slot.label.startsWith(`${selectedDate} `))
+        .filter((slot) => toLocalDateKey(slot.startAtUtc, viewerTimeZone) === selectedDate)
         .map((slot) => ({
           id: slot.label,
           label: slot.label,
-          timeText: getSlotTimeText(slot.label),
+          timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
         })),
-    [selectedDate, slots]
+    [selectedDate, slots, viewerTimeZone]
   );
   const slotGroups = useMemo(
     () => groupSlotsByTimeOfDay(slotItemsForDate).filter((group) => group.items.length > 0),
@@ -279,7 +279,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
                   variant={active ? "active" : "default"}
                   className="whitespace-nowrap"
                 >
-                  {formatDateLabel(date)}
+                  {formatDateLabel(date, viewerTimeZone)}
                 </Chip>
               );
             })}

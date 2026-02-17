@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { ReviewDto } from "@/lib/reviews/types";
 import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 // AUDIT (sections 4,7):
 // - Master cabinet renders both public tags and private "improve" tags.
@@ -14,14 +16,8 @@ type Props = {
   masterId: string;
 };
 
-function formatReviewDate(value: string): string {
-  return new Date(value).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatReviewDate(value: string, timeZone: string): string {
+  return UI_FMT.dateTimeLong(value, { timeZone });
 }
 
 function canReportReview(review: ReviewDto): boolean {
@@ -55,6 +51,7 @@ function collectTopPrivateTags(reviews: ReviewDto[]): Array<{ code: string; labe
 }
 
 export function MasterReviewsPage({ masterId }: Props) {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [reviews, setReviews] = useState<ReviewDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -253,7 +250,7 @@ export function MasterReviewsPage({ masterId }: Props) {
                     <div className="text-xs text-text-sec">
                       {"*".repeat(review.rating)}
                       {" "}
-                      {formatReviewDate(review.createdAt)}
+                      {formatReviewDate(review.createdAt, viewerTimeZone)}
                     </div>
                   </div>
                   <div className="mt-2 text-sm text-text-sec">
@@ -319,7 +316,9 @@ export function MasterReviewsPage({ masterId }: Props) {
                       </button>
                     ) : null}
                     {review.reportedAt ? (
-                      <div className="text-xs text-text-sec">Reported {formatReviewDate(review.reportedAt)}</div>
+                      <div className="text-xs text-text-sec">
+                        Reported {formatReviewDate(review.reportedAt, viewerTimeZone)}
+                      </div>
                     ) : null}
                   </div>
                 </article>

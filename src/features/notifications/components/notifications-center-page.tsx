@@ -10,6 +10,7 @@ import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notific
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
 import type { NotificationEvent } from "@/lib/notifications/notifier";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -76,6 +77,7 @@ function channelLabel(channel: "MASTER" | "STUDIO" | "SYSTEM"): string {
 
 export function NotificationsCenterPage({ initialData }: Props) {
   const t = UI_TEXT.notificationsCenter;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
   const [notifications, setNotifications] = useState(initialData.notifications);
@@ -336,7 +338,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
                         {channelLabel(note.channel)}
                       </div>
                     </div>
-                    <div className="text-xs text-text-sec">{UI_FMT.notificationTimeLabel(note.createdAt)}</div>
+                    <div className="text-xs text-text-sec">
+                      {UI_FMT.notificationTimeLabel(note.createdAt, { timeZone: viewerTimeZone })}
+                    </div>
                   </div>
                   {note.body ? <div className="mt-2 text-sm text-text-sec">{note.body}</div> : null}
 

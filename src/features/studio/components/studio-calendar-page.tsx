@@ -7,6 +7,8 @@ import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import { ScheduleBuilder } from "@/features/schedule/components/schedule-builder";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type CalendarView = "day" | "week" | "month";
@@ -96,23 +98,24 @@ function statusClass(status: string): string {
   return "border-primary/45 bg-primary/12 text-text-main";
 }
 
-function timeRangeLabel(startAt: string | null, endAt: string | null, fallback = "—"): string {
+function timeRangeLabel(startAt: string | null, endAt: string | null, timeZone: string, fallback = "\u2014"): string {
   if (!startAt || !endAt) return fallback;
-  const start = new Date(startAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  const end = new Date(endAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${start}—${end}`;
+  const start = UI_FMT.timeShort(startAt, { timeZone });
+  const end = UI_FMT.timeShort(endAt, { timeZone });
+  return `${start}\u2014${end}`;
 }
 
-function dayLabel(dateKey: string): string {
+function dayLabel(dateKey: string, timeZone: string): string {
   return new Date(`${dateKey}T00:00:00.000Z`).toLocaleDateString("ru-RU", {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
+    timeZone,
   });
 }
-
 export function StudioCalendarPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.calendar;
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [panel, setPanel] = useState<"calendar" | "schedule">("calendar");
   const [view, setView] = useState<CalendarView>("week");
   const [date, setDate] = useState(() => toDateKey(new Date()));
@@ -453,13 +456,13 @@ export function StudioCalendarPage({ studioId }: Props) {
             });
             return (
               <section key={dayKey} className="lux-card rounded-[24px] p-4">
-                <header className="mb-3 text-sm font-semibold">{dayLabel(dayKey)}</header>
+                <header className="mb-3 text-sm font-semibold">{dayLabel(dayKey, viewerTimeZone)}</header>
                 <div className="space-y-2">
                   {bookings.map((booking) => (
                     <article key={booking.id} className={`rounded-2xl border p-3 text-sm ${statusClass(booking.status)}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="font-medium">{booking.clientName}</div>
-                        <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt)}</div>
+                        <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt, viewerTimeZone)}</div>
                       </div>
                       <div className="mt-1 text-xs">
                         {booking.status} • {booking.serviceTitle} • {booking.clientPhone}
@@ -471,7 +474,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                       <div className="flex items-center justify-between gap-2">
                         <div className="font-medium">{block.type}</div>
                         <div className="text-xs">
-                          {timeRangeLabel(block.startAt, block.endAt)}
+                          {timeRangeLabel(block.startAt, block.endAt, viewerTimeZone)}
                         </div>
                       </div>
                     </article>
@@ -490,7 +493,7 @@ export function StudioCalendarPage({ studioId }: Props) {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold">{t.dayDetails} — {dayLabel(monthDetailsDay)}</h3>
+              <h3 className="text-base font-semibold">{t.dayDetails} — {dayLabel(monthDetailsDay, viewerTimeZone)}</h3>
               <button type="button" onClick={() => setMonthDetailsDay(null)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm">
                 {UI_TEXT.common.close}
               </button>
@@ -500,7 +503,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                 <article key={booking.id} className={`rounded-2xl border p-3 text-sm ${statusClass(booking.status)}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium">{booking.clientName}</div>
-                    <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt)}</div>
+                    <div className="text-xs">{timeRangeLabel(booking.startAt, booking.endAt, viewerTimeZone)}</div>
                   </div>
                   <div className="mt-1 text-xs">
                     {booking.status} • {booking.serviceTitle} • {booking.clientPhone}
@@ -511,7 +514,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                 <article key={block.id} className="rounded-2xl border border-border-subtle bg-bg-input p-3 text-sm text-text-sec">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-medium">{block.type}</div>
-                    <div className="text-xs">{timeRangeLabel(block.startAt, block.endAt)}</div>
+                    <div className="text-xs">{timeRangeLabel(block.startAt, block.endAt, viewerTimeZone)}</div>
                   </div>
                 </article>
               ))}

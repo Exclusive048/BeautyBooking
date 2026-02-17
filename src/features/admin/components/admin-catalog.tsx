@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { slugifyCategory } from "@/lib/slug";
 
 type CreatorInfo = {
@@ -35,16 +37,8 @@ const TABS = [
   { id: "moderation", label: "Модерация" },
 ];
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatDate(value: string, timeZone: string) {
+  return UI_FMT.dateTimeLong(value, { timeZone });
 }
 
 function creatorLabel(creator: CreatorInfo | null) {
@@ -53,6 +47,7 @@ function creatorLabel(creator: CreatorInfo | null) {
 }
 
 export function AdminCatalog() {
+  const viewerTimeZone = useViewerTimeZoneContext();
   const [tab, setTab] = useState("categories");
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -277,7 +272,9 @@ export function AdminCatalog() {
                     <tr key={category.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
                       <td className="px-4 py-3 text-sm text-text-main">{category.title}</td>
                       <td className="px-4 py-3 text-sm text-text-sec">{creatorLabel(category.createdBy)}</td>
-                      <td className="px-4 py-3 text-sm text-text-sec">{formatDate(category.createdAt)}</td>
+                      <td className="px-4 py-3 text-sm text-text-sec">
+                        {formatDate(category.createdAt, viewerTimeZone)}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-2">
                           <Button
