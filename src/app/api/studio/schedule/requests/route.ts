@@ -1,15 +1,44 @@
-import { StudioRole } from "@prisma/client";
+import { Prisma, ScheduleChangeRequestStatus, StudioRole } from "@prisma/client";
+import { z } from "zod";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
-import { getRequestId, logError } from "@/lib/logging/logger";
+import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
+import { parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
 function hasAdminRole(roles: StudioRole[]) {
   return roles.some((role) => role === StudioRole.ADMIN || role === StudioRole.OWNER);
+}
+
+const querySchema = z.object({
+  status: z.string().trim().optional(),
+});
+
+const STATUS_VALUES = new Set(Object.values(ScheduleChangeRequestStatus));
+const ALLOWED_STATUS_VALUES = [
+  "pending",
+  "approved",
+  "rejected",
+  "all",
+  ScheduleChangeRequestStatus.PENDING,
+  ScheduleChangeRequestStatus.APPROVED,
+  ScheduleChangeRequestStatus.REJECTED,
+];
+
+function parseStatusParam(value?: string | null): ScheduleChangeRequestStatus | undefined | null {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.toLowerCase() === "all") return undefined;
+  const upper = trimmed.toUpperCase();
+  if (STATUS_VALUES.has(upper as ScheduleChangeRequestStatus)) {
+    return upper as ScheduleChangeRequestStatus;
+  }
+  return null;
 }
 
 export async function GET(req: Request) {
@@ -23,13 +52,26 @@ export async function GET(req: Request) {
     }
 
     const url = new URL(req.url);
-    const status = url.searchParams.get("status");
+    const query = parseQuery(url, querySchema);
+    const parsedStatus = parseStatusParam(query.status);
+    if (parsedStatus === null) {
+      logInfo("GET /api/studio/schedule/requests invalid status", {
+        requestId: getRequestId(req),
+        route: "GET /api/studio/schedule/requests",
+        status: query.status ?? null,
+      });
+      return jsonFail(400, "Invalid status", "VALIDATION_ERROR", { allowed: ALLOWED_STATUS_VALUES });
+    }
+
+    const where: Prisma.ScheduleChangeRequestWhereInput = {
+      studioId: access.studioId,
+    };
+    if (parsedStatus) {
+      where.status = parsedStatus;
+    }
 
     const requests = await prisma.scheduleChangeRequest.findMany({
-      where: {
-        studioId: access.studioId,
-        ...(status ? { status: status as "PENDING" | "APPROVED" | "REJECTED" } : {}),
-      },
+      where,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

@@ -1,13 +1,9 @@
 import { cookies } from "next/headers";
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
 import { ReviewsSectionClient } from "@/features/public-profile/master/sections/reviews-section-client";
+import type { ClientBooking } from "@/lib/bookings/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
 import type { ApiResponse } from "@/lib/types/api";
-
-type ClientBooking = {
-  id: string;
-  provider: { id: string };
-};
 
 type Props = {
   providerId: string;
@@ -49,37 +45,50 @@ async function fetchCanReviewBookingId(providerId: string): Promise<string | nul
 }
 
 export async function ReviewsSection({ providerId }: Props) {
+  let provider = null;
+  let reviews: ReviewDto[] = [];
+  let canReviewBookingId: string | null = null;
+  let hasError = false;
+
   try {
-    const provider = await getProvider(providerId);
-    if (!provider) {
-      return (
-        <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-          Не удалось загрузить отзывы.
-        </div>
-      );
+    provider = await getProvider(providerId);
+    if (provider) {
+      const result = await Promise.all([
+        fetchReviews(provider.id),
+        fetchCanReviewBookingId(provider.id),
+      ]);
+      reviews = result[0];
+      canReviewBookingId = result[1];
     }
-
-    const [reviews, canReviewBookingId] = await Promise.all([
-      fetchReviews(provider.id),
-      fetchCanReviewBookingId(provider.id),
-    ]);
-
-    return (
-      <div className="fade-in-up">
-        <ReviewsSectionClient
-          providerId={provider.id}
-          initialRating={provider.rating}
-          initialReviewsCount={provider.reviews}
-          initialReviews={reviews}
-          canReviewBookingId={canReviewBookingId}
-        />
-      </div>
-    );
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
         Не удалось загрузить блок.
       </div>
     );
   }
+
+  if (!provider) {
+    return (
+      <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
+        Не удалось загрузить отзывы.
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-in-up">
+      <ReviewsSectionClient
+        providerId={provider.id}
+        initialRating={provider.rating}
+        initialReviewsCount={provider.reviews}
+        initialReviews={reviews}
+        canReviewBookingId={canReviewBookingId}
+      />
+    </div>
+  );
 }

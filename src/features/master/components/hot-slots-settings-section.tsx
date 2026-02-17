@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { moneyRUBPlain } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
 
 type RuleState = {
@@ -35,9 +36,6 @@ const TRIGGER_OPTIONS = [
 
 const PERCENT_OPTIONS = [10, 20, 30];
 
-function formatPrice(value: number): string {
-  return new Intl.NumberFormat("ru-RU").format(Math.max(0, value));
-}
 
 export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionProps) {
   const [rule, setRule] = useState<RuleState | null>(null);
@@ -290,7 +288,7 @@ export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionPro
                     <label key={service.serviceId} className="flex items-center justify-between gap-3 text-xs">
                       <span className="truncate text-text-main">{service.title}</span>
                       <span className="text-text-sec">
-                        {formatPrice(service.effectivePrice)} ₽ / {service.effectiveDurationMin} мин
+                        {moneyRUBPlain(service.effectivePrice)} ₽ / {service.effectiveDurationMin} мин
                       </span>
                       <input
                         type="checkbox"

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type HotSlotItem = {
   id: string;
@@ -34,9 +35,6 @@ type HotSlotItem = {
   } | null;
 };
 
-function formatPrice(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(Math.max(0, value))} ₽`;
-}
 
 function getDateKey(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("ru-RU", {
@@ -200,8 +198,8 @@ export function HotSlotsPageClient() {
                     <div className="mt-2 flex items-center gap-2 text-sm">
                       {originalPrice !== null && discountedPrice !== null ? (
                         <>
-                          <span className="text-text-sec line-through">{formatPrice(originalPrice)}</span>
-                          <span className="font-semibold text-text-main">{formatPrice(discountedPrice)}</span>
+                          <span className="text-text-sec line-through">{UI_FMT.priceLabel(originalPrice)}</span>
+                          <span className="font-semibold text-text-main">{UI_FMT.priceLabel(discountedPrice)}</span>
                         </>
                       ) : (
                         <span className="text-text-main">{discountText}</span>

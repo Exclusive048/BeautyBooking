@@ -21,12 +21,6 @@ type CatalogMapSidebarProps = {
   onHover: (id: string | null) => void;
 };
 
-function formatPrice(priceFrom: number | null): string {
-  if (priceFrom && priceFrom > 0) {
-    return `${UI_TEXT.catalog.priceFrom} ${moneyRUB(priceFrom)}`;
-  }
-  return UI_TEXT.catalog.priceOnRequest;
-}
 
 function formatRating(ratingAvg: number): string {
   if (Number.isFinite(ratingAvg) && ratingAvg > 0) {
@@ -77,7 +71,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                   <div className="text-xs text-muted-foreground">{formatRating(item.ratingAvg)}</div>
                 </div>
                 <div className="text-right text-xs text-foreground">
-                  <div>{formatPrice(item.priceFrom)}</div>
+                  <div>{item.priceFrom && item.priceFrom > 0 ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}` : UI_TEXT.catalog.priceOnRequest}</div>
                   <div className="text-muted-foreground">→</div>
                 </div>
               </div>
@@ -135,7 +129,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                   <div className="text-xs text-muted-foreground">{formatRating(item.ratingAvg)}</div>
                 </div>
                 <div className="text-right text-xs text-foreground">
-                  <div>{formatPrice(item.priceFrom)}</div>
+                  <div>{item.priceFrom && item.priceFrom > 0 ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}` : UI_TEXT.catalog.priceOnRequest}</div>
                   <div className="text-muted-foreground">→</div>
                 </div>
               </div>

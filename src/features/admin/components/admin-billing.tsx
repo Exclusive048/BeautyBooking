@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { moneyRUBPlain } from "@/lib/format";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { ApiResponse } from "@/lib/types/api";
@@ -35,10 +36,6 @@ const FEATURE_LABELS: Record<string, string> = {
   sharedCalendar: "Общий календарь",
 };
 
-function formatPrice(price: number) {
-  if (price <= 0) return "Бесплатно";
-  return `${new Intl.NumberFormat("ru-RU").format(price)} ₸/мес`;
-}
 
 export function AdminBilling() {
   const [plans, setPlans] = useState<BillingPlan[]>([]);
@@ -146,7 +143,7 @@ export function AdminBilling() {
                       <div className="text-base font-semibold text-text-main">{plan.name}</div>
                       <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
                     </div>
-                    <div className="text-sm font-semibold text-text-main">{formatPrice(plan.price)}</div>
+                    <div className="text-sm font-semibold text-text-main">{plan.price <= 0 ? "Бесплатно" : `${moneyRUBPlain(plan.price)} ₸/мес`}</div>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 space-y-3">

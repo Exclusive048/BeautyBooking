@@ -14,7 +14,7 @@ type FooterColumnProps = {
 export function FooterColumn({ title, links }: FooterColumnProps) {
   return (
     <div className="space-y-3">
-      <div className="text-[14px] font-medium uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
+      <div className="text-[14px] font-medium uppercase tracking-wide text-text-sec">
         {title}
       </div>
       <ul className="space-y-2">

@@ -11,7 +11,7 @@ type FooterLinkProps = {
 };
 
 const baseClass =
-  "text-[14px] text-neutral-700 transition-colors duration-200 underline-offset-4 hover:underline hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:text-neutral-300";
+  "text-[14px] text-text-sec transition-colors duration-200 underline-offset-4 hover:underline hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40";
 
 export function FooterLink({ href, children, external, className, ...rest }: FooterLinkProps) {
   if (external) {

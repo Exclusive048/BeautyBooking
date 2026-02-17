@@ -26,18 +26,26 @@ async function fetchPortfolio(providerId: string): Promise<PortfolioItemPreview[
 }
 
 export async function PortfolioSection({ providerId }: Props) {
+  let items: PortfolioItemPreview[] = [];
+  let hasError = false;
+
   try {
-    const items = await fetchPortfolio(providerId);
-    return (
-      <div className="fade-in-up">
-        <PortfolioStrip items={items} />
-      </div>
-    );
+    items = await fetchPortfolio(providerId);
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
         Не удалось загрузить блок.
       </div>
     );
   }
+
+  return (
+    <div className="fade-in-up">
+      <PortfolioStrip items={items} />
+    </div>
+  );
 }

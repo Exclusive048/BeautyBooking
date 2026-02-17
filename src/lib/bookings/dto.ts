@@ -1,41 +1,18 @@
-import type { ProviderType } from "@prisma/client";
+import type { BookingStatus, ProviderType } from "@prisma/client";
+import type { BookingRuntimeStatus } from "@/lib/bookings/flow";
 
-export type BookingStatusDto =
-  | "NEW"
-  | "PENDING"
-  | "CONFIRMED"
-  | "CHANGE_REQUESTED"
-  | "REJECTED"
-  | "IN_PROGRESS"
-  | "PREPAID"
-  | "STARTED"
-  | "FINISHED"
-  | "CANCELLED"
-  | "NO_SHOW";
-
-export type BookingActorDto = "CLIENT" | "MASTER";
-
-export type BookingServiceDto = {
-  id: string;
-  name: string;
-};
-
-export type BookingProviderDto = {
-  id: string;
-  name: string;
-  district: string;
-  address: string;
-  type: ProviderType;
-  publicUsername: string | null;
-};
+type BookingParty = "CLIENT" | "MASTER";
 
 export type BookingDto = {
   id: string;
   slotLabel: string;
-  status: BookingStatusDto;
+  status: BookingRuntimeStatus;
   providerId: string;
   masterProviderId: string | null;
-  service: BookingServiceDto;
+  service: {
+    id: string;
+    name: string;
+  };
   clientName: string;
   clientPhone: string;
   comment: string | null;
@@ -44,19 +21,36 @@ export type BookingDto = {
   endAtUtc: string | null;
   proposedStartAtUtc: string | null;
   proposedEndAtUtc: string | null;
-  requestedBy: BookingActorDto | null;
-  actionRequiredBy: BookingActorDto | null;
+  requestedBy: BookingParty | null;
+  actionRequiredBy: BookingParty | null;
   changeComment: string | null;
   clientChangeRequestsCount: number;
   masterChangeRequestsCount: number;
 };
 
+export type BookingClientProviderDto = {
+  id: string;
+  name: string;
+  district: string | null;
+  address: string | null;
+  type: ProviderType;
+  publicUsername: string | null;
+};
+
 export type BookingClientDto = BookingDto & {
-  provider: BookingProviderDto;
-  masterProvider: BookingProviderDto | null;
+  provider: BookingClientProviderDto;
+  masterProvider: BookingClientProviderDto | null;
 };
 
 export type BookingStatusUpdateDto = {
   id: string;
-  status: BookingStatusDto;
+  status: BookingStatus;
+};
+
+export type ClientBookingStatus = BookingStatus;
+
+export type ClientBooking = {
+  id: string;
+  status: ClientBookingStatus;
+  provider: { id: string };
 };

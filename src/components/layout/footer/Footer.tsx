@@ -63,7 +63,7 @@ export function Footer() {
   return (
     <footer
       role="contentinfo"
-      className="bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100"
+      className="bg-bg-page text-text-main"
       itemScope
       itemType="https://schema.org/WPFooter"
     >
@@ -75,7 +75,7 @@ export function Footer() {
             <div className="text-[18px] font-semibold" itemScope itemType="https://schema.org/Organization">
               <span itemProp="name">BeautyHub</span>
             </div>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            <p className="text-sm text-text-sec">
               Маркетплейс мастеров красоты. Находите лучших специалистов рядом и бронируйте
               услуги онлайн за пару минут.
             </p>
@@ -92,7 +92,7 @@ export function Footer() {
           </nav>
         </div>
 
-        <div className="border-t border-neutral-200 pt-6 dark:border-neutral-800">
+        <div className="border-t border-border-subtle pt-6">
           <FooterCopyright />
         </div>
       </div>

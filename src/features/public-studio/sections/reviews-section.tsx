@@ -3,14 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { StudioReviewsSectionClient } from "@/features/public-studio/sections/reviews-section-client";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
+import type { ClientBooking } from "@/lib/bookings/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
-
-type ClientBooking = {
-  id: string;
-  provider: { id: string };
-};
 
 type Props = {
   studioId: string;
@@ -52,43 +48,26 @@ async function fetchCanReviewBookingId(providerId: string): Promise<string | nul
 }
 
 export async function StudioReviewsSection({ studioId }: Props) {
+  let studio = null;
+  let reviews: ReviewDto[] = [];
+  let canReviewBookingId: string | null = null;
+  let hasError = false;
+
   try {
-    const studio = await getStudioProfile(studioId);
-    if (!studio) {
-      return (
-        <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
-          <Card className="bg-surface">
-            <CardContent className="p-5 md:p-6">
-              <div className="text-sm text-text-muted">Не удалось загрузить отзывы.</div>
-            </CardContent>
-          </Card>
-        </Section>
-      );
+    studio = await getStudioProfile(studioId);
+    if (studio) {
+      const result = await Promise.all([
+        fetchReviews(studio.id),
+        fetchCanReviewBookingId(studio.id),
+      ]);
+      reviews = result[0];
+      canReviewBookingId = result[1];
     }
-
-    const [reviews, canReviewBookingId] = await Promise.all([
-      fetchReviews(studio.id),
-      fetchCanReviewBookingId(studio.id),
-    ]);
-
-    return (
-      <div className="fade-in-up">
-        <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
-          <Card className="bg-surface">
-            <CardContent className="p-5 md:p-6">
-              <StudioReviewsSectionClient
-                studioId={studio.id}
-                initialRating={studio.rating}
-                initialReviewsCount={studio.reviews}
-                initialReviews={reviews}
-                canReviewBookingId={canReviewBookingId}
-              />
-            </CardContent>
-          </Card>
-        </Section>
-      </div>
-    );
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
         <Card className="bg-surface">
@@ -99,4 +78,34 @@ export async function StudioReviewsSection({ studioId }: Props) {
       </Section>
     );
   }
+
+  if (!studio) {
+    return (
+      <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
+        <Card className="bg-surface">
+          <CardContent className="p-5 md:p-6">
+            <div className="text-sm text-text-muted">Не удалось загрузить отзывы.</div>
+          </CardContent>
+        </Card>
+      </Section>
+    );
+  }
+
+  return (
+    <div className="fade-in-up">
+      <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
+        <Card className="bg-surface">
+          <CardContent className="p-5 md:p-6">
+            <StudioReviewsSectionClient
+              studioId={studio.id}
+              initialRating={studio.rating}
+              initialReviewsCount={studio.reviews}
+              initialReviews={reviews}
+              canReviewBookingId={canReviewBookingId}
+            />
+          </CardContent>
+        </Card>
+      </Section>
+    </div>
+  );
 }

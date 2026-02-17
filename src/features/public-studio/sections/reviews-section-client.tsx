@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { fetchStudioProfile } from "@/features/booking/lib/studio-booking";
 import type { ReviewDto } from "@/lib/reviews/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -13,11 +14,6 @@ type Props = {
   initialReviews: ReviewDto[];
   canReviewBookingId: string | null;
 };
-
-function stars(value: number): string {
-  const rounded = Math.max(0, Math.min(5, Math.round(value)));
-  return "*".repeat(rounded) + "-".repeat(5 - rounded);
-}
 
 export function StudioReviewsSectionClient({
   studioId,
@@ -35,7 +31,7 @@ export function StudioReviewsSectionClient({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-text-muted">
-          {stars(rating)} / {reviewsCount} {UI_TEXT.publicStudio.reviewsCountLabel}
+          {UI_FMT.starsLabel(rating)} / {reviewsCount} {UI_TEXT.publicStudio.reviewsCountLabel}
         </div>
         {canReviewBookingId && !showReviewForm ? (
           <button
@@ -74,7 +70,7 @@ export function StudioReviewsSectionClient({
             <div key={review.id} className="rounded-xl border p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-text">{review.authorName}</div>
-                <div className="text-xs text-text-muted">{stars(review.rating)}</div>
+                <div className="text-xs text-text-muted">{UI_FMT.starsLabel(review.rating)}</div>
               </div>
               {review.text ? <div className="mt-2 text-sm text-text-muted">{review.text}</div> : null}
               {review.publicTags.length > 0 ? (

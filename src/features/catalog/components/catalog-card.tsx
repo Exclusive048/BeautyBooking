@@ -1,8 +1,7 @@
-"use client";
-
 import Link from "next/link";
 import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { moneyRUB } from "@/lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type CatalogCardItem = {
@@ -29,15 +28,6 @@ type CatalogCardProps = {
   serviceQuery: string;
 };
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
   const hasServiceQuery = serviceQuery.trim().length > 0;
   const href = item.publicUsername ? `/u/${item.publicUsername}` : null;
@@ -50,7 +40,7 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
         : UI_TEXT.catalog.priceOnRequest;
 
   const slotText = item.nextSlot
-    ? `${UI_TEXT.catalog.nextSlotLabel}: ${formatDateTime(item.nextSlot.startAt)}`
+    ? `${UI_TEXT.catalog.nextSlotLabel}: ${UI_FMT.dateTimeShort(item.nextSlot.startAt)}`
     : item.todaySlotsCount && item.todaySlotsCount > 0
       ? `${item.todaySlotsCount} ${UI_TEXT.catalog.todaySlotsLabel}`
       : UI_TEXT.catalog.noSlots;

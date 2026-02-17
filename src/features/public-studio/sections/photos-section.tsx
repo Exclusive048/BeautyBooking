@@ -20,30 +20,16 @@ async function fetchStudioPortfolio(studioId: string): Promise<MediaAssetDto[]> 
 }
 
 export async function StudioPhotosSection({ studioId }: Props) {
+  let portfolio: MediaAssetDto[] = [];
+  let hasError = false;
+
   try {
-    const portfolio = await fetchStudioPortfolio(studioId);
-    return (
-      <div className="fade-in-up">
-        <Section title={UI_TEXT.publicStudio.sectionPhotos} subtitle={UI_TEXT.publicStudio.sectionPhotosSubtitle}>
-          <Card className="bg-surface">
-            <CardContent className="p-5 md:p-6">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {portfolio.length > 0
-                  ? portfolio.map((asset) => (
-                      <div key={asset.id} className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
-                        <img src={asset.url} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    ))
-                  : Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="aspect-square rounded-2xl border border-border bg-muted" />
-                    ))}
-              </div>
-            </CardContent>
-          </Card>
-        </Section>
-      </div>
-    );
+    portfolio = await fetchStudioPortfolio(studioId);
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.sectionPhotos} subtitle={UI_TEXT.publicStudio.sectionPhotosSubtitle}>
         <Card className="bg-surface">
@@ -54,4 +40,26 @@ export async function StudioPhotosSection({ studioId }: Props) {
       </Section>
     );
   }
+
+  return (
+    <div className="fade-in-up">
+      <Section title={UI_TEXT.publicStudio.sectionPhotos} subtitle={UI_TEXT.publicStudio.sectionPhotosSubtitle}>
+        <Card className="bg-surface">
+          <CardContent className="p-5 md:p-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {portfolio.length > 0
+                ? portfolio.map((asset) => (
+                    <div key={asset.id} className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
+                      <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                    </div>
+                  ))
+                : Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="aspect-square rounded-2xl border border-border bg-muted" />
+                  ))}
+            </div>
+          </CardContent>
+        </Card>
+      </Section>
+    </div>
+  );
 }

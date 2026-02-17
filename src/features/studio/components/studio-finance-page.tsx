@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type FinanceGroupBy = "masters" | "categories" | "services";
@@ -51,17 +52,6 @@ function money(value: number, suffix: string): string {
   return `${new Intl.NumberFormat("ru-RU").format(value)} ${suffix}`;
 }
 
-function formatDateTime(value: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export function StudioFinancePage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.finance;
@@ -196,7 +186,7 @@ export function StudioFinancePage({ studioId }: Props) {
                   <tr key={booking.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
                     <td className="px-4 py-3 text-sm text-text-main">{booking.clientName}</td>
                     <td className="px-4 py-3 text-sm text-text-sec">{booking.masterName ?? "—"}</td>
-                    <td className="px-4 py-3 text-sm text-text-sec">{formatDateTime(booking.startAtUtc)}</td>
+                    <td className="px-4 py-3 text-sm text-text-sec">{UI_FMT.dateTimeShort(booking.startAtUtc ?? "")}</td>
                     <td className="px-4 py-3 text-sm font-medium text-text-main">
                       {money(booking.amount, t.moneySuffix)}
                     </td>

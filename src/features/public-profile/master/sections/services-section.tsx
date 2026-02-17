@@ -7,25 +7,34 @@ type Props = {
 };
 
 export async function ServicesSection({ providerId, initialServiceId }: Props) {
+  let provider = null;
+  let hasError = false;
+
   try {
-    const provider = await getProvider(providerId);
-    if (!provider) {
-      return (
-        <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-          Не удалось загрузить услуги.
-        </div>
-      );
-    }
-    return (
-      <div className="fade-in-up">
-        <ServicesSectionClient services={provider.services} initialServiceId={initialServiceId} />
-      </div>
-    );
+    provider = await getProvider(providerId);
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
         Не удалось загрузить блок.
       </div>
     );
   }
+
+  if (!provider) {
+    return (
+      <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
+        Не удалось загрузить услуги.
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-in-up">
+      <ServicesSectionClient services={provider.services} initialServiceId={initialServiceId} />
+    </div>
+  );
 }
