@@ -1,8 +1,9 @@
 "use client";
 
-import type { FormEvent, RefObject } from "react";
+import { useCallback, useEffect, useRef, type FormEvent, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
 
 type Props = {
   name: string;
@@ -13,17 +14,19 @@ type Props = {
   telegram: string;
   instagram: string;
   vk: string;
-  addressSuggestions: string[];
-  addressSuggestLoading: boolean;
-  addressSuggestFocused: boolean;
-  addressSuggestRootRef: RefObject<HTMLDivElement | null>;
+  addressInputRef: Ref<HTMLTextAreaElement>;
+  addressStatus?: AddressStatus | null;
+  addressSuggestions: AddressSuggestion[];
+  isAddressSuggestOpen: boolean;
+  setIsAddressSuggestOpen: (open: boolean) => void;
+  selectAddressSuggestion: (item: AddressSuggestion) => void;
+  addressSuggestIndex: number;
+  setAddressSuggestIndex: (value: number) => void;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onDescriptionInput: (event: FormEvent<HTMLTextAreaElement>) => void;
-  descriptionRef: RefObject<HTMLTextAreaElement | null>;
+  descriptionRef: Ref<HTMLTextAreaElement>;
   onAddressChange: (value: string) => void;
-  onAddressFocus: () => void;
-  onAddressSuggestionSelect: (value: string) => void;
   onPhoneChange: (value: string) => void;
   onEmailChange: (value: string) => void;
   onTelegramChange: (value: string) => void;
@@ -43,23 +46,109 @@ export function StudioProfileForm({
   telegram,
   instagram,
   vk,
+  addressInputRef,
+  addressStatus,
   addressSuggestions,
-  addressSuggestLoading,
-  addressSuggestFocused,
-  addressSuggestRootRef,
+  isAddressSuggestOpen,
+  setIsAddressSuggestOpen,
+  selectAddressSuggestion,
+  addressSuggestIndex,
+  setAddressSuggestIndex,
   onNameChange,
   onDescriptionChange,
   onDescriptionInput,
   descriptionRef,
   onAddressChange,
-  onAddressFocus,
-  onAddressSuggestionSelect,
   onPhoneChange,
   onEmailChange,
   onTelegramChange,
   onInstagramChange,
   onVkChange,
 }: Props) {
+  const addressStatusTone =
+    addressStatus?.tone === "success"
+      ? "text-emerald-500"
+      : addressStatus?.tone === "error"
+        ? "text-rose-400"
+        : "text-text-sec";
+
+  const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isAddressSuggestOpen) return;
+    const handleDocumentClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!addressSuggestRootRef.current) return;
+      if (!addressSuggestRootRef.current.contains(target)) {
+        setIsAddressSuggestOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("touchstart", handleDocumentClick);
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("touchstart", handleDocumentClick);
+    };
+  }, [isAddressSuggestOpen, setIsAddressSuggestOpen]);
+
+  const handleAddressKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (addressSuggestions.length === 0) return;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (!isAddressSuggestOpen) {
+          setIsAddressSuggestOpen(true);
+          setAddressSuggestIndex(0);
+          return;
+        }
+        setAddressSuggestIndex((prev) =>
+          prev < addressSuggestions.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!isAddressSuggestOpen) {
+          setIsAddressSuggestOpen(true);
+          setAddressSuggestIndex(addressSuggestions.length - 1);
+          return;
+        }
+        setAddressSuggestIndex((prev) =>
+          prev <= 0 ? addressSuggestions.length - 1 : prev - 1
+        );
+        return;
+      }
+
+      if (event.key === "Enter" && isAddressSuggestOpen) {
+        if (
+          addressSuggestIndex >= 0 &&
+          addressSuggestIndex < addressSuggestions.length
+        ) {
+          event.preventDefault();
+          selectAddressSuggestion(addressSuggestions[addressSuggestIndex]);
+        }
+        return;
+      }
+
+      if (event.key === "Escape" && isAddressSuggestOpen) {
+        setIsAddressSuggestOpen(false);
+        return;
+      }
+    },
+    [
+      addressSuggestions,
+      addressSuggestIndex,
+      isAddressSuggestOpen,
+      selectAddressSuggestion,
+      setAddressSuggestIndex,
+      setIsAddressSuggestOpen,
+    ]
+  );
+
   return (
     <section className="lux-card rounded-[24px] p-5 md:p-6">
       <div className="grid gap-6 lg:grid-cols-2">
@@ -88,37 +177,45 @@ export function StudioProfileForm({
 
           <div className="space-y-2">
             <div className="text-xs font-medium text-text-label">Адрес</div>
-            <div className="relative" ref={addressSuggestRootRef}>
+            <div ref={addressSuggestRootRef} className="relative">
               <Textarea
+                ref={addressInputRef}
                 value={address}
                 onChange={(event) => onAddressChange(event.target.value)}
-                onFocus={onAddressFocus}
+                onKeyDown={handleAddressKeyDown}
+                onFocus={() => {
+                  if (addressSuggestions.length > 0) {
+                    setIsAddressSuggestOpen(true);
+                  }
+                }}
+                onBlur={() => {
+                  setIsAddressSuggestOpen(false);
+                }}
                 placeholder="Город, улица, дом"
                 className={inputClass}
                 rows={2}
               />
-              {addressSuggestFocused ? (
-                <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-border-subtle bg-bg-card shadow-sm">
-                  {addressSuggestLoading ? (
-                    <div className="px-3 py-2 text-xs text-text-sec">Ищем адрес...</div>
-                  ) : addressSuggestions.length > 0 ? (
-                    addressSuggestions.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        className="block w-full border-b border-border-subtle px-3 py-2 text-left text-sm last:border-b-0 hover:bg-bg-input/80"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => onAddressSuggestionSelect(suggestion)}
-                      >
-                        {suggestion}
-                      </button>
-                    ))
-                  ) : address.trim().length >= 3 ? (
-                    <div className="px-3 py-2 text-xs text-text-sec">Совпадений не найдено</div>
-                  ) : (
-                    <div className="px-3 py-2 text-xs text-text-sec">Введите минимум 3 символа</div>
-                  )}
+              {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
+                <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
+                  {addressSuggestions.map((item, index) => (
+                    <button
+                      type="button"
+                      key={`${item.value}-${index}`}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setAddressSuggestIndex(index)}
+                      onClick={() => selectAddressSuggestion(item)}
+                      className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
+                        index === addressSuggestIndex ? "bg-bg-input" : ""
+                      }`}
+                      aria-label={`Выбрать адрес ${item.value}`}
+                    >
+                      <span className="whitespace-normal break-words">{item.value}</span>
+                    </button>
+                  ))}
                 </div>
+              ) : null}
+              {addressStatus ? (
+                <div className={`mt-1 text-xs ${addressStatusTone}`}>{addressStatus.text}</div>
               ) : null}
             </div>
           </div>

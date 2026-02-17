@@ -6,8 +6,22 @@ import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterProfileData, updateMasterProfile } from "@/lib/master/profile.service";
 import { updateMasterProfileSchema } from "@/lib/master/schemas";
 import { parseBody } from "@/lib/validation";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+
+const jsonUtf8Headers = { "Content-Type": "application/json; charset=utf-8" };
+
+function jsonProfileOk<T>(data: T) {
+  return NextResponse.json({ ok: true, data }, { status: 200, headers: jsonUtf8Headers });
+}
+
+function jsonProfileFail(status: number, message: string, code?: string) {
+  return NextResponse.json(
+    { ok: false, error: message, code },
+    { status, headers: jsonUtf8Headers }
+  );
+}
 
 export async function GET(req: Request) {
   try {
@@ -32,18 +46,38 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonProfileFail(401, "Unauthorized", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, updateMasterProfileSchema);
+    const addressProvided = body.address !== undefined;
+    const hasGeoLat = body.geoLat !== undefined;
+    const hasGeoLng = body.geoLng !== undefined;
+    if (hasGeoLat !== hasGeoLng) {
+      return jsonProfileFail(400, "ADDRESS_COORDS_REQUIRED", "ADDRESS_COORDS_REQUIRED");
+    }
+    if (addressProvided) {
+      const trimmed = body.address?.trim() ?? "";
+      if (trimmed) {
+        if (!hasGeoLat || body.geoLat === null || body.geoLng === null) {
+          return jsonProfileFail(400, "ADDRESS_COORDS_REQUIRED", "ADDRESS_COORDS_REQUIRED");
+        }
+      } else {
+        if (!hasGeoLat || body.geoLat !== null || body.geoLng !== null) {
+          return jsonProfileFail(400, "ADDRESS_COORDS_REQUIRED", "ADDRESS_COORDS_REQUIRED");
+        }
+      }
+    }
     const data = await updateMasterProfile(masterId, {
       displayName: body.displayName,
       tagline: body.tagline,
       address: body.address,
+      geoLat: body.geoLat,
+      geoLng: body.geoLng,
       bio: body.bio,
       avatarUrl: body.avatarUrl,
       isPublished: body.isPublished,
     });
-    return jsonOk(data);
+    return jsonProfileOk(data);
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {
@@ -53,6 +87,6 @@ export async function PATCH(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    return jsonProfileFail(appError.status, appError.message, appError.code);
   }
 }
