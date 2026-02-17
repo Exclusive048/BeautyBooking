@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -23,9 +24,6 @@ type PortfolioDetail = {
   nearestSlots: Array<{ startAt: string }>;
 };
 
-function formatPrice(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
-}
 
 function formatDuration(min: number): string {
   const hours = Math.floor(min / 60);
@@ -97,7 +95,7 @@ export default function BookFromPortfolioClient() {
             <ul className="mt-2 space-y-1 text-sm text-neutral-700">
               {detail.serviceOptions.map((service) => (
                 <li key={service.serviceId}>
-                  • {service.title} — {formatDuration(service.durationMin)} / {formatPrice(service.price)}
+                  • {service.title} — {formatDuration(service.durationMin)} / {UI_FMT.priceLabel(service.price)}
                 </li>
               ))}
             </ul>
@@ -106,7 +104,7 @@ export default function BookFromPortfolioClient() {
           <div className="rounded-xl bg-neutral-50 p-3 text-sm">
             <div className="font-semibold">{UI_TEXT.feed.total}</div>
             <div className="mt-1">
-              {formatDuration(detail.totalDurationMin)} / {formatPrice(detail.totalPrice)}
+              {formatDuration(detail.totalDurationMin)} / {UI_FMT.priceLabel(detail.totalPrice)}
             </div>
           </div>
 

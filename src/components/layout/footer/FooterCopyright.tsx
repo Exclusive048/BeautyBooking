@@ -10,7 +10,7 @@ const LEGAL_LINKS = [
 
 export function FooterCopyright() {
   return (
-    <div className="flex flex-col gap-2 text-[13px] text-neutral-500 dark:text-neutral-400 md:flex-row md:flex-wrap md:items-center">
+    <div className="flex flex-col gap-2 text-[13px] text-text-sec md:flex-row md:flex-wrap md:items-center">
       <span>{COPYRIGHT_TEXT}</span>
       <div className="flex flex-wrap items-center gap-2">
         {LEGAL_LINKS.map((link) => (
@@ -22,7 +22,7 @@ export function FooterCopyright() {
           </span>
         ))}
       </div>
-      <span className="text-neutral-400 dark:text-neutral-500">•</span>
+      <span className="text-text-sec">•</span>
       <span>{LEGAL_ENTITY_TEXT}</span>
     </div>
   );

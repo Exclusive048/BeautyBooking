@@ -27,32 +27,44 @@ async function fetchCoverUrl(providerId: string): Promise<string | null> {
 }
 
 export async function HeroSection({ providerId }: Props) {
+  let provider = null;
+  let coverUrl: string | null = null;
+  let hasError = false;
+
   try {
-    const [provider, coverUrl] = await Promise.all([
+    const result = await Promise.all([
       getProvider(providerId),
       fetchCoverUrl(providerId),
     ]);
-    if (!provider) {
-      return (
-        <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-          Не удалось загрузить профиль.
-        </div>
-      );
-    }
-    return (
-      <div className="fade-in-up">
-        <HeroBlock
-          provider={provider}
-          coverUrl={coverUrl}
-          specialization={provider.tagline.trim() ? provider.tagline : null}
-        />
-      </div>
-    );
+    provider = result[0];
+    coverUrl = result[1];
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
         Не удалось загрузить блок.
       </div>
     );
   }
+
+  if (!provider) {
+    return (
+      <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
+        Не удалось загрузить профиль.
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-in-up">
+      <HeroBlock
+        provider={provider}
+        coverUrl={coverUrl}
+        specialization={provider.tagline.trim() ? provider.tagline : null}
+      />
+    </div>
+  );
 }

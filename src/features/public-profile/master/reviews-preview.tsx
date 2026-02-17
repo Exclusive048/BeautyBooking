@@ -20,17 +20,12 @@ type Props = {
   onRatingRefresh?: () => Promise<void>;
 };
 
-function reviewStars(value: number): string {
-  const rounded = Math.max(0, Math.min(5, Math.round(value)));
-  return "*".repeat(rounded) + "-".repeat(5 - rounded);
-}
-
 function ReviewCard({ review }: { review: ReviewDto }) {
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-medium">{review.authorName}</div>
-        <div className="text-xs text-text-sec">{reviewStars(review.rating)}</div>
+        <div className="text-xs text-text-sec">{UI_FMT.starsLabel(review.rating)}</div>
       </div>
       {review.text ? <div className="mt-2 text-sm text-text-sec">{review.text}</div> : null}
       {review.publicTags.length > 0 ? (

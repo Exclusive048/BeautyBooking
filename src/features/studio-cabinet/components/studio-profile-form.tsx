@@ -104,9 +104,11 @@ export function StudioProfileForm({
           setAddressSuggestIndex(0);
           return;
         }
-        setAddressSuggestIndex((prev) =>
-          prev < addressSuggestions.length - 1 ? prev + 1 : 0
-        );
+        const nextIndex =
+          addressSuggestIndex < addressSuggestions.length - 1
+            ? addressSuggestIndex + 1
+            : 0;
+        setAddressSuggestIndex(nextIndex);
         return;
       }
 
@@ -117,9 +119,11 @@ export function StudioProfileForm({
           setAddressSuggestIndex(addressSuggestions.length - 1);
           return;
         }
-        setAddressSuggestIndex((prev) =>
-          prev <= 0 ? addressSuggestions.length - 1 : prev - 1
-        );
+        const nextIndex =
+          addressSuggestIndex <= 0
+            ? addressSuggestions.length - 1
+            : addressSuggestIndex - 1;
+        setAddressSuggestIndex(nextIndex);
         return;
       }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { moneyRUBPlain } from "@/lib/format";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -61,9 +62,6 @@ type Props = {
   studioId: string;
 };
 
-function formatPrice(value: number, suffix: string): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ${suffix}`;
-}
 
 export function StudioServicesPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.services;
@@ -282,7 +280,7 @@ export function StudioServicesPage({ studioId }: Props) {
                     <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-text-sec">
                       <span>{service.baseDurationMin} {t.durationMin}</span>
                       <span>•</span>
-                      <span>{formatPrice(service.basePrice, t.currency)}</span>
+                      <span>{`${moneyRUBPlain(service.basePrice)} ${t.currency}`}</span>
                     </div>
                     <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
                       <input

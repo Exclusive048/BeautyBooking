@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PortfolioItemPreview = {
@@ -25,9 +26,6 @@ type Props = {
   items: PortfolioItemPreview[];
 };
 
-function formatPrice(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
-}
 
 export function PortfolioStrip({ items }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -136,7 +134,7 @@ export function PortfolioStrip({ items }: Props) {
                     <div className="mt-4 space-y-2 text-sm text-text-main">
                       {selectedItem.serviceOptions.map((service) => (
                         <div key={service.serviceId}>
-                          • {service.title} — {formatPrice(service.price)}
+                          • {service.title} — {UI_FMT.priceLabel(service.price)}
                         </div>
                       ))}
                     </div>

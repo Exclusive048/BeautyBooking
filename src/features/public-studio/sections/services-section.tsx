@@ -8,30 +8,16 @@ type Props = {
 };
 
 export async function StudioServicesSection({ studioId }: Props) {
-  try {
-    const studio = await getStudioProfile(studioId);
-    if (!studio) {
-      return (
-        <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
-          <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-            Не удалось загрузить услуги.
-          </div>
-        </Section>
-      );
-    }
+  let studio = null;
+  let hasError = false;
 
-    return (
-      <div className="fade-in-up">
-        <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
-          <StudioServicesList
-            studioId={studio.id}
-            categories={studio.categories}
-            services={studio.services}
-          />
-        </Section>
-      </div>
-    );
+  try {
+    studio = await getStudioProfile(studioId);
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
         <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
@@ -40,4 +26,26 @@ export async function StudioServicesSection({ studioId }: Props) {
       </Section>
     );
   }
+
+  if (!studio) {
+    return (
+      <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
+        <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
+          Не удалось загрузить услуги.
+        </div>
+      </Section>
+    );
+  }
+
+  return (
+    <div className="fade-in-up">
+      <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
+        <StudioServicesList
+          studioId={studio.id}
+          categories={studio.categories}
+          services={studio.services}
+        />
+      </Section>
+    </div>
+  );
 }

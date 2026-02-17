@@ -18,33 +18,44 @@ async function fetchStudioPortfolio(studioId: string): Promise<MediaAssetDto[]> 
 }
 
 export async function StudioHeroSection({ studioId }: Props) {
+  let studio = null;
+  let portfolio: MediaAssetDto[] = [];
+  let hasError = false;
+
   try {
-    const [studio, portfolio] = await Promise.all([
+    const result = await Promise.all([
       getStudioProfile(studioId),
       fetchStudioPortfolio(studioId),
     ]);
-    if (!studio) {
-      return (
-        <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-          Не удалось загрузить профиль студии.
-        </div>
-      );
-    }
-
-    const imageUrls = studio.bannerUrl
-      ? [studio.bannerUrl, ...portfolio.map((item) => item.url).filter((url) => url !== studio.bannerUrl)]
-      : portfolio.map((item) => item.url);
-
-    return (
-      <div className="fade-in-up">
-        <StudioHeroGallery studio={studio} imageUrls={imageUrls} />
-      </div>
-    );
+    studio = result[0];
+    portfolio = result[1];
   } catch {
+    hasError = true;
+  }
+
+  if (hasError) {
     return (
       <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
         Не удалось загрузить блок.
       </div>
     );
   }
+
+  if (!studio) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
+        Не удалось загрузить профиль студии.
+      </div>
+    );
+  }
+
+  const imageUrls = studio.bannerUrl
+    ? [studio.bannerUrl, ...portfolio.map((item) => item.url).filter((url) => url !== studio.bannerUrl)]
+    : portfolio.map((item) => item.url);
+
+  return (
+    <div className="fade-in-up">
+      <StudioHeroGallery studio={studio} imageUrls={imageUrls} />
+    </div>
+  );
 }

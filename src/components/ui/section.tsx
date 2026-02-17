@@ -18,11 +18,11 @@ export function Section({
     <section className={cn("space-y-4", className)}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg md:text-xl font-semibold tracking-tight text-[rgb(var(--text))]">
+          <h2 className="text-lg md:text-xl font-semibold tracking-tight text-text-main">
             {title}
           </h2>
           {subtitle ? (
-            <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">{subtitle}</p>
+            <p className="mt-1 text-sm text-text-sec">{subtitle}</p>
           ) : null}
         </div>
         {right ? <div className="shrink-0">{right}</div> : null}

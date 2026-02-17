@@ -9,6 +9,7 @@ import { HeaderBlock } from "@/components/ui/header-block";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type ModelOfferStatus = "ACTIVE" | "CLOSED" | "ARCHIVED";
 
@@ -157,8 +158,6 @@ export function ModelOffersPage() {
     []
   );
 
-  const priceFormatter = useMemo(() => new Intl.NumberFormat("ru-RU"), []);
-
   const serviceOptions = useMemo(() => {
     return [...services]
       .map((service) => {
@@ -185,14 +184,6 @@ export function ModelOffersPage() {
       return dateFormatter.format(date);
     },
     [dateFormatter]
-  );
-
-  const formatPrice = useCallback(
-    (value: number | null) => {
-      if (!value || value <= 0) return "Бесплатно";
-      return `${priceFormatter.format(value)} ₽`;
-    },
-    [priceFormatter]
   );
 
   const loadOffers = useCallback(async () => {
@@ -578,7 +569,7 @@ export function ModelOffersPage() {
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-text-main">
-                    <span className="font-semibold">{formatPrice(offer.price)}</span>
+                    <span className="font-semibold">{(offer.price && offer.price > 0 ? UI_FMT.priceLabel(offer.price) : "Бесплатно")}</span>
                     {offer.extraBusyMin > 0 ? (
                       <span className="text-xs text-text-sec">+{offer.extraBusyMin} мин съемки</span>
                     ) : null}

@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -68,9 +69,6 @@ const TAG_OPTIONS = [
   { key: "near", label: UI_TEXT.feed.tagNearby },
 ] as const;
 
-function formatPrice(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
-}
 
 function formatDuration(min: number): string {
   if (min <= 0) return "";
@@ -413,13 +411,13 @@ export default function InspirationFeedClient() {
               </button>
 
               <div className="absolute left-3 top-3 rounded-full border border-white/30 bg-black/45 px-3 py-1 text-xs font-medium text-white backdrop-blur">
-                {item.totalPrice > 0 ? formatPrice(item.totalPrice) : "—"}
+                {item.totalPrice > 0 ? UI_FMT.priceLabel(item.totalPrice) : "—"}
               </div>
 
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/78 via-black/35 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
                 <div className="text-sm font-semibold text-white">{item.primaryServiceTitle ?? item.caption ?? item.masterName}</div>
                 <div className="mt-1 text-xs text-white/90">
-                  {formatDuration(item.totalDurationMin)}{item.totalPrice > 0 ? ` • ${formatPrice(item.totalPrice)}` : ""}
+                  {formatDuration(item.totalDurationMin)}{item.totalPrice > 0 ? ` • ${UI_FMT.priceLabel(item.totalPrice)}` : ""}
                 </div>
                 <div className="mt-1 text-xs text-white/90">{UI_TEXT.feed.byMaster}: {item.masterName}</div>
                 {item.studioName ? <div className="mt-0.5 text-xs text-white/80">{UI_TEXT.feed.byStudio}: {item.studioName}</div> : null}
@@ -488,7 +486,7 @@ export default function InspirationFeedClient() {
                       <ul className="mt-2 space-y-1 text-sm text-neutral-700">
                         {selectedItem.serviceOptions.map((service) => (
                           <li key={service.serviceId}>
-                            • {service.title} — {formatDuration(service.durationMin)} / {formatPrice(service.price)}
+                            • {service.title} — {formatDuration(service.durationMin)} / {UI_FMT.priceLabel(service.price)}
                           </li>
                         ))}
                       </ul>
@@ -496,7 +494,7 @@ export default function InspirationFeedClient() {
 
                     <div className="rounded-xl bg-neutral-50 p-3 text-sm text-neutral-900">
                       <div className="font-semibold">{UI_TEXT.feed.total}</div>
-                      <div className="mt-1">{formatDuration(selectedItem.totalDurationMin)} / {formatPrice(selectedItem.totalPrice)}</div>
+                      <div className="mt-1">{formatDuration(selectedItem.totalDurationMin)} / {UI_FMT.priceLabel(selectedItem.totalPrice)}</div>
                     </div>
 
                     <div>
@@ -543,7 +541,7 @@ export default function InspirationFeedClient() {
                         <img src={similar.mediaUrl} alt={similar.masterName} className="h-24 w-full object-cover" />
                         <div className="p-2 text-xs">
                           <div className="truncate text-neutral-800">{similar.masterName}</div>
-                          <div className="text-neutral-500">{formatPrice(similar.totalPrice)}</div>
+                          <div className="text-neutral-500">{UI_FMT.priceLabel(similar.totalPrice)}</div>
                         </div>
                       </button>
                     ))}

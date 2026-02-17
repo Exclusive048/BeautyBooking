@@ -5,21 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
-import { SlotPicker } from "@/features/booking/components/slot-picker";
+import {
+  SlotPickerOptimized,
+  groupSlotsByTimeOfDay,
+  type SlotItem as SlotPickerItem,
+} from "@/features/booking/components/slot-picker/slot-picker";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
-import { timeToMinutes } from "@/lib/schedule/time";
 import { UI_TEXT } from "@/lib/ui/text";
 
-type SlotItem = {
+type ApiSlot = {
   startAtUtc: string;
   endAtUtc: string;
   label: string;
-};
-
-type SlotGroup = {
-  id: string;
-  label: string;
-  items: string[];
 };
 
 type BookingInfo = {
@@ -93,42 +90,15 @@ function buildDateRange(days: number) {
   return items;
 }
 
-function groupSlotsByDayPeriod(slots: SlotItem[], dateKey: string): SlotGroup[] {
-  const items = slots
-    .filter((slot) => slot.label.startsWith(`${dateKey} `))
-    .map((slot) => {
-      const [, time] = slot.label.split(" ");
-      if (!time) return null;
-      const minutes = timeToMinutes(time);
-      if (minutes === null) return null;
-      return { label: slot.label, minutes };
-    })
-    .filter((v): v is { label: string; minutes: number } => Boolean(v));
-
-  items.sort((a, b) => a.minutes - b.minutes);
-
-  const groups = [
-    { id: "morning", label: UI_TEXT.clientCabinet.booking.morning, items: [] as string[] },
-    { id: "day", label: UI_TEXT.clientCabinet.booking.day, items: [] as string[] },
-    { id: "evening", label: UI_TEXT.clientCabinet.booking.evening, items: [] as string[] },
-  ];
-
-  for (const item of items) {
-    const group = item.minutes < 13 * 60 ? groups[0] : item.minutes < 18 * 60 ? groups[1] : groups[2];
-    group.items.push(item.label);
-  }
-
-  return groups.filter((g) => g.items.length > 0).map((g) => ({
-    id: `${dateKey}-${g.id}`,
-    label: g.label,
-    items: g.items,
-  }));
+function getSlotTimeText(label: string) {
+  const [, time] = label.split(" ");
+  return time ?? label;
 }
 
 export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const t = UI_TEXT.clientCabinet;
   const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange(7)[0] ?? "");
-  const [slots, setSlots] = useState<SlotItem[]>([]);
+  const [slots, setSlots] = useState<ApiSlot[]>([]);
   const [slotLabel, setSlotLabel] = useState<string>(booking.slotLabel);
   const [silentMode, setSilentMode] = useState<boolean>(booking.silentMode);
   const [loading, setLoading] = useState(false);
@@ -153,7 +123,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
 
         const res = await fetch(url.toString(), { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ slots: SlotItem[]; meta: { toDateExclusive: string } }>
+          | ApiResponse<{ slots: ApiSlot[]; meta: { toDateExclusive: string } }>
           | null;
         if (!res.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
         if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
@@ -185,7 +155,21 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
     t.bookingsPanel.unknownError,
   ]);
 
-  const slotGroups = useMemo(() => groupSlotsByDayPeriod(slots, selectedDate), [slots, selectedDate]);
+  const slotItemsForDate = useMemo<SlotPickerItem[]>(
+    () =>
+      slots
+        .filter((slot) => slot.label.startsWith(`${selectedDate} `))
+        .map((slot) => ({
+          id: slot.label,
+          label: slot.label,
+          timeText: getSlotTimeText(slot.label),
+        })),
+    [selectedDate, slots]
+  );
+  const slotGroups = useMemo(
+    () => groupSlotsByTimeOfDay(slotItemsForDate).filter((group) => group.items.length > 0),
+    [slotItemsForDate]
+  );
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
   const canEditSilentMode = booking.status === "PENDING";
   const canRescheduleNow = useMemo(() => {
@@ -310,7 +294,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
             <div className="mt-2 text-sm text-text-sec">{t.booking.noSlots}</div>
           ) : (
             <div className="mt-3">
-              <SlotPicker groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+              <SlotPickerOptimized groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
             </div>
           )}
         </div>

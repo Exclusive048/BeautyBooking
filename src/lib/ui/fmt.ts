@@ -12,9 +12,24 @@ export const UI_FMT = {
       minute: "2-digit",
     });
   },
+  dateTimeShort(iso: string): string {
+    if (!iso || !iso.trim()) return "вЂ”";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "вЂ”";
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  },
   ratingLabel(rating: number, count: number): string {
     if (count <= 0) return UI_TEXT.publicProfile.hero.novice;
     return `⭐ ${rating.toFixed(1)} (${count})`;
+  },
+  starsLabel(rating: number): string {
+    const rounded = Math.max(0, Math.min(5, Math.round(rating)));
+    return "*".repeat(rounded) + "-".repeat(5 - rounded);
   },
   totalLabel(sum: number): string {
     return `Итого: ${new Intl.NumberFormat("ru-RU").format(sum)} ₽`;

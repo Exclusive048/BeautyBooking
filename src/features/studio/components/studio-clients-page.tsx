@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type ClientItem = {
@@ -23,15 +24,6 @@ type Props = {
   studioId: string;
 };
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function formatMoney(value: number, suffix: string): string {
   return `${new Intl.NumberFormat("ru-RU").format(value)} ${suffix}`;
@@ -98,7 +90,7 @@ export function StudioClientsPage({ studioId }: Props) {
                 <tr key={client.key} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
                   <td className="px-4 py-3 text-sm text-text-main">{client.displayName}</td>
                   <td className="px-4 py-3 text-sm text-text-sec">{client.phone}</td>
-                  <td className="px-4 py-3 text-sm text-text-sec">{formatDateTime(client.lastBookingAt)}</td>
+                  <td className="px-4 py-3 text-sm text-text-sec">{UI_FMT.dateTimeShort(client.lastBookingAt)}</td>
                   <td className="px-4 py-3 text-sm text-text-sec">{client.lastServiceName}</td>
                   <td className="px-4 py-3 text-sm font-medium text-text-main">{client.visitsCount}</td>
                   <td className="px-4 py-3 text-sm text-text-main">{formatMoney(client.totalAmount, t.moneySuffix)}</td>

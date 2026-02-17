@@ -7,7 +7,7 @@ export function Skeleton({ className, ...props }: Props) {
   return (
     <div
       className={cn(
-        "animate-pulse rounded-xl bg-neutral-200/70 dark:bg-neutral-800/70",
+        "animate-pulse rounded-xl bg-bg-input/50",
         className
       )}
       aria-hidden="true"
