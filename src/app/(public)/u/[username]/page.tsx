@@ -1,18 +1,19 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
-import { PublicMasterProfileClient } from "@/features/public-profile/master/public-profile-client";
-import { PublicStudioProfileClient } from "@/features/public-studio/public-studio-profile-client";
+import { PublicMasterProfilePage } from "@/features/public-profile/master/public-profile-page";
+import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-profile-page";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 };
 
 function normalizeUsername(input: string) {
   return input.trim().toLowerCase();
 }
 
-export default async function PublicUsernamePage({ params }: Props) {
+export default async function PublicUsernamePage({ params, searchParams }: Props) {
   const { username: raw } = await Promise.resolve(params);
   const username = normalizeUsername(raw);
 
@@ -66,8 +67,19 @@ export default async function PublicUsernamePage({ params }: Props) {
   }
 
   if (result.providerType === "STUDIO") {
-    return <PublicStudioProfileClient studioId={result.providerId} />;
+    return <PublicStudioProfilePage studioId={result.providerId} />;
   }
 
-  return <PublicMasterProfileClient providerId={result.providerId} />;
+  const initialServiceId =
+    typeof searchParams?.serviceId === "string" ? searchParams?.serviceId : null;
+  const initialSlotStartAt =
+    typeof searchParams?.slotStartAt === "string" ? searchParams?.slotStartAt : null;
+
+  return (
+    <PublicMasterProfilePage
+      providerId={result.providerId}
+      initialServiceId={initialServiceId}
+      initialSlotStartAt={initialSlotStartAt}
+    />
+  );
 }

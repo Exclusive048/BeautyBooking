@@ -3,9 +3,13 @@ import { Footer } from "@/components/layout/footer";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-bg-page [--topbar-h:72px]">
-      <Topbar />
-      <main className="mx-auto max-w-6xl px-4 py-6 md:py-10">{children}</main>
+    <div className="min-h-[100dvh] w-full bg-bg-page [--topbar-h:72px] flex flex-col">
+      <div className="w-full">
+        <Topbar />
+      </div>
+      <main className="flex-1 w-full">
+        <div className="mx-auto w-full max-w-6xl px-4 py-6 md:py-10">{children}</div>
+      </main>
       <Footer />
     </div>
   );

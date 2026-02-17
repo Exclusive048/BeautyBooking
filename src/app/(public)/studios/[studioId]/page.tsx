@@ -1,9 +1,9 @@
-import { PublicStudioProfileClient } from "@/features/public-studio/public-studio-profile-client";
+import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-profile-page";
 
 type Props = {
   params: { studioId: string };
 };
 
 export default function StudioProfilePage({ params }: Props) {
-  return <PublicStudioProfileClient studioId={params.studioId} />;
+  return <PublicStudioProfilePage studioId={params.studioId} />;
 }
