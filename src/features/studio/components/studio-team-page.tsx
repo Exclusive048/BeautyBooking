@@ -9,6 +9,7 @@ import { MasterCardDrawer } from "@/features/studio/components/master-card-drawe
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 
 export type StudioTeamMaster = {
   id: string;
@@ -38,8 +39,14 @@ export function StudioTeamPage({ studioId }: Props) {
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [title, setTitle] = useState("");
+  const plan = usePlanFeatures();
 
   const mastersCountText = useMemo(() => t.mastersCount.replace("{count}", String(masters.length)), [masters.length, t.mastersCount]);
+  const teamLimit = plan.limit("maxTeamMasters");
+  const limitReached = teamLimit !== null && masters.length >= teamLimit;
+  const limitSoftWarning = teamLimit !== null && masters.length >= Math.max(teamLimit - 1, 1);
+  const limitLabel =
+    teamLimit === null ? "Unlimited" : `${masters.length} / ${teamLimit}`;
 
   const load = async (): Promise<void> => {
     setLoading(true);
@@ -111,11 +118,34 @@ export function StudioTeamPage({ studioId }: Props) {
     <section className="space-y-3">
       <ScheduleRequestsPanel />
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm text-text-sec">{mastersCountText}</div>
-        <Button type="button" onClick={() => setShowCreateModal(true)} variant="secondary" size="sm">
+        <div className="text-sm text-text-sec">
+          {mastersCountText}
+          {teamLimit !== null ? (
+            <span className={`ml-2 text-xs ${limitSoftWarning ? "text-amber-600" : "text-text-sec"}`}>
+              {limitLabel}
+            </span>
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          variant="secondary"
+          size="sm"
+          disabled={limitReached}
+        >
           + {t.addMaster}
         </Button>
       </div>
+
+      {limitReached ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          Team limit reached. Upgrade your plan to add more мастеров.{" "}
+          <a href="/cabinet/billing" className="underline">
+            View plans
+          </a>
+          .
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>

@@ -102,6 +102,11 @@ async function main() {
   await prisma.booking.deleteMany();
   await prisma.service.deleteMany();
   await prisma.provider.deleteMany();
+  await prisma.systemConfig.upsert({
+    where: { key: "onlinePaymentsEnabled" },
+    update: { value: false },
+    create: { key: "onlinePaymentsEnabled", value: false },
+  });
 
   console.log("✅ Seed done");
 }

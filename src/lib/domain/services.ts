@@ -2,12 +2,14 @@ export type ServiceInput = {
   name: string;
   durationMin: number;
   price: number;
+  onlinePaymentEnabled?: boolean;
 };
 
 export type ServiceUpdate = {
   name?: string;
   durationMin?: number;
   price?: number;
+  onlinePaymentEnabled?: boolean;
 };
 
 export type ServiceRecord = {
@@ -17,6 +19,7 @@ export type ServiceRecord = {
   durationMin: number;
   price: number;
   isEnabled: boolean;
+  onlinePaymentEnabled: boolean;
 };
 
 export type MasterServiceOverride = {

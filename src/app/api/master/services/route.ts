@@ -6,6 +6,8 @@ import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { createSoloMasterService, upsertMasterServices } from "@/lib/master/profile.service";
 import { createMasterServiceSchema, upsertMasterServicesSchema } from "@/lib/master/schemas";
 import { parseBody } from "@/lib/validation";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createFeatureGateError, createSystemDisabledError } from "@/lib/billing/guards";
 
 export const runtime = "nodejs";
 
@@ -50,6 +52,18 @@ export async function PUT(req: Request) {
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, upsertMasterServicesSchema);
+
+    const wantsOnlinePayments = body.items.some((item) => item.onlinePaymentEnabled === true);
+    if (wantsOnlinePayments) {
+      const plan = await getCurrentPlan(user.id);
+      if (!plan.features.onlinePayments) {
+        throw createFeatureGateError("onlinePayments", "PRO");
+      }
+      if (!plan.system.onlinePaymentsEnabled) {
+        throw createSystemDisabledError("onlinePayments");
+      }
+    }
+
     const data = await upsertMasterServices(masterId, body.items);
     return jsonOk(data);
   } catch (error) {

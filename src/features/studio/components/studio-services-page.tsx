@@ -9,6 +9,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { TooltipHint } from "@/components/ui/tooltip-hint";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
+import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import {
   normalizeStudioServiceDurationMin,
   normalizeStudioServicePrice,
@@ -27,6 +28,7 @@ type StudioServiceView = {
   basePrice: number;
   baseDurationMin: number;
   isActive: boolean;
+  onlinePaymentEnabled: boolean;
   masters: StudioServiceAssignedMaster[];
 };
 
@@ -65,6 +67,7 @@ type Props = {
 
 export function StudioServicesPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.services;
+  const plan = usePlanFeatures();
   const [data, setData] = useState<ServicesData>({ categories: [] });
   const [masters, setMasters] = useState<StudioMaster[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +79,7 @@ export function StudioServicesPage({ studioId }: Props) {
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [submittingCategory, setSubmittingCategory] = useState(false);
   const [submittingService, setSubmittingService] = useState(false);
+  const [togglingServiceId, setTogglingServiceId] = useState<string | null>(null);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [newServiceTitle, setNewServiceTitle] = useState("");
   const [newServiceCategoryId, setNewServiceCategoryId] = useState("");
@@ -94,6 +98,14 @@ export function StudioServicesPage({ studioId }: Props) {
       .replace("{categories}", String(data.categories.length))
       .replace("{services}", String(totalServices));
   }, [data.categories.length, t.summary, totalServices]);
+  const onlinePaymentsAllowed = plan.can("onlinePayments");
+  const onlinePaymentsSystemEnabled = plan.system?.onlinePaymentsEnabled ?? false;
+  const canOnlinePayments = onlinePaymentsAllowed && onlinePaymentsSystemEnabled;
+  const onlinePaymentsLockedMessage = !onlinePaymentsAllowed
+    ? "Онлайн-оплата доступна на PRO и выше."
+    : !onlinePaymentsSystemEnabled
+      ? "Функция временно отключена администрацией"
+      : null;
 
   async function load(): Promise<void> {
     setLoading(true);
@@ -165,6 +177,34 @@ export function StudioServicesPage({ studioId }: Props) {
       setError(err instanceof Error ? err.message : t.assignFailed);
     } finally {
       setAssigningServiceId(null);
+    }
+  };
+
+  const toggleOnlinePayment = async (service: StudioServiceView, nextValue: boolean): Promise<void> => {
+    if (nextValue && !canOnlinePayments) {
+      setError(onlinePaymentsLockedMessage ?? "Онлайн-оплата недоступна.");
+      return;
+    }
+    setTogglingServiceId(service.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/studio/services/${service.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studioId,
+          onlinePaymentEnabled: nextValue,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.loadFailed);
+    } finally {
+      setTogglingServiceId(null);
     }
   };
 
@@ -291,6 +331,19 @@ export function StudioServicesPage({ studioId }: Props) {
                       />
                       <span>{t.visibleInSearch}</span>
                       <TooltipHint text={t.visibleInSearchHint} />
+                    </label>
+                    <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
+                      <input
+                        type="checkbox"
+                        checked={service.onlinePaymentEnabled}
+                        disabled={!canOnlinePayments || togglingServiceId === service.id}
+                        onChange={(event) => void toggleOnlinePayment(service, event.target.checked)}
+                        className="h-4 w-4 rounded border-border-subtle accent-primary disabled:opacity-60"
+                      />
+                      <span>Онлайн-оплата</span>
+                      {onlinePaymentsLockedMessage ? (
+                        <TooltipHint text={onlinePaymentsLockedMessage} />
+                      ) : null}
                     </label>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

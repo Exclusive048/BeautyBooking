@@ -5,6 +5,8 @@ import { ensureStudioAdmin } from "@/lib/studios/access";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/auth/otp";
 import { MembershipStatus, ProviderType } from "@prisma/client";
+import { toAppError } from "@/lib/api/errors";
+import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 
 const createSchema = z.object({
   phone: z.string().trim().min(6),
@@ -87,6 +89,13 @@ export async function POST(
   });
   if (!studio) {
     return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  }
+
+  try {
+    await ensureStudioTeamLimit(auth.user.id, studio.id);
+  } catch (error) {
+    const appError = toAppError(error);
+    return fail(appError.message, appError.status, appError.code, appError.details);
   }
 
   const invite = await prisma.studioInvite.upsert({

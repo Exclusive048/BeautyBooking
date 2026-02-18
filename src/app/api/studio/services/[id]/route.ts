@@ -7,6 +7,8 @@ import { ensureStudioRole } from "@/lib/studio/access";
 import { updateStudioServiceSchema } from "@/lib/studio/schemas";
 import { updateStudioService } from "@/lib/studio/services.service";
 import { parseBody } from "@/lib/validation";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createFeatureGateError, createSystemDisabledError } from "@/lib/billing/guards";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -28,6 +30,16 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
 
+    if (body.onlinePaymentEnabled === true) {
+      const plan = await getCurrentPlan(user.id);
+      if (!plan.features.onlinePayments) {
+        throw createFeatureGateError("onlinePayments", "PRO");
+      }
+      if (!plan.system.onlinePaymentsEnabled) {
+        throw createSystemDisabledError("onlinePayments");
+      }
+    }
+
     const data = await updateStudioService({
       studioId: body.studioId,
       serviceId: id,
@@ -38,6 +50,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       basePrice: body.basePrice,
       baseDurationMin: body.baseDurationMin,
       isActive: body.isActive,
+      onlinePaymentEnabled: body.onlinePaymentEnabled,
     });
     return jsonOk(data);
   } catch (error) {

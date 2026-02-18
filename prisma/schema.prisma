@@ -226,6 +226,7 @@ model UserProfile {
   reviewsAuthored    Review[]           @relation("ReviewAuthor")
   favorites          Favorite[]
   modelApplications  ModelApplication[]
+  clientNotes        ClientNote[]        @relation("ClientNotesForClient")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -400,6 +401,7 @@ model Provider {
   publicUsernameAliases PublicUsernameAlias[]
   createdGlobalCategories GlobalCategory[] @relation("GlobalCategoryCreatorProvider")
   modelOffers ModelOffer[]
+  clientNotes ClientNote[] @relation("ClientNotesForMaster")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -439,6 +441,7 @@ model Service {
   sortOrder       Int     @default(0)
   isEnabled       Boolean @default(true)
   isActive        Boolean @default(true)
+  onlinePaymentEnabled Boolean @default(false)
 
   bookings       Booking[]
   masterServices MasterService[]
@@ -857,6 +860,12 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+model SystemConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
 model Review {
   id            String              @id @default(cuid())
   bookingId     String?             @unique
@@ -985,10 +994,28 @@ model BillingPlan {
   name      String
   price     Int
   features  Json
+  sortOrder Int                @default(0)
+  inheritsFromPlanId String?
+  inheritsFromPlan   BillingPlan? @relation("BillingPlanInherit", fields: [inheritsFromPlanId], references: [id])
+  inheritedByPlans   BillingPlan[] @relation("BillingPlanInherit")
   isActive  Boolean            @default(true)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   subscriptions UserSubscription[]
+}
+
+model ClientNote {
+  id           String      @id @default(cuid())
+  masterId     String
+  master       Provider    @relation("ClientNotesForMaster", fields: [masterId], references: [id], onDelete: Cascade)
+  clientUserId String
+  clientUser   UserProfile @relation("ClientNotesForClient", fields: [clientUserId], references: [id], onDelete: Cascade)
+  text         String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([masterId, clientUserId])
+  @@index([clientUserId])
 }
 
 model UserSubscription {

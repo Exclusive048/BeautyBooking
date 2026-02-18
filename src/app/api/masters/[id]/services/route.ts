@@ -9,6 +9,7 @@ import {
 } from "@/lib/providers/services";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -21,6 +22,7 @@ const updateSchema = z.object({
   name: z.string().trim().min(1).optional(),
   durationMin: z.number().int().optional(),
   price: z.number().int().optional(),
+  onlinePaymentEnabled: z.boolean().optional(),
 });
 
 const deleteSchema = z.object({
@@ -100,6 +102,21 @@ export async function PUT(
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+
+  if (parsed.data.onlinePaymentEnabled === true) {
+    const plan = await getCurrentPlan(auth.user.id);
+    if (!plan.features.onlinePayments) {
+      return fail("Feature not available", 403, "FEATURE_GATE", {
+        feature: "onlinePayments",
+        requiredPlan: "PRO",
+      });
+    }
+    if (!plan.system.onlinePaymentsEnabled) {
+      return fail("Feature disabled by system", 403, "SYSTEM_FEATURE_DISABLED", {
+        feature: "onlinePayments",
+      });
+    }
+  }
 
   const { serviceId, ...input } = parsed.data;
   const result = await updateProviderService(p.id, serviceId, input);

@@ -15,6 +15,7 @@ export type StudioServiceView = {
   baseDurationMin: number;
   sortOrder: number;
   isActive: boolean;
+  onlinePaymentEnabled: boolean;
   masters: StudioServiceAssignedMaster[];
 };
 
@@ -66,6 +67,7 @@ export async function getStudioServices(studioId: string): Promise<{ categories:
       durationMin: true,
       sortOrder: true,
       isActive: true,
+      onlinePaymentEnabled: true,
       masterServices: {
         where: { isEnabled: true },
         select: {
@@ -86,6 +88,7 @@ export async function getStudioServices(studioId: string): Promise<{ categories:
       baseDurationMin: service.baseDurationMin ?? service.durationMin,
       sortOrder: service.sortOrder,
       isActive: service.isActive,
+      onlinePaymentEnabled: service.onlinePaymentEnabled,
       masters: service.masterServices.map((ms) => ({
         masterId: ms.masterProvider.id,
         masterName: ms.masterProvider.name,
@@ -238,6 +241,7 @@ export async function createStudioService(input: {
         sortOrder: (last?.sortOrder ?? -1) + 1,
         isActive: true,
         isEnabled: true,
+        onlinePaymentEnabled: false,
       },
       select: { id: true },
     });
@@ -264,6 +268,7 @@ export async function updateStudioService(input: {
   basePrice?: number;
   baseDurationMin?: number;
   isActive?: boolean;
+  onlinePaymentEnabled?: boolean;
 }): Promise<{ id: string }> {
   const service = await prisma.service.findUnique({
     where: { id: input.serviceId },
@@ -326,6 +331,9 @@ export async function updateStudioService(input: {
           ? { durationMin: normalizedDurationMin, baseDurationMin: normalizedDurationMin }
           : {}),
         ...(typeof input.isActive === "boolean" ? { isActive: input.isActive } : {}),
+        ...(typeof input.onlinePaymentEnabled === "boolean"
+          ? { onlinePaymentEnabled: input.onlinePaymentEnabled }
+          : {}),
         ...(nextGlobalCategoryId !== undefined ? { globalCategoryId: nextGlobalCategoryId } : {}),
       },
     });

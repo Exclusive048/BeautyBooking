@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, createMasterPortfolioSchema);
-    const data = await createMasterPortfolioItem(masterId, body);
+    const data = await createMasterPortfolioItem(user.id, masterId, body);
     return jsonOk(data, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);
