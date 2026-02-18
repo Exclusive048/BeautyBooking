@@ -319,10 +319,10 @@ export function AdminBilling() {
       ) : null}
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-text-main">Tariff plans</h2>
+        <h2 className="text-lg font-semibold text-text-main">Тарифные планы</h2>
 
         {loading ? (
-          <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Loading...</div>
+          <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {plans.map((plan) => {
@@ -336,7 +336,7 @@ export function AdminBilling() {
                         <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
                       </div>
                       <div className="text-sm font-semibold text-text-main">
-                        {plan.price <= 0 ? "Free" : `${moneyRUBPlain(plan.price)} KZT/mo`}
+                        {plan.price <= 0 ? "Free" : `${moneyRUBPlain(plan.price)} Руб/мес.`}
                       </div>
                     </div>
                   </CardHeader>
@@ -355,13 +355,13 @@ export function AdminBilling() {
                         </li>
                       ))}
                     </ul>
-                    <div className="text-xs text-text-sec">Catalog priority: {effective.catalogPriority}</div>
+                    <div className="text-xs text-text-sec">Тип подписки: {effective.catalogPriority}</div>
                     <div className="text-xs text-text-sec">
-                      Team masters limit: {effective.maxTeamMasters ?? "Unlimited"}
+                      Лимит мастеров: {effective.maxTeamMasters ?? "Безлимитно"}
                     </div>
                     <div className="pt-2">
                       <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
-                        Edit
+                        Редактировать
                       </Button>
                     </div>
                   </CardContent>
