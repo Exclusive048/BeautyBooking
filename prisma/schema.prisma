@@ -34,6 +34,12 @@ enum AccountType {
   SUPERADMIN
 }
 
+enum PlanTier {
+  FREE
+  PRO
+  PREMIUM
+}
+
 enum ConsentType {
   TERMS
   PRIVACY
@@ -993,6 +999,8 @@ model BillingPlan {
   code      String             @unique
   name      String
   price     Int
+  tier      PlanTier           @default(FREE)
+  providerType ProviderType    @default(MASTER)
   features  Json
   sortOrder Int                @default(0)
   inheritsFromPlanId String?

@@ -30,19 +30,7 @@ const socials: SocialLink[] = [
         />
       </svg>
     ),
-  },
-  {
-    label: "OK",
-    href: "https://ok.ru/beautyhub",
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-        <path
-          fill="currentColor"
-          d="M12 4.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0-8.6Zm0 2.3a2 2 0 1 0 0 4.1 2 2 0 0 0 0-4.1Zm5.5 7.9c.4-.4 1-.4 1.4 0 .4.4.4 1 0 1.4-1.1 1.1-2.5 1.8-4.1 2.1l2 2c.4.4.4 1 0 1.4a1 1 0 0 1-1.4 0l-2.9-2.9-2.9 2.9a1 1 0 0 1-1.4-1.4l2-2c-1.6-.3-3-1-4.1-2.1a1 1 0 0 1 1.4-1.4 5.8 5.8 0 0 0 8 0Z"
-        />
-      </svg>
-    ),
-  },
+  }
 ];
 
 export function FooterSocials() {

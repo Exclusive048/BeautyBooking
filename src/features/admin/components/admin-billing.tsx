@@ -1,19 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { moneyRUBPlain } from "@/lib/format";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Tabs, type TabItem } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/cn";
+import { moneyRUB } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
-import type { PlanFeatures } from "@/lib/billing/types";
+import {
+  FEATURE_CATALOG,
+  type FeatureKey,
+  type BooleanFeatureKey,
+  type LimitFeatureKey,
+} from "@/lib/billing/feature-catalog";
+import {
+  canDisableFeature,
+  deriveUiState,
+  getDefaultPlanFeatures,
+  isRelaxedLimit,
+  parseOverrides,
+  resolveEffectiveFeatures,
+  type FeatureUiState,
+  type PlanFeatureOverrides,
+  type PlanNode,
+  type PlanTier,
+} from "@/lib/billing/features";
+
+type ProviderType = "MASTER" | "STUDIO";
 
 type BillingPlan = {
   id: string;
   code: string;
   name: string;
   price: number;
+  tier: PlanTier;
+  providerType: ProviderType;
   features: Record<string, unknown>;
   sortOrder: number;
   inheritsFromPlanId: string | null;
@@ -25,187 +49,84 @@ type BillingResponse = {
   plans: BillingPlan[];
 };
 
-type BooleanFeatureKey = {
-  [Key in keyof PlanFeatures]: PlanFeatures[Key] extends boolean ? Key : never;
-}[keyof PlanFeatures];
+type ModalMode = "create" | "edit";
 
-type LimitFeatureKey = {
-  [Key in keyof PlanFeatures]: PlanFeatures[Key] extends number | null ? Key : never;
-}[keyof PlanFeatures];
-
-const BOOLEAN_FEATURES: Array<{ key: BooleanFeatureKey; label: string }> = [
-  { key: "onlinePayments", label: "Online payments" },
-  { key: "hotSlots", label: "Hot slots" },
-  { key: "analyticsCharts", label: "Analytics charts" },
-  { key: "financeReport", label: "Finance report" },
-  { key: "tgNotifications", label: "Notifications: Telegram" },
-  { key: "vkNotifications", label: "Notifications: VK" },
-  { key: "maxNotifications", label: "Notifications: Max" },
-  { key: "smsNotifications", label: "Notifications: SMS" },
-  { key: "clientVisitHistory", label: "Client visit history" },
-  { key: "clientNotes", label: "Client notes" },
-  { key: "clientImport", label: "Client import" },
-  { key: "highlightCard", label: "Highlighted card" },
-];
-
-const LIMIT_FEATURES: Array<{ key: LimitFeatureKey; label: string }> = [
-  { key: "maxTeamMasters", label: "Team masters limit" },
-  { key: "maxPortfolioPhotosSolo", label: "Portfolio (solo master)" },
-  { key: "maxPortfolioPhotosStudioDesign", label: "Portfolio (studio design)" },
-  { key: "maxPortfolioPhotosPerStudioMaster", label: "Portfolio (studio master)" },
-];
-
-const DEFAULT_FEATURES: PlanFeatures = {
-  onlinePayments: false,
-  hotSlots: false,
-  analyticsCharts: false,
-  financeReport: false,
-  tgNotifications: false,
-  vkNotifications: false,
-  maxNotifications: false,
-  smsNotifications: false,
-  clientVisitHistory: false,
-  clientNotes: false,
-  clientImport: false,
-  catalogPriority: "FREE",
-  highlightCard: false,
-  maxTeamMasters: 2,
-  maxPortfolioPhotosSolo: 15,
-  maxPortfolioPhotosStudioDesign: 15,
-  maxPortfolioPhotosPerStudioMaster: 10,
+const TIER_ORDER: Record<PlanTier, number> = {
+  FREE: 0,
+  PRO: 1,
+  PREMIUM: 2,
 };
 
-const CATALOG_PRIORITY_OPTIONS: Array<{ value: PlanFeatures["catalogPriority"]; label: string }> = [
-  { value: "FREE", label: "FREE" },
-  { value: "PRO", label: "PRO" },
-  { value: "PREMIUM", label: "PREMIUM" },
+const TIER_LABEL: Record<PlanTier, string> = {
+  FREE: "Бесплатный",
+  PRO: "PRO",
+  PREMIUM: "Премиум",
+};
+
+const PROVIDER_LABEL: Record<ProviderType, string> = {
+  MASTER: "Мастер",
+  STUDIO: "Студия",
+};
+
+const MODAL_TABS: TabItem[] = [
+  { id: "main", label: "Основное" },
+  { id: "features", label: "Функции" },
 ];
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function buildPlanMap(plans: BillingPlan[]): Map<string, PlanNode> {
+  return new Map(
+    plans.map((plan) => [
+      plan.id,
+      {
+        id: plan.id,
+        inheritsFromPlanId: plan.inheritsFromPlanId,
+        features: plan.features,
+      },
+    ])
+  );
 }
 
-function readBoolean(record: Record<string, unknown>, key: keyof PlanFeatures): boolean | undefined {
-  if (!Object.prototype.hasOwnProperty.call(record, key)) return undefined;
-  const value = record[key];
-  return typeof value === "boolean" ? value : undefined;
+function filterCatalog(
+  providerType: ProviderType
+): Array<[FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]> {
+  return (Object.entries(FEATURE_CATALOG) as Array<
+    [FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]
+  >)
+    .filter(([, def]) => def.appliesTo === "BOTH" || def.appliesTo === providerType)
+    .sort((a, b) => a[1].uiOrder - b[1].uiOrder);
 }
 
-function readNumberOrNull(
-  record: Record<string, unknown>,
-  key: keyof PlanFeatures
-): number | null | undefined {
-  if (!Object.prototype.hasOwnProperty.call(record, key)) return undefined;
-  const value = record[key];
-  if (value === null) return null;
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function readCatalogPriority(record: Record<string, unknown>): PlanFeatures["catalogPriority"] | undefined {
-  if (!Object.prototype.hasOwnProperty.call(record, "catalogPriority")) return undefined;
-  const value = record.catalogPriority;
-  if (typeof value !== "string") return undefined;
-  if (value === "FREE" || value === "PRO" || value === "PREMIUM") return value;
-  return undefined;
-}
-
-function parseOverrides(raw: unknown): Partial<PlanFeatures> {
-  if (!isRecord(raw)) return {};
-  const record = raw;
-  const overrides: Partial<PlanFeatures> = {};
-
-  for (const feature of BOOLEAN_FEATURES) {
-    const value = readBoolean(record, feature.key);
-    if (typeof value === "boolean") overrides[feature.key] = value;
+function groupCatalog(entries: Array<[FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]>) {
+  const groups = new Map<string, Array<[FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]>>();
+  for (const entry of entries) {
+    const group = entry[1].group;
+    const current = groups.get(group) ?? [];
+    current.push(entry);
+    groups.set(group, current);
   }
-
-  for (const feature of LIMIT_FEATURES) {
-    const value = readNumberOrNull(record, feature.key);
-    if (value !== undefined) overrides[feature.key] = value;
-  }
-
-  const catalogPriority = readCatalogPriority(record);
-  if (catalogPriority) overrides.catalogPriority = catalogPriority;
-
-  return overrides;
+  return Array.from(groups.entries());
 }
-
-function mergeFeatures(base: PlanFeatures, override: Partial<PlanFeatures>): PlanFeatures {
-  return {
-    onlinePayments: override.onlinePayments ?? base.onlinePayments,
-    hotSlots: override.hotSlots ?? base.hotSlots,
-    analyticsCharts: override.analyticsCharts ?? base.analyticsCharts,
-    financeReport: override.financeReport ?? base.financeReport,
-    tgNotifications: override.tgNotifications ?? base.tgNotifications,
-    vkNotifications: override.vkNotifications ?? base.vkNotifications,
-    maxNotifications: override.maxNotifications ?? base.maxNotifications,
-    smsNotifications: override.smsNotifications ?? base.smsNotifications,
-    clientVisitHistory: override.clientVisitHistory ?? base.clientVisitHistory,
-    clientNotes: override.clientNotes ?? base.clientNotes,
-    clientImport: override.clientImport ?? base.clientImport,
-    catalogPriority: override.catalogPriority ?? base.catalogPriority,
-    highlightCard: override.highlightCard ?? base.highlightCard,
-    maxTeamMasters: override.maxTeamMasters !== undefined ? override.maxTeamMasters : base.maxTeamMasters,
-    maxPortfolioPhotosSolo:
-      override.maxPortfolioPhotosSolo !== undefined
-        ? override.maxPortfolioPhotosSolo
-        : base.maxPortfolioPhotosSolo,
-    maxPortfolioPhotosStudioDesign:
-      override.maxPortfolioPhotosStudioDesign !== undefined
-        ? override.maxPortfolioPhotosStudioDesign
-        : base.maxPortfolioPhotosStudioDesign,
-    maxPortfolioPhotosPerStudioMaster:
-      override.maxPortfolioPhotosPerStudioMaster !== undefined
-        ? override.maxPortfolioPhotosPerStudioMaster
-        : base.maxPortfolioPhotosPerStudioMaster,
-  };
-}
-
-function resolveEffectiveFeatures(
-  planId: string,
-  plansById: Map<string, BillingPlan>,
-  visited = new Set<string>(),
-  depth = 0
-): PlanFeatures {
-  if (depth >= 5) return { ...DEFAULT_FEATURES };
-  const plan = plansById.get(planId);
-  if (!plan) return { ...DEFAULT_FEATURES };
-  if (visited.has(planId)) return { ...DEFAULT_FEATURES };
-  visited.add(planId);
-
-  const base =
-    plan.inheritsFromPlanId && plansById.has(plan.inheritsFromPlanId)
-      ? resolveEffectiveFeatures(plan.inheritsFromPlanId, plansById, visited, depth + 1)
-      : { ...DEFAULT_FEATURES };
-
-  const overrides = parseOverrides(plan.features);
-  return mergeFeatures(base, overrides);
-}
-
-function buildOverrides(current: PlanFeatures, base: PlanFeatures | null): Record<string, unknown> {
-  if (!base) return { ...current };
-  const overrides: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(current) as Array<[keyof PlanFeatures, PlanFeatures[keyof PlanFeatures]]>) {
-    const baseValue = base[key];
-    if (value !== baseValue) {
-      overrides[key] = value;
-    }
-  }
-  return overrides;
-}
-
 
 export function AdminBilling() {
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activePlan, setActivePlan] = useState<BillingPlan | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<"main" | "features">("main");
+  const [featureQuery, setFeatureQuery] = useState("");
+  const [editingCode, setEditingCode] = useState("");
   const [editingName, setEditingName] = useState("");
   const [editingPrice, setEditingPrice] = useState("");
   const [editingSortOrder, setEditingSortOrder] = useState("");
+  const [editingTier, setEditingTier] = useState<PlanTier>("FREE");
+  const [editingProviderType, setEditingProviderType] = useState<ProviderType>("MASTER");
   const [editingInheritsFromPlanId, setEditingInheritsFromPlanId] = useState<string | null>(null);
-  const [editingFeatures, setEditingFeatures] = useState<PlanFeatures | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [editingIsActive, setEditingIsActive] = useState(true);
+  const [editingOverrides, setEditingOverrides] = useState<PlanFeatureOverrides>({});
+  const [limitErrors, setLimitErrors] = useState<Record<string, string | null>>({});
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -224,82 +145,265 @@ export function AdminBilling() {
     }
   }, []);
 
+  const closeModal = useCallback(() => {
+    setModalMode(null);
+    setActivePlanId(null);
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
 
-  const openEdit = (plan: BillingPlan) => {
-    setActivePlan(plan);
-    setEditingName(plan.name);
-    setEditingPrice(String(plan.price));
-    setEditingSortOrder(String(plan.sortOrder ?? 0));
-    setEditingInheritsFromPlanId(plan.inheritsFromPlanId ?? null);
-    setEditingFeatures(
-      effectiveFeaturesById.get(plan.id) ?? { ...DEFAULT_FEATURES }
-    );
-  };
+  useEffect(() => {
+    if (!modalMode) return;
+    const container = modalRef.current;
+    const firstField = container?.querySelector<HTMLInputElement>("input, select, textarea");
+    if (firstField) {
+      firstField.focus();
+      if (typeof firstField.select === "function") firstField.select();
+    }
+  }, [modalMode]);
 
-  const closeEdit = () => {
-    setActivePlan(null);
-    setEditingName("");
-    setEditingPrice("");
-    setEditingSortOrder("");
-    setEditingInheritsFromPlanId(null);
-    setEditingFeatures(null);
-  };
+  useEffect(() => {
+    if (!modalMode) return;
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const container = modalRef.current;
+      if (!container) return;
+
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        )
+      ).filter((el) => !el.hasAttribute("disabled"));
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [modalMode, closeModal]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" || !modalMode) return;
+    const keysCount = Object.keys(FEATURE_CATALOG).length;
+    const entriesCount = Object.entries(FEATURE_CATALOG).length;
+    if (keysCount !== entriesCount) {
+      // eslint-disable-next-line no-console
+      console.warn("[admin-billing] feature catalog mismatch", { keysCount, entriesCount });
+    } else {
+      // eslint-disable-next-line no-console
+      console.debug("[admin-billing] feature catalog size", keysCount);
+    }
+  }, [modalMode]);
 
   const plansById = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
 
-  const effectiveFeaturesById = useMemo(() => {
-    const map = new Map<string, PlanFeatures>();
-    for (const plan of plans) {
-      map.set(plan.id, resolveEffectiveFeatures(plan.id, plansById));
+  const groupedPlans = useMemo(() => {
+    const sorted = [...plans].sort((a, b) => {
+      if (a.providerType !== b.providerType) return a.providerType.localeCompare(b.providerType);
+      if (a.tier !== b.tier) return TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
+    const groups: Record<ProviderType, BillingPlan[]> = { MASTER: [], STUDIO: [] };
+    for (const plan of sorted) groups[plan.providerType].push(plan);
+    return groups;
+  }, [plans]);
+
+  const openCreate = () => {
+    setModalMode("create");
+    setActivePlanId(null);
+    setActiveTab("main");
+    setFeatureQuery("");
+    setEditingCode("");
+    setEditingName("");
+    setEditingPrice("0");
+    setEditingSortOrder("0");
+    setEditingTier("FREE");
+    setEditingProviderType("MASTER");
+    setEditingInheritsFromPlanId(null);
+    setEditingIsActive(true);
+    setEditingOverrides({});
+    setLimitErrors({});
+  };
+
+  const openEdit = (plan: BillingPlan) => {
+    setModalMode("edit");
+    setActivePlanId(plan.id);
+    setActiveTab("main");
+    setFeatureQuery("");
+    setEditingCode(plan.code);
+    setEditingName(plan.name);
+    setEditingPrice(String(plan.price));
+    setEditingSortOrder(String(plan.sortOrder ?? 0));
+    setEditingTier(plan.tier);
+    setEditingProviderType(plan.providerType);
+    setEditingInheritsFromPlanId(plan.inheritsFromPlanId ?? null);
+    setEditingIsActive(plan.isActive);
+    setEditingOverrides(parseOverrides(plan.features));
+    setLimitErrors({});
+  };
+
+  const draftPlanId = modalMode === "create" ? "__new__" : activePlanId;
+
+  const draftPlansById = useMemo(() => {
+    const map = buildPlanMap(plans);
+    if (modalMode && draftPlanId) {
+      map.set(draftPlanId, {
+        id: draftPlanId,
+        inheritsFromPlanId: editingInheritsFromPlanId ?? null,
+        features: editingOverrides,
+      });
     }
     return map;
-  }, [plans, plansById]);
+  }, [plans, modalMode, draftPlanId, editingInheritsFromPlanId, editingOverrides]);
+
+  const parentEffective = useMemo(() => {
+    if (!editingInheritsFromPlanId) return undefined;
+    return resolveEffectiveFeatures(editingInheritsFromPlanId, draftPlansById);
+  }, [draftPlansById, editingInheritsFromPlanId]);
+
+  const uiState = useMemo(() => {
+    if (!draftPlanId) return null;
+    return deriveUiState(draftPlanId, draftPlansById);
+  }, [draftPlanId, draftPlansById]);
+
+  const catalogEntries = useMemo(() => filterCatalog(editingProviderType), [editingProviderType]);
+
+  const normalizedQuery = featureQuery.trim().toLowerCase();
+
+  const filteredCatalogEntries = useMemo(() => {
+    if (!normalizedQuery) return catalogEntries;
+    return catalogEntries.filter(([key, def]) => {
+      const haystack = `${def.title} ${def.description} ${def.group} ${key}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [catalogEntries, normalizedQuery]);
+
+  const groupedCatalog = useMemo(() => groupCatalog(filteredCatalogEntries), [filteredCatalogEntries]);
+
+  const validateLimitOverride = (key: LimitFeatureKey, nextValue: number | null) => {
+    const parentValue = parentEffective ? parentEffective[key] : undefined;
+    if (!isRelaxedLimit(parentValue, nextValue)) {
+      setLimitErrors((current) => ({
+        ...current,
+        [key]: "Лимит нельзя сделать строже, чем у родительского тарифа.",
+      }));
+      return false;
+    }
+    setLimitErrors((current) => ({ ...current, [key]: null }));
+    return true;
+  };
+
+  const updateOverride = (key: BooleanFeatureKey, checked: boolean) => {
+    setEditingOverrides((current) => {
+      const next = { ...current };
+      if (checked) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const updateLimitOverride = (key: LimitFeatureKey, value: number | null | undefined) => {
+    if (value === undefined) {
+      setEditingOverrides((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setLimitErrors((current) => ({ ...current, [key]: null }));
+      return;
+    }
+    if (!validateLimitOverride(key, value == null ? null : value)) return;
+    setEditingOverrides((current) => ({ ...current, [key]: value }));
+  };
 
   const savePlan = async () => {
-    if (!activePlan) return;
+    if (!modalMode) return;
     setSaving(true);
     setError(null);
+
     const priceValue = Number(editingPrice);
     const sortOrderValue = Number(editingSortOrder);
+
     if (Number.isNaN(priceValue) || priceValue < 0) {
-      setError("Введите корректную цену.");
+      setError("Укажите корректную цену.");
       setSaving(false);
       return;
     }
     if (!Number.isFinite(sortOrderValue)) {
-      setError("Введите корректный порядок сортировки.");
+      setError("Укажите корректный порядок сортировки.");
       setSaving(false);
       return;
     }
 
-    const resolvedFeatures = editingFeatures ?? { ...DEFAULT_FEATURES };
-    const baseFeatures = editingInheritsFromPlanId
-      ? effectiveFeaturesById.get(editingInheritsFromPlanId) ?? null
-      : null;
-    const featureOverrides = buildOverrides(resolvedFeatures, baseFeatures);
+    for (const key of Object.keys(limitErrors)) {
+      if (limitErrors[key]) {
+        setError("Исправьте ошибки лимитов.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    const parentValueMap = parentEffective ?? getDefaultPlanFeatures();
+    for (const [key, value] of Object.entries(editingOverrides)) {
+      if (!FEATURE_CATALOG[key as FeatureKey]) continue;
+      if (FEATURE_CATALOG[key as FeatureKey].kind === "limit") {
+        const parentLimit = parentEffective ? parentValueMap[key as LimitFeatureKey] : undefined;
+        if (!isRelaxedLimit(parentLimit, value as number | null)) {
+          setError("Лимит нельзя сделать строже, чем у родительского тарифа.");
+          setSaving(false);
+          return;
+        }
+      }
+    }
 
     try {
-      const res = await fetch("/api/admin/billing", {
-        method: "PATCH",
+      const endpoint = "/api/admin/billing";
+      const payload = {
+        code: editingCode.trim(),
+        name: editingName.trim(),
+        price: priceValue,
+        sortOrder: sortOrderValue,
+        tier: editingTier,
+        providerType: editingProviderType,
+        inheritsFromPlanId: editingInheritsFromPlanId,
+        features: editingOverrides,
+        isActive: editingIsActive,
+      };
+
+      const res = await fetch(endpoint, {
+        method: modalMode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: activePlan.id,
-          name: editingName,
-          price: priceValue,
-          sortOrder: sortOrderValue,
-          inheritsFromPlanId: editingInheritsFromPlanId,
-          features: featureOverrides,
-        }),
+        body: JSON.stringify(modalMode === "create" ? payload : { id: activePlanId, ...payload }),
       });
+
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : "Не удалось сохранить тариф");
       }
+
       await load();
-      closeEdit();
+      closeModal();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось сохранить тариф");
     } finally {
@@ -307,201 +411,389 @@ export function AdminBilling() {
     }
   };
 
+  if (loading) {
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>;
+  }
+
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-text-main">Финансы и тарифы</h1>
-        <p className="mt-1 text-sm text-text-sec">Управляйте тарифными планами и платежной логикой.</p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-main">Тарифы и подписки</h1>
+          <p className="mt-1 text-sm text-text-sec">
+            Управляйте тарифами, функциями и наследованием между уровнями.
+          </p>
+        </div>
+        <Button onClick={openCreate} variant="secondary">
+          Создать тариф
+        </Button>
       </header>
 
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-text-main">Тарифные планы</h2>
+      {(["MASTER", "STUDIO"] as ProviderType[]).map((providerType) => (
+        <section key={providerType} className="space-y-4">
+          <h2 className="text-lg font-semibold text-text-main">
+            {providerType === "MASTER" ? "Тарифы для мастеров" : "Тарифы для студий"}
+          </h2>
 
-        {loading ? (
-          <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>
-        ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {plans.map((plan) => {
-              const effective = effectiveFeaturesById.get(plan.id) ?? { ...DEFAULT_FEATURES };
-              return (
-                <Card key={plan.id} className="flex flex-col">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-base font-semibold text-text-main">{plan.name}</div>
-                        <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
-                      </div>
-                      <div className="text-sm font-semibold text-text-main">
-                        {plan.price <= 0 ? "Free" : `${moneyRUBPlain(plan.price)} Руб/мес.`}
-                      </div>
+            {groupedPlans[providerType].map((plan) => (
+              <Card key={plan.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-text-main">{plan.name}</div>
+                      <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 space-y-3">
-                    <ul className="space-y-2 text-sm text-text-sec">
-                      {BOOLEAN_FEATURES.map((feature) => (
-                        <li key={feature.key} className="flex items-center gap-2">
-                          <span
-                            className={`h-2.5 w-2.5 rounded-full ${
-                              effective[feature.key] ? "bg-emerald-500" : "bg-neutral-300"
-                            }`}
-                          />
-                          <span className={effective[feature.key] ? "text-text-main" : "text-text-sec"}>
-                            {feature.label}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="text-xs text-text-sec">Тип подписки: {effective.catalogPriority}</div>
-                    <div className="text-xs text-text-sec">
-                      Лимит мастеров: {effective.maxTeamMasters ?? "Безлимитно"}
+                    <div className="text-sm font-semibold text-text-main">
+                      {plan.price <= 0 ? "Бесплатно" : `${moneyRUB(plan.price)} /мес.`}
                     </div>
-                    <div className="pt-2">
-                      <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
-                        Редактировать
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 space-y-3">
+                  <div className="text-xs text-text-sec">
+                    {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.providerType]} • Сортировка: {plan.sortOrder}
+                  </div>
+                  <div className="text-xs text-text-sec">Статус: {plan.isActive ? "Активен" : "Отключён"}</div>
+                  <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
+                    Редактировать
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        )}
-      </section>
+        </section>
+      ))}
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-text-main">История транзакций</h2>
-        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">
-          История транзакций появится позже.
-        </div>
-      </section>
-
-            <ModalSurface open={Boolean(activePlan)} onClose={closeEdit} title="Edit plan">
-        {activePlan ? (
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-text-sec">Name</label>
-                <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-text-sec">Price (per month)</label>
-                <Input
-                  value={editingPrice}
-                  onChange={(e) => setEditingPrice(e.target.value.replace(/[^\d]/g, ""))}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-text-sec">Sort order</label>
-                <Input
-                  value={editingSortOrder}
-                  onChange={(e) => setEditingSortOrder(e.target.value.replace(/[^\d-]/g, ""))}
-                />
-              </div>
+      <ModalSurface open={Boolean(modalMode)} onClose={closeModal} className="max-w-3xl p-0">
+        <div ref={modalRef} className="flex max-h-[80dvh] flex-col">
+          <header className="flex items-center justify-between gap-4 border-b border-border-subtle/60 px-6 py-4">
+            <div>
+              <h3 className="text-lg font-semibold text-text-main">
+                {modalMode === "create" ? "Создание тарифа" : "Редактирование тарифа"}
+              </h3>
+              <p className="mt-1 text-xs text-text-sec">
+                Настройте основные параметры и включите нужные функции ниже.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={closeModal}
+              aria-label="Закрыть"
+              className="rounded-full border border-border-subtle p-2 text-text-sec transition hover:text-text-main"
+            >
+              ×
+            </button>
+          </header>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-text-sec">Inherits from</label>
-                <select
-                  value={editingInheritsFromPlanId ?? ""}
-                  onChange={(event) =>
-                    setEditingInheritsFromPlanId(event.target.value || null)
-                  }
-                  className="h-10 rounded-lg border border-border-subtle bg-bg-input px-3 text-sm"
-                >
-                  <option value="">No inheritance</option>
-                  {plans
-                    .filter((plan) => plan.id !== activePlan.id)
-                    .map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-text-sec">Catalog priority</label>
-                <select
-                  value={(editingFeatures ?? DEFAULT_FEATURES).catalogPriority}
-                  onChange={(event) =>
-                    setEditingFeatures((prev) => ({
-                      ...(prev ?? { ...DEFAULT_FEATURES }),
-                      catalogPriority: event.target.value as PlanFeatures["catalogPriority"],
-                    }))
-                  }
-                  className="h-10 rounded-lg border border-border-subtle bg-bg-input px-3 text-sm"
-                >
-                  {CATALOG_PRIORITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            <Tabs
+              items={MODAL_TABS}
+              value={activeTab}
+              onChange={(value) => setActiveTab(value as "main" | "features")}
+              className="mb-5"
+            />
 
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-text-sec">Features</div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {BOOLEAN_FEATURES.map((feature) => (
-                  <label key={feature.key} className="flex items-center gap-2 text-sm text-text-main">
-                    <input
-                      type="checkbox"
-                      checked={Boolean((editingFeatures ?? DEFAULT_FEATURES)[feature.key])}
-                      onChange={(event) =>
-                        setEditingFeatures((prev) => ({
-                          ...(prev ?? { ...DEFAULT_FEATURES }),
-                          [feature.key]: event.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 accent-primary"
+            {activeTab === "main" ? (
+              <div className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs text-text-sec">
+                    Код
+                    <Input
+                      value={editingCode}
+                      onChange={(event) => setEditingCode(event.target.value)}
+                      disabled={modalMode === "edit"}
                     />
-                    {feature.label}
                   </label>
-                ))}
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-text-sec">Limits (empty = unlimited)</div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {LIMIT_FEATURES.map((feature) => {
-                  const value = (editingFeatures ?? DEFAULT_FEATURES)[feature.key];
-                  return (
-                    <label key={feature.key} className="space-y-1 text-sm text-text-main">
-                      <span className="text-xs text-text-sec">{feature.label}</span>
-                      <Input
-                        type="number"
-                        value={value === null ? "" : String(value)}
-                        onChange={(event) => {
-                          const raw = event.target.value;
-                          setEditingFeatures((prev) => ({
-                            ...(prev ?? { ...DEFAULT_FEATURES }),
-                            [feature.key]: raw === "" ? null : Number(raw),
-                          }));
-                        }}
-                        placeholder="Unlimited"
-                      />
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
+                  <label className="text-xs text-text-sec">
+                    Название
+                    <Input value={editingName} onChange={(event) => setEditingName(event.target.value)} />
+                  </label>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeEdit} disabled={saving}>
-                Cancel
-              </Button>
-              <Button onClick={savePlan} disabled={saving}>
-                {saving ? "Saving..." : "Save"}
-              </Button>
-            </div>
+                  <label className="text-xs text-text-sec">
+                    Тип
+                    <select
+                      value={editingProviderType}
+                      onChange={(event) => setEditingProviderType(event.target.value as ProviderType)}
+                      className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                    >
+                      <option value="MASTER">Мастер</option>
+                      <option value="STUDIO">Студия</option>
+                    </select>
+                  </label>
+
+                  <label className="text-xs text-text-sec">
+                    Уровень
+                    <select
+                      value={editingTier}
+                      onChange={(event) => setEditingTier(event.target.value as PlanTier)}
+                      className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                    >
+                      <option value="FREE">Бесплатный</option>
+                      <option value="PRO">PRO</option>
+                      <option value="PREMIUM">Премиум</option>
+                    </select>
+                  </label>
+
+                  <label className="text-xs text-text-sec sm:col-span-2">
+                    Наследуется от
+                    <select
+                      value={editingInheritsFromPlanId ?? ""}
+                      onChange={(event) => setEditingInheritsFromPlanId(event.target.value ? event.target.value : null)}
+                      className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                    >
+                      <option value="">—</option>
+                      {plans
+                        .filter((plan) => plan.id !== activePlanId && plan.providerType === editingProviderType)
+                        .map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.name} ({plan.code})
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  <label className="text-xs text-text-sec">
+                    Цена, ₽/мес.
+                    <Input
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={editingPrice}
+                      onChange={(event) => setEditingPrice(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="text-xs text-text-sec">
+                    Порядок сортировки
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={editingSortOrder}
+                      onChange={(event) => setEditingSortOrder(event.target.value)}
+                    />
+                  </label>
+
+                  <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm sm:col-span-2">
+                    <div>
+                      <div className="text-xs text-text-sec">Активен</div>
+                      <div className="text-[11px] text-text-sec">
+                        Тариф отображается и доступен для назначения/оплаты.
+                      </div>
+                    </div>
+                    <Switch checked={editingIsActive} onCheckedChange={setEditingIsActive} />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "features" ? (
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Input
+                    placeholder="Поиск функции..."
+                    value={featureQuery}
+                    onChange={(event) => setFeatureQuery(event.target.value)}
+                    className="max-w-sm"
+                  />
+                  <div className="text-xs text-text-sec">Показано: {filteredCatalogEntries.length}</div>
+                </div>
+
+                {groupedCatalog.length === 0 ? (
+                  <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-6 text-sm text-text-sec">
+                    Ничего не найдено.
+                  </div>
+                ) : null}
+
+                <div className="space-y-8">
+                  {groupedCatalog.map(([groupName, entries], groupIndex) => (
+                    <section
+                      key={groupName}
+                      className={cn("pt-2", groupIndex > 0 ? "border-t border-border-subtle/50" : "")}
+                    >
+                      <div className="sticky top-0 z-10 -mx-6 px-6 py-2 text-[11px] font-semibold uppercase tracking-widest text-text-sec/70 backdrop-blur">
+                        {groupName}
+                      </div>
+
+                      <div className="mt-4 grid gap-x-8 gap-y-6 md:grid-cols-2">
+                        {entries.map(([key, def]) => {
+                          const state = uiState?.[key] as FeatureUiState | undefined;
+                          if (!state) return null;
+
+                          if (def.kind === "boolean") {
+                            const isOverridden = state.isOverridden;
+                            const isInherited = state.isInherited && state.effectiveValue === true;
+                            const disabled = !canDisableFeature(key as BooleanFeatureKey, state);
+
+                            const inheritedPlanCode = state.inheritedFromPlanId
+                              ? plansById.get(state.inheritedFromPlanId)?.code ?? "BASE"
+                              : "BASE";
+
+                            const checked = Boolean(state.effectiveValue);
+
+                            const toggleValue = () => {
+                              if (disabled) return;
+                              updateOverride(key as BooleanFeatureKey, !checked);
+                            };
+
+                            return (
+                              <div
+                                key={key}
+                                role="button"
+                                tabIndex={disabled ? -1 : 0}
+                                onClick={toggleValue}
+                                onKeyDown={(event) => {
+                                  if (disabled) return;
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    toggleValue();
+                                  }
+                                }}
+                                className={cn(
+                                  "flex items-start justify-between gap-4 rounded-lg px-3 py-3 transition-colors",
+                                  disabled ? "opacity-90" : "cursor-pointer hover:bg-white/5"
+                                )}
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium text-text-main">{def.title}</div>
+                                  {def.description ? (
+                                    <div className="text-xs text-text-sec">{def.description}</div>
+                                  ) : null}
+
+                                  {isInherited ? (
+                                    <div className="mt-1 text-[11px] text-text-sec">
+                                      Унаследовано из: {inheritedPlanCode}
+                                    </div>
+                                  ) : null}
+
+                                  {isInherited ? (
+                                    <div className="text-[11px] text-text-sec">
+                                      Нельзя отключить, т.к. включено в базовом тарифе.
+                                    </div>
+                                  ) : isOverridden ? (
+                                    <div className="mt-1 text-[11px] text-text-sec">
+                                      Переопределено для этого тарифа.
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                <div
+                                  className="shrink-0"
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <Switch
+                                    checked={checked}
+                                    disabled={disabled}
+                                    onCheckedChange={(value) => updateOverride(key as BooleanFeatureKey, value)}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // limit
+                          const overrideValue = editingOverrides[key as LimitFeatureKey];
+                          const effectiveValue = state.effectiveValue as number | null;
+                          const parentLimit = parentEffective ? parentEffective[key as LimitFeatureKey] : undefined;
+
+                          const isUnlimited =
+                            overrideValue === null || (overrideValue === undefined && effectiveValue === null);
+
+                          const isLocked = parentLimit === null && overrideValue === undefined;
+
+                          const inputValue =
+                            overrideValue === null
+                              ? ""
+                              : overrideValue !== undefined
+                                ? String(overrideValue)
+                                : effectiveValue === null
+                                  ? ""
+                                  : String(effectiveValue);
+
+                          const limitHint = isLocked
+                            ? "Лимит унаследован, изменить нельзя."
+                            : parentLimit !== undefined
+                              ? "Лимит можно только ослаблять относительно родителя."
+                              : null;
+
+                          return (
+                            <div
+                              key={key}
+                              className={cn(
+                                "flex flex-col gap-3 rounded-lg px-3 py-3 md:col-span-2",
+                                isLocked ? "opacity-90" : "hover:bg-white/5"
+                              )}
+                            >
+                              <div>
+                                <div className="text-sm font-medium text-text-main">{def.title}</div>
+                                {def.description ? <div className="text-xs text-text-sec">{def.description}</div> : null}
+                                {limitHint ? <div className="mt-1 text-[11px] text-text-sec">{limitHint}</div> : null}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-3">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  value={inputValue}
+                                  disabled={isUnlimited || isLocked}
+                                  onChange={(event) => {
+                                    const raw = event.target.value;
+                                    if (!raw) {
+                                      updateLimitOverride(key as LimitFeatureKey, undefined);
+                                      return;
+                                    }
+                                    const value = Number(raw);
+                                    if (!Number.isFinite(value)) return;
+                                    updateLimitOverride(key as LimitFeatureKey, value);
+                                  }}
+                                  className="w-28"
+                                />
+
+                                <div className="flex items-center gap-2 text-xs text-text-sec">
+                                  <Switch
+                                    checked={isUnlimited}
+                                    disabled={isLocked}
+                                    onCheckedChange={(checked) =>
+                                      updateLimitOverride(key as LimitFeatureKey, checked ? null : undefined)
+                                    }
+                                  />
+                                  <span>Безлимит</span>
+                                </div>
+
+                                {limitErrors[key as string] ? (
+                                  <span className="text-xs text-rose-500">{limitErrors[key as string]}</span>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+
+          <footer className="shrink-0 border-t border-border-subtle/60 bg-bg-card/80 px-6 py-4 backdrop-blur">
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={closeModal}>
+                Отмена
+              </Button>
+              <Button type="button" onClick={() => void savePlan()} disabled={saving}>
+                {saving ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </div>
+          </footer>
+        </div>
       </ModalSurface>
     </section>
   );

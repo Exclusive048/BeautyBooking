@@ -77,6 +77,8 @@ export function usePlanFeatures() {
       loading: state.loading,
       error: state.error,
       planCode: state.data?.planCode ?? null,
+      tier: state.data?.tier ?? null,
+      providerType: state.data?.providerType ?? null,
       planId: state.data?.planId ?? null,
       features,
       system,
