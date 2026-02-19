@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { providerPublicUrl, studioBookingUrl } from "@/lib/public-urls";
 
 export type StudioMasterCard = {
   id: string;
@@ -25,7 +26,7 @@ type MasterExtra = {
 };
 
 type Props = {
-  studioId: string;
+  studio: { id: string; publicUsername: string | null };
   masters: StudioMasterCard[];
 };
 
@@ -35,7 +36,7 @@ function gradeLabel(rating: number, reviews: number): string {
   return UI_TEXT.publicStudio.gradeNew;
 }
 
-export function StudioMastersCarousel({ studioId, masters }: Props) {
+export function StudioMastersCarousel({ studio, masters }: Props) {
   const [extras, setExtras] = useState<Record<string, MasterExtra>>({});
 
   useEffect(() => {
@@ -106,52 +107,55 @@ export function StudioMastersCarousel({ studioId, masters }: Props) {
   return (
     <div className="overflow-x-auto pb-1">
       <div className="flex min-w-max gap-4">
-        {masterCards.map((master) => (
-          <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-            <div className="relative h-48 overflow-hidden bg-muted">
-              {master.avatarUrl ? (
-                <img src={master.avatarUrl} alt={master.name} className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
-              ) : (
-                <div className="h-full w-full bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-700" />
-              )}
-              <div className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white">{master.grade}</div>
+        {masterCards.map((master) => {
+          const masterHref = providerPublicUrl(
+            { id: master.id, publicUsername: master.publicUsername },
+            "studio-masters-carousel"
+          );
+          const bookingHref = studioBookingUrl(studio, { masterId: master.id }, "studio-masters-carousel");
 
-              <div className="absolute inset-x-0 bottom-0 translate-y-full bg-black/65 p-3 transition duration-200 group-hover:translate-y-0">
-                {master.thumbs.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-1">
-                    {master.thumbs.map((thumb, index) => (
-                      <img key={`${master.id}-${index}`} src={thumb} alt="" className="h-12 w-full rounded-md object-cover" />
-                    ))}
-                  </div>
+          return (
+            <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+              <div className="relative h-48 overflow-hidden bg-muted">
+                {master.avatarUrl ? (
+                  <img src={master.avatarUrl} alt={master.name} className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
                 ) : (
-                  <div className="text-xs text-white/80">{UI_TEXT.publicStudio.noPortfolio}</div>
+                  <div className="h-full w-full bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-700" />
                 )}
-              </div>
-            </div>
+                <div className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white">{master.grade}</div>
 
-            <div className="space-y-2 p-4">
-              <div className="text-sm font-semibold text-text">{master.name}</div>
-              {master.specialization ? <div className="text-xs text-text-muted">{master.specialization}</div> : null}
-              <div className="flex items-center gap-2">
-                {master.publicUsername ? (
-                  <Link href={`/u/${master.publicUsername}`} className="text-xs font-medium text-text underline underline-offset-2">
+                <div className="absolute inset-x-0 bottom-0 translate-y-full bg-black/65 p-3 transition duration-200 group-hover:translate-y-0">
+                  {master.thumbs.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-1">
+                      {master.thumbs.map((thumb, index) => (
+                        <img key={`${master.id}-${index}`} src={thumb} alt="" className="h-12 w-full rounded-md object-cover" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-white/80">{UI_TEXT.publicStudio.noPortfolio}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 p-4">
+                <div className="text-sm font-semibold text-text">{master.name}</div>
+                {master.specialization ? <div className="text-xs text-text-muted">{master.specialization}</div> : null}
+                <div className="flex items-center gap-2">
+                  <Link href={masterHref} className="text-xs font-medium text-text underline underline-offset-2">
                     {UI_TEXT.publicStudio.openMaster}
                   </Link>
-                ) : (
-                  <span className="text-xs text-text-muted">Ссылка временно недоступна</span>
-                )}
-                <Link
-                  href={`/studios/${studioId}/booking?masterId=${master.id}`}
-                  className="ml-auto rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900"
-                >
-                  {UI_TEXT.publicStudio.book}
-                </Link>
+                  <Link
+                    href={bookingHref}
+                    className="ml-auto rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900"
+                  >
+                    {UI_TEXT.publicStudio.book}
+                  </Link>
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </div>
   );
 }
-

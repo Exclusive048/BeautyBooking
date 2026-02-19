@@ -2,6 +2,7 @@ import { StudioHeroGallery } from "@/features/public-studio/studio-hero-gallery"
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import type { MediaAssetDto } from "@/lib/media/types";
 import type { ApiResponse } from "@/lib/types/api";
+import { studioBookingUrl } from "@/lib/public-urls";
 
 type Props = {
   studioId: string;
@@ -29,8 +30,9 @@ export async function StudioHeroSection({ studioId }: Props) {
     ]);
     studio = result[0];
     portfolio = result[1];
-  } catch {
+  } catch (error) {
     hasError = true;
+    console.error("[public-studio] hero-section failed", { studioId, error });
   }
 
   if (hasError) {
@@ -53,9 +55,15 @@ export async function StudioHeroSection({ studioId }: Props) {
     ? [studio.bannerUrl, ...portfolio.map((item) => item.url).filter((url) => url !== studio.bannerUrl)]
     : portfolio.map((item) => item.url);
 
+  const bookingHref = studioBookingUrl(
+    { id: studio.id, publicUsername: studio.publicUsername },
+    undefined,
+    "public-studio-hero"
+  );
+
   return (
     <div className="fade-in-up">
-      <StudioHeroGallery studio={studio} imageUrls={imageUrls} />
+      <StudioHeroGallery studio={studio} imageUrls={imageUrls} bookingHref={bookingHref} />
     </div>
   );
 }

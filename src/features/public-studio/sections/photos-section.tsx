@@ -25,8 +25,9 @@ export async function StudioPhotosSection({ studioId }: Props) {
 
   try {
     portfolio = await fetchStudioPortfolio(studioId);
-  } catch {
+  } catch (error) {
     hasError = true;
+    console.error("[public-studio] photos-section failed", { studioId, error });
   }
 
   if (hasError) {

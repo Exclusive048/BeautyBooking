@@ -63,8 +63,9 @@ export async function StudioReviewsSection({ studioId }: Props) {
       reviews = result[0];
       canReviewBookingId = result[1];
     }
-  } catch {
+  } catch (error) {
     hasError = true;
+    console.error("[public-studio] reviews-section failed", { studioId, error });
   }
 
   if (hasError) {

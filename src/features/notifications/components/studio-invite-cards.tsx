@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { providerPublicUrl } from "@/lib/public-urls";
 
 type Props = {
   invites: NotificationCenterInviteItem[];
@@ -99,15 +100,16 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
                 >
                   {savingId === invite.id ? t.rejecting : t.reject}
                 </Button>
-                {invite.studioPublicUsername ? (
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href={`/u/${invite.studioPublicUsername}`}>{t.studioProfile}</Link>
-                  </Button>
-                ) : (
-                  <Button type="button" variant="ghost" size="sm" disabled>
+                <Button asChild variant="ghost" size="sm">
+                  <Link
+                    href={providerPublicUrl(
+                      { id: invite.studioId, publicUsername: invite.studioPublicUsername },
+                      "studio-invite"
+                    )}
+                  >
                     {t.studioProfile}
-                  </Button>
-                )}
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

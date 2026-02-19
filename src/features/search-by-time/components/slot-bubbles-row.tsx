@@ -1,19 +1,24 @@
 import Link from "next/link";
 import type { AvailabilitySlotPreview } from "@/lib/search-by-time/types";
 import { moneyRUB } from "@/lib/format";
+import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 
 type Props = {
-  providerUsername: string;
+  provider: { id: string; publicUsername: string | null };
   serviceId?: string | null;
   slots: AvailabilitySlotPreview[];
 };
 
-function buildSlotHref(username: string, serviceId: string | null | undefined, slotStartAt: string): string {
-  const params = new URLSearchParams();
-  if (serviceId) params.set("serviceId", serviceId);
-  if (slotStartAt) params.set("slotStartAt", slotStartAt);
-  const suffix = params.toString();
-  return suffix ? `/u/${username}?${suffix}` : `/u/${username}`;
+function buildSlotHref(
+  provider: { id: string; publicUsername: string | null },
+  serviceId: string | null | undefined,
+  slotStartAt: string
+): string {
+  const base = providerPublicUrl(provider, "slot-bubbles-row");
+  return withQuery(base, {
+    serviceId: serviceId || undefined,
+    slotStartAt: slotStartAt || undefined,
+  });
 }
 
 function formatDiscount(slot: AvailabilitySlotPreview): string | null {
@@ -24,7 +29,7 @@ function formatDiscount(slot: AvailabilitySlotPreview): string | null {
   return `-${moneyRUB(slot.discountValue)}`;
 }
 
-export function SlotBubblesRow({ providerUsername, serviceId, slots }: Props) {
+export function SlotBubblesRow({ provider, serviceId, slots }: Props) {
   return (
     <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
       {slots.map((slot) => {
@@ -32,7 +37,7 @@ export function SlotBubblesRow({ providerUsername, serviceId, slots }: Props) {
         return (
           <Link
             key={slot.startAtUtc}
-            href={buildSlotHref(providerUsername, serviceId, slot.startAtUtc)}
+            href={buildSlotHref(provider, serviceId, slot.startAtUtc)}
             className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-card/65 px-3 py-1 text-xs font-medium text-text-main transition hover:bg-bg-card"
             aria-label={`Записаться на ${slot.label}`}
           >

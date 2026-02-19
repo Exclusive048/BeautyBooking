@@ -6,6 +6,6 @@ export async function GET(req: Request) {
   const user = await getSessionUser();
   if (!user) return nextRedirect(req, "/login");
 
-  const result = await createStudioProfile({ userId: user.id, roles: user.roles });
-  return nextRedirect(req, `/cabinet/studio/${result.studioId}`);
+  await createStudioProfile({ userId: user.id, roles: user.roles });
+  return nextRedirect(req, "/cabinet/studio");
 }

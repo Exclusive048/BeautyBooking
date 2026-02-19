@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
   title: "BeautyHub",
-  description: "запись к мастерам",
+  description: "Запись к мастерам",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

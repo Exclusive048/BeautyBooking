@@ -6,6 +6,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { moneyRUB } from "@/lib/format";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { providerPublicUrl } from "@/lib/public-urls";
 
 type CatalogCardItem = {
   type: "master" | "studio";
@@ -34,7 +35,7 @@ type CatalogCardProps = {
 export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
   const viewerTimeZone = useViewerTimeZoneContext();
   const hasServiceQuery = serviceQuery.trim().length > 0;
-  const href = item.publicUsername ? `/u/${item.publicUsername}` : null;
+  const href = providerPublicUrl({ id: item.id, publicUsername: item.publicUsername }, "catalog-card");
 
   const priceText =
     hasServiceQuery && item.primaryService && item.primaryService.price > 0
@@ -92,14 +93,6 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
     "group block overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card transition-all duration-300";
   const interactiveClass =
     "hover:scale-[1.01] hover:shadow-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40";
-
-  if (!href) {
-    return (
-      <div className={`${baseClass} opacity-70`} aria-disabled="true">
-        {cardBody}
-      </div>
-    );
-  }
 
   return (
     <Link href={href} aria-label={item.title} className={`${baseClass} ${interactiveClass}`}>

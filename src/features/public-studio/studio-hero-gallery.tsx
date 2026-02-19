@@ -1,9 +1,12 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import { UI_TEXT } from "@/lib/ui/text";
+import { withQuery } from "@/lib/public-urls";
 
 type StudioHeroData = {
   name: string;
@@ -17,13 +20,20 @@ type StudioHeroData = {
 type Props = {
   studio: StudioHeroData;
   imageUrls: string[];
+  bookingHref: string;
 };
 
-export function StudioHeroGallery({ studio, imageUrls }: Props) {
+export function StudioHeroGallery({ studio, imageUrls, bookingHref }: Props) {
   const mapsHref = buildYandexMapsUrl({
     address: studio.address,
     lat: studio.geoLat ?? null,
     lon: studio.geoLng ?? null,
+  });
+  const searchParams = useSearchParams();
+  const bookingUrl = withQuery(bookingHref, {
+    serviceId: searchParams?.get("serviceId") ?? undefined,
+    masterId: searchParams?.get("masterId") ?? undefined,
+    slotStartAt: searchParams?.get("slotStartAt") ?? undefined,
   });
 
   const heroImages = imageUrls.slice(0, 5);
@@ -77,12 +87,12 @@ export function StudioHeroGallery({ studio, imageUrls }: Props) {
             ) : null}
           </div>
 
-          <a
-            href="#studio-booking-entry"
+          <Link
+            href={bookingUrl}
             className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-white/90"
           >
             {UI_TEXT.publicStudio.heroBook}
-          </a>
+          </Link>
         </div>
       </div>
 

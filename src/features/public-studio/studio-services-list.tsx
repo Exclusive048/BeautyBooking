@@ -5,9 +5,10 @@ import { useMemo, useState } from "react";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { studioBookingUrl } from "@/lib/public-urls";
 
 type Props = {
-  studioId: string;
+  studio: { id: string; publicUsername: string | null };
   categories: string[];
   services: ProviderServiceDto[];
 };
@@ -49,7 +50,7 @@ function buildGroups(categories: string[], services: ProviderServiceDto[]): Serv
   return groups.length > 0 ? groups : [{ title: UI_TEXT.publicStudio.allServices, services }];
 }
 
-export function StudioServicesList({ studioId, categories, services }: Props) {
+export function StudioServicesList({ studio, categories, services }: Props) {
   const groups = useMemo(() => buildGroups(categories, services), [categories, services]);
   const [activeGroup, setActiveGroup] = useState(groups[0]?.title ?? UI_TEXT.publicStudio.allServices);
 
@@ -94,7 +95,7 @@ export function StudioServicesList({ studioId, categories, services }: Props) {
                 </div>
               </div>
               <Link
-                href={`/studios/${studioId}/booking?serviceId=${service.id}`}
+                href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services")}
                 className="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
                 aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
               >

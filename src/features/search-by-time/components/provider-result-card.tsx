@@ -5,6 +5,7 @@ import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { SlotBubblesRow } from "@/features/search-by-time/components/slot-bubbles-row";
 import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
 import { moneyRUB } from "@/lib/format";
+import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -20,13 +21,11 @@ export function ProviderResultCard({ item }: Props) {
         ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}`
         : UI_TEXT.catalog.priceOnRequest;
 
+  const href = providerPublicUrl({ id: item.providerId, publicUsername: item.publicUsername }, "search-result-card");
+
   return (
     <article className="overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card">
-      <Link
-        href={`/u/${item.publicUsername}`}
-        aria-label={item.name}
-        className="group block transition hover:opacity-95"
-      >
+      <Link href={href} aria-label={item.name} className="group block transition hover:opacity-95">
         <PhotoCarousel photos={item.photos} alt={item.name} />
       </Link>
 
@@ -58,7 +57,11 @@ export function ProviderResultCard({ item }: Props) {
         <div className="text-sm text-text-main">{priceText}</div>
 
         <div className="text-xs text-text-sec">{UI_TEXT.catalog.timeSearch.freeInTime}</div>
-        <SlotBubblesRow providerUsername={item.publicUsername} serviceId={item.service.id} slots={item.slots} />
+        <SlotBubblesRow
+          provider={{ id: item.providerId, publicUsername: item.publicUsername }}
+          serviceId={item.service.id}
+          slots={item.slots}
+        />
       </div>
     </article>
   );

@@ -13,8 +13,9 @@ export async function StudioServicesSection({ studioId }: Props) {
 
   try {
     studio = await getStudioProfile(studioId);
-  } catch {
+  } catch (error) {
     hasError = true;
+    console.error("[public-studio] services-section failed", { studioId, error });
   }
 
   if (hasError) {
@@ -41,7 +42,7 @@ export async function StudioServicesSection({ studioId }: Props) {
     <div className="fade-in-up">
       <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
         <StudioServicesList
-          studioId={studio.id}
+          studio={{ id: studio.id, publicUsername: studio.publicUsername }}
           categories={studio.categories}
           services={studio.services}
         />

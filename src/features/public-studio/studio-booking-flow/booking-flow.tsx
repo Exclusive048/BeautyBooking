@@ -25,6 +25,7 @@ import {
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { studioBookingUrl } from "@/lib/public-urls";
 
 type MasterAvailability = {
   serviceAvailable: boolean;
@@ -115,7 +116,11 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
   const nextPath =
     typeof window !== "undefined"
       ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-      : `/studios/${studioId}/booking`;
+      : studioBookingUrl(
+          { id: studioId, publicUsername: studio?.publicUsername ?? null },
+          undefined,
+          "studio-booking-flow"
+        );
 
   useEffect(() => {
     let cancelled = false;
