@@ -600,9 +600,9 @@ export const UI_TEXT = {
     clients: {
       loading: "Загрузка клиентов...",
       empty: "Пока нет клиентов. Список формируется из записей.",
-      loadFailed: "Не удалось загрузить клиентов",
-      apiErrorPrefix: "Ошибка API",
-      moneySuffix: "₸",
+        loadFailed: "Не удалось загрузить клиентов",
+        apiErrorPrefix: "Ошибка API",
+        moneySuffix: "₽",
       columns: {
         client: "Клиент",
         phone: "Телефон",

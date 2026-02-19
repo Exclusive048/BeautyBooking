@@ -266,6 +266,8 @@ enum MediaEntityType {
 
   MODEL_APPLICATION
 
+  CLIENT_CARD
+
 }
 
 
@@ -277,6 +279,8 @@ enum MediaKind {
   PORTFOLIO
 
   MODEL_APPLICATION_PHOTO
+
+  CLIENT_CARD_PHOTO
 
 }
 
@@ -509,6 +513,7 @@ model UserProfile {
   modelApplications  ModelApplication[]
 
   clientNotes        ClientNote[]        @relation("ClientNotesForClient")
+  clientCards        ClientCard[]        @relation("ClientCardsForUser")
 
   publicUsernameAliases PublicUsernameAlias[] @relation("ClientPublicUsernameAliases")
 
@@ -862,6 +867,8 @@ model Provider {
 
   clientNotes ClientNote[] @relation("ClientNotesForMaster")
 
+  clientCards ClientCard[]
+
 
 
   createdAt DateTime @default(now())
@@ -897,6 +904,66 @@ model PublicUsernameAlias {
   @@index([providerId])
 
   @@index([clientUserId])
+
+}
+
+model ClientCard {
+
+  id           String   @id @default(cuid())
+
+  providerId   String
+
+  provider     Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  clientUserId String?
+
+  clientUser   UserProfile? @relation("ClientCardsForUser", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  clientPhone  String?
+
+  notes        String?  @db.Text
+
+  tags         String[] @default([])
+
+  photos       ClientCardPhoto[]
+
+  createdAt    DateTime @default(now())
+
+  updatedAt    DateTime @updatedAt
+
+
+
+  @@index([providerId])
+
+  @@index([providerId, clientUserId])
+
+  @@index([providerId, clientPhone])
+
+  @@index([clientUserId])
+
+  @@index([clientPhone])
+
+}
+
+model ClientCardPhoto {
+
+  id           String     @id @default(cuid())
+
+  cardId       String
+
+  card         ClientCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  mediaAssetId String     @unique
+
+  mediaAsset   MediaAsset @relation("ClientCardPhotoAsset", fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  caption      String?
+
+  createdAt    DateTime   @default(now())
+
+
+
+  @@index([cardId])
 
 }
 
@@ -1657,6 +1724,7 @@ model MediaAsset {
   createdByUserId  String?
 
   createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  clientCardPhotos ClientCardPhoto[] @relation("ClientCardPhotoAsset")
 
   createdAt        DateTime        @default(now())
 
