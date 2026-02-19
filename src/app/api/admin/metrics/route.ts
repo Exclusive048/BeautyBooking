@@ -21,8 +21,8 @@ export async function GET() {
     }),
     prisma.userSubscription.count({
       where: {
-        status: "ACTIVE",
-        OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+        status: { in: ["ACTIVE", "PAST_DUE"] },
+        OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: now } }],
         plan: { code: { notIn: ["MASTER_FREE", "STUDIO_FREE"] } },
       },
     }),

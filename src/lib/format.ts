@@ -9,6 +9,26 @@ export function moneyRUB(value: number) {
   }).format(value);
 }
 
+export function moneyRUBFromKopeks(valueKopeks: number) {
+  const value = valueKopeks / 100;
+  const hasFraction = Math.abs(valueKopeks % 100) > 0;
+  return new Intl.NumberFormat(LOCALE, {
+    style: "currency",
+    currency: CURRENCY,
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+export function moneyRUBPlainFromKopeks(valueKopeks: number) {
+  const value = valueKopeks / 100;
+  const hasFraction = Math.abs(valueKopeks % 100) > 0;
+  return new Intl.NumberFormat(LOCALE, {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function moneyRUBPlain(value: number) {
   return new Intl.NumberFormat(LOCALE, {
     maximumFractionDigits: 0,

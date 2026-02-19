@@ -11,6 +11,7 @@ type BooleanFeatureKey = {
 type FeatureGateProps = {
   feature: BooleanFeatureKey;
   requiredPlan?: PlanTier;
+  scope?: "MASTER" | "STUDIO";
   title?: string;
   description?: string;
   ctaLabel?: string;
@@ -21,13 +22,14 @@ type FeatureGateProps = {
 export function FeatureGate({
   feature,
   requiredPlan,
+  scope,
   title,
   description,
   ctaLabel = "Посмотреть тарифы",
   className,
   children,
 }: FeatureGateProps) {
-  const plan = usePlanFeatures();
+  const plan = usePlanFeatures(scope);
 
   if (plan.loading) {
     return (

@@ -39,7 +39,7 @@ export function StudioTeamPage({ studioId }: Props) {
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [title, setTitle] = useState("");
-  const plan = usePlanFeatures();
+  const plan = usePlanFeatures("STUDIO");
 
   const mastersCountText = useMemo(() => t.mastersCount.replace("{count}", String(masters.length)), [masters.length, t.mastersCount]);
   const teamLimit = plan.limit("maxTeamMasters");

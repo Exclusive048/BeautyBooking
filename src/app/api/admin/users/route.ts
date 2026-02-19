@@ -52,11 +52,11 @@ export async function GET(req: Request) {
           select: { type: true },
         },
         subscriptions: {
-          orderBy: { updatedAt: "desc" },
-          take: 1,
           select: {
+            scope: true,
             status: true,
-            plan: { select: { id: true, code: true, name: true, price: true } },
+            currentPeriodEnd: true,
+            plan: { select: { id: true, code: true, name: true, tier: true, scope: true } },
           },
         },
       },
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
     const mapped = users.map((user) => {
       const providerTypes = user.providers.map((p) => p.type);
       const type = resolveUserType(user.roles, providerTypes);
-      const subscription = user.subscriptions[0] ?? null;
+      const subscriptions = user.subscriptions ?? [];
       return {
         id: user.id,
         displayName: user.displayName,
@@ -74,12 +74,14 @@ export async function GET(req: Request) {
         roles: user.roles,
         type,
         createdAt: user.createdAt.toISOString(),
-        subscription: subscription
-          ? {
-              status: subscription.status,
-              plan: subscription.plan,
-            }
-          : null,
+        subscriptions: subscriptions.map((subscription) => ({
+          scope: subscription.scope,
+          status: subscription.status,
+          currentPeriodEnd: subscription.currentPeriodEnd
+            ? subscription.currentPeriodEnd.toISOString()
+            : null,
+          plan: subscription.plan,
+        })),
       };
     });
 
@@ -133,23 +135,33 @@ export async function PATCH(req: Request) {
       return fail("Тариф не найден", 404, "NOT_FOUND");
     }
 
+    const now = new Date();
     const subscription = await prisma.userSubscription.upsert({
-      where: { userId },
+      where: { userId_scope: { userId, scope: plan.scope } },
       create: {
         userId,
+        scope: plan.scope,
         planId: plan.id,
         status: "ACTIVE",
-        startsAt: new Date(),
-        endsAt: null,
+        startedAt: now,
+        currentPeriodStart: now,
+        currentPeriodEnd: null,
+        periodMonths: 1,
+        autoRenew: false,
+        cancelAtPeriodEnd: false,
       },
       update: {
         planId: plan.id,
         status: "ACTIVE",
-        endsAt: null,
+        currentPeriodEnd: null,
+        autoRenew: false,
+        cancelAtPeriodEnd: false,
       },
       select: {
+        scope: true,
         status: true,
-        plan: { select: { id: true, code: true, name: true, price: true } },
+        currentPeriodEnd: true,
+        plan: { select: { id: true, code: true, name: true, tier: true, scope: true } },
       },
     });
 

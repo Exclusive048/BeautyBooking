@@ -67,7 +67,7 @@ type Props = {
 
 export function StudioServicesPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.services;
-  const plan = usePlanFeatures();
+  const plan = usePlanFeatures("STUDIO");
   const [data, setData] = useState<ServicesData>({ categories: [] });
   const [masters, setMasters] = useState<StudioMaster[]>([]);
   const [loading, setLoading] = useState(true);

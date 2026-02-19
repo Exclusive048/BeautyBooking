@@ -1,1195 +1,1272 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum ProviderType {
-  MASTER
-  STUDIO
-}
-
-enum StudioRole {
-  OWNER
-  ADMIN
-  MASTER
-}
-
-enum MembershipStatus {
-  ACTIVE
-  PENDING
-  REJECTED
-  LEFT
-}
-
-enum AccountType {
-  CLIENT
-  MASTER
-  STUDIO
-  STUDIO_ADMIN
-  ADMIN
-  SUPERADMIN
-}
-
-enum PlanTier {
-  FREE
-  PRO
-  PREMIUM
-}
-
-enum ConsentType {
-  TERMS
-  PRIVACY
-  MARKETING
-  PUBLIC_PROFILE
-}
-
-enum BookingStatus {
-  NEW
-  PENDING
-  CONFIRMED
-  CHANGE_REQUESTED
-  REJECTED
-  IN_PROGRESS
-  PREPAID
-  STARTED
-  FINISHED
-  CANCELLED
-  NO_SHOW
-}
-
-enum BookingCancelledBy {
-  CLIENT
-  PROVIDER
-  SYSTEM
-}
-
-enum BookingRequestedBy {
-  CLIENT
-  MASTER
-}
-
-enum BookingActionRequiredBy {
-  CLIENT
-  MASTER
-}
-
-enum DiscountType {
-  PERCENT
-  FIXED
-}
-
-enum DiscountApplyMode {
-  ALL_SERVICES
-  PRICE_FROM
-  MANUAL
-}
-
-enum ScheduleBreakKind {
-  WEEKLY
-  OVERRIDE
-}
-
-enum ScheduleRuleKind {
-  WEEKLY
-  CYCLE
-}
-
-enum ScheduleOverrideKind {
-  OFF
-  TIME_RANGE
-  TEMPLATE
-}
-
-enum NotificationType {
-  BOOKING_CREATED
-  BOOKING_CANCELLED
-  BOOKING_RESCHEDULED
-  BOOKING_REQUEST
-  BOOKING_CONFIRMED
-  BOOKING_DECLINED
-  MODEL_NEW_APPLICATION
-  MODEL_APPLICATION_REJECTED
-  MODEL_TIME_PROPOSED
-  MODEL_BOOKING_CREATED
-}
-
-enum MediaEntityType {
-  USER
-  MASTER
-  STUDIO
-  SITE
-  MODEL_APPLICATION
-}
-
-enum MediaKind {
-  AVATAR
-  PORTFOLIO
-  MODEL_APPLICATION_PHOTO
-}
-
-enum StudioMemberRole {
-  OWNER
-  ADMIN
-  MASTER
-  FINANCE
-}
-
-enum StudioMemberStatus {
-  ACTIVE
-  INVITED
-  DISABLED
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELLED
-  EXPIRED
-}
-
-enum BookingSource {
-  MANUAL
-  WEB
-  APP
-}
-
-enum TimeBlockType {
-  BREAK
-  BLOCK
-}
-
-enum WorkExceptionType {
-  OFF
-  SHIFT
-}
-
-enum ScheduleChangeRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum ReviewTargetType {
-  provider
-  studio
-}
-
-enum ReviewTagType {
-  PUBLIC
-  PRIVATE
-}
-
-enum ModelOfferStatus {
-  ACTIVE
-  CLOSED
-  ARCHIVED
-}
-
-enum ModelApplicationStatus {
-  PENDING
-  REJECTED
-  APPROVED_WAITING_CLIENT
-  CONFIRMED
-}
-
-model UserProfile {
-  id                 String              @id @default(cuid())
-  roles              AccountType[]       @default([CLIENT])
-  displayName        String?
-  phone              String?             @unique
-  email              String?             @unique
-  telegramId         String?             @unique
-  telegramUsername   String?
-  externalPhotoUrl   String?
-  telegramLink       TelegramLink?
-  telegramLinkTokens TelegramLinkToken[]
-  vkLink             VkLink?
-  createdCategories  GlobalCategory[] @relation("GlobalCategoryCreator")
-  subscriptions      UserSubscription[]
-
-  // NEW (optional profile fields)
-  firstName  String?
-  lastName   String?
-  middleName String?
-  birthDate  DateTime?
-  address    String?
-  geoLat     Float?
-  geoLng     Float?
-
-  providers          Provider[]         @relation("ProviderOwner")
-  ownedStudios       Studio[]           @relation("StudioOwner")
-  masterProfile      MasterProfile?
-  studioMemberships  StudioMembership[]
-  studioMembers      StudioMember[]
-  studioInvites      StudioInvite[]     @relation("StudioInvitedBy")
-  bookings           Booking[]          @relation("BookingClient")
-  notifications      Notification[]
-  consents           UserConsent[]
-  mediaAssetsCreated MediaAsset[]       @relation("MediaAssetCreatedBy")
-  reviewsAuthored    Review[]           @relation("ReviewAuthor")
-  favorites          Favorite[]
-  modelApplications  ModelApplication[]
-  clientNotes        ClientNote[]        @relation("ClientNotesForClient")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model UserConsent {
-  id              String      @id @default(cuid())
-  userId          String
-  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  consentType     ConsentType
-  documentVersion String
-
-  agreedAt        DateTime    @default(now())
-  ipAddress       String?
-  userAgent       String?
-
-  revokedAt       DateTime?
-
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  @@unique([userId, consentType])
-  @@index([userId])
-}
-
-model Studio {
-  id                  String                  @id @default(cuid())
-  providerId          String                  @unique
-  provider            Provider                @relation("StudioProvider", fields: [providerId], references: [id], onDelete: Cascade)
-  ownerUserId         String?
-  owner               UserProfile?            @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  memberships         StudioMembership[]
-  studioMembers       StudioMember[]
-  invites             StudioInvite[]
-  ratingAvg           Float                   @default(0)
-  ratingCount         Int                     @default(0)
-  serviceCategories   ServiceCategory[]
-  masterServices      MasterService[]
-  workShiftTemplates  WorkShiftTemplate[]
-  workDayRules        WorkDayRule[]
-  workExceptions      WorkException[]
-  timeBlocks          TimeBlock[]
-  scheduleRequests    ScheduleChangeRequest[]
-  services            Service[]
-  bookings            Booking[]
-  bookingServiceItems BookingServiceItem[]
-  portfolioItems      PortfolioItem[]
-  reviews             Review[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model MasterProfile {
-  id                 String      @id @default(cuid())
-  userId             String      @unique
-  user               UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-  providerId         String      @unique
-  provider           Provider    @relation("MasterProvider", fields: [providerId], references: [id], onDelete: Cascade)
-  lastBookingsSeenAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model StudioMembership {
-  id       String           @id @default(cuid())
-  userId   String
-  user     UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  studioId String
-  studio   Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  roles    StudioRole[]
-  status   MembershipStatus @default(PENDING)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, studioId])
-  @@index([userId])
-  @@index([studioId])
-  @@index([status])
-}
-
-model StudioInvite {
-  id              String           @id @default(cuid())
-  studioId        String
-  studio          Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  phone           String
-  status          MembershipStatus @default(PENDING)
-  invitedByUserId String
-  invitedBy       UserProfile      @relation("StudioInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([studioId, phone])
-  @@index([studioId])
-  @@index([phone])
-  @@index([status])
-}
-
-model OtpCode {
-  id        String    @id @default(cuid())
-  phone     String
-  codeHash  String
-  expiresAt DateTime
-  usedAt    DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@index([phone])
-  @@index([expiresAt])
-}
-
-model Provider {
-  id                       String       @id @default(cuid())
-  type                     ProviderType
-  name                     String
-  tagline                  String
-  rating                   Float        @default(0)
-  reviews                  Int          @default(0)
-  ratingAvg                Float        @default(0)
-  ratingCount              Int          @default(0)
-  priceFrom                Int          @default(0)
-  address                  String
-  district                 String
-  categories               String[]     @default([])
-  availableToday           Boolean      @default(false)
-  timezone                 String       @default("Asia/Almaty")
-  bufferBetweenBookingsMin Int          @default(0)
-  autoConfirmBookings      Boolean      @default(false)
-
-  studioId String?
-  studio   Provider?  @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)
-  masters  Provider[] @relation("StudioMasters")
-
-  // NEW (optional business contact + publish + geo)
-  contactName  String?
-  contactPhone String?
-  contactEmail String?
-  description  String?
-  avatarUrl    String?
-  geoLat       Float?
-  geoLng       Float?
-  isPublished  Boolean @default(false)
-  publicUsername          String?   @unique
-  publicUsernameUpdatedAt DateTime?
-
-  ownerUserId String?
-  owner       UserProfile? @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-
-  services          Service[]
-  masterServices    MasterService[]    @relation("MasterServices")
-  bookings          Booking[]
-  masterBookings    Booking[]          @relation("BookingMaster")
-  weeklySchedule    WeeklySchedule[]
-  scheduleRules     ScheduleRule[]
-  scheduleOverrides ScheduleOverride[]
-  scheduleBlocks    ScheduleBlock[]
-  scheduleBreaks    ScheduleBreak[]
-  scheduleTemplates ScheduleTemplate[]
-  weeklyScheduleConfig WeeklyScheduleConfig?
-  scheduleChangeRequests ScheduleChangeRequest[]
-  discountRule DiscountRule?
-  hotSlots      HotSlot[]
-
-  studioProfile  Studio?         @relation("StudioProvider")
-  masterProfile  MasterProfile?  @relation("MasterProvider")
-  reviewsAbout   Review[]
-  portfolioItems PortfolioItem[]
-  publicUsernameAliases PublicUsernameAlias[]
-  createdGlobalCategories GlobalCategory[] @relation("GlobalCategoryCreatorProvider")
-  modelOffers ModelOffer[]
-  clientNotes ClientNote[] @relation("ClientNotesForMaster")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([ownerUserId])
-  @@index([studioId])
-}
-
-model PublicUsernameAlias {
-  id         String   @id @default(cuid())
-  username   String   @unique
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-
-  @@index([providerId])
-}
-
-model Service {
-  id         String           @id @default(cuid())
-  providerId String
-  provider   Provider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  studioId   String?
-  studio     Studio?          @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  categoryId String?
-  category   ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  globalCategoryId String?
-  globalCategory   GlobalCategory? @relation(fields: [globalCategoryId], references: [id], onDelete: SetNull)
-
-  name            String
-  title           String?
-  description     String?
-  durationMin     Int
-  price           Int
-  baseDurationMin Int?
-  basePrice       Int?
-  sortOrder       Int     @default(0)
-  isEnabled       Boolean @default(true)
-  isActive        Boolean @default(true)
-  onlinePaymentEnabled Boolean @default(false)
-
-  bookings       Booking[]
-  masterServices MasterService[]
-  portfolioItems PortfolioItemService[]
-  bookingItems   BookingServiceItem[]
-  hotSlots       HotSlot[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-}
-
-model MasterService {
-  id               String   @id @default(cuid())
-  masterProviderId String
-  masterProvider   Provider @relation("MasterServices", fields: [masterProviderId], references: [id], onDelete: Cascade)
-  studioId         String?
-  studio           Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  masterId         String?
-  serviceId        String
-  service          Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  modelOffers      ModelOffer[]
-
-  priceOverride       Int?
-  durationOverrideMin Int?
-  isEnabled           Boolean @default(true)
-  commissionPct       Float?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([masterProviderId, serviceId])
-  @@index([masterProviderId])
-  @@index([serviceId])
-}
-
-model DiscountRule {
-  id            String             @id @default(cuid())
-  providerId    String             @unique
-  provider      Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  isEnabled     Boolean            @default(false)
-  triggerHours  Int
-  discountType  DiscountType
-  discountValue Int
-  applyMode     DiscountApplyMode
-  minPriceFrom  Int?
-  serviceIds    String[]           @default([])
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-}
-
-model HotSlot {
-  id            String        @id @default(cuid())
-  providerId    String
-  provider      Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  serviceId     String?
-  service       Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  startAtUtc    DateTime
-  endAtUtc      DateTime
-  discountType  DiscountType
-  discountValue Int
-  isActive      Boolean       @default(true)
-  activatedAt   DateTime      @default(now())
-  expiresAtUtc  DateTime
-  reason        String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  @@index([providerId, startAtUtc])
-  @@unique([providerId, startAtUtc, endAtUtc])
-}
-
-model Booking {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  serviceId String
-  service   Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-
-  masterProviderId String?
-  masterProvider   Provider? @relation("BookingMaster", fields: [masterProviderId], references: [id], onDelete: SetNull)
-
-  clientUserId String?
-  clientUser   UserProfile? @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
-
-  // UTC instants only. Use these for all scheduling logic and UI formatting.
-  startAtUtc DateTime?
-  endAtUtc   DateTime?
-  studioId   String?
-  studio     Studio?   @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  masterId   String?
-  clientId   String?
-  // Legacy fields (deprecated). Do not use for formatting or logic.
-  startAt    DateTime?
-  endAt      DateTime?
-
-  slotLabel           String
-  clientName          String
-  clientPhone         String
-  clientNameSnapshot  String?
-  clientPhoneSnapshot String?
-  comment             String?
-  source              BookingSource @default(MANUAL)
-  notes               String?
-  silentMode          Boolean       @default(false)
-
-  status                    BookingStatus            @default(PENDING)
-  cancelledBy               BookingCancelledBy?
-  cancelReason              String?
-  cancelledAtUtc            DateTime?
-  proposedStartAt           DateTime?
-  proposedEndAt             DateTime?
-  requestedBy               BookingRequestedBy?
-  changeComment             String?
-  actionRequiredBy          BookingActionRequiredBy?
-  clientChangeRequestsCount Int                      @default(0)
-  masterChangeRequestsCount Int                      @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  notifications Notification[]
-  review        Review?
-  serviceItems  BookingServiceItem[]
-  modelApplication ModelApplication? @relation("ModelApplicationBooking")
-
-  @@index([providerId])
-  @@index([masterProviderId])
-  @@index([startAtUtc])
-  @@index([serviceId])
-  @@index([clientUserId])
-  @@index([studioId])
-  @@index([masterId])
-  @@index([status, startAtUtc])
-}
-
-model Notification {
-  id     String      @id @default(cuid())
-  userId String
-  user   UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type      NotificationType
-  title     String
-  body      String
-  payloadJson Json
-  isRead    Boolean      @default(false)
-  bookingId String?
-  booking   Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  readAt    DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@index([userId, isRead, createdAt])
-  @@index([userId, createdAt])
-  @@index([bookingId])
-}
-
-model WeeklySchedule {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  dayOfWeek  Int
-  startLocal String
-  endLocal   String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@index([providerId, dayOfWeek])
-}
-
-model ScheduleRule {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  kind        ScheduleRuleKind
-  timezone    String
-  anchorDate  DateTime?
-  payloadJson Json
-  isActive    Boolean          @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId, isActive])
-  @@index([providerId, updatedAt])
-}
-
-model ScheduleOverride {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  date       DateTime
-  kind       ScheduleOverrideKind @default(TIME_RANGE)
-  isDayOff   Boolean              @default(false)
-  startLocal String?
-  endLocal   String?
-  templateId String?
-  template   ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  isActive   Boolean?
-  note       String?
-  reason     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@index([providerId, date])
-}
-
-model ScheduleBlock {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  date       DateTime
-  startLocal String
-  endLocal   String
-  reason     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@index([providerId, date])
-}
-
-model ScheduleBreak {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  kind       ScheduleBreakKind
-  dayOfWeek  Int?
-  date       DateTime?
-  startLocal String
-  endLocal   String
-  note       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@index([providerId, kind])
-  @@index([providerId, kind, dayOfWeek])
-  @@index([providerId, date])
-}
-
-model ScheduleTemplate {
-  id         String   @id @default(cuid())
-  providerId String
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  name       String
-  startLocal String
-  endLocal   String
-  color      String?
-
-  breaks     ScheduleTemplateBreak[]
-  scheduleOverrides ScheduleOverride[]
-  weeklyScheduleDays WeeklyScheduleDay[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@unique([providerId, name])
-}
-
-model ScheduleTemplateBreak {
-  id         String           @id @default(cuid())
-  templateId String
-  template   ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  startLocal String
-  endLocal   String
-  sortOrder  Int @default(0)
-
-  @@index([templateId])
-}
-
-model WeeklyScheduleConfig {
-  id         String   @id @default(cuid())
-  providerId String   @unique
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  days       WeeklyScheduleDay[]
-
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-}
-
-model WeeklyScheduleDay {
-  id         String   @id @default(cuid())
-  configId   String
-  config     WeeklyScheduleConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-
-  weekday    Int
-  templateId String?
-  template   ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  isActive   Boolean @default(false)
-
-  @@unique([configId, weekday])
-  @@index([templateId])
-}
-
-model TelegramLink {
-  id             String      @id @default(cuid())
-  userId         String      @unique
-  telegramUserId String?
-  chatId         String?     @unique
-  isEnabled      Boolean     @default(true)
-  linkedAt       DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  user           UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VkLink {
-  id        String      @id @default(cuid())
-  userId    String      @unique
-  vkUserId  String      @unique
-  accessToken  String
-  refreshToken String
-  deviceId     String
-  isEnabled Boolean     @default(true)
-  linkedAt  DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model TelegramLinkToken {
-  id        String      @id @default(cuid())
-  userId    String
-  tokenHash String      @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime    @default(now())
-  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model MediaAsset {
-  id               String          @id @default(cuid())
-  entityType       MediaEntityType
-  entityId         String
-  kind             MediaKind
-  storageProvider  String
-  storageKey       String
-  mimeType         String
-  sizeBytes        Int
-  originalFilename String
-  createdByUserId  String?
-  createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  deletedAt        DateTime?
-
-  @@index([entityType, entityId, kind, deletedAt])
-  @@index([storageKey])
-  @@index([createdByUserId])
-}
-
-model ModelOffer {
-  id                 String          @id @default(cuid())
-  masterId           String
-  master             Provider        @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  masterServiceId    String
-  masterService      MasterService   @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
-  dateLocal          String
-  timeRangeStartLocal String
-  timeRangeEndLocal   String
-  price              Decimal?
-  requirements       String[]        @default([])
-  extraBusyMin       Int             @default(0)
-  status             ModelOfferStatus @default(ACTIVE)
-  applications       ModelApplication[]
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-
-  @@index([masterId])
-  @@index([status])
-  @@index([dateLocal])
-  @@index([masterServiceId])
-}
-
-model ModelApplication {
-  id               String                 @id @default(cuid())
-  offerId          String
-  offer            ModelOffer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  clientUserId     String
-  clientUser       UserProfile            @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
-  status           ModelApplicationStatus @default(PENDING)
-  clientNote       String?
-  consentToShoot   Boolean
-  proposedTimeLocal String?
-  confirmedStartAt DateTime?
-  bookingId        String?                @unique
-  booking          Booking?               @relation("ModelApplicationBooking", fields: [bookingId], references: [id], onDelete: SetNull)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-
-  @@unique([offerId, clientUserId])
-  @@index([offerId])
-  @@index([status])
-  @@index([clientUserId])
-}
-
-model AppSetting {
-  key       String   @id
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model SystemConfig {
-  key       String   @id
-  value     Json
-  updatedAt DateTime @updatedAt
-}
-
-model Review {
-  id            String              @id @default(cuid())
-  bookingId     String?             @unique
-  booking       Booking?            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  authorId      String
-  author        UserProfile         @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  studioId      String?
-  studio        Studio?             @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  masterId      String?
-  master        Provider?           @relation(fields: [masterId], references: [id], onDelete: SetNull)
-  targetType    ReviewTargetType
-  targetId      String
-  rating        Int
-  text          String?
-  replyText     String?
-  repliedAt     DateTime?
-  reportComment String?
-  reportedAt    DateTime?
-  tags          ReviewTagOnReview[]
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-
-  @@index([targetType, targetId])
-  @@index([studioId, createdAt])
-  @@index([masterId, createdAt])
-}
-
-model ReviewTag {
-  id        String              @id @default(cuid())
-  code      String              @unique
-  label     String
-  icon      String?
-  type      ReviewTagType
-  category  String
-  isActive  Boolean             @default(true)
-  reviews   ReviewTagOnReview[]
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-
-  @@index([type, isActive])
-}
-
-model ReviewTagOnReview {
-  reviewId  String
-  review    Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  tagId     String
-  tag       ReviewTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-
-  @@id([reviewId, tagId])
-  @@index([tagId])
-  @@index([reviewId])
-}
-
-model StudioMember {
-  id        String             @id @default(cuid())
-  studioId  String
-  studio    Studio             @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  userId    String
-  user      UserProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      StudioMemberRole
-  status    StudioMemberStatus @default(ACTIVE)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-
-  @@unique([studioId, userId, role])
-  @@index([userId, status])
-  @@index([studioId, status])
-}
-
-model ServiceCategory {
-  id        String    @id @default(cuid())
-  studioId  String
-  studio    Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  title     String
-  sortOrder Int       @default(0)
-  services  Service[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([studioId, sortOrder])
-}
-
-model GlobalCategory {
-  id              String      @id @default(cuid())
-  name            String
-  slug            String      @unique
-  icon            String?
-  isActive        Boolean     @default(true)
-  isValidated     Boolean     @default(false)
-  isRejected      Boolean     @default(false)
-  usageCount      Int         @default(0)
-  createdByUserId String?
-  createdBy       UserProfile? @relation("GlobalCategoryCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  createdByProviderId String?
-  createdByProvider   Provider? @relation("GlobalCategoryCreatorProvider", fields: [createdByProviderId], references: [id], onDelete: SetNull)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  services        Service[]
-  tags            Tag[]
-
-  @@index([isActive])
-  @@index([isValidated, isRejected])
-  @@index([createdByUserId])
-  @@index([createdByProviderId])
-}
-
-model Tag {
-  id                String      @id @default(cuid())
-  name              String
-  slug              String      @unique
-  usageCount        Int         @default(0)
-  isFeatured        Boolean     @default(false)
-  relatedCategoryId String?
-  relatedCategory   GlobalCategory? @relation(fields: [relatedCategoryId], references: [id], onDelete: SetNull)
-  portfolioItems    PortfolioItemTag[]
-  createdAt         DateTime    @default(now())
-
-  @@index([isFeatured, usageCount])
-  @@index([relatedCategoryId])
-}
-
-model BillingPlan {
-  id        String             @id @default(cuid())
-  code      String             @unique
-  name      String
-  price     Int
-  tier      PlanTier           @default(FREE)
-  providerType ProviderType    @default(MASTER)
-  features  Json
-  sortOrder Int                @default(0)
-  inheritsFromPlanId String?
-  inheritsFromPlan   BillingPlan? @relation("BillingPlanInherit", fields: [inheritsFromPlanId], references: [id])
-  inheritedByPlans   BillingPlan[] @relation("BillingPlanInherit")
-  isActive  Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  subscriptions UserSubscription[]
-}
-
-model ClientNote {
-  id           String      @id @default(cuid())
-  masterId     String
-  master       Provider    @relation("ClientNotesForMaster", fields: [masterId], references: [id], onDelete: Cascade)
-  clientUserId String
-  clientUser   UserProfile @relation("ClientNotesForClient", fields: [clientUserId], references: [id], onDelete: Cascade)
-  text         String
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  @@unique([masterId, clientUserId])
-  @@index([clientUserId])
-}
-
-model UserSubscription {
-  id        String             @id @default(cuid())
-  userId    String             @unique
-  planId    String
-  status    SubscriptionStatus @default(ACTIVE)
-  startsAt  DateTime           @default(now())
-  endsAt    DateTime?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  user      UserProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan      BillingPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([planId])
-}
-
-model BookingServiceItem {
-  id                  String   @id @default(cuid())
-  bookingId           String
-  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  studioId            String?
-  studio              Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  serviceId           String?
-  service             Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  titleSnapshot       String
-  priceSnapshot       Int
-  durationSnapshotMin Int
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@index([bookingId])
-  @@index([studioId])
-  @@index([serviceId])
-}
-
-model WorkShiftTemplate {
-  id             String        @id @default(cuid())
-  studioId       String
-  studio         Studio        @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  masterId       String?
-  title          String
-  startTime      String
-  endTime        String
-  breakRulesJson String?
-  dayRules       WorkDayRule[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  @@index([studioId, masterId])
-}
-
-model WorkDayRule {
-  id         String            @id @default(cuid())
-  studioId   String
-  studio     Studio            @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  masterId   String
-  weekday    Int
-  templateId String
-  template   WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  isWorking  Boolean           @default(true)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-
-  @@unique([studioId, masterId, weekday])
-  @@index([templateId])
-}
-
-model WorkException {
-  id        String            @id @default(cuid())
-  studioId  String?
-  studio    Studio?           @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  masterId  String
-  date      DateTime
-  type      WorkExceptionType
-  startTime String?
-  endTime   String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
-  @@index([studioId, masterId, date])
-}
-
-model TimeBlock {
-  id        String        @id @default(cuid())
-  studioId  String?
-  studio    Studio?       @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  masterId  String
-  startAt   DateTime
-  endAt     DateTime
-  type      TimeBlockType
-  note      String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  @@index([studioId, masterId, startAt, endAt])
-}
-
-model ScheduleChangeRequest {
-  id          String                      @id @default(cuid())
-  studioId    String?
-  studio      Studio?                     @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  providerId  String
-  provider    Provider                    @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  comment     String?
-  payloadJson Json
-  status      ScheduleChangeRequestStatus @default(PENDING)
-  createdAt   DateTime                    @default(now())
-  updatedAt   DateTime                    @updatedAt
-
-  @@index([providerId, status, createdAt])
-  @@index([studioId, status, createdAt])
-}
-
-model PortfolioItem {
-  id        String                 @id @default(cuid())
-  studioId  String?
-  studio    Studio?                @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  masterId  String
-  master    Provider               @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  mediaUrl  String
-  caption   String?
-  isPublic  Boolean                @default(true)
-  width     Int?
-  height    Int?
-  services  PortfolioItemService[]
-  tags      PortfolioItemTag[]
-  favorites Favorite[]
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
-
-  @@index([masterId, createdAt])
-  @@index([studioId, createdAt])
-}
-
-model PortfolioItemService {
-  portfolioItemId String
-  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
-  serviceId       String
-  service         Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
-
-  @@id([portfolioItemId, serviceId])
-  @@index([serviceId])
-}
-
-model PortfolioItemTag {
-  portfolioItemId String
-  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
-  tagId           String
-  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
-
-  @@id([portfolioItemId, tagId])
-  @@index([tagId])
-}
-
-model Favorite {
-  id              String        @id @default(cuid())
-  userId          String
-  user            UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  portfolioItemId String
-  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
-
-  @@unique([userId, portfolioItemId])
-  @@index([portfolioItemId, createdAt])
-}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProviderType {
+  MASTER
+  STUDIO
+}
+
+enum SubscriptionScope {
+  MASTER
+  STUDIO
+}
+enum StudioRole {
+  OWNER
+  ADMIN
+  MASTER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+  LEFT
+}
+
+enum AccountType {
+  CLIENT
+  MASTER
+  STUDIO
+  STUDIO_ADMIN
+  ADMIN
+  SUPERADMIN
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  PREMIUM
+}
+
+enum ConsentType {
+  TERMS
+  PRIVACY
+  MARKETING
+  PUBLIC_PROFILE
+}
+
+enum BookingStatus {
+  NEW
+  PENDING
+  CONFIRMED
+  CHANGE_REQUESTED
+  REJECTED
+  IN_PROGRESS
+  PREPAID
+  STARTED
+  FINISHED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingCancelledBy {
+  CLIENT
+  PROVIDER
+  SYSTEM
+}
+
+enum BookingRequestedBy {
+  CLIENT
+  MASTER
+}
+
+enum BookingActionRequiredBy {
+  CLIENT
+  MASTER
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum DiscountApplyMode {
+  ALL_SERVICES
+  PRICE_FROM
+  MANUAL
+}
+
+enum ScheduleBreakKind {
+  WEEKLY
+  OVERRIDE
+}
+
+enum ScheduleRuleKind {
+  WEEKLY
+  CYCLE
+}
+
+enum ScheduleOverrideKind {
+  OFF
+  TIME_RANGE
+  TEMPLATE
+}
+
+enum NotificationType {
+  BOOKING_CREATED
+  BOOKING_CANCELLED
+  BOOKING_RESCHEDULED
+  BOOKING_REQUEST
+  BOOKING_CONFIRMED
+  BOOKING_DECLINED
+  MODEL_NEW_APPLICATION
+  MODEL_APPLICATION_REJECTED
+  MODEL_TIME_PROPOSED
+  MODEL_BOOKING_CREATED
+  BILLING_PAYMENT_SUCCEEDED
+  BILLING_PAYMENT_FAILED
+  BILLING_RENEWAL_CONFIRMATION_REQUIRED
+  BILLING_SUBSCRIPTION_CANCELLED
+  BILLING_SUBSCRIPTION_EXPIRED
+}
+
+enum MediaEntityType {
+  USER
+  MASTER
+  STUDIO
+  SITE
+  MODEL_APPLICATION
+}
+
+enum MediaKind {
+  AVATAR
+  PORTFOLIO
+  MODEL_APPLICATION_PHOTO
+}
+
+enum StudioMemberRole {
+  OWNER
+  ADMIN
+  MASTER
+  FINANCE
+}
+
+enum StudioMemberStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PENDING
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  SUCCEEDED
+  CANCELED
+  FAILED
+  REFUNDED
+}
+
+enum BookingSource {
+  MANUAL
+  WEB
+  APP
+}
+
+enum TimeBlockType {
+  BREAK
+  BLOCK
+}
+
+enum WorkExceptionType {
+  OFF
+  SHIFT
+}
+
+enum ScheduleChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReviewTargetType {
+  provider
+  studio
+}
+
+enum ReviewTagType {
+  PUBLIC
+  PRIVATE
+}
+
+enum ModelOfferStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum ModelApplicationStatus {
+  PENDING
+  REJECTED
+  APPROVED_WAITING_CLIENT
+  CONFIRMED
+}
+
+model UserProfile {
+  id                 String              @id @default(cuid())
+  roles              AccountType[]       @default([CLIENT])
+  displayName        String?
+  phone              String?             @unique
+  email              String?             @unique
+  telegramId         String?             @unique
+  telegramUsername   String?
+  externalPhotoUrl   String?
+  telegramLink       TelegramLink?
+  telegramLinkTokens TelegramLinkToken[]
+  vkLink             VkLink?
+  createdCategories  GlobalCategory[] @relation("GlobalCategoryCreator")
+  subscriptions      UserSubscription[]
+
+  // NEW (optional profile fields)
+  firstName  String?
+  lastName   String?
+  middleName String?
+  birthDate  DateTime?
+  address    String?
+  geoLat     Float?
+  geoLng     Float?
+
+  providers          Provider[]         @relation("ProviderOwner")
+  ownedStudios       Studio[]           @relation("StudioOwner")
+  masterProfile      MasterProfile?
+  studioMemberships  StudioMembership[]
+  studioMembers      StudioMember[]
+  studioInvites      StudioInvite[]     @relation("StudioInvitedBy")
+  bookings           Booking[]          @relation("BookingClient")
+  notifications      Notification[]
+  consents           UserConsent[]
+  mediaAssetsCreated MediaAsset[]       @relation("MediaAssetCreatedBy")
+  reviewsAuthored    Review[]           @relation("ReviewAuthor")
+  favorites          Favorite[]
+  modelApplications  ModelApplication[]
+  clientNotes        ClientNote[]        @relation("ClientNotesForClient")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserConsent {
+  id              String      @id @default(cuid())
+  userId          String
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  consentType     ConsentType
+  documentVersion String
+
+  agreedAt        DateTime    @default(now())
+  ipAddress       String?
+  userAgent       String?
+
+  revokedAt       DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, consentType])
+  @@index([userId])
+}
+
+model Studio {
+  id                  String                  @id @default(cuid())
+  providerId          String                  @unique
+  provider            Provider                @relation("StudioProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  ownerUserId         String?
+  owner               UserProfile?            @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  memberships         StudioMembership[]
+  studioMembers       StudioMember[]
+  invites             StudioInvite[]
+  ratingAvg           Float                   @default(0)
+  ratingCount         Int                     @default(0)
+  serviceCategories   ServiceCategory[]
+  masterServices      MasterService[]
+  workShiftTemplates  WorkShiftTemplate[]
+  workDayRules        WorkDayRule[]
+  workExceptions      WorkException[]
+  timeBlocks          TimeBlock[]
+  scheduleRequests    ScheduleChangeRequest[]
+  services            Service[]
+  bookings            Booking[]
+  bookingServiceItems BookingServiceItem[]
+  portfolioItems      PortfolioItem[]
+  reviews             Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MasterProfile {
+  id                 String      @id @default(cuid())
+  userId             String      @unique
+  user               UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId         String      @unique
+  provider           Provider    @relation("MasterProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  lastBookingsSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudioMembership {
+  id       String           @id @default(cuid())
+  userId   String
+  user     UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId String
+  studio   Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  roles    StudioRole[]
+  status   MembershipStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, studioId])
+  @@index([userId])
+  @@index([studioId])
+  @@index([status])
+}
+
+model StudioInvite {
+  id              String           @id @default(cuid())
+  studioId        String
+  studio          Studio           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  phone           String
+  status          MembershipStatus @default(PENDING)
+  invitedByUserId String
+  invitedBy       UserProfile      @relation("StudioInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, phone])
+  @@index([studioId])
+  @@index([phone])
+  @@index([status])
+}
+
+model OtpCode {
+  id        String    @id @default(cuid())
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+model Provider {
+  id                       String       @id @default(cuid())
+  type                     ProviderType
+  name                     String
+  tagline                  String
+  rating                   Float        @default(0)
+  reviews                  Int          @default(0)
+  ratingAvg                Float        @default(0)
+  ratingCount              Int          @default(0)
+  priceFrom                Int          @default(0)
+  address                  String
+  district                 String
+  categories               String[]     @default([])
+  availableToday           Boolean      @default(false)
+  timezone                 String       @default("Asia/Almaty")
+  bufferBetweenBookingsMin Int          @default(0)
+  autoConfirmBookings      Boolean      @default(false)
+
+  studioId String?
+  studio   Provider?  @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)
+  masters  Provider[] @relation("StudioMasters")
+
+  // NEW (optional business contact + publish + geo)
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  description  String?
+  avatarUrl    String?
+  geoLat       Float?
+  geoLng       Float?
+  isPublished  Boolean @default(false)
+  publicUsername          String?   @unique
+  publicUsernameUpdatedAt DateTime?
+
+  ownerUserId String?
+  owner       UserProfile? @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  services          Service[]
+  masterServices    MasterService[]    @relation("MasterServices")
+  bookings          Booking[]
+  masterBookings    Booking[]          @relation("BookingMaster")
+  weeklySchedule    WeeklySchedule[]
+  scheduleRules     ScheduleRule[]
+  scheduleOverrides ScheduleOverride[]
+  scheduleBlocks    ScheduleBlock[]
+  scheduleBreaks    ScheduleBreak[]
+  scheduleTemplates ScheduleTemplate[]
+  weeklyScheduleConfig WeeklyScheduleConfig?
+  scheduleChangeRequests ScheduleChangeRequest[]
+  discountRule DiscountRule?
+  hotSlots      HotSlot[]
+
+  studioProfile  Studio?         @relation("StudioProvider")
+  masterProfile  MasterProfile?  @relation("MasterProvider")
+  reviewsAbout   Review[]
+  portfolioItems PortfolioItem[]
+  publicUsernameAliases PublicUsernameAlias[]
+  createdGlobalCategories GlobalCategory[] @relation("GlobalCategoryCreatorProvider")
+  modelOffers ModelOffer[]
+  clientNotes ClientNote[] @relation("ClientNotesForMaster")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@index([studioId])
+}
+
+model PublicUsernameAlias {
+  id         String   @id @default(cuid())
+  username   String   @unique
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([providerId])
+}
+
+model Service {
+  id         String           @id @default(cuid())
+  providerId String
+  provider   Provider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  studioId   String?
+  studio     Studio?          @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  categoryId String?
+  category   ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  globalCategoryId String?
+  globalCategory   GlobalCategory? @relation(fields: [globalCategoryId], references: [id], onDelete: SetNull)
+
+  name            String
+  title           String?
+  description     String?
+  durationMin     Int
+  price           Int
+  baseDurationMin Int?
+  basePrice       Int?
+  sortOrder       Int     @default(0)
+  isEnabled       Boolean @default(true)
+  isActive        Boolean @default(true)
+  onlinePaymentEnabled Boolean @default(false)
+
+  bookings       Booking[]
+  masterServices MasterService[]
+  portfolioItems PortfolioItemService[]
+  bookingItems   BookingServiceItem[]
+  hotSlots       HotSlot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+}
+
+model MasterService {
+  id               String   @id @default(cuid())
+  masterProviderId String
+  masterProvider   Provider @relation("MasterServices", fields: [masterProviderId], references: [id], onDelete: Cascade)
+  studioId         String?
+  studio           Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId         String?
+  serviceId        String
+  service          Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  modelOffers      ModelOffer[]
+
+  priceOverride       Int?
+  durationOverrideMin Int?
+  isEnabled           Boolean @default(true)
+  commissionPct       Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([masterProviderId, serviceId])
+  @@index([masterProviderId])
+  @@index([serviceId])
+}
+
+model DiscountRule {
+  id            String             @id @default(cuid())
+  providerId    String             @unique
+  provider      Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  isEnabled     Boolean            @default(false)
+  triggerHours  Int
+  discountType  DiscountType
+  discountValue Int
+  applyMode     DiscountApplyMode
+  minPriceFrom  Int?
+  serviceIds    String[]           @default([])
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model HotSlot {
+  id            String        @id @default(cuid())
+  providerId    String
+  provider      Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceId     String?
+  service       Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  startAtUtc    DateTime
+  endAtUtc      DateTime
+  discountType  DiscountType
+  discountValue Int
+  isActive      Boolean       @default(true)
+  activatedAt   DateTime      @default(now())
+  expiresAtUtc  DateTime
+  reason        String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([providerId, startAtUtc])
+  @@unique([providerId, startAtUtc, endAtUtc])
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  masterProviderId String?
+  masterProvider   Provider? @relation("BookingMaster", fields: [masterProviderId], references: [id], onDelete: SetNull)
+
+  clientUserId String?
+  clientUser   UserProfile? @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  // UTC instants only. Use these for all scheduling logic and UI formatting.
+  startAtUtc DateTime?
+  endAtUtc   DateTime?
+  studioId   String?
+  studio     Studio?   @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId   String?
+  clientId   String?
+  // Legacy fields (deprecated). Do not use for formatting or logic.
+  startAt    DateTime?
+  endAt      DateTime?
+
+  slotLabel           String
+  clientName          String
+  clientPhone         String
+  clientNameSnapshot  String?
+  clientPhoneSnapshot String?
+  comment             String?
+  source              BookingSource @default(MANUAL)
+  notes               String?
+  silentMode          Boolean       @default(false)
+
+  status                    BookingStatus            @default(PENDING)
+  cancelledBy               BookingCancelledBy?
+  cancelReason              String?
+  cancelledAtUtc            DateTime?
+  proposedStartAt           DateTime?
+  proposedEndAt             DateTime?
+  requestedBy               BookingRequestedBy?
+  changeComment             String?
+  actionRequiredBy          BookingActionRequiredBy?
+  clientChangeRequestsCount Int                      @default(0)
+  masterChangeRequestsCount Int                      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+  review        Review?
+  serviceItems  BookingServiceItem[]
+  modelApplication ModelApplication? @relation("ModelApplicationBooking")
+
+  @@index([providerId])
+  @@index([masterProviderId])
+  @@index([startAtUtc])
+  @@index([serviceId])
+  @@index([clientUserId])
+  @@index([studioId])
+  @@index([masterId])
+  @@index([status, startAtUtc])
+}
+
+model Notification {
+  id     String      @id @default(cuid())
+  userId String
+  user   UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  body      String
+  payloadJson Json
+  isRead    Boolean      @default(false)
+  bookingId String?
+  booking   Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+  @@index([bookingId])
+}
+
+model WeeklySchedule {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  dayOfWeek  Int
+  startLocal String
+  endLocal   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, dayOfWeek])
+}
+
+model ScheduleRule {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  kind        ScheduleRuleKind
+  timezone    String
+  anchorDate  DateTime?
+  payloadJson Json
+  isActive    Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, isActive])
+  @@index([providerId, updatedAt])
+}
+
+model ScheduleOverride {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  date       DateTime
+  kind       ScheduleOverrideKind @default(TIME_RANGE)
+  isDayOff   Boolean              @default(false)
+  startLocal String?
+  endLocal   String?
+  templateId String?
+  template   ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  isActive   Boolean?
+  note       String?
+  reason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, date])
+}
+
+model ScheduleBlock {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  date       DateTime
+  startLocal String
+  endLocal   String
+  reason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, date])
+}
+
+model ScheduleBreak {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  kind       ScheduleBreakKind
+  dayOfWeek  Int?
+  date       DateTime?
+  startLocal String
+  endLocal   String
+  note       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, kind])
+  @@index([providerId, kind, dayOfWeek])
+  @@index([providerId, date])
+}
+
+model ScheduleTemplate {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  name       String
+  startLocal String
+  endLocal   String
+  color      String?
+
+  breaks     ScheduleTemplateBreak[]
+  scheduleOverrides ScheduleOverride[]
+  weeklyScheduleDays WeeklyScheduleDay[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@unique([providerId, name])
+}
+
+model ScheduleTemplateBreak {
+  id         String           @id @default(cuid())
+  templateId String
+  template   ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  startLocal String
+  endLocal   String
+  sortOrder  Int @default(0)
+
+  @@index([templateId])
+}
+
+model WeeklyScheduleConfig {
+  id         String   @id @default(cuid())
+  providerId String   @unique
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  days       WeeklyScheduleDay[]
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model WeeklyScheduleDay {
+  id         String   @id @default(cuid())
+  configId   String
+  config     WeeklyScheduleConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  weekday    Int
+  templateId String?
+  template   ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  isActive   Boolean @default(false)
+
+  @@unique([configId, weekday])
+  @@index([templateId])
+}
+
+model TelegramLink {
+  id             String      @id @default(cuid())
+  userId         String      @unique
+  telegramUserId String?
+  chatId         String?     @unique
+  isEnabled      Boolean     @default(true)
+  linkedAt       DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  user           UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VkLink {
+  id        String      @id @default(cuid())
+  userId    String      @unique
+  vkUserId  String      @unique
+  accessToken  String
+  refreshToken String
+  deviceId     String
+  isEnabled Boolean     @default(true)
+  linkedAt  DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramLinkToken {
+  id        String      @id @default(cuid())
+  userId    String
+  tokenHash String      @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime    @default(now())
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MediaAsset {
+  id               String          @id @default(cuid())
+  entityType       MediaEntityType
+  entityId         String
+  kind             MediaKind
+  storageProvider  String
+  storageKey       String
+  mimeType         String
+  sizeBytes        Int
+  originalFilename String
+  createdByUserId  String?
+  createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+
+  @@index([entityType, entityId, kind, deletedAt])
+  @@index([storageKey])
+  @@index([createdByUserId])
+}
+
+model ModelOffer {
+  id                 String          @id @default(cuid())
+  masterId           String
+  master             Provider        @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  masterServiceId    String
+  masterService      MasterService   @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
+  dateLocal          String
+  timeRangeStartLocal String
+  timeRangeEndLocal   String
+  price              Decimal?
+  requirements       String[]        @default([])
+  extraBusyMin       Int             @default(0)
+  status             ModelOfferStatus @default(ACTIVE)
+  applications       ModelApplication[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([masterId])
+  @@index([status])
+  @@index([dateLocal])
+  @@index([masterServiceId])
+}
+
+model ModelApplication {
+  id               String                 @id @default(cuid())
+  offerId          String
+  offer            ModelOffer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  clientUserId     String
+  clientUser       UserProfile            @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+  status           ModelApplicationStatus @default(PENDING)
+  clientNote       String?
+  consentToShoot   Boolean
+  proposedTimeLocal String?
+  confirmedStartAt DateTime?
+  bookingId        String?                @unique
+  booking          Booking?               @relation("ModelApplicationBooking", fields: [bookingId], references: [id], onDelete: SetNull)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([offerId, clientUserId])
+  @@index([offerId])
+  @@index([status])
+  @@index([clientUserId])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id            String              @id @default(cuid())
+  bookingId     String?             @unique
+  booking       Booking?            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        UserProfile         @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  studioId      String?
+  studio        Studio?             @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId      String?
+  master        Provider?           @relation(fields: [masterId], references: [id], onDelete: SetNull)
+  targetType    ReviewTargetType
+  targetId      String
+  rating        Int
+  text          String?
+  replyText     String?
+  repliedAt     DateTime?
+  reportComment String?
+  reportedAt    DateTime?
+  tags          ReviewTagOnReview[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([studioId, createdAt])
+  @@index([masterId, createdAt])
+}
+
+model ReviewTag {
+  id        String              @id @default(cuid())
+  code      String              @unique
+  label     String
+  icon      String?
+  type      ReviewTagType
+  category  String
+  isActive  Boolean             @default(true)
+  reviews   ReviewTagOnReview[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([type, isActive])
+}
+
+model ReviewTagOnReview {
+  reviewId  String
+  review    Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       ReviewTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@id([reviewId, tagId])
+  @@index([tagId])
+  @@index([reviewId])
+}
+
+model StudioMember {
+  id        String             @id @default(cuid())
+  studioId  String
+  studio    Studio             @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId    String
+  user      UserProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      StudioMemberRole
+  status    StudioMemberStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([studioId, userId, role])
+  @@index([userId, status])
+  @@index([studioId, status])
+}
+
+model ServiceCategory {
+  id        String    @id @default(cuid())
+  studioId  String
+  studio    Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int       @default(0)
+  services  Service[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([studioId, sortOrder])
+}
+
+model GlobalCategory {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique
+  icon            String?
+  isActive        Boolean     @default(true)
+  isValidated     Boolean     @default(false)
+  isRejected      Boolean     @default(false)
+  usageCount      Int         @default(0)
+  createdByUserId String?
+  createdBy       UserProfile? @relation("GlobalCategoryCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByProviderId String?
+  createdByProvider   Provider? @relation("GlobalCategoryCreatorProvider", fields: [createdByProviderId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  services        Service[]
+  tags            Tag[]
+
+  @@index([isActive])
+  @@index([isValidated, isRejected])
+  @@index([createdByUserId])
+  @@index([createdByProviderId])
+}
+
+model Tag {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  usageCount        Int         @default(0)
+  isFeatured        Boolean     @default(false)
+  relatedCategoryId String?
+  relatedCategory   GlobalCategory? @relation(fields: [relatedCategoryId], references: [id], onDelete: SetNull)
+  portfolioItems    PortfolioItemTag[]
+  createdAt         DateTime    @default(now())
+
+  @@index([isFeatured, usageCount])
+  @@index([relatedCategoryId])
+}
+
+model BillingPlan {
+  id        String             @id @default(cuid())
+  code      String             @unique
+  name      String
+  tier      PlanTier           @default(FREE)
+  scope     SubscriptionScope  @default(MASTER)
+  features  Json
+  sortOrder Int                @default(0)
+  inheritsFromPlanId String?
+  inheritsFromPlan   BillingPlan? @relation("BillingPlanInherit", fields: [inheritsFromPlanId], references: [id])
+  inheritedByPlans   BillingPlan[] @relation("BillingPlanInherit")
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  prices   BillingPlanPrice[]
+  subscriptions UserSubscription[]
+}
+
+model BillingPlanPrice {
+  id           String      @id @default(cuid())
+  planId       String
+  plan         BillingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  periodMonths Int
+  priceKopeks  Int
+  isActive     Boolean     @default(true)
+
+  @@unique([planId, periodMonths])
+  @@index([periodMonths])
+}
+
+model ClientNote {
+  id           String      @id @default(cuid())
+  masterId     String
+  master       Provider    @relation("ClientNotesForMaster", fields: [masterId], references: [id], onDelete: Cascade)
+  clientUserId String
+  clientUser   UserProfile @relation("ClientNotesForClient", fields: [clientUserId], references: [id], onDelete: Cascade)
+  text         String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([masterId, clientUserId])
+  @@index([clientUserId])
+}
+
+model UserSubscription {
+  id        String             @id @default(cuid())
+  userId    String
+  planId    String
+  status    SubscriptionStatus @default(ACTIVE)
+  scope              SubscriptionScope
+  startedAt          DateTime           @default(now())
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  periodMonths       Int                @default(1)
+  autoRenew          Boolean            @default(true)
+  cancelAtPeriodEnd  Boolean            @default(false)
+  cancelledAt        DateTime?
+  graceUntil         DateTime?
+  nextBillingAt      DateTime?
+  paymentMethodId    String?
+  lastPaymentAt      DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      UserProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      BillingPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  payments  BillingPayment[]
+
+  @@unique([userId, scope])
+  @@index([status, autoRenew, nextBillingAt])
+  @@index([status, graceUntil])
+}
+
+model BillingPayment {
+  id                 String               @id @default(cuid())
+  subscriptionId     String
+  subscription       UserSubscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  type               String
+  status             BillingPaymentStatus
+  amountKopeks       Int
+  currency           String               @default("RUB")
+  periodMonths       Int
+  yookassaPaymentId  String?              @unique
+  confirmationUrl    String?
+  idempotenceKey     String               @unique
+  metadata           Json?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([subscriptionId, status])
+  @@index([status, createdAt])
+}
+
+model BillingAuditLog {
+  id             String             @id @default(cuid())
+  userId         String
+  scope          SubscriptionScope?
+  subscriptionId String?
+  paymentId      String?
+  action         String
+  details        Json?
+  createdAt      DateTime           @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+model BookingServiceItem {
+  id                  String   @id @default(cuid())
+  bookingId           String
+  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  studioId            String?
+  studio              Studio?  @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  serviceId           String?
+  service             Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  titleSnapshot       String
+  priceSnapshot       Int
+  durationSnapshotMin Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([studioId])
+  @@index([serviceId])
+}
+
+model WorkShiftTemplate {
+  id             String        @id @default(cuid())
+  studioId       String
+  studio         Studio        @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId       String?
+  title          String
+  startTime      String
+  endTime        String
+  breakRulesJson String?
+  dayRules       WorkDayRule[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([studioId, masterId])
+}
+
+model WorkDayRule {
+  id         String            @id @default(cuid())
+  studioId   String
+  studio     Studio            @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId   String
+  weekday    Int
+  templateId String
+  template   WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  isWorking  Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([studioId, masterId, weekday])
+  @@index([templateId])
+}
+
+model WorkException {
+  id        String            @id @default(cuid())
+  studioId  String?
+  studio    Studio?           @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId  String
+  date      DateTime
+  type      WorkExceptionType
+  startTime String?
+  endTime   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([studioId, masterId, date])
+}
+
+model TimeBlock {
+  id        String        @id @default(cuid())
+  studioId  String?
+  studio    Studio?       @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  masterId  String
+  startAt   DateTime
+  endAt     DateTime
+  type      TimeBlockType
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([studioId, masterId, startAt, endAt])
+}
+
+model ScheduleChangeRequest {
+  id          String                      @id @default(cuid())
+  studioId    String?
+  studio      Studio?                     @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  providerId  String
+  provider    Provider                    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  comment     String?
+  payloadJson Json
+  status      ScheduleChangeRequestStatus @default(PENDING)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  @@index([providerId, status, createdAt])
+  @@index([studioId, status, createdAt])
+}
+
+model PortfolioItem {
+  id        String                 @id @default(cuid())
+  studioId  String?
+  studio    Studio?                @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  masterId  String
+  master    Provider               @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  mediaUrl  String
+  caption   String?
+  isPublic  Boolean                @default(true)
+  width     Int?
+  height    Int?
+  services  PortfolioItemService[]
+  tags      PortfolioItemTag[]
+  favorites Favorite[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@index([masterId, createdAt])
+  @@index([studioId, createdAt])
+}
+
+model PortfolioItemService {
+  portfolioItemId String
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@id([portfolioItemId, serviceId])
+  @@index([serviceId])
+}
+
+model PortfolioItemTag {
+  portfolioItemId String
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  tagId           String
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@id([portfolioItemId, tagId])
+  @@index([tagId])
+}
+
+model Favorite {
+  id              String        @id @default(cuid())
+  userId          String
+  user            UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolioItemId String
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([userId, portfolioItemId])
+  @@index([portfolioItemId, createdAt])
+}

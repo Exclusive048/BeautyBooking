@@ -1,10 +1,11 @@
-import { Prisma, ProviderType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
+import { BILLING_PERIODS } from "@/lib/billing/constants";
 import {
   FEATURE_CATALOG,
   type LimitFeatureKey,
@@ -15,17 +16,25 @@ import {
   isRelaxedLimit,
   type PlanFeatureOverrides,
   type PlanNode,
-  type PlanTier,
 } from "@/lib/billing/features";
+import { ensureDefaultPlans } from "@/lib/billing/plan-seed";
 
 const patchSchema = z.object({
   id: z.string().trim().min(1),
   code: z.string().trim().min(1).optional(),
   name: z.string().trim().min(1),
-  price: z.number().int().min(0),
+  prices: z
+    .array(
+      z.object({
+        periodMonths: z.number().int().refine((value) => BILLING_PERIODS.includes(value as (typeof BILLING_PERIODS)[number])),
+        priceKopeks: z.number().int().min(0),
+        isActive: z.boolean().optional(),
+      })
+    )
+    .optional(),
   sortOrder: z.number().int().optional(),
   tier: z.enum(["FREE", "PRO", "PREMIUM"]).optional(),
-  providerType: z.enum(["MASTER", "STUDIO"]).optional(),
+  scope: z.enum(["MASTER", "STUDIO"]).optional(),
   isActive: z.boolean().optional(),
   inheritsFromPlanId: z.string().trim().min(1).nullable().optional(),
   features: z.record(z.string(), z.unknown()).optional(),
@@ -34,178 +43,33 @@ const patchSchema = z.object({
 const createSchema = z.object({
   code: z.string().trim().min(1),
   name: z.string().trim().min(1),
-  price: z.number().int().min(0),
+  prices: z.array(
+    z.object({
+      periodMonths: z.number().int().refine((value) => BILLING_PERIODS.includes(value as (typeof BILLING_PERIODS)[number])),
+      priceKopeks: z.number().int().min(0),
+      isActive: z.boolean().optional(),
+    })
+  ),
   sortOrder: z.number().int().optional(),
   tier: z.enum(["FREE", "PRO", "PREMIUM"]),
-  providerType: z.enum(["MASTER", "STUDIO"]),
+  scope: z.enum(["MASTER", "STUDIO"]),
   isActive: z.boolean().optional(),
   inheritsFromPlanId: z.string().trim().min(1).nullable().optional(),
   features: z.record(z.string(), z.unknown()).optional(),
 });
 
-const DEFAULT_PLANS: Array<{
-  code: string;
-  name: string;
-  price: number;
-  tier: PlanTier;
-  providerType: ProviderType;
-  features: PlanFeatureOverrides;
-  sortOrder: number;
-  inheritsFrom: string | null;
-}> = [
-  {
-    code: "MASTER_FREE",
-    name: "MASTER FREE",
-    price: 0,
-    tier: "FREE",
-    providerType: ProviderType.MASTER,
-    features: {
-      onlineBooking: true,
-      catalogListing: true,
-      pwaPush: true,
-    },
-    sortOrder: 0,
-    inheritsFrom: null,
-  },
-  {
-    code: "MASTER_PRO",
-    name: "MASTER PRO",
-    price: 600,
-    tier: "PRO",
-    providerType: ProviderType.MASTER,
-    features: {},
-    sortOrder: 10,
-    inheritsFrom: "MASTER_FREE",
-  },
-  {
-    code: "MASTER_PREMIUM",
-    name: "MASTER PREMIUM",
-    price: 1500,
-    tier: "PREMIUM",
-    providerType: ProviderType.MASTER,
-    features: {},
-    sortOrder: 20,
-    inheritsFrom: "MASTER_PRO",
-  },
-  {
-    code: "STUDIO_FREE",
-    name: "STUDIO FREE",
-    price: 0,
-    tier: "FREE",
-    providerType: ProviderType.STUDIO,
-    features: {
-      onlineBooking: true,
-      catalogListing: true,
-      pwaPush: true,
-    },
-    sortOrder: 0,
-    inheritsFrom: null,
-  },
-  {
-    code: "STUDIO_PRO",
-    name: "STUDIO PRO",
-    price: 2000,
-    tier: "PRO",
-    providerType: ProviderType.STUDIO,
-    features: {},
-    sortOrder: 10,
-    inheritsFrom: "STUDIO_FREE",
-  },
-  {
-    code: "STUDIO_PREMIUM",
-    name: "STUDIO PREMIUM",
-    price: 5000,
-    tier: "PREMIUM",
-    providerType: ProviderType.STUDIO,
-    features: {},
-    sortOrder: 20,
-    inheritsFrom: "STUDIO_PRO",
-  },
-];
+function normalizePrices(prices: Array<{ periodMonths: number; priceKopeks: number; isActive?: boolean }>) {
+  const byPeriod = new Map<number, { periodMonths: number; priceKopeks: number; isActive?: boolean }>();
+  for (const entry of prices) {
+    if (!BILLING_PERIODS.includes(entry.periodMonths as (typeof BILLING_PERIODS)[number])) continue;
+    byPeriod.set(entry.periodMonths, entry);
+  }
+  return Array.from(byPeriod.values());
+}
 
 const LIMIT_FEATURE_KEYS = Object.keys(FEATURE_CATALOG).filter(
   (key) => FEATURE_CATALOG[key as keyof typeof FEATURE_CATALOG].kind === "limit"
 ) as LimitFeatureKey[];
-
-async function ensureDefaultPlans() {
-  const existing = await prisma.billingPlan.findMany({
-    select: {
-      id: true,
-      code: true,
-      inheritsFromPlanId: true,
-      sortOrder: true,
-      tier: true,
-      providerType: true,
-      name: true,
-      price: true,
-      features: true,
-    },
-  });
-  const byCode = new Map(existing.map((plan) => [plan.code, plan]));
-
-  const missing = DEFAULT_PLANS.filter((plan) => !byCode.has(plan.code));
-  if (missing.length > 0) {
-    for (const plan of missing) {
-      const inheritsFromPlanId = plan.inheritsFrom ? byCode.get(plan.inheritsFrom)?.id ?? null : null;
-      const created = await prisma.billingPlan.create({
-        data: {
-          code: plan.code,
-          name: plan.name,
-          price: plan.price,
-          tier: plan.tier,
-          providerType: plan.providerType,
-          features: plan.features as Prisma.InputJsonValue,
-          sortOrder: plan.sortOrder ?? 0,
-          inheritsFromPlanId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          code: true,
-          inheritsFromPlanId: true,
-          sortOrder: true,
-          tier: true,
-          providerType: true,
-          name: true,
-          price: true,
-          features: true,
-        },
-      });
-      byCode.set(created.code, created);
-    }
-  }
-
-  const updates = DEFAULT_PLANS.flatMap((plan) => {
-    const existingPlan = byCode.get(plan.code);
-    if (!existingPlan) return [];
-    const desiredInheritsFromId = plan.inheritsFrom ? byCode.get(plan.inheritsFrom)?.id ?? null : null;
-    const desiredSortOrder = plan.sortOrder ?? 0;
-    const needsTier = existingPlan.tier !== plan.tier;
-    const needsProviderType = existingPlan.providerType !== plan.providerType;
-    const needsSort = existingPlan.sortOrder !== desiredSortOrder;
-    const needsParent = (existingPlan.inheritsFromPlanId ?? null) !== (desiredInheritsFromId ?? null);
-
-    if (!needsSort && !needsParent && !needsTier && !needsProviderType) {
-      return [];
-    }
-
-    return [
-      prisma.billingPlan.update({
-        where: { id: existingPlan.id },
-        data: {
-          sortOrder: desiredSortOrder,
-          inheritsFromPlanId: desiredInheritsFromId,
-          ...(needsTier ? { tier: plan.tier } : {}),
-          ...(needsProviderType ? { providerType: plan.providerType } : {}),
-        },
-      }),
-    ];
-  });
-
-  if (updates.length > 0) {
-    await prisma.$transaction(updates);
-  }
-}
 
 function buildPlanMap(plans: Array<{ id: string; inheritsFromPlanId: string | null; features: unknown }>): Map<string, PlanNode> {
   return new Map(plans.map((plan) => [plan.id, plan]));
@@ -268,19 +132,22 @@ export async function GET() {
   await ensureDefaultPlans();
 
   const plans = await prisma.billingPlan.findMany({
-    orderBy: [{ providerType: "asc" }, { sortOrder: "asc" }, { price: "asc" }],
+    orderBy: [{ scope: "asc" }, { sortOrder: "asc" }],
     select: {
       id: true,
       code: true,
       name: true,
-      price: true,
       tier: true,
-      providerType: true,
+      scope: true,
       features: true,
       sortOrder: true,
       inheritsFromPlanId: true,
       isActive: true,
       updatedAt: true,
+      prices: {
+        select: { id: true, periodMonths: true, priceKopeks: true, isActive: true },
+        orderBy: { periodMonths: "asc" },
+      },
     },
   });
 
@@ -320,30 +187,48 @@ export async function POST(req: Request) {
     const overrides = parseOverrides(parsed.data.features);
     assertRelaxedLimits(overrides, parentEffective);
 
+    const normalized = normalizePrices(parsed.data.prices);
+    const missingPeriods = BILLING_PERIODS.filter(
+      (period) => !normalized.some((entry) => entry.periodMonths === period)
+    );
+    if (missingPeriods.length > 0) {
+      return fail("Укажите цены для всех периодов подписки.", 400, "VALIDATION_ERROR", {
+        fieldErrors: { prices: "Нужны цены для 1/3/6/12 месяцев." },
+      });
+    }
     const created = await prisma.billingPlan.create({
       data: {
         code: parsed.data.code,
         name: parsed.data.name,
-        price: parsed.data.price,
         tier: parsed.data.tier,
-        providerType: parsed.data.providerType,
+        scope: parsed.data.scope,
         sortOrder: parsed.data.sortOrder ?? 0,
         inheritsFromPlanId: parsed.data.inheritsFromPlanId ?? null,
         features: overrides as Prisma.InputJsonValue,
         isActive: parsed.data.isActive ?? true,
+        prices: {
+          create: normalized.map((entry) => ({
+            periodMonths: entry.periodMonths,
+            priceKopeks: entry.priceKopeks,
+            isActive: entry.isActive ?? true,
+          })),
+        },
       },
       select: {
         id: true,
         code: true,
         name: true,
-        price: true,
         tier: true,
-        providerType: true,
+        scope: true,
         features: true,
         sortOrder: true,
         inheritsFromPlanId: true,
         isActive: true,
         updatedAt: true,
+        prices: {
+          select: { id: true, periodMonths: true, priceKopeks: true, isActive: true },
+          orderBy: { periodMonths: "asc" },
+        },
       },
     });
 
@@ -369,12 +254,12 @@ export async function PATCH(req: Request) {
       id,
       code,
       name,
-      price,
+      prices,
       features,
       sortOrder,
       inheritsFromPlanId,
       tier,
-      providerType,
+      scope,
       isActive,
     } = parsed.data;
 
@@ -412,28 +297,53 @@ export async function PATCH(req: Request) {
       data: {
         ...(code ? { code } : {}),
         name,
-        price,
         ...(overrides ? { features: overrides as Prisma.InputJsonValue } : {}),
         ...(typeof sortOrder === "number" ? { sortOrder } : {}),
         ...(inheritsFromPlanId !== undefined ? { inheritsFromPlanId } : {}),
         ...(tier ? { tier } : {}),
-        ...(providerType ? { providerType } : {}),
+        ...(scope ? { scope } : {}),
         ...(typeof isActive === "boolean" ? { isActive } : {}),
       },
       select: {
         id: true,
         code: true,
         name: true,
-        price: true,
         tier: true,
-        providerType: true,
+        scope: true,
         features: true,
         sortOrder: true,
         inheritsFromPlanId: true,
         isActive: true,
         updatedAt: true,
+        prices: {
+          select: { id: true, periodMonths: true, priceKopeks: true, isActive: true },
+          orderBy: { periodMonths: "asc" },
+        },
       },
     });
+
+    if (prices && prices.length > 0) {
+      const normalized = normalizePrices(prices);
+      if (normalized.length > 0) {
+        await prisma.$transaction(
+          normalized.map((entry) =>
+            prisma.billingPlanPrice.upsert({
+              where: { planId_periodMonths: { planId: id, periodMonths: entry.periodMonths } },
+              create: {
+                planId: id,
+                periodMonths: entry.periodMonths,
+                priceKopeks: entry.priceKopeks,
+                isActive: entry.isActive ?? true,
+              },
+              update: {
+                priceKopeks: entry.priceKopeks,
+                ...(typeof entry.isActive === "boolean" ? { isActive: entry.isActive } : {}),
+              },
+            })
+          )
+        );
+      }
+    }
 
     return ok({ plan: updated });
   } catch (error) {
@@ -441,3 +351,5 @@ export async function PATCH(req: Request) {
     return fail(appError.message, appError.status, appError.code, appError.details);
   }
 }
+
+

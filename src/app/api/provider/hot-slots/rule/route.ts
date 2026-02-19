@@ -6,6 +6,7 @@ import { parseBody } from "@/lib/validation";
 import { hotSlotRuleSchema } from "@/lib/hot-slots/schemas";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getOrCreateDiscountRule, saveDiscountRule } from "@/lib/hot-slots/service";
+import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createFeatureGateError } from "@/lib/billing/guards";
 
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
 
-    const plan = await getCurrentPlan(user.id);
+    const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
     if (!plan.features.hotSlots) {
       throw createFeatureGateError("hotSlots", "PREMIUM");
     }
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
 
-    const plan = await getCurrentPlan(user.id);
+    const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
     if (!plan.features.hotSlots) {
       throw createFeatureGateError("hotSlots", "PREMIUM");
     }

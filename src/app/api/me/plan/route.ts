@@ -2,6 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 
 export const runtime = "nodejs";
@@ -11,7 +12,13 @@ export async function GET(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
 
-    const plan = await getCurrentPlan(user.id);
+    const { searchParams } = new URL(req.url);
+    const rawScope = searchParams.get("scope");
+    const scope =
+      rawScope === SubscriptionScope.MASTER || rawScope === SubscriptionScope.STUDIO
+        ? rawScope
+        : undefined;
+    const plan = await getCurrentPlan(user.id, scope);
     return jsonOk(plan, {
       headers: { "Cache-Control": "private, max-age=60" },
     });
