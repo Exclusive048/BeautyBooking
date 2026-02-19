@@ -1,0 +1,66 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { usePlanFeatures } from "@/lib/billing/use-plan-features";
+import type { PlanFeatures, PlanTier } from "@/lib/billing/types";
+
+type BooleanFeatureKey = {
+  [Key in keyof PlanFeatures]: PlanFeatures[Key] extends boolean ? Key : never;
+}[keyof PlanFeatures];
+
+type FeatureGateProps = {
+  feature: BooleanFeatureKey;
+  requiredPlan?: PlanTier;
+  title?: string;
+  description?: string;
+  ctaLabel?: string;
+  className?: string;
+  children: ReactNode;
+};
+
+export function FeatureGate({
+  feature,
+  requiredPlan,
+  title,
+  description,
+  ctaLabel = "Посмотреть тарифы",
+  className,
+  children,
+}: FeatureGateProps) {
+  const plan = usePlanFeatures();
+
+  if (plan.loading) {
+    return (
+      <div className="rounded-2xl bg-bg-card/80 p-4 text-xs text-text-sec">
+        Р—Р°РіСЂСѓР·РєР° С‚Р°СЂРёС„Р°...
+      </div>
+    );
+  }
+
+  if (plan.can(feature)) {
+    return <>{children}</>;
+  }
+
+  const requiredLabel = requiredPlan ?? "PRO";
+  return (
+    <div className={`relative ${className ?? ""}`}>
+      <div className="pointer-events-none opacity-40">{children}</div>
+      <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-bg-card/80 p-4 text-center backdrop-blur-sm">
+        <div className="max-w-sm">
+          <div className="text-sm font-semibold text-text-main">
+            {title ?? "Функция недоступна"}
+          </div>
+          <div className="mt-1 text-xs text-text-sec">
+            {description ?? `Доступно на тарифе ${requiredLabel}.`}
+          </div>
+          <a
+            href="/cabinet/billing"
+            className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-xs text-text-main transition hover:bg-bg-card"
+          >
+            {ctaLabel}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

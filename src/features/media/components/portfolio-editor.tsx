@@ -6,6 +6,7 @@ import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
+import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 
 type Props = {
   entityType: MediaEntityType;
@@ -30,6 +31,18 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const plan = usePlanFeatures();
+  const portfolioLimit =
+    entityType === "STUDIO"
+      ? plan.features
+        ? plan.limit("maxPortfolioPhotosStudioDesign")
+        : MEDIA_PORTFOLIO_LIMIT
+      : MEDIA_PORTFOLIO_LIMIT;
+  const limitReached = portfolioLimit !== null && assets.length >= portfolioLimit;
+  const limitWarning =
+    portfolioLimit !== null && assets.length >= Math.max(portfolioLimit - 1, 1);
+  const limitLabel =
+    portfolioLimit === null ? "Без лимита" : `${assets.length} / ${portfolioLimit}`;
 
   const load = useCallback(async () => {
     setError(null);
@@ -51,6 +64,10 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
   const upload = useCallback(
     async (file: File, replaceAssetId?: string) => {
+      if (!replaceAssetId && limitReached) {
+        setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+        return;
+      }
       setBusy(true);
       setError(null);
       try {
@@ -73,7 +90,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         setBusy(false);
       }
     },
-    [entityType, entityId, load]
+    [entityType, entityId, limitReached, load]
   );
 
   const remove = useCallback(
@@ -98,15 +115,20 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
   return (
     <div className="space-y-3">
-      {canEdit && assets.length < MEDIA_PORTFOLIO_LIMIT ? (
-        <button
-          type="button"
-          onClick={() => addInputRef.current?.click()}
-          className="rounded-xl border px-4 py-2 text-sm hover:bg-neutral-50"
-          disabled={busy}
-        >
-          Добавить фото
-        </button>
+      {canEdit ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => addInputRef.current?.click()}
+            className="rounded-xl border px-4 py-2 text-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={busy || limitReached}
+          >
+            {limitReached ? "Лимит достигнут" : "Добавить фото"}
+          </button>
+          <div className={`text-xs ${limitWarning ? "text-amber-600" : "text-text-sec"}`}>
+            {limitLabel}
+          </div>
+        </div>
       ) : null}
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">

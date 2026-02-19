@@ -1,4 +1,6 @@
 import { AppError } from "@/lib/api/errors";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createLimitReachedError } from "@/lib/billing/guards";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
@@ -91,6 +93,7 @@ export type MasterProfileServiceItem = {
   serviceId: string;
   title: string;
   isEnabled: boolean;
+  onlinePaymentEnabled: boolean;
   basePrice: number;
   baseDurationMin: number;
   priceOverride: number | null;
@@ -147,6 +150,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         title: true,
         isEnabled: true,
         isActive: true,
+        onlinePaymentEnabled: true,
         price: true,
         durationMin: true,
       },
@@ -171,6 +175,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         serviceId: service.id,
         title: service.title?.trim() || service.name,
         isEnabled: service.isEnabled && service.isActive,
+        onlinePaymentEnabled: service.onlinePaymentEnabled,
         basePrice: service.price,
         baseDurationMin: service.durationMin,
         priceOverride: null,
@@ -197,6 +202,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       name: true,
       title: true,
       isActive: true,
+      onlinePaymentEnabled: true,
       price: true,
       durationMin: true,
       basePrice: true,
@@ -241,6 +247,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         serviceId: service.id,
         title: service.title?.trim() || service.name,
         isEnabled: Boolean(service.isActive && override?.isEnabled),
+        onlinePaymentEnabled: service.onlinePaymentEnabled,
         basePrice,
         baseDurationMin,
         priceOverride: override?.priceOverride ?? null,
@@ -301,6 +308,7 @@ export async function upsertMasterServices(
   items: Array<{
     serviceId: string;
     isEnabled: boolean;
+    onlinePaymentEnabled?: boolean;
     durationOverrideMin?: number | null;
     priceOverride?: number | null;
   }>
@@ -325,6 +333,9 @@ export async function upsertMasterServices(
           data: {
             isEnabled: item.isEnabled,
             isActive: item.isEnabled,
+            ...(typeof item.onlinePaymentEnabled === "boolean"
+              ? { onlinePaymentEnabled: item.onlinePaymentEnabled }
+              : {}),
             ...(typeof item.durationOverrideMin === "number"
               ? { durationMin: item.durationOverrideMin }
               : {}),
@@ -441,6 +452,7 @@ export async function createSoloMasterService(
           globalCategoryId,
           isEnabled: true,
           isActive: true,
+          onlinePaymentEnabled: false,
           sortOrder: (last?.sortOrder ?? -1) + 1,
         },
         select: { id: true },
@@ -487,6 +499,7 @@ export async function listMasterPortfolio(masterId: string): Promise<{ items: Ma
 }
 
 export async function createMasterPortfolioItem(
+  userId: string,
   masterId: string,
   input: { mediaUrl: string; caption?: string; serviceIds: string[]; tagIds?: string[] }
 ): Promise<{ id: string }> {
@@ -520,6 +533,22 @@ export async function createMasterPortfolioItem(
     });
     if (tags.length !== uniqueTagIds.length) {
       throw new AppError("Тег не найден", 404, "NOT_FOUND");
+    }
+  }
+
+  const plan = await getCurrentPlan(userId);
+  const limitKey = context.isSolo
+    ? "maxPortfolioPhotosSolo"
+    : "maxPortfolioPhotosPerStudioMaster";
+  const limit = context.isSolo
+    ? plan.features.maxPortfolioPhotosSolo
+    : plan.features.maxPortfolioPhotosPerStudioMaster;
+  if (typeof limit === "number") {
+    const current = await prisma.portfolioItem.count({
+      where: { masterId },
+    });
+    if (current >= limit) {
+      throw createLimitReachedError(limitKey, limit, current);
     }
   }
 

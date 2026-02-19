@@ -2,9 +2,17 @@ import { randomUUID } from "crypto";
 import { MediaEntityType, MediaKind, type UserProfile } from "@prisma/client";
 import { Readable } from "stream";
 import { AppError } from "@/lib/api/errors";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createLimitReachedError } from "@/lib/billing/guards";
 import { prisma } from "@/lib/prisma";
 import { getStorageProvider } from "@/lib/media/storage";
-import { MEDIA_ALLOWED_MIME_TYPES, MEDIA_MAX_FILE_SIZE_BYTES, MEDIA_PORTFOLIO_LIMIT, toMediaAssetDto, type MediaAssetDto } from "@/lib/media/types";
+import {
+  MEDIA_ALLOWED_MIME_TYPES,
+  MEDIA_MAX_FILE_SIZE_BYTES,
+  MEDIA_PORTFOLIO_LIMIT,
+  toMediaAssetDto,
+  type MediaAssetDto,
+} from "@/lib/media/types";
 import { ensureCanManageMedia, ensureCanReadMedia } from "@/lib/media/access";
 import { SITE_LOGIN_HERO_SETTING_KEY, SITE_LOGO_SETTING_KEY } from "@/lib/media/settings";
 
@@ -70,7 +78,47 @@ async function deleteAssetById(assetId: string): Promise<void> {
   });
 }
 
-async function enforcePortfolioLimit(entityType: MediaEntityType, entityId: string): Promise<void> {
+async function resolvePortfolioLimit(input: {
+  userId: string;
+  entityType: MediaEntityType;
+  entityId: string;
+}): Promise<{ limitKey: string | null; limit: number | null }> {
+  if (input.entityType === MediaEntityType.STUDIO) {
+    const plan = await getCurrentPlan(input.userId);
+    return {
+      limitKey: "maxPortfolioPhotosStudioDesign",
+      limit: plan.features.maxPortfolioPhotosStudioDesign,
+    };
+  }
+
+  if (input.entityType === MediaEntityType.MASTER) {
+    const provider = await prisma.provider.findUnique({
+      where: { id: input.entityId },
+      select: { id: true, type: true, studioId: true },
+    });
+    if (!provider || provider.type !== "MASTER") {
+      return { limitKey: null, limit: MEDIA_PORTFOLIO_LIMIT };
+    }
+    const plan = await getCurrentPlan(input.userId);
+    return provider.studioId
+      ? {
+          limitKey: "maxPortfolioPhotosPerStudioMaster",
+          limit: plan.features.maxPortfolioPhotosPerStudioMaster,
+        }
+      : {
+          limitKey: "maxPortfolioPhotosSolo",
+          limit: plan.features.maxPortfolioPhotosSolo,
+        };
+  }
+
+  return { limitKey: null, limit: MEDIA_PORTFOLIO_LIMIT };
+}
+
+async function enforcePortfolioLimit(
+  userId: string,
+  entityType: MediaEntityType,
+  entityId: string
+): Promise<void> {
   const excludedAssetIds: string[] = [];
 
   if (entityType === MediaEntityType.STUDIO) {
@@ -102,7 +150,13 @@ async function enforcePortfolioLimit(entityType: MediaEntityType, entityId: stri
       ...(excludedAssetIds.length > 0 ? { id: { notIn: excludedAssetIds } } : {}),
     },
   });
-  if (count >= MEDIA_PORTFOLIO_LIMIT) {
+
+  const { limitKey, limit } = await resolvePortfolioLimit({ userId, entityType, entityId });
+  if (limit === null) return;
+  if (count >= limit) {
+    if (limitKey) {
+      throw createLimitReachedError(limitKey, limit, count);
+    }
     throw new AppError("Portfolio limit reached", 409, "MEDIA_PORTFOLIO_LIMIT_REACHED");
   }
 }
@@ -133,7 +187,7 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
   await ensureCanManageMedia(user, input.entityType, entityId, input.kind);
 
   if (input.kind === MediaKind.PORTFOLIO && !input.replaceAssetId) {
-    await enforcePortfolioLimit(input.entityType, entityId);
+    await enforcePortfolioLimit(user.id, input.entityType, entityId);
   }
 
   if (input.replaceAssetId) {

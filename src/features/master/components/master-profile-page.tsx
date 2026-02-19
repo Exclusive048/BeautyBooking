@@ -2,11 +2,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import {
   useAddressWithGeocode,
   type AddressCoords,
@@ -21,6 +23,7 @@ type MasterServiceItem = {
   serviceId: string;
   title: string;
   isEnabled: boolean;
+  onlinePaymentEnabled: boolean;
   basePrice: number;
   baseDurationMin: number;
   priceOverride: number | null;
@@ -223,6 +226,7 @@ export function MasterProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autosaveInfo, setAutosaveInfo] = useState<string | null>(null);
+  const plan = usePlanFeatures();
   const [pendingInvites, setPendingInvites] = useState<NotificationCenterInviteItem[]>([]);
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
@@ -517,6 +521,24 @@ export function MasterProfilePage() {
     () => new Map(serviceList.map((service) => [service.serviceId, service.title])),
     [serviceList]
   );
+  const portfolioLimit = data?.master.isSolo
+    ? plan.limit("maxPortfolioPhotosSolo")
+    : plan.limit("maxPortfolioPhotosPerStudioMaster");
+  const portfolioCount = data?.portfolio.length ?? 0;
+  const portfolioLimitReached = portfolioLimit !== null && portfolioCount >= portfolioLimit;
+  const portfolioLimitWarning =
+    portfolioLimit !== null && portfolioCount >= Math.max(portfolioLimit - 1, 1);
+  const portfolioLimitLabel =
+    portfolioLimit === null ? "Без лимита" : `${portfolioCount} / ${portfolioLimit}`;
+  const onlinePaymentsAllowed = plan.can("onlinePayments");
+  const onlinePaymentsSystemEnabled = plan.system?.onlinePaymentsEnabled ?? false;
+  const canOnlinePayments = onlinePaymentsAllowed && onlinePaymentsSystemEnabled;
+  const showOnlinePaymentsToggle = data?.master.isSolo ?? false;
+  const onlinePaymentsLockedMessage = !onlinePaymentsAllowed
+    ? "Онлайн-оплата доступна на PRO и выше."
+    : !onlinePaymentsSystemEnabled
+      ? "Функция временно отключена администрацией"
+      : null;
 
   function normalizePrice(value: number): number {
     return Math.ceil(value / 100) * 100;
@@ -803,6 +825,7 @@ export function MasterProfilePage() {
       const payloadItems = snapshot.map((item) => ({
         serviceId: item.serviceId,
         isEnabled: item.isEnabled,
+        onlinePaymentEnabled: item.onlinePaymentEnabled,
         durationOverrideMin: item.isEnabled ? normalizeDuration(item.effectiveDurationMin) : item.durationOverrideMin,
         priceOverride:
           item.canEditPrice && item.isEnabled ? normalizePrice(item.effectivePrice) : undefined,
@@ -1007,6 +1030,10 @@ export function MasterProfilePage() {
 
   const uploadPortfolioFile = async (file: File): Promise<void> => {
     if (!data) return;
+    if (portfolioLimitReached) {
+      setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -1028,6 +1055,7 @@ export function MasterProfilePage() {
 
   const handlePortfolioDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (portfolioLimitReached) return;
     setDropActive(true);
   };
 
@@ -1038,6 +1066,10 @@ export function MasterProfilePage() {
   const handlePortfolioDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDropActive(false);
+    if (portfolioLimitReached) {
+      setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+      return;
+    }
     const file = event.dataTransfer.files?.[0] ?? null;
     if (file) {
       void uploadPortfolioFile(file);
@@ -1552,7 +1584,14 @@ export function MasterProfilePage() {
                   ) : null}
 
                   <ConnectedAccountsSection />
-                  <HotSlotsSettingsSection services={serviceList} />
+                  <FeatureGate
+                    feature="hotSlots"
+                    requiredPlan="PREMIUM"
+                    title="Горячие слоты"
+                    description="Подсветите свободные окна и получите больше записей."
+                  >
+                    <HotSlotsSettingsSection services={serviceList} />
+                  </FeatureGate>
                 </div>
               </div>
             ) : null}
@@ -1725,6 +1764,28 @@ export function MasterProfilePage() {
                     {!service.canEditPrice ? (
                       <div className="mt-1 text-xs text-text-sec">Цена управляется студией, доступен только тайминг.</div>
                     ) : null}
+                    {showOnlinePaymentsToggle ? (
+                      <label
+                        className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec"
+                        title={onlinePaymentsLockedMessage ?? undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={service.onlinePaymentEnabled}
+                          disabled={!canOnlinePayments}
+                          onChange={(event) =>
+                            setServicesDraft((current) => ({
+                              ...current,
+                              [service.serviceId]: {
+                                ...current[service.serviceId],
+                                onlinePaymentEnabled: event.target.checked,
+                              },
+                            }))
+                          }
+                        />
+                        Онлайн-оплата
+                      </label>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -1841,6 +1902,19 @@ export function MasterProfilePage() {
                 <p className="mt-1 text-xs text-text-sec">Добавляйте работы и связывайте их с услугами.</p>
               </div>
 
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className={portfolioLimitWarning ? "text-amber-600" : "text-text-sec"}>
+                  {portfolioLimitLabel}
+                </span>
+                {portfolioLimitReached ? (
+                  <span className="text-rose-400">
+                    Р›РёРјРёС‚ РґРѕСЃС‚РёРіРЅСѓС‚.{" "}
+                    <a href="/cabinet/billing" className="underline">
+                      РўР°СЂРёС„С‹
+                    </a>
+                  </span>
+                ) : null}
+              </div>
               <input
                 ref={newPortfolioInputRef}
                 type="file"
@@ -1855,10 +1929,16 @@ export function MasterProfilePage() {
                 }}
               />
               <div
-                className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 text-center text-sm transition ${
+                className={`flex min-h-[160px] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 text-center text-sm transition ${
                   dropActive ? "border-primary bg-primary/10" : "border-border-subtle bg-bg-card/80"
-                }`}
-                onClick={() => newPortfolioInputRef.current?.click()}
+                } ${portfolioLimitReached ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                onClick={() => {
+                  if (portfolioLimitReached) {
+                    setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+                    return;
+                  }
+                  newPortfolioInputRef.current?.click();
+                }}
                 onDragOver={handlePortfolioDragOver}
                 onDragLeave={handlePortfolioDragLeave}
                 onDrop={handlePortfolioDrop}

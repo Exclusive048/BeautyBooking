@@ -7,6 +7,7 @@ import { ensureStudioRole } from "@/lib/studio/access";
 import { createStudioMasterSchema, studioServicesQuerySchema } from "@/lib/studio/schemas";
 import { createStudioMaster, listStudioMasters } from "@/lib/studio/masters.service";
 import { parseBody, parseQuery } from "@/lib/validation";
+import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,8 @@ export async function POST(req: Request) {
       userId: user.id,
       allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
+
+    await ensureStudioTeamLimit(user.id, body.studioId);
 
     const data = await createStudioMaster({
       ...body,

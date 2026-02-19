@@ -46,6 +46,7 @@ function toServiceRecord(service: {
   durationMin: number;
   price: number;
   isEnabled: boolean;
+  onlinePaymentEnabled: boolean;
 }): ServiceRecord {
   return {
     id: service.id,
@@ -54,6 +55,7 @@ function toServiceRecord(service: {
     durationMin: service.durationMin,
     price: service.price,
     isEnabled: service.isEnabled,
+    onlinePaymentEnabled: service.onlinePaymentEnabled,
   };
 }
 

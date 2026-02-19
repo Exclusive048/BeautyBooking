@@ -23,7 +23,7 @@ export async function GET() {
       where: {
         status: "ACTIVE",
         OR: [{ endsAt: null }, { endsAt: { gt: now } }],
-        plan: { code: { not: "FREE" } },
+        plan: { code: { notIn: ["MASTER_FREE", "STUDIO_FREE"] } },
       },
     }),
   ]);

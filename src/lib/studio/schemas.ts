@@ -74,6 +74,7 @@ export const updateStudioServiceSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(1000).optional(),
   globalCategoryId: z.string().trim().min(1).nullable().optional(),
+  onlinePaymentEnabled: z.boolean().optional(),
   basePrice: z
     .number()
     .int()

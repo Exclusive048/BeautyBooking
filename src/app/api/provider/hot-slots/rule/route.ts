@@ -6,6 +6,8 @@ import { parseBody } from "@/lib/validation";
 import { hotSlotRuleSchema } from "@/lib/hot-slots/schemas";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getOrCreateDiscountRule, saveDiscountRule } from "@/lib/hot-slots/service";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createFeatureGateError } from "@/lib/billing/guards";
 
 export const runtime = "nodejs";
 
@@ -13,6 +15,11 @@ export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+
+    const plan = await getCurrentPlan(user.id);
+    if (!plan.features.hotSlots) {
+      throw createFeatureGateError("hotSlots", "PREMIUM");
+    }
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const rule = await getOrCreateDiscountRule(providerId);
@@ -35,6 +42,11 @@ export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+
+    const plan = await getCurrentPlan(user.id);
+    if (!plan.features.hotSlots) {
+      throw createFeatureGateError("hotSlots", "PREMIUM");
+    }
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, hotSlotRuleSchema);

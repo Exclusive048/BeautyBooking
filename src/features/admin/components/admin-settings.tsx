@@ -14,28 +14,42 @@ type SettingsResponse = {
   seoDescription: string | null;
 };
 
+type SystemConfigResponse = {
+  onlinePaymentsEnabled: boolean;
+};
+
 export function AdminSettings() {
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState(false);
+  const [flagsSaving, setFlagsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
+    useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/admin/settings", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<SettingsResponse> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить настройки");
+        const [settingsRes, flagsRes] = await Promise.all([
+          fetch("/api/admin/settings", { cache: "no-store" }),
+          fetch("/api/admin/system-config", { cache: "no-store" }),
+        ]);
+        const json = (await settingsRes.json().catch(() => null)) as ApiResponse<SettingsResponse> | null;
+        if (!settingsRes.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : "Failed to load settings");
         }
         setSeoTitle(json.data.seoTitle ?? "");
         setSeoDescription(json.data.seoDescription ?? "");
+
+        const flagsJson = (await flagsRes.json().catch(() => null)) as ApiResponse<SystemConfigResponse> | null;
+        if (flagsRes.ok && flagsJson && flagsJson.ok) {
+          setOnlinePaymentsEnabled(Boolean(flagsJson.data.onlinePaymentsEnabled));
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось загрузить настройки");
+        setError(err instanceof Error ? err.message : "Failed to load settings");
       } finally {
         setLoading(false);
       }
@@ -66,6 +80,29 @@ export function AdminSettings() {
       setError(err instanceof Error ? err.message : "Не удалось сохранить настройки");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveFlags = async () => {
+    setFlagsSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/admin/system-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ onlinePaymentsEnabled }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<SystemConfigResponse> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : "Failed to save settings");
+      }
+      setOnlinePaymentsEnabled(Boolean(json.data.onlinePaymentsEnabled));
+      setSuccess("Settings saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setFlagsSaving(false);
     }
   };
 
@@ -108,6 +145,29 @@ export function AdminSettings() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="text-base font-semibold text-text-main">System flags</div>
+          <p className="text-sm text-text-sec">Global feature toggles for the platform.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center justify-between gap-3 text-sm text-text-main">
+            <span>Online payments enabled (global)</span>
+            <input
+              type="checkbox"
+              checked={onlinePaymentsEnabled}
+              onChange={(event) => setOnlinePaymentsEnabled(event.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+          <div className="flex justify-end">
+            <Button onClick={saveFlags} disabled={flagsSaving}>
+              {flagsSaving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
