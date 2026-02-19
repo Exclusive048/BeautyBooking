@@ -34,6 +34,22 @@ async function isStudioAdminOrOwnerByStudioProviderId(studioProviderId: string, 
   return Boolean(membership);
 }
 
+async function canManageProvider(providerId: string, userId: string): Promise<boolean> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { id: true, type: true, ownerUserId: true, studioId: true },
+  });
+  if (!provider) return false;
+
+  if (provider.type === ProviderType.STUDIO) {
+    return isStudioAdminOrOwnerByStudioProviderId(provider.id, userId);
+  }
+
+  if (provider.ownerUserId === userId) return true;
+  if (provider.studioId && (await isStudioAdminOrOwnerByStudioProviderId(provider.studioId, userId))) return true;
+  return false;
+}
+
 export async function ensureCanManageMedia(
   user: UserProfile,
   entityType: MediaEntityType,
@@ -88,6 +104,22 @@ export async function ensureCanManageMedia(
     return;
   }
 
+  if (entityType === MediaEntityType.CLIENT_CARD) {
+    if (kind !== MediaKind.CLIENT_CARD_PHOTO) {
+      throw new AppError("Forbidden", 403, "FORBIDDEN");
+    }
+    const card = await prisma.clientCard.findUnique({
+      where: { id: entityId },
+      select: { id: true, providerId: true },
+    });
+    if (!card) {
+      throw new AppError("Client card not found", 404, "CLIENT_CARD_NOT_FOUND");
+    }
+    const canManage = await canManageProvider(card.providerId, user.id);
+    if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    return;
+  }
+
   throw new AppError("Forbidden", 403, "FORBIDDEN");
 }
 
@@ -118,6 +150,20 @@ export async function ensureCanReadMedia(
     }
     if (application.clientUserId === user.id) return;
     await resolveMasterAccess(application.offer.masterId, user.id);
+    return;
+  }
+
+  if (entityType === MediaEntityType.CLIENT_CARD) {
+    if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    const card = await prisma.clientCard.findUnique({
+      where: { id: entityId },
+      select: { id: true, providerId: true },
+    });
+    if (!card) {
+      throw new AppError("Client card not found", 404, "CLIENT_CARD_NOT_FOUND");
+    }
+    const canManage = await canManageProvider(card.providerId, user.id);
+    if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
     return;
   }
 }

@@ -10,7 +10,7 @@ export type ClientCardSummary = {
   photosCount: number;
 };
 
-export type StudioClientListItem = {
+export type MasterClientListItem = {
   key: string;
   clientUserId: string | null;
   displayName: string;
@@ -24,13 +24,9 @@ export type StudioClientListItem = {
   card: ClientCardSummary | null;
 };
 
-export type StudioClientsData = {
-  clients: StudioClientListItem[];
+export type MasterClientsData = {
+  clients: MasterClientListItem[];
 };
-
-function clientSortDate(lastBookingAt: Date): number {
-  return lastBookingAt.getTime();
-}
 
 async function loadCardSummaries(providerId: string, clients: Map<string, { clientUserId: string | null; phone: string }>) {
   const userIds = Array.from(new Set(Array.from(clients.values()).map((item) => item.clientUserId).filter(Boolean))) as string[];
@@ -70,22 +66,37 @@ async function loadCardSummaries(providerId: string, clients: Map<string, { clie
   return map;
 }
 
-export async function getStudioClients(
-  studioId: string,
-  sort?: "newest",
+function sortClients(
+  sort: "recent" | "visits" | "alpha" | undefined,
+  a: { lastBookingAt: Date; visitsCount: number; displayName: string },
+  b: { lastBookingAt: Date; visitsCount: number; displayName: string }
+): number {
+  if (sort === "visits") {
+    if (b.visitsCount !== a.visitsCount) return b.visitsCount - a.visitsCount;
+    return b.lastBookingAt.getTime() - a.lastBookingAt.getTime();
+  }
+  if (sort === "alpha") {
+    return a.displayName.localeCompare(b.displayName, "ru");
+  }
+  return b.lastBookingAt.getTime() - a.lastBookingAt.getTime();
+}
+
+export async function getMasterClients(
+  providerId: string,
+  sort?: "recent" | "visits" | "alpha",
   includeCardSummary = false
-): Promise<StudioClientsData> {
-  const studio = await prisma.studio.findUnique({
-    where: { id: studioId },
-    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
+): Promise<MasterClientsData> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { id: true, type: true, timezone: true },
   });
-  if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+  if (!provider || provider.type !== "MASTER") {
+    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
   }
 
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
+      OR: [{ providerId }, { masterProviderId: providerId }],
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
     },
     select: {
@@ -126,15 +137,10 @@ export async function getStudioClients(
     applyProfileNames(grouped, profiles);
   }
 
-  const cardMap = includeCardSummary ? await loadCardSummaries(studio.providerId, grouped) : new Map();
+  const cardMap = includeCardSummary ? await loadCardSummaries(providerId, grouped) : new Map();
 
   const clients = Array.from(grouped.values())
-    .sort((a, b) => {
-      if (sort === "newest" || !sort) {
-        return clientSortDate(b.lastBookingAt) - clientSortDate(a.lastBookingAt);
-      }
-      return clientSortDate(b.lastBookingAt) - clientSortDate(a.lastBookingAt);
-    })
+    .sort((a, b) => sortClients(sort, a, b))
     // TODO: добавить курсорную пагинацию для длинных списков клиентов.
     .slice(0, 50)
     .map((item) => ({
@@ -144,7 +150,7 @@ export async function getStudioClients(
       phone: item.phone,
       lastBookingAt: item.lastBookingAt.toISOString(),
       lastVisitAt: item.lastVisitAt ? item.lastVisitAt.toISOString() : null,
-      daysSinceLastVisit: calculateDaysSinceLastVisit(item.lastVisitAt, studio.provider.timezone),
+      daysSinceLastVisit: calculateDaysSinceLastVisit(item.lastVisitAt, provider.timezone),
       lastServiceName: item.lastServiceName,
       visitsCount: item.visitsCount,
       totalAmount: item.totalAmount,

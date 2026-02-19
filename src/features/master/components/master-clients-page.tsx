@@ -6,7 +6,6 @@ import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { ClientCardDrawer } from "@/features/crm/components/client-card-drawer";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -20,7 +19,6 @@ type ClientCardSummary = {
 
 type ClientItem = {
   key: string;
-  clientUserId: string | null;
   displayName: string;
   phone: string;
   lastBookingAt: string;
@@ -36,18 +34,14 @@ type ClientsData = {
   clients: ClientItem[];
 };
 
-type Props = {
-  studioId: string;
-};
-
 type SelectedClient = {
   key: string;
   name: string;
   phone: string;
 };
 
-function formatMoney(value: number, suffix: string): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ${suffix}`;
+function formatMoney(value: number): string {
+  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
 }
 
 function formatDaysAgo(value: number | null): string {
@@ -64,12 +58,12 @@ function formatDaysAgo(value: number | null): string {
   return `${value} ${suffix} назад`;
 }
 
-export function StudioClientsPage({ studioId }: Props) {
-  const t = UI_TEXT.studioCabinet.clients;
+export function MasterClientsPage() {
   const viewerTimeZone = useViewerTimeZoneContext();
   const searchParams = useSearchParams();
-  const sort = searchParams.get("sort") === "newest" ? "newest" : undefined;
-  const plan = usePlanFeatures("STUDIO");
+  const rawSort = searchParams.get("sort");
+  const sort = rawSort === "visits" || rawSort === "alpha" || rawSort === "recent" ? rawSort : "recent";
+  const plan = usePlanFeatures("MASTER");
   const [data, setData] = useState<ClientsData>({ clients: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +72,7 @@ export function StudioClientsPage({ studioId }: Props) {
   const [reloadTick, setReloadTick] = useState(0);
 
   const tagMap = useMemo(() => new Map(CLIENT_TAGS.map((tag) => [tag.id, tag])), []);
+
   const canOpenCards = plan.tier ? plan.tier !== "FREE" : false;
 
   useEffect(() => {
@@ -85,28 +80,26 @@ export function StudioClientsPage({ studioId }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({ studioId });
-        if (sort) {
-          params.set("sort", sort);
-        }
-        const res = await fetch(`/api/studio/clients?${params.toString()}`, { cache: "no-store" });
+        const params = new URLSearchParams();
+        if (sort) params.set("sort", sort);
+        const res = await fetch(`/api/master/clients?${params.toString()}`, { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<ClientsData> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
         setData(json.data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : t.loadFailed);
+        setError(err instanceof Error ? err.message : "Не удалось загрузить клиентов");
       } finally {
         setLoading(false);
       }
     };
 
     void load();
-  }, [reloadTick, sort, studioId, t.apiErrorPrefix, t.loadFailed]);
+  }, [reloadTick, sort]);
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка клиентов...</div>;
   }
 
   return (
@@ -114,19 +107,19 @@ export function StudioClientsPage({ studioId }: Props) {
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       {data.clients.length === 0 ? (
-        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.empty}</div>
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Пока нет клиентов. Список формируется из записей.</div>
       ) : (
         <div className="lux-card overflow-hidden rounded-[24px]">
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
-                <th className="px-4 py-3 text-left">{t.columns.client}</th>
-                <th className="px-4 py-3 text-left">{t.columns.phone}</th>
-                <th className="px-4 py-3 text-left">{t.columns.lastBooking}</th>
-                <th className="px-4 py-3 text-left">{t.columns.service}</th>
+                <th className="px-4 py-3 text-left">Клиент</th>
+                <th className="px-4 py-3 text-left">Телефон</th>
+                <th className="px-4 py-3 text-left">Последний визит</th>
+                <th className="px-4 py-3 text-left">Услуга</th>
                 <th className="px-4 py-3 text-left">Теги</th>
-                <th className="px-4 py-3 text-left">{t.columns.visits}</th>
-                <th className="px-4 py-3 text-left">{t.columns.amount}</th>
+                <th className="px-4 py-3 text-left">Посещения</th>
+                <th className="px-4 py-3 text-left">Сумма</th>
               </tr>
             </thead>
             <tbody>
@@ -172,7 +165,7 @@ export function StudioClientsPage({ studioId }: Props) {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-text-main">{client.visitsCount}</td>
-                    <td className="px-4 py-3 text-sm text-text-main">{formatMoney(client.totalAmount, t.moneySuffix)}</td>
+                    <td className="px-4 py-3 text-sm text-text-main">{formatMoney(client.totalAmount)}</td>
                   </tr>
                 );
               })}
@@ -183,8 +176,7 @@ export function StudioClientsPage({ studioId }: Props) {
 
       {selected ? (
         <ClientCardDrawer
-          scope="STUDIO"
-          studioId={studioId}
+          scope="MASTER"
           clientKey={selected.key}
           clientName={selected.name}
           clientPhone={selected.phone}
