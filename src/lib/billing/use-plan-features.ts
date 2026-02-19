@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CurrentPlanInfo, PlanFeatures } from "@/lib/billing/types";
 
+type SubscriptionScope = "MASTER" | "STUDIO";
+
 type BooleanFeatureKey = {
   [Key in keyof PlanFeatures]: PlanFeatures[Key] extends boolean ? Key : never;
 }[keyof PlanFeatures];
@@ -17,7 +19,7 @@ type PlanState = {
   data: CurrentPlanInfo | null;
 };
 
-export function usePlanFeatures() {
+export function usePlanFeatures(scope?: SubscriptionScope) {
   const [state, setState] = useState<PlanState>({
     loading: true,
     error: null,
@@ -27,7 +29,8 @@ export function usePlanFeatures() {
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const res = await fetch("/api/me/plan", { cache: "no-store" });
+      const url = scope ? `/api/me/plan?scope=${scope}` : "/api/me/plan";
+      const res = await fetch(url, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as
         | { ok: true; data: CurrentPlanInfo }
         | { ok: false; error?: { message?: string } }
@@ -47,7 +50,7 @@ export function usePlanFeatures() {
         data: null,
       });
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     void load();
@@ -78,7 +81,7 @@ export function usePlanFeatures() {
       error: state.error,
       planCode: state.data?.planCode ?? null,
       tier: state.data?.tier ?? null,
-      providerType: state.data?.providerType ?? null,
+      scope: state.data?.scope ?? null,
       planId: state.data?.planId ?? null,
       features,
       system,

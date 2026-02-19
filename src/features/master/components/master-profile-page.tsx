@@ -226,7 +226,7 @@ export function MasterProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autosaveInfo, setAutosaveInfo] = useState<string | null>(null);
-  const plan = usePlanFeatures();
+  const plan = usePlanFeatures("MASTER");
   const [pendingInvites, setPendingInvites] = useState<NotificationCenterInviteItem[]>([]);
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
@@ -397,7 +397,7 @@ export function MasterProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setAddressSnapshot]);
 
     useEffect(() => {
       void load();
@@ -1587,6 +1587,7 @@ export function MasterProfilePage() {
                   <FeatureGate
                     feature="hotSlots"
                     requiredPlan="PREMIUM"
+                    scope="MASTER"
                     title="Горячие слоты"
                     description="Подсветите свободные окна и получите больше записей."
                   >
@@ -2106,3 +2107,5 @@ export function MasterProfilePage() {
     </section>
   );
 }
+
+

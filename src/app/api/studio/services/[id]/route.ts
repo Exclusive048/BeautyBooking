@@ -7,6 +7,7 @@ import { ensureStudioRole } from "@/lib/studio/access";
 import { updateStudioServiceSchema } from "@/lib/studio/schemas";
 import { updateStudioService } from "@/lib/studio/services.service";
 import { parseBody } from "@/lib/validation";
+import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createFeatureGateError, createSystemDisabledError } from "@/lib/billing/guards";
 
@@ -31,7 +32,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     });
 
     if (body.onlinePaymentEnabled === true) {
-      const plan = await getCurrentPlan(user.id);
+      const plan = await getCurrentPlan(user.id, SubscriptionScope.STUDIO);
       if (!plan.features.onlinePayments) {
         throw createFeatureGateError("onlinePayments", "PRO");
       }

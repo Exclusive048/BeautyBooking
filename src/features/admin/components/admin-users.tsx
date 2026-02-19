@@ -12,7 +12,8 @@ type PlanInfo = {
   id: string;
   code: string;
   name: string;
-  price: number;
+  scope: "MASTER" | "STUDIO";
+  tier: string;
 };
 
 type UserItem = {
@@ -23,10 +24,12 @@ type UserItem = {
   roles: string[];
   type: "client" | "master" | "studio";
   createdAt: string;
-  subscription: {
+  subscriptions: Array<{
+    scope: "MASTER" | "STUDIO";
     status: string;
+    currentPeriodEnd: string | null;
     plan: PlanInfo;
-  } | null;
+  }>;
 };
 
 type UsersResponse = {
@@ -116,13 +119,13 @@ export function AdminUsers() {
 
   useEffect(() => {
     if (activeUser && !selectedPlanId && plans.length > 0) {
-      setSelectedPlanId(activeUser.subscription?.plan.id ?? plans[0].id);
+      setSelectedPlanId(activeUser.subscriptions[0]?.plan.id ?? plans[0].id);
     }
   }, [activeUser, plans, selectedPlanId]);
 
   const openModal = (user: UserItem) => {
     setActiveUser(user);
-    setSelectedPlanId(user.subscription?.plan.id ?? plans[0]?.id ?? "");
+    setSelectedPlanId(user.subscriptions[0]?.plan.id ?? plans[0]?.id ?? "");
   };
 
   const closeModal = () => {
@@ -206,9 +209,17 @@ export function AdminUsers() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-2">
-                        <span className="text-xs text-text-sec">
-                          {user.subscription?.plan.name ?? "FREE"}
-                        </span>
+                        <div className="flex flex-col items-end gap-1 text-xs text-text-sec">
+                          {user.subscriptions.length > 0 ? (
+                            user.subscriptions.map((subscription) => (
+                              <span key={`${user.id}:${subscription.scope}`}>
+                                {subscription.scope}: {subscription.plan.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span>FREE</span>
+                          )}
+                        </div>
                         <Button size="sm" variant="secondary" onClick={() => openModal(user)}>
                           Изменить тариф
                         </Button>
@@ -247,7 +258,7 @@ export function AdminUsers() {
               </option>
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name}
+                  {plan.name} ({plan.scope === "MASTER" ? "Мастер" : "Студия"})
                 </option>
               ))}
             </Select>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
 import {
   FEATURE_CATALOG,
@@ -29,20 +29,31 @@ import {
   type PlanTier,
 } from "@/lib/billing/features";
 
-type ProviderType = "MASTER" | "STUDIO";
+type SubscriptionScope = "MASTER" | "STUDIO";
+
+type PeriodMonths = 1 | 3 | 6 | 12;
+
+const PERIODS: PeriodMonths[] = [1, 3, 6, 12];
 
 type BillingPlan = {
   id: string;
   code: string;
   name: string;
-  price: number;
   tier: PlanTier;
-  providerType: ProviderType;
+  scope: SubscriptionScope;
   features: Record<string, unknown>;
   sortOrder: number;
   inheritsFromPlanId: string | null;
   isActive: boolean;
   updatedAt: string;
+  prices: BillingPlanPrice[];
+};
+
+type BillingPlanPrice = {
+  id: string;
+  periodMonths: PeriodMonths;
+  priceKopeks: number;
+  isActive: boolean;
 };
 
 type BillingResponse = {
@@ -63,7 +74,7 @@ const TIER_LABEL: Record<PlanTier, string> = {
   PREMIUM: "Премиум",
 };
 
-const PROVIDER_LABEL: Record<ProviderType, string> = {
+const PROVIDER_LABEL: Record<SubscriptionScope, string> = {
   MASTER: "Мастер",
   STUDIO: "Студия",
 };
@@ -87,12 +98,12 @@ function buildPlanMap(plans: BillingPlan[]): Map<string, PlanNode> {
 }
 
 function filterCatalog(
-  providerType: ProviderType
+  scope: SubscriptionScope
 ): Array<[FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]> {
   return (Object.entries(FEATURE_CATALOG) as Array<
     [FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]
   >)
-    .filter(([, def]) => def.appliesTo === "BOTH" || def.appliesTo === providerType)
+    .filter(([, def]) => def.appliesTo === "BOTH" || def.appliesTo === scope)
     .sort((a, b) => a[1].uiOrder - b[1].uiOrder);
 }
 
@@ -107,6 +118,42 @@ function groupCatalog(entries: Array<[FeatureKey, (typeof FEATURE_CATALOG)[Featu
   return Array.from(groups.entries());
 }
 
+function getPriceForPeriod(plan: BillingPlan, periodMonths: PeriodMonths) {
+  return plan.prices.find((price) => price.periodMonths === periodMonths) ?? null;
+}
+
+function resolvePlanMonthlyLabel(plan: BillingPlan) {
+  const monthly = getPriceForPeriod(plan, 1);
+  if (!monthly || monthly.priceKopeks <= 0) return "Р‘РµСЃРїР»Р°С‚РЅРѕ";
+  return `${moneyRUBFromKopeks(monthly.priceKopeks)} /РјРµСЃ.`;
+}
+
+function formatPriceInput(priceKopeks: number) {
+  const value = priceKopeks / 100;
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(2).replace(/\.00$/, "");
+}
+
+function buildPriceDraft(prices: BillingPlanPrice[]): Record<PeriodMonths, string> {
+  const map = new Map<PeriodMonths, BillingPlanPrice>(
+    prices.map((price) => [price.periodMonths, price])
+  );
+  return {
+    1: formatPriceInput(map.get(1)?.priceKopeks ?? 0),
+    3: formatPriceInput(map.get(3)?.priceKopeks ?? 0),
+    6: formatPriceInput(map.get(6)?.priceKopeks ?? 0),
+    12: formatPriceInput(map.get(12)?.priceKopeks ?? 0),
+  };
+}
+
+function parsePriceInput(raw: string): number | null {
+  const normalized = raw.trim().replace(",", ".");
+  if (!normalized) return 0;
+  const value = Number(normalized);
+  if (!Number.isFinite(value) || value < 0) return null;
+  return Math.round(value * 100);
+}
+
 export function AdminBilling() {
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +165,12 @@ export function AdminBilling() {
   const [featureQuery, setFeatureQuery] = useState("");
   const [editingCode, setEditingCode] = useState("");
   const [editingName, setEditingName] = useState("");
-  const [editingPrice, setEditingPrice] = useState("");
+  const [editingPrices, setEditingPrices] = useState<Record<PeriodMonths, string>>(
+    () => buildPriceDraft([])
+  );
   const [editingSortOrder, setEditingSortOrder] = useState("");
   const [editingTier, setEditingTier] = useState<PlanTier>("FREE");
-  const [editingProviderType, setEditingProviderType] = useState<ProviderType>("MASTER");
+  const [editingScope, setEditingScope] = useState<SubscriptionScope>("MASTER");
   const [editingInheritsFromPlanId, setEditingInheritsFromPlanId] = useState<string | null>(null);
   const [editingIsActive, setEditingIsActive] = useState(true);
   const [editingOverrides, setEditingOverrides] = useState<PlanFeatureOverrides>({});
@@ -208,10 +257,8 @@ export function AdminBilling() {
     const keysCount = Object.keys(FEATURE_CATALOG).length;
     const entriesCount = Object.entries(FEATURE_CATALOG).length;
     if (keysCount !== entriesCount) {
-      // eslint-disable-next-line no-console
       console.warn("[admin-billing] feature catalog mismatch", { keysCount, entriesCount });
     } else {
-      // eslint-disable-next-line no-console
       console.debug("[admin-billing] feature catalog size", keysCount);
     }
   }, [modalMode]);
@@ -220,12 +267,12 @@ export function AdminBilling() {
 
   const groupedPlans = useMemo(() => {
     const sorted = [...plans].sort((a, b) => {
-      if (a.providerType !== b.providerType) return a.providerType.localeCompare(b.providerType);
+      if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
       if (a.tier !== b.tier) return TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
       return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
     });
-    const groups: Record<ProviderType, BillingPlan[]> = { MASTER: [], STUDIO: [] };
-    for (const plan of sorted) groups[plan.providerType].push(plan);
+    const groups: Record<SubscriptionScope, BillingPlan[]> = { MASTER: [], STUDIO: [] };
+    for (const plan of sorted) groups[plan.scope].push(plan);
     return groups;
   }, [plans]);
 
@@ -236,10 +283,10 @@ export function AdminBilling() {
     setFeatureQuery("");
     setEditingCode("");
     setEditingName("");
-    setEditingPrice("0");
+    setEditingPrices(buildPriceDraft([]));
     setEditingSortOrder("0");
     setEditingTier("FREE");
-    setEditingProviderType("MASTER");
+    setEditingScope("MASTER");
     setEditingInheritsFromPlanId(null);
     setEditingIsActive(true);
     setEditingOverrides({});
@@ -253,10 +300,10 @@ export function AdminBilling() {
     setFeatureQuery("");
     setEditingCode(plan.code);
     setEditingName(plan.name);
-    setEditingPrice(String(plan.price));
+    setEditingPrices(buildPriceDraft(plan.prices));
     setEditingSortOrder(String(plan.sortOrder ?? 0));
     setEditingTier(plan.tier);
-    setEditingProviderType(plan.providerType);
+    setEditingScope(plan.scope);
     setEditingInheritsFromPlanId(plan.inheritsFromPlanId ?? null);
     setEditingIsActive(plan.isActive);
     setEditingOverrides(parseOverrides(plan.features));
@@ -287,7 +334,7 @@ export function AdminBilling() {
     return deriveUiState(draftPlanId, draftPlansById);
   }, [draftPlanId, draftPlansById]);
 
-  const catalogEntries = useMemo(() => filterCatalog(editingProviderType), [editingProviderType]);
+  const catalogEntries = useMemo(() => filterCatalog(editingScope), [editingScope]);
 
   const normalizedQuery = featureQuery.trim().toLowerCase();
 
@@ -341,15 +388,7 @@ export function AdminBilling() {
     if (!modalMode) return;
     setSaving(true);
     setError(null);
-
-    const priceValue = Number(editingPrice);
     const sortOrderValue = Number(editingSortOrder);
-
-    if (Number.isNaN(priceValue) || priceValue < 0) {
-      setError("Укажите корректную цену.");
-      setSaving(false);
-      return;
-    }
     if (!Number.isFinite(sortOrderValue)) {
       setError("Укажите корректный порядок сортировки.");
       setSaving(false);
@@ -377,15 +416,29 @@ export function AdminBilling() {
       }
     }
 
+    const pricesPayload = PERIODS.map((periodMonths) => {
+      const priceKopeks = parsePriceInput(editingPrices[periodMonths] ?? "");
+      if (priceKopeks === null) return null;
+      return { periodMonths, priceKopeks };
+    });
+
+    if (pricesPayload.some((entry) => entry === null)) {
+      setError("РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Рµ С†РµРЅС‹ РґР»СЏ РІСЃРµС… СЃСЂРѕРєРѕРІ.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const endpoint = "/api/admin/billing";
       const payload = {
         code: editingCode.trim(),
         name: editingName.trim(),
-        price: priceValue,
+        prices: pricesPayload.filter(
+          (entry): entry is { periodMonths: PeriodMonths; priceKopeks: number } => Boolean(entry)
+        ),
         sortOrder: sortOrderValue,
         tier: editingTier,
-        providerType: editingProviderType,
+        scope: editingScope,
         inheritsFromPlanId: editingInheritsFromPlanId,
         features: editingOverrides,
         isActive: editingIsActive,
@@ -433,14 +486,14 @@ export function AdminBilling() {
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       ) : null}
 
-      {(["MASTER", "STUDIO"] as ProviderType[]).map((providerType) => (
-        <section key={providerType} className="space-y-4">
+      {(["MASTER", "STUDIO"] as SubscriptionScope[]).map((scope) => (
+        <section key={scope} className="space-y-4">
           <h2 className="text-lg font-semibold text-text-main">
-            {providerType === "MASTER" ? "Тарифы для мастеров" : "Тарифы для студий"}
+            {scope === "MASTER" ? "Тарифы для мастеров" : "Тарифы для студий"}
           </h2>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {groupedPlans[providerType].map((plan) => (
+            {groupedPlans[scope].map((plan) => (
               <Card key={plan.id} className="flex flex-col">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
@@ -449,14 +502,14 @@ export function AdminBilling() {
                       <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
                     </div>
                     <div className="text-sm font-semibold text-text-main">
-                      {plan.price <= 0 ? "Бесплатно" : `${moneyRUB(plan.price)} /мес.`}
+                      {resolvePlanMonthlyLabel(plan)}
                     </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="flex-1 space-y-3">
                   <div className="text-xs text-text-sec">
-                    {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.providerType]} • Сортировка: {plan.sortOrder}
+                    {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.scope]} • Сортировка: {plan.sortOrder}
                   </div>
                   <div className="text-xs text-text-sec">Статус: {plan.isActive ? "Активен" : "Отключён"}</div>
                   <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
@@ -518,8 +571,8 @@ export function AdminBilling() {
                   <label className="text-xs text-text-sec">
                     Тип
                     <select
-                      value={editingProviderType}
-                      onChange={(event) => setEditingProviderType(event.target.value as ProviderType)}
+                      value={editingScope}
+                      onChange={(event) => setEditingScope(event.target.value as SubscriptionScope)}
                       className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
                     >
                       <option value="MASTER">Мастер</option>
@@ -549,7 +602,7 @@ export function AdminBilling() {
                     >
                       <option value="">—</option>
                       {plans
-                        .filter((plan) => plan.id !== activePlanId && plan.providerType === editingProviderType)
+                        .filter((plan) => plan.id !== activePlanId && plan.scope === editingScope)
                         .map((plan) => (
                           <option key={plan.id} value={plan.id}>
                             {plan.name} ({plan.code})
@@ -558,16 +611,28 @@ export function AdminBilling() {
                     </select>
                   </label>
 
-                  <label className="text-xs text-text-sec">
-                    Цена, ₽/мес.
-                    <Input
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={editingPrice}
-                      onChange={(event) => setEditingPrice(event.target.value)}
-                    />
-                  </label>
+                                    <div className="sm:col-span-2">
+                    <div className="text-xs text-text-sec">Цены по периодам, ₽</div>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                      {PERIODS.map((periodMonths) => (
+                        <label key={periodMonths} className="text-xs text-text-sec">
+                          {periodMonths} ���.
+                          <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={editingPrices[periodMonths]}
+                            onChange={(event) =>
+                              setEditingPrices((current) => ({
+                                ...current,
+                                [periodMonths]: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
 
                   <label className="text-xs text-text-sec">
                     Порядок сортировки
@@ -798,3 +863,9 @@ export function AdminBilling() {
     </section>
   );
 }
+
+
+
+
+
+

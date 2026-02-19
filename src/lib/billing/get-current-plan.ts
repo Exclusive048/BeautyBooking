@@ -1,4 +1,4 @@
-import { ProviderType } from "@prisma/client";
+import { SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   getDefaultPlanFeatures,
@@ -16,7 +16,7 @@ export type CurrentPlanInfo = {
   planId: string | null;
   planCode: string | null;
   tier: PlanTier | null;
-  providerType: ProviderType | null;
+  scope: SubscriptionScope | null;
   features: PlanFeatures;
   system: SystemFlags;
 };
@@ -35,46 +35,58 @@ async function getSystemFlags(): Promise<SystemFlags> {
   };
 }
 
-export async function getCurrentPlan(userId: string): Promise<CurrentPlanInfo> {
+export async function getCurrentPlan(
+  userId: string,
+  scopeOverride?: SubscriptionScope
+): Promise<CurrentPlanInfo> {
   const user = await prisma.userProfile.findUnique({
     where: { id: userId },
     select: { roles: true },
   });
-  const providerType = user?.roles.includes("STUDIO") || user?.roles.includes("STUDIO_ADMIN")
-    ? ProviderType.STUDIO
-    : ProviderType.MASTER;
+  const fallbackScope =
+    scopeOverride ??
+    (user?.roles.includes("STUDIO") || user?.roles.includes("STUDIO_ADMIN")
+      ? SubscriptionScope.STUDIO
+      : SubscriptionScope.MASTER);
 
   const subscription = await prisma.userSubscription.findUnique({
-    where: { userId },
+    where: { userId_scope: { userId, scope: fallbackScope } },
     select: {
       id: true,
       status: true,
+      currentPeriodEnd: true,
       plan: {
-        select: { id: true, code: true, tier: true, providerType: true, features: true },
+        select: { id: true, code: true, tier: true, scope: true, features: true },
       },
     },
   });
 
-  let planId: string | null = subscription?.plan?.id ?? null;
-  let planCode: string | null = subscription?.plan?.code ?? null;
-  let tier: PlanTier | null = subscription?.plan?.tier ?? null;
-  let planProviderType: ProviderType | null = subscription?.plan?.providerType ?? null;
+  const now = new Date();
+  const isActive =
+    subscription &&
+    (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") &&
+    (!subscription.currentPeriodEnd || subscription.currentPeriodEnd > now);
+
+  let planId: string | null = isActive ? subscription?.plan?.id ?? null : null;
+  let planCode: string | null = isActive ? subscription?.plan?.code ?? null : null;
+  let tier: PlanTier | null = isActive ? subscription?.plan?.tier ?? null : null;
+  let planScope: SubscriptionScope | null = isActive ? subscription?.plan?.scope ?? null : null;
   let features: PlanFeatures = getDefaultPlanFeatures();
 
   if (planId) {
     const chain = await loadPlanChain(planId);
     features = resolveEffectiveFeatures(planId, new Map(chain.map((item) => [item.id, item])));
   } else {
-    const fallbackCode = providerType === ProviderType.STUDIO ? "STUDIO_FREE" : "MASTER_FREE";
+    const fallbackCode = fallbackScope === SubscriptionScope.STUDIO ? "STUDIO_FREE" : "MASTER_FREE";
     const freePlan = await prisma.billingPlan.findUnique({
       where: { code: fallbackCode },
-      select: { id: true, code: true, tier: true, providerType: true, features: true, inheritsFromPlanId: true },
+      select: { id: true, code: true, tier: true, scope: true, features: true, inheritsFromPlanId: true },
     });
     if (freePlan) {
       planId = freePlan.id;
       planCode = freePlan.code;
       tier = freePlan.tier;
-      planProviderType = freePlan.providerType;
+      planScope = freePlan.scope;
       const chain = await loadPlanChain(freePlan.id);
       features = resolveEffectiveFeatures(freePlan.id, new Map(chain.map((item) => [item.id, item])));
     } else {
@@ -89,7 +101,7 @@ export async function getCurrentPlan(userId: string): Promise<CurrentPlanInfo> {
     planId,
     planCode,
     tier,
-    providerType: planProviderType ?? providerType,
+    scope: planScope ?? fallbackScope,
     features,
     system,
   };

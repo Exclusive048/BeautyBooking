@@ -1,3 +1,4 @@
+import { SubscriptionScope } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -55,7 +56,7 @@ export async function PUT(req: Request) {
 
     const wantsOnlinePayments = body.items.some((item) => item.onlinePaymentEnabled === true);
     if (wantsOnlinePayments) {
-      const plan = await getCurrentPlan(user.id);
+      const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
       if (!plan.features.onlinePayments) {
         throw createFeatureGateError("onlinePayments", "PRO");
       }

@@ -8,7 +8,7 @@ import {
   updateProviderService,
 } from "@/lib/providers/services";
 import { prisma } from "@/lib/prisma";
-import { ProviderType } from "@prisma/client";
+import { ProviderType, SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 
 const createSchema = z.object({
@@ -104,7 +104,7 @@ export async function PUT(
   if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
 
   if (parsed.data.onlinePaymentEnabled === true) {
-    const plan = await getCurrentPlan(auth.user.id);
+    const plan = await getCurrentPlan(auth.user.id, SubscriptionScope.MASTER);
     if (!plan.features.onlinePayments) {
       return fail("Feature not available", 403, "FEATURE_GATE", {
         feature: "onlinePayments",

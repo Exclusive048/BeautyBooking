@@ -31,7 +31,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const plan = usePlanFeatures();
+  const plan = usePlanFeatures(entityType === "STUDIO" ? "STUDIO" : "MASTER");
   const portfolioLimit =
     entityType === "STUDIO"
       ? plan.features

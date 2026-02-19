@@ -112,7 +112,7 @@ export function StudioProfilePage({ providerId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [providerId, t.apiErrorPrefix, t.loadFailed]);
+  }, [providerId, t.apiErrorPrefix, t.loadFailed, setAddressSnapshot]);
 
   useEffect(() => {
     void load();
