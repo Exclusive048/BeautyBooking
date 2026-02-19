@@ -5,12 +5,44 @@ import { AppError } from "@/lib/api/errors";
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 32;
 const USERNAME_RANDOM_SUFFIX_LENGTH = 4;
-const BANNED_USERNAMES = new Set([
+
+export const RESERVED_SLUGS = new Set([
+  "booking",
+  "settings",
   "admin",
   "api",
-  "cabinet",
   "u",
+  "c",
+  "auth",
   "login",
+  "logout",
+  "cabinet",
+  "providers",
+  "studios",
+  "clients",
+  "sitemap.xml",
+  "robots.txt",
+  "about",
+  "become-master",
+  "blog",
+  "book",
+  "careers",
+  "catalog",
+  "faq",
+  "gift-cards",
+  "help",
+  "how-it-works",
+  "how-to-book",
+  "notifications",
+  "partners",
+  "pricing",
+  "privacy",
+  "support",
+  "terms",
+  "hot",
+  "inspiration",
+  "403",
+  "favicon.ico",
   "signup",
   "static",
   "public",
@@ -29,16 +61,11 @@ export type GenerateDefaultUsernameParams = {
 };
 
 export type ResolvePublicUsernameDeps = {
-  findProviderByUsername: (username: string) => Promise<{
+  findProviderByUsernameOrAlias: (username: string) => Promise<{
     id: string;
     publicUsername: string | null;
     isPublished: boolean;
     type: ProviderType;
-  } | null>;
-  findAlias: (username: string) => Promise<{ providerId: string } | null>;
-  findProviderById: (id: string) => Promise<{
-    publicUsername: string | null;
-    isPublished: boolean;
   } | null>;
 };
 
@@ -49,6 +76,18 @@ export type ResolvePublicUsernameResult =
       status: "not-found";
       reason: "invalid" | "missing" | "unpublished" | "alias-unpublished";
     };
+
+export type ResolvePublicClientUsernameDeps = {
+  findClientByUsernameOrAlias: (username: string) => Promise<{
+    id: string;
+    publicUsername: string | null;
+  } | null>;
+};
+
+export type ResolvePublicClientUsernameResult =
+  | { status: "found"; clientId: string }
+  | { status: "redirect"; username: string }
+  | { status: "not-found"; reason: "invalid" | "missing" };
 
 type PrismaTx = Prisma.TransactionClient | PrismaClient;
 
@@ -67,6 +106,10 @@ function randomSuffix(length: number = USERNAME_RANDOM_SUFFIX_LENGTH): string {
     result += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   return result;
+}
+
+export function normalizeUsernameInput(input: string): string {
+  return input.trim().toLowerCase();
 }
 
 export function slugifyUsername(input: string): string {
@@ -104,7 +147,7 @@ export function validateUsername(username: string): UsernameValidationResult {
     return { ok: false, reason: "Username не может состоять только из цифр." };
   }
 
-  if (BANNED_USERNAMES.has(username)) {
+  if (RESERVED_SLUGS.has(username)) {
     return { ok: false, reason: "Этот username нельзя использовать." };
   }
 
@@ -142,8 +185,12 @@ export function generateDefaultUsername(params: GenerateDefaultUsernameParams): 
 }
 
 export async function isUsernameTaken(prismaTx: PrismaTx, username: string): Promise<boolean> {
-  const [provider, alias] = await Promise.all([
+  const [provider, client, alias] = await Promise.all([
     prismaTx.provider.findUnique({
+      where: { publicUsername: username },
+      select: { id: true },
+    }),
+    prismaTx.userProfile.findUnique({
       where: { publicUsername: username },
       select: { id: true },
     }),
@@ -153,7 +200,7 @@ export async function isUsernameTaken(prismaTx: PrismaTx, username: string): Pro
     }),
   ]);
 
-  return Boolean(provider || alias);
+  return Boolean(provider || client || alias);
 }
 
 export async function ensureUniqueUsername(prismaTx: PrismaTx, baseUsername: string): Promise<string> {
@@ -187,23 +234,48 @@ export async function resolvePublicUsername(
     return { status: "not-found", reason: "invalid" };
   }
 
-  const provider = await deps.findProviderByUsername(normalized);
-  if (provider) {
-    if (!provider.isPublished) {
-      return { status: "not-found", reason: "unpublished" };
-    }
-    return { status: "found", providerId: provider.id, providerType: provider.type };
-  }
-
-  const alias = await deps.findAlias(normalized);
-  if (!alias) {
+  const provider = await deps.findProviderByUsernameOrAlias(normalized);
+  if (!provider) {
     return { status: "not-found", reason: "missing" };
   }
 
-  const aliasProvider = await deps.findProviderById(alias.providerId);
-  if (!aliasProvider || !aliasProvider.isPublished || !aliasProvider.publicUsername) {
+  const matchedAlias = provider.publicUsername !== normalized;
+  if (!provider.publicUsername) {
     return { status: "not-found", reason: "alias-unpublished" };
   }
 
-  return { status: "redirect", username: aliasProvider.publicUsername };
+  if (!provider.isPublished) {
+    return { status: "not-found", reason: matchedAlias ? "alias-unpublished" : "unpublished" };
+  }
+
+  if (matchedAlias) {
+    return { status: "redirect", username: provider.publicUsername };
+  }
+
+  return { status: "found", providerId: provider.id, providerType: provider.type };
+}
+
+export async function resolvePublicClientUsername(
+  deps: ResolvePublicClientUsernameDeps,
+  rawUsername: string
+): Promise<ResolvePublicClientUsernameResult> {
+  const normalized = slugifyUsername(rawUsername);
+  if (!normalized || !validateUsername(normalized).ok) {
+    return { status: "not-found", reason: "invalid" };
+  }
+
+  const client = await deps.findClientByUsernameOrAlias(normalized);
+  if (!client) {
+    return { status: "not-found", reason: "missing" };
+  }
+
+  if (!client.publicUsername) {
+    return { status: "not-found", reason: "missing" };
+  }
+
+  if (client.publicUsername !== normalized) {
+    return { status: "redirect", username: client.publicUsername };
+  }
+
+  return { status: "found", clientId: client.id };
 }

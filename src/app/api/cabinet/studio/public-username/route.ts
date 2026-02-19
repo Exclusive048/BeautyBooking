@@ -8,9 +8,10 @@ import {
   ensureUniqueUsername,
   generateDefaultUsername,
   isUsernameTaken,
-  slugifyUsername,
+  normalizeUsernameInput,
   validateUsername,
 } from "@/lib/publicUsername";
+import { providerPublicUrl } from "@/lib/public-urls";
 import { parseBody } from "@/lib/validation";
 import { ProviderType } from "@prisma/client";
 
@@ -20,16 +21,8 @@ const bodySchema = z.object({
   username: z.string().trim().min(1),
 });
 
-function buildPublicUrl(appUrl: string, username: string) {
-  return `${appUrl}/u/${username}`;
-}
-
-async function resolveOwnedStudioProvider(userId: string) {
-  return prisma.provider.findFirst({
-    where: { ownerUserId: userId, type: ProviderType.STUDIO },
-    select: { id: true, name: true, publicUsername: true },
-    orderBy: { createdAt: "asc" },
-  });
+function buildPublicUrl(appUrl: string, providerId: string, username: string) {
+  return `${appUrl}${providerPublicUrl({ id: providerId, publicUsername: username }, "studio-public-username")}`;
 }
 
 export async function GET(req: Request) {
@@ -42,7 +35,10 @@ export async function GET(req: Request) {
       throw new AppError("APP_PUBLIC_URL is not configured", 500, "APP_PUBLIC_URL_MISSING");
     }
 
-    const provider = await resolveOwnedStudioProvider(auth.user.id);
+    const provider = await prisma.provider.findFirst({
+      where: { type: ProviderType.STUDIO, ownerUserId: auth.user.id },
+      select: { id: true, name: true, publicUsername: true },
+    });
     if (!provider) {
       return jsonFail(404, "Профиль студии не найден.", "PROVIDER_NOT_FOUND");
     }
@@ -62,7 +58,7 @@ export async function GET(req: Request) {
       username = updated.publicUsername ?? username;
     }
 
-    return jsonOk({ username, url: buildPublicUrl(appUrl, username) });
+    return jsonOk({ username, url: buildPublicUrl(appUrl, provider.id, username) });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
@@ -80,19 +76,22 @@ export async function POST(req: Request) {
     }
 
     const body = await parseBody(req, bodySchema);
-    const normalized = slugifyUsername(body.username);
+    const normalized = normalizeUsernameInput(body.username);
     const validation = validateUsername(normalized);
     if (!validation.ok) {
       return jsonFail(400, validation.reason, "VALIDATION_ERROR");
     }
 
-    const provider = await resolveOwnedStudioProvider(auth.user.id);
+    const provider = await prisma.provider.findFirst({
+      where: { type: ProviderType.STUDIO, ownerUserId: auth.user.id },
+      select: { id: true, publicUsername: true },
+    });
     if (!provider) {
       return jsonFail(404, "Профиль студии не найден.", "PROVIDER_NOT_FOUND");
     }
 
     if (provider.publicUsername === normalized) {
-      return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, normalized) });
+      return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, provider.id, normalized) });
     }
 
     if (await isUsernameTaken(prisma, normalized)) {
@@ -141,7 +140,7 @@ export async function POST(req: Request) {
       }
     });
 
-    return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, normalized) });
+    return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, provider.id, normalized) });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);

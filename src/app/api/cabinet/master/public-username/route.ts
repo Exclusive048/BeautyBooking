@@ -9,9 +9,10 @@ import {
   ensureUniqueUsername,
   generateDefaultUsername,
   isUsernameTaken,
-  slugifyUsername,
+  normalizeUsernameInput,
   validateUsername,
 } from "@/lib/publicUsername";
+import { providerPublicUrl } from "@/lib/public-urls";
 import { parseBody } from "@/lib/validation";
 import { ProviderType } from "@prisma/client";
 
@@ -21,8 +22,8 @@ const bodySchema = z.object({
   username: z.string().trim().min(1),
 });
 
-function buildPublicUrl(appUrl: string, username: string) {
-  return `${appUrl}/u/${username}`;
+function buildPublicUrl(appUrl: string, providerId: string, username: string) {
+  return `${appUrl}${providerPublicUrl({ id: providerId, publicUsername: username }, "master-public-username")}`;
 }
 
 export async function GET(req: Request) {
@@ -66,7 +67,7 @@ export async function GET(req: Request) {
       username = updated.publicUsername ?? username;
     }
 
-    return jsonOk({ username, url: buildPublicUrl(appUrl, username) });
+    return jsonOk({ username, url: buildPublicUrl(appUrl, providerId, username) });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
     }
 
     const body = await parseBody(req, bodySchema);
-    const normalized = slugifyUsername(body.username);
+    const normalized = normalizeUsernameInput(body.username);
     const validation = validateUsername(normalized);
     if (!validation.ok) {
       return jsonFail(400, validation.reason, "VALIDATION_ERROR");
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
     }
 
     if (provider.publicUsername === normalized) {
-      return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, normalized) });
+      return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, providerId, normalized) });
     }
 
     if (await isUsernameTaken(prisma, normalized)) {
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
       }
     });
 
-    return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, normalized) });
+    return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, providerId, normalized) });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);

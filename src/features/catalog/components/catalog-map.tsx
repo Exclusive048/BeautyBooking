@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { providerPublicUrl } from "@/lib/public-urls";
 
 type CatalogMapPoint = {
   id: string;
@@ -543,8 +544,8 @@ export function CatalogMap({
       );
 
       placemark.events.add("click", () => {
-        const href = point.publicUsername ? `/u/${point.publicUsername}` : null;
-        if (href) router.push(href);
+        const href = providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map");
+        router.push(href);
       });
 
       placemarksRef.current.set(point.id, { placemark, baseClass });

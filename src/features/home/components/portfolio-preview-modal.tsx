@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { PortfolioDetail } from "@/lib/feed/portfolio.service";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 
 type Props = {
   itemId: string | null;
@@ -59,11 +60,14 @@ export function PortfolioPreviewModal({ itemId, open, onClose }: Props) {
   }, [itemId, open]);
 
   const primaryService = detail?.serviceOptions[0] ?? null;
-  const masterUsername = detail?.masterPublicUsername ?? null;
-  const actionHref = masterUsername
-    ? primaryService
-      ? `/u/${masterUsername}?serviceId=${encodeURIComponent(primaryService.serviceId)}`
-      : `/u/${masterUsername}`
+  const actionHref = detail
+    ? (() => {
+        const base = providerPublicUrl(
+          { id: detail.masterId, publicUsername: detail.masterPublicUsername },
+          "portfolio-preview"
+        );
+        return primaryService ? withQuery(base, { serviceId: primaryService.serviceId }) : base;
+      })()
     : null;
 
   return (

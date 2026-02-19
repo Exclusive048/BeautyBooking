@@ -7,6 +7,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
+import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 
 type PortfolioDetail = {
   id: string;
@@ -24,7 +25,6 @@ type PortfolioDetail = {
   totalPrice: number;
   nearestSlots: Array<{ startAt: string }>;
 };
-
 
 function formatDuration(min: number): string {
   const hours = Math.floor(min / 60);
@@ -67,11 +67,16 @@ export default function BookFromPortfolioClient() {
     };
   }, [portfolioId]);
 
+  const primaryService = detail?.serviceOptions[0] ?? null;
   const bookLink = useMemo(() => {
-    if (!detail?.masterPublicUsername) return "#";
-    return detail.masterPublicUsername ? `/u/${detail.masterPublicUsername}` : "#";
-  }, [detail]);
-  const canOpenProfile = Boolean(detail?.masterPublicUsername);
+    if (!detail) return "#";
+    const base = providerPublicUrl(
+      { id: detail.masterId, publicUsername: detail.masterPublicUsername },
+      "portfolio-book"
+    );
+    return primaryService ? withQuery(base, { serviceId: primaryService.serviceId }) : base;
+  }, [detail, primaryService]);
+  const canOpenProfile = Boolean(detail);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">

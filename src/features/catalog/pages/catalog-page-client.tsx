@@ -11,6 +11,7 @@ import { DateTimeFilterBar } from "@/features/search-by-time/components/date-tim
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
+import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -153,7 +154,7 @@ function toSidebarItem(point: CatalogMapPoint): MapSidebarItem {
     avatarUrl: point.avatarUrl,
     ratingAvg: point.ratingAvg,
     priceFrom: point.priceFrom,
-    href: point.publicUsername ? `/u/${point.publicUsername}` : null,
+    href: providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map-sidebar"),
   };
 }
 

@@ -15,8 +15,9 @@ export async function StudioDetailsSection({ studioId }: Props) {
 
   try {
     studio = await getStudioProfile(studioId);
-  } catch {
+  } catch (error) {
     hasError = true;
+    console.error("[public-studio] details-section failed", { studioId, error });
   }
 
   if (hasError) {

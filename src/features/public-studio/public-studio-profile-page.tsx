@@ -15,9 +15,10 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
+  bookingParams?: { masterId?: string; serviceId?: string; slotStartAt?: string };
 };
 
-export function PublicStudioProfilePage({ studioId }: Props) {
+export function PublicStudioProfilePage({ studioId, bookingParams }: Props) {
   return (
     <div className="space-y-8">
       <Suspense fallback={<HeroSkeleton />}>
@@ -25,7 +26,7 @@ export function PublicStudioProfilePage({ studioId }: Props) {
       </Suspense>
 
       <Suspense fallback={<BookingSkeleton />}>
-        <StudioBookingSection studioId={studioId} />
+        <StudioBookingSection studioId={studioId} bookingParams={bookingParams} />
       </Suspense>
 
       <Suspense fallback={<ServicesSkeleton />}>

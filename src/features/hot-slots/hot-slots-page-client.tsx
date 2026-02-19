@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 
 type HotSlotItem = {
   id: string;
@@ -35,7 +36,6 @@ type HotSlotItem = {
     durationMin: number;
   } | null;
 };
-
 
 function getDateKey(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("ru-RU", {
@@ -155,9 +155,11 @@ export function HotSlotsPageClient() {
               originalPrice !== null
                 ? calculateDiscountedPrice(item.slot.discountType, item.slot.discountValue, originalPrice)
                 : null;
-            const href = hasService
-              ? `/u/${item.provider.publicUsername}?serviceId=${encodeURIComponent(item.service!.id)}`
-              : `/u/${item.provider.publicUsername}`;
+            const base = providerPublicUrl(
+              { id: item.provider.id, publicUsername: item.provider.publicUsername },
+              "hot-slots-card"
+            );
+            const href = hasService ? withQuery(base, { serviceId: item.service!.id }) : base;
 
             return (
               <Card key={item.id} className="h-full border border-border-subtle bg-bg-card/90">
@@ -184,11 +186,11 @@ export function HotSlotsPageClient() {
                         {item.provider.district || item.provider.address || "Адрес уточняется"}
                       </div>
                       <div className="mt-1 text-xs text-text-sec">
-                        {item.provider.ratingAvg.toFixed(1)} · {item.provider.ratingCount} отзывов
+                        {item.provider.ratingAvg.toFixed(1)} • {item.provider.ratingCount} отзывов
                       </div>
                     </div>
                     <span className="rounded-full bg-amber-200/60 px-2 py-1 text-[10px] font-semibold text-amber-900">
-                      Горящее
+                      Горячее
                     </span>
                   </div>
 

@@ -10,6 +10,7 @@ import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { providerPublicUrl } from "@/lib/public-urls";
 
 type BookingItem = {
   id: string;
@@ -284,9 +285,21 @@ export function ClientBookingsPanel() {
           const studioName = b.provider.type === "STUDIO" ? b.provider.name : null;
           const masterName =
             b.masterProvider?.name ?? (b.provider.type === "MASTER" ? b.provider.name : null);
-          const studioUsername = b.provider.type === "STUDIO" ? b.provider.publicUsername : null;
-          const masterUsername =
-            b.masterProvider?.publicUsername ?? (b.provider.type === "MASTER" ? b.provider.publicUsername : null);
+          const masterTarget =
+            b.masterProvider ?? (b.provider.type === "MASTER" ? b.provider : null);
+          const masterLink = masterTarget
+            ? providerPublicUrl(
+                { id: masterTarget.id, publicUsername: masterTarget.publicUsername },
+                "client-bookings-master"
+              )
+            : null;
+          const studioLink =
+            b.provider.type === "STUDIO"
+              ? providerPublicUrl(
+                  { id: b.provider.id, publicUsername: b.provider.publicUsername },
+                  "client-bookings-studio"
+                )
+              : null;
           const addressLine = [b.provider.district, b.provider.address].filter(Boolean).join(" / ");
           const slotLabel = UI_FMT.dateTimeShort(b.startAtUtc ?? "", { timeZone: viewerTimeZone });
 
@@ -307,14 +320,14 @@ export function ClientBookingsPanel() {
                 <div className="mt-2 text-xs text-text-sec">Ожидает подтверждения мастера</div>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
-                {masterUsername ? (
+                {masterLink ? (
                   <Button asChild type="button" variant="secondary" size="sm">
-                    <Link href={`/u/${masterUsername}`}>Перейти к мастеру</Link>
+                    <Link href={masterLink}>Перейти к мастеру</Link>
                   </Button>
                 ) : null}
-                {studioUsername ? (
+                {studioLink ? (
                   <Button asChild type="button" variant="secondary" size="sm">
-                    <Link href={`/u/${studioUsername}`}>Перейти в студию</Link>
+                    <Link href={studioLink}>Перейти в студию</Link>
                   </Button>
                 ) : null}
                 {canManage ? (

@@ -3,19 +3,22 @@ import { Button } from "@/components/ui/button";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { UI_TEXT } from "@/lib/ui/text";
+import { studioBookingUrl } from "@/lib/public-urls";
 
 type Props = {
   studioId: string;
+  bookingParams?: { masterId?: string; serviceId?: string; slotStartAt?: string };
 };
 
-export async function StudioBookingSection({ studioId }: Props) {
+export async function StudioBookingSection({ studioId, bookingParams }: Props) {
   let studio = null;
   let hasError = false;
 
   try {
     studio = await getStudioProfile(studioId);
-  } catch {
+  } catch (error) {
     hasError = true;
+    console.error("[public-studio] booking-section failed", { studioId, error });
   }
 
   if (hasError) {
@@ -34,16 +37,26 @@ export async function StudioBookingSection({ studioId }: Props) {
     );
   }
 
+  const bookingHref = studioBookingUrl(
+    { id: studio.id, publicUsername: studio.publicUsername },
+    bookingParams,
+    "public-studio-booking"
+  );
+
   return (
     <div className="fade-in-up" id="studio-booking-entry">
       <div className="rounded-2xl border border-border bg-surface p-5 md:p-6">
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.heroBook}</div>
           <Button asChild variant="secondary">
-            <Link href={`/studios/${studio.id}/booking`}>{UI_TEXT.publicStudio.openBookingFlow}</Link>
+            <Link href={bookingHref}>{UI_TEXT.publicStudio.openBookingFlow}</Link>
           </Button>
         </div>
-        <StudioBookingFlow studioId={studio.id} />
+        <StudioBookingFlow
+          studioId={studio.id}
+          initialMasterId={bookingParams?.masterId}
+          initialServiceId={bookingParams?.serviceId}
+        />
       </div>
     </div>
   );

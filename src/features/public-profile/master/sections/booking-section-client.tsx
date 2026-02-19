@@ -6,6 +6,7 @@ import { PublicBookingWidget } from "@/features/public-profile/master/public-boo
 import { useSelectedServices } from "@/features/public-profile/master/selected-services-context";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Card, CardContent } from "@/components/ui/card";
+import { studioBookingUrl } from "@/lib/public-urls";
 
 type Props = {
   provider: ProviderProfileDto;
@@ -17,9 +18,14 @@ export function BookingSectionClient({ provider, initialSlotStartAt }: Props) {
 
   const studioBookingHref =
     provider.type === "MASTER" && provider.studioId
-      ? `/studios/${provider.studioId}/booking?masterId=${encodeURIComponent(provider.id)}${
-          selectedServices[0] ? `&serviceId=${encodeURIComponent(selectedServices[0].id)}` : ""
-        }`
+      ? studioBookingUrl(
+          { id: provider.studioId, publicUsername: null },
+          {
+            masterId: provider.id,
+            serviceId: selectedServices[0]?.id,
+          },
+          "master-studio-booking"
+        )
       : null;
 
   if (studioBookingHref) {
