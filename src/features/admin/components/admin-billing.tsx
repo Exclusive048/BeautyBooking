@@ -616,7 +616,7 @@ export function AdminBilling() {
                     <div className="mt-2 grid gap-3 sm:grid-cols-2">
                       {PERIODS.map((periodMonths) => (
                         <label key={periodMonths} className="text-xs text-text-sec">
-                          {periodMonths} мес.
+                          {periodMonths} пїЅпїЅпїЅ.
                           <Input
                             type="number"
                             min={0}

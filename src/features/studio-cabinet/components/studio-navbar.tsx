@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/cabinet/studio/calendar", label: "Календарь" },
   { href: "/cabinet/studio/team", label: "Команда" },
   { href: "/cabinet/studio/clients", label: "Клиенты" },
+  { href: "/cabinet/studio/analytics", label: "Аналитика" },
   { href: "/cabinet/studio/finance", label: "Финансы" },
 ];
 
