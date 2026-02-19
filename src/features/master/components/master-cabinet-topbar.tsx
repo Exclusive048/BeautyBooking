@@ -11,6 +11,7 @@ type Props = {
 const NAV_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/cabinet/master/dashboard", label: "Главная" },
   { href: "/cabinet/master/schedule", label: "Мой график" },
+  { href: "/cabinet/master/analytics", label: "Аналитика" },
   { href: "/cabinet/master/model-offers", label: "Ищу модель" },
   { href: "/cabinet/master/profile", label: "Профиль" },
 ];
