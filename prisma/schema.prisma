@@ -130,6 +130,14 @@ enum BookingStatus {
 
 }
 
+enum ChatSenderType {
+
+  CLIENT
+
+  MASTER
+
+}
+
 
 
 enum BookingCancelledBy {
@@ -249,6 +257,8 @@ enum NotificationType {
   BILLING_SUBSCRIPTION_CANCELLED
 
   BILLING_SUBSCRIPTION_EXPIRED
+
+  CHAT_MESSAGE_RECEIVED
 
 }
 
@@ -1259,6 +1269,8 @@ model Booking {
 
   notifications Notification[]
 
+  chat          BookingChat?
+
   review        Review?
 
   serviceItems  BookingServiceItem[]
@@ -1282,6 +1294,52 @@ model Booking {
   @@index([masterId])
 
   @@index([status, startAtUtc])
+
+}
+
+
+
+model BookingChat {
+
+  id        String         @id @default(cuid())
+
+  bookingId String         @unique
+
+  booking   Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  messages  ChatMessage[]
+
+  createdAt DateTime       @default(now())
+
+
+
+  @@index([bookingId])
+
+}
+
+model ChatMessage {
+
+  id         String         @id @default(cuid())
+
+  chatId     String
+
+  chat       BookingChat    @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  senderType ChatSenderType
+
+  senderName String
+
+  body       String         @db.Text
+
+  readAt     DateTime?
+
+  createdAt  DateTime       @default(now())
+
+
+
+  @@index([chatId, createdAt])
+
+  @@index([chatId, readAt])
 
 }
 

@@ -8,6 +8,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { BookingChat } from "@/features/chat/components/booking-chat";
 
 type DayBooking = {
   id: string;
@@ -165,12 +166,17 @@ export function MasterDashboardPage() {
   const [savingManual, setSavingManual] = useState(false);
   const bookingsSeenSentRef = useRef(false);
   const manualQueryHandledRef = useRef(false);
+  const chatQueryHandledRef = useRef(false);
+  const chatScrollHandledRef = useRef(false);
   const searchParams = useSearchParams();
   const [manualStartAt, setManualStartAt] = useState(`${todayDateKey()}T10:00`);
   const [manualServiceId, setManualServiceId] = useState("");
   const [manualClientName, setManualClientName] = useState("");
   const [manualClientPhone, setManualClientPhone] = useState("");
   const [manualNotes, setManualNotes] = useState("");
+
+  const [chatOpenMap, setChatOpenMap] = useState<Record<string, boolean>>({});
+  const [chatUnreadMap, setChatUnreadMap] = useState<Record<string, number>>({});
 
   const [slotsServiceId, setSlotsServiceId] = useState("");
   const [freeSlots, setFreeSlots] = useState<AvailabilitySlot[]>([]);
@@ -256,6 +262,26 @@ export function MasterDashboardPage() {
     }
     setManualOpen(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (chatQueryHandledRef.current) return;
+    const bookingId = searchParams.get("bookingId");
+    const chat = searchParams.get("chat");
+    if (chat !== "open" || !bookingId) return;
+    chatQueryHandledRef.current = true;
+    setChatOpenMap((prev) => ({ ...prev, [bookingId]: true }));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const bookingId = searchParams.get("bookingId");
+    const chat = searchParams.get("chat");
+    if (chat !== "open" || !bookingId) return;
+    if (chatScrollHandledRef.current) return;
+    const target = document.getElementById(`booking-${bookingId}`);
+    if (!target) return;
+    chatScrollHandledRef.current = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [searchParams, data.bookings.length]);
 
   useEffect(() => {
     if (!data.masterId || bookingsSeenSentRef.current) return;
@@ -411,6 +437,14 @@ export function MasterDashboardPage() {
     } finally {
       setActionId(null);
     }
+  };
+
+  const toggleChat = (id: string) => {
+    setChatOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleUnreadChange = (id: string, count: number) => {
+    setChatUnreadMap((prev) => ({ ...prev, [id]: count }));
   };
 
   const getStatusLabel = (status: string): string => {
@@ -628,6 +662,7 @@ export function MasterDashboardPage() {
             {sortedBookings.map((booking) => (
               <section
                 key={booking.id}
+                id={`booking-${booking.id}`}
                 className={`rounded-[22px] border border-border-subtle bg-bg-card p-4 ${
                   booking.id === data.currentBookingId ? "border-primary/55 bg-primary/10" : ""
                 }`}
@@ -709,6 +744,27 @@ export function MasterDashboardPage() {
                     >
                       Request move
                     </button>
+                  ) : null}
+                </div>
+                <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleChat(booking.id)}
+                    className="flex w-full items-center justify-between text-sm font-medium"
+                  >
+                    <span>Чат</span>
+                    {chatUnreadMap[booking.id] ? (
+                      <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[booking.id]}</Badge>
+                    ) : null}
+                  </button>
+                  {chatOpenMap[booking.id] ? (
+                    <div className="mt-3">
+                      <BookingChat
+                        bookingId={booking.id}
+                        currentRole="MASTER"
+                        onUnreadCountChange={(count) => handleUnreadChange(booking.id, count)}
+                      />
+                    </div>
                   ) : null}
                 </div>
               </section>
