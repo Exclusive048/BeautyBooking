@@ -1,6 +1,7 @@
 import { HeroBlock } from "@/features/public-profile/master/hero-block";
+import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
-import type { ApiResponse } from "@/lib/types/api";
+import { serverApiFetch } from "@/lib/api/server-fetch";
 
 type PortfolioItemPreview = {
   id: string;
@@ -15,14 +16,9 @@ type Props = {
 };
 
 async function fetchCoverUrl(providerId: string): Promise<string | null> {
-  const res = await fetch(
-    `/api/feed/portfolio?masterId=${encodeURIComponent(providerId)}&limit=1`,
-    { cache: "no-store" }
-  );
-  const json = (await res.json().catch(() => null)) as ApiResponse<{
-    items: PortfolioItemPreview[];
-  }> | null;
-  if (!res.ok || !json || !json.ok) return null;
+  const path = `/api/feed/portfolio?masterId=${encodeURIComponent(providerId)}&limit=1`;
+  const json = await serverApiFetch<{ items: PortfolioItemPreview[] }>(path);
+  if (!json.ok) return null;
   return json.data.items?.[0]?.mediaUrl ?? null;
 }
 
@@ -38,8 +34,12 @@ export async function HeroSection({ providerId }: Props) {
     ]);
     provider = result[0];
     coverUrl = result[1];
-  } catch {
+  } catch (error) {
     hasError = true;
+    logPublicBlockError("master-hero", error, [
+      `/api/providers/${providerId}`,
+      `/api/feed/portfolio?masterId=${encodeURIComponent(providerId)}&limit=1`,
+    ]);
   }
 
   if (hasError) {

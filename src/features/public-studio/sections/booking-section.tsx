@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
+import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { UI_TEXT } from "@/lib/ui/text";
 import { studioBookingUrl } from "@/lib/public-urls";
 
@@ -18,7 +19,7 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
     studio = await getStudioProfile(studioId);
   } catch (error) {
     hasError = true;
-    console.error("[public-studio] booking-section failed", { studioId, error });
+    logPublicStudioBlockError("booking-section", error, [`/api/providers/${studioId}`]);
   }
 
   if (hasError) {

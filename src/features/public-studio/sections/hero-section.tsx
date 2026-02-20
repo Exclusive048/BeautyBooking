@@ -1,20 +1,18 @@
 import { StudioHeroGallery } from "@/features/public-studio/studio-hero-gallery";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import type { MediaAssetDto } from "@/lib/media/types";
-import type { ApiResponse } from "@/lib/types/api";
 import { studioBookingUrl } from "@/lib/public-urls";
+import { serverApiFetch } from "@/lib/api/server-fetch";
+import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 
 type Props = {
   studioId: string;
 };
 
 async function fetchStudioPortfolio(studioId: string): Promise<MediaAssetDto[]> {
-  const res = await fetch(
-    `/api/media?entityType=STUDIO&entityId=${encodeURIComponent(studioId)}&kind=PORTFOLIO`,
-    { cache: "no-store" }
-  );
-  const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
-  if (!res.ok || !json || !json.ok) return [];
+  const path = `/api/media?entityType=STUDIO&entityId=${encodeURIComponent(studioId)}&kind=PORTFOLIO`;
+  const json = await serverApiFetch<{ assets: MediaAssetDto[] }>(path);
+  if (!json.ok) return [];
   return json.data.assets ?? [];
 }
 
@@ -32,7 +30,10 @@ export async function StudioHeroSection({ studioId }: Props) {
     portfolio = result[1];
   } catch (error) {
     hasError = true;
-    console.error("[public-studio] hero-section failed", { studioId, error });
+    logPublicStudioBlockError("hero-section", error, [
+      `/api/providers/${studioId}`,
+      `/api/media?entityType=STUDIO&entityId=${encodeURIComponent(studioId)}&kind=PORTFOLIO`,
+    ]);
   }
 
   if (hasError) {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withQuery } from "@/lib/public-urls";
 import { PublicMasterProfilePage } from "@/features/public-profile/master/public-profile-page";
 import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-profile-page";
+import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 
 type Props = {
   params: { id: string };
@@ -42,10 +43,12 @@ export default async function ProviderProfilePage({ params, searchParams }: Prop
   const initialSlotStartAt = typeof sp.slotStartAt === "string" ? sp.slotStartAt : null;
 
   return (
-    <PublicMasterProfilePage
-      providerId={provider.id}
-      initialServiceId={initialServiceId}
-      initialSlotStartAt={initialSlotStartAt}
-    />
+    <SelectedServicesProvider>
+      <PublicMasterProfilePage
+        providerId={provider.id}
+        initialServiceId={initialServiceId}
+        initialSlotStartAt={initialSlotStartAt}
+      />
+    </SelectedServicesProvider>
   );
 }

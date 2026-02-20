@@ -1,6 +1,7 @@
 import { Section } from "@/components/ui/section";
 import { StudioMastersCarousel } from "@/features/public-studio/studio-masters-carousel";
 import { getStudioMasters, getStudioProfile } from "@/features/public-studio/server/studio-query";
+import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 
@@ -22,7 +23,10 @@ export async function StudioTeamSection({ studioId }: Props) {
     studio = studioProfile ? { id: studioProfile.id, publicUsername: studioProfile.publicUsername } : null;
   } catch (error) {
     hasError = true;
-    console.error("[public-studio] team-section failed", { studioId, error });
+    logPublicStudioBlockError("team-section", error, [
+      `/api/providers/${studioId}`,
+      `/api/providers/${studioId}/masters`,
+    ]);
   }
 
   if (hasError) {

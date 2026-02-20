@@ -1,19 +1,18 @@
 import { cache } from "react";
-import {
-  fetchStudioMasters,
-  fetchStudioProfile,
-  type StudioMaster,
-} from "@/features/booking/lib/studio-booking";
+import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
+import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 
 export const getStudioProfile = cache(async (studioId: string): Promise<ProviderProfileDto | null> => {
   if (!studioId) return null;
-  const result = await fetchStudioProfile(studioId);
-  return result.ok ? result.provider : null;
+  const json = await serverApiFetch<{ provider: ProviderProfileDto | null }>(`/api/providers/${studioId}`);
+  if (!json.ok) return null;
+  return json.data.provider ?? null;
 });
 
 export const getStudioMasters = cache(async (studioId: string): Promise<StudioMaster[]> => {
   if (!studioId) return [];
-  const result = await fetchStudioMasters(studioId);
-  return result.ok ? result.masters : [];
+  const json = await serverApiFetch<{ masters: StudioMaster[] }>(`/api/providers/${studioId}/masters`);
+  if (!json.ok) return [];
+  return json.data.masters ?? [];
 });

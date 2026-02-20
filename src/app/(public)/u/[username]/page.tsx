@@ -7,6 +7,7 @@ import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { buildProviderSchema } from "@/lib/seo/schema";
 import { withQuery } from "@/lib/public-urls";
+import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -305,11 +306,13 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
       {schema ? (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
       ) : null}
-      <PublicMasterProfilePage
-        providerId={result.providerId}
-        initialServiceId={initialServiceId}
-        initialSlotStartAt={initialSlotStartAt}
-      />
+      <SelectedServicesProvider>
+        <PublicMasterProfilePage
+          providerId={result.providerId}
+          initialServiceId={initialServiceId}
+          initialSlotStartAt={initialSlotStartAt}
+        />
+      </SelectedServicesProvider>
     </>
   );
 }
