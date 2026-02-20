@@ -2,6 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
+import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { moneyRUB } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -17,7 +18,7 @@ export async function StudioDetailsSection({ studioId }: Props) {
     studio = await getStudioProfile(studioId);
   } catch (error) {
     hasError = true;
-    console.error("[public-studio] details-section failed", { studioId, error });
+    logPublicStudioBlockError("details-section", error, [`/api/providers/${studioId}`]);
   }
 
   if (hasError) {

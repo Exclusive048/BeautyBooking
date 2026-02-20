@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { HeroSection } from "@/features/public-profile/master/sections/hero-section";
 import { ServicesSection } from "@/features/public-profile/master/sections/services-section";
 import { PortfolioSection } from "@/features/public-profile/master/sections/portfolio-section";
@@ -28,29 +27,27 @@ export function PublicMasterProfilePage({
         <HeroSection providerId={providerId} />
       </Suspense>
 
-      <SelectedServicesProvider>
-        <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-          <div className="space-y-4">
-            <Suspense fallback={<ServicesSkeleton />}>
-              <ServicesSection providerId={providerId} initialServiceId={initialServiceId} />
-            </Suspense>
+      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div className="space-y-4">
+          <Suspense fallback={<ServicesSkeleton />}>
+            <ServicesSection providerId={providerId} initialServiceId={initialServiceId} />
+          </Suspense>
 
-            <Suspense fallback={<PortfolioSkeleton />}>
-              <PortfolioSection providerId={providerId} />
-            </Suspense>
+          <Suspense fallback={<PortfolioSkeleton />}>
+            <PortfolioSection providerId={providerId} />
+          </Suspense>
 
-            <Suspense fallback={<ReviewsSkeleton />}>
-              <ReviewsSection providerId={providerId} />
-            </Suspense>
-          </div>
-
-          <div className="h-fit lg:sticky lg:top-6 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto">
-            <Suspense fallback={<BookingSkeleton />}>
-              <BookingSection providerId={providerId} initialSlotStartAt={initialSlotStartAt} />
-            </Suspense>
-          </div>
+          <Suspense fallback={<ReviewsSkeleton />}>
+            <ReviewsSection providerId={providerId} />
+          </Suspense>
         </div>
-      </SelectedServicesProvider>
+
+        <div className="h-fit lg:sticky lg:top-6 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto">
+          <Suspense fallback={<BookingSkeleton />}>
+            <BookingSection providerId={providerId} initialSlotStartAt={initialSlotStartAt} />
+          </Suspense>
+        </div>
+      </div>
     </div>
   );
 }

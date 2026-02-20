@@ -1,42 +1,47 @@
 import { cookies } from "next/headers";
+import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
 import { ReviewsSectionClient } from "@/features/public-profile/master/sections/reviews-section-client";
+import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ClientBooking } from "@/lib/bookings/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
-import type { ApiResponse } from "@/lib/types/api";
 
 type Props = {
   providerId: string;
 };
 
 async function fetchReviews(providerId: string): Promise<ReviewDto[]> {
-  const res = await fetch(
-    `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}&limit=3&offset=0`,
-    { cache: "no-store" }
-  );
-  const json = (await res.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
-  if (!res.ok || !json || !json.ok) return [];
+  const path = `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}&limit=3&offset=0`;
+  const json = await serverApiFetch<{ reviews: ReviewDto[] }>(path);
+  if (!json.ok) return [];
   return json.data.reviews ?? [];
 }
 
-async function fetchCanReviewBookingId(providerId: string): Promise<string | null> {
-  const cookie = cookies().toString();
-  const headers = cookie ? { cookie } : undefined;
+async function buildCookieHeader(): Promise<string | null> {
+  const store = await cookies();
+  const entries = store.getAll();
+  if (!entries.length) return null;
+  const header = entries.map(({ name, value }) => `${name}=${value}`).join("; ");
+  return header || null;
+}
 
-  const bookingsRes = await fetch("/api/me/bookings", { cache: "no-store", headers });
-  const bookingsJson = (await bookingsRes.json().catch(() => null)) as ApiResponse<{
-    bookings: ClientBooking[];
-  }> | null;
-  if (!bookingsRes.ok || !bookingsJson || !bookingsJson.ok) return null;
+async function fetchCanReviewBookingId(providerId: string): Promise<string | null> {
+  const cookieHeader = await buildCookieHeader();
+  const headers = cookieHeader ? { cookie: cookieHeader } : undefined;
+
+  const bookingsJson = await serverApiFetch<{ bookings: ClientBooking[] }>(
+    "/api/me/bookings",
+    headers ? { headers } : undefined
+  );
+  if (!bookingsJson.ok) return null;
 
   const ownBookings = bookingsJson.data.bookings.filter((booking) => booking.provider.id === providerId);
   for (const booking of ownBookings) {
-    const canLeaveRes = await fetch(
+    const canLeaveJson = await serverApiFetch<{ canLeave: boolean }>(
       `/api/reviews/can-leave?bookingId=${encodeURIComponent(booking.id)}`,
-      { cache: "no-store", headers }
+      headers ? { headers } : undefined
     );
-    const canLeaveJson = (await canLeaveRes.json().catch(() => null)) as ApiResponse<{ canLeave: boolean }> | null;
-    if (canLeaveRes.ok && canLeaveJson && canLeaveJson.ok && canLeaveJson.data.canLeave) {
+    if (canLeaveJson.ok && canLeaveJson.data.canLeave) {
       return booking.id;
     }
   }
@@ -60,8 +65,13 @@ export async function ReviewsSection({ providerId }: Props) {
       reviews = result[0];
       canReviewBookingId = result[1];
     }
-  } catch {
+  } catch (error) {
     hasError = true;
+    logPublicBlockError("master-reviews", error, [
+      `/api/providers/${providerId}`,
+      `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}&limit=3&offset=0`,
+      "/api/me/bookings",
+    ]);
   }
 
   if (hasError) {

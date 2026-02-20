@@ -1,6 +1,7 @@
 import { Section } from "@/components/ui/section";
 import { StudioServicesList } from "@/features/public-studio/studio-services-list";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
+import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -15,7 +16,7 @@ export async function StudioServicesSection({ studioId }: Props) {
     studio = await getStudioProfile(studioId);
   } catch (error) {
     hasError = true;
-    console.error("[public-studio] services-section failed", { studioId, error });
+    logPublicStudioBlockError("services-section", error, [`/api/providers/${studioId}`]);
   }
 
   if (hasError) {

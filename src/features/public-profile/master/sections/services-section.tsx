@@ -1,4 +1,5 @@
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
+import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { ServicesSectionClient } from "@/features/public-profile/master/sections/services-section-client";
 
 type Props = {
@@ -12,8 +13,9 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
 
   try {
     provider = await getProvider(providerId);
-  } catch {
+  } catch (error) {
     hasError = true;
+    logPublicBlockError("master-services", error, [`/api/providers/${providerId}`]);
   }
 
   if (hasError) {

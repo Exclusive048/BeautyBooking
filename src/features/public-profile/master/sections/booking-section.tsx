@@ -1,4 +1,5 @@
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
+import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { BookingSectionClient } from "@/features/public-profile/master/sections/booking-section-client";
 
 type Props = {
@@ -12,8 +13,9 @@ export async function BookingSection({ providerId, initialSlotStartAt }: Props) 
 
   try {
     provider = await getProvider(providerId);
-  } catch {
+  } catch (error) {
     hasError = true;
+    logPublicBlockError("master-booking", error, [`/api/providers/${providerId}`]);
   }
 
   if (hasError) {
