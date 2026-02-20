@@ -35,9 +35,16 @@ export type BookingClientProviderDto = {
   address: string | null;
   type: ProviderType;
   publicUsername: string | null;
+  avatarUrl: string | null;
 };
 
-export type BookingClientDto = BookingDto & {
+export type BookingClientDto = Omit<BookingDto, "service"> & {
+  service: {
+    id: string;
+    name: string;
+    price: number;
+    durationMin: number;
+  };
   provider: BookingClientProviderDto;
   masterProvider: BookingClientProviderDto | null;
 };

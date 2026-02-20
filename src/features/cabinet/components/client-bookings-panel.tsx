@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
+import { BookingDetailDrawer } from "@/features/cabinet/components/booking-detail-drawer";
 import { ReviewForm } from "@/features/reviews/components/review-form";
-import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { BookingChat } from "@/features/chat/components/booking-chat";
 
-type BookingItem = {
+export type BookingItem = {
   id: string;
   slotLabel: string;
   comment: string | null;
@@ -50,6 +50,7 @@ type BookingItem = {
     address: string;
     type: "MASTER" | "STUDIO";
     publicUsername: string | null;
+    avatarUrl: string | null;
   };
   masterProvider: {
     id: string;
@@ -58,11 +59,12 @@ type BookingItem = {
     address: string;
     type: "MASTER" | "STUDIO";
     publicUsername: string | null;
+    avatarUrl: string | null;
   } | null;
-  service: { id: string; name: string };
+  service: { id: string; name: string; price: number; durationMin: number };
 };
 
-type BookingReviewState = {
+export type BookingReviewState = {
   canLeave: boolean;
   reviewId: string | null;
   canDelete: boolean;
@@ -79,23 +81,6 @@ function statusLabel(status: BookingItem["status"]) {
   if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
   if (status === "FINISHED") return "Завершена";
   return UI_TEXT.clientCabinet.booking.cancelled;
-}
-
-function minutesUntilStart(booking: BookingItem): number | null {
-  if (!booking.startAtUtc) return null;
-  const diffMs = new Date(booking.startAtUtc).getTime() - Date.now();
-  if (!Number.isFinite(diffMs)) return null;
-  return Math.floor(diffMs / 60000);
-}
-
-function canManageByClient(booking: BookingItem): boolean {
-  // AUDIT (доступность кнопок клиента):
-  // - реализовано: кнопки отмены/переноса только для PENDING/CONFIRMED.
-  // - реализовано: проверка >= 60 минут до старта.
-  // - реализовано частично: исторические записи с startAtUtc=null остаются управляемыми до миграции данных.
-  if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
-  const minutesLeft = minutesUntilStart(booking);
-  return minutesLeft === null || minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
 }
 
 function isExcludedStatus(status: BookingItem["status"]): boolean {
@@ -127,6 +112,7 @@ export function ClientBookingsPanel() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<BookingItem | null>(null);
   const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null);
   const [reviewStateMap, setReviewStateMap] = useState<Record<string, BookingReviewState>>({});
   const [chatOpenMap, setChatOpenMap] = useState<Record<string, boolean>>({});
   const [chatUnreadMap, setChatUnreadMap] = useState<Record<string, number>>({});
@@ -247,6 +233,7 @@ export function ClientBookingsPanel() {
       }));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
+      throw e;
     } finally {
       setActionId(null);
     }
@@ -260,9 +247,9 @@ export function ClientBookingsPanel() {
       if (!res.ok || !json || !json.ok) {
         throw new Error(getErrorMessage(json, "Не удалось удалить отзыв"));
       }
-      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
+      throw e;
     } finally {
       setActionId(null);
     }
@@ -277,9 +264,9 @@ export function ClientBookingsPanel() {
         | null;
       if (!res.ok) throw new Error(getErrorMessage(json, "Не удалось подтвердить запись"));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, "Не удалось подтвердить запись"));
-      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
+      throw e;
     } finally {
       setActionId(null);
     }
@@ -313,9 +300,6 @@ export function ClientBookingsPanel() {
     <>
       <div className="space-y-3">
         {sortedItems.map((b) => {
-          const canManage = canManageByClient(b);
-          const waitsClientDecision =
-            b.status === "CHANGE_REQUESTED" && b.actionRequiredBy === "CLIENT";
           const waitsMasterDecision =
             b.status === "CHANGE_REQUESTED" && b.actionRequiredBy === "MASTER";
           const studioName = b.provider.type === "STUDIO" ? b.provider.name : null;
@@ -340,7 +324,16 @@ export function ClientBookingsPanel() {
           const slotLabel = UI_FMT.dateTimeShort(b.startAtUtc ?? "", { timeZone: viewerTimeZone });
 
           return (
-            <div key={b.id} id={`booking-${b.id}`} className="lux-card rounded-[22px] p-4">
+            <div
+              key={b.id}
+              id={`booking-${b.id}`}
+              onClick={(event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest("[data-ignore-drawer]")) return;
+                setSelectedBooking(b);
+              }}
+              className="lux-card rounded-[22px] p-4 cursor-pointer transition-all hover:ring-1 hover:ring-border-subtle"
+            >
               <div className="flex items-center justify-between gap-4">
                 <div className="font-medium">{b.provider.name}</div>
                 <div className="text-sm text-text-sec">{statusLabel(b.status)}</div>
@@ -355,87 +348,29 @@ export function ClientBookingsPanel() {
               {waitsMasterDecision ? (
                 <div className="mt-2 text-xs text-text-sec">Ожидает подтверждения мастера</div>
               ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2" data-ignore-drawer>
                 {masterLink ? (
                   <Button asChild type="button" variant="secondary" size="sm">
-                    <Link href={masterLink}>Перейти к мастеру</Link>
+                    <Link href={masterLink} onClick={(event) => event.stopPropagation()}>
+                      Перейти к мастеру
+                    </Link>
                   </Button>
                 ) : null}
                 {studioLink ? (
                   <Button asChild type="button" variant="secondary" size="sm">
-                    <Link href={studioLink}>Перейти в студию</Link>
-                  </Button>
-                ) : null}
-                {canManage ? (
-                  <>
-                    <Button
-                      type="button"
-                      onClick={() => setRescheduleBooking(b)}
-                      disabled={actionId === b.id}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      {t.bookingsPanel.reschedule}
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => cancelBooking(b.id)}
-                      disabled={actionId === b.id}
-                      variant="danger"
-                      size="sm"
-                    >
-                      {t.bookingsPanel.cancelBooking}
-                    </Button>
-                  </>
-                ) : null}
-                {waitsClientDecision ? (
-                  <>
-                    <Button
-                      type="button"
-                      onClick={() => confirmBookingAction(b.id)}
-                      disabled={actionId === b.id}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      Подтвердить перенос
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => cancelBooking(b.id)}
-                      disabled={actionId === b.id}
-                      variant="danger"
-                      size="sm"
-                    >
-                      Отклонить перенос
-                    </Button>
-                  </>
-                ) : null}
-                {reviewStateMap[b.id]?.canLeave ? (
-                  <Button
-                    type="button"
-                    onClick={() => setReviewBookingId(b.id)}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    {t.bookingsPanel.leaveReview}
-                  </Button>
-                ) : null}
-                {reviewStateMap[b.id]?.canDelete && reviewStateMap[b.id]?.reviewId ? (
-                  <Button
-                    type="button"
-                    onClick={() => deleteReviewAction(b.id, reviewStateMap[b.id]!.reviewId!)}
-                    disabled={actionId === b.id}
-                    variant="danger"
-                    size="sm"
-                  >
-                    Удалить отзыв
+                    <Link href={studioLink} onClick={(event) => event.stopPropagation()}>
+                      Перейти в студию
+                    </Link>
                   </Button>
                 ) : null}
               </div>
-              <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3">
+              <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3" data-ignore-drawer>
                 <button
                   type="button"
-                  onClick={() => toggleChat(b.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleChat(b.id);
+                  }}
                   className="flex w-full items-center justify-between text-sm font-medium"
                 >
                   <span>Чат</span>
@@ -457,6 +392,21 @@ export function ClientBookingsPanel() {
           );
         })}
       </div>
+
+      {selectedBooking ? (
+        <BookingDetailDrawer
+          booking={selectedBooking}
+          reviewState={reviewStateMap[selectedBooking.id]}
+          actionId={actionId}
+          onClose={() => setSelectedBooking(null)}
+          onCancel={cancelBooking}
+          onConfirm={confirmBookingAction}
+          onReschedule={setRescheduleBooking}
+          onLeaveReview={setReviewBookingId}
+          onDeleteReview={deleteReviewAction}
+          onActionSuccess={load}
+        />
+      ) : null}
 
       {rescheduleBooking ? (
         <RescheduleModal

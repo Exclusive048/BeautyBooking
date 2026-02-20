@@ -138,7 +138,7 @@ export async function listClientBookings(userId: string): Promise<BookingClientD
       changeComment: true,
       clientChangeRequestsCount: true,
       masterChangeRequestsCount: true,
-      service: { select: { id: true, name: true } },
+      service: { select: { id: true, name: true, price: true, durationMin: true } },
       provider: {
         select: {
           id: true,
@@ -147,6 +147,7 @@ export async function listClientBookings(userId: string): Promise<BookingClientD
           address: true,
           type: true,
           publicUsername: true,
+          avatarUrl: true,
         },
       },
       masterProvider: {
@@ -157,6 +158,7 @@ export async function listClientBookings(userId: string): Promise<BookingClientD
           address: true,
           type: true,
           publicUsername: true,
+          avatarUrl: true,
         },
       },
     },

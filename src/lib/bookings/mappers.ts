@@ -41,12 +41,28 @@ type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
     silentMode: true;
     startAtUtc: true;
     endAtUtc: true;
-    service: { select: { id: true; name: true } };
+    service: { select: { id: true; name: true; price: true; durationMin: true } };
     provider: {
-      select: { id: true; name: true; district: true; address: true; type: true; publicUsername: true };
+      select: {
+        id: true;
+        name: true;
+        district: true;
+        address: true;
+        type: true;
+        publicUsername: true;
+        avatarUrl: true;
+      };
     };
     masterProvider: {
-      select: { id: true; name: true; district: true; address: true; type: true; publicUsername: true };
+      select: {
+        id: true;
+        name: true;
+        district: true;
+        address: true;
+        type: true;
+        publicUsername: true;
+        avatarUrl: true;
+      };
     };
   };
 }> & {
@@ -95,6 +111,12 @@ export function toBookingDto(model: BookingWithServiceModel): BookingDto {
 export function toClientBookingDto(model: BookingWithServiceProviderModel): BookingClientDto {
   return {
     ...toBookingDto(model),
+    service: {
+      id: model.service.id,
+      name: model.service.name,
+      price: model.service.price,
+      durationMin: model.service.durationMin,
+    },
     provider: {
       id: model.provider.id,
       name: model.provider.name,
@@ -102,6 +124,7 @@ export function toClientBookingDto(model: BookingWithServiceProviderModel): Book
       address: model.provider.address,
       type: model.provider.type,
       publicUsername: model.provider.publicUsername ?? null,
+      avatarUrl: model.provider.avatarUrl ?? null,
     },
     masterProvider: model.masterProvider
       ? {
@@ -111,6 +134,7 @@ export function toClientBookingDto(model: BookingWithServiceProviderModel): Book
           address: model.masterProvider.address,
           type: model.masterProvider.type,
           publicUsername: model.masterProvider.publicUsername ?? null,
+          avatarUrl: model.masterProvider.avatarUrl ?? null,
         }
       : null,
   };
