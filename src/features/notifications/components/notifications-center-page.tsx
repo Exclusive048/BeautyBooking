@@ -20,6 +20,11 @@ type Props = {
   initialData: NotificationCenterData;
 };
 
+type ChatPayload = {
+  bookingId?: unknown;
+  senderType?: unknown;
+};
+
 function resolveIncomingChannel(event: NotificationEvent): NotificationChannel {
   const payload = event.payloadJson;
   if (payload && typeof payload === "object") {
@@ -27,9 +32,31 @@ function resolveIncomingChannel(event: NotificationEvent): NotificationChannel {
     if (providerType === "STUDIO") return "STUDIO";
     if (providerType === "MASTER") return "MASTER";
   }
+  if (event.type === "CHAT_MESSAGE_RECEIVED") {
+    const record = parseChatPayload(event.payloadJson);
+    if (record?.senderType === "CLIENT") return "MASTER";
+    return "SYSTEM";
+  }
   if (event.type === "BOOKING_REQUEST") return "MASTER";
   if (event.type === "MODEL_NEW_APPLICATION" || event.type === "MODEL_BOOKING_CREATED") return "MASTER";
   return "SYSTEM";
+}
+
+function parseChatPayload(payload: unknown): { bookingId: string; senderType?: "CLIENT" | "MASTER" } | null {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as ChatPayload;
+  if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
+  const senderType =
+    record.senderType === "CLIENT" || record.senderType === "MASTER" ? record.senderType : undefined;
+  return { bookingId: record.bookingId, senderType };
+}
+
+function resolveChatOpenHref(payload: { bookingId: string; senderType?: "CLIENT" | "MASTER" }): string {
+  const params = new URLSearchParams({ bookingId: payload.bookingId, chat: "open" });
+  if (payload.senderType === "CLIENT") {
+    return `/cabinet/master/dashboard?${params.toString()}`;
+  }
+  return `/cabinet/bookings?${params.toString()}`;
 }
 
 function toCenterItem(event: NotificationEvent): NotificationCenterNotificationItem {
@@ -40,10 +67,14 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
       event.type !== "MODEL_APPLICATION_REJECTED" &&
       event.type !== "MODEL_BOOKING_CREATED"
     ) {
-      return undefined;
+      if (event.type !== "CHAT_MESSAGE_RECEIVED") return undefined;
     }
     const payload = event.payloadJson;
     if (!payload || typeof payload !== "object") return undefined;
+    if (event.type === "CHAT_MESSAGE_RECEIVED") {
+      const chatPayload = parseChatPayload(payload);
+      return chatPayload ? resolveChatOpenHref(chatPayload) : undefined;
+    }
     const record = payload as { offerId?: unknown; applicationId?: unknown };
     if ((event.type === "MODEL_TIME_PROPOSED" || event.type === "MODEL_APPLICATION_REJECTED") && typeof record.applicationId === "string") {
       return `/cabinet/model-applications?applicationId=${record.applicationId}`;

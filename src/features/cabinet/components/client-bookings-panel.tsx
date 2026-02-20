@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
 import { ReviewForm } from "@/features/reviews/components/review-form";
@@ -11,6 +13,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
+import { BookingChat } from "@/features/chat/components/booking-chat";
 
 type BookingItem = {
   id: string;
@@ -117,6 +120,7 @@ function sortBookings(items: BookingItem[]): BookingItem[] {
 export function ClientBookingsPanel() {
   const t = UI_TEXT.clientCabinet;
   const viewerTimeZone = useViewerTimeZoneContext();
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +128,10 @@ export function ClientBookingsPanel() {
   const [rescheduleBooking, setRescheduleBooking] = useState<BookingItem | null>(null);
   const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
   const [reviewStateMap, setReviewStateMap] = useState<Record<string, BookingReviewState>>({});
+  const [chatOpenMap, setChatOpenMap] = useState<Record<string, boolean>>({});
+  const [chatUnreadMap, setChatUnreadMap] = useState<Record<string, number>>({});
+  const chatQueryHandledRef = useRef(false);
+  const chatScrollHandledRef = useRef(false);
 
   const loadCanLeave = useCallback(async (bookings: BookingItem[]) => {
     const entries = await Promise.all(
@@ -182,6 +190,26 @@ export function ClientBookingsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (chatQueryHandledRef.current) return;
+    const bookingId = searchParams.get("bookingId");
+    const chat = searchParams.get("chat");
+    if (chat !== "open" || !bookingId) return;
+    chatQueryHandledRef.current = true;
+    setChatOpenMap((prev) => ({ ...prev, [bookingId]: true }));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const bookingId = searchParams.get("bookingId");
+    const chat = searchParams.get("chat");
+    if (chat !== "open" || !bookingId) return;
+    if (chatScrollHandledRef.current) return;
+    const target = document.getElementById(`booking-${bookingId}`);
+    if (!target) return;
+    chatScrollHandledRef.current = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [items.length, searchParams]);
 
   const sortedItems = useMemo(() => sortBookings(items), [items]);
 
@@ -257,6 +285,14 @@ export function ClientBookingsPanel() {
     }
   };
 
+  const toggleChat = (id: string) => {
+    setChatOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleUnreadChange = (id: string, count: number) => {
+    setChatUnreadMap((prev) => ({ ...prev, [id]: count }));
+  };
+
   if (loading) {
     return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.bookingsPanel.loading}</div>;
   }
@@ -304,7 +340,7 @@ export function ClientBookingsPanel() {
           const slotLabel = UI_FMT.dateTimeShort(b.startAtUtc ?? "", { timeZone: viewerTimeZone });
 
           return (
-            <div key={b.id} className="lux-card rounded-[22px] p-4">
+            <div key={b.id} id={`booking-${b.id}`} className="lux-card rounded-[22px] p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="font-medium">{b.provider.name}</div>
                 <div className="text-sm text-text-sec">{statusLabel(b.status)}</div>
@@ -394,6 +430,27 @@ export function ClientBookingsPanel() {
                   >
                     Удалить отзыв
                   </Button>
+                ) : null}
+              </div>
+              <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3">
+                <button
+                  type="button"
+                  onClick={() => toggleChat(b.id)}
+                  className="flex w-full items-center justify-between text-sm font-medium"
+                >
+                  <span>Чат</span>
+                  {chatUnreadMap[b.id] ? (
+                    <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[b.id]}</Badge>
+                  ) : null}
+                </button>
+                {chatOpenMap[b.id] ? (
+                  <div className="mt-3">
+                    <BookingChat
+                      bookingId={b.id}
+                      currentRole="CLIENT"
+                      onUnreadCountChange={(count) => handleUnreadChange(b.id, count)}
+                    />
+                  </div>
                 ) : null}
               </div>
             </div>

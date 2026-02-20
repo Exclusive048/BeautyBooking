@@ -90,6 +90,19 @@ function resolveModelOpenHref(type: NotificationCenterNotificationItem["type"], 
   return undefined;
 }
 
+function resolveChatOpenHref(type: NotificationCenterNotificationItem["type"], payloadJson: unknown): string | undefined {
+  if (type !== "CHAT_MESSAGE_RECEIVED") return undefined;
+  const payload = parseJsonPayload(payloadJson);
+  if (!payload || typeof payload !== "object") return undefined;
+  const record = payload as { bookingId?: unknown; senderType?: unknown };
+  if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return undefined;
+  const params = new URLSearchParams({ bookingId: record.bookingId, chat: "open" });
+  if (record.senderType === "CLIENT") {
+    return `/cabinet/master/dashboard?${params.toString()}`;
+  }
+  return `/cabinet/bookings?${params.toString()}`;
+}
+
 function resolveModelChannel(type: NotificationCenterNotificationItem["type"]): NotificationChannel | null {
   if (type === "MODEL_NEW_APPLICATION" || type === "MODEL_BOOKING_CREATED") return "MASTER";
   if (type === "MODEL_TIME_PROPOSED" || type === "MODEL_APPLICATION_REJECTED") return "SYSTEM";
@@ -275,7 +288,7 @@ export async function getNotificationCenterData(input: {
       readAt: item.readAt ? item.readAt.toISOString() : null,
       createdAt: item.createdAt.toISOString(),
       payloadJson: item.payloadJson ?? null,
-      openHref: resolveModelOpenHref(item.type, item.payloadJson),
+      openHref: resolveModelOpenHref(item.type, item.payloadJson) ?? resolveChatOpenHref(item.type, item.payloadJson),
     })),
     ...scheduleRequestNotifications,
   ].sort((a, b) => {

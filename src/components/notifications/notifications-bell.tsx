@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -20,6 +21,11 @@ type BookingPayload = {
   bookingStatus?: unknown;
 };
 
+type ChatPayload = {
+  bookingId?: unknown;
+  senderType?: unknown;
+};
+
 function parseBookingPayload(payload: unknown): { bookingId: string; bookingStatus?: string } | null {
   if (!payload || typeof payload !== "object") return null;
   const record = payload as BookingPayload;
@@ -28,7 +34,25 @@ function parseBookingPayload(payload: unknown): { bookingId: string; bookingStat
   return { bookingId: record.bookingId, bookingStatus };
 }
 
+function parseChatPayload(payload: unknown): { bookingId: string; senderType?: "CLIENT" | "MASTER" } | null {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as ChatPayload;
+  if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
+  const senderType =
+    record.senderType === "CLIENT" || record.senderType === "MASTER" ? record.senderType : undefined;
+  return { bookingId: record.bookingId, senderType };
+}
+
+function resolveChatHref(payload: { bookingId: string; senderType?: "CLIENT" | "MASTER" }): string {
+  const params = new URLSearchParams({ bookingId: payload.bookingId, chat: "open" });
+  if (payload.senderType === "CLIENT") {
+    return `/cabinet/master/dashboard?${params.toString()}`;
+  }
+  return `/cabinet/bookings?${params.toString()}`;
+}
+
 export function NotificationsBell({ ariaLabel }: Props) {
+  const router = useRouter();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const viewerTimeZone = useViewerTimeZoneContext();
   const timersRef = useRef<Map<string, number>>(new Map());
@@ -117,6 +141,13 @@ export function NotificationsBell({ ariaLabel }: Props) {
     }
   };
 
+  const handleOpenChat = async (notificationId: string, payload: unknown) => {
+    const chatPayload = parseChatPayload(payload);
+    if (!chatPayload) return;
+    router.push(resolveChatHref(chatPayload));
+    await markRead(notificationId);
+  };
+
   return (
     <>
       <Button asChild variant="secondary" className="relative">
@@ -136,6 +167,8 @@ export function NotificationsBell({ ariaLabel }: Props) {
         <div className="fixed right-4 top-4 z-50 flex w-[min(360px,90vw)] flex-col gap-3">
           {toasts.map((toast) => {
             const booking = parseBookingPayload(toast.payloadJson);
+            const chatPayload =
+              toast.type === "CHAT_MESSAGE_RECEIVED" ? parseChatPayload(toast.payloadJson) : null;
             const canAct =
               toast.type === "BOOKING_REQUEST" &&
               booking?.bookingId &&
@@ -159,6 +192,17 @@ export function NotificationsBell({ ariaLabel }: Props) {
                       onClick={() => void handleDecline(toast.id, toast.payloadJson)}
                     >
                       Отклонить
+                    </Button>
+                  </div>
+                ) : null}
+                {toast.type === "CHAT_MESSAGE_RECEIVED" && chatPayload ? (
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void handleOpenChat(toast.id, toast.payloadJson)}
+                    >
+                      РћС‚РєСЂС‹С‚СЊ С‡Р°С‚
                     </Button>
                   </div>
                 ) : null}

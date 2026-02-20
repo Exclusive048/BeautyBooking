@@ -5,11 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { ScheduleBuilder } from "@/features/schedule/components/schedule-builder";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { BookingChat } from "@/features/chat/components/booking-chat";
 
 type CalendarView = "day" | "week" | "month";
 
@@ -112,6 +114,29 @@ function dayLabel(dateKey: string, timeZone: string): string {
     month: "2-digit",
     timeZone,
   });
+}
+
+function CalendarBookingChat({ bookingId }: { bookingId: string }) {
+  const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  return (
+    <div className="mt-2 rounded-xl border border-border-subtle bg-bg-input/40 p-2">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between text-xs font-medium"
+      >
+        <span>Чат</span>
+        {unreadCount > 0 ? <Badge className="px-2 py-0.5 text-[10px]">{unreadCount}</Badge> : null}
+      </button>
+      {open ? (
+        <div className="mt-2">
+          <BookingChat bookingId={bookingId} currentRole="MASTER" onUnreadCountChange={setUnreadCount} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 export function StudioCalendarPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.calendar;
@@ -467,6 +492,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                       <div className="mt-1 text-xs">
                         {booking.status} • {booking.serviceTitle} • {booking.clientPhone}
                       </div>
+                      <CalendarBookingChat bookingId={booking.id} />
                     </article>
                   ))}
                   {blocks.map((block) => (
@@ -508,6 +534,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                   <div className="mt-1 text-xs">
                     {booking.status} • {booking.serviceTitle} • {booking.clientPhone}
                   </div>
+                  <CalendarBookingChat bookingId={booking.id} />
                 </article>
               ))}
               {monthDayDetails.blocks.map((block) => (
