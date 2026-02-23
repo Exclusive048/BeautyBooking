@@ -1,4 +1,13 @@
 /** @type {import('tailwindcss').Config} */
+const breakpoints = {
+  xs: "375px",
+  sm: "640px",
+  md: "768px",
+  lg: "1024px",
+  xl: "1280px",
+  "2xl": "1536px",
+};
+
 module.exports = {
   darkMode: "class",
   content: [
@@ -7,6 +16,7 @@ module.exports = {
     "./src/features/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
+    screens: breakpoints,
     extend: {
       colors: {
         bg: "rgb(var(--bg) / <alpha-value>)",

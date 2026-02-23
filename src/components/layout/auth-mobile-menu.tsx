@@ -95,7 +95,7 @@ export function AuthMobileMenu({
       </Button>
 
       {open ? (
-        <div className="absolute right-0 z-40 mt-2 w-[min(88vw,320px)] rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur">
+        <div className="absolute right-0 z-[100] mt-2 w-[min(88vw,320px)] rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur">
           <div className="rounded-2xl bg-bg-input px-3 py-2">
             <div className="text-xs text-text-sec">{UI_TEXT.nav.mobileMenuTitle}</div>
             <div className="text-sm font-semibold text-text-main">{userLabel}</div>

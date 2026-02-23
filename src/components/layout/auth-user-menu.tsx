@@ -52,7 +52,7 @@ export function AuthUserMenu({ userLabel, showAdminLink }: Props) {
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-40 mt-2 w-56 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur">
+        <div className="absolute right-0 z-[100] mt-2 w-56 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur">
           <Link
             href="/cabinet/profile"
             className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
