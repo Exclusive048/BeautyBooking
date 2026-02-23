@@ -139,6 +139,27 @@
     background-color: rgb(var(--surface));
     color: rgb(var(--text));
   }
+
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  a,
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 @layer components {
@@ -283,6 +304,50 @@
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  .pt-safe {
+    padding-top: var(--safe-area-inset-top);
+  }
+
+  .pr-safe {
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .pb-safe {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .pl-safe {
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  .touch-feedback {
+    transition: transform 120ms ease, filter 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .touch-feedback:active {
+    transform: scale(0.98);
+    filter: brightness(0.98);
+  }
+
+  .card-pressable {
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .card-pressable:active {
+    transform: translateY(1px) scale(0.99);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-pressable {
+    transition: transform 140ms ease, filter 140ms ease;
+  }
+
+  .btn-pressable:active {
+    transform: scale(0.97);
+    filter: brightness(0.98);
   }
 
   @keyframes fadeInUp {

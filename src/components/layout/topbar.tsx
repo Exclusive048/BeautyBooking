@@ -123,24 +123,24 @@ export async function Topbar() {
 
   return (
     <header className="sticky top-0 z-30">
-      <div className="mx-auto mt-3 flex h-[var(--topbar-h)] max-w-6xl items-center justify-between rounded-[26px] border border-border-subtle/80 bg-bg-card/75 px-4 shadow-card backdrop-blur">
-        <Link href="/" className="flex items-center gap-3">
+      <div className="mx-auto mt-3 flex h-[var(--topbar-h)] w-full max-w-6xl min-w-0 items-center justify-between rounded-[26px] border border-border-subtle/80 bg-bg-card/75 px-4 shadow-card backdrop-blur">
+        <Link href="/" className="flex min-w-0 items-center gap-3">
           {siteLogoUrl ? (
             <img src={siteLogoUrl} alt={UI_TEXT.nav.siteLogoAlt} className="h-10 w-10 rounded-2xl object-cover" />
           ) : (
             <div className="h-10 w-10 rounded-2xl bg-primary/35" />
           )}
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-text-main">BeautyHub</div>
-            <div className="text-xs text-text-sec">{UI_TEXT.nav.bookingToMasters}</div>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-semibold text-text-main">BeautyHub</div>
+            <div className="hidden xs:block truncate text-xs text-text-sec">{UI_TEXT.nav.bookingToMasters}</div>
           </div>
         </Link>
 
-        <nav className="flex items-center gap-2">
-          <Button asChild variant="secondary">
+        <nav className="flex items-center gap-2 flex-shrink-0">
+          <Button asChild variant="secondary" className="hidden sm:inline-flex">
             <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
           </Button>
-          <Button asChild variant="secondary">
+          <Button asChild variant="secondary" className="hidden sm:inline-flex">
             <Link href="/cabinet/bookings">{UI_TEXT.nav.myBookings}</Link>
           </Button>
 
