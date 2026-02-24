@@ -18,6 +18,7 @@ Clients discover specialists by category, location, and price, and book in a cou
 - [Data Model Highlights](#data-model-highlights)
 - [Subscription Tiers](#subscription-tiers)
 - [Notifications](#notifications)
+- [Webhooks](#webhooks)
 - [Roadmap](#roadmap)
 
 ---
@@ -235,6 +236,17 @@ Server emits events via notificationsNotifier (Node EventEmitter)
 Currently in-memory (single process). Redis client is already wired — switching to Redis Pub/Sub for multi-instance requires only one file change (`src/lib/notifications/notifier.ts`).
 
 **Telegram bot** sends messages for all booking lifecycle events via a background worker queue with exponential retry.
+
+---
+
+## Webhooks
+
+### YooKassa
+`/api/payments/yookassa/webhook` expects the token in the `Authorization` header:
+
+```
+Authorization: Bearer <YOOKASSA_WEBHOOK_TOKEN>
+```
 
 ---
 

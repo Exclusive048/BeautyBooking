@@ -54,7 +54,10 @@ export function verifySessionToken(token: string): SessionPayload | null {
   const data = `${h}.${p}`;
   const expected = sign(data, secret);
 
-  if (expected !== s) return null;
+  const expectedBuf = Buffer.from(expected);
+  const sigBuf = Buffer.from(s);
+  if (expectedBuf.length !== sigBuf.length) return null;
+  if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
 
   const payload = JSON.parse(fromBase64url(p)) as SessionPayload;
 
