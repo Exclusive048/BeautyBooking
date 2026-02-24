@@ -20,6 +20,7 @@ type ProviderProfileSource = Pick<
   | "categories"
   | "availableToday"
   | "timezone"
+  | "cancellationDeadlineHours"
   | "geoLat"
   | "geoLng"
 > & { services: ProviderServiceSource[] };
@@ -86,6 +87,7 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     categories: provider.categories,
     availableToday: provider.availableToday,
     timezone: provider.timezone,
+    cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
     superpowerBadges: [],

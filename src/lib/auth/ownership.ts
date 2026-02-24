@@ -1,4 +1,4 @@
-import { MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import type { SessionUser } from "@/lib/auth/access";
@@ -106,6 +106,10 @@ export async function requireBookingCancelAccess(
   bookingId: string
 ): Promise<{ cancelledBy: "CLIENT" | "PROVIDER" }> {
   const booking = await loadBookingAccess(bookingId);
+
+  if (user.roles.includes(AccountType.ADMIN) || user.roles.includes(AccountType.SUPERADMIN)) {
+    return { cancelledBy: "PROVIDER" };
+  }
 
   if (isClientOwner(user.userId, booking)) {
     return { cancelledBy: "CLIENT" };

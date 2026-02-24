@@ -34,6 +34,7 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       categories: true,
       availableToday: true,
       timezone: true,
+      cancellationDeadlineHours: true,
       geoLat: true,
       geoLng: true,
       services: {

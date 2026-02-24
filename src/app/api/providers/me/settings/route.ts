@@ -4,8 +4,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { providerSettingsSchema } from "@/lib/providers/schemas";
 import {
-  getProviderAutoConfirmSettings,
-  updateProviderAutoConfirmSettings,
+  getProviderSettings,
+  updateProviderSettings,
 } from "@/lib/providers/settings";
 import { parseBody } from "@/lib/validation";
 
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
 
-    const data = await getProviderAutoConfirmSettings(user.id);
+    const data = await getProviderSettings(user.id);
     return jsonOk(data);
   } catch (error) {
     const appError = toAppError(error);
@@ -37,8 +37,9 @@ export async function PATCH(req: Request) {
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
 
     const body = await parseBody(req, providerSettingsSchema);
-    const data = await updateProviderAutoConfirmSettings(user.id, {
+    const data = await updateProviderSettings(user.id, {
       autoConfirmBookings: body.autoConfirmBookings,
+      cancellationDeadlineHours: body.cancellationDeadlineHours,
     });
     return jsonOk(data);
   } catch (error) {

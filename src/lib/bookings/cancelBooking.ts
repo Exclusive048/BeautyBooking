@@ -11,6 +11,7 @@ import type { BookingCancelInput } from "@/lib/domain/bookings";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import {
   canCancelOrReschedule,
+  ensureCancellationDeadline,
   ensureBookingActionWindow,
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
@@ -35,6 +36,7 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
       proposedEndAt: true,
       requestedBy: true,
       actionRequiredBy: true,
+      provider: { select: { cancellationDeadlineHours: true } },
     },
   });
   if (!booking) throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
@@ -63,8 +65,10 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     if (!canCancelOrReschedule(booking.status)) {
       throw new AppError("Booking cannot be cancelled in current state", 409, "CONFLICT");
     }
-    ensureBookingActionWindow(booking.startAtUtc);
-    if (input.cancelledBy !== "CLIENT") {
+    if (input.cancelledBy === "CLIENT") {
+      ensureBookingActionWindow(booking.startAtUtc);
+      ensureCancellationDeadline(booking.startAtUtc, booking.provider.cancellationDeadlineHours);
+    } else {
       const reason = input.reason?.trim() ?? "";
       if (reason.length === 0) {
         throw new AppError("Comment is required", 400, "VALIDATION_ERROR");

@@ -141,6 +141,9 @@ export async function Topbar() {
             <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
           </Button>
           <Button asChild variant="secondary" className="hidden sm:inline-flex">
+            <Link href="/models">Для моделей</Link>
+          </Button>
+          <Button asChild variant="secondary" className="hidden sm:inline-flex">
             <Link href="/cabinet/bookings">{UI_TEXT.nav.myBookings}</Link>
           </Button>
 

@@ -34,6 +34,7 @@ function buildFooterLinks() {
     { label: "Как забронировать", href: "/how-to-book" },
     { label: "Популярные услуги", href: "/catalog?sort=popular" },
     { label: "Мастера рядом", href: "/catalog?available=today" },
+    { label: "Предложения для моделей", href: "/models" },
     ...(showGiftCards ? [{ label: "Подарочные сертификаты", href: "/gift-cards" }] : []),
   ];
 

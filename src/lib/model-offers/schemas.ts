@@ -74,6 +74,13 @@ export const rejectApplicationSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
+export const publicModelOffersQuerySchema = z.object({
+  categoryId: z.string().trim().min(1).optional(),
+  city: z.string().trim().min(1).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(40).default(20),
+});
+
 export function isTimeWithinRange(input: {
   value: string;
   start: string;

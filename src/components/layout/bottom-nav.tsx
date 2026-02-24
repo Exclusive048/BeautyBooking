@@ -4,13 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
 import { useMemo } from "react";
-import { useCurrentAccount } from "@/features/auth/use-current-account";
+import { useMe } from "@/lib/hooks/use-me";
 
 type NavItem = {
   label: string;
   href: string;
   icon: (props: { className?: string }) => ReactElement;
 };
+
+type AccountType = "GUEST" | "CLIENT" | "MASTER" | "STUDIO" | "ADMIN";
+
+function resolveAccountType(roles?: string[] | null): AccountType {
+  if (!roles || roles.length === 0) return "GUEST";
+  if (roles.includes("SUPERADMIN") || roles.includes("ADMIN")) return "ADMIN";
+  if (roles.includes("STUDIO_ADMIN") || roles.includes("STUDIO")) return "STUDIO";
+  if (roles.includes("MASTER")) return "MASTER";
+  if (roles.includes("CLIENT")) return "CLIENT";
+  return "GUEST";
+}
 
 function IconHome({ className }: { className?: string }) {
   return (
@@ -105,16 +116,17 @@ const NAV_ITEMS_ADMIN: NavItem[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const account = useCurrentAccount();
+  const { user } = useMe();
+  const accountType = resolveAccountType(user?.roles);
 
   const items = useMemo<NavItem[]>(() => {
-    if (!account || account.type === "GUEST") return NAV_ITEMS_GUEST;
-    if (account.type === "CLIENT") return NAV_ITEMS_CLIENT;
-    if (account.type === "MASTER") return NAV_ITEMS_MASTER;
-    if (account.type === "STUDIO") return NAV_ITEMS_STUDIO;
-    if (account.type === "ADMIN") return NAV_ITEMS_ADMIN;
+    if (accountType === "GUEST") return NAV_ITEMS_GUEST;
+    if (accountType === "CLIENT") return NAV_ITEMS_CLIENT;
+    if (accountType === "MASTER") return NAV_ITEMS_MASTER;
+    if (accountType === "STUDIO") return NAV_ITEMS_STUDIO;
+    if (accountType === "ADMIN") return NAV_ITEMS_ADMIN;
     return NAV_ITEMS_GUEST;
-  }, [account]);
+  }, [accountType]);
 
   const hiddenPrefixes = ["/auth", "/login", "/logout", "/book"];
   const isHidden = hiddenPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

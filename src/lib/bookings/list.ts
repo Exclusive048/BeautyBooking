@@ -148,6 +148,7 @@ export async function listClientBookings(userId: string): Promise<BookingClientD
           type: true,
           publicUsername: true,
           avatarUrl: true,
+          cancellationDeadlineHours: true,
         },
       },
       masterProvider: {
@@ -159,6 +160,7 @@ export async function listClientBookings(userId: string): Promise<BookingClientD
           type: true,
           publicUsername: true,
           avatarUrl: true,
+          cancellationDeadlineHours: true,
         },
       },
     },

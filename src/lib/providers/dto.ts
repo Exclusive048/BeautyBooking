@@ -49,6 +49,7 @@ export type ProviderProfileDto = {
   categories: string[];
   availableToday: boolean;
   timezone: string;
+  cancellationDeadlineHours: number | null;
   geoLat: number | null;
   geoLng: number | null;
   superpowerBadges: ProviderSuperpowerBadgeDto[];
