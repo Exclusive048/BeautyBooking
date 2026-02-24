@@ -10,6 +10,8 @@ import { otpVerifySchema } from "@/lib/auth/schemas";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { linkGuestBookingsToUserByPhone } from "@/lib/bookings/link-guest-bookings";
 import { logError } from "@/lib/logging/logger";
+import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
+import { NextResponse } from "next/server";
 
 const CONSENT_DOCUMENT_VERSION = "1.0";
 
@@ -20,6 +22,14 @@ export async function POST(req: Request) {
     return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
   }
   const { phone, code } = parsed.data;
+
+  const lockCheck = await checkOtpVerifyLock(phone);
+  if (!lockCheck.ok) {
+    return NextResponse.json(
+      { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
+      { status: lockCheck.status, headers: { "Retry-After": String(lockCheck.retryAfterSec) } }
+    );
+  }
 
   const now = new Date();
   const codeHash = hashOtpCode(phone, code);
@@ -35,8 +45,17 @@ export async function POST(req: Request) {
   });
 
   if (!otp) {
+    const failResult = await registerOtpVerifyFailure(phone);
+    if (!failResult.ok) {
+      return NextResponse.json(
+        { error: failResult.error, retryAfterSec: failResult.retryAfterSec },
+        { status: failResult.status, headers: { "Retry-After": String(failResult.retryAfterSec) } }
+      );
+    }
     return fail("Code not found", 401, "CODE_NOT_FOUND");
   }
+
+  await clearOtpVerifyFailures(phone);
 
   await prisma.otpCode.update({
     where: { id: otp.id },

@@ -5,6 +5,13 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { mediaListQuerySchema, mediaUploadBodySchema } from "@/lib/media/schemas";
 import { listMediaAssets, uploadMediaAsset } from "@/lib/media/service";
+import {
+  MEDIA_ALLOWED_MIME_TYPES,
+  MEDIA_MAX_FILE_SIZE_BYTES,
+  type AllowedMediaMimeType,
+} from "@/lib/media/types";
+import { fileTypeFromBuffer } from "file-type";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -64,14 +71,42 @@ export async function POST(req: Request) {
       return jsonFail(400, "Validation error", "VALIDATION_ERROR");
     }
 
-    const bytes = new Uint8Array(await fileValue.arrayBuffer());
+    if (fileValue.size <= 0 || fileValue.size > MEDIA_MAX_FILE_SIZE_BYTES) {
+      return jsonFail(400, "File is too large", "MEDIA_FILE_TOO_LARGE");
+    }
+
+    const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
+    const detected = await fileTypeFromBuffer(rawBuffer);
+    if (!detected || !MEDIA_ALLOWED_MIME_TYPES.includes(detected.mime as AllowedMediaMimeType)) {
+      return jsonFail(415, "Unsupported image type", "MEDIA_INVALID_MIME");
+    }
+
+    let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
+    let outputBuffer: Buffer;
+
+    if (detected.mime === "image/png") {
+      outputMime = "image/webp";
+      outputBuffer = await sharp(rawBuffer).webp({ quality: 90 }).toBuffer();
+    } else if (detected.mime === "image/jpeg") {
+      outputMime = "image/jpeg";
+      outputBuffer = await sharp(rawBuffer).jpeg({ quality: 90 }).toBuffer();
+    } else {
+      outputMime = "image/webp";
+      outputBuffer = await sharp(rawBuffer).webp({ quality: 90 }).toBuffer();
+    }
+
+    if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {
+      return jsonFail(400, "File is too large", "MEDIA_FILE_TOO_LARGE");
+    }
+
+    const bytes = new Uint8Array(outputBuffer);
     const asset = await uploadMediaAsset(user, {
       entityType: parsedBody.data.entityType as MediaEntityType,
       entityId: parsedBody.data.entityId,
       kind: parsedBody.data.kind as MediaKind,
       replaceAssetId: parsedBody.data.replaceAssetId,
-      mimeType: fileValue.type,
-      sizeBytes: fileValue.size,
+      mimeType: outputMime,
+      sizeBytes: outputBuffer.length,
       bytes,
       originalFilename: fileValue.name || "upload",
     });

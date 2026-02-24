@@ -38,8 +38,10 @@ function extractClientIp(req: Request): string | null {
 }
 
 function getWebhookToken(req: Request): string | null {
-  const url = new URL(req.url);
-  return url.searchParams.get("token")?.trim() ?? null;
+  const header = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!header) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  return match?.[1]?.trim() ?? null;
 }
 
 function getGraceUntil(now: Date): Date {
