@@ -8,7 +8,7 @@ import { studioBookingUrl } from "@/lib/public-urls";
 
 type Props = {
   studioId: string;
-  bookingParams?: { masterId?: string; serviceId?: string; slotStartAt?: string };
+  bookingParams?: { master?: string; masterId?: string; serviceId?: string; slotStartAt?: string };
 };
 
 export async function StudioBookingSection({ studioId, bookingParams }: Props) {
@@ -40,7 +40,12 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
 
   const bookingHref = studioBookingUrl(
     { id: studio.id, publicUsername: studio.publicUsername },
-    bookingParams,
+    {
+      master: bookingParams?.master,
+      masterId: bookingParams?.master ? undefined : bookingParams?.masterId,
+      serviceId: bookingParams?.serviceId,
+      slotStartAt: bookingParams?.slotStartAt,
+    },
     "public-studio-booking"
   );
 
@@ -56,6 +61,7 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
         <StudioBookingFlow
           studioId={studio.id}
           initialMasterId={bookingParams?.masterId}
+          initialMasterKey={bookingParams?.master}
           initialServiceId={bookingParams?.serviceId}
         />
       </div>

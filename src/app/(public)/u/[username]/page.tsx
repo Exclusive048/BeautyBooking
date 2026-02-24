@@ -8,6 +8,7 @@ import { resolvePublicAppUrl } from "@/lib/app-url";
 import { buildProviderSchema } from "@/lib/seo/schema";
 import { withQuery } from "@/lib/public-urls";
 import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
+import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -155,16 +156,18 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
 
   const result = await resolvePublicUsername(
     {
-      findProviderByUsernameOrAlias: async (username: string) =>
-        prisma.provider.findFirst({
-          where: {
-            OR: [
-              { publicUsername: username },
-              { publicUsernameAliases: { some: { username } } },
-            ],
-          },
+      findProviderByUsernameOrAlias: async (username: string) => {
+        const direct = await resolveProviderBySlugOrId({
+          key: username,
           select: { id: true, publicUsername: true, isPublished: true, type: true },
-        }),
+        });
+        if (direct) return direct;
+
+        return prisma.provider.findFirst({
+          where: { publicUsernameAliases: { some: { username } } },
+          select: { id: true, publicUsername: true, isPublished: true, type: true },
+        });
+      },
     },
     username
   );
@@ -192,9 +195,13 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
   }
 
   if (result.status === "redirect") {
+    const master = typeof sp.master === "string" ? sp.master : undefined;
+    const legacyMasterId = typeof sp.masterId === "string" ? sp.masterId : undefined;
     const redirectUrl = withQuery(`/u/${result.username}`, {
       serviceId: typeof sp.serviceId === "string" ? sp.serviceId : undefined,
       slotStartAt: typeof sp.slotStartAt === "string" ? sp.slotStartAt : undefined,
+      master: master,
+      masterId: master ? undefined : legacyMasterId,
     });
     if (redirectUrl === `/u/${username}`) notFound();
     permanentRedirect(redirectUrl);
@@ -283,7 +290,8 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
 
   const bookingParams = {
     serviceId: typeof sp.serviceId === "string" ? sp.serviceId : undefined,
-    masterId: typeof sp.masterId === "string" ? sp.masterId : undefined,
+    master: typeof sp.master === "string" ? sp.master : undefined,
+    masterId: typeof sp.master === "string" ? undefined : typeof sp.masterId === "string" ? sp.masterId : undefined,
     slotStartAt: typeof sp.slotStartAt === "string" ? sp.slotStartAt : undefined,
   };
 

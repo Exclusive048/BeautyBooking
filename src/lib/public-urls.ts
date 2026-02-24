@@ -84,6 +84,9 @@ export function studioBookingUrl(
   params?: QueryParams,
   context: string = "studio-booking"
 ): string {
-  const base = providerPublicUrl(studio, context, "studios");
-  return withQuery(`${base}/booking`, params);
+  if (!studio.publicUsername) {
+    reportMissing({ kind: "provider", id: studio.id, context });
+  }
+  const studioKey = studio.publicUsername ?? studio.id;
+  return withQuery(`/u/${studioKey}/booking`, params);
 }

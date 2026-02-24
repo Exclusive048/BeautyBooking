@@ -15,7 +15,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
-  bookingParams?: { masterId?: string; serviceId?: string; slotStartAt?: string };
+  bookingParams?: { master?: string; masterId?: string; serviceId?: string; slotStartAt?: string };
 };
 
 export function PublicStudioProfilePage({ studioId, bookingParams }: Props) {

@@ -4,6 +4,7 @@ import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
 import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
+import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -63,8 +64,8 @@ export async function GET(
     return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
   }
 
-  const provider = await prisma.provider.findUnique({
-    where: { id: p.providerId },
+  const provider = await resolveProviderBySlugOrId({
+    key: p.providerId,
     select: { id: true, type: true, timezone: true },
   });
   if (!provider || provider.type !== "MASTER") {

@@ -1,8 +1,9 @@
 import { ok, fail } from "@/lib/api/response";
-import { prisma } from "@/lib/prisma";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
 import { formatZodError } from "@/lib/api/validation";
 import { ProviderType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -17,9 +18,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
     }
     const { id } = parsed.data;
 
-    const provider = await prisma.provider.findUnique({
-      where: { id },
-      select: { id: true, type: true },
+    const provider = await resolveProviderBySlugOrId({
+      key: id,
+      select: { id: true, type: true, name: true, publicUsername: true },
     });
 
     if (!provider) {
@@ -27,15 +28,11 @@ export async function GET(_req: Request, ctx: RouteContext) {
     }
 
     if (provider.type === ProviderType.MASTER) {
-      const master = await prisma.provider.findUnique({
-        where: { id },
-        select: { id: true, name: true, publicUsername: true },
-      });
-      return ok({ masters: master ? [master] : [] });
+      return ok({ masters: [{ id: provider.id, name: provider.name, publicUsername: provider.publicUsername }] });
     }
 
     const masters = await prisma.provider.findMany({
-      where: { studioId: id, type: ProviderType.MASTER },
+      where: { studioId: provider.id, type: ProviderType.MASTER },
       select: { id: true, name: true, publicUsername: true },
       orderBy: { createdAt: "asc" },
     });

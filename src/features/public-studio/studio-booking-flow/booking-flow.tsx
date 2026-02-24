@@ -36,6 +36,7 @@ type MasterAvailability = {
 type Props = {
   studioId: string;
   initialMasterId?: string;
+  initialMasterKey?: string;
   initialServiceId?: string;
 };
 
@@ -46,7 +47,7 @@ function buildLoginUrl(nextPath: string): string {
   return `/login?${params.toString()}`;
 }
 
-export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId }: Props) {
+export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey, initialServiceId }: Props) {
   const viewerTimeZone = useViewerTimeZoneContext();
   const [studio, setStudio] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<StudioMaster[]>([]);
@@ -59,6 +60,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
   const [masterId, setMasterId] = useState(initialMasterId ?? "");
   const [slotLabel, setSlotLabel] = useState("");
   const [availabilityByMaster, setAvailabilityByMaster] = useState<Record<string, MasterAvailability>>({});
+  const [masterSelectionError, setMasterSelectionError] = useState<string | null>(null);
 
   const [me, setMe] = useState<BookingUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
@@ -82,9 +84,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
   }, [availabilityByMaster, masters, serviceId]);
 
   const resolvedMasterId = useMemo(() => {
-    if (!serviceId) return "";
     if (masterId && masterId !== ANY_MASTER_ID) return masterId;
     if (masterId === ANY_MASTER_ID) {
+      if (!serviceId) return "";
       const withSlots = availableMasters.find((master) => (availabilityByMaster[master.id]?.slots.length ?? 0) > 0);
       return withSlots?.id ?? "";
     }
@@ -167,9 +169,33 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
   }, []);
 
   useEffect(() => {
-    setMasterId((prev) => (prev === ANY_MASTER_ID ? prev : ""));
     setSlotLabel("");
+    setMasterSelectionError(null);
   }, [serviceId]);
+
+  useEffect(() => {
+    if (masterSelectionError) {
+      setMasterSelectionError(null);
+    }
+  }, [masterId, masterSelectionError]);
+
+  useEffect(() => {
+    if (!masters.length) return;
+    if (masterId && masterId !== ANY_MASTER_ID) {
+      const exists = masters.some((master) => master.id === masterId);
+      if (!exists) {
+        setMasterId("");
+      }
+      return;
+    }
+    if (!masterId && initialMasterKey) {
+      const normalized = initialMasterKey.trim().toLowerCase();
+      const match = masters.find((master) => master.publicUsername?.toLowerCase() === normalized);
+      if (match) {
+        setMasterId(match.id);
+      }
+    }
+  }, [initialMasterKey, masterId, masters]);
 
   useEffect(() => {
     if (!serviceId || masters.length === 0) {
@@ -214,6 +240,15 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
       cancelled = true;
     };
   }, [masters, selectedDate, serviceId]);
+
+  useEffect(() => {
+    if (!serviceId || !masterId || masterId === ANY_MASTER_ID) return;
+    const availability = availabilityByMaster[masterId];
+    if (availability?.serviceAvailable === false) {
+      setMasterId("");
+      setMasterSelectionError(UI_TEXT.publicStudio.noMastersWithService);
+    }
+  }, [availabilityByMaster, masterId, serviceId]);
 
   useEffect(() => {
     if (!slots.length) {
@@ -358,6 +393,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialServiceId 
               ))}
             </div>
           ) : null}
+          {serviceId && masterSelectionError ? <div className="mt-2 text-xs text-amber-600">{masterSelectionError}</div> : null}
         </section>
       </div>
 
