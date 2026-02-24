@@ -27,6 +27,6 @@ test("withQuery builds stable query order", () => {
 });
 
 test("studioBookingUrl builds booking link with params", () => {
-  const url = studioBookingUrl({ id: "s1", publicUsername: "studio-1" }, { masterId: "m1", serviceId: "srv" });
-  assert.equal(url, "/u/studio-1/booking?masterId=m1&serviceId=srv");
+  const url = studioBookingUrl({ id: "s1", publicUsername: "studio-1" }, { master: "master-1", serviceId: "srv" });
+  assert.equal(url, "/u/studio-1/booking?master=master-1&serviceId=srv");
 });

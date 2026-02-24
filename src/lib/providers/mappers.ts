@@ -1,7 +1,28 @@
 import type { Provider, Service } from "@prisma/client";
 import type { ProviderCardDto, ProviderProfileDto, ProviderServiceDto } from "@/lib/providers/dto";
 
-type ProviderWithServices = Provider & { services: ProviderServiceSource[] };
+type ProviderProfileSource = Pick<
+  Provider,
+  | "id"
+  | "type"
+  | "studioId"
+  | "name"
+  | "avatarUrl"
+  | "tagline"
+  | "description"
+  | "publicUsername"
+  | "isPublished"
+  | "rating"
+  | "reviews"
+  | "priceFrom"
+  | "address"
+  | "district"
+  | "categories"
+  | "availableToday"
+  | "timezone"
+  | "geoLat"
+  | "geoLng"
+> & { services: ProviderServiceSource[] };
 type ProviderCardSource = Pick<
   Provider,
   | "id"
@@ -45,7 +66,7 @@ export function mapProviderCard(provider: ProviderCardSource): ProviderCardDto {
   };
 }
 
-export function mapProviderProfile(provider: ProviderWithServices): ProviderProfileDto {
+export function mapProviderProfile(provider: ProviderProfileSource): ProviderProfileDto {
   return {
     id: provider.id,
     type: provider.type,

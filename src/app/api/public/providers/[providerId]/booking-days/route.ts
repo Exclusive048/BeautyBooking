@@ -1,10 +1,10 @@
 import { ok, fail } from "@/lib/api/response";
-import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { findWorkingDays } from "@/lib/schedule/booking-days";
 import * as cache from "@/lib/cache/cache";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
+import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 const MAX_SCAN_DAYS = 60;
 const CACHE_TTL_SECONDS = 120;
@@ -30,8 +30,8 @@ export async function GET(
     return fail("Invalid limit", 400, "LIMIT_INVALID");
   }
 
-  const provider = await prisma.provider.findUnique({
-    where: { id: p.providerId },
+  const provider = await resolveProviderBySlugOrId({
+    key: p.providerId,
     select: { id: true, type: true, timezone: true },
   });
   if (!provider || provider.type !== "MASTER") {

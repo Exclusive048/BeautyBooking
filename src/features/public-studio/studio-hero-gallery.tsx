@@ -30,9 +30,12 @@ export function StudioHeroGallery({ studio, imageUrls, bookingHref }: Props) {
     lon: studio.geoLng ?? null,
   });
   const searchParams = useSearchParams();
+  const master = searchParams?.get("master") ?? undefined;
+  const masterId = searchParams?.get("masterId") ?? undefined;
   const bookingUrl = withQuery(bookingHref, {
     serviceId: searchParams?.get("serviceId") ?? undefined,
-    masterId: searchParams?.get("masterId") ?? undefined,
+    master: master ?? undefined,
+    masterId: master ? undefined : masterId,
     slotStartAt: searchParams?.get("slotStartAt") ?? undefined,
   });
 

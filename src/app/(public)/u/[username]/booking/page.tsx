@@ -6,6 +6,7 @@ import { resolvePublicUsername } from "@/lib/publicUsername";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { withQuery } from "@/lib/public-urls";
+import { looksLikeProviderId, resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -108,19 +109,93 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
   const { username: raw } = await Promise.resolve(params);
   const sp = (await Promise.resolve(searchParams)) ?? {};
   const username = normalizeUsername(raw);
+  const masterParam = typeof sp.master === "string" ? sp.master : undefined;
+  const legacyMasterId = typeof sp.masterId === "string" ? sp.masterId : undefined;
+  const serviceParam = typeof sp.serviceId === "string" ? sp.serviceId : undefined;
+
+  async function resolveMasterSelection(studioId: string) {
+    const key = masterParam ?? legacyMasterId;
+    if (!key) return null;
+
+    const master = await resolveProviderBySlugOrId({
+      key,
+      select: { id: true, publicUsername: true, type: true, studioId: true },
+    });
+
+    if (!master || master.type !== "MASTER" || master.studioId !== studioId) {
+      return null;
+    }
+
+    return master;
+  }
+
+  if (looksLikeProviderId(username)) {
+    const provider = await resolveProviderBySlugOrId({
+      key: username,
+      select: { id: true, publicUsername: true, isPublished: true, type: true },
+    });
+
+    if (!provider || !provider.isPublished) {
+      notFound();
+    }
+
+    if (provider.type === "MASTER") {
+      const redirectUrl = withQuery(`/u/${provider.publicUsername ?? username}`, {
+        serviceId: serviceParam,
+      });
+      permanentRedirect(redirectUrl);
+    }
+
+    const studioSlug = provider.publicUsername ?? username;
+    const master = await resolveMasterSelection(provider.id);
+    const shouldRedirectStudio = provider.publicUsername && provider.publicUsername !== username;
+    const shouldRedirectMaster =
+      (!masterParam && legacyMasterId && master?.publicUsername) ||
+      (masterParam &&
+        looksLikeProviderId(masterParam) &&
+        master?.publicUsername &&
+        master.publicUsername !== masterParam);
+
+    if (shouldRedirectStudio || shouldRedirectMaster) {
+      const rest = { ...sp };
+      delete rest.master;
+      delete rest.masterId;
+      const redirectUrl = withQuery(`/u/${studioSlug}/booking`, {
+        ...rest,
+        master: shouldRedirectMaster ? master?.publicUsername : masterParam,
+        masterId: master && !master.publicUsername ? legacyMasterId : undefined,
+      });
+      permanentRedirect(redirectUrl);
+    }
+
+    const initialMasterId = master?.id;
+    const initialServiceId = serviceParam;
+
+    return (
+      <Suspense fallback={null}>
+        <StudioBookingFlow
+          studioId={provider.id}
+          initialMasterId={initialMasterId}
+          initialServiceId={initialServiceId}
+        />
+      </Suspense>
+    );
+  }
 
   const result = await resolvePublicUsername(
     {
-      findProviderByUsernameOrAlias: async (username: string) =>
-        prisma.provider.findFirst({
-          where: {
-            OR: [
-              { publicUsername: username },
-              { publicUsernameAliases: { some: { username } } },
-            ],
-          },
+      findProviderByUsernameOrAlias: async (username: string) => {
+        const direct = await resolveProviderBySlugOrId({
+          key: username,
           select: { id: true, publicUsername: true, isPublished: true, type: true },
-        }),
+        });
+        if (direct) return direct;
+
+        return prisma.provider.findFirst({
+          where: { publicUsernameAliases: { some: { username } } },
+          select: { id: true, publicUsername: true, isPublished: true, type: true },
+        });
+      },
     },
     username
   );
@@ -131,21 +206,41 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
 
   if (result.status === "redirect") {
     const redirectUrl = withQuery(`/u/${result.username}/booking`, {
-      masterId: typeof sp.masterId === "string" ? sp.masterId : undefined,
-      serviceId: typeof sp.serviceId === "string" ? sp.serviceId : undefined,
+      master: masterParam,
+      masterId: masterParam ? undefined : legacyMasterId,
+      serviceId: serviceParam,
     });
     permanentRedirect(redirectUrl);
   }
 
   if (result.providerType === "MASTER") {
     const redirectUrl = withQuery(`/u/${username}`, {
-      serviceId: typeof sp.serviceId === "string" ? sp.serviceId : undefined,
+      serviceId: serviceParam,
     });
     permanentRedirect(redirectUrl);
   }
 
-  const initialMasterId = typeof sp.masterId === "string" ? sp.masterId : undefined;
-  const initialServiceId = typeof sp.serviceId === "string" ? sp.serviceId : undefined;
+  const master = await resolveMasterSelection(result.providerId);
+  const shouldRedirectMaster =
+    (!masterParam && legacyMasterId && master?.publicUsername) ||
+    (masterParam &&
+      looksLikeProviderId(masterParam) &&
+      master?.publicUsername &&
+      master.publicUsername !== masterParam);
+
+  if (shouldRedirectMaster) {
+    const rest = { ...sp };
+    delete rest.master;
+    delete rest.masterId;
+    const redirectUrl = withQuery(`/u/${username}/booking`, {
+      ...rest,
+      master: master?.publicUsername,
+    });
+    permanentRedirect(redirectUrl);
+  }
+
+  const initialMasterId = master?.id;
+  const initialServiceId = serviceParam;
 
   return (
     <Suspense fallback={null}>

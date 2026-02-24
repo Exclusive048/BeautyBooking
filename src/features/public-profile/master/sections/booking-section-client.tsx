@@ -11,17 +11,24 @@ import { studioBookingUrl } from "@/lib/public-urls";
 type Props = {
   provider: ProviderProfileDto;
   initialSlotStartAt: string | null;
+  studioPublicUsername: string | null;
 };
 
-export function BookingSectionClient({ provider, initialSlotStartAt }: Props) {
+export function BookingSectionClient({ provider, initialSlotStartAt, studioPublicUsername }: Props) {
   const { selectedServices, removeService } = useSelectedServices();
+
+  const masterKey = provider.publicUsername?.trim() || "";
+  if (!masterKey) {
+    console.warn("Missing master publicUsername for studio booking link.", { masterId: provider.id });
+  }
 
   const studioBookingHref =
     provider.type === "MASTER" && provider.studioId
       ? studioBookingUrl(
-          { id: provider.studioId, publicUsername: null },
+          { id: provider.studioId, publicUsername: studioPublicUsername },
           {
-            masterId: provider.id,
+            master: masterKey || undefined,
+            masterId: masterKey ? undefined : provider.id,
             serviceId: selectedServices[0]?.id,
           },
           "master-studio-booking"

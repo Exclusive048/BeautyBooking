@@ -112,7 +112,11 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
             { id: master.id, publicUsername: master.publicUsername },
             "studio-masters-carousel"
           );
-          const bookingHref = studioBookingUrl(studio, { masterId: master.id }, "studio-masters-carousel");
+          const bookingHref = studioBookingUrl(
+            studio,
+            master.publicUsername ? { master: master.publicUsername } : { masterId: master.id },
+            "studio-masters-carousel"
+          );
 
           return (
             <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
