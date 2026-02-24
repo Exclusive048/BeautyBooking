@@ -790,6 +790,7 @@ model Provider {
   bufferBetweenBookingsMin Int          @default(0)
 
   autoConfirmBookings      Boolean      @default(false)
+  cancellationDeadlineHours Int?
 
 
 

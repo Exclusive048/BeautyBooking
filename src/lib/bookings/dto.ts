@@ -36,6 +36,7 @@ export type BookingClientProviderDto = {
   type: ProviderType;
   publicUsername: string | null;
   avatarUrl: string | null;
+  cancellationDeadlineHours: number | null;
 };
 
 export type BookingClientDto = Omit<BookingDto, "service"> & {

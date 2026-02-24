@@ -59,14 +59,25 @@ function minutesUntilStart(booking: BookingItem): number | null {
   return Math.floor(diffMs / 60000);
 }
 
-function canManageByClient(booking: BookingItem): boolean {
-  // AUDIT (доступность кнопок клиента):
-  // - реализовано: кнопки отмены/переноса только для PENDING/CONFIRMED.
-  // - реализовано: проверка >= 60 минут до старта.
-  // - реализовано частично: исторические записи с startAtUtc=null остаются управляемыми до миграции данных.
+function canRescheduleByClient(booking: BookingItem): boolean {
   if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
   const minutesLeft = minutesUntilStart(booking);
   return minutesLeft === null || minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
+}
+
+function canCancelByClient(booking: BookingItem): boolean {
+  if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
+  const minutesLeft = minutesUntilStart(booking);
+  if (minutesLeft !== null && minutesLeft < BOOKING_ACTION_WINDOW_MINUTES) return false;
+
+  const deadlineHours = booking.provider.cancellationDeadlineHours;
+  if (deadlineHours === null || deadlineHours === undefined) return true;
+  if (deadlineHours <= 0) return false;
+  if (!booking.startAtUtc) return true;
+  const startMs = new Date(booking.startAtUtc).getTime();
+  if (!Number.isFinite(startMs)) return true;
+  const deadlineMs = startMs - deadlineHours * 60 * 60 * 1000;
+  return Date.now() <= deadlineMs;
 }
 
 function buildRebookUrl(booking: BookingItem): string | null {
@@ -112,6 +123,18 @@ export function BookingDetailDrawer({
   const [mounted, setMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const canReschedule = useMemo(() => canRescheduleByClient(booking), [booking]);
+  const canCancel = useMemo(() => canCancelByClient(booking), [booking]);
+  const cancellationDeadlineLabel = useMemo(() => {
+    const deadlineHours = booking.provider.cancellationDeadlineHours;
+    if (deadlineHours === null || deadlineHours === undefined) return null;
+    if (deadlineHours <= 0) return "Отмена запрещена";
+    if (!booking.startAtUtc) return null;
+    const startMs = new Date(booking.startAtUtc).getTime();
+    if (!Number.isFinite(startMs)) return null;
+    const deadlineIso = new Date(startMs - deadlineHours * 60 * 60 * 1000).toISOString();
+    return `Отмена возможна до ${UI_FMT.dateTimeLong(deadlineIso, { timeZone: viewerTimeZone })}`;
+  }, [booking.provider.cancellationDeadlineHours, booking.startAtUtc, viewerTimeZone]);
 
   useEffect(() => {
     setMounted(true);
@@ -139,7 +162,7 @@ export function BookingDetailDrawer({
   const addressLine = [booking.provider.address, booking.provider.district].filter(Boolean).join(" / ");
   const waitsClientDecision =
     booking.status === "CHANGE_REQUESTED" && booking.actionRequiredBy === "CLIENT";
-  const canManage = canManageByClient(booking);
+  const canManage = canReschedule || canCancel;
   const isBusy = actionId === booking.id || busyAction !== null;
   const reviewId = reviewState?.reviewId ?? null;
 
@@ -235,6 +258,12 @@ export function BookingDetailDrawer({
             </section>
           ) : null}
 
+          {cancellationDeadlineLabel ? (
+            <section className="rounded-2xl border border-border-subtle bg-bg-input/40 p-4 text-xs text-text-sec">
+              {cancellationDeadlineLabel}
+            </section>
+          ) : null}
+
           {booking.status === "FINISHED" && rebookUrl ? (
             <Button asChild size="lg" className="w-full">
               <Link href={rebookUrl}>Записаться снова</Link>
@@ -244,36 +273,40 @@ export function BookingDetailDrawer({
           <section className="space-y-3">
             {canManage ? (
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() => onReschedule(booking)}
-                  disabled={isBusy}
-                  variant="secondary"
-                  size="sm"
-                >
-                  {t.bookingsPanel.reschedule}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    setBusyAction("cancel");
-                    try {
-                      await onCancel(booking.id);
-                      await onActionSuccess();
-                      onClose();
-                    } catch {
-                      // errors handled in parent
-                    } finally {
-                      setBusyAction(null);
-                    }
-                  }}
-                  disabled={isBusy}
-                  variant="danger"
-                  size="sm"
-                >
-                  {busyAction === "cancel" ? <ActionSpinner /> : null}
-                  {t.bookingsPanel.cancelBooking}
-                </Button>
+                {canReschedule ? (
+                  <Button
+                    type="button"
+                    onClick={() => onReschedule(booking)}
+                    disabled={isBusy}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    {t.bookingsPanel.reschedule}
+                  </Button>
+                ) : null}
+                {canCancel ? (
+                  <Button
+                    type="button"
+                    onClick={async () => {
+                      setBusyAction("cancel");
+                      try {
+                        await onCancel(booking.id);
+                        await onActionSuccess();
+                        onClose();
+                      } catch {
+                        // errors handled in parent
+                      } finally {
+                        setBusyAction(null);
+                      }
+                    }}
+                    disabled={isBusy}
+                    variant="danger"
+                    size="sm"
+                  >
+                    {busyAction === "cancel" ? <ActionSpinner /> : null}
+                    {t.bookingsPanel.cancelBooking}
+                  </Button>
+                ) : null}
               </div>
             ) : null}
 

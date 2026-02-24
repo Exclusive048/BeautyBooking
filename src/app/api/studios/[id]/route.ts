@@ -27,6 +27,7 @@ const updateSchema = z
     isPublished: z.boolean().optional(),
     timezone: z.string().trim().optional(),
     bannerAssetId: z.string().trim().nullable().optional(),
+    cancellationDeadlineHours: z.number().int().min(0).max(168).nullable().optional(),
   })
   .refine(
     (data) =>
@@ -43,7 +44,8 @@ const updateSchema = z
       data.geoLng !== undefined ||
       data.isPublished !== undefined ||
       data.timezone !== undefined ||
-      data.bannerAssetId !== undefined,
+      data.bannerAssetId !== undefined ||
+      data.cancellationDeadlineHours !== undefined,
     { message: "At least one field is required" }
   );
 

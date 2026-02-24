@@ -82,6 +82,30 @@ export function ensureBookingActionWindow(startAtUtc: Date | null, now: Date = n
   }
 }
 
+export function ensureCancellationDeadline(
+  startAtUtc: Date | null,
+  deadlineHours: number | null | undefined,
+  now: Date = new Date()
+): void {
+  if (deadlineHours === null || deadlineHours === undefined) return;
+  if (!startAtUtc) {
+    throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
+  }
+  const startMs = startAtUtc.getTime();
+  if (!Number.isFinite(startMs)) {
+    throw new AppError("Booking time is invalid", 409, "BOOKING_TIME_REQUIRED");
+  }
+
+  if (deadlineHours <= 0) {
+    throw new AppError("Отмена записи запрещена", 423, "CANCELLATION_DEADLINE_PASSED");
+  }
+
+  const deadlineMs = startMs - deadlineHours * 60 * 60 * 1000;
+  if (now.getTime() > deadlineMs) {
+    throw new AppError("Срок отмены записи истёк", 423, "CANCELLATION_DEADLINE_PASSED");
+  }
+}
+
 export function canCancelOrReschedule(status: BookingStatus): boolean {
   const normalized = normalizeBookingStatus(status);
   return normalized === "PENDING" || normalized === "CONFIRMED";

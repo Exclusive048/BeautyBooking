@@ -29,6 +29,7 @@ type StudioProfileData = {
     isPublished: boolean;
     bannerAssetId: string | null;
     bannerUrl: string | null;
+    cancellationDeadlineHours: number | null;
   };
 };
 
@@ -51,6 +52,8 @@ export function StudioProfilePage({ providerId }: Props) {
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [isPublished, setIsPublished] = useState(false);
+  const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
+  const [cancellationDeadlineInput, setCancellationDeadlineInput] = useState("");
 
   const [telegram, setTelegram] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -107,6 +110,9 @@ export function StudioProfilePage({ providerId }: Props) {
       setContactEmail(studio.contactEmail ?? "");
       setIsPublished(studio.isPublished);
       setBannerUrl(studio.bannerUrl);
+      const deadlineValue = studio.cancellationDeadlineHours ?? null;
+      setCancellationDeadlineHours(deadlineValue);
+      setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
@@ -149,6 +155,17 @@ export function StudioProfilePage({ providerId }: Props) {
         contactEmail: contactEmail.trim() || null,
         isPublished,
       };
+
+      const trimmedDeadline = cancellationDeadlineInput.trim();
+      if (!trimmedDeadline) {
+        payload.cancellationDeadlineHours = null;
+      } else {
+        const parsedDeadline = Number(trimmedDeadline);
+        if (!Number.isFinite(parsedDeadline) || parsedDeadline < 0 || parsedDeadline > 168) {
+          throw new Error("Укажите значение от 0 до 168.");
+        }
+        payload.cancellationDeadlineHours = Math.floor(parsedDeadline);
+      }
 
       if (!trimmedAddress) {
         payload.address = "";
@@ -293,6 +310,29 @@ export function StudioProfilePage({ providerId }: Props) {
             />
             Опубликовать профиль
           </label>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-bg-card/90 p-4">
+        <h3 className="text-sm font-semibold">Политика отмены</h3>
+        <p className="mt-1 text-xs text-text-sec">
+          Клиент может отменить запись не позднее указанного срока. Пустое значение — без ограничений, 0 — отмена запрещена.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <input
+            type="number"
+            min={0}
+            max={168}
+            inputMode="numeric"
+            value={cancellationDeadlineInput}
+            onChange={(event) => setCancellationDeadlineInput(event.target.value)}
+            placeholder="Например, 24"
+            className="h-10 w-[180px] rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <div className="text-xs text-text-sec">
+            Текущее значение:{" "}
+            {cancellationDeadlineHours === null ? "Без ограничений" : `${cancellationDeadlineHours} ч.`}
+          </div>
         </div>
       </div>
 

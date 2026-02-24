@@ -29,6 +29,7 @@ export function getErrorMessageByCode(code?: ErrorCode): string | null {
     BOOKING_CONFLICT: "This time slot is no longer available.",
     SLOT_CONFLICT: "This time slot is no longer available.",
     SERVICE_DISABLED: "Selected service is not available.",
+    CANCELLATION_DEADLINE_PASSED: "Отмена недоступна: срок отмены истёк.",
   };
   return map[code] ?? null;
 }

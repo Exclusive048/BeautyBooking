@@ -21,6 +21,7 @@ export type StudioProviderPrivateDto = {
   bufferBetweenBookingsMin: number;
   bannerAssetId: string | null;
   bannerUrl: string | null;
+  cancellationDeadlineHours: number | null;
 };
 
 export async function getStudioProviderById(
@@ -46,6 +47,7 @@ export async function getStudioProviderById(
       isPublished: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
+      cancellationDeadlineHours: true,
     },
   });
 
@@ -75,6 +77,7 @@ export async function getStudioProviderById(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
   };
 }
 
@@ -93,6 +96,7 @@ export type StudioProfileUpdate = {
   isPublished?: boolean;
   timezone?: string;
   bannerAssetId?: string | null;
+  cancellationDeadlineHours?: number | null;
 };
 
 export async function updateStudioProviderProfile(
@@ -115,6 +119,9 @@ export async function updateStudioProviderProfile(
       ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
       ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
       ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+      ...(input.cancellationDeadlineHours !== undefined
+        ? { cancellationDeadlineHours: input.cancellationDeadlineHours }
+        : {}),
     },
     select: {
       id: true,
@@ -134,6 +141,7 @@ export async function updateStudioProviderProfile(
       isPublished: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
+      cancellationDeadlineHours: true,
     },
   });
 
@@ -167,5 +175,6 @@ export async function updateStudioProviderProfile(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
   };
 }

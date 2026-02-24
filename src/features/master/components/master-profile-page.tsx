@@ -231,6 +231,9 @@ export function MasterProfilePage() {
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
   const [autoConfirmSaving, setAutoConfirmSaving] = useState(false);
+  const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
+  const [cancellationDeadlineInput, setCancellationDeadlineInput] = useState("");
+  const [cancellationDeadlineSaving, setCancellationDeadlineSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>("main");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
@@ -464,6 +467,8 @@ export function MasterProfilePage() {
   useEffect(() => {
     if (!data?.master.isSolo) {
       setAutoConfirmBookings(null);
+      setCancellationDeadlineHours(null);
+      setCancellationDeadlineInput("");
       return;
     }
 
@@ -476,15 +481,20 @@ export function MasterProfilePage() {
           signal: controller.signal,
         });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ autoConfirmBookings: boolean }>
+          | ApiResponse<{ autoConfirmBookings: boolean; cancellationDeadlineHours: number | null }>
           | null;
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
         setAutoConfirmBookings(json.data.autoConfirmBookings);
+        const deadlineValue = json.data.cancellationDeadlineHours ?? null;
+        setCancellationDeadlineHours(deadlineValue);
+        setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setAutoConfirmBookings(null);
+        setCancellationDeadlineHours(null);
+        setCancellationDeadlineInput("");
       } finally {
         if (!controller.signal.aborted) {
           setAutoConfirmLoading(false);
@@ -792,7 +802,7 @@ export function MasterProfilePage() {
         body: JSON.stringify({ autoConfirmBookings: nextValue }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ autoConfirmBookings: boolean }>
+        | ApiResponse<{ autoConfirmBookings: boolean; cancellationDeadlineHours: number | null }>
         | ApiErrorShape
         | null;
       if (!res.ok || !json || !json.ok) {
@@ -804,10 +814,58 @@ export function MasterProfilePage() {
         );
       }
       setAutoConfirmBookings(json.data.autoConfirmBookings);
+      const deadlineValue = json.data.cancellationDeadlineHours ?? null;
+      setCancellationDeadlineHours(deadlineValue);
+      setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось обновить настройки");
     } finally {
       setAutoConfirmSaving(false);
+    }
+  };
+
+  const saveCancellationDeadline = async (): Promise<void> => {
+    if (!data?.master.isSolo) return;
+    setCancellationDeadlineSaving(true);
+    setError(null);
+    try {
+      const trimmed = cancellationDeadlineInput.trim();
+      let value: number | null;
+      if (!trimmed) {
+        value = null;
+      } else {
+        const parsed = Number(trimmed);
+        if (!Number.isFinite(parsed) || parsed < 0 || parsed > 168) {
+          throw new Error("Укажите значение от 0 до 168.");
+        }
+        value = Math.floor(parsed);
+      }
+
+      const res = await fetch("/api/providers/me/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancellationDeadlineHours: value }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ autoConfirmBookings: boolean; cancellationDeadlineHours: number | null }>
+        | ApiErrorShape
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(
+          extractApiErrorMessage(
+            json && !json.ok ? json : null,
+            `API error: ${res.status}`
+          )
+        );
+      }
+      setAutoConfirmBookings(json.data.autoConfirmBookings);
+      const deadlineValue = json.data.cancellationDeadlineHours ?? null;
+      setCancellationDeadlineHours(deadlineValue);
+      setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обновить срок отмены");
+    } finally {
+      setCancellationDeadlineSaving(false);
     }
   };
 
@@ -1578,6 +1636,45 @@ export function MasterProfilePage() {
                           />
                           {autoConfirmLoading ? "Загрузка..." : autoConfirmBookings ? "Включено" : "Выключено"}
                         </label>
+                      </div>
+                    </div>
+                  </div>
+                  ) : null}
+
+                {data.master.isSolo ? (
+                  <div className="rounded-2xl bg-bg-card/90 p-4">
+                    <h4 className="text-sm font-semibold">Политика отмены</h4>
+                    <p className="mt-1 text-xs text-text-sec">
+                      Клиент может отменить запись не позднее указанного срока. Пустое значение — без ограничений, 0 — отмена запрещена.
+                    </p>
+                    <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
+                      <label className="block text-xs text-text-sec">Срок отмены (часы)</label>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <input
+                          type="number"
+                          min={0}
+                          max={168}
+                          inputMode="numeric"
+                          value={cancellationDeadlineInput}
+                          onChange={(event) => setCancellationDeadlineInput(event.target.value)}
+                          disabled={autoConfirmLoading || cancellationDeadlineSaving}
+                          placeholder="Например, 24"
+                          className="h-10 w-[160px] rounded-xl border border-border-subtle bg-bg-card px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void saveCancellationDeadline()}
+                          disabled={autoConfirmLoading || cancellationDeadlineSaving}
+                          className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+                        >
+                          {cancellationDeadlineSaving ? "Сохраняем..." : "Сохранить"}
+                        </button>
+                      </div>
+                      <div className="mt-2 text-xs text-text-sec">
+                        Текущее значение:{" "}
+                        {cancellationDeadlineHours === null
+                          ? "Без ограничений"
+                          : `${cancellationDeadlineHours} ч.`}
                       </div>
                     </div>
                   </div>
