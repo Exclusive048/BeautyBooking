@@ -110,9 +110,9 @@ export function BottomNav() {
   const items = useMemo<NavItem[]>(() => {
     if (!account || account.type === "GUEST") return NAV_ITEMS_GUEST;
     if (account.type === "CLIENT") return NAV_ITEMS_CLIENT;
-    if (account.type === "MASTER_SOLO" || account.type === "MASTER_IN_STUDIO") return NAV_ITEMS_MASTER;
-    if (account.type === "STUDIO_ADMIN") return NAV_ITEMS_STUDIO;
-    if (account.type === "PLATFORM_ADMIN") return NAV_ITEMS_ADMIN;
+    if (account.type === "MASTER") return NAV_ITEMS_MASTER;
+    if (account.type === "STUDIO") return NAV_ITEMS_STUDIO;
+    if (account.type === "ADMIN") return NAV_ITEMS_ADMIN;
     return NAV_ITEMS_GUEST;
   }, [account]);
 
