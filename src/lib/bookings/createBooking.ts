@@ -25,6 +25,8 @@ import {
   type NotificationRecord,
 } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { logError } from "@/lib/logging/logger";
 
 export async function createBooking(input: {
   providerId: string;
@@ -229,6 +231,17 @@ export async function createBooking(input: {
     await sendBookingTelegramNotifications(created.id, "CREATED", { notifyClientOnCreate: true });
   } catch (error) {
     console.error("Не удалось отправить Telegram-уведомления о записи:", error);
+  }
+
+  if (shouldAutoConfirm) {
+    try {
+      await scheduleBookingReminders(created.id);
+    } catch (error) {
+      logError("Failed to schedule booking reminders", {
+        bookingId: created.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   await invalidateSlotsForBookingRange({

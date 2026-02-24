@@ -6,12 +6,17 @@ import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { resolveProviderForHotSlots } from "@/lib/hot-slots/service";
+import { notifyHotSlotSubscribers } from "@/lib/hot-slots/notifications";
 
 type HotSlotsJobStats = {
   processed: number;
   skipped: number;
   activated: number;
 };
+
+function slotKey(startAtUtc: Date, endAtUtc: Date): string {
+  return `${startAtUtc.toISOString()}::${endAtUtc.toISOString()}`;
+}
 
 function resolveWindow(now: Date, timeZone: string, triggerHours: number) {
   if (triggerHours === 0) {
@@ -71,12 +76,6 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
         eligible = services.filter((service) => service.price >= minPrice);
       }
 
-      await prisma.hotSlot.updateMany({
-        where: { providerId: provider.id },
-        data: { isActive: false },
-      });
-      await invalidateSlotsForMaster(provider.id);
-
       if (eligible.length === 0) {
         stats.skipped += 1;
         continue;
@@ -89,6 +88,23 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
       }
 
       const window = resolveWindow(now, provider.timezone, rule.triggerHours);
+      const existingActive = await prisma.hotSlot.findMany({
+        where: {
+          providerId: provider.id,
+          isActive: true,
+          startAtUtc: { gte: window.windowStart, lte: window.windowEnd },
+        },
+        select: { startAtUtc: true, endAtUtc: true },
+      });
+      const existingKeys = new Set(
+        existingActive.map((slot) => slotKey(slot.startAtUtc, slot.endAtUtc))
+      );
+
+      await prisma.hotSlot.updateMany({
+        where: { providerId: provider.id },
+        data: { isActive: false },
+      });
+      await invalidateSlotsForMaster(provider.id);
       const days = Math.max(1, Math.min(14, diffDateKeys(window.fromKey, window.toKeyExclusive)));
 
       const slotsResult = await listAvailabilitySlotsPaginated(provider.id, anchor.id, anchor.durationMin, {
@@ -116,6 +132,9 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
         (rule.applyMode === "MANUAL" && rule.serviceIds.length === 1) ||
         (rule.applyMode === "PRICE_FROM" && eligible.length === 1);
       const hotServiceId = shouldAttachService ? eligible[0]?.id ?? null : null;
+      const hotServiceTitle = hotServiceId
+        ? eligible.find((service) => service.id === hotServiceId)?.title ?? null
+        : null;
 
       const reasonBase =
         rule.applyMode === "ALL_SERVICES"
@@ -160,6 +179,22 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
 
       if (ops.length > 0) {
         await prisma.$transaction(ops);
+      }
+
+      const newSlots = visibleSlots.filter(
+        (slot) => !existingKeys.has(slotKey(slot.startAtUtc, slot.endAtUtc))
+      );
+      if (newSlots.length > 0) {
+        await notifyHotSlotSubscribers({
+          providerId: provider.id,
+          providerName: provider.name,
+          providerPublicUsername: provider.publicUsername ?? null,
+          timezone: provider.timezone,
+          discountType: rule.discountType,
+          discountValue: rule.discountValue,
+          serviceTitle: hotServiceTitle,
+          slots: newSlots.map((slot) => ({ startAtUtc: slot.startAtUtc })),
+        });
       }
 
       stats.processed += 1;

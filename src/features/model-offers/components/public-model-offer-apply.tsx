@@ -52,12 +52,16 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
 
   async function uploadAssets(): Promise<string[]> {
     const mediaIds: string[] = [];
+    const currentUserId = userId;
+    if (!currentUserId) {
+      throw new Error("USER_REQUIRED");
+    }
 
     for (const file of files) {
       const formData = new FormData();
       formData.set("file", file);
       formData.set("entityType", "USER");
-      formData.set("entityId", userId);
+      formData.set("entityId", currentUserId);
       formData.set("kind", "MODEL_APPLICATION_PHOTO");
 
       const data = await fetchJson<UploadResponse>("/api/media", {

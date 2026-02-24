@@ -9,6 +9,8 @@ import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTel
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
+import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { logError } from "@/lib/logging/logger";
 
 function shiftMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60 * 1000);
@@ -166,6 +168,8 @@ export async function confirmBooking(
               startAt: startAtUtc,
               endAt: endAtUtc,
               slotLabel: startAtUtc.toISOString(),
+              reminder24hSentAt: null,
+              reminder2hSentAt: null,
             }
           : {}),
       },
@@ -196,6 +200,15 @@ export async function confirmBooking(
     await sendBookingTelegramNotifications(updated.id, "CONFIRMED", { notifyMasterOnConfirm: false });
   } catch (error) {
     console.error("Failed to send Telegram booking notifications:", error);
+  }
+
+  try {
+    await scheduleBookingReminders(updated.id);
+  } catch (error) {
+    logError("Failed to schedule booking reminders", {
+      bookingId: updated.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   if (appliesRequestedChange) {

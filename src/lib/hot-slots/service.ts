@@ -16,6 +16,8 @@ type ProviderForHotSlots = {
   studioId: string | null;
   timezone: string;
   priceFrom: number;
+  name: string;
+  publicUsername: string | null;
 };
 
 const DEFAULT_RULE = {
@@ -31,7 +33,15 @@ const DEFAULT_RULE = {
 async function loadProvider(providerId: string): Promise<ProviderForHotSlots> {
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
-    select: { id: true, type: true, studioId: true, timezone: true, priceFrom: true },
+    select: {
+      id: true,
+      type: true,
+      studioId: true,
+      timezone: true,
+      priceFrom: true,
+      name: true,
+      publicUsername: true,
+    },
   });
   if (!provider) {
     throw new AppError("Провайдер не найден.", 404, "PROVIDER_NOT_FOUND");

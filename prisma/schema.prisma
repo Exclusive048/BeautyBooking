@@ -240,6 +240,10 @@ enum NotificationType {
 
   BOOKING_DECLINED
 
+  BOOKING_REMINDER_24H
+
+  BOOKING_REMINDER_2H
+
   MODEL_NEW_APPLICATION
 
   MODEL_APPLICATION_REJECTED
@@ -247,6 +251,8 @@ enum NotificationType {
   MODEL_TIME_PROPOSED
 
   MODEL_BOOKING_CREATED
+
+  HOT_SLOT_AVAILABLE
 
   BILLING_PAYMENT_SUCCEEDED
 
@@ -471,6 +477,7 @@ model UserProfile {
   createdCategories  GlobalCategory[] @relation("GlobalCategoryCreator")
 
   subscriptions      UserSubscription[]
+  hotSlotSubscriptions HotSlotSubscription[]
 
 
 
@@ -791,6 +798,7 @@ model Provider {
 
   autoConfirmBookings      Boolean      @default(false)
   cancellationDeadlineHours Int?
+  remindersEnabled Boolean @default(true)
 
 
 
@@ -859,6 +867,7 @@ model Provider {
   discountRule DiscountRule?
 
   hotSlots      HotSlot[]
+  hotSlotSubscriptions HotSlotSubscription[]
 
 
 
@@ -1166,6 +1175,23 @@ model HotSlot {
 
 }
 
+model HotSlotSubscription {
+
+  id         String   @id @default(cuid())
+
+  userId     String
+  providerId String
+
+  user     UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider Provider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, providerId])
+  @@index([providerId])
+  @@index([userId])
+}
+
 
 
 model Booking {
@@ -1259,6 +1285,9 @@ model Booking {
   clientChangeRequestsCount Int                      @default(0)
 
   masterChangeRequestsCount Int                      @default(0)
+
+  reminder24hSentAt DateTime?
+  reminder2hSentAt  DateTime?
 
 
 

@@ -8,6 +8,8 @@ import {
   type NotificationRecord,
 } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { logError } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
 import { ProviderType, Prisma } from "@prisma/client";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
@@ -231,6 +233,17 @@ export async function createClientBooking(
     await sendBookingTelegramNotifications(booking.id, "CREATED", { notifyClientOnCreate: true });
   } catch (error) {
     console.error("Не удалось отправить Telegram-уведомления о записи:", error);
+  }
+
+  if (shouldAutoConfirm) {
+    try {
+      await scheduleBookingReminders(booking.id);
+    } catch (error) {
+      logError("Failed to schedule booking reminders", {
+        bookingId: booking.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   await invalidateSlotsForBookingRange({

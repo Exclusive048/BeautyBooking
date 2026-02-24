@@ -6,6 +6,7 @@ import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
 
 type Props = {
   provider: ProviderProfileDto;
@@ -52,6 +53,10 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
         <div className="pointer-events-none absolute -right-12 top-8 h-56 w-56 rounded-full bg-primary-magenta/18 blur-3xl" />
 
         <div className="absolute right-4 top-4 flex items-center gap-2">
+          <HotSlotsSubscribeButton
+            providerId={provider.id}
+            enabled={provider.type === "MASTER" && provider.hotSlotsEnabled}
+          />
           <button
             type="button"
             onClick={onShare}

@@ -231,6 +231,8 @@ export function MasterProfilePage() {
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
   const [autoConfirmSaving, setAutoConfirmSaving] = useState(false);
+  const [remindersEnabled, setRemindersEnabled] = useState<boolean | null>(null);
+  const [remindersSaving, setRemindersSaving] = useState(false);
   const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
   const [cancellationDeadlineInput, setCancellationDeadlineInput] = useState("");
   const [cancellationDeadlineSaving, setCancellationDeadlineSaving] = useState(false);
@@ -467,6 +469,7 @@ export function MasterProfilePage() {
   useEffect(() => {
     if (!data?.master.isSolo) {
       setAutoConfirmBookings(null);
+      setRemindersEnabled(null);
       setCancellationDeadlineHours(null);
       setCancellationDeadlineInput("");
       return;
@@ -481,18 +484,24 @@ export function MasterProfilePage() {
           signal: controller.signal,
         });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ autoConfirmBookings: boolean; cancellationDeadlineHours: number | null }>
+          | ApiResponse<{
+              autoConfirmBookings: boolean;
+              cancellationDeadlineHours: number | null;
+              remindersEnabled: boolean;
+            }>
           | null;
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
         setAutoConfirmBookings(json.data.autoConfirmBookings);
+        setRemindersEnabled(json.data.remindersEnabled);
         const deadlineValue = json.data.cancellationDeadlineHours ?? null;
         setCancellationDeadlineHours(deadlineValue);
         setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setAutoConfirmBookings(null);
+        setRemindersEnabled(null);
         setCancellationDeadlineHours(null);
         setCancellationDeadlineInput("");
       } finally {
@@ -802,7 +811,11 @@ export function MasterProfilePage() {
         body: JSON.stringify({ autoConfirmBookings: nextValue }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ autoConfirmBookings: boolean; cancellationDeadlineHours: number | null }>
+        | ApiResponse<{
+            autoConfirmBookings: boolean;
+            cancellationDeadlineHours: number | null;
+            remindersEnabled: boolean;
+          }>
         | ApiErrorShape
         | null;
       if (!res.ok || !json || !json.ok) {
@@ -814,6 +827,7 @@ export function MasterProfilePage() {
         );
       }
       setAutoConfirmBookings(json.data.autoConfirmBookings);
+      setRemindersEnabled(json.data.remindersEnabled);
       const deadlineValue = json.data.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
@@ -821,6 +835,44 @@ export function MasterProfilePage() {
       setError(err instanceof Error ? err.message : "Не удалось обновить настройки");
     } finally {
       setAutoConfirmSaving(false);
+    }
+  };
+
+  const updateRemindersEnabled = async (nextValue: boolean): Promise<void> => {
+    if (!data?.master.isSolo) return;
+    setRemindersSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/providers/me/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ remindersEnabled: nextValue }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{
+            autoConfirmBookings: boolean;
+            cancellationDeadlineHours: number | null;
+            remindersEnabled: boolean;
+          }>
+        | ApiErrorShape
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(
+          extractApiErrorMessage(
+            json && !json.ok ? json : null,
+            `API error: ${res.status}`
+          )
+        );
+      }
+      setAutoConfirmBookings(json.data.autoConfirmBookings);
+      setRemindersEnabled(json.data.remindersEnabled);
+      const deadlineValue = json.data.cancellationDeadlineHours ?? null;
+      setCancellationDeadlineHours(deadlineValue);
+      setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обновить напоминания");
+    } finally {
+      setRemindersSaving(false);
     }
   };
 
@@ -847,7 +899,11 @@ export function MasterProfilePage() {
         body: JSON.stringify({ cancellationDeadlineHours: value }),
       });
       const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ autoConfirmBookings: boolean; cancellationDeadlineHours: number | null }>
+        | ApiResponse<{
+            autoConfirmBookings: boolean;
+            cancellationDeadlineHours: number | null;
+            remindersEnabled: boolean;
+          }>
         | ApiErrorShape
         | null;
       if (!res.ok || !json || !json.ok) {
@@ -859,6 +915,7 @@ export function MasterProfilePage() {
         );
       }
       setAutoConfirmBookings(json.data.autoConfirmBookings);
+      setRemindersEnabled(json.data.remindersEnabled);
       const deadlineValue = json.data.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
@@ -1635,6 +1692,38 @@ export function MasterProfilePage() {
                             onChange={(event) => void updateAutoConfirm(event.target.checked)}
                           />
                           {autoConfirmLoading ? "Загрузка..." : autoConfirmBookings ? "Включено" : "Выключено"}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  ) : null}
+
+                {data.master.isSolo ? (
+                  <div className="rounded-2xl bg-bg-card/90 p-4">
+                    <h4 className="text-sm font-semibold">РќР°РїРѕРјРёРЅР°РЅРёСЏ</h4>
+                    <p className="mt-1 text-xs text-text-sec">
+                      РћС‚РїСЂР°РІР»СЏС‚СЊ РєР»РёРµРЅС‚Сѓ Рё РјР°СЃС‚РµСЂСѓ РЅР°РїРѕРјРёРЅР°РЅРёСЏ Рѕ Р·Р°РїРёСЃРё.
+                    </p>
+                    <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium">РќР°РїРѕРјРёРЅР°РЅРёСЏ Рѕ Р·Р°РїРёСЃРё</div>
+                          <div className="mt-1 text-xs text-text-sec">
+                            РњРѕР¶РЅРѕ РѕС‚РєР»СЋС‡РёС‚СЊ, РµСЃР»Рё РЅРµ РЅСѓР¶РЅС‹ СѓРІРµРґРѕРјР»РµРЅРёСЏ Р·Р° 24 С‡Р°СЃР° Рё 2 С‡Р°СЃР°.
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={remindersEnabled ?? false}
+                            disabled={autoConfirmLoading || remindersSaving}
+                            onChange={(event) => void updateRemindersEnabled(event.target.checked)}
+                          />
+                          {remindersSaving
+                            ? "РЎРѕС…СЂР°РЅСЏРµРј..."
+                            : remindersEnabled
+                              ? "Р’РєР»СЋС‡РµРЅРѕ"
+                              : "Р’С‹РєР»СЋС‡РµРЅРѕ"}
                         </label>
                       </div>
                     </div>

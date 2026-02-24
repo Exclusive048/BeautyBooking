@@ -35,6 +35,7 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       availableToday: true,
       timezone: true,
       cancellationDeadlineHours: true,
+      discountRule: { select: { isEnabled: true } },
       geoLat: true,
       geoLng: true,
       services: {
@@ -54,6 +55,7 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
   }
 
   const profile = mapProviderProfile(provider);
+  profile.hotSlotsEnabled = provider.discountRule?.isEnabled ?? false;
   if (provider.type === ProviderType.STUDIO) {
     profile.bannerUrl = await getStudioBannerUrl(provider.id);
     return profile;

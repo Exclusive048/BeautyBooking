@@ -67,3 +67,9 @@ export const hotSlotRuleSchema = z
   });
 
 export type HotSlotRuleInput = z.infer<typeof hotSlotRuleSchema>;
+
+export const hotSlotSubscriptionSchema = z.object({
+  providerId: z.string().trim().min(1),
+});
+
+export type HotSlotSubscriptionInput = z.infer<typeof hotSlotSubscriptionSchema>;
