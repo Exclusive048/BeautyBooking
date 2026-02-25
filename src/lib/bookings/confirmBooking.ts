@@ -186,7 +186,9 @@ export async function confirmBooking(
         db: tx,
       });
     } catch (error) {
-      console.error("Failed to create booking notifications:", error);
+      logError("Failed to create booking notifications", {
+        error: error instanceof Error ? error.stack : String(error),
+      });
     }
 
     return { updated, notifications };
@@ -199,7 +201,9 @@ export async function confirmBooking(
   try {
     await sendBookingTelegramNotifications(updated.id, "CONFIRMED", { notifyMasterOnConfirm: false });
   } catch (error) {
-    console.error("Failed to send Telegram booking notifications:", error);
+    logError("Failed to send Telegram booking notifications", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   try {

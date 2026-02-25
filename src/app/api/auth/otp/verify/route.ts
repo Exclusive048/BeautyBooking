@@ -114,7 +114,10 @@ export async function POST(req: Request) {
       skipDuplicates: true,
     });
   } catch (error) {
-    console.error("Failed to save user consents", { userId: profile.id, error });
+    logError("Failed to save user consents", {
+      userId: profile.id,
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   const token = createSessionToken(
