@@ -30,6 +30,7 @@ type StudioProfileData = {
     bannerAssetId: string | null;
     bannerUrl: string | null;
     cancellationDeadlineHours: number | null;
+    remindersEnabled: boolean;
   };
 };
 
@@ -54,6 +55,7 @@ export function StudioProfilePage({ providerId }: Props) {
   const [isPublished, setIsPublished] = useState(false);
   const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
   const [cancellationDeadlineInput, setCancellationDeadlineInput] = useState("");
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   const [telegram, setTelegram] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -113,6 +115,7 @@ export function StudioProfilePage({ providerId }: Props) {
       const deadlineValue = studio.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
+      setRemindersEnabled(studio.remindersEnabled ?? true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
@@ -154,6 +157,7 @@ export function StudioProfilePage({ providerId }: Props) {
         contactPhone: contactPhone.trim() || null,
         contactEmail: contactEmail.trim() || null,
         isPublished,
+        remindersEnabled,
       };
 
       const trimmedDeadline = cancellationDeadlineInput.trim();
@@ -334,6 +338,21 @@ export function StudioProfilePage({ providerId }: Props) {
             {cancellationDeadlineHours === null ? "Без ограничений" : `${cancellationDeadlineHours} ч.`}
           </div>
         </div>
+      </div>
+
+      <div className="rounded-2xl bg-bg-card/90 p-4">
+        <h3 className="text-sm font-semibold">РќР°РїРѕРјРёРЅР°РЅРёСЏ</h3>
+        <p className="mt-1 text-xs text-text-sec">
+          РќР°РїРѕРјРёРЅР°РЅРёСЏ Рѕ Р·Р°РїРёСЃРё Р·Р° 24 С‡Р°СЃР° Рё 2 С‡Р°СЃР° РґРѕ РЅР°С‡Р°Р»Р°.
+        </p>
+        <label className="mt-3 inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={remindersEnabled}
+            onChange={(event) => setRemindersEnabled(event.target.checked)}
+          />
+          {remindersEnabled ? "Р’РєР»СЋС‡РµРЅРѕ" : "Р’С‹РєР»СЋС‡РµРЅРѕ"}
+        </label>
       </div>
 
       <StudioProfileForm

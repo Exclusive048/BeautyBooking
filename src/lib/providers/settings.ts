@@ -6,6 +6,7 @@ import { getCurrentMasterProviderId } from "@/lib/master/access";
 export type ProviderSettings = {
   autoConfirmBookings: boolean;
   cancellationDeadlineHours: number | null;
+  remindersEnabled: boolean;
 };
 
 export function isAutoConfirmAllowed(provider: { type: ProviderType; studioId: string | null }): boolean {
@@ -26,6 +27,7 @@ export async function getProviderSettings(userId: string): Promise<ProviderSetti
       studioId: true,
       autoConfirmBookings: true,
       cancellationDeadlineHours: true,
+      remindersEnabled: true,
     },
   });
 
@@ -40,12 +42,17 @@ export async function getProviderSettings(userId: string): Promise<ProviderSetti
   return {
     autoConfirmBookings: provider.autoConfirmBookings,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
+    remindersEnabled: provider.remindersEnabled,
   };
 }
 
 export async function updateProviderSettings(
   userId: string,
-  input: { autoConfirmBookings?: boolean; cancellationDeadlineHours?: number | null }
+  input: {
+    autoConfirmBookings?: boolean;
+    cancellationDeadlineHours?: number | null;
+    remindersEnabled?: boolean;
+  }
 ): Promise<ProviderSettings> {
   const providerId = await getCurrentMasterProviderId(userId);
   const provider = await prisma.provider.findUnique({
@@ -61,22 +68,30 @@ export async function updateProviderSettings(
     throw new AppError("Settings are not allowed for studio masters", 403, "FORBIDDEN");
   }
 
-  const data: { autoConfirmBookings?: boolean; cancellationDeadlineHours?: number | null } = {};
+  const data: {
+    autoConfirmBookings?: boolean;
+    cancellationDeadlineHours?: number | null;
+    remindersEnabled?: boolean;
+  } = {};
   if (input.autoConfirmBookings !== undefined) {
     data.autoConfirmBookings = input.autoConfirmBookings;
   }
   if (input.cancellationDeadlineHours !== undefined) {
     data.cancellationDeadlineHours = input.cancellationDeadlineHours;
   }
+  if (input.remindersEnabled !== undefined) {
+    data.remindersEnabled = input.remindersEnabled;
+  }
 
   const updated = await prisma.provider.update({
     where: { id: provider.id },
     data,
-    select: { autoConfirmBookings: true, cancellationDeadlineHours: true },
+    select: { autoConfirmBookings: true, cancellationDeadlineHours: true, remindersEnabled: true },
   });
 
   return {
     autoConfirmBookings: updated.autoConfirmBookings,
     cancellationDeadlineHours: updated.cancellationDeadlineHours ?? null,
+    remindersEnabled: updated.remindersEnabled,
   };
 }

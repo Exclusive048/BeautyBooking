@@ -25,6 +25,8 @@ import {
   type NotificationRecord,
 } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { logError, logInfo } from "@/lib/logging/logger";
 
 export async function createBooking(input: {
   providerId: string;
@@ -189,7 +191,7 @@ export async function createBooking(input: {
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   );
   const transactionMs = Date.now() - transactionStartedAt;
-  console.info(`[booking:create] transaction ms=${transactionMs}`);
+  logInfo("[booking:create] transaction complete", { transactionMs });
   createdBookingId = created.id;
 
   if (idempotencyKey && idempotencyLockAcquired) {
@@ -205,7 +207,7 @@ export async function createBooking(input: {
   try {
     const snapshot = await loadBookingSnapshot(created.id);
     const snapshotMs = Date.now() - snapshotStartedAt;
-    console.info(`[booking:create] snapshot ms=${snapshotMs}`);
+    logInfo("[booking:create] snapshot loaded", { snapshotMs });
     if (snapshot) {
       notifications = shouldAutoConfirm
         ? await createBookingConfirmedNotifications({
@@ -218,7 +220,9 @@ export async function createBooking(input: {
         : await createBookingRequestNotifications({ bookingId: created.id, snapshot });
     }
   } catch (error) {
-    console.error("Не удалось создать уведомления по записи:", error);
+    logError("Не удалось создать уведомления по записи", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   if (notifications.length > 0) {
@@ -228,7 +232,20 @@ export async function createBooking(input: {
   try {
     await sendBookingTelegramNotifications(created.id, "CREATED", { notifyClientOnCreate: true });
   } catch (error) {
-    console.error("Не удалось отправить Telegram-уведомления о записи:", error);
+    logError("Не удалось отправить Telegram-уведомления о записи", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
+  }
+
+  if (shouldAutoConfirm) {
+    try {
+      await scheduleBookingReminders(created.id);
+    } catch (error) {
+      logError("Failed to schedule booking reminders", {
+        bookingId: created.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   await invalidateSlotsForBookingRange({

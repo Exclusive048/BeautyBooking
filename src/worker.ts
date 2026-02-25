@@ -2,8 +2,9 @@ import { dequeue } from "@/lib/queue/queue";
 import { enqueue } from "@/lib/queue/queue";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { logError } from "@/lib/logging/logger";
+import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
-import { TELEGRAM_SEND_JOB_TYPE } from "@/lib/queue/types";
+import { BOOKING_REMINDER_JOB_TYPE, TELEGRAM_SEND_JOB_TYPE } from "@/lib/queue/types";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,7 +25,9 @@ function enqueueRetry(job: Job, delayMs: number): void {
   }, delayMs);
 }
 
-async function processTelegramSend(job: Job): Promise<void> {
+async function processTelegramSend(
+  job: Extract<Job, { type: typeof TELEGRAM_SEND_JOB_TYPE }>
+): Promise<void> {
   if (typeof job.runAt === "number" && job.runAt > Date.now()) {
     enqueueRetry(job, job.runAt - Date.now());
     return;
@@ -54,6 +57,17 @@ async function processTelegramSend(job: Job): Promise<void> {
   });
 }
 
+async function processBookingReminderJob(
+  job: Extract<Job, { type: typeof BOOKING_REMINDER_JOB_TYPE }>
+): Promise<void> {
+  if (typeof job.runAt === "number" && job.runAt > Date.now()) {
+    enqueueRetry(job, job.runAt - Date.now());
+    return;
+  }
+
+  await processBookingReminder(job.payload);
+}
+
 async function run() {
   while (true) {
     const job = await dequeue();
@@ -68,8 +82,16 @@ async function run() {
             error: error instanceof Error ? error.message : String(error),
           });
         }
-      } else {
-        logError("Worker unknown job type", { jobId: job.id, type: job.type });
+      } else if (job.type === BOOKING_REMINDER_JOB_TYPE) {
+        try {
+          await processBookingReminderJob(job);
+        } catch (error) {
+          logError("Worker job processing failed", {
+            jobId: job.id,
+            type: job.type,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
       continue;
     }

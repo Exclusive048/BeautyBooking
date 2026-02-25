@@ -10,6 +10,7 @@ import {
   type BookingActor,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
+import { logError } from "@/lib/logging/logger";
 
 type RescheduleRecord = BookingDto;
 
@@ -264,7 +265,9 @@ export async function rescheduleBooking(input: {
       publishNotifications(notifications);
     }
   } catch (error) {
-    console.error("Failed to create booking notifications:", error);
+    logError("Failed to create booking notifications", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   await invalidateSlotsForBookingMove({

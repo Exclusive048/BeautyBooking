@@ -8,6 +8,7 @@ import {
   REVIEW_WINDOW_DAYS,
 } from "@/lib/reviews/constants";
 import { toReviewDto, type ReviewDto, type ReviewTagDto } from "@/lib/reviews/types";
+import { logError } from "@/lib/logging/logger";
 
 // AUDIT MATRIX (task sections 1-9)
 // 1) Tag taxonomy: IMPLEMENTED (ReviewTag dictionary + seed).
@@ -429,7 +430,9 @@ export async function createReview(input: {
       text: created.text ?? null,
     });
   } catch (error) {
-    console.error("Failed to create review notifications:", error);
+    logError("Failed to create review notifications", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   return toReviewDto(created);

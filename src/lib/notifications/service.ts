@@ -80,6 +80,8 @@ export type BookingNotificationPayload = {
   studioId: string | null;
 };
 
+export type BookingReminderKind = "REMINDER_24H" | "REMINDER_2H";
+
 function toNotificationEvent(record: NotificationRecord): NotificationEvent {
   return {
     id: record.id,
@@ -287,6 +289,80 @@ export function buildBookingDeclinedBody(snapshot: BookingNotificationSnapshot):
     return `Запись на ${serviceName} ${whenLabel} была отклонена.`;
   }
   return `Запись на ${serviceName} была отклонена.`;
+}
+
+function resolveReminderType(kind: BookingReminderKind): NotificationType {
+  return kind === "REMINDER_24H"
+    ? NotificationType.BOOKING_REMINDER_24H
+    : NotificationType.BOOKING_REMINDER_2H;
+}
+
+function buildBookingReminderTitle(kind: BookingReminderKind, audience: "CLIENT" | "MASTER"): string {
+  const suffix = kind === "REMINDER_24H" ? "за 24 часа" : "за 2 часа";
+  if (audience === "MASTER") {
+    return `Напоминание о записи ${suffix}`;
+  }
+  return `Напоминание ${suffix}`;
+}
+
+function buildBookingReminderBody(
+  snapshot: BookingNotificationSnapshot,
+  audience: "CLIENT" | "MASTER"
+): string {
+  const serviceName = resolveServiceLabel(snapshot.service);
+  const whenLabel = formatDateLabel(snapshot.startAtUtc, snapshot.provider.timezone);
+  if (audience === "MASTER") {
+    const clientLabel = snapshot.clientName ? `клиент ${snapshot.clientName}` : "клиент";
+    if (whenLabel) {
+      return `${clientLabel} на ${serviceName} ${whenLabel}`;
+    }
+    return `${clientLabel} на ${serviceName}`;
+  }
+  if (whenLabel) {
+    return `Ваша запись на ${serviceName} ${whenLabel}`;
+  }
+  return `Ваша запись на ${serviceName}`;
+}
+
+export async function createBookingReminderNotifications(input: {
+  bookingId: string;
+  kind: BookingReminderKind;
+  db?: DbClient;
+  snapshot?: BookingNotificationSnapshot | null;
+}): Promise<NotificationRecord[]> {
+  const db = input.db ?? prisma;
+  const snapshot = input.snapshot ?? (await loadBookingSnapshot(input.bookingId, db));
+  if (!snapshot) return [];
+
+  const records: CreateNotificationInput[] = [];
+  const payload = buildBookingPayload(snapshot);
+  const type = resolveReminderType(input.kind);
+
+  if (snapshot.clientUserId) {
+    records.push({
+      userId: snapshot.clientUserId,
+      type,
+      title: buildBookingReminderTitle(input.kind, "CLIENT"),
+      body: buildBookingReminderBody(snapshot, "CLIENT"),
+      payloadJson: payload,
+      bookingId: snapshot.id,
+    });
+  }
+
+  const masterOwnerId = resolveMasterOwnerId(snapshot);
+  if (masterOwnerId) {
+    records.push({
+      userId: masterOwnerId,
+      type,
+      title: buildBookingReminderTitle(input.kind, "MASTER"),
+      body: buildBookingReminderBody(snapshot, "MASTER"),
+      payloadJson: payload,
+      bookingId: snapshot.id,
+    });
+  }
+
+  if (records.length === 0) return [];
+  return createNotifications(records, db);
 }
 
 export async function createBookingRequestNotifications(input: {

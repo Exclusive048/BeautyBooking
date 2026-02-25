@@ -16,6 +16,7 @@ import {
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { logError } from "@/lib/logging/logger";
 
 export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
   // AUDIT (отмена/отклонение):
@@ -117,7 +118,9 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
         notifications = await createBookingDeclinedNotifications({ bookingId: updated.id, db: tx });
       }
     } catch (error) {
-      console.error("Failed to create booking notifications:", error);
+      logError("Failed to create booking notifications", {
+        error: error instanceof Error ? error.stack : String(error),
+      });
     }
 
     return { updated, notifications };
@@ -131,7 +134,9 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     try {
       await sendBookingTelegramNotifications(updated.id, "CANCELLED");
     } catch (error) {
-      console.error("Failed to send Telegram booking notifications:", error);
+      logError("Failed to send Telegram booking notifications", {
+        error: error instanceof Error ? error.stack : String(error),
+      });
     }
   }
 

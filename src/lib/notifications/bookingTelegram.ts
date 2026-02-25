@@ -58,3 +58,19 @@ export function buildClientBookingCreatedText(payload: BookingTelegramPayload): 
   pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
   return lines.join("\n");
 }
+
+export function buildBookingReminderText(
+  payload: BookingTelegramPayload & { kind: "REMINDER_24H" | "REMINDER_2H" }
+): string {
+  const suffix =
+    payload.kind === "REMINDER_24H"
+      ? "\u0437\u0430 24 \u0447\u0430\u0441\u0430"
+      : "\u0437\u0430 2 \u0447\u0430\u0441\u0430";
+  const lines: string[] = [`\u23f0 \u041d\u0430\u043f\u043e\u043c\u0438\u043d\u0430\u043d\u0438\u0435 ${suffix}`];
+  pushIf(lines, `\u0423\u0441\u043b\u0443\u0433\u0430: ${payload.serviceName}`);
+  pushIf(lines, payload.whenText ? `\u041a\u043e\u0433\u0434\u0430: ${payload.whenText}` : null);
+  pushIf(lines, formatClientLine(payload.clientName, payload.clientPhone));
+  pushIf(lines, formatMasterLine(payload.masterName));
+  pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
+  return lines.join("\n");
+}

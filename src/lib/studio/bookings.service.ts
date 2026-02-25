@@ -9,6 +9,7 @@ import {
   publishNotifications,
   type NotificationRecord,
 } from "@/lib/notifications/service";
+import { logError } from "@/lib/logging/logger";
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
@@ -124,7 +125,9 @@ export async function createStudioBooking(input: {
       publishNotifications(notifications);
     }
   } catch (error) {
-    console.error("Failed to create booking notifications:", error);
+    logError("Failed to create booking notifications", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   await invalidateSlotsForBookingRange({
@@ -343,7 +346,9 @@ export async function updateMasterBookingStatus(input: {
         ? await createBookingNotifications({ bookingId: updated.id, kind: "CONFIRMED" }, tx)
         : await createBookingDeclinedNotifications({ bookingId: updated.id, db: tx });
     } catch (error) {
-      console.error("Failed to create booking notifications:", error);
+      logError("Failed to create booking notifications", {
+        error: error instanceof Error ? error.stack : String(error),
+      });
     }
 
     return { updated, notifications };

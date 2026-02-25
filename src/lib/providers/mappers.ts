@@ -88,6 +88,7 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     availableToday: provider.availableToday,
     timezone: provider.timezone,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
+    hotSlotsEnabled: false,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
     superpowerBadges: [],

@@ -4,6 +4,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+import { logError } from "@/lib/logging/logger";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -40,7 +41,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return ok({ masters });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
-    console.error("GET /api/providers/[id]/masters failed:", detail);
+    logError("GET /api/providers/[id]/masters failed", { error: detail });
     return fail("Internal error", 500, "INTERNAL_ERROR");
   }
 }

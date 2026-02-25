@@ -14,8 +14,12 @@ export const providerSettingsSchema = z
   .object({
     autoConfirmBookings: z.boolean().optional(),
     cancellationDeadlineHours: z.number().int().min(0).max(168).nullable().optional(),
+    remindersEnabled: z.boolean().optional(),
   })
   .refine(
-    (value) => value.autoConfirmBookings !== undefined || value.cancellationDeadlineHours !== undefined,
+    (value) =>
+      value.autoConfirmBookings !== undefined ||
+      value.cancellationDeadlineHours !== undefined ||
+      value.remindersEnabled !== undefined,
     { message: "At least one field is required" }
   );

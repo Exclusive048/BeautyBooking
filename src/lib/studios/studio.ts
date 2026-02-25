@@ -22,6 +22,7 @@ export type StudioProviderPrivateDto = {
   bannerAssetId: string | null;
   bannerUrl: string | null;
   cancellationDeadlineHours: number | null;
+  remindersEnabled: boolean;
 };
 
 export async function getStudioProviderById(
@@ -48,6 +49,7 @@ export async function getStudioProviderById(
       timezone: true,
       bufferBetweenBookingsMin: true,
       cancellationDeadlineHours: true,
+      remindersEnabled: true,
     },
   });
 
@@ -78,6 +80,7 @@ export async function getStudioProviderById(
     bannerAssetId,
     bannerUrl,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
+    remindersEnabled: provider.remindersEnabled,
   };
 }
 
@@ -97,6 +100,7 @@ export type StudioProfileUpdate = {
   timezone?: string;
   bannerAssetId?: string | null;
   cancellationDeadlineHours?: number | null;
+  remindersEnabled?: boolean;
 };
 
 export async function updateStudioProviderProfile(
@@ -122,6 +126,7 @@ export async function updateStudioProviderProfile(
       ...(input.cancellationDeadlineHours !== undefined
         ? { cancellationDeadlineHours: input.cancellationDeadlineHours }
         : {}),
+      ...(input.remindersEnabled !== undefined ? { remindersEnabled: input.remindersEnabled } : {}),
     },
     select: {
       id: true,
@@ -142,6 +147,7 @@ export async function updateStudioProviderProfile(
       timezone: true,
       bufferBetweenBookingsMin: true,
       cancellationDeadlineHours: true,
+      remindersEnabled: true,
     },
   });
 
@@ -176,5 +182,6 @@ export async function updateStudioProviderProfile(
     bannerAssetId,
     bannerUrl,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
+    remindersEnabled: provider.remindersEnabled,
   };
 }

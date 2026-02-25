@@ -40,6 +40,7 @@ export async function PATCH(req: Request) {
     const data = await updateProviderSettings(user.id, {
       autoConfirmBookings: body.autoConfirmBookings,
       cancellationDeadlineHours: body.cancellationDeadlineHours,
+      remindersEnabled: body.remindersEnabled,
     });
     return jsonOk(data);
   } catch (error) {

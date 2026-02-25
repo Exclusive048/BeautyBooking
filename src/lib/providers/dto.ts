@@ -50,6 +50,7 @@ export type ProviderProfileDto = {
   availableToday: boolean;
   timezone: string;
   cancellationDeadlineHours: number | null;
+  hotSlotsEnabled: boolean;
   geoLat: number | null;
   geoLng: number | null;
   superpowerBadges: ProviderSuperpowerBadgeDto[];

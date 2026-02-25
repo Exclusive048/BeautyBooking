@@ -9,7 +9,9 @@ import {
   buildBookingConfirmedText,
   buildClientBookingCreatedText,
   buildBookingCreatedText,
+  buildBookingReminderText,
 } from "@/lib/notifications/bookingTelegram";
+import type { BookingReminderKind } from "@/lib/queue/types";
 
 type BookingTelegramKind = "CREATED" | "CANCELLED" | "CONFIRMED";
 
@@ -181,6 +183,51 @@ export async function sendBookingTelegramNotifications(
     }
   } catch (error) {
     logError("Failed to send booking telegram notifications", {
+      bookingId,
+      kind,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+export async function sendBookingReminderTelegramNotifications(
+  bookingId: string,
+  kind: BookingReminderKind
+): Promise<void> {
+  const ctx = await loadBookingContext(bookingId);
+  if (!ctx) return;
+
+  try {
+    const masterChatId = ctx.masterUserId ? await getTelegramChatIdForUser(ctx.masterUserId) : null;
+    const clientChatId = ctx.clientUserId ? await getTelegramChatIdForUser(ctx.clientUserId) : null;
+
+    if (masterChatId) {
+      const text = buildBookingReminderText({
+        kind,
+        serviceName: ctx.serviceName,
+        whenText: ctx.whenText,
+        clientName: ctx.clientName,
+        clientPhone: ctx.clientPhone,
+        masterName: ctx.masterName,
+        linkUrl: ctx.masterUrl,
+      });
+      await enqueueTelegramSend(masterChatId, text);
+    }
+
+    if (clientChatId) {
+      const text = buildBookingReminderText({
+        kind,
+        serviceName: ctx.serviceName,
+        whenText: ctx.whenText,
+        clientName: ctx.clientName,
+        clientPhone: ctx.clientPhone,
+        masterName: ctx.masterName,
+        linkUrl: ctx.clientUrl,
+      });
+      await enqueueTelegramSend(clientChatId, text);
+    }
+  } catch (error) {
+    logError("Failed to send booking reminder telegram notifications", {
       bookingId,
       kind,
       error: error instanceof Error ? error.message : String(error),

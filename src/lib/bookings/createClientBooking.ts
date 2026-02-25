@@ -8,6 +8,8 @@ import {
   type NotificationRecord,
 } from "@/lib/notifications/service";
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
 import { ProviderType, Prisma } from "@prisma/client";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
@@ -191,7 +193,7 @@ export async function createClientBooking(
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
   const transactionMs = Date.now() - transactionStartedAt;
-  console.info(`[booking:create] transaction ms=${transactionMs}`);
+  logInfo("[booking:create:legacy] transaction complete", { transactionMs });
   createdBookingId = booking.id;
 
   if (resolvedIdempotencyKey && idempotencyLockAcquired) {
@@ -207,7 +209,7 @@ export async function createClientBooking(
   try {
     const snapshot = await loadBookingSnapshot(booking.id);
     const snapshotMs = Date.now() - snapshotStartedAt;
-    console.info(`[booking:create] snapshot ms=${snapshotMs}`);
+    logInfo("[booking:create:legacy] snapshot loaded", { snapshotMs });
     if (snapshot) {
       notifications = shouldAutoConfirm
         ? await createBookingConfirmedNotifications({
@@ -220,7 +222,9 @@ export async function createClientBooking(
         : await createBookingRequestNotifications({ bookingId: booking.id, snapshot });
     }
   } catch (error) {
-    console.error("Не удалось создать уведомления по записи:", error);
+    logError("Не удалось создать уведомления по записи", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
   }
 
   if (notifications.length > 0) {
@@ -230,7 +234,20 @@ export async function createClientBooking(
   try {
     await sendBookingTelegramNotifications(booking.id, "CREATED", { notifyClientOnCreate: true });
   } catch (error) {
-    console.error("Не удалось отправить Telegram-уведомления о записи:", error);
+    logError("Не удалось отправить Telegram-уведомления о записи", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
+  }
+
+  if (shouldAutoConfirm) {
+    try {
+      await scheduleBookingReminders(booking.id);
+    } catch (error) {
+      logError("Failed to schedule booking reminders", {
+        bookingId: booking.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   await invalidateSlotsForBookingRange({
