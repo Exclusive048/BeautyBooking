@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
-import { listPublicModelOffers } from "@/lib/model-offers/public.service";
+import { listModelOfferFilterCategories, listPublicModelOffers } from "@/lib/model-offers/public.service";
 
 export const metadata: Metadata = {
   title: "Предложения для моделей | BeautyHub",
@@ -44,11 +43,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
   const limit = 12;
 
   const [categories, offers] = await Promise.all([
-    prisma.globalCategory.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      orderBy: [{ usageCount: "desc" }, { name: "asc" }],
-    }),
+    listModelOfferFilterCategories(),
     listPublicModelOffers({ categoryId, city, page, limit }),
   ]);
 

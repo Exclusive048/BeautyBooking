@@ -251,3 +251,16 @@ export async function getPublicModelOffer(offerId: string): Promise<PublicModelO
 
   return offer ? toPublicItem(offer) : null;
 }
+
+export type PublicModelOfferFilterCategory = {
+  id: string;
+  name: string;
+};
+
+export async function listModelOfferFilterCategories(): Promise<PublicModelOfferFilterCategory[]> {
+  return prisma.globalCategory.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true },
+    orderBy: [{ usageCount: "desc" }, { name: "asc" }],
+  });
+}
