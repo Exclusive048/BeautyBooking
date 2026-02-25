@@ -1,5 +1,3 @@
-"use server";
-
 import { Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
