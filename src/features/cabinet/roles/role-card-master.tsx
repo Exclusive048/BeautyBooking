@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type MasterActiveData = {
   name: string;
@@ -11,6 +12,8 @@ type MasterActiveData = {
   isActive?: boolean | null;
   statusLabel?: string | null;
   avatarUrl?: string | null;
+  avatarFocalX?: number | null;
+  avatarFocalY?: number | null;
   coverUrl?: string | null;
   actionLabel?: string;
   actionHref?: string;
@@ -82,8 +85,13 @@ export function RoleCardMaster(props: Props) {
         <div className="flex items-center gap-4">
           <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.avatarUrl} alt={data.name} className="h-full w-full object-cover" />
+              <FocalImage
+                src={data.avatarUrl}
+                alt={data.name}
+                focalX={data.avatarFocalX}
+                focalY={data.avatarFocalY}
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
                 Фото

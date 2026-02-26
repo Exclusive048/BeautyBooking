@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { FocalImage } from "@/components/ui/focal-image";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { moneyRUB } from "@/lib/format";
@@ -46,7 +47,13 @@ export async function StudioDetailsSection({ studioId }: Props) {
       <Card className="bg-surface">
         <CardContent className="space-y-4 p-5 md:p-6">
           {studio.avatarUrl ? (
-            <img src={studio.avatarUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
+            <FocalImage
+              src={studio.avatarUrl}
+              alt=""
+              focalX={studio.avatarFocalX}
+              focalY={studio.avatarFocalY}
+              className="h-20 w-20 rounded-2xl object-cover"
+            />
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <Badge>{UI_TEXT.publicStudio.typeStudio}</Badge>

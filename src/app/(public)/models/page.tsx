@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listModelOfferFilterCategories, listPublicModelOffers } from "@/lib/model-offers/public.service";
+import { FocalImage } from "@/components/ui/focal-image";
 
 export const metadata: Metadata = {
   title: "Предложения для моделей | BeautyHub",
@@ -107,8 +108,13 @@ export default async function ModelsPage({ searchParams }: PageProps) {
               <div className="flex items-center gap-3">
                 <div className="h-12 w-12 overflow-hidden rounded-2xl border border-border-subtle/80 bg-bg-input">
                   {offer.master.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={offer.master.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    <FocalImage
+                      src={offer.master.avatarUrl}
+                      alt=""
+                      focalX={offer.master.avatarFocalX}
+                      focalY={offer.master.avatarFocalY}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
                       {offer.master.name.slice(0, 1).toUpperCase()}

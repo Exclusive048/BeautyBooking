@@ -2,31 +2,54 @@
 
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type Props = {
   bannerUrl?: string | null;
+  bannerFocalX?: number | null;
+  bannerFocalY?: number | null;
   avatar: ReactNode;
   title: string;
   description?: string | null;
   onEditBanner: () => void;
+  onEditFocal?: () => void;
 };
 
-export function StudioProfileHero({ bannerUrl, avatar, title, description, onEditBanner }: Props) {
+export function StudioProfileHero({
+  bannerUrl,
+  bannerFocalX,
+  bannerFocalY,
+  avatar,
+  title,
+  description,
+  onEditBanner,
+  onEditFocal,
+}: Props) {
   return (
     <section className="overflow-hidden rounded-[24px] border border-border-subtle bg-bg-card shadow-card">
       <div className="relative h-[200px] w-full overflow-hidden bg-bg-input">
         {bannerUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+          <FocalImage
+            src={bannerUrl}
+            alt=""
+            focalX={bannerFocalX}
+            focalY={bannerFocalY}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
             Обложка студии
           </div>
         )}
-        <div className="absolute right-4 top-4">
+        <div className="absolute right-4 top-4 flex flex-col gap-2">
           <Button variant="secondary" size="sm" onClick={onEditBanner}>
             Изменить обложку
           </Button>
+          {onEditFocal ? (
+            <Button variant="secondary" size="sm" onClick={onEditFocal}>
+              РўРѕС‡РєР° С„РѕРєСѓСЃР°
+            </Button>
+          ) : null}
         </div>
         <div className="absolute -bottom-8 left-6">{avatar}</div>
       </div>

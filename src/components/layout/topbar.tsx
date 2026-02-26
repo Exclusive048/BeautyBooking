@@ -11,15 +11,18 @@ import { hasAdminRole } from "@/lib/auth/guards";
 import { hasMasterProfile } from "@/lib/auth/roles";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
-import { getSiteLogoUrl } from "@/lib/media/queries";
+import { getSiteLogoAsset } from "@/lib/media/queries";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type WorkspaceLink = {
   href: string;
   label: string;
   ariaLabel: string;
   avatarUrl: string | null;
+  avatarFocalX?: number | null;
+  avatarFocalY?: number | null;
   fallbackIcon: string;
 };
 
@@ -29,7 +32,13 @@ function WorkspaceShortcutLink({ item }: { item: WorkspaceLink }) {
       <Link href={item.href} aria-label={item.ariaLabel} title={item.label}>
         <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border-subtle/80 bg-bg-card text-sm">
           {item.avatarUrl ? (
-            <img src={item.avatarUrl} alt="" className="h-full w-full object-cover" />
+            <FocalImage
+              src={item.avatarUrl}
+              alt=""
+              focalX={item.avatarFocalX}
+              focalY={item.avatarFocalY}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <span aria-hidden>{item.fallbackIcon}</span>
           )}
@@ -52,7 +61,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
     hasMaster
       ? prisma.masterProfile.findUnique({
           where: { userId },
-          select: { provider: { select: { avatarUrl: true } } },
+          select: { provider: { select: { avatarUrl: true, avatarFocalX: true, avatarFocalY: true } } },
         })
       : Promise.resolve(null),
     hasStudio
@@ -60,7 +69,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           where: {
             OR: [{ ownerUserId: userId }, { provider: { ownerUserId: userId } }],
           },
-          select: { provider: { select: { avatarUrl: true } } },
+          select: { provider: { select: { avatarUrl: true, avatarFocalX: true, avatarFocalY: true } } },
         })
       : Promise.resolve(null),
     hasStudio
@@ -72,7 +81,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           },
           select: {
             studio: {
-              select: { provider: { select: { avatarUrl: true } } },
+              select: { provider: { select: { avatarUrl: true, avatarFocalX: true, avatarFocalY: true } } },
             },
           },
         })
@@ -88,6 +97,8 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           label: UI_TEXT.nav.masterWorkspace,
           ariaLabel: UI_TEXT.nav.openMasterWorkspace,
           avatarUrl: masterProfile?.provider.avatarUrl ?? null,
+          avatarFocalX: masterProfile?.provider.avatarFocalX ?? null,
+          avatarFocalY: masterProfile?.provider.avatarFocalY ?? null,
           fallbackIcon: "✂️",
         }
       : null,
@@ -97,6 +108,8 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           label: UI_TEXT.nav.studioWorkspace,
           ariaLabel: UI_TEXT.nav.openStudioWorkspace,
           avatarUrl: studioProvider?.avatarUrl ?? null,
+          avatarFocalX: studioProvider?.avatarFocalX ?? null,
+          avatarFocalY: studioProvider?.avatarFocalY ?? null,
           fallbackIcon: "🏢",
         }
       : null,
@@ -105,7 +118,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
 
 export async function Topbar() {
   const user = await getSessionUser();
-  const siteLogoUrl = await getSiteLogoUrl();
+  const siteLogo = await getSiteLogoAsset();
 
   let userLabel: string = UI_TEXT.auth.menu;
   let showAdminLink = false;
@@ -125,8 +138,14 @@ export async function Topbar() {
     <header className="sticky top-0 z-30">
       <div className="mx-auto mt-3 flex h-[var(--topbar-h)] w-full max-w-6xl min-w-0 items-center justify-between rounded-[26px] border border-border-subtle/80 bg-bg-card/75 px-4 shadow-card backdrop-blur">
         <Link href="/" className="flex min-w-0 items-center gap-3">
-          {siteLogoUrl ? (
-            <img src={siteLogoUrl} alt={UI_TEXT.nav.siteLogoAlt} className="h-10 w-10 rounded-2xl object-cover" />
+          {siteLogo?.url ? (
+            <FocalImage
+              src={siteLogo.url}
+              alt={UI_TEXT.nav.siteLogoAlt}
+              focalX={siteLogo.focalX}
+              focalY={siteLogo.focalY}
+              className="h-10 w-10 rounded-2xl object-cover"
+            />
           ) : (
             <div className="h-10 w-10 rounded-2xl bg-primary/35" />
           )}

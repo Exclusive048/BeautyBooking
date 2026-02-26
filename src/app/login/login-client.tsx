@@ -7,9 +7,12 @@ import VkLoginButton from "@/components/auth/vk-login-button";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type LoginClientProps = {
   heroImageUrl: string | null;
+  heroImageFocalX: number | null;
+  heroImageFocalY: number | null;
 };
 
 function normalizePhone(input: string) {
@@ -31,7 +34,11 @@ function safeNext(nextRaw: string | null) {
   return nextRaw;
 }
 
-export default function LoginClient({ heroImageUrl }: LoginClientProps) {
+export default function LoginClient({
+  heroImageUrl,
+  heroImageFocalX,
+  heroImageFocalY,
+}: LoginClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
@@ -133,8 +140,13 @@ export default function LoginClient({ heroImageUrl }: LoginClientProps) {
       <div className="mx-auto grid h-full min-h-[100dvh] w-full max-w-6xl gap-10 px-4 py-6 lg:min-h-0 lg:grid-cols-[520px_1fr] lg:items-center lg:py-8">
         <aside className="relative hidden h-full max-h-[720px] min-h-0 max-w-[520px] overflow-hidden rounded-3xl border border-white/10 bg-white/5 lg:block">
           {heroImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={heroImageUrl} alt="" className="h-full w-full object-cover" />
+            <FocalImage
+              src={heroImageUrl}
+              alt=""
+              focalX={heroImageFocalX}
+              focalY={heroImageFocalY}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
           )}

@@ -27,6 +27,8 @@ export default async function RolesPage() {
             select: {
               name: true,
               avatarUrl: true,
+              avatarFocalX: true,
+              avatarFocalY: true,
               tagline: true,
               categories: true,
               ratingAvg: true,
@@ -44,6 +46,8 @@ export default async function RolesPage() {
         select: {
           name: true,
           avatarUrl: true,
+          avatarFocalX: true,
+          avatarFocalY: true,
           ratingAvg: true,
           ratingCount: true,
           isPublished: true,
@@ -64,6 +68,8 @@ export default async function RolesPage() {
             ? "Профиль опубликован"
             : "Профиль не опубликован",
           avatarUrl: masterProvider.avatarUrl,
+          avatarFocalX: masterProvider.avatarFocalX ?? null,
+          avatarFocalY: masterProvider.avatarFocalY ?? null,
           actionLabel: "Открыть кабинет",
           actionHref: masterCabinetHref,
         }
@@ -91,6 +97,8 @@ export default async function RolesPage() {
       ? {
           name: studioProvider.name,
           logoUrl: studioProvider.avatarUrl,
+          logoFocalX: studioProvider.avatarFocalX ?? null,
+          logoFocalY: studioProvider.avatarFocalY ?? null,
           metrics: studioMetrics,
           actionLabel: "Открыть кабинет",
           actionHref: studioCabinetHref,

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { getPublicModelOffer } from "@/lib/model-offers/public.service";
 import { ModelOfferApplyForm } from "@/features/model-offers/components/public-model-offer-apply";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type PageProps = {
   params: Promise<{ offerId: string }>;
@@ -46,8 +47,13 @@ export default async function ModelOfferPage({ params }: PageProps) {
           <div className="flex items-center gap-3">
             <div className="h-14 w-14 overflow-hidden rounded-2xl border border-border-subtle/80 bg-bg-input">
               {offer.master.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={offer.master.avatarUrl} alt="" className="h-full w-full object-cover" />
+                <FocalImage
+                  src={offer.master.avatarUrl}
+                  alt=""
+                  focalX={offer.master.avatarFocalX}
+                  focalY={offer.master.avatarFocalY}
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-base font-semibold text-text-sec">
                   {offer.master.name.slice(0, 1).toUpperCase()}

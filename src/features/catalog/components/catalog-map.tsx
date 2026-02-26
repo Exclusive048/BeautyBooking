@@ -4,18 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { providerPublicUrl } from "@/lib/public-urls";
-
-type CatalogMapPoint = {
-  id: string;
-  title: string;
-  type: "master" | "studio";
-  avatarUrl: string | null;
-  ratingAvg: number;
-  priceFrom: number | null;
-  publicUsername: string | null;
-  geoLat: number;
-  geoLng: number;
-};
+import type { CatalogMapPoint } from "@/features/catalog/types";
 
 type MapSearchPayload = {
   bbox: string;

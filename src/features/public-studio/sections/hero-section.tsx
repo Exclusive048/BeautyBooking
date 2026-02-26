@@ -52,9 +52,17 @@ export async function StudioHeroSection({ studioId }: Props) {
     );
   }
 
-  const imageUrls = studio.bannerUrl
-    ? [studio.bannerUrl, ...portfolio.map((item) => item.url).filter((url) => url !== studio.bannerUrl)]
-    : portfolio.map((item) => item.url);
+  const portfolioItems = portfolio.map((item) => ({
+    url: item.url,
+    focalX: item.focalX ?? null,
+    focalY: item.focalY ?? null,
+  }));
+  const bannerItem = studio.bannerUrl
+    ? { url: studio.bannerUrl, focalX: studio.bannerFocalX ?? null, focalY: studio.bannerFocalY ?? null }
+    : null;
+  const imageItems = bannerItem
+    ? [bannerItem, ...portfolioItems.filter((item) => item.url !== studio.bannerUrl)]
+    : portfolioItems;
 
   const bookingHref = studioBookingUrl(
     { id: studio.id, publicUsername: studio.publicUsername },
@@ -64,7 +72,7 @@ export async function StudioHeroSection({ studioId }: Props) {
 
   return (
     <div className="fade-in-up">
-      <StudioHeroGallery studio={studio} imageUrls={imageUrls} bookingHref={bookingHref} />
+      <StudioHeroGallery studio={studio} imageItems={imageItems} bookingHref={bookingHref} />
     </div>
   );
 }

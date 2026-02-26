@@ -5,12 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { UI_TEXT } from "@/lib/ui/text";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type WorkspaceMenuLink = {
   href: string;
   label: string;
   ariaLabel: string;
   avatarUrl: string | null;
+  avatarFocalX?: number | null;
+  avatarFocalY?: number | null;
   fallbackIcon: string;
 };
 
@@ -37,8 +40,13 @@ function WorkspaceMenuItem({
     >
       <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border-subtle/80 bg-bg-card text-sm">
         {item.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.avatarUrl} alt="" className="h-full w-full object-cover" />
+          <FocalImage
+            src={item.avatarUrl}
+            alt=""
+            focalX={item.avatarFocalX}
+            focalY={item.avatarFocalY}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <span aria-hidden>{item.fallbackIcon}</span>
         )}

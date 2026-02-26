@@ -471,6 +471,8 @@ model UserProfile {
   telegramUsername   String?
 
   externalPhotoUrl   String?
+  avatarFocalX       Float?
+  avatarFocalY       Float?
 
   telegramLink       TelegramLink?
 
@@ -825,6 +827,10 @@ model Provider {
   description  String?
 
   avatarUrl    String?
+  avatarFocalX Float?
+  avatarFocalY Float?
+  bannerFocalX Float?
+  bannerFocalY Float?
 
   geoLat       Float?
 
@@ -1834,6 +1840,8 @@ model MediaAsset {
   sizeBytes        Int
 
   originalFilename String
+  focalX           Float?
+  focalY           Float?
 
   createdByUserId  String?
 

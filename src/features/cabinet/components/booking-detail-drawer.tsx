@@ -13,6 +13,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { MissingPublicUsernameError } from "@/lib/public-urls";
 import type { BookingItem, BookingReviewState } from "@/features/cabinet/components/client-bookings-panel";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type BusyAction = "cancel" | "confirm" | "deleteReview" | null;
 
@@ -184,7 +185,13 @@ export function BookingDetailDrawer({
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 overflow-hidden rounded-full border border-border-subtle bg-bg-input">
               {booking.provider.avatarUrl ? (
-                <img src={booking.provider.avatarUrl} alt="" className="h-full w-full object-cover" />
+                <FocalImage
+                  src={booking.provider.avatarUrl}
+                  alt=""
+                  focalX={booking.provider.avatarFocalX}
+                  focalY={booking.provider.avatarFocalY}
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
                   {resolveInitial(booking.provider.name)}
@@ -240,7 +247,13 @@ export function BookingDetailDrawer({
               <div className="mt-3 flex items-center gap-3">
                 <div className="h-10 w-10 overflow-hidden rounded-full border border-border-subtle bg-bg-input">
                   {booking.masterProvider.avatarUrl ? (
-                    <img src={booking.masterProvider.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    <FocalImage
+                      src={booking.masterProvider.avatarUrl}
+                      alt=""
+                      focalX={booking.masterProvider.avatarFocalX}
+                      focalY={booking.masterProvider.avatarFocalY}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
                       {resolveInitial(booking.masterProvider.name)}

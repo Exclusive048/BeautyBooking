@@ -7,6 +7,7 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type Props = {
   provider: ProviderProfileDto;
@@ -44,7 +45,7 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
     <section className="relative overflow-hidden rounded-[32px] border border-border-subtle/70 bg-bg-card shadow-hover">
       <div className="relative h-[280px] md:h-[340px]">
         {coverUrl ? (
-          <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+          <FocalImage src={coverUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-bg-card via-bg-input to-muted" />
         )}
@@ -81,9 +82,11 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="flex items-end gap-4">
                 {provider.avatarUrl ? (
-                  <img
+                  <FocalImage
                     src={provider.avatarUrl}
                     alt={provider.name}
+                    focalX={provider.avatarFocalX}
+                    focalY={provider.avatarFocalY}
                     className="h-[120px] w-[120px] rounded-full border-4 border-white/65 object-cover shadow-card"
                   />
                 ) : (

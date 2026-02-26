@@ -9,6 +9,8 @@ export async function listProviderCards() {
       type: true,
       name: true,
       avatarUrl: true,
+      avatarFocalX: true,
+      avatarFocalY: true,
       tagline: true,
       rating: true,
       reviews: true,

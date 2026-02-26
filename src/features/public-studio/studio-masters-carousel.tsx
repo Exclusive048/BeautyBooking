@@ -7,6 +7,7 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl, studioBookingUrl } from "@/lib/public-urls";
+import { FocalImage } from "@/components/ui/focal-image";
 
 export type StudioMasterCard = {
   id: string;
@@ -20,6 +21,8 @@ type PortfolioFeedItem = {
 
 type MasterExtra = {
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   specialization: string | null;
   grade: string;
   portfolioThumbs: string[];
@@ -65,6 +68,8 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
 
           const value: MasterExtra = {
             avatarUrl: provider?.avatarUrl ?? null,
+            avatarFocalX: provider?.avatarFocalX ?? null,
+            avatarFocalY: provider?.avatarFocalY ?? null,
             specialization: provider?.tagline?.trim() || null,
             grade: gradeLabel(provider?.rating ?? 0, provider?.reviews ?? 0),
             portfolioThumbs: portfolio.slice(0, 3).map((item) => item.mediaUrl),
@@ -92,6 +97,8 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
         return {
           ...master,
           avatarUrl: extra?.avatarUrl ?? null,
+          avatarFocalX: extra?.avatarFocalX ?? null,
+          avatarFocalY: extra?.avatarFocalY ?? null,
           specialization: extra?.specialization ?? null,
           grade: extra?.grade ?? UI_TEXT.publicStudio.gradeNew,
           thumbs: extra?.portfolioThumbs ?? [],
@@ -122,7 +129,13 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
             <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
               <div className="relative h-48 overflow-hidden bg-muted">
                 {master.avatarUrl ? (
-                  <img src={master.avatarUrl} alt={master.name} className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
+                  <FocalImage
+                    src={master.avatarUrl}
+                    alt={master.name}
+                    focalX={master.avatarFocalX}
+                    focalY={master.avatarFocalY}
+                    className="h-full w-full object-cover transition group-hover:scale-[1.03]"
+                  />
                 ) : (
                   <div className="h-full w-full bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-700" />
                 )}

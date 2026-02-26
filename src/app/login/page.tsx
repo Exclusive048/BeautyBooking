@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import LoginClient from "./login-client";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { getSessionUser } from "@/lib/auth/session";
-import { getLoginHeroImageUrl } from "@/lib/media/queries";
+import { getLoginHeroImageAsset } from "@/lib/media/queries";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
@@ -11,11 +11,15 @@ export default async function LoginPage() {
     const decision = await resolveCabinetRedirect(user.id);
     redirect(decision.target);
   }
-  const heroImageUrl = await getLoginHeroImageUrl();
+  const heroImage = await getLoginHeroImageAsset();
 
   return (
     <Suspense fallback={<div className="min-h-[70vh]" />}>
-      <LoginClient heroImageUrl={heroImageUrl} />
+      <LoginClient
+        heroImageUrl={heroImage?.url ?? null}
+        heroImageFocalX={heroImage?.focalX ?? null}
+        heroImageFocalY={heroImage?.focalY ?? null}
+      />
     </Suspense>
   );
 }

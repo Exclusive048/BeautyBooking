@@ -9,6 +9,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { providerPublicUrl, withQuery } from "@/lib/public-urls";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type HotSlotItem = {
   id: string;
@@ -17,6 +18,8 @@ type HotSlotItem = {
     publicUsername: string;
     name: string;
     avatarUrl: string | null;
+    avatarFocalX: number | null;
+    avatarFocalY: number | null;
     address: string;
     district: string;
     ratingAvg: number;
@@ -167,9 +170,11 @@ export function HotSlotsPageClient() {
                   <div className="flex items-start gap-3">
                     <div className="h-12 w-12 overflow-hidden rounded-full border border-border-subtle bg-bg-input/60">
                       {item.provider.avatarUrl ? (
-                        <img
+                        <FocalImage
                           src={item.provider.avatarUrl}
                           alt={item.provider.name}
+                          focalX={item.provider.avatarFocalX}
+                          focalY={item.provider.avatarFocalY}
                           className="h-full w-full object-cover"
                         />
                       ) : (

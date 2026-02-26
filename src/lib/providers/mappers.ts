@@ -8,6 +8,8 @@ type ProviderProfileSource = Pick<
   | "studioId"
   | "name"
   | "avatarUrl"
+  | "avatarFocalX"
+  | "avatarFocalY"
   | "tagline"
   | "description"
   | "publicUsername"
@@ -23,6 +25,8 @@ type ProviderProfileSource = Pick<
   | "cancellationDeadlineHours"
   | "geoLat"
   | "geoLng"
+  | "bannerFocalX"
+  | "bannerFocalY"
 > & { services: ProviderServiceSource[] };
 type ProviderCardSource = Pick<
   Provider,
@@ -30,6 +34,8 @@ type ProviderCardSource = Pick<
   | "type"
   | "name"
   | "avatarUrl"
+  | "avatarFocalX"
+  | "avatarFocalY"
   | "tagline"
   | "rating"
   | "reviews"
@@ -56,6 +62,8 @@ export function mapProviderCard(provider: ProviderCardSource): ProviderCardDto {
     type: provider.type,
     name: provider.name,
     avatarUrl: provider.avatarUrl,
+    avatarFocalX: provider.avatarFocalX ?? null,
+    avatarFocalY: provider.avatarFocalY ?? null,
     tagline: provider.tagline,
     rating: provider.rating,
     reviews: provider.reviews,
@@ -74,7 +82,11 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     studioId: provider.studioId,
     name: provider.name,
     avatarUrl: provider.avatarUrl,
+    avatarFocalX: provider.avatarFocalX ?? null,
+    avatarFocalY: provider.avatarFocalY ?? null,
     bannerUrl: null,
+    bannerFocalX: provider.bannerFocalX ?? null,
+    bannerFocalY: provider.bannerFocalY ?? null,
     tagline: provider.tagline,
     description: provider.description ?? null,
     publicUsername: provider.publicUsername ?? null,
