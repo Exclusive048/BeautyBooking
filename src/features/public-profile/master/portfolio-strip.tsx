@@ -24,10 +24,15 @@ type PortfolioDetail = PortfolioItemPreview & {
 
 type Props = {
   items: PortfolioItemPreview[];
+  visualIndexByAssetId?: Record<string, { visualIndexed: boolean; visualCategory: string | null }>;
 };
 
+function parseMediaAssetId(url: string): string | null {
+  const match = url.match(/\/api\/media\/file\/([^/?#]+)/);
+  return match?.[1] ?? null;
+}
 
-export function PortfolioStrip({ items }: Props) {
+export function PortfolioStrip({ items, visualIndexByAssetId }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<PortfolioDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,29 +83,39 @@ export function PortfolioStrip({ items }: Props) {
         </div>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setError(null);
-                setSelectedItem(null);
-                setSelectedId(item.id);
-              }}
-              className="group overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card"
-            >
-              <div className="aspect-square overflow-hidden">
-                <img
-                  src={item.mediaUrl}
-                  alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                />
-              </div>
-              <div className="p-2 text-xs text-text-sec">
-                {item.primaryServiceTitle ?? item.caption ?? item.masterName}
-              </div>
-            </button>
-          ))}
+          {items.map((item) => {
+            const assetId = parseMediaAssetId(item.mediaUrl);
+            const indexState = assetId ? visualIndexByAssetId?.[assetId] : undefined;
+            const isIndexed = Boolean(indexState?.visualIndexed && indexState?.visualCategory);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setSelectedItem(null);
+                  setSelectedId(item.id);
+                }}
+                className="group overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card"
+              >
+                <div className="relative aspect-square overflow-hidden">
+                  <img
+                    src={item.mediaUrl}
+                    alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                  />
+                  {isIndexed ? (
+                    <span className="absolute left-2 top-2 rounded-full bg-emerald-600/90 px-2 py-1 text-[10px] font-semibold text-white shadow">
+                      ✓ В поиске
+                    </span>
+                  ) : null}
+                </div>
+                <div className="p-2 text-xs text-text-sec">
+                  {item.primaryServiceTitle ?? item.caption ?? item.masterName}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 

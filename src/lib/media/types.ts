@@ -21,6 +21,8 @@ export type MediaAssetDto = {
   originalFilename: string;
   url: string;
   createdAt: string;
+  visualIndexed: boolean;
+  visualCategory: string | null;
 };
 
 export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
@@ -34,5 +36,7 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     originalFilename: asset.originalFilename,
     url: `/api/media/file/${asset.id}`,
     createdAt: asset.createdAt.toISOString(),
+    visualIndexed: asset.visualIndexed,
+    visualCategory: asset.visualCategory ?? null,
   };
 }

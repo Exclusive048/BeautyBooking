@@ -1840,6 +1840,13 @@ model MediaAsset {
   createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   clientCardPhotos ClientCardPhoto[] @relation("ClientCardPhotoAsset")
   bookingReferences Booking[] @relation("BookingReferencePhoto")
+  visualIndexed        Boolean   @default(false)
+  visualIndexedAt      DateTime?
+  visualPromptVersion  String?
+  visualDescription    String?
+  visualMeta           Json?
+  visualCategory       String?
+  embedding            MediaAssetEmbedding?
 
   createdAt        DateTime        @default(now())
 
@@ -1855,6 +1862,17 @@ model MediaAsset {
 
   @@index([createdByUserId])
 
+}
+
+model MediaAssetEmbedding {
+  id        String   @id @default(cuid())
+  assetId   String   @unique
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime @default(now())
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
 }
 
 

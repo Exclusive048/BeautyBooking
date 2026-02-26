@@ -7,6 +7,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { HomeFilters } from "@/features/home/components/home-filters";
 import { PortfolioGrid } from "@/features/home/components/portfolio-grid";
 import { PortfolioPreviewModal } from "@/features/home/components/portfolio-preview-modal";
+import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 
 type HomeCategory = {
   id: string;
@@ -54,6 +55,7 @@ export function HomeFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [visualSearchOpen, setVisualSearchOpen] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const fetchFeed = useCallback(
@@ -196,6 +198,7 @@ export function HomeFeed() {
           setSelectedTagId(null);
         }}
         onSelectTag={(next) => setSelectedTagId((prev) => (prev === next ? null : next))}
+        onOpenVisualSearch={() => setVisualSearchOpen(true)}
       />
 
       {loading ? (
@@ -223,6 +226,8 @@ export function HomeFeed() {
         open={Boolean(selectedItemId)}
         onClose={() => setSelectedItemId(null)}
       />
+
+      <VisualSearchModal open={visualSearchOpen} onClose={() => setVisualSearchOpen(false)} />
     </div>
   );
 }

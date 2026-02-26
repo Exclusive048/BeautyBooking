@@ -16,6 +16,8 @@ import {
 import { ensureCanManageMedia, ensureCanReadMedia } from "@/lib/media/access";
 import { SITE_LOGIN_HERO_SETTING_KEY, SITE_LOGO_SETTING_KEY } from "@/lib/media/settings";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { enqueue } from "@/lib/queue/queue";
+import { createVisualSearchIndexJob } from "@/lib/queue/types";
 
 type UploadMediaInput = {
   entityType: MediaEntityType;
@@ -283,6 +285,13 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
     (input.kind === MediaKind.AVATAR || input.kind === MediaKind.PORTFOLIO)
   ) {
     await invalidateAdvisorCache(entityId);
+  }
+
+  if (
+    input.kind === MediaKind.PORTFOLIO &&
+    (input.entityType === MediaEntityType.MASTER || input.entityType === MediaEntityType.STUDIO)
+  ) {
+    void enqueue(createVisualSearchIndexJob({ assetId: created.id }));
   }
 
   return toMediaAssetDto(created);
