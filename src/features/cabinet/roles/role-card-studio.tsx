@@ -19,22 +19,28 @@ type Props =
 export function RoleCardStudio(props: Props) {
   if (props.mode === "empty") {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border-subtle text-3xl text-text-sec">
-            +
+      <Card className="h-full border-dashed">
+        <CardContent className="flex h-full flex-col justify-between p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-2xl border border-border-subtle bg-bg-input text-3xl text-text-sec">
+              +
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="text-base font-semibold text-text-main">У меня студия</div>
+              <div className="text-sm text-text-sec">
+                Управляйте командой мастеров, филиалами и общим расписанием
+              </div>
+            </div>
           </div>
-          <div className="text-lg font-semibold text-text-main">У меня студия</div>
-          <div className="max-w-xs text-sm text-text-sec">
-            Управляйте командой мастеров, филиалами и общим расписанием
+          <div className="mt-5">
+            {props.actionHref ? (
+              <Button asChild className="w-full">
+                <Link href={props.actionHref}>{props.actionLabel}</Link>
+              </Button>
+            ) : (
+              <Button className="w-full">{props.actionLabel}</Button>
+            )}
           </div>
-          {props.actionHref ? (
-            <Button asChild>
-              <Link href={props.actionHref}>{props.actionLabel}</Link>
-            </Button>
-          ) : (
-            <Button>{props.actionLabel}</Button>
-          )}
         </CardContent>
       </Card>
     );
@@ -42,19 +48,28 @@ export function RoleCardStudio(props: Props) {
 
   if (props.mode === "upsell") {
     return (
-      <Card className="opacity-70">
-        <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-          <div className="text-lg font-semibold text-text-main">Расширяйтесь до студии</div>
-          <div className="max-w-xs text-sm text-text-sec">
-            Добавьте команду мастеров и управляйте расписанием в одном месте
+      <Card className="h-full opacity-70">
+        <CardContent className="flex h-full flex-col justify-between p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-2xl border border-border-subtle bg-bg-input text-3xl text-text-sec">
+              +
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="text-base font-semibold text-text-main">Расширяйтесь до студии</div>
+              <div className="text-sm text-text-sec">
+                Добавьте команду мастеров и управляйте расписанием в одном месте
+              </div>
+            </div>
           </div>
-          {props.actionHref ? (
-            <Button asChild>
-              <Link href={props.actionHref}>{props.actionLabel}</Link>
-            </Button>
-          ) : (
-            <Button>{props.actionLabel}</Button>
-          )}
+          <div className="mt-5">
+            {props.actionHref ? (
+              <Button asChild className="w-full">
+                <Link href={props.actionHref}>{props.actionLabel}</Link>
+              </Button>
+            ) : (
+              <Button className="w-full">{props.actionLabel}</Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
@@ -69,10 +84,10 @@ export function RoleCardStudio(props: Props) {
   const isPublished = statusMetric === "Опубликована";
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:gap-6 md:p-6">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
+    <Card className="h-full">
+      <CardContent className="flex h-full flex-col justify-between p-5">
+        <div className="flex items-center gap-4">
+          <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={data.logoUrl} alt={data.name} className="h-full w-full object-cover" />
@@ -82,29 +97,22 @@ export function RoleCardStudio(props: Props) {
               </div>
             )}
           </div>
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="truncate text-base font-semibold text-text-main">{data.name}</div>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-sec">
-              <span className="truncate">Студия</span>
-              {statusMetric ? <span className="text-text-sec/80">•</span> : null}
-              {statusMetric ? (
-                <span className="inline-flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "text-xs",
-                      isPublished ? "text-emerald-300" : "text-text-sec"
-                    )}
-                  >
-                    ●
-                  </span>
-                  <span>{statusMetric}</span>
-                </span>
-              ) : null}
-            </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="truncate text-base font-semibold text-text-main">{data.name}</div>
+            <div className="text-sm text-text-sec">Студия</div>
+            {statusMetric ? (
+              <div className="flex items-center gap-2 text-sm text-text-sec">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    isPublished ? "bg-emerald-400" : "bg-border-subtle"
+                  )}
+                />
+                <span className="truncate">{statusMetric}</span>
+              </div>
+            ) : null}
             {otherMetrics && otherMetrics.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-sec">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-sec">
                 {otherMetrics.map((metric) => (
                   <span key={metric}>{metric}</span>
                 ))}
@@ -112,13 +120,13 @@ export function RoleCardStudio(props: Props) {
             ) : null}
           </div>
         </div>
-        <div className="md:ml-6">
+        <div className="mt-5">
           {data.actionHref ? (
-            <Button asChild className="w-full md:w-auto">
+            <Button asChild className="w-full">
               <Link href={data.actionHref}>{data.actionLabel ?? "Открыть кабинет"}</Link>
             </Button>
           ) : (
-            <Button className="w-full md:w-auto">{data.actionLabel ?? "Открыть кабинет"}</Button>
+            <Button className="w-full">{data.actionLabel ?? "Открыть кабинет"}</Button>
           )}
         </div>
       </CardContent>
