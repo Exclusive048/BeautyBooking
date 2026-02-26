@@ -284,6 +284,8 @@ enum MediaEntityType {
 
   CLIENT_CARD
 
+  BOOKING
+
 }
 
 
@@ -297,6 +299,8 @@ enum MediaKind {
   MODEL_APPLICATION_PHOTO
 
   CLIENT_CARD_PHOTO
+
+  BOOKING_REFERENCE
 
 }
 
@@ -1031,6 +1035,10 @@ model Service {
 
   onlinePaymentEnabled Boolean @default(false)
 
+  requiresReferencePhoto Boolean @default(false)
+
+  bookingQuestions        ServiceBookingQuestion[]
+
 
 
   bookings       Booking[]
@@ -1053,6 +1061,18 @@ model Service {
 
   @@index([providerId])
 
+}
+
+model ServiceBookingQuestion {
+  id        String  @id @default(cuid())
+  serviceId String
+  text      String
+  required  Boolean @default(false)
+  order     Int     @default(0)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
 }
 
 
@@ -1261,6 +1281,12 @@ model Booking {
   notes               String?
 
   silentMode          Boolean       @default(false)
+
+  referencePhotoAssetId String?
+
+  bookingAnswers         Json?
+
+  referencePhoto MediaAsset? @relation("BookingReferencePhoto", fields: [referencePhotoAssetId], references: [id])
 
 
 
@@ -1813,6 +1839,7 @@ model MediaAsset {
 
   createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   clientCardPhotos ClientCardPhoto[] @relation("ClientCardPhotoAsset")
+  bookingReferences Booking[] @relation("BookingReferencePhoto")
 
   createdAt        DateTime        @default(now())
 

@@ -15,6 +15,7 @@ import {
 } from "@/lib/media/types";
 import { ensureCanManageMedia, ensureCanReadMedia } from "@/lib/media/access";
 import { SITE_LOGIN_HERO_SETTING_KEY, SITE_LOGO_SETTING_KEY } from "@/lib/media/settings";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 type UploadMediaInput = {
   entityType: MediaEntityType;
@@ -277,7 +278,68 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
     });
   }
 
+  if (
+    input.entityType === MediaEntityType.MASTER &&
+    (input.kind === MediaKind.AVATAR || input.kind === MediaKind.PORTFOLIO)
+  ) {
+    await invalidateAdvisorCache(entityId);
+  }
+
   return toMediaAssetDto(created);
+}
+
+export async function uploadBookingReferenceAsset(
+  user: UserProfile | null,
+  input: {
+    mimeType: string;
+    sizeBytes: number;
+    bytes: Uint8Array;
+    originalFilename: string;
+  }
+): Promise<{ id: string }> {
+  const entityId = `pending:${user?.id ?? randomUUID()}`;
+  validateUploadBasics({
+    entityType: MediaEntityType.BOOKING,
+    entityId,
+    kind: MediaKind.BOOKING_REFERENCE,
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+    bytes: input.bytes,
+    originalFilename: input.originalFilename,
+  });
+
+  const storage = getStorageProvider();
+  const storageKey = buildStorageKey({
+    entityType: MediaEntityType.BOOKING,
+    entityId,
+    kind: MediaKind.BOOKING_REFERENCE,
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+    bytes: input.bytes,
+    originalFilename: input.originalFilename,
+  });
+  await storage.putObject({
+    key: storageKey,
+    bytes: input.bytes,
+    contentType: input.mimeType,
+  });
+
+  const created = await prisma.mediaAsset.create({
+    data: {
+      entityType: MediaEntityType.BOOKING,
+      entityId,
+      kind: MediaKind.BOOKING_REFERENCE,
+      storageProvider: storage.name,
+      storageKey,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      originalFilename: input.originalFilename,
+      createdByUserId: user?.id ?? null,
+    },
+    select: { id: true },
+  });
+
+  return { id: created.id };
 }
 
 export async function deleteMediaAsset(user: UserProfile, assetId: string): Promise<{ id: string }> {
@@ -335,6 +397,13 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
       where: { id: asset.entityId },
       data: { avatarUrl: nextAvatar ? `/api/media/file/${nextAvatar.id}` : null },
     });
+  }
+
+  if (
+    asset.entityType === MediaEntityType.MASTER &&
+    (asset.kind === MediaKind.AVATAR || asset.kind === MediaKind.PORTFOLIO)
+  ) {
+    await invalidateAdvisorCache(asset.entityId);
   }
 
   return { id: asset.id };

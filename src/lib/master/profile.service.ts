@@ -2,6 +2,7 @@ import { AppError } from "@/lib/api/errors";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
 import { prisma } from "@/lib/prisma";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { Prisma } from "@prisma/client";
 
 type MasterContext = {
@@ -599,6 +600,7 @@ export async function createMasterPortfolioItem(
     return item;
   });
 
+  await invalidateAdvisorCache(masterId);
   return { id: created.id };
 }
 
@@ -640,5 +642,6 @@ export async function deleteMasterPortfolioItem(
       });
     }
   });
+  await invalidateAdvisorCache(masterId);
   return { id: item.id };
 }

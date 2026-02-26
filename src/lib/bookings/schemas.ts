@@ -15,4 +15,15 @@ export const createBookingSchema = z.object({
   clientPhone: z.string().trim().min(1, "Client phone is required"),
   comment: z.string().trim().nullable().optional(),
   silentMode: z.boolean().optional(),
+  referencePhotoAssetId: z.string().trim().min(1).nullable().optional(),
+  bookingAnswers: z
+    .array(
+      z.object({
+        questionId: z.string().trim().min(1),
+        questionText: z.string().trim().min(1).max(300),
+        answer: z.string().trim().min(1).max(1000),
+      })
+    )
+    .max(5)
+    .optional(),
 });

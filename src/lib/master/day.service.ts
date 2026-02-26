@@ -4,6 +4,7 @@ import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import type { BookingStatus } from "@prisma/client";
 
 export type MasterDayBooking = {
@@ -24,6 +25,8 @@ export type MasterDayBooking = {
   clientPhone: string;
   notes: string | null;
   silentMode: boolean;
+  referencePhotoAssetId: string | null;
+  bookingAnswers: Array<{ questionId: string; questionText: string; answer: string }> | null;
   serviceTitle: string;
   serviceName: string;
   durationMin: number;
@@ -84,6 +87,25 @@ function parseDateKey(date: string): Date {
 function sumBookingPrice(input: { serviceItems: Array<{ priceSnapshot: number }>; servicePrice: number }): number {
   const snap = input.serviceItems.reduce((sum, item) => sum + Math.max(0, item.priceSnapshot), 0);
   return snap > 0 ? snap : input.servicePrice;
+}
+
+function normalizeBookingAnswers(
+  value: unknown
+): Array<{ questionId: string; questionText: string; answer: string }> | null {
+  if (!Array.isArray(value)) return null;
+  const answers = value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const questionId = typeof record.questionId === "string" ? record.questionId.trim() : "";
+      const questionText = typeof record.questionText === "string" ? record.questionText.trim() : "";
+      const answer = typeof record.answer === "string" ? record.answer.trim() : "";
+      if (!questionId || !questionText || !answer) return null;
+      return { questionId, questionText, answer };
+    })
+    .filter((item): item is { questionId: string; questionText: string; answer: string } => item !== null);
+
+  return answers.length > 0 ? answers : null;
 }
 
 function computeGaps(bookings: MasterDayBooking[], dateKey: string): MasterDayGap[] {
@@ -207,6 +229,8 @@ export async function getMasterDay(input: {
         clientPhone: true,
         notes: true,
         silentMode: true,
+        referencePhotoAssetId: true,
+        bookingAnswers: true,
         service: { select: { name: true, title: true, durationMin: true } },
       },
       orderBy: { startAtUtc: "asc" },
@@ -307,6 +331,8 @@ export async function getMasterDay(input: {
       clientPhone: item.clientPhone,
       notes: item.notes ?? null,
       silentMode: item.silentMode,
+      referencePhotoAssetId: item.referencePhotoAssetId ?? null,
+      bookingAnswers: normalizeBookingAnswers(item.bookingAnswers),
       serviceTitle: baseDto.serviceName,
       serviceName: baseDto.serviceName,
       durationMin: baseDto.durationMin,
@@ -456,6 +482,7 @@ export async function createSoloMasterBooking(input: {
     startAtUtc: input.startAt,
     endAtUtc: endAt,
   });
+  await invalidateAdvisorCache(input.masterId);
 
   return { id: created.id };
 }

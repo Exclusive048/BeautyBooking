@@ -2,6 +2,7 @@ import type { AvailabilitySlot } from "@/lib/domain/schedule";
 import * as cache from "@/lib/cache/cache";
 import { listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 const SLOTS_TTL_SECONDS = 120;
 const SLOTS_INDEX_TTL_SECONDS = SLOTS_TTL_SECONDS;
@@ -53,7 +54,10 @@ export async function setCachedSlotsForDate(input: {
 }
 
 export async function invalidateSlotsForMaster(masterId: string): Promise<void> {
-  await cache.delByPattern(`slots:${masterId}:*`);
+  await Promise.all([
+    cache.delByPattern(`slots:${masterId}:*`),
+    invalidateAdvisorCache(masterId),
+  ]);
 }
 
 export async function invalidateSlotsForDateKeys(masterId: string, dateKeys: string[]): Promise<void> {

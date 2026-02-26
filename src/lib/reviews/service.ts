@@ -9,6 +9,7 @@ import {
 } from "@/lib/reviews/constants";
 import { toReviewDto, type ReviewDto, type ReviewTagDto } from "@/lib/reviews/types";
 import { logError } from "@/lib/logging/logger";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 // AUDIT MATRIX (task sections 1-9)
 // 1) Tag taxonomy: IMPLEMENTED (ReviewTag dictionary + seed).
@@ -418,6 +419,10 @@ export async function createReview(input: {
       throw new AppError("Review already exists", 409, "REVIEW_ALREADY_EXISTS");
     }
     throw error;
+  }
+
+  if (created.targetType === "provider") {
+    await invalidateAdvisorCache(created.targetId);
   }
 
   try {

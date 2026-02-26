@@ -22,6 +22,11 @@ type BookingTelegramNotifyOptions = {
   notifyMasterOnCancel?: boolean;
 };
 
+type BookingAnswerEntry = {
+  questionText: string;
+  answer: string;
+};
+
 type BookingTelegramContext = {
   serviceName: string;
   whenText: string | null;
@@ -32,6 +37,8 @@ type BookingTelegramContext = {
   clientUrl: string;
   masterUserId: string | null;
   clientUserId: string | null;
+  referencePhotoUrl: string | null;
+  bookingAnswers: BookingAnswerEntry[];
 };
 
 const DEFAULT_OPTIONS: Required<BookingTelegramNotifyOptions> = {
@@ -54,6 +61,20 @@ function formatDateTimeUtc(date: Date): string {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+function normalizeBookingAnswers(value: unknown): BookingAnswerEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const questionText = typeof record.questionText === "string" ? record.questionText.trim() : "";
+      const answer = typeof record.answer === "string" ? record.answer.trim() : "";
+      if (!questionText || !answer) return null;
+      return { questionText, answer };
+    })
+    .filter((item): item is BookingAnswerEntry => item !== null);
+}
+
 async function enqueueTelegramSend(chatId: string, text: string): Promise<void> {
   await enqueue(
     createTelegramSendJob({
@@ -66,13 +87,7 @@ async function enqueueTelegramSend(chatId: string, text: string): Promise<void> 
 async function loadBookingContext(bookingId: string): Promise<BookingTelegramContext | null> {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    select: {
-      id: true,
-      slotLabel: true,
-      startAtUtc: true,
-      clientUserId: true,
-      clientName: true,
-      clientPhone: true,
+    include: {
       service: { select: { name: true } },
       provider: { select: { name: true, ownerUserId: true } },
       masterProvider: { select: { name: true, ownerUserId: true } },
@@ -102,6 +117,10 @@ async function loadBookingContext(bookingId: string): Promise<BookingTelegramCon
     clientUrl: `${appUrl}/cabinet/profile`,
     masterUserId,
     clientUserId: booking.clientUserId ?? null,
+    referencePhotoUrl: booking.referencePhotoAssetId
+      ? `${appUrl}/api/media/file/${booking.referencePhotoAssetId}`
+      : null,
+    bookingAnswers: normalizeBookingAnswers(booking.bookingAnswers),
   };
 }
 
@@ -127,6 +146,8 @@ export async function sendBookingTelegramNotifications(
           clientName: ctx.clientName,
           clientPhone: ctx.clientPhone,
           linkUrl: ctx.masterUrl,
+          referencePhotoUrl: ctx.referencePhotoUrl,
+          bookingAnswers: ctx.bookingAnswers,
         });
         await enqueueTelegramSend(masterChatId, text);
       }

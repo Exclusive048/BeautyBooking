@@ -10,6 +10,7 @@ import {
   type NotificationRecord,
 } from "@/lib/notifications/service";
 import { logError } from "@/lib/logging/logger";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
@@ -136,6 +137,7 @@ export async function createStudioBooking(input: {
     startAtUtc: input.startAt,
     endAtUtc: endAt,
   });
+  await invalidateAdvisorCache(master.id);
 
   return { id: created.id };
 }
