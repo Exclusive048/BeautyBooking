@@ -22,6 +22,14 @@ export type BookingCreateInput = {
   clientPhone: string;
   comment: string | null;
   silentMode?: boolean;
+  referencePhotoAssetId?: string | null;
+  bookingAnswers?: BookingAnswerPayload[] | null;
+};
+
+export type BookingAnswerPayload = {
+  questionId: string;
+  questionText: string;
+  answer: string;
 };
 
 export type BookingCreateResult =

@@ -50,6 +50,39 @@ async function canManageProvider(providerId: string, userId: string): Promise<bo
   return false;
 }
 
+async function canReadBookingMedia(user: UserProfile, bookingId: string): Promise<boolean> {
+  if (user.roles.includes(AccountType.ADMIN) || user.roles.includes(AccountType.SUPERADMIN)) {
+    return true;
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      clientUserId: true,
+      provider: { select: { id: true, type: true, ownerUserId: true, studioId: true } },
+      masterProvider: { select: { ownerUserId: true } },
+    },
+  });
+  if (!booking) {
+    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+  }
+
+  if (booking.clientUserId && booking.clientUserId === user.id) return true;
+  if (booking.provider.ownerUserId && booking.provider.ownerUserId === user.id) return true;
+  if (booking.masterProvider?.ownerUserId && booking.masterProvider.ownerUserId === user.id) return true;
+
+  if (booking.provider.type === ProviderType.STUDIO) {
+    return isStudioAdminOrOwnerByStudioProviderId(booking.provider.id, user.id);
+  }
+
+  if (booking.provider.studioId) {
+    return isStudioAdminOrOwnerByStudioProviderId(booking.provider.studioId, user.id);
+  }
+
+  return false;
+}
+
 export async function ensureCanManageMedia(
   user: UserProfile,
   entityType: MediaEntityType,
@@ -164,6 +197,13 @@ export async function ensureCanReadMedia(
     }
     const canManage = await canManageProvider(card.providerId, user.id);
     if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    return;
+  }
+
+  if (entityType === MediaEntityType.BOOKING) {
+    if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    const allowed = await canReadBookingMedia(user, entityId);
+    if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
     return;
   }
 }

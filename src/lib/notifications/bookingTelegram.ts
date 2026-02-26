@@ -5,57 +5,83 @@ type BookingTelegramPayload = {
   clientPhone?: string | null;
   masterName?: string | null;
   linkUrl: string;
+  referencePhotoUrl?: string | null;
+  bookingAnswers?: Array<{ questionText: string; answer: string }>;
 };
 
 function formatClientLine(name?: string | null, phone?: string | null): string | null {
   const safeName = name?.trim() ?? "";
   const safePhone = phone?.trim() ?? "";
-  if (safeName && safePhone) return `\u041a\u043b\u0438\u0435\u043d\u0442: ${safeName}, ${safePhone}`;
-  if (safeName) return `\u041a\u043b\u0438\u0435\u043d\u0442: ${safeName}`;
-  if (safePhone) return `\u041a\u043b\u0438\u0435\u043d\u0442: ${safePhone}`;
+  if (safeName && safePhone) return `Клиент: ${safeName}, ${safePhone}`;
+  if (safeName) return `Клиент: ${safeName}`;
+  if (safePhone) return `Клиент: ${safePhone}`;
   return null;
 }
 
 function formatMasterLine(name?: string | null): string | null {
   const safeName = name?.trim() ?? "";
-  return safeName ? `\u041c\u0430\u0441\u0442\u0435\u0440: ${safeName}` : null;
+  return safeName ? `Мастер: ${safeName}` : null;
 }
 
 function pushIf(lines: string[], value: string | null | undefined) {
   if (value && value.trim().length > 0) lines.push(value);
 }
 
+function pushBookingAnswers(
+  lines: string[],
+  answers?: Array<{ questionText: string; answer: string }> | null
+) {
+  if (!answers || answers.length === 0) return;
+  const normalized = answers
+    .map((item) => ({
+      question: item.questionText?.trim() ?? "",
+      answer: item.answer?.trim() ?? "",
+    }))
+    .filter((item) => item.question.length > 0 && item.answer.length > 0);
+  if (normalized.length === 0) return;
+
+  lines.push("💬 Ответы клиента:");
+  for (const item of normalized) {
+    lines.push(`• ${item.question}: ${item.answer}`);
+  }
+}
+
 export function buildBookingCreatedText(payload: BookingTelegramPayload): string {
-  const lines: string[] = ["\ud83d\udcc5 \u041d\u043e\u0432\u0430\u044f \u0437\u0430\u043f\u0438\u0441\u044c"];
-  pushIf(lines, `\u0423\u0441\u043b\u0443\u0433\u0430: ${payload.serviceName}`);
-  pushIf(lines, payload.whenText ? `\u041a\u043e\u0433\u0434\u0430: ${payload.whenText}` : null);
+  const lines: string[] = ["📅 Новая запись"];
+  pushIf(lines, `Услуга: ${payload.serviceName}`);
+  pushIf(lines, payload.whenText ? `Когда: ${payload.whenText}` : null);
   pushIf(lines, formatClientLine(payload.clientName, payload.clientPhone));
-  pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
+  pushIf(
+    lines,
+    payload.referencePhotoUrl ? `📎 Клиент прикрепил референс: ${payload.referencePhotoUrl}` : null
+  );
+  pushBookingAnswers(lines, payload.bookingAnswers);
+  pushIf(lines, `Ссылка: ${payload.linkUrl}`);
   return lines.join("\n");
 }
 
 export function buildBookingCancelledText(payload: BookingTelegramPayload): string {
-  const lines: string[] = ["\u274c \u0417\u0430\u043f\u0438\u0441\u044c \u043e\u0442\u043c\u0435\u043d\u0435\u043d\u0430"];
-  pushIf(lines, `\u0423\u0441\u043b\u0443\u0433\u0430: ${payload.serviceName}`);
-  pushIf(lines, payload.whenText ? `\u041a\u043e\u0433\u0434\u0430: ${payload.whenText}` : null);
-  pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
+  const lines: string[] = ["❌ Запись отменена"];
+  pushIf(lines, `Услуга: ${payload.serviceName}`);
+  pushIf(lines, payload.whenText ? `Когда: ${payload.whenText}` : null);
+  pushIf(lines, `Ссылка: ${payload.linkUrl}`);
   return lines.join("\n");
 }
 
 export function buildBookingConfirmedText(payload: BookingTelegramPayload): string {
-  const lines: string[] = ["\u2705 \u0417\u0430\u043f\u0438\u0441\u044c \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0430"];
-  pushIf(lines, `\u0423\u0441\u043b\u0443\u0433\u0430: ${payload.serviceName}`);
-  pushIf(lines, payload.whenText ? `\u041a\u043e\u0433\u0434\u0430: ${payload.whenText}` : null);
+  const lines: string[] = ["✅ Запись подтверждена"];
+  pushIf(lines, `Услуга: ${payload.serviceName}`);
+  pushIf(lines, payload.whenText ? `Когда: ${payload.whenText}` : null);
   pushIf(lines, formatMasterLine(payload.masterName));
-  pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
+  pushIf(lines, `Ссылка: ${payload.linkUrl}`);
   return lines.join("\n");
 }
 
 export function buildClientBookingCreatedText(payload: BookingTelegramPayload): string {
-  const lines: string[] = ["\u2705 \u0417\u0430\u043f\u0438\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u043d\u0430"];
-  pushIf(lines, `\u0423\u0441\u043b\u0443\u0433\u0430: ${payload.serviceName}`);
-  pushIf(lines, payload.whenText ? `\u041a\u043e\u0433\u0434\u0430: ${payload.whenText}` : null);
-  pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
+  const lines: string[] = ["✅ Запись создана"];
+  pushIf(lines, `Услуга: ${payload.serviceName}`);
+  pushIf(lines, payload.whenText ? `Когда: ${payload.whenText}` : null);
+  pushIf(lines, `Ссылка: ${payload.linkUrl}`);
   return lines.join("\n");
 }
 
@@ -64,13 +90,13 @@ export function buildBookingReminderText(
 ): string {
   const suffix =
     payload.kind === "REMINDER_24H"
-      ? "\u0437\u0430 24 \u0447\u0430\u0441\u0430"
-      : "\u0437\u0430 2 \u0447\u0430\u0441\u0430";
-  const lines: string[] = [`\u23f0 \u041d\u0430\u043f\u043e\u043c\u0438\u043d\u0430\u043d\u0438\u0435 ${suffix}`];
-  pushIf(lines, `\u0423\u0441\u043b\u0443\u0433\u0430: ${payload.serviceName}`);
-  pushIf(lines, payload.whenText ? `\u041a\u043e\u0433\u0434\u0430: ${payload.whenText}` : null);
+      ? "за 24 часа"
+      : "за 2 часа";
+  const lines: string[] = [`⏰ Напоминание ${suffix}`];
+  pushIf(lines, `Услуга: ${payload.serviceName}`);
+  pushIf(lines, payload.whenText ? `Когда: ${payload.whenText}` : null);
   pushIf(lines, formatClientLine(payload.clientName, payload.clientPhone));
   pushIf(lines, formatMasterLine(payload.masterName));
-  pushIf(lines, `\u0421\u0441\u044b\u043b\u043a\u0430: ${payload.linkUrl}`);
+  pushIf(lines, `Ссылка: ${payload.linkUrl}`);
   return lines.join("\n");
 }

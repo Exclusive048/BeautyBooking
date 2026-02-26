@@ -66,6 +66,8 @@ export async function POST(req: Request) {
       clientPhone,
       comment,
       silentMode,
+      referencePhotoAssetId,
+      bookingAnswers,
     } = await parseBody(req, bookingCreateSchema);
 
     const idempotencyKeyRaw = req.headers.get("x-idempotency-key");
@@ -89,6 +91,8 @@ export async function POST(req: Request) {
         clientPhone,
         comment,
         silentMode,
+        referencePhotoAssetId,
+        bookingAnswers,
         clientUserId: user.userId,
         idempotencyKey: normalizedIdempotencyKey,
       });
@@ -103,6 +107,8 @@ export async function POST(req: Request) {
       clientPhone,
       comment,
       silentMode,
+      referencePhotoAssetId,
+      bookingAnswers,
     }, normalizedIdempotencyKey);
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {

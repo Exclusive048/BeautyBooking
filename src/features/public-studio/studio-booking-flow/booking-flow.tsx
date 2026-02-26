@@ -22,6 +22,11 @@ import {
   type SlotItem,
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
+import {
+  fetchPublicServiceBookingConfig,
+  uploadBookingReference,
+  type ServiceBookingConfig,
+} from "@/features/booking/lib/booking-config";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -66,6 +71,14 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [meLoading, setMeLoading] = useState(true);
   const [comment, setComment] = useState("");
   const [silentMode, setSilentMode] = useState(false);
+  const [bookingConfig, setBookingConfig] = useState<ServiceBookingConfig | null>(null);
+  const [bookingConfigLoading, setBookingConfigLoading] = useState(false);
+  const [bookingConfigError, setBookingConfigError] = useState<string | null>(null);
+  const [referencePhotoAssetId, setReferencePhotoAssetId] = useState<string | null>(null);
+  const [referencePreviewUrl, setReferencePreviewUrl] = useState<string | null>(null);
+  const [referenceUploading, setReferenceUploading] = useState(false);
+  const [referenceUploadError, setReferenceUploadError] = useState<string | null>(null);
+  const [bookingAnswers, setBookingAnswers] = useState<Record<string, string>>({});
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -174,6 +187,59 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   }, [serviceId]);
 
   useEffect(() => {
+    if (!serviceId) {
+      setBookingConfig(null);
+      setBookingConfigError(null);
+      setBookingAnswers({});
+      setReferencePhotoAssetId(null);
+      setReferencePreviewUrl(null);
+      setReferenceUploadError(null);
+      setReferenceUploading(false);
+      setBookingConfigLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBookingConfigLoading(true);
+    setBookingConfigError(null);
+    setBookingAnswers({});
+    setReferencePhotoAssetId(null);
+    setReferencePreviewUrl(null);
+    setReferenceUploadError(null);
+    setReferenceUploading(false);
+
+    (async () => {
+      try {
+        const config = await fetchPublicServiceBookingConfig(serviceId);
+        if (!cancelled) {
+          setBookingConfig(config);
+        }
+      } catch {
+        if (!cancelled) {
+          setBookingConfig(null);
+          setBookingConfigError("Не удалось загрузить требования записи.");
+        }
+      } finally {
+        if (!cancelled) {
+          setBookingConfigLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [serviceId]);
+
+  useEffect(() => {
+    return () => {
+      if (referencePreviewUrl) {
+        URL.revokeObjectURL(referencePreviewUrl);
+      }
+    };
+  }, [referencePreviewUrl]);
+
+  useEffect(() => {
     if (masterSelectionError) {
       setMasterSelectionError(null);
     }
@@ -259,6 +325,25 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     setSlotLabel(slots[0]?.label ?? "");
   }, [slotLabel, slots]);
 
+  async function handleReferenceUpload(file: File) {
+    setReferenceUploadError(null);
+    setReferenceUploading(true);
+    setReferencePhotoAssetId(null);
+    setReferencePreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+
+    const result = await uploadBookingReference(file);
+    if (!result.ok) {
+      setReferenceUploadError(result.error);
+      setReferencePhotoAssetId(null);
+    } else {
+      setReferencePhotoAssetId(result.assetId);
+    }
+    setReferenceUploading(false);
+  }
+
   async function onSubmit() {
     if (!studio || !selectedService || !resolvedMasterId || !slotLabel) return;
 
@@ -272,6 +357,36 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     setSubmitError(null);
     setSubmitSuccess(null);
     try {
+      if (bookingConfig?.requiresReferencePhoto && !referencePhotoAssetId) {
+        setSubmitError("Нужен фото-референс для записи.");
+        setSubmitLoading(false);
+        return;
+      }
+      if (bookingConfig?.questions?.length) {
+        const missingRequired = bookingConfig.questions.some(
+          (question) => question.required && !(bookingAnswers[question.id]?.trim() ?? "")
+        );
+        if (missingRequired) {
+          setSubmitError("Ответьте на обязательные вопросы.");
+          setSubmitLoading(false);
+          return;
+        }
+      }
+
+      const answersPayload =
+        bookingConfig?.questions
+          ?.map((question) => {
+            const value = bookingAnswers[question.id]?.trim() ?? "";
+            if (!value) return null;
+            return {
+              questionId: question.id,
+              questionText: question.text,
+              answer: value,
+            };
+          })
+          .filter((item): item is { questionId: string; questionText: string; answer: string } => item !== null) ??
+        null;
+
       const result = await createBooking({
         providerId: studio.id,
         serviceId: selectedService.id,
@@ -283,6 +398,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         clientPhone: me?.phone ?? "",
         comment: comment.trim() ? comment.trim() : null,
         silentMode,
+        referencePhotoAssetId,
+        bookingAnswers: answersPayload,
       });
 
       if (!result.ok && result.error === "AUTH_REQUIRED") {
@@ -491,6 +608,70 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
             className="mt-1 min-h-[84px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none"
           />
 
+          
+          {bookingConfigLoading ? (
+            <div className="mt-3 text-xs text-text-muted">????????? ?????????? ??????...</div>
+          ) : null}
+          {bookingConfigError ? <div className="mt-3 text-xs text-red-600">{bookingConfigError}</div> : null}
+
+          {bookingConfig && (bookingConfig.requiresReferencePhoto || bookingConfig.questions.length > 0) ? (
+            <div className="mt-3 rounded-xl border border-border bg-surface p-3 text-sm">
+              <div className="text-sm font-semibold text-text">?????? ???????</div>
+
+              {bookingConfig.requiresReferencePhoto ? (
+                <div className="mt-3">
+                  <label className="block text-xs text-text-muted">
+                    ????-???????? <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      if (file) void handleReferenceUpload(file);
+                    }}
+                    disabled={referenceUploading}
+                    className="mt-2 block w-full text-xs text-text-muted"
+                  />
+                  {referenceUploading ? (
+                    <div className="mt-2 text-xs text-text-muted">????????? ????...</div>
+                  ) : null}
+                  {referenceUploadError ? (
+                    <div className="mt-2 text-xs text-red-600">{referenceUploadError}</div>
+                  ) : null}
+                  {referencePreviewUrl ? (
+                    <img
+                      src={referencePreviewUrl}
+                      alt="????????"
+                      className="mt-3 max-h-48 w-full rounded-xl object-cover"
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
+              {bookingConfig.questions.length > 0 ? (
+                <div className="mt-3 space-y-3">
+                  {bookingConfig.questions.map((question) => (
+                    <label key={question.id} className="block text-xs text-text-muted">
+                      <span className="text-sm text-text">
+                        {question.text}
+                        {question.required ? <span className="text-red-500"> *</span> : null}
+                      </span>
+                      <input
+                        type="text"
+                        value={bookingAnswers[question.id] ?? ""}
+                        onChange={(event) =>
+                          setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
+                        }
+                        className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none"
+                        placeholder="??? ?????"
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {submitError ? <div className="mt-2 text-sm text-red-600">{submitError}</div> : null}
           {submitSuccess ? <div className="mt-2 text-sm text-emerald-600">{submitSuccess}</div> : null}
           {!meLoading && !me ? <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicStudio.authRequiredText}</div> : null}
@@ -498,7 +679,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           <button
             type="button"
             onClick={() => void onSubmit()}
-            disabled={submitLoading || !selectedService || !resolvedMasterId || !slotLabel}
+            disabled={submitLoading || referenceUploading || !selectedService || !resolvedMasterId || !slotLabel}
             className="mt-4 w-full rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-neutral-900"
           >
             {UI_TEXT.publicStudio.book}

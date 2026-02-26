@@ -134,6 +134,18 @@ export const createMasterServiceSchema = z.object({
   globalCategoryId: z.string().trim().min(1).optional(),
 });
 
+const bookingQuestionSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  text: z.string().trim().min(10).max(300),
+  required: z.boolean(),
+  order: z.number().int().min(0).max(1000),
+});
+
+export const serviceBookingConfigSchema = z.object({
+  requiresReferencePhoto: z.boolean(),
+  questions: z.array(bookingQuestionSchema).max(5),
+});
+
 export const createMasterPortfolioSchema = z.object({
   mediaUrl: z.string().url().max(2000),
   caption: z.string().trim().max(2000).optional(),

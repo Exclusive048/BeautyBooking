@@ -9,6 +9,7 @@ import type { MediaAssetDto } from "@/lib/media/types";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { BookingChat } from "@/features/chat/components/booking-chat";
+import { MasterAdvisorSection } from "@/features/master/components/master-advisor-section";
 
 type DayBooking = {
   id: string;
@@ -28,6 +29,10 @@ type DayBooking = {
   clientPhone: string;
   notes: string | null;
   silentMode: boolean;
+
+  referencePhotoAssetId: string | null;
+
+  bookingAnswers: Array<{ questionId: string; questionText: string; answer: string }> | null;
   serviceTitle: string;
   serviceName?: string;
   durationMin?: number;
@@ -689,6 +694,35 @@ export function MasterDashboardPage() {
                 {booking.silentMode ? (
                   <div className="mt-2 text-xs text-text-sec">Режим тишины включён</div>
                 ) : null}
+
+                {booking.referencePhotoAssetId || (booking.bookingAnswers?.length ?? 0) > 0 ? (
+                  <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-xs text-text-sec">
+                    <div className="text-xs font-semibold text-text-main">?????? ???????</div>
+                    {booking.referencePhotoAssetId ? (
+                      <a
+                        href={`/api/media/file/${booking.referencePhotoAssetId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 block"
+                      >
+                        <img
+                          src={`/api/media/file/${booking.referencePhotoAssetId}`}
+                          alt="???????? ???????"
+                          className="max-h-52 w-full rounded-xl object-cover"
+                        />
+                      </a>
+                    ) : null}
+                    {booking.bookingAnswers && booking.bookingAnswers.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {booking.bookingAnswers.map((answer) => (
+                          <div key={answer.questionId}>
+                            ? {answer.questionText}: {answer.answer}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {/* AUDIT (кнопки мастера):
                       - реализовано: PENDING + actionRequiredBy=MASTER => Confirm/Reject.
@@ -779,6 +813,7 @@ export function MasterDashboardPage() {
           </div>
 
           <div className="space-y-3">
+            <MasterAdvisorSection />
             <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Мой баланс (месяц)</h3>

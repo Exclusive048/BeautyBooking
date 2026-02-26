@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { ProviderType, Prisma } from "@prisma/client";
+import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
 import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
@@ -27,6 +27,8 @@ import {
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
 
 export async function createBooking(input: {
   providerId: string;
@@ -39,6 +41,8 @@ export async function createBooking(input: {
   clientPhone: string;
   comment: string | null | undefined;
   silentMode?: boolean;
+  referencePhotoAssetId?: string | null;
+  bookingAnswers?: BookingAnswerPayload[] | null;
   clientUserId: string;
   idempotencyKey?: string | null;
 }): Promise<BookingDto> {
@@ -85,6 +89,13 @@ export async function createBooking(input: {
       startAtUtc: input.startAtUtc,
       endAtUtc: input.endAtUtc,
     });
+
+  const bookingExtras = await resolveBookingExtras({
+    serviceId: service.id,
+    clientUserId: input.clientUserId,
+    referencePhotoAssetId: input.referencePhotoAssetId ?? null,
+    bookingAnswers: input.bookingAnswers ?? null,
+  });
 
   const hotProviderId = resolvedMasterProviderId ?? (provider.type === ProviderType.MASTER ? provider.id : null);
   if (hotProviderId) {
@@ -146,7 +157,7 @@ export async function createBooking(input: {
         bufferMin,
       });
 
-      return tx.booking.create({
+      const created = await tx.booking.create({
         data: {
           providerId: input.providerId,
           serviceId: service.id,
@@ -161,6 +172,8 @@ export async function createBooking(input: {
           clientPhone: input.clientPhone,
           comment: input.comment,
           silentMode: input.silentMode ?? false,
+          referencePhotoAssetId: bookingExtras.referencePhotoAssetId,
+          bookingAnswers: bookingExtras.bookingAnswers ?? undefined,
           clientUserId: input.clientUserId,
           status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
           actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
@@ -187,6 +200,18 @@ export async function createBooking(input: {
           service: { select: { id: true, name: true } },
         },
       });
+
+      if (bookingExtras.referencePhotoAssetId) {
+        await tx.mediaAsset.update({
+          where: { id: bookingExtras.referencePhotoAssetId },
+          data: {
+            entityType: MediaEntityType.BOOKING,
+            entityId: created.id,
+          },
+        });
+      }
+
+      return created;
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   );
@@ -254,6 +279,12 @@ export async function createBooking(input: {
     startAtUtc: created.startAtUtc,
     endAtUtc: created.endAtUtc,
   });
+
+  const advisorMasterId =
+    resolvedMasterProviderId ?? (provider.type === ProviderType.MASTER ? provider.id : null);
+  if (advisorMasterId) {
+    await invalidateAdvisorCache(advisorMasterId);
+  }
 
   return toBookingDto(created);
   } catch (error) {
