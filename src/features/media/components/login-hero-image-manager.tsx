@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FocalImage } from "@/components/ui/focal-image";
+import { ModalSurface } from "@/components/ui/modal-surface";
+import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -24,6 +27,7 @@ export function LoginHeroImageManager() {
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickingFocal, setPickingFocal] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -66,6 +70,7 @@ export function LoginHeroImageManager() {
         }
 
         setAsset(json.data.asset);
+        setPickingFocal(true);
       } catch (uploadError) {
         const message = uploadError instanceof Error ? uploadError.message : UI_TEXT.admin.media.uploadFailed;
         setError(message);
@@ -111,8 +116,13 @@ export function LoginHeroImageManager() {
 
       <div className="relative h-40 w-full overflow-hidden rounded-2xl border bg-neutral-100">
         {asset ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={asset.url} alt={UI_TEXT.admin.media.loginHeroTitle} className="h-full w-full object-cover" />
+          <FocalImage
+            src={asset.url}
+            alt={UI_TEXT.admin.media.loginHeroTitle}
+            focalX={asset.focalX}
+            focalY={asset.focalY}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-neutral-500">
             {UI_TEXT.admin.media.emptyImage}
@@ -129,6 +139,17 @@ export function LoginHeroImageManager() {
         >
           {asset ? UI_TEXT.admin.media.replaceImage : UI_TEXT.admin.media.uploadImage}
         </button>
+
+        {asset ? (
+          <button
+            type="button"
+            className="rounded-xl border px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-60"
+            onClick={() => setPickingFocal(true)}
+            disabled={busy}
+          >
+            Точка фокуса
+          </button>
+        ) : null}
 
         {asset ? (
           <button
@@ -157,6 +178,26 @@ export function LoginHeroImageManager() {
           event.currentTarget.value = "";
         }}
       />
+
+      {asset ? (
+        <ModalSurface
+          open={pickingFocal}
+          onClose={() => setPickingFocal(false)}
+          title="Точка фокуса"
+        >
+          <FocalPointPicker
+            assetId={asset.id}
+            imageUrl={asset.url}
+            initialFocalX={asset.focalX}
+            initialFocalY={asset.focalY}
+            onSave={async () => {
+              await load();
+              setPickingFocal(false);
+            }}
+            onSkip={() => setPickingFocal(false)}
+          />
+        </ModalSurface>
+      ) : null}
     </div>
   );
 }

@@ -20,6 +20,8 @@ export type ProviderCardDto = {
   type: ProviderTypeDto;
   name: string;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   tagline: string;
   rating: number;
   reviews: number;
@@ -36,7 +38,11 @@ export type ProviderProfileDto = {
   studioId: string | null;
   name: string;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   bannerUrl: string | null;
+  bannerFocalX: number | null;
+  bannerFocalY: number | null;
   tagline: string;
   description: string | null;
   publicUsername: string | null;

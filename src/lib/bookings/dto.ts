@@ -36,6 +36,8 @@ export type BookingClientProviderDto = {
   type: ProviderType;
   publicUsername: string | null;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   cancellationDeadlineHours: number | null;
 };
 

@@ -20,6 +20,8 @@ export type PublicModelOfferMaster = {
   name: string;
   publicUsername: string | null;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   ratingAvg: number;
   ratingCount: number;
   city: string | null;
@@ -77,6 +79,8 @@ function toPublicItem(input: {
     id: string;
     name: string;
     avatarUrl: string | null;
+    avatarFocalX: number | null;
+    avatarFocalY: number | null;
     publicUsername: string | null;
     ratingAvg: number;
     ratingCount: number;
@@ -125,6 +129,8 @@ function toPublicItem(input: {
       name: input.master.name,
       publicUsername: input.master.publicUsername ?? null,
       avatarUrl: input.master.avatarUrl ?? null,
+      avatarFocalX: input.master.avatarFocalX ?? null,
+      avatarFocalY: input.master.avatarFocalY ?? null,
       ratingAvg: input.master.ratingAvg,
       ratingCount: input.master.ratingCount,
       city: input.master.district ?? null,
@@ -168,6 +174,8 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
           id: true,
           name: true,
           avatarUrl: true,
+          avatarFocalX: true,
+          avatarFocalY: true,
           publicUsername: true,
           ratingAvg: true,
           ratingCount: true,
@@ -224,6 +232,8 @@ export async function getPublicModelOffer(offerId: string): Promise<PublicModelO
           id: true,
           name: true,
           avatarUrl: true,
+          avatarFocalX: true,
+          avatarFocalY: true,
           publicUsername: true,
           ratingAvg: true,
           ratingCount: true,

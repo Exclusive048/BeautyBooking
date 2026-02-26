@@ -2,10 +2,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type StudioActiveData = {
   name: string;
   logoUrl?: string | null;
+  logoFocalX?: number | null;
+  logoFocalY?: number | null;
   metrics?: string[];
   actionLabel?: string;
   actionHref?: string;
@@ -89,8 +92,13 @@ export function RoleCardStudio(props: Props) {
         <div className="flex items-center gap-4">
           <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.logoUrl} alt={data.name} className="h-full w-full object-cover" />
+              <FocalImage
+                src={data.logoUrl}
+                alt={data.name}
+                focalX={data.logoFocalX}
+                focalY={data.logoFocalY}
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
                 Лого

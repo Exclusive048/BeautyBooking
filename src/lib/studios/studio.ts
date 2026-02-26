@@ -14,6 +14,8 @@ export type StudioProviderPrivateDto = {
   contactEmail: string | null;
   description: string | null;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   geoLat: number | null;
   geoLng: number | null;
   isPublished: boolean;
@@ -21,6 +23,8 @@ export type StudioProviderPrivateDto = {
   bufferBetweenBookingsMin: number;
   bannerAssetId: string | null;
   bannerUrl: string | null;
+  bannerFocalX: number | null;
+  bannerFocalY: number | null;
   cancellationDeadlineHours: number | null;
   remindersEnabled: boolean;
 };
@@ -43,12 +47,16 @@ export async function getStudioProviderById(
       contactEmail: true,
       description: true,
       avatarUrl: true,
+      avatarFocalX: true,
+      avatarFocalY: true,
       geoLat: true,
       geoLng: true,
       isPublished: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
       cancellationDeadlineHours: true,
+      bannerFocalX: true,
+      bannerFocalY: true,
       remindersEnabled: true,
     },
   });
@@ -72,6 +80,8 @@ export async function getStudioProviderById(
     contactEmail: provider.contactEmail,
     description: provider.description,
     avatarUrl: provider.avatarUrl,
+    avatarFocalX: provider.avatarFocalX ?? null,
+    avatarFocalY: provider.avatarFocalY ?? null,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
     isPublished: provider.isPublished,
@@ -79,6 +89,8 @@ export async function getStudioProviderById(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    bannerFocalX: provider.bannerFocalX ?? null,
+    bannerFocalY: provider.bannerFocalY ?? null,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
     remindersEnabled: provider.remindersEnabled,
   };
@@ -141,12 +153,16 @@ export async function updateStudioProviderProfile(
       contactEmail: true,
       description: true,
       avatarUrl: true,
+      avatarFocalX: true,
+      avatarFocalY: true,
       geoLat: true,
       geoLng: true,
       isPublished: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
       cancellationDeadlineHours: true,
+      bannerFocalX: true,
+      bannerFocalY: true,
       remindersEnabled: true,
     },
   });
@@ -174,6 +190,8 @@ export async function updateStudioProviderProfile(
     contactEmail: provider.contactEmail,
     description: provider.description,
     avatarUrl: provider.avatarUrl,
+    avatarFocalX: provider.avatarFocalX ?? null,
+    avatarFocalY: provider.avatarFocalY ?? null,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
     isPublished: provider.isPublished,
@@ -181,6 +199,8 @@ export async function updateStudioProviderProfile(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    bannerFocalX: provider.bannerFocalX ?? null,
+    bannerFocalY: provider.bannerFocalY ?? null,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
     remindersEnabled: provider.remindersEnabled,
   };

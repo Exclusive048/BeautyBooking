@@ -7,6 +7,7 @@ import { CatalogCard } from "@/features/catalog/components/catalog-card";
 import { FilterChips } from "@/features/catalog/components/filter-chips";
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
+import type { CatalogMapPoint } from "@/features/catalog/types";
 import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
@@ -26,6 +27,8 @@ type CatalogSearchItem = {
   publicUsername: string | null;
   title: string;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   ratingAvg: number;
   reviewsCount: number;
   photos: string[];
@@ -55,23 +58,13 @@ type MapSearchState = {
 
 type MapSearchSource = "auto" | "manual";
 
-type CatalogMapPoint = {
-  id: string;
-  title: string;
-  type: "master" | "studio";
-  avatarUrl: string | null;
-  ratingAvg: number;
-  priceFrom: number | null;
-  publicUsername: string | null;
-  geoLat: number;
-  geoLng: number;
-};
-
 type MapSidebarItem = {
   id: string;
   title: string;
   type: "master" | "studio";
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   ratingAvg: number;
   priceFrom: number | null;
   href: string | null;
@@ -124,6 +117,8 @@ function toMapPoint(
       title: item.name,
       type: item.providerType === "STUDIO" ? "studio" : "master",
       avatarUrl: item.avatarUrl,
+      avatarFocalX: item.avatarFocalX,
+      avatarFocalY: item.avatarFocalY,
       ratingAvg: item.ratingAvg,
       priceFrom: item.priceFrom,
       publicUsername: item.publicUsername ?? null,
@@ -138,6 +133,8 @@ function toMapPoint(
     title: item.title,
     type: item.type,
     avatarUrl: item.avatarUrl,
+    avatarFocalX: item.avatarFocalX,
+    avatarFocalY: item.avatarFocalY,
     ratingAvg: item.ratingAvg,
     priceFrom: item.minPrice,
     publicUsername: item.publicUsername ?? null,
@@ -152,6 +149,8 @@ function toSidebarItem(point: CatalogMapPoint): MapSidebarItem {
     title: point.title,
     type: point.type,
     avatarUrl: point.avatarUrl,
+    avatarFocalX: point.avatarFocalX ?? null,
+    avatarFocalY: point.avatarFocalY ?? null,
     ratingAvg: point.ratingAvg,
     priceFrom: point.priceFrom,
     href: providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map-sidebar"),

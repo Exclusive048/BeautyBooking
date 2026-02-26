@@ -7,6 +7,7 @@ import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
 import { moneyRUB } from "@/lib/format";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type Props = {
   item: AvailabilityProviderItem;
@@ -32,10 +33,11 @@ export function ProviderResultCard({ item }: Props) {
       <div className="space-y-3 p-4">
         <div className="flex items-center gap-3">
           {item.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <FocalImage
               src={item.avatarUrl}
               alt={item.name}
+              focalX={item.avatarFocalX}
+              focalY={item.avatarFocalY}
               className={`h-10 w-10 object-cover ring-1 ring-border-subtle ${item.providerType === "MASTER" ? "rounded-full" : "rounded-xl"}`}
               loading="lazy"
             />

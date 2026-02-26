@@ -10,6 +10,8 @@ import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
 import { StudioProfileHero } from "@/features/studio-cabinet/components/studio-profile-hero";
 import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-profile-form";
 import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-bar";
+import { ModalSurface } from "@/components/ui/modal-surface";
+import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
 
 type StudioProfileData = {
   studio: {
@@ -26,9 +28,13 @@ type StudioProfileData = {
     contactEmail: string | null;
     description: string | null;
     avatarUrl: string | null;
+    avatarFocalX: number | null;
+    avatarFocalY: number | null;
     isPublished: boolean;
     bannerAssetId: string | null;
     bannerUrl: string | null;
+    bannerFocalX: number | null;
+    bannerFocalY: number | null;
     cancellationDeadlineHours: number | null;
     remindersEnabled: boolean;
   };
@@ -77,6 +83,10 @@ export function StudioProfilePage({ providerId }: Props) {
   } = useAddressWithGeocode();
 
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [bannerAssetId, setBannerAssetId] = useState<string | null>(null);
+  const [bannerFocalX, setBannerFocalX] = useState<number | null>(null);
+  const [bannerFocalY, setBannerFocalY] = useState<number | null>(null);
+  const [pickingBannerFocal, setPickingBannerFocal] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -112,6 +122,9 @@ export function StudioProfilePage({ providerId }: Props) {
       setContactEmail(studio.contactEmail ?? "");
       setIsPublished(studio.isPublished);
       setBannerUrl(studio.bannerUrl);
+      setBannerAssetId(studio.bannerAssetId ?? null);
+      setBannerFocalX(studio.bannerFocalX ?? null);
+      setBannerFocalY(studio.bannerFocalY ?? null);
       const deadlineValue = studio.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
@@ -243,6 +256,10 @@ export function StudioProfilePage({ providerId }: Props) {
         );
       }
       setBannerUrl(saveJson.data.studio.bannerUrl);
+      setBannerAssetId(saveJson.data.studio.bannerAssetId ?? null);
+      setBannerFocalX(saveJson.data.studio.bannerFocalX ?? null);
+      setBannerFocalY(saveJson.data.studio.bannerFocalY ?? null);
+      setPickingBannerFocal(true);
       setInfo(t.bannerUploaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.uploadBannerFailed);
@@ -264,6 +281,8 @@ export function StudioProfilePage({ providerId }: Props) {
     </div>
   );
 
+  const canPickBannerFocal = Boolean(bannerAssetId && bannerUrl);
+
   return (
     <div className="space-y-6">
       {error ? (
@@ -279,10 +298,13 @@ export function StudioProfilePage({ providerId }: Props) {
 
       <StudioProfileHero
         bannerUrl={bannerUrl}
+        bannerFocalX={bannerFocalX}
+        bannerFocalY={bannerFocalY}
         avatar={avatarNode}
         title={name || "Студия"}
         description={description}
         onEditBanner={() => bannerInputRef.current?.click()}
+        onEditFocal={bannerUrl ? () => setPickingBannerFocal(true) : undefined}
       />
 
       <input
@@ -298,6 +320,26 @@ export function StudioProfilePage({ providerId }: Props) {
           }
         }}
       />
+
+      {canPickBannerFocal ? (
+        <ModalSurface
+          open={pickingBannerFocal}
+          onClose={() => setPickingBannerFocal(false)}
+          title="Точка фокуса"
+        >
+          <FocalPointPicker
+            assetId={bannerAssetId!}
+            imageUrl={bannerUrl!}
+            initialFocalX={bannerFocalX}
+            initialFocalY={bannerFocalY}
+            onSave={async () => {
+              await load();
+              setPickingBannerFocal(false);
+            }}
+            onSkip={() => setPickingBannerFocal(false)}
+          />
+        </ModalSurface>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />

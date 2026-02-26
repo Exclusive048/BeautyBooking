@@ -51,6 +51,8 @@ export type BookingItem = {
     type: "MASTER" | "STUDIO";
     publicUsername: string | null;
     avatarUrl: string | null;
+    avatarFocalX: number | null;
+    avatarFocalY: number | null;
     cancellationDeadlineHours: number | null;
   };
   masterProvider: {
@@ -61,6 +63,8 @@ export type BookingItem = {
     type: "MASTER" | "STUDIO";
     publicUsername: string | null;
     avatarUrl: string | null;
+    avatarFocalX: number | null;
+    avatarFocalY: number | null;
     cancellationDeadlineHours: number | null;
   } | null;
   service: { id: string; name: string; price: number; durationMin: number };

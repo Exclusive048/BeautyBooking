@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { FocalImage } from "@/components/ui/focal-image";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
@@ -280,6 +281,8 @@ export function MasterProfilePage() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarAssetId, setAvatarAssetId] = useState<string | null>(null);
+  const [avatarFocalX, setAvatarFocalX] = useState<number | null>(null);
+  const [avatarFocalY, setAvatarFocalY] = useState<number | null>(null);
   const [servicesDraft, setServicesDraft] = useState<Record<string, MasterServiceItem>>({});
 
   const [newSoloServiceTitle, setNewSoloServiceTitle] = useState("");
@@ -405,7 +408,14 @@ export function MasterProfilePage() {
 
       const avatarJson = (await avatarRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
       if (avatarRes.ok && avatarJson && avatarJson.ok) {
-        setAvatarAssetId(avatarJson.data.assets[0]?.id ?? null);
+        const avatarAsset = avatarJson.data.assets[0] ?? null;
+        setAvatarAssetId(avatarAsset?.id ?? null);
+        setAvatarFocalX(avatarAsset?.focalX ?? null);
+        setAvatarFocalY(avatarAsset?.focalY ?? null);
+      } else {
+        setAvatarAssetId(null);
+        setAvatarFocalX(null);
+        setAvatarFocalY(null);
       }
 
       const portfolioJson = (await portfolioRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
@@ -1193,6 +1203,8 @@ export function MasterProfilePage() {
       });
       setAvatarAssetId(asset.id);
       setAvatarUrl(asset.url);
+      setAvatarFocalX(asset.focalX ?? null);
+      setAvatarFocalY(asset.focalY ?? null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить аватар");
@@ -1213,6 +1225,8 @@ export function MasterProfilePage() {
       }
       setAvatarAssetId(null);
       setAvatarUrl("");
+      setAvatarFocalX(null);
+      setAvatarFocalY(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось удалить аватар");
@@ -1454,7 +1468,13 @@ export function MasterProfilePage() {
   const selectBaseClass =
     "w-full rounded-lg border border-transparent bg-bg-input px-2.5 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle disabled:opacity-60";
   const previewAvatar = avatarUrl ? (
-    <img src={avatarUrl} alt="avatar" className="h-full w-full rounded-2xl object-cover" />
+    <FocalImage
+      src={avatarUrl}
+      alt="avatar"
+      focalX={avatarFocalX}
+      focalY={avatarFocalY}
+      className="h-full w-full rounded-2xl object-cover"
+    />
   ) : (
     <div className="flex h-full w-full items-center justify-center rounded-2xl bg-bg-input text-xs text-text-sec">
       Нет фото
@@ -1752,7 +1772,13 @@ export function MasterProfilePage() {
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-bg-input">
                         {avatarUrl ? (
-                          <img src={avatarUrl} alt="avatar" className="h-full w-full rounded-2xl object-cover" />
+                          <FocalImage
+                            src={avatarUrl}
+                            alt="avatar"
+                            focalX={avatarFocalX}
+                            focalY={avatarFocalY}
+                            className="h-full w-full rounded-2xl object-cover"
+                          />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs text-text-sec">
                             Нет фото

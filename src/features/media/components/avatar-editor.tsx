@@ -6,6 +6,9 @@ import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
+import { FocalImage } from "@/components/ui/focal-image";
+import { ModalSurface } from "@/components/ui/modal-surface";
+import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
 
 type Props = {
   entityType: MediaEntityType;
@@ -39,6 +42,9 @@ export function AvatarEditor({
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickingFocal, setPickingFocal] = useState(false);
+  const [focalAsset, setFocalAsset] = useState<MediaAssetDto | null>(null);
+  const openFocalAfterLoadRef = useRef(false);
 
   const activeAsset = assets[0] ?? null;
   const imageUrl = activeAsset?.url ?? fallbackUrl ?? null;
@@ -51,7 +57,16 @@ export function AvatarEditor({
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : t.loadFailed);
       }
-      setAssets(json.data.assets);
+      const nextAssets = json.data.assets;
+      setAssets(nextAssets);
+      if (openFocalAfterLoadRef.current) {
+        openFocalAfterLoadRef.current = false;
+        const nextAsset = nextAssets[0] ?? null;
+        if (nextAsset) {
+          setFocalAsset(nextAsset);
+          setPickingFocal(true);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
@@ -76,6 +91,7 @@ export function AvatarEditor({
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : t.uploadFailed);
         }
+        openFocalAfterLoadRef.current = true;
         await load();
       } catch (e) {
         setError(e instanceof Error ? e.message : t.uploadFailed);
@@ -114,12 +130,22 @@ export function AvatarEditor({
     () => (activeAsset ? t.replace : t.upload),
     [activeAsset, t.replace, t.upload]
   );
+  const hasFocalPoint = activeAsset?.focalX !== null && activeAsset?.focalY !== null;
+  const focalButtonLabel = hasFocalPoint ? "Изменить точку фокуса" : "Задать точку фокуса";
+
+  const pickerAsset = focalAsset ?? activeAsset;
 
   return (
     <div className="space-y-2">
       <div className={`group relative overflow-hidden rounded-2xl border bg-neutral-100 ${sizeClassName}`}>
         {imageUrl ? (
-          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+          <FocalImage
+            src={imageUrl}
+            alt=""
+            focalX={activeAsset?.focalX ?? null}
+            focalY={activeAsset?.focalY ?? null}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500">{t.noAvatar}</div>
         )}
@@ -136,15 +162,29 @@ export function AvatarEditor({
               ✎
             </button>
             {activeAsset ? (
-              <button
-                type="button"
-                onClick={remove}
-                disabled={busy}
-                aria-label={t.remove}
-                className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
-              >
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFocalAsset(activeAsset);
+                    setPickingFocal(true);
+                  }}
+                  disabled={busy}
+                  aria-label={focalButtonLabel}
+                  className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={remove}
+                  disabled={busy}
+                  aria-label={t.remove}
+                  className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
+                >
                 ✕
               </button>
+              </>
             ) : null}
           </div>
         ) : null}
@@ -176,6 +216,22 @@ export function AvatarEditor({
           e.currentTarget.value = "";
         }}
       />
+
+      {pickerAsset ? (
+        <ModalSurface open={pickingFocal} onClose={() => setPickingFocal(false)} title="Точка фокуса">
+          <FocalPointPicker
+            assetId={pickerAsset.id}
+            imageUrl={pickerAsset.url}
+            initialFocalX={pickerAsset.focalX}
+            initialFocalY={pickerAsset.focalY}
+            onSave={async () => {
+              await load();
+              setPickingFocal(false);
+            }}
+            onSkip={() => setPickingFocal(false)}
+          />
+        </ModalSurface>
+      ) : null}
     </div>
   );
 }

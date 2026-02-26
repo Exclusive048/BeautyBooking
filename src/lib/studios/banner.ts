@@ -68,6 +68,10 @@ export async function setStudioBannerAssetId(studioProviderId: string, assetId: 
   const key = studioBannerSettingKey(studioProviderId);
   if (!assetId) {
     await prisma.appSetting.deleteMany({ where: { key } });
+    await prisma.provider.updateMany({
+      where: { id: studioProviderId },
+      data: { bannerFocalX: null, bannerFocalY: null },
+    });
     return;
   }
 
@@ -77,5 +81,9 @@ export async function setStudioBannerAssetId(studioProviderId: string, assetId: 
     where: { key },
     update: { value: assetId },
     create: { key, value: assetId },
+  });
+  await prisma.provider.updateMany({
+    where: { id: studioProviderId },
+    data: { bannerFocalX: null, bannerFocalY: null },
   });
 }

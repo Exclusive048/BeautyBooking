@@ -20,6 +20,8 @@ export type CatalogProviderItem = {
   publicUsername: string | null;
   title: string;
   avatarUrl: string | null;
+  avatarFocalX: number | null;
+  avatarFocalY: number | null;
   ratingAvg: number;
   reviewsCount: number;
   distanceMeters: number | null;
@@ -348,6 +350,8 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       name: true,
       publicUsername: true,
       avatarUrl: true,
+      avatarFocalX: true,
+      avatarFocalY: true,
       ratingAvg: true,
       reviews: true,
       priceFrom: true,
@@ -443,6 +447,8 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       publicUsername: provider.publicUsername ?? null,
       title: provider.name,
       avatarUrl: provider.avatarUrl,
+      avatarFocalX: provider.avatarFocalX ?? null,
+      avatarFocalY: provider.avatarFocalY ?? null,
       ratingAvg: provider.ratingAvg,
       reviewsCount: provider.reviews,
       distanceMeters: null,

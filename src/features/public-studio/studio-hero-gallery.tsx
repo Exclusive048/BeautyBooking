@@ -1,12 +1,11 @@
 "use client";
-
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import { UI_TEXT } from "@/lib/ui/text";
 import { withQuery } from "@/lib/public-urls";
+import { FocalImage } from "@/components/ui/focal-image";
 
 type StudioHeroData = {
   name: string;
@@ -17,13 +16,19 @@ type StudioHeroData = {
   geoLng?: number | null;
 };
 
+type HeroImageItem = {
+  url: string;
+  focalX: number | null;
+  focalY: number | null;
+};
+
 type Props = {
   studio: StudioHeroData;
-  imageUrls: string[];
+  imageItems: HeroImageItem[];
   bookingHref: string;
 };
 
-export function StudioHeroGallery({ studio, imageUrls, bookingHref }: Props) {
+export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
   const mapsHref = buildYandexMapsUrl({
     address: studio.address,
     lat: studio.geoLat ?? null,
@@ -39,7 +44,7 @@ export function StudioHeroGallery({ studio, imageUrls, bookingHref }: Props) {
     slotStartAt: searchParams?.get("slotStartAt") ?? undefined,
   });
 
-  const heroImages = imageUrls.slice(0, 5);
+  const heroImages = imageItems.slice(0, 5);
   const primary = heroImages[0] ?? null;
   const secondary = heroImages.slice(1);
 
@@ -48,7 +53,13 @@ export function StudioHeroGallery({ studio, imageUrls, bookingHref }: Props) {
       <div className="grid gap-2 p-2 md:grid-cols-[2fr_1fr]">
         <div className="relative h-64 overflow-hidden rounded-2xl md:h-[420px]">
           {primary ? (
-            <img src={primary} alt={studio.name} className="h-full w-full object-cover" />
+            <FocalImage
+              src={primary.url}
+              alt={studio.name}
+              focalX={primary.focalX}
+              focalY={primary.focalY}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
           )}
@@ -57,11 +68,17 @@ export function StudioHeroGallery({ studio, imageUrls, bookingHref }: Props) {
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-2 md:grid-rows-2">
           {Array.from({ length: 4 }).map((_, index) => {
-            const src = secondary[index] ?? null;
+            const item = secondary[index] ?? null;
             return (
               <div key={index} className="relative h-32 overflow-hidden rounded-2xl md:h-full">
-                {src ? (
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                {item ? (
+                  <FocalImage
+                    src={item.url}
+                    alt=""
+                    focalX={item.focalX}
+                    focalY={item.focalY}
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="h-full w-full bg-white/5" />
                 )}
