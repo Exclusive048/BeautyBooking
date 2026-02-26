@@ -23,22 +23,28 @@ type Props =
 export function RoleCardMaster(props: Props) {
   if (props.mode === "empty") {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border-subtle text-3xl text-text-sec">
-            +
+      <Card className="h-full border-dashed">
+        <CardContent className="flex h-full flex-col justify-between p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-2xl border border-border-subtle bg-bg-input text-3xl text-text-sec">
+              +
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="text-base font-semibold text-text-main">Я — мастер</div>
+              <div className="text-sm text-text-sec">
+                Создайте профиль, добавьте услуги и принимайте клиентов
+              </div>
+            </div>
           </div>
-          <div className="text-lg font-semibold text-text-main">Я — мастер</div>
-          <div className="max-w-xs text-sm text-text-sec">
-            Создайте профиль, добавьте услуги и принимайте клиентов
+          <div className="mt-5">
+            {props.actionHref ? (
+              <Button asChild className="w-full">
+                <Link href={props.actionHref}>{props.actionLabel}</Link>
+              </Button>
+            ) : (
+              <Button className="w-full">{props.actionLabel}</Button>
+            )}
           </div>
-          {props.actionHref ? (
-            <Button asChild>
-              <Link href={props.actionHref}>{props.actionLabel}</Link>
-            </Button>
-          ) : (
-            <Button>{props.actionLabel}</Button>
-          )}
         </CardContent>
       </Card>
     );
@@ -64,7 +70,7 @@ export function RoleCardMaster(props: Props) {
 
   return (
     <Card
-      className={cn("relative overflow-hidden")}
+      className={cn("relative h-full overflow-hidden")}
       style={
         data.coverUrl
           ? { backgroundImage: `url(${data.coverUrl})`, backgroundSize: "cover" }
@@ -72,9 +78,9 @@ export function RoleCardMaster(props: Props) {
       }
     >
       {data.coverUrl ? <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" /> : null}
-      <CardContent className="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:gap-6 md:p-6">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
+      <CardContent className="relative flex h-full flex-col justify-between p-5">
+        <div className="flex items-center gap-4">
+          <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={data.avatarUrl} alt={data.name} className="h-full w-full object-cover" />
@@ -84,41 +90,32 @@ export function RoleCardMaster(props: Props) {
               </div>
             )}
           </div>
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="truncate text-base font-semibold text-text-main">{data.name}</div>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-sec">
-              {data.specialization ? (
-                <span className="truncate">{data.specialization}</span>
-              ) : null}
-              {data.specialization && statusText ? <span className="text-text-sec/80">•</span> : null}
-              {statusText ? (
-                <span className="inline-flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "text-xs",
-                      isPublished ? "text-emerald-300" : "text-text-sec"
-                    )}
-                  >
-                    ●
-                  </span>
-                  <span>{statusText}</span>
-                </span>
-              ) : null}
-            </div>
-            {ratingLabel ? (
-              <div className="mt-2 text-xs text-text-sec">{ratingLabel}</div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="truncate text-base font-semibold text-text-main">{data.name}</div>
+            {data.specialization ? (
+              <div className="truncate text-sm text-text-sec">{data.specialization}</div>
             ) : null}
+            {statusText ? (
+              <div className="flex items-center gap-2 text-sm text-text-sec">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    isPublished ? "bg-emerald-400" : "bg-border-subtle"
+                  )}
+                />
+                <span className="truncate">{statusText}</span>
+              </div>
+            ) : null}
+            {ratingLabel ? <div className="text-xs text-text-sec">{ratingLabel}</div> : null}
           </div>
         </div>
-        <div className="md:ml-6">
+        <div className="mt-5">
           {data.actionHref ? (
-            <Button asChild className="w-full md:w-auto">
+            <Button asChild className="w-full">
               <Link href={data.actionHref}>{data.actionLabel ?? "Открыть кабинет"}</Link>
             </Button>
           ) : (
-            <Button className="w-full md:w-auto">{data.actionLabel ?? "Открыть кабинет"}</Button>
+            <Button className="w-full">{data.actionLabel ?? "Открыть кабинет"}</Button>
           )}
         </div>
       </CardContent>
