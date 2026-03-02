@@ -15,8 +15,18 @@ type StudioActiveData = {
 };
 
 type Props =
-  | { mode: "empty"; actionLabel: string; actionHref?: string }
-  | { mode: "upsell"; actionLabel: string; actionHref?: string }
+  | {
+      mode: "empty";
+      actionLabel: string;
+      actionHref?: string;
+      actionMethod?: "GET" | "POST";
+    }
+  | {
+      mode: "upsell";
+      actionLabel: string;
+      actionHref?: string;
+      actionMethod?: "GET" | "POST";
+    }
   | { mode: "active"; data: StudioActiveData };
 
 export function RoleCardStudio(props: Props) {
@@ -36,7 +46,13 @@ export function RoleCardStudio(props: Props) {
             </div>
           </div>
           <div className="mt-5">
-            {props.actionHref ? (
+            {props.actionHref && props.actionMethod === "POST" ? (
+              <form action={props.actionHref} method="post">
+                <Button type="submit" className="w-full">
+                  {props.actionLabel}
+                </Button>
+              </form>
+            ) : props.actionHref ? (
               <Button asChild className="w-full">
                 <Link href={props.actionHref}>{props.actionLabel}</Link>
               </Button>
@@ -65,7 +81,13 @@ export function RoleCardStudio(props: Props) {
             </div>
           </div>
           <div className="mt-5">
-            {props.actionHref ? (
+            {props.actionHref && props.actionMethod === "POST" ? (
+              <form action={props.actionHref} method="post">
+                <Button type="submit" className="w-full">
+                  {props.actionLabel}
+                </Button>
+              </form>
+            ) : props.actionHref ? (
               <Button asChild className="w-full">
                 <Link href={props.actionHref}>{props.actionLabel}</Link>
               </Button>

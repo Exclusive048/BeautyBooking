@@ -125,6 +125,7 @@ export default async function RolesPage() {
             mode="empty"
             actionLabel="Создать мастера"
             actionHref={createMasterHref}
+            actionMethod="POST"
           />
         )}
 
@@ -135,12 +136,14 @@ export default async function RolesPage() {
             mode="upsell"
             actionLabel="Создать студию"
             actionHref={createStudioHref}
+            actionMethod="POST"
           />
         ) : (
           <RoleCardStudio
             mode="empty"
             actionLabel="Создать студию"
             actionHref={createStudioHref}
+            actionMethod="POST"
           />
         )}
       </div>
