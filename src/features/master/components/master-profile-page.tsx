@@ -1516,10 +1516,6 @@ export function MasterProfilePage() {
     </div>
   );
 
-  if (loading || !data) {
-    return <div className="rounded-2xl bg-bg-card/90 p-5 text-sm text-text-sec">Загрузка профиля...</div>;
-  }
-
   const closeBookingConfig = useCallback(() => {
     setBookingConfigServiceId(null);
     setBookingConfigDraft(null);
@@ -1615,6 +1611,10 @@ export function MasterProfilePage() {
     }
   }, [bookingConfigDraft, bookingConfigServiceId, closeBookingConfig]);
 
+  if (loading || !data) {
+    return <div className="rounded-2xl bg-bg-card/90 p-5 text-sm text-text-sec">Загрузка профиля...</div>;
+  }
+
   return (
     <section className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -1639,100 +1639,6 @@ export function MasterProfilePage() {
         <nav className="flex gap-2 overflow-x-auto rounded-2xl bg-bg-card/70 p-2 lg:flex-col lg:p-3">
           {PROFILE_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
-            const closeBookingConfig = useCallback(() => {
-    setBookingConfigServiceId(null);
-    setBookingConfigDraft(null);
-    setBookingConfigError(null);
-  }, []);
-
-  const addBookingQuestion = useCallback(() => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      if (current.questions.length >= 5) return current;
-      return {
-        ...current,
-        questions: [
-          ...current.questions,
-          {
-            tempId: buildTempId("question"),
-            text: "",
-            required: false,
-            order: current.questions.length,
-          },
-        ],
-      };
-    });
-  }, []);
-
-  const updateBookingQuestion = useCallback((tempId: string, patch: Partial<BookingQuestionDraft>) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        questions: current.questions.map((question) =>
-          question.tempId === tempId ? { ...question, ...patch } : question
-        ),
-      };
-    });
-  }, []);
-
-  const removeBookingQuestion = useCallback((tempId: string) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        questions: current.questions.filter((question) => question.tempId !== tempId),
-      };
-    });
-  }, []);
-
-  const moveBookingQuestion = useCallback((index: number, direction: -1 | 1) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      const next = [...current.questions];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      return {
-        ...current,
-        questions: next.map((question, idx) => ({ ...question, order: idx })),
-      };
-    });
-  }, []);
-
-  const saveBookingConfig = useCallback(async () => {
-    if (!bookingConfigServiceId || !bookingConfigDraft) return;
-    setBookingConfigSaving(true);
-    setBookingConfigError(null);
-    try {
-      const payload = {
-        requiresReferencePhoto: bookingConfigDraft.requiresReferencePhoto,
-        questions: bookingConfigDraft.questions.map((question, index) => ({
-          id: question.id,
-          text: question.text,
-          required: question.required,
-          order: index,
-        })),
-      };
-      const res = await fetch(`/api/master/services/${bookingConfigServiceId}/booking-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
-        requiresReferencePhoto: boolean;
-        questions: Array<{ id: string; text: string; required: boolean; order: number }>;
-      }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-      }
-      closeBookingConfig();
-    } catch (err) {
-      setBookingConfigError(err instanceof Error ? err.message : "?? ??????? ????????? ????????? ??????");
-    } finally {
-      setBookingConfigSaving(false);
-    }
-  }, [bookingConfigDraft, bookingConfigServiceId, closeBookingConfig]);
 
   return (
               <button
@@ -2238,100 +2144,6 @@ export function MasterProfilePage() {
           <div className="divide-y divide-border-subtle">
             {serviceList.map((service) => {
               const durationOptions = buildDurationOptions(service.effectiveDurationMin);
-              const closeBookingConfig = useCallback(() => {
-    setBookingConfigServiceId(null);
-    setBookingConfigDraft(null);
-    setBookingConfigError(null);
-  }, []);
-
-  const addBookingQuestion = useCallback(() => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      if (current.questions.length >= 5) return current;
-      return {
-        ...current,
-        questions: [
-          ...current.questions,
-          {
-            tempId: buildTempId("question"),
-            text: "",
-            required: false,
-            order: current.questions.length,
-          },
-        ],
-      };
-    });
-  }, []);
-
-  const updateBookingQuestion = useCallback((tempId: string, patch: Partial<BookingQuestionDraft>) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        questions: current.questions.map((question) =>
-          question.tempId === tempId ? { ...question, ...patch } : question
-        ),
-      };
-    });
-  }, []);
-
-  const removeBookingQuestion = useCallback((tempId: string) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        questions: current.questions.filter((question) => question.tempId !== tempId),
-      };
-    });
-  }, []);
-
-  const moveBookingQuestion = useCallback((index: number, direction: -1 | 1) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      const next = [...current.questions];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      return {
-        ...current,
-        questions: next.map((question, idx) => ({ ...question, order: idx })),
-      };
-    });
-  }, []);
-
-  const saveBookingConfig = useCallback(async () => {
-    if (!bookingConfigServiceId || !bookingConfigDraft) return;
-    setBookingConfigSaving(true);
-    setBookingConfigError(null);
-    try {
-      const payload = {
-        requiresReferencePhoto: bookingConfigDraft.requiresReferencePhoto,
-        questions: bookingConfigDraft.questions.map((question, index) => ({
-          id: question.id,
-          text: question.text,
-          required: question.required,
-          order: index,
-        })),
-      };
-      const res = await fetch(`/api/master/services/${bookingConfigServiceId}/booking-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
-        requiresReferencePhoto: boolean;
-        questions: Array<{ id: string; text: string; required: boolean; order: number }>;
-      }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-      }
-      closeBookingConfig();
-    } catch (err) {
-      setBookingConfigError(err instanceof Error ? err.message : "?? ??????? ????????? ????????? ??????");
-    } finally {
-      setBookingConfigSaving(false);
-    }
-  }, [bookingConfigDraft, bookingConfigServiceId, closeBookingConfig]);
 
   return (
                 <div key={service.serviceId} className="grid grid-cols-[minmax(0,2fr)_150px_150px_90px] items-center gap-3 py-3">
@@ -2556,100 +2368,6 @@ export function MasterProfilePage() {
                     .map((id) => serviceTitleById.get(id))
                     .filter((value): value is string => Boolean(value));
                   const isBroken = brokenPortfolio[item.id];
-                  const closeBookingConfig = useCallback(() => {
-    setBookingConfigServiceId(null);
-    setBookingConfigDraft(null);
-    setBookingConfigError(null);
-  }, []);
-
-  const addBookingQuestion = useCallback(() => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      if (current.questions.length >= 5) return current;
-      return {
-        ...current,
-        questions: [
-          ...current.questions,
-          {
-            tempId: buildTempId("question"),
-            text: "",
-            required: false,
-            order: current.questions.length,
-          },
-        ],
-      };
-    });
-  }, []);
-
-  const updateBookingQuestion = useCallback((tempId: string, patch: Partial<BookingQuestionDraft>) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        questions: current.questions.map((question) =>
-          question.tempId === tempId ? { ...question, ...patch } : question
-        ),
-      };
-    });
-  }, []);
-
-  const removeBookingQuestion = useCallback((tempId: string) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        questions: current.questions.filter((question) => question.tempId !== tempId),
-      };
-    });
-  }, []);
-
-  const moveBookingQuestion = useCallback((index: number, direction: -1 | 1) => {
-    setBookingConfigDraft((current) => {
-      if (!current) return current;
-      const next = [...current.questions];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      return {
-        ...current,
-        questions: next.map((question, idx) => ({ ...question, order: idx })),
-      };
-    });
-  }, []);
-
-  const saveBookingConfig = useCallback(async () => {
-    if (!bookingConfigServiceId || !bookingConfigDraft) return;
-    setBookingConfigSaving(true);
-    setBookingConfigError(null);
-    try {
-      const payload = {
-        requiresReferencePhoto: bookingConfigDraft.requiresReferencePhoto,
-        questions: bookingConfigDraft.questions.map((question, index) => ({
-          id: question.id,
-          text: question.text,
-          required: question.required,
-          order: index,
-        })),
-      };
-      const res = await fetch(`/api/master/services/${bookingConfigServiceId}/booking-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
-        requiresReferencePhoto: boolean;
-        questions: Array<{ id: string; text: string; required: boolean; order: number }>;
-      }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-      }
-      closeBookingConfig();
-    } catch (err) {
-      setBookingConfigError(err instanceof Error ? err.message : "?? ??????? ????????? ????????? ??????");
-    } finally {
-      setBookingConfigSaving(false);
-    }
-  }, [bookingConfigDraft, bookingConfigServiceId, closeBookingConfig]);
 
   return (
                     <div key={item.id} className="relative overflow-hidden rounded-2xl bg-bg-card/90 p-3">

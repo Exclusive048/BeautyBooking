@@ -13,6 +13,7 @@ const NAV_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/cabinet/master/schedule", label: "Мой график" },
   { href: "/cabinet/master/clients", label: "Клиенты" },
   { href: "/cabinet/master/analytics", label: "Аналитика" },
+  { href: "/cabinet/billing", label: "Подписка" },
   { href: "/cabinet/master/model-offers", label: "Ищу модель" },
   { href: "/cabinet/master/profile", label: "Профиль" },
 ];
