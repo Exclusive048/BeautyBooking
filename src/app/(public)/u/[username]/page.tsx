@@ -9,6 +9,7 @@ import { buildProviderSchema } from "@/lib/seo/schema";
 import { withQuery } from "@/lib/public-urls";
 import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+import { getNonce } from "@/lib/csp/nonce";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -150,6 +151,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicUsernamePage({ params, searchParams }: Props) {
+  const nonce = getNonce();
   const { username: raw } = await Promise.resolve(params);
   const sp = (await Promise.resolve(searchParams)) ?? {};
   const username = normalizeUsername(raw);
@@ -299,7 +301,11 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
     return (
       <>
         {schema ? (
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+          <script
+            nonce={nonce}
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+          />
         ) : null}
         <PublicStudioProfilePage studioId={result.providerId} bookingParams={bookingParams} />
       </>
@@ -312,7 +318,11 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
   return (
     <>
       {schema ? (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+        <script
+          nonce={nonce}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
       ) : null}
       <SelectedServicesProvider>
         <PublicMasterProfilePage
