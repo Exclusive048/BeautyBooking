@@ -2,12 +2,17 @@ import { dequeue } from "@/lib/queue/queue";
 import { enqueue } from "@/lib/queue/queue";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { logError } from "@/lib/logging/logger";
+import { alertCritical } from "@/lib/monitoring";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import { BOOKING_REMINDER_JOB_TYPE, TELEGRAM_SEND_JOB_TYPE } from "@/lib/queue/types";
 
 process.on("uncaughtException", (error) => {
-  logError("Worker uncaughtException — process will exit", {
+  logError("Worker uncaughtException", {
+    error: error.message,
+    stack: error.stack,
+  });
+  void alertCritical("Worker процесс упал (uncaughtException)", {
     error: error.message,
     stack: error.stack,
   });
@@ -15,7 +20,11 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason) => {
-  logError("Worker unhandledRejection — process will exit", {
+  logError("Worker unhandledRejection", {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  void alertCritical("Worker процесс упал (unhandledRejection)", {
     error: reason instanceof Error ? reason.message : String(reason),
     stack: reason instanceof Error ? reason.stack : undefined,
   });

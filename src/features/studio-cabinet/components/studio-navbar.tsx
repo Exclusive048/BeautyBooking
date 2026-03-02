@@ -30,7 +30,9 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
   const settingsActive = pathname.startsWith("/cabinet/studio/settings");
 
   return (
-    <div className="sticky top-4 z-30 w-full px-4">
+    // top-[var(--topbar-h)] — прилипает строго под топбаром (72px)
+    // z-20 — ниже топбара (z-30), чтобы не перекрывать кнопку профиля
+    <div className="sticky top-[var(--topbar-h)] z-20 w-full px-4">
       <div className="glass-panel mx-auto flex h-14 w-full max-w-6xl items-center justify-between rounded-[24px] px-4">
         <div className="flex items-baseline gap-2">
           <Link

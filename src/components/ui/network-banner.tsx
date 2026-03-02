@@ -1,9 +1,21 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 
+function subscribe(cb: () => void) {
+  return () => {};
+}
+
+function useIsMounted() {
+  return useSyncExternalStore(subscribe, () => true, () => false);
+}
+
 export function NetworkBanner() {
+  const mounted = useIsMounted();
   const { isOnline, justReconnected } = useNetworkStatus();
+
+  if (!mounted) return null;
 
   if (!isOnline) {
     return (

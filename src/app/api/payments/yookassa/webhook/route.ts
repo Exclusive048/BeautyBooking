@@ -8,6 +8,7 @@ import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError } from "@/lib/logging/logger";
 import { NotificationType } from "@prisma/client";
+import { alertCritical } from "@/lib/monitoring";
 
 export const runtime = "nodejs";
 
@@ -93,10 +94,11 @@ export async function POST(req: Request) {
     return fail("Bad request", 400, "BAD_REQUEST");
   }
 
-  const event = payload.event ?? payload.type ?? "";
-  const object = payload.object ?? {};
+  try {
+    const event = payload.event ?? payload.type ?? "";
+    const object = payload.object ?? {};
 
-  if (event === "refund.succeeded") {
+    if (event === "refund.succeeded") {
     const paymentId = payload.object?.payment_id ?? payload.payment?.id;
     if (!paymentId) return ok({ ok: true });
 
@@ -119,16 +121,16 @@ export async function POST(req: Request) {
       details: { yookassaPaymentId: paymentId },
     });
     return ok({ ok: true });
-  }
+    }
 
-  if (!event.startsWith("payment.")) {
+    if (!event.startsWith("payment.")) {
     return ok({ ok: true });
-  }
+    }
 
-  const internalId = object.metadata?.internalPaymentId;
-  const yookassaPaymentId = object.id;
+    const internalId = object.metadata?.internalPaymentId;
+    const yookassaPaymentId = object.id;
 
-  const billingPayment =
+    const billingPayment =
     typeof internalId === "string"
       ? await prisma.billingPayment.findUnique({
           where: { id: internalId },
@@ -155,18 +157,18 @@ export async function POST(req: Request) {
           })
         : null;
 
-  if (!billingPayment) {
+    if (!billingPayment) {
     logError("YooKassa webhook: payment not found", { yookassaPaymentId, internalId });
     return ok({ ok: true });
-  }
+    }
 
-  if (["SUCCEEDED", "CANCELED", "FAILED", "REFUNDED"].includes(billingPayment.status)) {
+    if (["SUCCEEDED", "CANCELED", "FAILED", "REFUNDED"].includes(billingPayment.status)) {
     return ok({ ok: true });
-  }
+    }
 
-  const now = new Date();
+    const now = new Date();
 
-  if (event === "payment.succeeded") {
+    if (event === "payment.succeeded") {
     const planIdFromMeta = typeof object.metadata?.planId === "string" ? object.metadata?.planId : null;
     const rawPeriod = object.metadata?.periodMonths;
     const parsedPeriod =
@@ -226,9 +228,9 @@ export async function POST(req: Request) {
     });
 
     return ok({ ok: true });
-  }
+    }
 
-  if (event === "payment.canceled" || event === "payment.failed") {
+    if (event === "payment.canceled" || event === "payment.failed") {
     const newStatus = event === "payment.canceled" ? "CANCELED" : "FAILED";
     await prisma.billingPayment.update({
       where: { id: billingPayment.id },
@@ -264,6 +266,12 @@ export async function POST(req: Request) {
     });
 
     return ok({ ok: true });
+    }
+  } catch (error) {
+    await alertCritical("YooKassa webhook processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 
   return ok({ ok: true });

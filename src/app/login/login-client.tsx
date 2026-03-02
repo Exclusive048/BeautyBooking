@@ -15,16 +15,32 @@ type LoginClientProps = {
   heroImageFocalY: number | null;
 };
 
-function normalizePhone(input: string) {
-  const cleaned = input.replace(/[()\s-]/g, "");
-  if (!cleaned) return "";
-  if (cleaned.startsWith("+")) return cleaned;
-  return `+${cleaned}`;
+function normalizePhone(input: string): string {
+  const digits = input.replace(/\D/g, "");
+  if (!digits) return "";
+
+  // 8XXXXXXXXXX → +7XXXXXXXXXX
+  if (digits.startsWith("8") && digits.length === 11) {
+    return `+7${digits.slice(1)}`;
+  }
+
+  // 7XXXXXXXXXX → +7XXXXXXXXXX
+  if (digits.startsWith("7") && digits.length === 11) {
+    return `+${digits}`;
+  }
+
+  // уже с плюсом: +7XXXXXXXXXX
+  if (input.trim().startsWith("+")) {
+    return `+${digits}`;
+  }
+
+  return `+${digits}`;
 }
 
-function isPhoneValid(input: string) {
+function isPhoneValid(input: string): boolean {
   const normalized = normalizePhone(input);
-  return normalized.length >= 8;
+  // Российский номер: +7 и ровно 10 цифр после
+  return /^\+7\d{10}$/.test(normalized);
 }
 
 function safeNext(nextRaw: string | null) {
@@ -74,13 +90,13 @@ export default function LoginClient({
     setErrorText(null);
     const normalized = normalizePhone(phone);
 
-    if (normalized.length >= 8 && !agreedToTerms) {
-      setErrorText("Необходимо согласие с условиями и политикой конфиденциальности.");
+    if (!isPhoneValid(phone)) {
+      setErrorText(UI_TEXT.auth.loginPage.invalidPhone);
       return;
     }
 
-    if (!normalized || normalized.length < 8) {
-      setErrorText(UI_TEXT.auth.loginPage.invalidPhone);
+    if (!agreedToTerms) {
+      setErrorText("Необходимо согласие с условиями и политикой конфиденциальности.");
       return;
     }
 
@@ -179,7 +195,7 @@ export default function LoginClient({
                 <label className="block text-sm font-medium">{UI_TEXT.auth.loginPage.phoneLabel}</label>
                 <input
                   className="h-12 w-full rounded-2xl border border-border bg-background px-5 text-base outline-none transition focus:ring-2 focus:ring-primary/40"
-                  placeholder={UI_TEXT.auth.loginPage.phonePlaceholder}
+                  placeholder="+7 (___) ___-__-__"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
                   inputMode="tel"
@@ -198,7 +214,7 @@ export default function LoginClient({
                 <button
                   type="button"
                   onClick={sendCode}
-                  disabled={loading || (phoneValid && !agreedToTerms)}
+                  disabled={loading || !phoneValid || (phoneValid && !agreedToTerms)}
                   className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
                 >
                   {loading ? UI_TEXT.auth.loginPage.sending : UI_TEXT.auth.loginPage.sendCode}

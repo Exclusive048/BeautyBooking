@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { alertError } from "@/lib/monitoring";
 
 export type LogMeta = Record<string, unknown>;
 
@@ -8,6 +9,10 @@ export function logInfo(message: string, meta: LogMeta = {}) {
 
 export function logError(message: string, meta: LogMeta = {}) {
   console.error(JSON.stringify({ level: "error", message, ...meta }));
+  const skipAlert = Boolean((meta as { __skipAlert?: boolean }).__skipAlert);
+  if (typeof window === "undefined" && !skipAlert) {
+    void alertError(message, meta);
+  }
 }
 
 export function getRequestId(req: Request): string {

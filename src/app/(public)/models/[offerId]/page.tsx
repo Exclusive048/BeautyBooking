@@ -100,7 +100,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
               </div>
               <div className="flex items-center justify-between">
                 <span>Стоимость</span>
-                <span>{offer.price !== null ? `${offer.price} ₸` : "Бесплатно"}</span>
+                <span>{offer.price !== null ? `${offer.price} ₽` : "Бесплатно"}</span>
               </div>
             </div>
 
