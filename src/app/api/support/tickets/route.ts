@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
-import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getRedisConnection } from "@/lib/redis/connection";
 
 export const runtime = "nodejs";

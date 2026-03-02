@@ -10,7 +10,7 @@ import {
 import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { logError, logInfo } from "@/lib/logging/logger";
-import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
