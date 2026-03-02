@@ -1,4 +1,4 @@
-import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const TELEGRAM_WEBHOOK_RATE_LIMIT = {
   limit: 30,

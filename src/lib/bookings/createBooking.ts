@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
-import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
   buildCreateBookingIdempotencyKey,

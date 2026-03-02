@@ -1,7 +1,7 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
-import { checkRateLimit } from "@/lib/rateLimit/rateLimiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { refreshAdvisorInsights } from "@/lib/advisor/cache";
