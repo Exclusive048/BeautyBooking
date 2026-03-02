@@ -7,6 +7,7 @@ import { NetworkBanner } from "@/components/ui/network-banner";
 import { PWAUpdatePrompt } from "@/components/pwa/update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { getNonce } from "@/lib/csp/nonce";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -58,8 +59,12 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = getNonce();
   return (
     <html lang="ru" suppressHydrationWarning>
+      <head>
+        <meta property="csp-nonce" content={nonce} />
+      </head>
       <body>
         <ThemeProvider>
           <ViewerTimeZoneProvider>

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { fail, ok } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
 import { addMonthsUtc } from "@/lib/billing/utils";
@@ -49,6 +50,25 @@ function getGraceUntil(now: Date): Date {
 }
 
 export async function POST(req: Request) {
+  const rawBody = Buffer.from(await req.arrayBuffer());
+  const signature = req.headers.get("x-api-signature-sha256")?.trim();
+  const secret = process.env.YOOKASSA_SECRET_KEY?.trim();
+  if (!signature || !secret) {
+    logError("YooKassa webhook rejected: signature missing", {
+      signaturePresent: Boolean(signature),
+      secretPresent: Boolean(secret),
+    });
+    return fail("Invalid signature", 403, "FORBIDDEN");
+  }
+
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expectedBuf = Buffer.from(expected);
+  const providedBuf = Buffer.from(signature);
+  if (expectedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(expectedBuf, providedBuf)) {
+    logError("YooKassa webhook rejected: invalid signature");
+    return fail("Invalid signature", 403, "FORBIDDEN");
+  }
+
   const ip = extractClientIp(req);
   if (!ip || !isYookassaIpAllowed(ip)) {
     logError("YooKassa webhook rejected: IP not allowed", { ip });
@@ -62,7 +82,13 @@ export async function POST(req: Request) {
     return fail("Unauthorized", 401, "UNAUTHORIZED");
   }
 
-  const payload = (await req.json().catch(() => null)) as WebhookPayload | null;
+  const payload = (() => {
+    try {
+      return JSON.parse(rawBody.toString("utf-8")) as WebhookPayload;
+    } catch {
+      return null;
+    }
+  })();
   if (!payload) {
     return fail("Bad request", 400, "BAD_REQUEST");
   }

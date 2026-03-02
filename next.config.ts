@@ -73,23 +73,6 @@ const withPWAConfig = withPWA({
 
 const isProd = process.env.NODE_ENV === "production";
 
-// CSP can be tightened per integration requirements (e.g., add trusted script/img origins).
-const cspDirectives = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-  "object-src 'none'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https:",
-  "style-src 'self' 'unsafe-inline' https:",
-  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"} https:`,
-  "connect-src 'self' https: wss:",
-  ...(isProd ? ["upgrade-insecure-requests"] : []),
-];
-
-const contentSecurityPolicy = cspDirectives.join("; ");
-
 const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
@@ -104,7 +87,6 @@ const nextConfig: NextConfig = {
         key: "Permissions-Policy",
         value: "geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()",
       },
-      { key: "Content-Security-Policy", value: contentSecurityPolicy },
       ...(isProd
         ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
         : []),

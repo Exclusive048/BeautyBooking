@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -80,11 +81,33 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next({
+  const nonce = randomBytes(16).toString("base64");
+  const isProd = process.env.NODE_ENV === "production";
+  const csp = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "object-src 'none'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https:`,
+    "style-src 'self' 'unsafe-inline' https:",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https: wss:",
+    ...(isProd ? ["upgrade-insecure-requests"] : []),
+  ].join("; ");
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", csp);
+
+  const response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   });
+  response.headers.set("content-security-policy", csp);
+  return response;
 }
 
 export const config = {

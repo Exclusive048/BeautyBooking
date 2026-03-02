@@ -6,6 +6,22 @@ import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import { BOOKING_REMINDER_JOB_TYPE, TELEGRAM_SEND_JOB_TYPE } from "@/lib/queue/types";
 
+process.on("uncaughtException", (error) => {
+  logError("Worker uncaughtException — process will exit", {
+    error: error.message,
+    stack: error.stack,
+  });
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logError("Worker unhandledRejection — process will exit", {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  process.exit(1);
+});
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
