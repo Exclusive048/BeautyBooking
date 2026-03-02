@@ -8,15 +8,16 @@ export default function SupportPageClient() {
   const [type, setType] = useState<TicketType>("bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileName = file?.name ?? null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    setFileName(file ? file.name : null);
+    const nextFile = e.target.files?.[0] ?? null;
+    setFile(nextFile);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,10 +37,44 @@ export default function SupportPageClient() {
 
     // TODO: реальный API эндпоинт для тикетов
     // Пока просто эмулируем успех
-    await new Promise((res) => setTimeout(res, 1200));
+    const pageUrl = typeof window === "undefined" ? null : window.location.href;
 
-    setSending(false);
-    setSent(true);
+    try {
+      const res = await fetch("/api/support/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          title: title.trim(),
+          description: description.trim(),
+          fileName,
+          pageUrl,
+        }),
+      });
+
+      let payload: { ok?: boolean; error?: string } | null = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+
+      if (res.status === 429) {
+        setError("Слишком часто. Попробуйте через несколько минут.");
+        return;
+      }
+
+      if (!res.ok || !payload?.ok) {
+        setError(payload?.error ?? "Не удалось отправить обращение. Попробуйте позже.");
+        return;
+      }
+
+      setSent(true);
+    } catch {
+      setError("Не удалось отправить обращение. Проверьте соединение и попробуйте снова.");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (sent) {
@@ -60,8 +95,12 @@ export default function SupportPageClient() {
             setSent(false);
             setTitle("");
             setDescription("");
-            setFileName(null);
+            setFile(null);
             setType("bug");
+            setError(null);
+            if (fileRef.current) {
+              fileRef.current.value = "";
+            }
           }}
           className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
         >
@@ -168,12 +207,16 @@ export default function SupportPageClient() {
           className="hidden"
           onChange={handleFileChange}
         />
+        <p className="text-xs text-text-sec">
+          Файл пока не отправляется — передадим только имя.
+        </p>
       </div>
 
       {/* Privacy note */}
       <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-xs text-text-sec leading-relaxed">
         📌 При отправке обращения мы получим ваши контактные данные из профиля (имя и email или Telegram). Они используются только для ответа на ваш запрос.
       </div>
+      <div className="text-xs text-text-sec">Ответ придет по email.</div>
 
       {/* Error */}
       {error && (

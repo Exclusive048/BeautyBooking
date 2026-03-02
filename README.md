@@ -267,3 +267,18 @@ Authorization: Bearer <YOOKASSA_WEBHOOK_TOKEN>
 ## License
 
 Private repository. All rights reserved.
+
+---
+
+## Environment
+
+Support tickets (SMTP):
+
+```
+SUPPORT_TO="support@example.com"
+SMTP_HOST="smtp.example.com"
+SMTP_PORT="587"
+SMTP_USER="smtp-user"
+SMTP_PASS="smtp-password"
+SMTP_FROM="BeautyHub <no-reply@example.com>"
+```
