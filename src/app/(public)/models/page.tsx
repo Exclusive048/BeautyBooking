@@ -141,7 +141,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
                 {offer.dateLocal} • {offer.timeRangeStartLocal}-{offer.timeRangeEndLocal}
               </div>
               <div className="mt-1 text-sm text-text-sec">
-                {offer.price !== null ? `${offer.price} ₸` : "Бесплатно"} • {offer.service.durationMin} мин
+                {offer.price !== null ? `${offer.price} ₽` : "Бесплатно"} • {offer.service.durationMin} мин
               </div>
 
               <div className="mt-auto pt-5 text-sm font-semibold text-primary">

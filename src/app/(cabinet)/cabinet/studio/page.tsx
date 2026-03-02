@@ -14,7 +14,7 @@ function pluralize(value: number, one: string, few: string, many: string): strin
 }
 
 function formatMoney(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ₸`;
+  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
 }
 
 const EMPTY_HINT = "Данные появятся после первых записей";

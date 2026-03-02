@@ -34,7 +34,7 @@ export function FeatureGate({
   if (plan.loading) {
     return (
       <div className="rounded-2xl bg-bg-card/80 p-4 text-xs text-text-sec">
-        Р—Р°РіСЂСѓР·РєР° С‚Р°СЂРёС„Р°...
+        Загрузка компонента...
       </div>
     );
   }

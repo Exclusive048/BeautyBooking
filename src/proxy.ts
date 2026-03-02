@@ -82,7 +82,8 @@ export async function proxy(request: NextRequest) {
   }
 
   const nonce = randomBytes(16).toString("base64");
-  const isProd = process.env.NODE_ENV === "production";
+  const isDev = process.env.NODE_ENV !== "production";
+
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -94,24 +95,25 @@ export async function proxy(request: NextRequest) {
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
     "connect-src 'self' https: wss:",
-    ...(isProd ? ["upgrade-insecure-requests"] : []),
+    ...(!isDev ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("content-security-policy", csp);
+
+  // В dev не устанавливаем CSP — нужен eval для Fast Refresh
+  if (!isDev) {
+    requestHeaders.set("content-security-policy", csp);
+  }
 
   const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
+    request: { headers: requestHeaders },
   });
-  response.headers.set("content-security-policy", csp);
-  const isDev = process.env.NODE_ENV !== "production";
-  // В dev пропускаем CSP — нужен eval для Fast Refresh
+
   if (!isDev) {
     response.headers.set("content-security-policy", csp);
   }
+
   return response;
 }
 
