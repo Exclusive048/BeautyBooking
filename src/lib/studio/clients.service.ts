@@ -24,9 +24,20 @@ export type StudioClientListItem = {
   card: ClientCardSummary | null;
 };
 
-export type StudioClientsData = {
-  clients: StudioClientListItem[];
+export type ClientsPageInput = {
+  studioId: string;
+  sort?: "newest";
+  includeCardSummary?: boolean;
+  cursor?: string;
+  limit?: number;
 };
+
+export type ClientsPageResult<T> = {
+  items: T[];
+  nextCursor: string | null;
+};
+
+export type StudioClientsData = ClientsPageResult<StudioClientListItem>;
 
 function clientSortDate(lastBookingAt: Date): number {
   return lastBookingAt.getTime();
@@ -70,13 +81,10 @@ async function loadCardSummaries(providerId: string, clients: Map<string, { clie
   return map;
 }
 
-export async function getStudioClients(
-  studioId: string,
-  sort?: "newest",
-  includeCardSummary = false
-): Promise<StudioClientsData> {
+export async function getStudioClients(input: ClientsPageInput): Promise<StudioClientsData> {
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
   const studio = await prisma.studio.findUnique({
-    where: { id: studioId },
+    where: { id: input.studioId },
     select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
@@ -126,30 +134,46 @@ export async function getStudioClients(
     applyProfileNames(grouped, profiles);
   }
 
+  const includeCardSummary = input.includeCardSummary ?? false;
   const cardMap = includeCardSummary ? await loadCardSummaries(studio.providerId, grouped) : new Map();
 
-  const clients = Array.from(grouped.values())
-    .sort((a, b) => {
-      if (sort === "newest" || !sort) {
-        return clientSortDate(b.lastBookingAt) - clientSortDate(a.lastBookingAt);
-      }
+  const sortedClients = Array.from(grouped.values()).sort((a, b) => {
+    if (input.sort === "newest" || !input.sort) {
       return clientSortDate(b.lastBookingAt) - clientSortDate(a.lastBookingAt);
-    })
-    // TODO: добавить курсорную пагинацию для длинных списков клиентов.
-    .slice(0, 50)
-    .map((item) => ({
-      key: item.key,
-      clientUserId: item.clientUserId,
-      displayName: item.displayName,
-      phone: item.phone,
-      lastBookingAt: item.lastBookingAt.toISOString(),
-      lastVisitAt: item.lastVisitAt ? item.lastVisitAt.toISOString() : null,
-      daysSinceLastVisit: calculateDaysSinceLastVisit(item.lastVisitAt, studio.provider.timezone),
-      lastServiceName: item.lastServiceName,
-      visitsCount: item.visitsCount,
-      totalAmount: item.totalAmount,
-      card: includeCardSummary ? cardMap.get(item.key) ?? null : null,
-    }));
+    }
+    return clientSortDate(b.lastBookingAt) - clientSortDate(a.lastBookingAt);
+  });
 
-  return { clients };
+  const cursorIndex =
+    input.cursor === undefined
+      ? -1
+      : sortedClients.findIndex(
+          (item) => item.key === input.cursor || (item.clientUserId && item.clientUserId === input.cursor)
+        );
+  const startIndex = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+  const pageCandidates = sortedClients.slice(startIndex, startIndex + limit + 1);
+
+  let nextCursor: string | null = null;
+  if (pageCandidates.length > limit) {
+    const cursorItem = pageCandidates[limit - 1];
+    nextCursor = cursorItem.clientUserId ?? cursorItem.key;
+    pageCandidates.pop();
+  }
+
+  const clients = pageCandidates.map((item) => ({
+    key: item.key,
+    clientUserId: item.clientUserId,
+    displayName: item.displayName,
+    phone: item.phone,
+    lastBookingAt: item.lastBookingAt.toISOString(),
+    lastVisitAt: item.lastVisitAt ? item.lastVisitAt.toISOString() : null,
+    daysSinceLastVisit: calculateDaysSinceLastVisit(item.lastVisitAt, studio.provider.timezone),
+    lastServiceName: item.lastServiceName,
+    visitsCount: item.visitsCount,
+    totalAmount: item.totalAmount,
+    card: includeCardSummary ? cardMap.get(item.key) ?? null : null,
+  }));
+
+  return { items: clients, nextCursor };
 }
+

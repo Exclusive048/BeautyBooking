@@ -25,6 +25,8 @@ export const studioServicesQuerySchema = z.object({
 export const studioClientsQuerySchema = z.object({
   studioId: z.string().trim().min(1),
   sort: z.enum(["newest"]).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 export const studioFinanceQuerySchema = z.object({

@@ -26,7 +26,13 @@ export async function GET(req: Request) {
     });
 
     const plan = await getCurrentPlan(user.id, SubscriptionScope.STUDIO);
-    const data = await getStudioClients(query.studioId, query.sort, canAccessClientCards(plan.tier));
+    const data = await getStudioClients({
+      studioId: query.studioId,
+      sort: query.sort,
+      includeCardSummary: canAccessClientCards(plan.tier),
+      cursor: query.cursor,
+      limit: query.limit,
+    });
     return jsonOk(data);
   } catch (error) {
     const appError = toAppError(error);

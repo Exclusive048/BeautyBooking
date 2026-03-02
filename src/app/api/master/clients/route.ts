@@ -12,6 +12,8 @@ import { parseQuery } from "@/lib/validation";
 
 const querySchema = z.object({
   sort: z.enum(["recent", "visits", "alpha"]).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 export const runtime = "nodejs";
@@ -25,7 +27,13 @@ export async function GET(req: Request) {
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
 
-    const data = await getMasterClients(providerId, query.sort, canAccessClientCards(plan.tier));
+    const data = await getMasterClients({
+      providerId,
+      sort: query.sort,
+      includeCardSummary: canAccessClientCards(plan.tier),
+      cursor: query.cursor,
+      limit: query.limit,
+    });
     return jsonOk(data);
   } catch (error) {
     const appError = toAppError(error);

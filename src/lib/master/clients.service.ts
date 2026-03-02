@@ -24,9 +24,20 @@ export type MasterClientListItem = {
   card: ClientCardSummary | null;
 };
 
-export type MasterClientsData = {
-  clients: MasterClientListItem[];
+export type ClientsPageInput = {
+  providerId: string;
+  sort?: "recent" | "visits" | "alpha";
+  includeCardSummary?: boolean;
+  cursor?: string;
+  limit?: number;
 };
+
+export type ClientsPageResult<T> = {
+  items: T[];
+  nextCursor: string | null;
+};
+
+export type MasterClientsData = ClientsPageResult<MasterClientListItem>;
 
 async function loadCardSummaries(providerId: string, clients: Map<string, { clientUserId: string | null; phone: string }>) {
   const userIds = Array.from(new Set(Array.from(clients.values()).map((item) => item.clientUserId).filter(Boolean))) as string[];
@@ -81,13 +92,10 @@ function sortClients(
   return b.lastBookingAt.getTime() - a.lastBookingAt.getTime();
 }
 
-export async function getMasterClients(
-  providerId: string,
-  sort?: "recent" | "visits" | "alpha",
-  includeCardSummary = false
-): Promise<MasterClientsData> {
+export async function getMasterClients(input: ClientsPageInput): Promise<MasterClientsData> {
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
   const provider = await prisma.provider.findUnique({
-    where: { id: providerId },
+    where: { id: input.providerId },
     select: { id: true, type: true, timezone: true },
   });
   if (!provider || provider.type !== "MASTER") {
@@ -96,7 +104,7 @@ export async function getMasterClients(
 
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [{ providerId }, { masterProviderId: providerId }],
+      OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }],
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
     },
     select: {
@@ -137,25 +145,41 @@ export async function getMasterClients(
     applyProfileNames(grouped, profiles);
   }
 
-  const cardMap = includeCardSummary ? await loadCardSummaries(providerId, grouped) : new Map();
+  const includeCardSummary = input.includeCardSummary ?? false;
+  const cardMap = includeCardSummary ? await loadCardSummaries(input.providerId, grouped) : new Map();
 
-  const clients = Array.from(grouped.values())
-    .sort((a, b) => sortClients(sort, a, b))
-    // TODO: добавить курсорную пагинацию для длинных списков клиентов.
-    .slice(0, 50)
-    .map((item) => ({
-      key: item.key,
-      clientUserId: item.clientUserId,
-      displayName: item.displayName,
-      phone: item.phone,
-      lastBookingAt: item.lastBookingAt.toISOString(),
-      lastVisitAt: item.lastVisitAt ? item.lastVisitAt.toISOString() : null,
-      daysSinceLastVisit: calculateDaysSinceLastVisit(item.lastVisitAt, provider.timezone),
-      lastServiceName: item.lastServiceName,
-      visitsCount: item.visitsCount,
-      totalAmount: item.totalAmount,
-      card: includeCardSummary ? cardMap.get(item.key) ?? null : null,
-    }));
+  const sortedClients = Array.from(grouped.values()).sort((a, b) => sortClients(input.sort, a, b));
 
-  return { clients };
+  const cursorIndex =
+    input.cursor === undefined
+      ? -1
+      : sortedClients.findIndex(
+          (item) => item.key === input.cursor || (item.clientUserId && item.clientUserId === input.cursor)
+        );
+  const startIndex = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+  const pageCandidates = sortedClients.slice(startIndex, startIndex + limit + 1);
+
+  let nextCursor: string | null = null;
+  if (pageCandidates.length > limit) {
+    const cursorItem = pageCandidates[limit - 1];
+    nextCursor = cursorItem.clientUserId ?? cursorItem.key;
+    pageCandidates.pop();
+  }
+
+  const clients = pageCandidates.map((item) => ({
+    key: item.key,
+    clientUserId: item.clientUserId,
+    displayName: item.displayName,
+    phone: item.phone,
+    lastBookingAt: item.lastBookingAt.toISOString(),
+    lastVisitAt: item.lastVisitAt ? item.lastVisitAt.toISOString() : null,
+    daysSinceLastVisit: calculateDaysSinceLastVisit(item.lastVisitAt, provider.timezone),
+    lastServiceName: item.lastServiceName,
+    visitsCount: item.visitsCount,
+    totalAmount: item.totalAmount,
+    card: includeCardSummary ? cardMap.get(item.key) ?? null : null,
+  }));
+
+  return { items: clients, nextCursor };
 }
+
