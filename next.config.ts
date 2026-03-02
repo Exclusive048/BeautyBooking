@@ -74,6 +74,7 @@ const withPWAConfig = withPWA({
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["redis", "@redis/client"],
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -98,14 +99,7 @@ const nextConfig: NextConfig = {
         headers,
       },
     ];
-  },
-  webpack: (config, { dev, isServer }) => {
-    if (dev && !isServer) {
-      config.devtool = "source-map";
-    }
-
-    return config;
-  },
+  }
 };
 
 export default withPWAConfig(nextConfig);

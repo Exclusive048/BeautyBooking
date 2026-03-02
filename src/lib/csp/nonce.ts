@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 
-export function getNonce(): string {
-  return headers().get("x-nonce") ?? "";
+export async function getNonce(): Promise<string> {
+  const h = await headers();
+  return h.get("x-nonce") ?? "";
 }
