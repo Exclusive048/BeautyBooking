@@ -6,7 +6,7 @@ import { PAST_DUE_GRACE_DAYS } from "@/lib/billing/constants";
 import { isYookassaIpAllowed } from "@/lib/payments/yookassa/allowlist";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { NotificationType } from "@prisma/client";
 import { alertCritical } from "@/lib/monitoring";
 
@@ -77,8 +77,8 @@ export async function POST(req: Request) {
   }
 
   const token = getWebhookToken(req);
-  const expected = process.env.YOOKASSA_WEBHOOK_TOKEN?.trim();
-  if (!expected || token !== expected) {
+  const expectedToken = process.env.YOOKASSA_WEBHOOK_TOKEN?.trim();
+  if (expectedToken && token !== expectedToken) {
     logError("YooKassa webhook rejected: invalid token", { ip });
     return fail("Unauthorized", 401, "UNAUTHORIZED");
   }
@@ -99,173 +99,190 @@ export async function POST(req: Request) {
     const object = payload.object ?? {};
 
     if (event === "refund.succeeded") {
-    const paymentId = payload.object?.payment_id ?? payload.payment?.id;
-    if (!paymentId) return ok({ ok: true });
+      const paymentId = payload.object?.payment_id ?? payload.payment?.id;
+      if (!paymentId) return ok({ ok: true });
 
-    const billingPayment = await prisma.billingPayment.findUnique({
-      where: { yookassaPaymentId: paymentId },
-      select: { id: true, subscriptionId: true, subscription: { select: { userId: true, scope: true } } },
-    });
-    if (!billingPayment) return ok({ ok: true });
+      const billingPayment = await prisma.billingPayment.findUnique({
+        where: { yookassaPaymentId: paymentId },
+        select: { id: true, subscriptionId: true, subscription: { select: { userId: true, scope: true } } },
+      });
+      if (!billingPayment) return ok({ ok: true });
 
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: { status: "REFUNDED" },
-    });
-    await createBillingAuditLog({
-      userId: billingPayment.subscription.userId,
-      scope: billingPayment.subscription.scope,
-      subscriptionId: billingPayment.subscriptionId,
-      paymentId: billingPayment.id,
-      action: "PAYMENT_REFUNDED",
-      details: { yookassaPaymentId: paymentId },
-    });
-    return ok({ ok: true });
+      await prisma.billingPayment.update({
+        where: { id: billingPayment.id },
+        data: { status: "REFUNDED" },
+      });
+      await createBillingAuditLog({
+        userId: billingPayment.subscription.userId,
+        scope: billingPayment.subscription.scope,
+        subscriptionId: billingPayment.subscriptionId,
+        paymentId: billingPayment.id,
+        action: "PAYMENT_REFUNDED",
+        details: { yookassaPaymentId: paymentId },
+      });
+      return ok({ ok: true });
     }
 
     if (!event.startsWith("payment.")) {
-    return ok({ ok: true });
+      return ok({ ok: true });
     }
 
     const internalId = object.metadata?.internalPaymentId;
     const yookassaPaymentId = object.id;
 
     const billingPayment =
-    typeof internalId === "string"
-      ? await prisma.billingPayment.findUnique({
-          where: { id: internalId },
-          select: {
-            id: true,
-            status: true,
-            type: true,
-            periodMonths: true,
-            subscriptionId: true,
-            subscription: { select: { id: true, userId: true, scope: true, planId: true } },
-          },
-        })
-      : yookassaPaymentId
+      typeof internalId === "string"
         ? await prisma.billingPayment.findUnique({
-            where: { yookassaPaymentId },
+            where: { id: internalId },
             select: {
               id: true,
               status: true,
               type: true,
               periodMonths: true,
               subscriptionId: true,
-              subscription: { select: { id: true, userId: true, scope: true, planId: true } },
+              subscription: {
+                select: { id: true, userId: true, scope: true, planId: true, status: true, periodMonths: true },
+              },
             },
           })
-        : null;
+        : yookassaPaymentId
+          ? await prisma.billingPayment.findUnique({
+              where: { yookassaPaymentId },
+              select: {
+                id: true,
+                status: true,
+                type: true,
+                periodMonths: true,
+                subscriptionId: true,
+                subscription: {
+                  select: { id: true, userId: true, scope: true, planId: true, status: true, periodMonths: true },
+                },
+              },
+            })
+          : null;
 
     if (!billingPayment) {
-    logError("YooKassa webhook: payment not found", { yookassaPaymentId, internalId });
-    return ok({ ok: true });
+      logError("YooKassa webhook: payment not found", { yookassaPaymentId, internalId });
+      return ok({ ok: true });
     }
 
-    if (["SUCCEEDED", "CANCELED", "FAILED", "REFUNDED"].includes(billingPayment.status)) {
-    return ok({ ok: true });
+    if (["CANCELED", "FAILED", "REFUNDED"].includes(billingPayment.status)) {
+      return ok({ ok: true });
     }
 
     const now = new Date();
 
     if (event === "payment.succeeded") {
-    const planIdFromMeta = typeof object.metadata?.planId === "string" ? object.metadata?.planId : null;
-    const rawPeriod = object.metadata?.periodMonths;
-    const parsedPeriod =
-      typeof rawPeriod === "number"
-        ? rawPeriod
-        : typeof rawPeriod === "string"
-          ? Number(rawPeriod)
-          : NaN;
-    const periodMonthsFromMeta = Number.isFinite(parsedPeriod)
-      ? parsedPeriod
-      : billingPayment.periodMonths;
+      const alreadySucceeded = billingPayment.status === "SUCCEEDED";
+      const planIdFromMeta = typeof object.metadata?.planId === "string" ? object.metadata?.planId : null;
+      const rawPeriod = object.metadata?.periodMonths;
+      const parsedPeriod =
+        typeof rawPeriod === "number"
+          ? rawPeriod
+          : typeof rawPeriod === "string"
+            ? Number(rawPeriod)
+            : NaN;
+      const periodMonthsFromMeta = Number.isFinite(parsedPeriod)
+        ? parsedPeriod
+        : billingPayment.periodMonths > 0
+          ? billingPayment.periodMonths
+          : billingPayment.subscription.periodMonths;
 
-    const periodStart = now;
-    const periodEnd = addMonthsUtc(periodStart, periodMonthsFromMeta);
+      const periodStart = now;
+      const periodEnd = addMonthsUtc(periodStart, periodMonthsFromMeta);
 
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: {
-        status: "SUCCEEDED",
-        yookassaPaymentId: yookassaPaymentId ?? null,
-        confirmationUrl: object.confirmation?.confirmation_url ?? null,
-      },
-    });
+      await prisma.$transaction([
+        prisma.billingPayment.update({
+          where: { id: billingPayment.id },
+          data: {
+            status: "SUCCEEDED",
+            yookassaPaymentId: yookassaPaymentId ?? null,
+            confirmationUrl: object.confirmation?.confirmation_url ?? null,
+          },
+        }),
+        prisma.userSubscription.update({
+          where: { id: billingPayment.subscriptionId },
+          data: {
+            status: "ACTIVE",
+            planId: planIdFromMeta ?? billingPayment.subscription.planId,
+            periodMonths: periodMonthsFromMeta,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            nextBillingAt: periodEnd,
+            graceUntil: null,
+            cancelAtPeriodEnd: false,
+            autoRenew: true,
+            lastPaymentAt: now,
+            paymentMethodId: object.payment_method?.saved ? object.payment_method?.id ?? undefined : undefined,
+          },
+        }),
+      ]);
 
-    await prisma.userSubscription.update({
-      where: { id: billingPayment.subscriptionId },
-      data: {
-        status: "ACTIVE",
-        planId: planIdFromMeta ?? billingPayment.subscription.planId,
-        periodMonths: periodMonthsFromMeta,
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-        nextBillingAt: periodEnd,
-        graceUntil: null,
-        cancelAtPeriodEnd: false,
-        autoRenew: true,
-        lastPaymentAt: now,
-        paymentMethodId: object.payment_method?.saved ? object.payment_method?.id ?? undefined : undefined,
-      },
-    });
+      logInfo("YooKassa payment succeeded", {
+        paymentId: billingPayment.id,
+        subscriptionId: billingPayment.subscriptionId,
+        userId: billingPayment.subscription.userId,
+        alreadySucceeded,
+      });
 
-    await createBillingAuditLog({
-      userId: billingPayment.subscription.userId,
-      scope: billingPayment.subscription.scope,
-      subscriptionId: billingPayment.subscriptionId,
-      paymentId: billingPayment.id,
-      action: "PAYMENT_SUCCEEDED",
-      details: { yookassaPaymentId },
-    });
+      if (!alreadySucceeded) {
+        await createBillingAuditLog({
+          userId: billingPayment.subscription.userId,
+          scope: billingPayment.subscription.scope,
+          subscriptionId: billingPayment.subscriptionId,
+          paymentId: billingPayment.id,
+          action: "PAYMENT_SUCCEEDED",
+          details: { yookassaPaymentId },
+        });
 
-    await createBillingNotification({
-      userId: billingPayment.subscription.userId,
-      type: NotificationType.BILLING_PAYMENT_SUCCEEDED,
-      title: "Оплата прошла",
-      body: "Оплата подписки успешно завершена.",
-      payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
-    });
+        await createBillingNotification({
+          userId: billingPayment.subscription.userId,
+          type: NotificationType.BILLING_PAYMENT_SUCCEEDED,
+          title: "Оплата прошла",
+          body: "Оплата подписки успешно завершена.",
+          payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
+        });
+      }
 
-    return ok({ ok: true });
+      return ok({ ok: true });
     }
 
     if (event === "payment.canceled" || event === "payment.failed") {
-    const newStatus = event === "payment.canceled" ? "CANCELED" : "FAILED";
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: {
-        status: newStatus,
-        yookassaPaymentId: yookassaPaymentId ?? null,
-        confirmationUrl: object.confirmation?.confirmation_url ?? null,
-      },
-    });
-
-    if (billingPayment.type === "RENEWAL") {
-      await prisma.userSubscription.update({
-        where: { id: billingPayment.subscriptionId },
-        data: { status: "PAST_DUE", graceUntil: getGraceUntil(now) },
+      const newStatus = event === "payment.canceled" ? "CANCELED" : "FAILED";
+      await prisma.billingPayment.update({
+        where: { id: billingPayment.id },
+        data: {
+          status: newStatus,
+          yookassaPaymentId: yookassaPaymentId ?? null,
+          confirmationUrl: object.confirmation?.confirmation_url ?? null,
+        },
       });
-    }
 
-    await createBillingAuditLog({
-      userId: billingPayment.subscription.userId,
-      scope: billingPayment.subscription.scope,
-      subscriptionId: billingPayment.subscriptionId,
-      paymentId: billingPayment.id,
-      action: "PAYMENT_FAILED",
-      details: { yookassaPaymentId, event },
-    });
+      if (billingPayment.type === "RENEWAL") {
+        await prisma.userSubscription.update({
+          where: { id: billingPayment.subscriptionId },
+          data: { status: "PAST_DUE", graceUntil: getGraceUntil(now) },
+        });
+      }
 
-    await createBillingNotification({
-      userId: billingPayment.subscription.userId,
-      type: NotificationType.BILLING_PAYMENT_FAILED,
-      title: "Платёж не прошёл",
-      body: "Не удалось завершить оплату подписки.",
-      payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
-    });
+      await createBillingAuditLog({
+        userId: billingPayment.subscription.userId,
+        scope: billingPayment.subscription.scope,
+        subscriptionId: billingPayment.subscriptionId,
+        paymentId: billingPayment.id,
+        action: "PAYMENT_FAILED",
+        details: { yookassaPaymentId, event },
+      });
 
-    return ok({ ok: true });
+      await createBillingNotification({
+        userId: billingPayment.subscription.userId,
+        type: NotificationType.BILLING_PAYMENT_FAILED,
+        title: "Платёж не прошёл",
+        body: "Не удалось завершить оплату подписки.",
+        payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
+      });
+
+      return ok({ ok: true });
     }
   } catch (error) {
     await alertCritical("YooKassa webhook processing failed", {

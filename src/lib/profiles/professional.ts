@@ -1,7 +1,8 @@
-import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import { AccountType, MembershipStatus, ProviderType, StudioRole, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addRoleToUser } from "@/lib/auth/roles";
 import { ensureUniqueUsername, generateDefaultUsername } from "@/lib/publicUsername";
+import { ensureFreeSubscription } from "@/lib/billing/ensure-free-subscription";
 
 type MasterProfileCreateResult =
   | { status: "created"; masterProfileId: string; providerId: string }
@@ -30,6 +31,7 @@ export async function createMasterProfile(
   });
 
   if (existingProfile) {
+    await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
     return {
       status: "already-exists",
       masterProfileId: existingProfile.id,
@@ -77,6 +79,8 @@ export async function createMasterProfile(
     select: { id: true, providerId: true },
   });
 
+  await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
+
   return {
     status: "created",
     masterProfileId: createdProfile.id,
@@ -98,6 +102,7 @@ export async function createStudioProfile(
   });
 
   if (existingProvider?.studioProfile) {
+    await ensureFreeSubscription(input.userId, SubscriptionScope.STUDIO);
     return {
       status: "already-exists",
       studioId: existingProvider.studioProfile.id,
@@ -170,6 +175,8 @@ export async function createStudioProfile(
       select: { id: true },
     });
   }
+
+  await ensureFreeSubscription(input.userId, SubscriptionScope.STUDIO);
 
   return { status: "created", studioId: studio.id, providerId: provider.id };
 }

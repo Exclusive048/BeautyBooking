@@ -151,7 +151,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicUsernamePage({ params, searchParams }: Props) {
-  const nonce = getNonce();
+  const nonce = await getNonce();
   const { username: raw } = await Promise.resolve(params);
   const sp = (await Promise.resolve(searchParams)) ?? {};
   const username = normalizeUsername(raw);
