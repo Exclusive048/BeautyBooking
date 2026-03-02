@@ -58,7 +58,7 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
   return "publicApi";
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const method = request.method.toUpperCase();
   const pathname = normalizePathname(request.nextUrl.pathname);
   const tier = resolveRateLimitTier(method, pathname);

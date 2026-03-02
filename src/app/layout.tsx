@@ -58,8 +58,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const nonce = getNonce();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = await getNonce();
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
