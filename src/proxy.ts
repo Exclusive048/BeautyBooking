@@ -107,6 +107,11 @@ export async function proxy(request: NextRequest) {
     },
   });
   response.headers.set("content-security-policy", csp);
+  const isDev = process.env.NODE_ENV !== "production";
+  // В dev пропускаем CSP — нужен eval для Fast Refresh
+  if (!isDev) {
+    response.headers.set("content-security-policy", csp);
+  }
   return response;
 }
 
