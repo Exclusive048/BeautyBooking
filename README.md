@@ -282,3 +282,5 @@ SMTP_USER="smtp-user"
 SMTP_PASS="smtp-password"
 SMTP_FROM="BeautyHub <no-reply@example.com>"
 ```
+
+Supabase variables `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are no longer used.
