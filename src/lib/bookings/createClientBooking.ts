@@ -1,13 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import {
-  createBookingConfirmedNotifications,
-  createBookingRequestNotifications,
-  loadBookingSnapshot,
-  publishNotifications,
-  type NotificationRecord,
-} from "@/lib/notifications/service";
-import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -229,41 +221,6 @@ export async function createClientBooking(
       });
     }
 
-    let notifications: NotificationRecord[] = [];
-    const snapshotStartedAt = Date.now();
-    try {
-      const snapshot = await loadBookingSnapshot(booking.id);
-      const snapshotMs = Date.now() - snapshotStartedAt;
-      logInfo("[booking:create:legacy] snapshot loaded", { snapshotMs });
-      if (snapshot) {
-        notifications = shouldAutoConfirm
-          ? await createBookingConfirmedNotifications({
-              bookingId: booking.id,
-              notifyClient: true,
-              notifyMaster: true,
-              masterMode: "AUTO",
-              snapshot,
-            })
-          : await createBookingRequestNotifications({ bookingId: booking.id, snapshot });
-      }
-    } catch (error) {
-      logError("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ СѓРІРµРґРѕРјР»РµРЅРёСЏ РїРѕ Р·Р°РїРёСЃРё", {
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
-
-    if (notifications.length > 0) {
-      publishNotifications(notifications);
-    }
-
-    try {
-      await sendBookingTelegramNotifications(booking.id, "CREATED", { notifyClientOnCreate: true });
-    } catch (error) {
-      logError("РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ Telegram-СѓРІРµРґРѕРјР»РµРЅРёСЏ Рѕ Р·Р°РїРёСЃРё", {
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
-
     if (shouldAutoConfirm) {
       try {
         await scheduleBookingReminders(booking.id);
@@ -296,3 +253,4 @@ export async function createClientBooking(
     throw error;
   }
 }
+

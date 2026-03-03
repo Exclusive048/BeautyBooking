@@ -7,7 +7,7 @@ import { getSessionUser } from "@/lib/auth/access";
 import { resolveChatAccess } from "@/lib/chat/access";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
-import { notificationsNotifier } from "@/lib/notifications/notifier";
+import { deliverNotification } from "@/lib/notifications/delivery";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
@@ -101,25 +101,31 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
     });
 
     const recipientUserId =
-      access.senderType === "CLIENT" ? access.booking.masterProvider?.ownerUserId ?? null : access.booking.clientUserId;
+      access.senderType === "CLIENT"
+        ? access.booking.masterProvider?.ownerUserId ?? null
+        : access.booking.clientUserId;
 
     if (recipientUserId) {
       const bodyPreview = previewBody(message.body);
-      const notifier = await notificationsNotifier;
-      notifier.publish(recipientUserId, {
-        id: message.id,
+      const title = `Сообщение от ${senderName}`;
+      const payload = {
+        bookingId,
+        chatId: chat.id,
+        messageId: message.id,
+        senderType: access.senderType,
+        senderName,
+        bodyPreview,
+      };
+      await deliverNotification({
+        userId: recipientUserId,
         type: NotificationType.CHAT_MESSAGE_RECEIVED,
-        title: `Сообщение от ${senderName}`,
+        title,
         body: bodyPreview,
-        payloadJson: {
-          bookingId,
-          chatId: chat.id,
-          messageId: message.id,
-          senderType: access.senderType,
-          senderName,
-          bodyPreview,
-        },
-        createdAt: message.createdAt.toISOString(),
+        payloadJson: payload,
+        pushUrl:
+          access.senderType === "CLIENT"
+            ? `/cabinet/master/dashboard?bookingId=${bookingId}&chat=open`
+            : `/cabinet/bookings?bookingId=${bookingId}&chat=open`,
       });
     }
 

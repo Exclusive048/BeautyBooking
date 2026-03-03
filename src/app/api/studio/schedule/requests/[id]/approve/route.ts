@@ -6,6 +6,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { applySchedulePayload, type SchedulePayload } from "@/lib/schedule/unified";
+import { loadScheduleRequestWithRelations, notifyScheduleRequestApproved } from "@/lib/notifications/studio-notifications";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,19 @@ export async function POST(
       where: { id: request.id },
       data: { status: "APPROVED" },
     });
+
+    try {
+      const fullRequest = await loadScheduleRequestWithRelations(request.id);
+      if (fullRequest) {
+        await notifyScheduleRequestApproved(fullRequest);
+      }
+    } catch (error) {
+      logError("POST /api/studio/schedule/requests/[id]/approve notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/studio/schedule/requests/[id]/approve",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
 
     return jsonOk({ id: request.id, status: "APPROVED" });
   } catch (error) {

@@ -73,7 +73,14 @@ function parseJsonPayload(payloadJson: unknown): unknown {
 }
 
 function resolveModelOpenHref(type: NotificationCenterNotificationItem["type"], payloadJson: unknown): string | undefined {
-  if (type !== "MODEL_NEW_APPLICATION" && type !== "MODEL_TIME_PROPOSED" && type !== "MODEL_APPLICATION_REJECTED" && type !== "MODEL_BOOKING_CREATED") {
+  if (
+    type !== "MODEL_NEW_APPLICATION" &&
+    type !== "MODEL_APPLICATION_RECEIVED" &&
+    type !== "MODEL_TIME_PROPOSED" &&
+    type !== "MODEL_APPLICATION_REJECTED" &&
+    type !== "MODEL_BOOKING_CREATED" &&
+    type !== "MODEL_TIME_CONFIRMED"
+  ) {
     return undefined;
   }
   const payload = parseJsonPayload(payloadJson);
@@ -104,7 +111,14 @@ function resolveChatOpenHref(type: NotificationCenterNotificationItem["type"], p
 }
 
 function resolveModelChannel(type: NotificationCenterNotificationItem["type"]): NotificationChannel | null {
-  if (type === "MODEL_NEW_APPLICATION" || type === "MODEL_BOOKING_CREATED") return "MASTER";
+  if (
+    type === "MODEL_NEW_APPLICATION" ||
+    type === "MODEL_APPLICATION_RECEIVED" ||
+    type === "MODEL_BOOKING_CREATED" ||
+    type === "MODEL_TIME_CONFIRMED"
+  ) {
+    return "MASTER";
+  }
   if (type === "MODEL_TIME_PROPOSED" || type === "MODEL_APPLICATION_REJECTED") return "SYSTEM";
   return null;
 }
@@ -279,6 +293,7 @@ export async function getNotificationCenterData(input: {
       type: item.type,
       channel:
         resolveModelChannel(item.type) ??
+        (item.type.startsWith("STUDIO_") ? "STUDIO" : null) ??
         classifyNotificationChannel({
           userId: input.userId,
           studioIds,

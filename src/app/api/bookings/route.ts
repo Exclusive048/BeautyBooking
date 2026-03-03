@@ -12,6 +12,9 @@ import { getSessionUser, requireRole } from "@/lib/auth/access";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { listProviderBookingsForOwner } from "@/lib/bookings/list";
+import { loadBookingWithRelations, notifyBookingConfirmed, notifyBookingCreated } from "@/lib/notifications/booking-notifications";
+import { loadHotSlotWithRelations, notifyHotSlotBooked } from "@/lib/notifications/hot-slot-notifications";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
@@ -96,6 +99,43 @@ export async function POST(req: Request) {
         clientUserId: user.userId,
         idempotencyKey: normalizedIdempotencyKey,
       });
+      try {
+        const fullBooking = await loadBookingWithRelations(created.id);
+        if (fullBooking) {
+          await notifyBookingCreated(fullBooking);
+          if (fullBooking.status === "CONFIRMED") {
+            await notifyBookingConfirmed(fullBooking);
+          }
+          const hotProviderId =
+            fullBooking.masterProvider?.id ??
+            (fullBooking.provider.type === "MASTER" ? fullBooking.provider.id : null);
+          if (hotProviderId && fullBooking.startAtUtc) {
+            const hotSlot = await prisma.hotSlot.findFirst({
+              where: {
+                providerId: hotProviderId,
+                startAtUtc: fullBooking.startAtUtc,
+                isActive: true,
+                expiresAtUtc: { gt: new Date() },
+                OR: [{ serviceId: null }, { serviceId: fullBooking.serviceId }],
+              },
+              select: { id: true },
+            });
+            if (hotSlot) {
+              const fullHotSlot = await loadHotSlotWithRelations(hotSlot.id);
+              if (fullHotSlot) {
+                await notifyHotSlotBooked(fullHotSlot, fullBooking.clientName);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logError("POST /api/bookings notifications failed", {
+          requestId: getRequestId(req),
+          route: "POST /api/bookings",
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       return jsonOk({ booking: created }, { status: 201 });
     }
 
@@ -110,6 +150,43 @@ export async function POST(req: Request) {
       referencePhotoAssetId,
       bookingAnswers,
     }, normalizedIdempotencyKey);
+    try {
+      const fullBooking = await loadBookingWithRelations(booking.id);
+      if (fullBooking) {
+        await notifyBookingCreated(fullBooking);
+        if (fullBooking.status === "CONFIRMED") {
+          await notifyBookingConfirmed(fullBooking);
+        }
+        const hotProviderId =
+          fullBooking.masterProvider?.id ??
+          (fullBooking.provider.type === "MASTER" ? fullBooking.provider.id : null);
+        if (hotProviderId && fullBooking.startAtUtc) {
+          const hotSlot = await prisma.hotSlot.findFirst({
+            where: {
+              providerId: hotProviderId,
+              startAtUtc: fullBooking.startAtUtc,
+              isActive: true,
+              expiresAtUtc: { gt: new Date() },
+              OR: [{ serviceId: null }, { serviceId: fullBooking.serviceId }],
+            },
+            select: { id: true },
+          });
+          if (hotSlot) {
+            const fullHotSlot = await loadHotSlotWithRelations(hotSlot.id);
+            if (fullHotSlot) {
+              await notifyHotSlotBooked(fullHotSlot, fullBooking.clientName);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logError("POST /api/bookings notifications failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/bookings",
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

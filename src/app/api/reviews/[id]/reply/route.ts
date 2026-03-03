@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { reviewIdParamSchema, reviewReplySchema } from "@/lib/reviews/schemas";
 import { replyToReview } from "@/lib/reviews/service";
+import { loadReviewWithRelations, notifyReviewReplied } from "@/lib/notifications/review-notifications";
 import { parseBody } from "@/lib/validation";
 
 type RouteContext = {
@@ -31,6 +32,19 @@ export async function POST(req: Request, ctx: RouteContext) {
       currentUserId: user.id,
       text: body.text,
     });
+
+    try {
+      const fullReview = await loadReviewWithRelations(review.id);
+      if (fullReview) {
+        await notifyReviewReplied(fullReview);
+      }
+    } catch (error) {
+      logError("POST /api/reviews/[id]/reply notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/reviews/{id}/reply",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
 
     return jsonOk({ review });
   } catch (error) {

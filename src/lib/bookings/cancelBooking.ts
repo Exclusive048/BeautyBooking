@@ -1,12 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import {
-  createBookingDeclinedNotifications,
-  createBookingNotifications,
-  publishNotifications,
-  type NotificationRecord,
-} from "@/lib/notifications/service";
-import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingCancelInput } from "@/lib/domain/bookings";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import {
@@ -77,7 +70,7 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     }
   }
 
-  const { updated, notifications } = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
       where: { id: input.bookingId },
       data: declinesMasterChange
@@ -102,43 +95,8 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
       select: { id: true, status: true },
     });
 
-    let notifications: NotificationRecord[] = [];
-    try {
-      if (declinesMasterChange) {
-        notifications = await createBookingNotifications(
-          { bookingId: updated.id, kind: "RESCHEDULED" },
-          tx
-        );
-      } else if (input.cancelledBy === "CLIENT") {
-        notifications = await createBookingNotifications(
-          { bookingId: updated.id, kind: "CANCELLED" },
-          tx
-        );
-      } else {
-        notifications = await createBookingDeclinedNotifications({ bookingId: updated.id, db: tx });
-      }
-    } catch (error) {
-      logError("Failed to create booking notifications", {
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
-
-    return { updated, notifications };
+    return updated;
   });
-
-  if (notifications.length > 0) {
-    publishNotifications(notifications);
-  }
-
-  if (!declinesMasterChange) {
-    try {
-      await sendBookingTelegramNotifications(updated.id, "CANCELLED");
-    } catch (error) {
-      logError("Failed to send Telegram booking notifications", {
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
-  }
 
   if (!declinesMasterChange) {
     await invalidateSlotsForBookingRange({

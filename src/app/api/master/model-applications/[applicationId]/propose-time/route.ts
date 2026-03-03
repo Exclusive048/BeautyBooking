@@ -3,7 +3,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
 import { isTimeWithinRange, proposeTimeSchema } from "@/lib/model-offers/schemas";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
+import { loadApplicationWithRelations, notifyModelTimeProposed } from "@/lib/notifications/model-notifications";
 import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
@@ -69,19 +69,9 @@ export async function POST(req: Request, ctx: RouteContext) {
       select: { id: true, status: true, proposedTimeLocal: true },
     });
 
-    if (application.clientUserId) {
-      const notification = await createNotification({
-        userId: application.clientUserId,
-        type: "MODEL_TIME_PROPOSED",
-        title: "Предложено время",
-        body: `Мастер предложил время ${application.offer.dateLocal} ${body.proposedTimeLocal}. Подтвердите запись.`,
-        payloadJson: {
-          offerId: application.offer.id,
-          applicationId: application.id,
-          proposedTimeLocal: body.proposedTimeLocal,
-        },
-      });
-      publishNotifications([notification]);
+    const fullApplication = await loadApplicationWithRelations(updated.id);
+    if (fullApplication) {
+      await notifyModelTimeProposed(fullApplication);
     }
 
     return jsonOk({ application: updated });

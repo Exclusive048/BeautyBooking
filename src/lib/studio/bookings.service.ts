@@ -3,13 +3,6 @@ import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
-import {
-  createBookingDeclinedNotifications,
-  createBookingNotifications,
-  publishNotifications,
-  type NotificationRecord,
-} from "@/lib/notifications/service";
-import { logError } from "@/lib/logging/logger";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
@@ -119,17 +112,6 @@ export async function createStudioBooking(input: {
 
     return booking;
   });
-
-  try {
-    const notifications = await createBookingNotifications({ bookingId: created.id, kind: "CREATED" });
-    if (notifications.length > 0) {
-      publishNotifications(notifications);
-    }
-  } catch (error) {
-    logError("Failed to create booking notifications", {
-      error: error instanceof Error ? error.stack : String(error),
-    });
-  }
 
   await invalidateSlotsForBookingRange({
     providerId: studio.providerId,
@@ -252,7 +234,7 @@ export async function moveStudioBooking(input: {
 export async function updateMasterBookingStatus(input: {
   bookingId: string;
   masterId: string;
-  status: "CONFIRMED" | "REJECTED";
+  status: "CONFIRMED" | "REJECTED" | "CANCELLED" | "NO_SHOW";
   comment?: string;
 }): Promise<{ id: string; status: string }> {
   // AUDIT (мастерские действия по статусу):
@@ -302,21 +284,25 @@ export async function updateMasterBookingStatus(input: {
     throw new AppError("Booking already started", 409, "CONFLICT");
   }
 
+  const isRejectAction = input.status === "REJECTED";
+  const isCancelAction = input.status === "CANCELLED";
+  const isNoShowAction = input.status === "NO_SHOW";
   const comment = input.comment?.trim() ?? "";
   const rejectsChangeRequest =
+    isRejectAction &&
     runtimeStatus === "CHANGE_REQUESTED" &&
     booking.requestedBy === "CLIENT" &&
     booking.actionRequiredBy === "MASTER";
 
-  if (!rejectsChangeRequest) {
+  if (!rejectsChangeRequest && (isRejectAction || isCancelAction)) {
     ensureBookingActionWindow(booking.startAtUtc);
   }
 
-  if (!rejectsChangeRequest && comment.length === 0) {
+  if (!rejectsChangeRequest && (isRejectAction || isCancelAction) && comment.length === 0) {
     throw new AppError("Comment is required", 400, "VALIDATION_ERROR");
   }
 
-  const { updated, notifications } = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
       where: { id: booking.id },
       data: rejectsChangeRequest
@@ -329,36 +315,21 @@ export async function updateMasterBookingStatus(input: {
             changeComment: null,
           }
         : {
-            status: "REJECTED",
+            status: input.status,
             cancelledBy: "PROVIDER",
-            cancelReason: comment,
+            cancelReason: comment || null,
             cancelledAtUtc: new Date(),
             requestedBy: "MASTER",
             actionRequiredBy: null,
             proposedStartAt: null,
             proposedEndAt: null,
-            changeComment: comment,
+            changeComment: comment || null,
           },
       select: { id: true, status: true },
     });
 
-    let notifications: NotificationRecord[] = [];
-    try {
-      notifications = rejectsChangeRequest
-        ? await createBookingNotifications({ bookingId: updated.id, kind: "CONFIRMED" }, tx)
-        : await createBookingDeclinedNotifications({ bookingId: updated.id, db: tx });
-    } catch (error) {
-      logError("Failed to create booking notifications", {
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
-
-    return { updated, notifications };
+    return updated;
   });
-
-  if (notifications.length > 0) {
-    publishNotifications(notifications);
-  }
 
   if (!rejectsChangeRequest) {
     await invalidateSlotsForBookingRange({

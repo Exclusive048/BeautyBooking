@@ -1,4 +1,4 @@
-import { AccountType, NotificationType, Prisma, type ReviewTargetType, type UserProfile } from "@prisma/client";
+import { AccountType, Prisma, type ReviewTargetType, type UserProfile } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
@@ -8,7 +8,6 @@ import {
   REVIEW_WINDOW_DAYS,
 } from "@/lib/reviews/constants";
 import { toReviewDto, type ReviewDto, type ReviewTagDto } from "@/lib/reviews/types";
-import { logError } from "@/lib/logging/logger";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 // AUDIT MATRIX (task sections 1-9)
@@ -254,56 +253,6 @@ async function recalculateTargetRatings(
   }
 }
 
-async function resolveMasterRecipientIds(targetType: ReviewTargetType, targetId: string): Promise<string[]> {
-  if (targetType !== "provider") return [];
-
-  const provider = await prisma.provider.findUnique({
-    where: { id: targetId },
-    select: {
-      type: true,
-      ownerUserId: true,
-      masterProfile: { select: { userId: true } },
-    },
-  });
-  if (!provider || provider.type !== "MASTER") return [];
-
-  const recipients = new Set<string>();
-  if (provider.ownerUserId) recipients.add(provider.ownerUserId);
-  if (provider.masterProfile?.userId) recipients.add(provider.masterProfile.userId);
-  return Array.from(recipients);
-}
-
-async function createReviewCreatedNotifications(input: {
-  bookingId: string | null;
-  authorId: string;
-  targetType: ReviewTargetType;
-  targetId: string;
-  rating: number;
-  text: string | null;
-}): Promise<void> {
-  const recipients = await resolveMasterRecipientIds(input.targetType, input.targetId);
-  const filteredRecipients = recipients.filter((recipientId) => recipientId !== input.authorId);
-  if (filteredRecipients.length === 0) return;
-
-  const textPart = input.text?.trim();
-  const body = textPart && textPart.length > 0 ? `Rating ${input.rating}/5: ${textPart}` : `Rating ${input.rating}/5`;
-
-  await prisma.notification.createMany({
-    data: filteredRecipients.map((userId) => ({
-      userId,
-      type: NotificationType.BOOKING_CREATED,
-      title: "New review",
-      body,
-      bookingId: input.bookingId,
-      payloadJson: {
-        bookingId: input.bookingId,
-        authorId: input.authorId,
-        rating: input.rating,
-      },
-    })),
-  });
-}
-
 async function ensureMasterReviewAccess(review: {
   targetType: ReviewTargetType;
   targetId: string;
@@ -423,21 +372,6 @@ export async function createReview(input: {
 
   if (created.targetType === "provider") {
     await invalidateAdvisorCache(created.targetId);
-  }
-
-  try {
-    await createReviewCreatedNotifications({
-      bookingId: created.bookingId,
-      authorId: created.authorId,
-      targetType: created.targetType,
-      targetId: created.targetId,
-      rating: created.rating,
-      text: created.text ?? null,
-    });
-  } catch (error) {
-    logError("Failed to create review notifications", {
-      error: error instanceof Error ? error.stack : String(error),
-    });
   }
 
   return toReviewDto(created);

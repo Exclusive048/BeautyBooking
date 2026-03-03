@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
+import { loadScheduleRequestWithRelations, notifyScheduleRequestRejected } from "@/lib/notifications/studio-notifications";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,19 @@ export async function POST(
       where: { id: request.id },
       data: { status: "REJECTED", comment },
     });
+
+    try {
+      const fullRequest = await loadScheduleRequestWithRelations(request.id);
+      if (fullRequest) {
+        await notifyScheduleRequestRejected(fullRequest);
+      }
+    } catch (error) {
+      logError("POST /api/studio/schedule/requests/[id]/reject notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/studio/schedule/requests/[id]/reject",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
 
     return jsonOk({ id: request.id, status: "REJECTED" });
   } catch (error) {

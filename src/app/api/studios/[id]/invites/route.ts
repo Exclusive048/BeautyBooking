@@ -7,6 +7,8 @@ import { normalizePhone } from "@/lib/auth/otp";
 import { MembershipStatus, ProviderType } from "@prisma/client";
 import { toAppError } from "@/lib/api/errors";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
+import { loadInviteWithRelations, notifyStudioInviteReceived } from "@/lib/notifications/studio-notifications";
+import { getRequestId, logError } from "@/lib/logging/logger";
 
 const createSchema = z.object({
   phone: z.string().trim().min(6),
@@ -109,6 +111,19 @@ export async function POST(
     },
     select: { id: true, studioId: true, phone: true, status: true },
   });
+
+  try {
+    const fullInvite = await loadInviteWithRelations(invite.id);
+    if (fullInvite) {
+      await notifyStudioInviteReceived(fullInvite);
+    }
+  } catch (error) {
+    logError("POST /api/studios/[id]/invites notification failed", {
+      requestId: getRequestId(req),
+      route: "POST /api/studios/{id}/invites",
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
 
   return ok({ invite }, { status: 201 });
 }

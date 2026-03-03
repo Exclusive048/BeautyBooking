@@ -170,7 +170,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
             const chatPayload =
               toast.type === "CHAT_MESSAGE_RECEIVED" ? parseChatPayload(toast.payloadJson) : null;
             const canAct =
-              toast.type === "BOOKING_REQUEST" &&
+              (toast.type === "BOOKING_CREATED" || toast.type === "BOOKING_REQUEST") &&
               booking?.bookingId &&
               (!booking.bookingStatus || booking.bookingStatus === "PENDING");
 

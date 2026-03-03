@@ -6,6 +6,13 @@ import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { masterBookingStatusSchema } from "@/lib/master/schemas";
 import { updateMasterBookingStatus } from "@/lib/studio/bookings.service";
 import { parseBody } from "@/lib/validation";
+import {
+  loadBookingWithRelations,
+  notifyBookingConfirmed,
+  notifyBookingNoShow,
+  notifyBookingRejected,
+  notifyCancelledByMaster,
+} from "@/lib/notifications/booking-notifications";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -25,13 +32,32 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     const body = await parseBody(req, masterBookingStatusSchema);
     const masterId = await getCurrentMasterProviderId(user.id);
-    const normalizedStatus = body.status === "CONFIRMED" ? "CONFIRMED" : "REJECTED";
     const result = await updateMasterBookingStatus({
       bookingId: id,
       masterId,
-      status: normalizedStatus,
+      status: body.status,
       comment: body.comment,
     });
+    try {
+      const fullBooking = await loadBookingWithRelations(result.id);
+      if (fullBooking) {
+        if (body.status === "CONFIRMED") {
+          await notifyBookingConfirmed(fullBooking);
+        } else if (body.status === "NO_SHOW") {
+          await notifyBookingNoShow(fullBooking);
+        } else if (body.status === "CANCELLED") {
+          await notifyCancelledByMaster(fullBooking);
+        } else {
+          await notifyBookingRejected(fullBooking);
+        }
+      }
+    } catch (error) {
+      logError("PATCH /api/master/bookings/[id]/status notification failed", {
+        requestId: getRequestId(req),
+        route: "PATCH /api/master/bookings/{id}/status",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return jsonOk(result);
   } catch (error) {
     const appError = toAppError(error);

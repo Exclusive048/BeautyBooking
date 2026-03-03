@@ -3,7 +3,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { applyModelOfferSchema } from "@/lib/model-offers/schemas";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
+import { loadApplicationWithRelations, notifyModelApplicationReceived } from "@/lib/notifications/model-notifications";
 import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
@@ -102,19 +102,9 @@ export async function POST(req: Request, ctx: RouteContext) {
       return application;
     });
 
-    const masterOwnerId = offer.master?.ownerUserId ?? offer.master?.masterProfile?.userId ?? null;
-    if (masterOwnerId) {
-      const notification = await createNotification({
-        userId: masterOwnerId,
-        type: "MODEL_NEW_APPLICATION",
-        title: "Новая заявка модели",
-        body: `Новая заявка на предложение ${offer.dateLocal} ${offer.timeRangeStartLocal}-${offer.timeRangeEndLocal}.`,
-        payloadJson: {
-          offerId: offer.id,
-          applicationId: created.id,
-        },
-      });
-      publishNotifications([notification]);
+    const application = await loadApplicationWithRelations(created.id);
+    if (application) {
+      await notifyModelApplicationReceived(application);
     }
 
     return jsonOk(

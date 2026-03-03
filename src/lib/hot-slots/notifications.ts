@@ -1,11 +1,7 @@
 import { NotificationType, type DiscountType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
-import { getTelegramChatIdForUser } from "@/lib/notifications/recipients";
-import { createTelegramSendJob } from "@/lib/queue/types";
-import { enqueue } from "@/lib/queue/queue";
+import { deliverNotification } from "@/lib/notifications/delivery";
 import { getAppPublicUrl } from "@/lib/telegram/config";
-import { logError } from "@/lib/logging/logger";
 
 type HotSlotNotificationInput = {
   providerId: string;
@@ -99,43 +95,17 @@ export async function notifyHotSlotSubscribers(input: HotSlotNotificationInput):
     bookingPath,
   };
 
-  const records = [];
   for (const sub of subscribers) {
-    records.push(
-      await createNotification({
-        userId: sub.userId,
-        type: NotificationType.HOT_SLOT_AVAILABLE,
-        title,
-        body,
-        payloadJson: payload,
-        bookingId: null,
-      })
-    );
+    const telegramText = buildTelegramText(input, slotLabel, linkUrl);
+    await deliverNotification({
+      userId: sub.userId,
+      type: NotificationType.HOT_SLOT_AVAILABLE,
+      title,
+      body,
+      payloadJson: payload,
+      bookingId: null,
+      pushUrl: bookingPath ?? "/hot-slots",
+      telegramText,
+    });
   }
-
-  if (records.length > 0) {
-    publishNotifications(records);
-  }
-
-  const telegramText = buildTelegramText(input, slotLabel, linkUrl);
-  await Promise.all(
-    subscribers.map(async (sub) => {
-      const chatId = await getTelegramChatIdForUser(sub.userId);
-      if (!chatId) return;
-      try {
-        await enqueue(
-          createTelegramSendJob({
-            chatId,
-            text: telegramText,
-          })
-        );
-      } catch (error) {
-        logError("Failed to enqueue hot slot telegram notification", {
-          providerId: input.providerId,
-          userId: sub.userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    })
-  );
 }

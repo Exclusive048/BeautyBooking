@@ -3,7 +3,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
 import { rejectApplicationSchema } from "@/lib/model-offers/schemas";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
+import { loadApplicationWithRelations, notifyModelApplicationRejected } from "@/lib/notifications/model-notifications";
 import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
@@ -61,18 +61,9 @@ export async function POST(req: Request, ctx: RouteContext) {
       select: { id: true, status: true },
     });
 
-    if (application.clientUserId) {
-      const notification = await createNotification({
-        userId: application.clientUserId,
-        type: "MODEL_APPLICATION_REJECTED",
-        title: "Заявка отклонена",
-        body: "Мастер отклонил вашу заявку на модельное предложение.",
-        payloadJson: {
-          offerId: application.offer.id,
-          applicationId: application.id,
-        },
-      });
-      publishNotifications([notification]);
+    const fullApplication = await loadApplicationWithRelations(updated.id);
+    if (fullApplication) {
+      await notifyModelApplicationRejected(fullApplication);
     }
 
     return jsonOk({ application: { id: updated.id, status: updated.status } });
