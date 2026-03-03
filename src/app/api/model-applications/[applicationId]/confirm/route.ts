@@ -3,7 +3,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { confirmApplicationSchema, isTimeWithinRange } from "@/lib/model-offers/schemas";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
+import { loadApplicationWithRelations, notifyModelTimeConfirmed } from "@/lib/notifications/model-notifications";
 import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
@@ -296,21 +296,9 @@ export async function POST(req: Request, ctx: RouteContext) {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
 
-    const masterOwnerId =
-      application.offer.master.ownerUserId ?? application.offer.master.masterProfile?.userId ?? null;
-    if (masterOwnerId) {
-      const notification = await createNotification({
-        userId: masterOwnerId,
-        type: "MODEL_BOOKING_CREATED",
-        title: "Запись подтверждена",
-        body: `Клиент подтвердил запись ${application.offer.dateLocal} ${application.proposedTimeLocal}.`,
-        payloadJson: {
-          offerId: application.offer.id,
-          applicationId: application.id,
-          bookingId,
-        },
-      });
-      publishNotifications([notification]);
+    const fullApplication = await loadApplicationWithRelations(application.id);
+    if (fullApplication) {
+      await notifyModelTimeConfirmed(fullApplication);
     }
 
     await invalidateSlotsForBookingRange({
@@ -333,3 +321,4 @@ export async function POST(req: Request, ctx: RouteContext) {
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
   }
 }
+

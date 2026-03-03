@@ -1,11 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import {
-  createBookingConfirmedNotifications,
-  publishNotifications,
-  type NotificationRecord,
-} from "@/lib/notifications/service";
-import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
@@ -151,7 +145,7 @@ export async function confirmBooking(
     throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
   }
 
-  const { updated, notifications } = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
@@ -176,35 +170,8 @@ export async function confirmBooking(
       select: { id: true, status: true },
     });
 
-    let notifications: NotificationRecord[] = [];
-    try {
-      notifications = await createBookingConfirmedNotifications({
-        bookingId: updated.id,
-        notifyClient: actor === "MASTER",
-        notifyMaster: actor === "CLIENT",
-        masterMode: "MANUAL",
-        db: tx,
-      });
-    } catch (error) {
-      logError("Failed to create booking notifications", {
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
-
-    return { updated, notifications };
+    return updated;
   });
-
-  if (notifications.length > 0) {
-    publishNotifications(notifications);
-  }
-
-  try {
-    await sendBookingTelegramNotifications(updated.id, "CONFIRMED", { notifyMasterOnConfirm: false });
-  } catch (error) {
-    logError("Failed to send Telegram booking notifications", {
-      error: error instanceof Error ? error.stack : String(error),
-    });
-  }
 
   try {
     await scheduleBookingReminders(updated.id);

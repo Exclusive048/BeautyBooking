@@ -227,45 +227,45 @@ enum ScheduleOverrideKind {
 
 
 enum NotificationType {
-
   BOOKING_CREATED
-
   BOOKING_CANCELLED
-
+  BOOKING_CANCELLED_BY_MASTER
+  BOOKING_CANCELLED_BY_CLIENT
   BOOKING_RESCHEDULED
-
+  BOOKING_RESCHEDULE_REQUESTED
   BOOKING_REQUEST
-
   BOOKING_CONFIRMED
-
   BOOKING_DECLINED
-
+  BOOKING_REJECTED
   BOOKING_REMINDER_24H
-
   BOOKING_REMINDER_2H
-
+  BOOKING_COMPLETED_REVIEW
+  BOOKING_NO_SHOW
+  REVIEW_LEFT
+  REVIEW_REPLIED
+  STUDIO_INVITE_RECEIVED
+  STUDIO_INVITE_ACCEPTED
+  STUDIO_INVITE_REJECTED
+  STUDIO_MEMBER_LEFT
+  STUDIO_SCHEDULE_REQUEST
+  STUDIO_SCHEDULE_APPROVED
+  STUDIO_SCHEDULE_REJECTED
   MODEL_NEW_APPLICATION
-
+  MODEL_APPLICATION_RECEIVED
   MODEL_APPLICATION_REJECTED
-
   MODEL_TIME_PROPOSED
-
   MODEL_BOOKING_CREATED
-
+  MODEL_TIME_CONFIRMED
   HOT_SLOT_AVAILABLE
-
+  HOT_SLOT_PUBLISHED
+  HOT_SLOT_BOOKED
+  HOT_SLOT_EXPIRING
   BILLING_PAYMENT_SUCCEEDED
-
   BILLING_PAYMENT_FAILED
-
   BILLING_RENEWAL_CONFIRMATION_REQUIRED
-
   BILLING_SUBSCRIPTION_CANCELLED
-
   BILLING_SUBSCRIPTION_EXPIRED
-
   CHAT_MESSAGE_RECEIVED
-
 }
 
 
@@ -524,6 +524,7 @@ model UserProfile {
   bookings           Booking[]          @relation("BookingClient")
 
   notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
 
   consents           UserConsent[]
 
@@ -1445,6 +1446,19 @@ model Notification {
 
   @@index([bookingId])
 
+}
+
+model PushSubscription {
+  id        String      @id @default(cuid())
+  userId    String
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String      @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 

@@ -2,6 +2,24 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import { notifyStudioMemberLeft } from "@/lib/notifications/studio-notifications";
+import { getRequestId, logError } from "@/lib/logging/logger";
+
+function resolveUserName(input: {
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  fallback: string;
+}): string {
+  const displayName = input.displayName?.trim();
+  if (displayName) return displayName;
+  const parts = [input.firstName?.trim(), input.lastName?.trim()].filter(Boolean) as string[];
+  if (parts.length > 0) return parts.join(" ");
+  const phone = input.phone?.trim();
+  if (phone) return phone;
+  return input.fallback;
+}
 
 export async function POST(
   _req: Request,
@@ -14,7 +32,12 @@ export async function POST(
 
   const studio = await prisma.studio.findUnique({
     where: { id: p.id },
-    select: { id: true, providerId: true },
+    select: {
+      id: true,
+      providerId: true,
+      ownerUserId: true,
+      provider: { select: { name: true, ownerUserId: true } },
+    },
   });
   if (!studio) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
 
@@ -57,6 +80,34 @@ export async function POST(
       data: { studioId: null },
     }),
   ]);
+
+  try {
+    const ownerUserId = studio.ownerUserId ?? studio.provider.ownerUserId ?? null;
+    if (ownerUserId) {
+      const profile = await prisma.userProfile.findUnique({
+        where: { id: auth.user.id },
+        select: { displayName: true, firstName: true, lastName: true, phone: true },
+      });
+      const masterName = resolveUserName({
+        displayName: profile?.displayName,
+        firstName: profile?.firstName,
+        lastName: profile?.lastName,
+        phone: profile?.phone,
+        fallback: "Мастер",
+      });
+      await notifyStudioMemberLeft({
+        studioOwnerUserId: ownerUserId,
+        masterName,
+        studioName: studio.provider.name || "Студия",
+      });
+    }
+  } catch (error) {
+    logError("POST /api/studios/[id]/leave notification failed", {
+      requestId: getRequestId(_req),
+      route: "POST /api/studios/{id}/leave",
+      stack: error instanceof Error ? error.stack : String(error),
+    });
+  }
 
   return ok({ left: true });
 }

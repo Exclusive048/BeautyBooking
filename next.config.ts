@@ -7,6 +7,7 @@ const withPWAConfig = withPWA({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
+  importScripts: ["/sw-push.js"],
   runtimeCaching: [
     {
       urlPattern: ({ request }) => request.mode === "navigate",

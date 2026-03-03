@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { createReviewSchema, listReviewsQuerySchema } from "@/lib/reviews/schemas";
 import { createReview, listReviews } from "@/lib/reviews/service";
+import { loadReviewWithRelations, notifyReviewLeft } from "@/lib/notifications/review-notifications";
 import { parseBody, parseQuery } from "@/lib/validation";
 import type { ApiFieldErrors } from "@/lib/api/contracts";
 
@@ -67,6 +68,18 @@ export async function POST(req: Request) {
       publicTagIds: body.publicTagIds,
       privateTagIds: body.privateTagIds,
     });
+    try {
+      const fullReview = await loadReviewWithRelations(review.id);
+      if (fullReview) {
+        await notifyReviewLeft(fullReview);
+      }
+    } catch (error) {
+      logError("POST /api/reviews notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/reviews",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
     return jsonOk({ review }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

@@ -9,10 +9,10 @@ import {
   type BookingReminderPayload,
 } from "@/lib/queue/types";
 import {
-  createBookingReminderNotifications,
-  publishNotifications,
-} from "@/lib/notifications/service";
-import { sendBookingReminderTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+  loadBookingWithRelations,
+  notifyBookingReminder24h,
+  notifyBookingReminder2h,
+} from "@/lib/notifications/booking-notifications";
 
 const MINUTES = 60 * 1000;
 const HOURS = 60 * MINUTES;
@@ -149,25 +149,21 @@ export async function processBookingReminder(payload: BookingReminderPayload): P
     const updated = await markReminderSent(tx, booking.id, payload.kind);
     if (!updated) return { sent: false };
 
-    const notifications = await createBookingReminderNotifications({
-      bookingId: booking.id,
-      kind: payload.kind,
-      db: tx,
-    });
-
-    return { sent: true, notifications };
+    return { sent: true };
   });
 
   if (!result.sent) return;
 
-  if (result.notifications && result.notifications.length > 0) {
-    publishNotifications(result.notifications);
-  }
-
   try {
-    await sendBookingReminderTelegramNotifications(payload.bookingId, payload.kind);
+    const booking = await loadBookingWithRelations(payload.bookingId);
+    if (!booking) return;
+    if (payload.kind === "REMINDER_24H") {
+      await notifyBookingReminder24h(booking);
+    } else {
+      await notifyBookingReminder2h(booking);
+    }
   } catch (error) {
-    logError("Failed to send booking reminder telegram notifications", {
+    logError("Failed to send booking reminder notifications", {
       bookingId: payload.bookingId,
       kind: payload.kind,
       error: error instanceof Error ? error.message : String(error),

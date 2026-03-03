@@ -17,16 +17,8 @@ import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-co
 import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
 import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
 import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
-import {
-  createBookingConfirmedNotifications,
-  createBookingRequestNotifications,
-  loadBookingSnapshot,
-  publishNotifications,
-  type NotificationRecord,
-} from "@/lib/notifications/service";
-import { sendBookingTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
 
@@ -227,41 +219,6 @@ export async function createBooking(input: {
     });
   }
 
-  let notifications: NotificationRecord[] = [];
-  const snapshotStartedAt = Date.now();
-  try {
-    const snapshot = await loadBookingSnapshot(created.id);
-    const snapshotMs = Date.now() - snapshotStartedAt;
-    logInfo("[booking:create] snapshot loaded", { snapshotMs });
-    if (snapshot) {
-      notifications = shouldAutoConfirm
-        ? await createBookingConfirmedNotifications({
-            bookingId: created.id,
-            notifyClient: true,
-            notifyMaster: true,
-            masterMode: "AUTO",
-            snapshot,
-          })
-        : await createBookingRequestNotifications({ bookingId: created.id, snapshot });
-    }
-  } catch (error) {
-    logError("Не удалось создать уведомления по записи", {
-      error: error instanceof Error ? error.stack : String(error),
-    });
-  }
-
-  if (notifications.length > 0) {
-    publishNotifications(notifications);
-  }
-
-  try {
-    await sendBookingTelegramNotifications(created.id, "CREATED", { notifyClientOnCreate: true });
-  } catch (error) {
-    logError("Не удалось отправить Telegram-уведомления о записи", {
-      error: error instanceof Error ? error.stack : String(error),
-    });
-  }
-
   if (shouldAutoConfirm) {
     try {
       await scheduleBookingReminders(created.id);
@@ -294,3 +251,4 @@ export async function createBooking(input: {
     throw error;
   }
 }
+

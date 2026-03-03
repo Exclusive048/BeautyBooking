@@ -5,6 +5,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveScheduleProvider } from "@/lib/schedule/provider-access";
 import { prisma } from "@/lib/prisma";
 import type { SchedulePayload } from "@/lib/schedule/unified";
+import { loadScheduleRequestWithRelations, notifyScheduleRequestSubmitted } from "@/lib/notifications/studio-notifications";
 
 export const runtime = "nodejs";
 
@@ -51,6 +52,19 @@ export async function POST(req: Request) {
       },
       select: { id: true },
     });
+
+    try {
+      const request = await loadScheduleRequestWithRelations(created.id);
+      if (request) {
+        await notifyScheduleRequestSubmitted(request);
+      }
+    } catch (error) {
+      logError("POST /api/provider/schedule/submit-request notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/provider/schedule/submit-request",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
 
     return jsonOk({ id: created.id }, { status: 201 });
   } catch (error) {

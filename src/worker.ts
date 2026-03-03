@@ -6,6 +6,8 @@ import { alertCritical } from "@/lib/monitoring";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import { BOOKING_REMINDER_JOB_TYPE, TELEGRAM_SEND_JOB_TYPE } from "@/lib/queue/types";
+import { runHotSlotExpiringJob } from "@/lib/hot-slots/job";
+import { runBookingReviewPromptJob } from "@/lib/bookings/review-prompts";
 
 process.on("uncaughtException", (error) => {
   logError("Worker uncaughtException", {
@@ -33,6 +35,22 @@ process.on("unhandledRejection", (reason) => {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function startPeriodicJobs() {
+  const intervalMs = 30 * 60 * 1000;
+  setInterval(() => {
+    void runHotSlotExpiringJob().catch((error) => {
+      logError("Hot slot expiring job failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+    void runBookingReviewPromptJob().catch((error) => {
+      logError("Booking review prompt job failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, intervalMs);
 }
 
 function getRetryDelaySeconds(attempts: number): number {
@@ -94,6 +112,7 @@ async function processBookingReminderJob(
 }
 
 async function run() {
+  startPeriodicJobs();
   while (true) {
     const job = await dequeue();
     if (job) {

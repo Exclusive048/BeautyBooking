@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
-import { createBookingNotifications, publishNotifications } from "@/lib/notifications/service";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import type { BookingDto } from "@/lib/bookings/dto";
 import {
@@ -10,7 +9,6 @@ import {
   type BookingActor,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
-import { logError } from "@/lib/logging/logger";
 
 type RescheduleRecord = BookingDto;
 
@@ -259,17 +257,6 @@ export async function rescheduleBooking(input: {
     },
   });
 
-  try {
-    const notifications = await createBookingNotifications({ bookingId: updated.id, kind: "RESCHEDULED" });
-    if (notifications.length > 0) {
-      publishNotifications(notifications);
-    }
-  } catch (error) {
-    logError("Failed to create booking notifications", {
-      error: error instanceof Error ? error.stack : String(error),
-    });
-  }
-
   await invalidateSlotsForBookingMove({
     previous: {
       providerId: booking.providerId,
@@ -287,3 +274,5 @@ export async function rescheduleBooking(input: {
 
   return { ok: true, data: toBookingDto(updated) };
 }
+
+

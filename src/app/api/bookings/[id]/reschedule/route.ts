@@ -7,6 +7,11 @@ import { parseBody } from "@/lib/validation";
 import { bookingRescheduleSchema } from "@/lib/validation/bookings";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import {
+  loadBookingWithRelations,
+  notifyBookingRescheduled,
+  notifyRescheduleRequested,
+} from "@/lib/notifications/booking-notifications";
 
 export async function POST(
   req: Request,
@@ -37,6 +42,24 @@ export async function POST(
     });
     if (!result.ok) {
       return jsonFail(result.status, result.message, resolveErrorCode(result.code, "INTERNAL_ERROR"));
+    }
+
+    try {
+      const fullBooking = await loadBookingWithRelations(result.data.id);
+      if (fullBooking) {
+        if (access.actor === "CLIENT") {
+          await notifyRescheduleRequested(fullBooking);
+        } else {
+          await notifyBookingRescheduled(fullBooking);
+        }
+      }
+    } catch (error) {
+      logError("POST /api/bookings/[id]/reschedule notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/bookings/{id}/reschedule",
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     return jsonOk({ booking: result.data });

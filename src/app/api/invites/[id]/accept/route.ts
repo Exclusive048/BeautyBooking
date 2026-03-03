@@ -1,6 +1,8 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { acceptStudioInvite } from "@/lib/invites/service";
+import { loadInviteWithRelations, notifyStudioInviteAccepted } from "@/lib/notifications/studio-notifications";
+import { getRequestId, logError } from "@/lib/logging/logger";
 
 export async function POST(
   req: Request,
@@ -19,6 +21,19 @@ export async function POST(
   });
 
   if (!result.ok) return fail(result.message, result.status, result.code);
+
+  try {
+    const invite = await loadInviteWithRelations(result.data.inviteId);
+    if (invite) {
+      await notifyStudioInviteAccepted(invite);
+    }
+  } catch (error) {
+    logError("POST /api/invites/[id]/accept notification failed", {
+      requestId: getRequestId(req),
+      route: "POST /api/invites/{id}/accept",
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
 
   return ok({
     inviteId: result.data.inviteId,

@@ -37,8 +37,15 @@ function resolveIncomingChannel(event: NotificationEvent): NotificationChannel {
     if (record?.senderType === "CLIENT") return "MASTER";
     return "SYSTEM";
   }
-  if (event.type === "BOOKING_REQUEST") return "MASTER";
-  if (event.type === "MODEL_NEW_APPLICATION" || event.type === "MODEL_BOOKING_CREATED") return "MASTER";
+  if (event.type.startsWith("STUDIO_")) return "STUDIO";
+  if (event.type === "BOOKING_CREATED" || event.type === "BOOKING_REQUEST") return "MASTER";
+  if (
+    event.type === "MODEL_APPLICATION_RECEIVED" ||
+    event.type === "MODEL_NEW_APPLICATION" ||
+    event.type === "MODEL_TIME_CONFIRMED"
+  ) {
+    return "MASTER";
+  }
   return "SYSTEM";
 }
 
@@ -63,9 +70,11 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
   const resolveOpenHref = (): string | undefined => {
     if (
       event.type !== "MODEL_NEW_APPLICATION" &&
+      event.type !== "MODEL_APPLICATION_RECEIVED" &&
       event.type !== "MODEL_TIME_PROPOSED" &&
       event.type !== "MODEL_APPLICATION_REJECTED" &&
-      event.type !== "MODEL_BOOKING_CREATED"
+      event.type !== "MODEL_BOOKING_CREATED" &&
+      event.type !== "MODEL_TIME_CONFIRMED"
     ) {
       if (event.type !== "CHAT_MESSAGE_RECEIVED") return undefined;
     }
@@ -342,7 +351,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
             {filteredNotifications.map((note) => {
               const bookingPayload = parseBookingPayload(note.payloadJson);
               const canAct =
-                note.type === "BOOKING_REQUEST" &&
+                (note.type === "BOOKING_CREATED" || note.type === "BOOKING_REQUEST") &&
                 bookingPayload?.bookingId &&
                 (!bookingPayload.bookingStatus || bookingPayload.bookingStatus === "PENDING");
               const isUnread = !note.isRead;

@@ -6,6 +6,11 @@ import { requireBookingCancelAccess } from "@/lib/auth/ownership";
 import { parseBody } from "@/lib/validation";
 import { bookingCancelSchema } from "@/lib/validation/bookings";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import {
+  loadBookingWithRelations,
+  notifyCancelledByClient,
+  notifyCancelledByMaster,
+} from "@/lib/notifications/booking-notifications";
 
 export async function POST(
   req: Request,
@@ -25,6 +30,24 @@ export async function POST(
       cancelledBy: cancellation.cancelledBy,
       reason: parsed.reason ?? null,
     });
+
+    try {
+      const fullBooking = await loadBookingWithRelations(booking.id);
+      if (fullBooking && fullBooking.status === "REJECTED") {
+        if (cancellation.cancelledBy === "CLIENT") {
+          await notifyCancelledByClient(fullBooking);
+        } else {
+          await notifyCancelledByMaster(fullBooking);
+        }
+      }
+    } catch (error) {
+      logError("POST /api/bookings/[id]/cancel notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/bookings/{id}/cancel",
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return jsonOk({ booking });
   } catch (error) {
