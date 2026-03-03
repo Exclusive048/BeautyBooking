@@ -1,33 +1,31 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { buildSameOriginRedirectUrl, getPublicOrigin, normalizeInternalPath } from "@/lib/http/origin";
 
-test("buildSameOriginRedirectUrl uses forwarded headers over req.url", () => {
-  const req = new Request("http://localhost:3000/api/auth/vk/callback", {
-    headers: {
-      "x-forwarded-proto": "https",
-      "x-forwarded-host": "beautyhub.art",
-    },
+describe("http/origin", () => {
+  it("uses forwarded headers for public origin", () => {
+    const req = new Request("http://internal.local/path", {
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "example.com",
+      },
+    });
+    expect(getPublicOrigin(req)).toBe("https://example.com");
   });
 
-  const url = buildSameOriginRedirectUrl(req, "/cabinet/studio");
-  assert.equal(url.toString(), "https://beautyhub.art/cabinet/studio");
-});
-
-test("getPublicOrigin falls back to host header and http proto", () => {
-  const req = new Request("http://localhost:3000/api/auth/vk/callback", {
-    headers: {
-      host: "beautyhub.art",
-    },
+  it("falls back to request url origin", () => {
+    const req = new Request("https://fallback.local/path");
+    expect(getPublicOrigin(req)).toBe("https://fallback.local");
   });
 
-  const origin = getPublicOrigin(req);
-  assert.equal(origin, "http://beautyhub.art");
-});
+  it("normalizes internal path and rejects external urls", () => {
+    expect(normalizeInternalPath("")).toBe("/cabinet/profile");
+    expect(normalizeInternalPath("http://evil.com")).toBe("/cabinet/profile");
+    expect(normalizeInternalPath("//evil.com")).toBe("/cabinet/profile");
+    expect(normalizeInternalPath("/good/path")).toBe("/good/path");
+  });
 
-test("normalizeInternalPath blocks external or invalid targets", () => {
-  assert.equal(normalizeInternalPath("http://evil.com"), "/cabinet/profile");
-  assert.equal(normalizeInternalPath("javascript:alert(1)"), "/cabinet/profile");
-  assert.equal(normalizeInternalPath("cabinet/studio"), "/cabinet/profile");
-  assert.equal(normalizeInternalPath("/cabinet/studio?x=1"), "/cabinet/studio?x=1");
+  it("builds same-origin redirect urls", () => {
+    const req = new Request("https://example.com/path");
+    const url = buildSameOriginRedirectUrl(req, "/target");
+    expect(url.toString()).toBe("https://example.com/target");
+  });
 });

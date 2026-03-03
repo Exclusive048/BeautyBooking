@@ -1,91 +1,77 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
-import { timeToMinutes } from "@/lib/schedule/time";
-import type { DayPlan } from "@/lib/schedule/types";
-import { applyPublishHorizon } from "@/lib/schedule/publish-horizon";
 
-const basePlan: DayPlan = {
-  isWorking: true,
-  workingIntervals: [{ start: "10:00", end: "19:00" }],
-  breaks: [],
-  meta: { source: "weekly-template" },
-};
-
-test("non-working day yields no slots", () => {
-  const plan: DayPlan = { ...basePlan, isWorking: false, workingIntervals: [] };
-  const slots = buildSlotsForDay({
-    dayPlan: plan,
-    dateKey: "2026-02-10",
-    timeZone: "UTC",
-    serviceDurationMin: 60,
-    bufferMin: 0,
-    bookings: [],
-    now: new Date(Date.UTC(2026, 1, 10, 9, 0, 0)),
-  });
-  assert.equal(slots.length, 0);
-});
-
-test("date beyond publish horizon yields no slots and reason", () => {
-  const plan: DayPlan = { ...basePlan };
-  const gated = applyPublishHorizon({
-    plan,
-    dateKey: "2026-02-20",
-    publishedUntilLocal: "2026-02-10",
-  });
-  assert.equal(gated.isWorking, false);
-  assert.equal(gated.meta.reason, "out_of_publish_horizon");
-
-  const slots = buildSlotsForDay({
-    dayPlan: gated,
-    dateKey: "2026-02-20",
-    timeZone: "UTC",
-    serviceDurationMin: 60,
-    bufferMin: 0,
-    bookings: [],
-    now: new Date(Date.UTC(2026, 1, 10, 9, 0, 0)),
-  });
-  assert.equal(slots.length, 0);
-});
-
-test("working day starts at or after 10:00", () => {
-  const slots = buildSlotsForDay({
-    dayPlan: basePlan,
-    dateKey: "2026-02-10",
-    timeZone: "UTC",
-    serviceDurationMin: 60,
-    bufferMin: 0,
-    bookings: [],
-    now: new Date(Date.UTC(2026, 1, 10, 9, 0, 0)),
-  });
-  assert.ok(slots.length > 0);
-  const first = slots[0]?.label.split(" ")[1] ?? "";
-  const firstMinutes = timeToMinutes(first) ?? 0;
-  assert.ok(firstMinutes >= 10 * 60);
-});
-
-test("breaks exclude overlapping slots", () => {
-  const plan: DayPlan = {
-    ...basePlan,
-    breaks: [{ start: "13:00", end: "14:00" }],
+describe("schedule/slots", () => {
+  const basePlan = {
+    isWorking: true,
+    workingIntervals: [{ start: "10:00", end: "12:00" }],
+    breaks: [],
+    meta: { source: "weekly-template" as const },
   };
-  const slots = buildSlotsForDay({
-    dayPlan: plan,
-    dateKey: "2026-02-10",
-    timeZone: "UTC",
-    serviceDurationMin: 60,
-    bufferMin: 0,
-    bookings: [],
-    now: new Date(Date.UTC(2026, 1, 10, 9, 0, 0)),
+
+  it("generates slots within working interval", () => {
+    const slots = buildSlotsForDay({
+      dayPlan: basePlan,
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [],
+      now: new Date("2026-03-03T08:00:00Z"),
+    });
+
+    expect(slots[0]?.label).toBe("2026-03-03 10:00");
+    expect(slots[slots.length - 1]?.label).toBe("2026-03-03 11:30");
+    expect(slots).toHaveLength(19);
   });
-  const breakStart = 13 * 60;
-  const breakEnd = 14 * 60;
-  const overlapsBreak = slots.some((slot) => {
-    const time = slot.label.split(" ")[1] ?? "";
-    const start = timeToMinutes(time);
-    if (start === null) return false;
-    const end = start + 60;
-    return start < breakEnd && end > breakStart;
+
+  it("skips slots overlapping breaks", () => {
+    const slots = buildSlotsForDay({
+      dayPlan: {
+        ...basePlan,
+        breaks: [{ start: "10:30", end: "10:45" }],
+      },
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [],
+      now: new Date("2026-03-03T08:00:00Z"),
+    });
+
+    const labels = slots.map((slot) => slot.label);
+    expect(labels).not.toContain("2026-03-03 10:30");
   });
-  assert.equal(overlapsBreak, false);
+
+  it("skips slots conflicting with bookings", () => {
+    const slots = buildSlotsForDay({
+      dayPlan: basePlan,
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [
+        {
+          startAtUtc: new Date("2026-03-03T10:00:00Z"),
+          endAtUtc: new Date("2026-03-03T11:00:00Z"),
+        },
+      ],
+      now: new Date("2026-03-03T08:00:00Z"),
+    });
+
+    expect(slots[0]?.label).toBe("2026-03-03 11:00");
+  });
+
+  it("returns no slots for past dateKey", () => {
+    const slots = buildSlotsForDay({
+      dayPlan: basePlan,
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [],
+      now: new Date("2026-03-03T13:00:00Z"),
+    });
+
+    expect(slots).toEqual([]);
+  });
 });

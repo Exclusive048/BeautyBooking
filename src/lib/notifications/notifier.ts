@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { createClient } from "redis";
+import type { RedisClientType } from "redis";
 import type { NotificationType, Prisma } from "@prisma/client";
 
 import { getRedisConnection } from "@/lib/redis/connection";
@@ -41,45 +41,25 @@ class MemoryNotificationNotifier implements NotificationNotifier {
 }
 
 class RedisNotificationNotifier implements NotificationNotifier {
-  private memory = new MemoryNotificationNotifier();
-  private publishClientPromise = getRedisConnection();
-  private subscriberClientPromise = this.createSubscriberClient();
+  constructor(
+    private publisherClient: RedisClientType,
+    private subscriberClient: RedisClientType
+  ) {}
 
-  publish(userId: string, event: NotificationEvent) {
+  publish(userId: string, event: NotificationEvent): void {
     const channel = `notifications:${userId}`;
     const payload = JSON.stringify(event);
 
-    void this.publishClientPromise
-      .then(async (client) => {
-        if (!client) {
-          this.memory.publish(userId, event);
-          return;
-        }
-        try {
-          await client.publish(channel, payload);
-        } catch (error) {
-          logError("Notifications publish failed", {
-            channel,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          this.memory.publish(userId, event);
-        }
-      })
-      .catch((error) => {
-        logError("Notifications publish connection failed", {
-          channel,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        this.memory.publish(userId, event);
+    void this.publisherClient.publish(channel, payload).catch((error) => {
+      logError("Notifications publish failed", {
+        channel,
+        error: error instanceof Error ? error.message : String(error),
       });
+    });
   }
 
-  subscribe(userId: string, handler: NotificationSubscriber) {
+  subscribe(userId: string, handler: NotificationSubscriber): () => void {
     const channel = `notifications:${userId}`;
-    const memoryUnsub = this.memory.subscribe(userId, handler);
-    let pendingUnsubscribe = false;
-    let subscribed = false;
-    let subscriberClient: ReturnType<typeof createClient> | null = null;
 
     const redisHandler = (message: string) => {
       try {
@@ -93,74 +73,31 @@ class RedisNotificationNotifier implements NotificationNotifier {
       }
     };
 
-    void this.subscriberClientPromise
-      .then(async (client) => {
-        if (!client) return;
-        subscriberClient = client;
-        try {
-          await client.subscribe(channel, redisHandler);
-          subscribed = true;
-          if (pendingUnsubscribe) {
-            await client.unsubscribe(channel, redisHandler);
-          }
-        } catch (error) {
-          logError("Notifications subscribe failed", {
-            channel,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      })
-      .catch((error) => {
-        logError("Notifications subscriber connection failed", {
+    void this.subscriberClient.subscribe(channel, redisHandler).catch((error) => {
+      logError("Notifications subscribe failed", {
+        channel,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    return () => {
+      void this.subscriberClient.unsubscribe(channel, redisHandler).catch((error) => {
+        logError("Notifications unsubscribe failed", {
           channel,
           error: error instanceof Error ? error.message : String(error),
         });
       });
-
-    return () => {
-      memoryUnsub();
-      if (subscriberClient && subscribed) {
-        void subscriberClient.unsubscribe(channel, redisHandler).catch((error) => {
-          logError("Notifications unsubscribe failed", {
-            channel,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        });
-        return;
-      }
-      pendingUnsubscribe = true;
     };
-  }
-
-  private async createSubscriberClient() {
-    const redisUrl = process.env.REDIS_URL?.trim();
-    if (!redisUrl) return null;
-
-    const client = createClient({
-      url: redisUrl,
-      socket: {
-        reconnectStrategy(retries) {
-          return Math.min(retries * 100, 2000);
-        },
-      },
-    });
-
-    client.on("error", (error: unknown) => {
-      logError("Redis subscriber error", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-
-    try {
-      await client.connect();
-      return client;
-    } catch (error) {
-      logError("Redis subscriber connection failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }
   }
 }
 
-export const notificationsNotifier: NotificationNotifier = new RedisNotificationNotifier();
+async function createNotifier(): Promise<NotificationNotifier> {
+  const publisherClient = await getRedisConnection();
+  const subscriberClient = await getRedisConnection();
+  if (!publisherClient || !subscriberClient) {
+    return new MemoryNotificationNotifier();
+  }
+  return new RedisNotificationNotifier(publisherClient, subscriberClient);
+}
+
+export const notificationsNotifier = createNotifier();

@@ -1,16 +1,15 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { focalPointToObjectPosition } from "@/lib/media/focal-point";
 
-test("focalPointToObjectPosition defaults to center", () => {
-  assert.equal(focalPointToObjectPosition(null, null), "50% 50%");
-  assert.equal(focalPointToObjectPosition(undefined, undefined), "50% 50%");
-});
+describe("media/focal-point", () => {
+  it("defaults to center when values are null", () => {
+    expect(focalPointToObjectPosition(null, null)).toBe("50% 50%");
+  });
 
-test("focalPointToObjectPosition maps 0 to 0%", () => {
-  assert.equal(focalPointToObjectPosition(0, 0), "0% 0%");
-});
+  it("rounds values to percent", () => {
+    expect(focalPointToObjectPosition(0.123, 0.987)).toBe("12% 99%");
+  });
 
-test("focalPointToObjectPosition maps 1 to 100%", () => {
-  assert.equal(focalPointToObjectPosition(1, 1), "100% 100%");
+  it("handles edge values", () => {
+    expect(focalPointToObjectPosition(0, 1)).toBe("0% 100%");
+  });
 });

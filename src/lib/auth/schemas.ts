@@ -4,7 +4,7 @@ import { normalizePhone } from "@/lib/auth/otp";
 
 const phoneSchema = z.preprocess(
   (value) => (typeof value === "string" ? normalizePhone(value) : value),
-  z.string().min(8, "Phone is too short")
+  z.string().regex(/^\+7\d{10}$/, "Phone must be Russian +7XXXXXXXXXX")
 );
 
 export const otpRequestSchema = z.object({

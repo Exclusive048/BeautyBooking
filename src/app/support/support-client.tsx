@@ -35,8 +35,6 @@ export default function SupportPageClient() {
 
     setSending(true);
 
-    // TODO: реальный API эндпоинт для тикетов
-    // Пока просто эмулируем успех
     const pageUrl = typeof window === "undefined" ? null : window.location.href;
 
     try {

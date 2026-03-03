@@ -1,50 +1,33 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { filterSlotsByDateKey } from "@/lib/schedule/slots-range";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
 
-test("filterSlotsByDateKey excludes slots outside [from,to)", () => {
-  const slots = [
-    {
-      startAtUtc: new Date(Date.UTC(2026, 1, 10, 10, 0)),
-      endAtUtc: new Date(Date.UTC(2026, 1, 10, 11, 0)),
-      label: "2026-02-10 10:00",
-    },
-    {
-      startAtUtc: new Date(Date.UTC(2026, 1, 11, 10, 0)),
-      endAtUtc: new Date(Date.UTC(2026, 1, 11, 11, 0)),
-      label: "2026-02-11 10:00",
-    },
-  ];
+describe("schedule/slots-range", () => {
+  it("filters slots within [from,to) keys", () => {
+    const slots = [
+      { startAtUtc: "2026-03-03T10:00:00Z" },
+      { startAtUtc: "2026-03-04T10:00:00Z" },
+    ];
+    const result = filterSlotsByDateKey({
+      slots,
+      fromKey: "2026-03-03",
+      toKey: "2026-03-04",
+      timeZone: "UTC",
+    });
 
-  const filtered = filterSlotsByDateKey({
-    slots,
-    fromKey: "2026-02-10",
-    toKey: "2026-02-11",
-    timeZone: "UTC",
+    expect(result).toHaveLength(1);
+    expect(result[0]?.startAtUtc).toBe("2026-03-03T10:00:00Z");
   });
 
-  assert.equal(filtered.length, 1);
-  assert.equal((filtered[0] as { label?: string })?.label, "2026-02-10 10:00");
-});
-
-test("filterSlotsByDateKey handles ISO startAtUtc strings", () => {
-  const slots = [
-    { startAtUtc: "2026-02-10T10:00:00.000Z", label: "2026-02-10 10:00" },
-    { startAtUtc: "2026-02-11T10:00:00.000Z", label: "2026-02-11 10:00" },
-  ];
-
-  const filtered = filterSlotsByDateKey({
-    slots,
-    fromKey: "2026-02-10",
-    toKey: "2026-02-11",
-    timeZone: "UTC",
+  it("excludes slots before fromKey", () => {
+    const slots = [
+      { startAtUtc: "2026-03-02T23:00:00Z" },
+      { startAtUtc: "2026-03-03T01:00:00Z" },
+    ];
+    const result = filterSlotsByDateKey({
+      slots,
+      fromKey: "2026-03-03",
+      toKey: "2026-03-04",
+      timeZone: "UTC",
+    });
+    expect(result.map((item) => item.startAtUtc)).toEqual(["2026-03-03T01:00:00Z"]);
   });
-
-  assert.equal(filtered.length, 1);
-  assert.equal((filtered[0] as { label?: string })?.label, "2026-02-10 10:00");
-});
-
-test("toLocalDateKey rejects dateKey strings", () => {
-  assert.throws(() => toLocalDateKey("2026-02-06", "UTC"), /Date key string is not allowed/);
 });

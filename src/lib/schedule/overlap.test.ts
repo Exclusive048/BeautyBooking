@@ -1,15 +1,14 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 
-test("buildBookingOverlapWhere matches overlap predicate", () => {
-  const rangeFromUtc = new Date(Date.UTC(2026, 1, 10, 0, 0, 0));
-  const rangeToExclusiveUtc = new Date(Date.UTC(2026, 1, 11, 0, 0, 0));
+describe("schedule/overlap", () => {
+  it("builds overlap predicate with exclusive boundaries", () => {
+    const from = new Date("2026-03-01T10:00:00Z");
+    const to = new Date("2026-03-01T12:00:00Z");
+    const where = buildBookingOverlapWhere(from, to);
 
-  const where = buildBookingOverlapWhere(rangeFromUtc, rangeToExclusiveUtc);
-
-  assert.deepEqual(where, {
-    startAtUtc: { not: null, lt: rangeToExclusiveUtc },
-    endAtUtc: { not: null, gt: rangeFromUtc },
+    expect(where.startAtUtc.not).toBeNull();
+    expect(where.startAtUtc.lt).toEqual(to);
+    expect(where.endAtUtc.not).toBeNull();
+    expect(where.endAtUtc.gt).toEqual(from);
   });
 });
