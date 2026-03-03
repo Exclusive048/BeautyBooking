@@ -1,78 +1,112 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { ProviderType } from "@prisma/client";
-import { ensureUniqueUsername, resolvePublicUsername, validateUsername } from "@/lib/publicUsername";
+import {
+  ensureUniqueUsername,
+  generateDefaultUsername,
+  normalizeUsernameInput,
+  resolvePublicClientUsername,
+  resolvePublicUsername,
+  slugifyUsername,
+  validateUsername,
+} from "@/lib/publicUsername";
 
-test("validateUsername accepts valid usernames", () => {
-  assert.equal(validateUsername("anna-beauty").ok, true);
-  assert.equal(validateUsername("studio24").ok, true);
-  assert.equal(validateUsername("master-123").ok, true);
-});
+describe("publicUsername", () => {
+  it("normalizes and slugifies input", () => {
+    expect(normalizeUsernameInput("  Anna  ")).toBe("anna");
+    expect(slugifyUsername("Anna Beauty")).toBe("anna-beauty");
+    expect(slugifyUsername("###")).toBe("");
+  });
 
-test("validateUsername rejects invalid usernames", () => {
-  assert.equal(validateUsername("ab").ok, false);
-  assert.equal(validateUsername("a--b").ok, false);
-  assert.equal(validateUsername("-master").ok, false);
-  assert.equal(validateUsername("master-").ok, false);
-  assert.equal(validateUsername("ADMIN").ok, false);
-  assert.equal(validateUsername("admin").ok, false);
-  assert.equal(validateUsername("12345").ok, false);
-});
+  it("validates usernames and rejects reserved or invalid values", () => {
+    expect(validateUsername("anna-beauty").ok).toBe(true);
+    expect(validateUsername("booking").ok).toBe(false);
+    expect(validateUsername("aa").ok).toBe(false);
+    expect(validateUsername("anna--beauty").ok).toBe(false);
+    expect(validateUsername("12345").ok).toBe(false);
+  });
 
-test("validateUsername rejects reserved slugs", () => {
-  assert.equal(validateUsername("booking").ok, false);
-  assert.equal(validateUsername("cabinet").ok, false);
-});
+  it("generates default username for studio", () => {
+    const result = generateDefaultUsername({
+      providerType: "STUDIO" as never,
+      studioName: "My Studio",
+    });
+    expect(result).toBe("my-studio");
+  });
 
-test("ensureUniqueUsername appends suffix when taken", async () => {
-  const taken = new Set(["anna-beauty", "anna-beauty-2"]);
-  const prismaMock = {
-    provider: {
-      findUnique: async ({ where }: { where: { publicUsername: string } }) =>
-        taken.has(where.publicUsername) ? { id: "p1" } : null,
-    },
-    userProfile: {
-      findUnique: async ({ where }: { where: { publicUsername: string } }) =>
-        taken.has(where.publicUsername) ? { id: "u1" } : null,
-    },
-    publicUsernameAlias: {
-      findUnique: async ({ where }: { where: { username: string } }) =>
-        taken.has(where.username) ? { id: "a1" } : null,
-    },
-  };
+  it("ensures unique username with suffix when taken", async () => {
+    const taken = new Set(["taken"]);
+    const prismaTx = {
+      provider: {
+        findUnique: vi.fn(async ({ where }) =>
+          taken.has(where.publicUsername) ? { id: "p1" } : null
+        ),
+      },
+      userProfile: {
+        findUnique: vi.fn(async ({ where }) =>
+          taken.has(where.publicUsername) ? { id: "u1" } : null
+        ),
+      },
+      publicUsernameAlias: {
+        findUnique: vi.fn(async ({ where }) =>
+          taken.has(where.username) ? { id: "a1" } : null
+        ),
+      },
+    };
 
-  const result = await ensureUniqueUsername(prismaMock as never, "anna-beauty");
-  assert.equal(result, "anna-beauty-3");
-});
+    const result = await ensureUniqueUsername(prismaTx as never, "taken");
+    expect(result).toBe("taken-2");
+  });
 
-test("resolvePublicUsername redirects from alias to current username", async () => {
-  const result = await resolvePublicUsername(
-    {
-      findProviderByUsernameOrAlias: async () => ({
-        id: "provider-1",
-        publicUsername: "new-name",
-        isPublished: true,
-        type: ProviderType.STUDIO,
+  it("resolves public usernames and redirects aliases", async () => {
+    const deps = {
+      findProviderByUsernameOrAlias: vi.fn(async (username: string) => {
+        if (username === "alias") {
+          return { id: "p1", publicUsername: "real", isPublished: true, type: "MASTER" };
+        }
+        if (username === "real") {
+          return { id: "p1", publicUsername: "real", isPublished: true, type: "MASTER" };
+        }
+        return null;
       }),
-    },
-    "old-name"
-  );
+    };
 
-  assert.deepEqual(result, { status: "redirect", username: "new-name" });
-});
+    await expect(resolvePublicUsername(deps, "###")).resolves.toEqual({
+      status: "not-found",
+      reason: "invalid",
+    });
+    await expect(resolvePublicUsername(deps, "missing")).resolves.toEqual({
+      status: "not-found",
+      reason: "missing",
+    });
+    await expect(resolvePublicUsername(deps, "alias")).resolves.toEqual({
+      status: "redirect",
+      username: "real",
+    });
+    await expect(resolvePublicUsername(deps, "real")).resolves.toEqual({
+      status: "found",
+      providerId: "p1",
+      providerType: "MASTER",
+    });
+  });
 
-test("resolvePublicUsername returns provider for published username", async () => {
-  const result = await resolvePublicUsername(
-    {
-      findProviderByUsernameOrAlias: async () => ({
-        id: "provider-2",
-        publicUsername: "master",
-        isPublished: true,
-        type: ProviderType.MASTER,
+  it("resolves client public usernames", async () => {
+    const deps = {
+      findClientByUsernameOrAlias: vi.fn(async (username: string) => {
+        if (username === "alias") {
+          return { id: "c1", publicUsername: "real" };
+        }
+        if (username === "real") {
+          return { id: "c1", publicUsername: "real" };
+        }
+        return null;
       }),
-    },
-    "master"
-  );
+    };
 
-  assert.deepEqual(result, { status: "found", providerId: "provider-2", providerType: ProviderType.MASTER });
+    await expect(resolvePublicClientUsername(deps, "alias")).resolves.toEqual({
+      status: "redirect",
+      username: "real",
+    });
+    await expect(resolvePublicClientUsername(deps, "real")).resolves.toEqual({
+      status: "found",
+      clientId: "c1",
+    });
+  });
 });

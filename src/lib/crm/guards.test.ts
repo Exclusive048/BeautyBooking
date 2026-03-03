@@ -1,14 +1,19 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { canAccessClientCards } from "@/lib/crm/guards";
+import { canAccessClientCards, ensureClientCardAccess } from "@/lib/crm/guards";
 
-test("canAccessClientCards allows PRO and PREMIUM", () => {
-  assert.equal(canAccessClientCards("PRO"), true);
-  assert.equal(canAccessClientCards("PREMIUM"), true);
-});
+describe("crm/guards", () => {
+  it("denies access for missing or FREE tier", () => {
+    expect(canAccessClientCards(null)).toBe(false);
+    expect(canAccessClientCards(undefined)).toBe(false);
+    expect(canAccessClientCards("FREE" as never)).toBe(false);
+  });
 
-test("canAccessClientCards denies FREE or missing", () => {
-  assert.equal(canAccessClientCards("FREE"), false);
-  assert.equal(canAccessClientCards(null), false);
-  assert.equal(canAccessClientCards(undefined), false);
+  it("allows access for paid tiers", () => {
+    expect(canAccessClientCards("PRO" as never)).toBe(true);
+    expect(canAccessClientCards("PREMIUM" as never)).toBe(true);
+  });
+
+  it("throws when access is denied", () => {
+    expect(() => ensureClientCardAccess("FREE" as never)).toThrow();
+    expect(() => ensureClientCardAccess("PRO" as never)).not.toThrow();
+  });
 });

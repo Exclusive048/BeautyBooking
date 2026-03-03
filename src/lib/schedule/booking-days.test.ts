@@ -1,27 +1,41 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { findWorkingDays } from "@/lib/schedule/booking-days";
-import type { DayPlan } from "@/lib/schedule/types";
 
-const working = new Set(["2026-02-06", "2026-02-09", "2026-02-10"]);
+describe("schedule/booking-days", () => {
+  it("collects working days and skips non-working", async () => {
+    const getDayPlan = vi.fn(async (dateKey: string) => ({
+      isWorking: dateKey !== "2026-03-02",
+      workingIntervals: [],
+      breaks: [],
+      meta: { source: "weekly-template" as const },
+    }));
 
-test("booking-days skips weekends and returns next working days", async () => {
-  const result = await findWorkingDays({
-    fromKey: "2026-02-06",
-    limit: 3,
-    maxScan: 10,
-    getDayPlan: async (dateKey) =>
-      ({
-        isWorking: working.has(dateKey),
-        workingIntervals: working.has(dateKey) ? [{ start: "10:00", end: "19:00" }] : [],
-        breaks: [],
-        meta: { source: "weekly-template" },
-      }) as DayPlan,
+    const result = await findWorkingDays({
+      fromKey: "2026-03-01",
+      limit: 2,
+      maxScan: 5,
+      getDayPlan,
+    });
+
+    expect(result.days.map((day) => day.date)).toEqual(["2026-03-01", "2026-03-03"]);
+    expect(result.nextFrom).toBe("2026-03-04");
   });
 
-  assert.deepEqual(
-    result.days.map((day) => day.date),
-    ["2026-02-06", "2026-02-09", "2026-02-10"]
-  );
-  assert.equal(result.nextFrom, "2026-02-11");
+  it("respects maxScan when no working days", async () => {
+    const getDayPlan = vi.fn(async () => ({
+      isWorking: false,
+      workingIntervals: [],
+      breaks: [],
+      meta: { source: "weekly-template" as const },
+    }));
+
+    const result = await findWorkingDays({
+      fromKey: "2026-03-01",
+      limit: 2,
+      maxScan: 2,
+      getDayPlan,
+    });
+
+    expect(result.days).toEqual([]);
+    expect(result.nextFrom).toBe("2026-03-03");
+  });
 });

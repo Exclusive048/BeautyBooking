@@ -105,7 +105,8 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
 
     if (recipientUserId) {
       const bodyPreview = previewBody(message.body);
-      notificationsNotifier.publish(recipientUserId, {
+      const notifier = await notificationsNotifier;
+      notifier.publish(recipientUserId, {
         id: message.id,
         type: NotificationType.CHAT_MESSAGE_RECEIVED,
         title: `Сообщение от ${senderName}`,

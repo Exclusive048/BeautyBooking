@@ -17,7 +17,8 @@ export async function GET(req: Request) {
     void writer.write(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
   };
 
-  const unsubscribe = notificationsNotifier.subscribe(user.id, (event) => {
+  const notifier = await notificationsNotifier;
+  const unsubscribe = notifier.subscribe(user.id, (event) => {
     send(event);
   });
 

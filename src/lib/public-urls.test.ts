@@ -1,32 +1,35 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { providerPublicUrl, studioBookingUrl, withQuery } from "@/lib/public-urls";
-import { setAlertHandler } from "@/lib/alerting";
+const alertMock = vi.hoisted(() => vi.fn());
 
-test("providerPublicUrl returns slug url when available", () => {
-  const url = providerPublicUrl({ id: "p1", publicUsername: "beauty-master" }, "test");
-  assert.equal(url, "/u/beauty-master");
-});
+vi.mock("@/lib/alerting", () => ({
+  alert: alertMock,
+}));
 
-test("providerPublicUrl falls back and alerts when username missing", () => {
-  let called = false;
-  const prev = setAlertHandler(() => {
-    called = true;
+import { clientPublicUrl, providerPublicUrl, studioBookingUrl, withQuery } from "@/lib/public-urls";
+
+describe("public-urls", () => {
+  beforeEach(() => {
+    alertMock.mockReset();
   });
 
-  const url = providerPublicUrl({ id: "p2", publicUsername: null }, "test");
-  assert.equal(url, "/providers/p2");
-  assert.equal(called, true);
+  it("builds stable query strings", () => {
+    const url = withQuery("/path", { b: 2, a: "x", c: [1, 2] });
+    expect(url).toBe("/path?a=x&b=2&c=1&c=2");
+  });
 
-  setAlertHandler(prev);
-});
+  it("returns fallback provider url and alerts when username missing", () => {
+    const url = providerPublicUrl({ id: "p1", publicUsername: null }, "ctx", "providers");
+    expect(url).toBe("/providers/p1");
+    expect(alertMock).toHaveBeenCalledTimes(1);
+  });
 
-test("withQuery builds stable query order", () => {
-  const url = withQuery("/u/test", { b: "2", a: "1" });
-  assert.equal(url, "/u/test?a=1&b=2");
-});
+  it("returns client url and alerts when username missing", () => {
+    const url = clientPublicUrl({ id: "c1", publicUsername: null }, "ctx");
+    expect(url).toBe("/clients/c1");
+    expect(alertMock).toHaveBeenCalledTimes(1);
+  });
 
-test("studioBookingUrl builds booking link with params", () => {
-  const url = studioBookingUrl({ id: "s1", publicUsername: "studio-1" }, { master: "master-1", serviceId: "srv" });
-  assert.equal(url, "/u/studio-1/booking?master=master-1&serviceId=srv");
+  it("builds studio booking url with params", () => {
+    const url = studioBookingUrl({ id: "s1", publicUsername: "studio" }, { serviceId: "svc" });
+    expect(url).toBe("/u/studio/booking?serviceId=svc");
+  });
 });

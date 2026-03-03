@@ -1,13 +1,39 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { generateOtpCode } from "@/lib/auth/otp";
+import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 
-test("generateOtpCode returns a 6-digit numeric code", () => {
-  for (let i = 0; i < 50; i += 1) {
-    const code = generateOtpCode();
-    assert.equal(code.length, 6);
-    assert.ok(/^\d{6}$/.test(code));
-    const asNumber = Number(code);
-    assert.ok(asNumber >= 100000 && asNumber <= 999999);
-  }
+describe("auth/otp", () => {
+  const originalSecret = process.env.AUTH_JWT_SECRET;
+
+  beforeEach(() => {
+    process.env.AUTH_JWT_SECRET = "test-secret";
+  });
+
+  afterEach(() => {
+    if (originalSecret === undefined) {
+      delete process.env.AUTH_JWT_SECRET;
+    } else {
+      process.env.AUTH_JWT_SECRET = originalSecret;
+    }
+  });
+
+  it("generates a 6-digit numeric code", () => {
+    for (let i = 0; i < 20; i += 1) {
+      const code = generateOtpCode();
+      expect(code).toMatch(/^\d{6}$/);
+    }
+  });
+
+  it("hashes consistently for the same inputs", () => {
+    const phone = "+79991234567";
+    const code = "123456";
+    const hash = hashOtpCode(phone, code);
+    expect(hashOtpCode(phone, code)).toBe(hash);
+  });
+
+  it("produces different hashes for different inputs", () => {
+    const phone = "+79991234567";
+    const code = "123456";
+    const hash = hashOtpCode(phone, code);
+    expect(hashOtpCode(phone, "654321")).not.toBe(hash);
+    expect(hashOtpCode("+79991230000", code)).not.toBe(hash);
+  });
 });

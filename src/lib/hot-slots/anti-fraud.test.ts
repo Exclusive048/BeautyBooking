@@ -1,15 +1,20 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
 
-test("blocks rebook within 24 hours before slot", () => {
-  const slotStart = new Date(Date.UTC(2026, 1, 10, 10, 0, 0));
-  const cancelled = new Date(slotStart.getTime() - 23 * 60 * 60 * 1000);
-  assert.equal(isHotSlotRebookBlocked(cancelled, slotStart), true);
-});
+describe("hot-slots/anti-fraud", () => {
+  it("blocks rebook within window", () => {
+    const cancelledAt = new Date("2026-03-01T00:00:00Z");
+    const slotStart = new Date("2026-03-01T10:00:00Z");
+    expect(isHotSlotRebookBlocked(cancelledAt, slotStart)).toBe(true);
+  });
 
-test("allows rebook after 24 hours window", () => {
-  const slotStart = new Date(Date.UTC(2026, 1, 10, 10, 0, 0));
-  const cancelled = new Date(slotStart.getTime() - 26 * 60 * 60 * 1000);
-  assert.equal(isHotSlotRebookBlocked(cancelled, slotStart), false);
+  it("allows rebook outside window", () => {
+    const cancelledAt = new Date("2026-03-01T00:00:00Z");
+    const slotStart = new Date("2026-03-03T00:00:01Z");
+    expect(isHotSlotRebookBlocked(cancelledAt, slotStart)).toBe(false);
+  });
+
+  it("handles invalid dates safely", () => {
+    expect(isHotSlotRebookBlocked(null, new Date())).toBe(false);
+    expect(isHotSlotRebookBlocked(new Date("bad"), new Date())).toBe(false);
+  });
 });

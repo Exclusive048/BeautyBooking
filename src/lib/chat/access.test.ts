@@ -1,47 +1,60 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { BookingStatus, ChatSenderType } from "@prisma/client";
-import { resolveChatAccessForBooking } from "@/lib/chat/access";
+const bookingFindUnique = vi.hoisted(() => vi.fn());
 
-const baseBooking = {
-  id: "b1",
-  status: BookingStatus.CONFIRMED,
-  startAtUtc: new Date(),
-  clientUserId: "client-1",
-  masterProvider: {
-    ownerUserId: "master-1",
-    name: "Master",
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    booking: { findUnique: bookingFindUnique },
   },
-};
+}));
 
-test("resolveChatAccessForBooking allows client", () => {
-  const result = resolveChatAccessForBooking(baseBooking, "client-1");
-  assert.equal(result.ok, true);
-  if (result.ok) {
-    assert.equal(result.senderType, ChatSenderType.CLIENT);
-  }
-});
+import { resolveChatAccess, resolveChatAccessForBooking } from "@/lib/chat/access";
 
-test("resolveChatAccessForBooking allows master", () => {
-  const result = resolveChatAccessForBooking(baseBooking, "master-1");
-  assert.equal(result.ok, true);
-  if (result.ok) {
-    assert.equal(result.senderType, ChatSenderType.MASTER);
-  }
-});
+describe("chat/access", () => {
+  beforeEach(() => {
+    bookingFindUnique.mockReset();
+  });
 
-test("resolveChatAccessForBooking denies studio admin user", () => {
-  const result = resolveChatAccessForBooking(baseBooking, "studio-admin-1");
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.equal(result.reason, "forbidden");
-  }
-});
+  it("denies access when booking is missing", () => {
+    const result = resolveChatAccessForBooking(null, "user-1");
+    expect(result).toEqual({ ok: false, reason: "not-found" });
+  });
 
-test("resolveChatAccessForBooking denies unrelated user", () => {
-  const result = resolveChatAccessForBooking(baseBooking, "random-user");
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.equal(result.reason, "forbidden");
-  }
+  it("allows client access for active booking", () => {
+    const booking = {
+      id: "b1",
+      status: "CONFIRMED",
+      startAtUtc: new Date(),
+      clientUserId: "user-1",
+      masterProvider: { ownerUserId: "master-1" },
+    };
+    const result = resolveChatAccessForBooking(booking, "user-1");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.senderType).toBe("CLIENT");
+    }
+  });
+
+  it("denies access for unrelated user", () => {
+    const booking = {
+      id: "b1",
+      status: "CONFIRMED",
+      startAtUtc: new Date(),
+      clientUserId: "user-1",
+      masterProvider: { ownerUserId: "master-1" },
+    };
+    const result = resolveChatAccessForBooking(booking, "user-2");
+    expect(result).toEqual({ ok: false, reason: "forbidden" });
+  });
+
+  it("loads booking via prisma for resolveChatAccess", async () => {
+    bookingFindUnique.mockResolvedValueOnce({
+      id: "b1",
+      status: "CONFIRMED",
+      startAtUtc: new Date(),
+      clientUserId: "user-1",
+      masterProvider: { ownerUserId: "master-1", name: "Master" },
+    });
+
+    const result = await resolveChatAccess("b1", "user-1");
+    expect(result.ok).toBe(true);
+  });
 });

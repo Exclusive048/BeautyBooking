@@ -45,7 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     if (rows.length <= PAGE_SIZE) break;
-    cursor = rows[PAGE_SIZE]?.id ?? null;
+    cursor = page[page.length - 1]?.id ?? null;
   }
 
   return urls;

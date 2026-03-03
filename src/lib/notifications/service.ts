@@ -122,7 +122,10 @@ async function createNotifications(
 }
 
 export function publishRealtime(userId: string, event: NotificationEvent) {
-  notificationsNotifier.publish(userId, event);
+  void (async () => {
+    const notifier = await notificationsNotifier;
+    notifier.publish(userId, event);
+  })();
 }
 
 export function publishNotifications(events: NotificationRecord[]): void {
