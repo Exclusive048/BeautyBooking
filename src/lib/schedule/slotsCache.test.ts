@@ -1,3 +1,5 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
 const cacheGet = vi.hoisted(() => vi.fn());
 const cacheSet = vi.hoisted(() => vi.fn());
 const cacheDel = vi.hoisted(() => vi.fn());

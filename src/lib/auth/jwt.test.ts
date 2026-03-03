@@ -1,5 +1,5 @@
 import { createSessionToken, verifySessionToken } from "@/lib/auth/jwt";
-
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 describe("auth/jwt", () => {
   const originalSecret = process.env.AUTH_JWT_SECRET;
 

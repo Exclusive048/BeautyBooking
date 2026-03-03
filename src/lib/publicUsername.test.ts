@@ -7,6 +7,8 @@ import {
   slugifyUsername,
   validateUsername,
 } from "@/lib/publicUsername";
+import { describe, it, expect, vi } from "vitest";
+import { ProviderType } from "@prisma/client";
 
 describe("publicUsername", () => {
   it("normalizes and slugifies input", () => {
@@ -59,10 +61,10 @@ describe("publicUsername", () => {
     const deps = {
       findProviderByUsernameOrAlias: vi.fn(async (username: string) => {
         if (username === "alias") {
-          return { id: "p1", publicUsername: "real", isPublished: true, type: "MASTER" };
+          return { id: "p1", publicUsername: "real", isPublished: true, type: ProviderType.MASTER };
         }
         if (username === "real") {
-          return { id: "p1", publicUsername: "real", isPublished: true, type: "MASTER" };
+          return { id: "p1", publicUsername: "real", isPublished: true, type: ProviderType.MASTER };
         }
         return null;
       }),

@@ -1,3 +1,5 @@
+import { describe, it, expect, vi } from "vitest";
+
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/redis/connection", () => ({ getRedisConnection: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn() }));

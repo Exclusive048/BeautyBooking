@@ -1,5 +1,5 @@
 import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
-
+import { describe, it, expect } from "vitest";
 describe("hot-slots/anti-fraud", () => {
   it("blocks rebook within window", () => {
     const cancelledAt = new Date("2026-03-01T00:00:00Z");

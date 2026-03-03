@@ -1,5 +1,5 @@
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
-
+import { describe, it, expect } from "vitest";
 describe("schedule/overlap", () => {
   it("builds overlap predicate with exclusive boundaries", () => {
     const from = new Date("2026-03-01T10:00:00Z");

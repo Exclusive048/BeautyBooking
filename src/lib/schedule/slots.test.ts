@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
 
 describe("schedule/slots", () => {

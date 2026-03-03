@@ -1,4 +1,5 @@
 import { canAccessClientCards, ensureClientCardAccess } from "@/lib/crm/guards";
+import { describe, it, expect } from "vitest";
 
 describe("crm/guards", () => {
   it("denies access for missing or FREE tier", () => {

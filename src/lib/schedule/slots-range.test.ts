@@ -1,5 +1,5 @@
 import { filterSlotsByDateKey } from "@/lib/schedule/slots-range";
-
+import { describe, it, expect } from "vitest";
 describe("schedule/slots-range", () => {
   it("filters slots within [from,to) keys", () => {
     const slots = [

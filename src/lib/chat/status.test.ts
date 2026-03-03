@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { getChatAvailability, isChatOpen, OPEN_STATUSES, READONLY_WINDOW_HOURS } from "@/lib/chat/status";
 
 describe("chat/status", () => {

@@ -1,5 +1,5 @@
 import { findWorkingDays } from "@/lib/schedule/booking-days";
-
+import { describe, it, expect, vi } from "vitest";
 describe("schedule/booking-days", () => {
   it("collects working days and skips non-working", async () => {
     const getDayPlan = vi.fn(async (dateKey: string) => ({

@@ -1,3 +1,5 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { BookingStatus } from "@prisma/client";
 const bookingFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
@@ -21,7 +23,7 @@ describe("chat/access", () => {
   it("allows client access for active booking", () => {
     const booking = {
       id: "b1",
-      status: "CONFIRMED",
+      status: BookingStatus.CONFIRMED,
       startAtUtc: new Date(),
       clientUserId: "user-1",
       masterProvider: { ownerUserId: "master-1" },
@@ -36,7 +38,7 @@ describe("chat/access", () => {
   it("denies access for unrelated user", () => {
     const booking = {
       id: "b1",
-      status: "CONFIRMED",
+      status: BookingStatus.CONFIRMED,
       startAtUtc: new Date(),
       clientUserId: "user-1",
       masterProvider: { ownerUserId: "master-1" },
@@ -48,7 +50,7 @@ describe("chat/access", () => {
   it("loads booking via prisma for resolveChatAccess", async () => {
     bookingFindUnique.mockResolvedValueOnce({
       id: "b1",
-      status: "CONFIRMED",
+      status: BookingStatus.CONFIRMED,
       startAtUtc: new Date(),
       clientUserId: "user-1",
       masterProvider: { ownerUserId: "master-1", name: "Master" },

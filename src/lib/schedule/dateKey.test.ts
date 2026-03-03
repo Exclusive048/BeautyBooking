@@ -8,7 +8,7 @@ import {
   parseDateKeyParts,
   parseDateKeyToUtc,
 } from "@/lib/schedule/dateKey";
-
+import { describe, it, expect } from "vitest";
 describe("schedule/dateKey", () => {
   it("parses valid keys and rejects invalid ones", () => {
     expect(parseDateKeyParts("2026-03-03")).toEqual({ year: 2026, month: 3, day: 3 });

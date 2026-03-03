@@ -1,5 +1,5 @@
 import { hotSlotRuleSchema } from "@/lib/hot-slots/schemas";
-
+import { describe, it, expect } from "vitest";
 describe("hot-slots/validation", () => {
   const baseRule = {
     isEnabled: true,

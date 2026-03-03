@@ -1,5 +1,6 @@
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { otpRequestSchema } from "@/lib/auth/schemas";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 

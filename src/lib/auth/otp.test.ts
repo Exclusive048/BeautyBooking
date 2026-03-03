@@ -1,5 +1,5 @@
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
-
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 describe("auth/otp", () => {
   const originalSecret = process.env.AUTH_JWT_SECRET;
 
