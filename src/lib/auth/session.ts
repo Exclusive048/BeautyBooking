@@ -12,8 +12,8 @@ export async function getSessionUser() {
   const payload = verifySessionToken(token);
   if (!payload) return null;
 
-  const user = await prisma.userProfile.findUnique({
-    where: { id: payload.sub },
+  const user = await prisma.userProfile.findFirst({
+    where: { id: payload.sub, isDeleted: false },
   });
 
   return user;

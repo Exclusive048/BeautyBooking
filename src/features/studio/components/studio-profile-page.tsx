@@ -2,6 +2,7 @@
 
 import { MediaEntityType } from "@prisma/client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
 import type { ApiResponse } from "@/lib/types/api";
@@ -12,6 +13,7 @@ import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-p
 import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-bar";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
+import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 
 type StudioProfileData = {
   studio: {
@@ -46,10 +48,15 @@ type Props = {
 
 export function StudioProfilePage({ providerId }: Props) {
   const t = UI_TEXT.studioCabinet.profile;
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteActiveCount, setDeleteActiveCount] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -218,6 +225,36 @@ export function StudioProfilePage({ providerId }: Props) {
       setError(err instanceof Error ? err.message : t.saveFailed);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteStudio = async () => {
+    setDeleteLoading(true);
+    setDeleteError(null);
+    setDeleteActiveCount(null);
+    try {
+      const res = await fetch("/api/cabinet/studio/delete", { method: "DELETE" });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ deleted: boolean }>
+        | { ok: false; error: { message: string; code?: string; details?: unknown } }
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        const code = json && !json.ok ? json.error.code : null;
+        if (code === "ACTIVE_BOOKINGS") {
+          const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
+          setDeleteActiveCount(typeof details?.count === "number" ? details.count : 0);
+        } else {
+          setDeleteError(json && !json.ok ? json.error.message : `Ошибка: ${res.status}`);
+        }
+        return;
+      }
+      setDeleteModalOpen(false);
+      router.push("/cabinet/roles");
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Не удалось удалить кабинет студии.");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -427,9 +464,35 @@ export function StudioProfilePage({ providerId }: Props) {
         onInstagramChange={setInstagram}
         onVkChange={setVk}
       />
+      <section className="mt-12 border-t border-red-200/40 pt-8">
+        <h2 className="text-sm font-semibold text-red-500">??????? ????</h2>
+        <p className="mt-1 text-xs text-text-sec">
+          ??? ??????? ?????? ??????? ??????????? ? ???????????????. ???????? ?????????? ???? ???? ????????????? ??????.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteError(null);
+            setDeleteActiveCount(null);
+            setDeleteModalOpen(true);
+          }}
+          className="mt-4 rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-500 hover:bg-red-50/10 transition-colors"
+        >
+          ??????? ??????? ??????
+        </button>
+      </section>
 
       <StickySaveBar onSave={() => void save()} loading={saving} disabled={saving} />
       <div id="reviews" />
+      <DeleteCabinetModal
+        open={deleteModalOpen}
+        type="studio"
+        onCancel={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteStudio}
+        loading={deleteLoading}
+        activeBookingsCount={deleteActiveCount}
+        error={deleteError}
+      />
     </div>
   );
 }

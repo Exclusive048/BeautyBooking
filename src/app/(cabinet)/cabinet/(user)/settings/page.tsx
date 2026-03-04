@@ -1,16 +1,24 @@
+import { redirect } from "next/navigation";
 import { HeaderBlock } from "@/components/ui/header-block";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
+import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
+import { getSessionUser } from "@/lib/auth/session";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
   return (
     <div className="space-y-6">
-      <HeaderBlock title="Настройки" subtitle="Подключения и уведомления" />
+      <HeaderBlock title="?????????" subtitle="??????????? ? ???????????" />
 
       <div className="grid gap-4">
         <TelegramNotificationsSection />
         <VkNotificationsSection />
       </div>
+
+      <DeleteAccountSection phone={user.phone ?? null} />
     </div>
   );
 }

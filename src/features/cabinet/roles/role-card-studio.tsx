@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,7 +29,7 @@ type Props =
       actionHref?: string;
       actionMethod?: "GET" | "POST";
     }
-  | { mode: "active"; data: StudioActiveData };
+  | { mode: "active"; data: StudioActiveData; onDelete?: () => void };
 
 export function RoleCardStudio(props: Props) {
   if (props.mode === "empty") {
@@ -158,6 +160,15 @@ export function RoleCardStudio(props: Props) {
           ) : (
             <Button className="w-full">{data.actionLabel ?? "Открыть кабинет"}</Button>
           )}
+          {"onDelete" in props && props.onDelete ? (
+            <button
+              type="button"
+              onClick={props.onDelete}
+              className="mt-4 text-xs text-text-sec transition-colors underline-offset-2 hover:text-red-500 hover:underline"
+            >
+              ??????? ??????? ??????
+            </button>
+          ) : null}
         </div>
       </CardContent>
     </Card>

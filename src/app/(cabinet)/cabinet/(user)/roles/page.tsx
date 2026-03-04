@@ -1,8 +1,7 @@
 import { ProviderType } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { HeaderBlock } from "@/components/ui/header-block";
-import { RoleCardMaster } from "@/features/cabinet/roles/role-card-master";
-import { RoleCardStudio } from "@/features/cabinet/roles/role-card-studio";
+import { RolesCards } from "@/features/cabinet/roles/roles-cards";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getMeProfile } from "@/lib/users/profile";
@@ -117,36 +116,14 @@ export default async function RolesPage() {
         subtitle="Управляйте своим бизнесом или работой мастера"
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-        {me.hasMasterProfile && masterData ? (
-          <RoleCardMaster mode="active" data={masterData} />
-        ) : (
-          <RoleCardMaster
-            mode="empty"
-            actionLabel="Создать мастера"
-            actionHref={createMasterHref}
-            actionMethod="POST"
-          />
-        )}
-
-        {me.hasStudioProfile && studioData ? (
-          <RoleCardStudio mode="active" data={studioData} />
-        ) : me.hasMasterProfile ? (
-          <RoleCardStudio
-            mode="upsell"
-            actionLabel="Создать студию"
-            actionHref={createStudioHref}
-            actionMethod="POST"
-          />
-        ) : (
-          <RoleCardStudio
-            mode="empty"
-            actionLabel="Создать студию"
-            actionHref={createStudioHref}
-            actionMethod="POST"
-          />
-        )}
-      </div>
+      <RolesCards
+        hasMasterProfile={me.hasMasterProfile}
+        hasStudioProfile={me.hasStudioProfile}
+        masterData={masterData}
+        studioData={studioData}
+        createMasterHref={createMasterHref}
+        createStudioHref={createStudioHref}
+      />
     </div>
   );
 }

@@ -250,6 +250,8 @@ enum NotificationType {
   STUDIO_SCHEDULE_REQUEST
   STUDIO_SCHEDULE_APPROVED
   STUDIO_SCHEDULE_REJECTED
+  STUDIO_DISBANDED
+  MASTER_CABINET_DELETED
   MODEL_NEW_APPLICATION
   MODEL_APPLICATION_RECEIVED
   MODEL_APPLICATION_REJECTED
@@ -546,6 +548,9 @@ model UserProfile {
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+
+  isDeleted Boolean @default(false)
+  deletedAt DateTime?
 
 }
 
