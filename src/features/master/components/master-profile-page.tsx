@@ -2,6 +2,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useRouter } from "next/navigation";
+import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalImage } from "@/components/ui/focal-image";
@@ -239,12 +241,17 @@ async function uploadMasterMedia(input: {
 }
 
 export function MasterProfilePage() {
+  const router = useRouter();
   const [data, setData] = useState<MasterProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autosaveInfo, setAutosaveInfo] = useState<string | null>(null);
   const plan = usePlanFeatures("MASTER");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteActiveCount, setDeleteActiveCount] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<NotificationCenterInviteItem[]>([]);
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
@@ -618,6 +625,36 @@ export function MasterProfilePage() {
 
     void loadInvites();
   }, []);
+
+  const handleDeleteMaster = async () => {
+    setDeleteLoading(true);
+    setDeleteError(null);
+    setDeleteActiveCount(null);
+    try {
+      const res = await fetch("/api/cabinet/master/delete", { method: "DELETE" });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ deleted: boolean }>
+        | { ok: false; error: { message: string; code?: string; details?: unknown } }
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        const code = json && !json.ok ? json.error.code : null;
+        if (code === "ACTIVE_BOOKINGS") {
+          const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
+          setDeleteActiveCount(typeof details?.count === "number" ? details.count : 0);
+        } else {
+          setDeleteError(json && !json.ok ? json.error.message : `Ошибка: ${res.status}`);
+        }
+        return;
+      }
+      setDeleteModalOpen(false);
+      router.push("/cabinet/roles");
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Не удалось удалить кабинет мастера.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
   const disabledServices = useMemo(
@@ -1980,6 +2017,24 @@ export function MasterProfilePage() {
                     <HotSlotsSettingsSection services={serviceList} />
                   </FeatureGate>
                 </div>
+              <section className="mt-12 border-t border-red-200/40 pt-8">
+                <h2 className="text-sm font-semibold text-red-500">??????? ????</h2>
+                <p className="mt-1 text-xs text-text-sec">
+                  ???????? ???????? ??????? ??????????. ??? ??????, ?????????? ? ????????? ????? ???????.
+                  ??????? ??????????? ??????? ??????????? ? ???????????? ? ?????????????????.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteActiveCount(null);
+                    setDeleteModalOpen(true);
+                  }}
+                  className="mt-4 rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-500 hover:bg-red-50/10 transition-colors"
+                >
+                  ??????? ??????? ???????
+                </button>
+              </section>
               </div>
             ) : null}
 
@@ -2619,6 +2674,15 @@ export function MasterProfilePage() {
           </div>
         </div>
       ) : null}
+    <DeleteCabinetModal
+      open={deleteModalOpen}
+      type="master"
+      onCancel={() => setDeleteModalOpen(false)}
+      onConfirm={handleDeleteMaster}
+      loading={deleteLoading}
+      activeBookingsCount={deleteActiveCount}
+      error={deleteError}
+    />
     </section>
   );
 }

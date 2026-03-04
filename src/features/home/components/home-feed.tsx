@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -44,6 +45,9 @@ function buildFeedUrl(params: {
 }
 
 export function HomeFeed() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [toast, setToast] = useState<string | null>(null);
   const [categories, setCategories] = useState<HomeCategory[]>([]);
   const [tags, setTags] = useState<HomeTag[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -74,6 +78,18 @@ export function HomeFeed() {
     },
     [selectedCategoryId, selectedTagId]
   );
+
+  useEffect(() => {
+    const deleted = searchParams.get("deleted");
+    if (deleted !== "1") return;
+    setToast("Ваш аккаунт удалён");
+    const timer = window.setTimeout(() => setToast(null), 2400);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("deleted");
+    const suffix = next.toString();
+    router.replace(suffix ? `/?${suffix}` : "/");
+    return () => window.clearTimeout(timer);
+  }, [router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +213,12 @@ export function HomeFeed() {
         }}
         onSelectTag={(next) => setSelectedTagId((prev) => (prev === next ? null : next))}
       />
+
+      {toast ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+          {toast}
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{UI_TEXT.home.loading}</div>
