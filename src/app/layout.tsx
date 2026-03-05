@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { ViewerTimeZoneProvider } from "@/components/providers/viewer-timezone-provider";
@@ -22,13 +22,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "BeautyHub",
+  title: "МастерРядом",
   description: "Запись к мастерам",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BeautyHub",
+    title: "МастерРядом",
     startupImage: [
       {
         url: "/splash/apple-splash-1290-2796.png",
@@ -79,3 +79,4 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     </html>
   );
 }
+

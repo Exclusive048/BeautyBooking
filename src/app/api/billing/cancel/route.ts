@@ -14,12 +14,12 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
-  if (!user) return fail("РќРµРѕР±С…РѕРґРёРјР° Р°РІС‚РѕСЂРёР·Р°С†РёСЏ.", 401, "UNAUTHORIZED");
+  if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
 
   const body = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return fail("РќРµРІРµСЂРЅС‹Рµ РґР°РЅРЅС‹Рµ.", 400, "VALIDATION_ERROR");
+    return fail("Неверные данные.", 400, "VALIDATION_ERROR");
   }
 
   const subscription = await prisma.userSubscription.findUnique({
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   });
 
   if (!subscription) {
-    return fail("РџРѕРґРїРёСЃРєР° РЅРµ РЅР°Р№РґРµРЅР°.", 404, "NOT_FOUND");
+    return fail("Подписка не найдена.", 404, "NOT_FOUND");
   }
 
   const now = new Date();

@@ -1,4 +1,4 @@
-type SchemaObject = {
+﻿type SchemaObject = {
   type?: "string" | "number" | "integer" | "boolean" | "object" | "array";
   properties?: Record<string, SchemaObject>;
   required?: readonly string[];
@@ -141,9 +141,9 @@ const limitQuery: ParameterObject = {
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
-    title: "BeautyHub API",
+    title: "МастерРядом API",
     version: "0.1.0",
-    description: "Minimal OpenAPI contract for BeautyHub public API.",
+    description: "Minimal OpenAPI contract for МастерРядом public API.",
   },
   servers: [{ url: "/" }],
   components: {
@@ -3614,3 +3614,4 @@ export const openApiSpec = {
 export function getOpenApiSpec() {
   return openApiSpec;
 }
+

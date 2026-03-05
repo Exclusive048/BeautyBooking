@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "О платформе — BeautyHub",
+  title: "О платформе — МастерРядом",
   description:
-    "BeautyHub — маркетплейс мастеров красоты. Узнайте, как мы помогаем клиентам находить специалистов, а мастерам — управлять записями и развивать бизнес.",
+    "МастерРядом — маркетплейс мастеров красоты. Узнайте, как мы помогаем клиентам находить специалистов, а мастерам — управлять записями и развивать бизнес.",
 };
 
 const STATS = [
@@ -53,9 +53,9 @@ export default function AboutPage() {
           </span>
         </h1>
         <p className="text-lg text-text-sec max-w-[600px] mx-auto leading-relaxed">
-          BeautyHub — это маркетплейс, который соединяет клиентов с мастерами красоты.
+          МастерРядом — это маркетплейс, который соединяет клиентов с мастерами красоты.
           Мы решаем простую, но болезненную проблему: найти хорошего специалиста и
-          записаться к нему — до сих пор та ещё задача.
+          записаться к нему — до сих пор С‚Р° РµС‰С‘ задача.
         </p>
       </section>
 
@@ -80,7 +80,7 @@ export default function AboutPage() {
           </div>
         </div>
         <p className="text-text-sec text-sm leading-relaxed pt-2 border-t border-border-subtle">
-          BeautyHub закрывает оба конца: клиент видит реальное расписание и бронирует
+          МастерРядом закрывает оба конца: клиент видит реальное расписание и бронирует
           онлайн, мастер получает уведомление и ведёт всю базу в одном месте.
         </p>
       </section>
@@ -121,7 +121,7 @@ export default function AboutPage() {
       <section className="text-center space-y-4">
         <h2 className="text-2xl font-semibold text-text-main">Присоединяйтесь</h2>
         <p className="text-text-sec text-sm">
-          Вы клиент — найдите мастера рядом. Вы мастер — попробуйте бесплатно.
+          Р’С‹ клиент — найдите мастера рядом. Р’С‹ мастер — попробуйте бесплатно.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
@@ -141,3 +141,4 @@ export default function AboutPage() {
     </main>
   );
 }
+

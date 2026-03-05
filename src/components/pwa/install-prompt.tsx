@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ export function PWAInstallPrompt() {
   return (
     <div className="fixed bottom-20 left-3 right-3 z-50 pb-safe">
       <div className="rounded-2xl border border-border-subtle bg-bg-card px-4 py-3 shadow-card">
-        <div className="text-sm font-semibold text-text-main">Установить BeautyHub</div>
+        <div className="text-sm font-semibold text-text-main">Установить МастерРядом</div>
         {ios ? (
           <div className="mt-1 text-xs text-text-sec">
             Нажмите <span className="inline-flex items-center gap-1 font-medium text-text-main"><ShareIcon />Поделиться</span> и выберите «На экран Домой».
@@ -137,3 +137,4 @@ export function PWAInstallPrompt() {
     </div>
   );
 }
+

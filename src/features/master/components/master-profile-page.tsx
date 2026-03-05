@@ -1937,16 +1937,16 @@ export function MasterProfilePage() {
 
                 {data.master.isSolo ? (
                   <div className="rounded-2xl bg-bg-card/90 p-4">
-                    <h4 className="text-sm font-semibold">РќР°РїРѕРјРёРЅР°РЅРёСЏ</h4>
+                    <h4 className="text-sm font-semibold">Напоминания</h4>
                     <p className="mt-1 text-xs text-text-sec">
-                      РћС‚РїСЂР°РІР»СЏС‚СЊ РєР»РёРµРЅС‚Сѓ Рё РјР°СЃС‚РµСЂСѓ РЅР°РїРѕРјРёРЅР°РЅРёСЏ Рѕ Р·Р°РїРёСЃРё.
+                      Отправлять клиенту и мастеру напоминания о записи.
                     </p>
                     <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-medium">РќР°РїРѕРјРёРЅР°РЅРёСЏ Рѕ Р·Р°РїРёСЃРё</div>
+                          <div className="text-sm font-medium">Напоминания о записи</div>
                           <div className="mt-1 text-xs text-text-sec">
-                            РњРѕР¶РЅРѕ РѕС‚РєР»СЋС‡РёС‚СЊ, РµСЃР»Рё РЅРµ РЅСѓР¶РЅС‹ СѓРІРµРґРѕРјР»РµРЅРёСЏ Р·Р° 24 С‡Р°СЃР° Рё 2 С‡Р°СЃР°.
+                            Можно отключить, если не нужны уведомления за 24 часа и 2 часа.
                           </div>
                         </div>
                         <label className="flex items-center gap-2 text-sm">
@@ -1957,10 +1957,10 @@ export function MasterProfilePage() {
                             onChange={(event) => void updateRemindersEnabled(event.target.checked)}
                           />
                           {remindersSaving
-                            ? "РЎРѕС…СЂР°РЅСЏРµРј..."
+                            ? "Сохраняем..."
                             : remindersEnabled
-                              ? "Р’РєР»СЋС‡РµРЅРѕ"
-                              : "Р’С‹РєР»СЋС‡РµРЅРѕ"}
+                              ? "Включено"
+                              : "Выключено"}
                         </label>
                       </div>
                     </div>
@@ -2358,9 +2358,9 @@ export function MasterProfilePage() {
                 </span>
                 {portfolioLimitReached ? (
                   <span className="text-rose-400">
-                    Р›РёРјРёС‚ РґРѕСЃС‚РёРіРЅСѓС‚.{" "}
+                    Лимит достигнут.{" "}
                     <a href="/cabinet/billing" className="underline">
-                      РўР°СЂРёС„С‹
+                      Тарифы
                     </a>
                   </span>
                 ) : null}

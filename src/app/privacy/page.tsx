@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const LEGAL_ENTITY_NAME = "[Укажи свои данные: ИП Иванов Иван Иванович]";
@@ -6,18 +6,18 @@ const INN = "[укажи ИНН]";
 const OGRN = "[укажи ОГРН]";
 const LEGAL_ADDRESS = "[укажи юридический адрес]";
 const CONTACT_EMAILS = {
-  privacy: "privacy@beautyhub.ru",
-  legal: "legal@beautyhub.ru",
-  support: "support@beautyhub.ru",
+  privacy: "privacy@МастерРядом.ru",
+  legal: "legal@МастерРядом.ru",
+  support: "support@МастерРядом.ru",
 };
 
 const DOCUMENT_VERSION = "1.0";
 const UPDATED_AT = "17.02.2026";
 
 export const metadata: Metadata = {
-  title: "Политика конфиденциальности — BeautyHub",
+  title: "Политика конфиденциальности — МастерРядом",
   description:
-    "Политика конфиденциальности BeautyHub: какие данные собираем, как используем и как защищаем.",
+    "Политика конфиденциальности МастерРядом: какие данные собираем, как используем и как защищаем.",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold text-text-main">Политика конфиденциальности</h1>
         <p className="text-sm text-text-sec">
           Настоящая Политика описывает, какие персональные данные мы собираем, как их используем и
-          какие права есть у пользователей сервиса BeautyHub.
+          какие права есть у пользователей сервиса МастерРядом.
         </p>
       </header>
 
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           <Section title="1. Общие положения">
             <p>
               Оператор обрабатывает персональные данные в соответствии с законодательством РФ и
-              настоящей Политикой. Используя сервис BeautyHub, пользователь подтверждает согласие с
+              настоящей Политикой. Используя сервис МастерРядом, пользователь подтверждает согласие с
               условиями обработки данных.
             </p>
           </Section>
@@ -130,3 +130,4 @@ export default function PrivacyPage() {
     </div>
   );
 }
+

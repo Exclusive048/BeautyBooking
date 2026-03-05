@@ -1,6 +1,6 @@
-{
-  "name": "BeautyHub",
-  "short_name": "BeautyHub",
+﻿{
+  "name": "МастерРядом",
+  "short_name": "МастерРядом",
   "description": "Запись к мастерам",
   "lang": "ru",
   "start_url": "/?source=pwa",
@@ -65,3 +65,4 @@
     }
   ]
 }
+

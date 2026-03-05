@@ -1,4 +1,4 @@
-import { logError } from "@/lib/logging/logger";
+﻿import { logError } from "@/lib/logging/logger";
 
 export type AlertLevel = "critical" | "error" | "warning";
 export type AlertContext = Record<string, unknown>;
@@ -56,7 +56,7 @@ export async function sendAlert(
   const parts = [
     `${emoji} ${label}`,
     "",
-    `[BeautyHub] ${emoji} ${escapeHtml(message)}`,
+    `[МастерРядом] ${emoji} ${escapeHtml(message)}`,
   ];
   if (contextLines.length > 0) {
     parts.push("", ...contextLines);
@@ -91,3 +91,4 @@ export async function sendAlert(
     });
   }
 }
+

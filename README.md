@@ -1,11 +1,11 @@
-# BeautyHub
+﻿# МастерРядом
 
 **Online booking marketplace for beauty services** — a single platform for clients, solo masters, and studios.
 
 Clients discover specialists by category, location, and price, and book in a couple of taps — no calls, no DMs. Masters and studios get a full-featured cabinet: scheduling, client management, portfolio, analytics, and notifications.
 
-> **Status:** MVP · Active development  
-> **Domain:** beautyhub.art
+> **Status:** MVP В· Active development  
+> **Domain:** МастерРядом.art
 
 ---
 
@@ -26,12 +26,15 @@ Clients discover specialists by category, location, and price, and book in a cou
 ## How It Works
 
 ### For clients
+
 Browse the catalog or inspiration feed → open a provider profile → pick a service and time slot → confirm booking → get notified when the master approves.
 
 ### For solo masters
+
 Register → fill profile and price list → configure schedule → get bookings → manage from the dashboard.
 
 ### For studios
+
 Create a studio → invite masters by phone → assign services → manage the whole team from a shared calendar and finance view.
 
 ---
@@ -39,6 +42,7 @@ Create a studio → invite masters by phone → assign services → manage the w
 ## Features
 
 ### Public catalog & discovery
+
 - Filterable catalog: category, district, price, available today
 - Map view with geolocation
 - Inspiration feed — live stream of portfolio photos; tap a photo → book directly
@@ -47,6 +51,7 @@ Create a studio → invite masters by phone → assign services → manage the w
 - Reviews with star rating and master replies
 
 ### Booking
+
 - Real-time slot availability
 - Online booking with confirm / decline / reschedule flow
 - Manual booking creation by master
@@ -56,6 +61,7 @@ Create a studio → invite masters by phone → assign services → manage the w
 - Booking status machine: `NEW → PENDING → CONFIRMED → IN_PROGRESS → FINISHED` (+ `CANCELLED`, `NO_SHOW`, `REJECTED`, `CHANGE_REQUESTED`)
 
 ### Master cabinet
+
 - Dashboard with today's schedule
 - Full schedule management:
   - Weekly recurring schedule
@@ -65,44 +71,46 @@ Create a studio → invite masters by phone → assign services → manage the w
   - Time blocks (lunch, break)
 - Portfolio editor (upload, reorder, tag by service)
 - Services & price list with drag-and-drop sorting
-- Client list with visit history and personal notes *(PRO+)*
-- Hot slots — publish urgent discounted openings *(Premium)*
+- Client list with visit history and personal notes _(PRO+)_
+- Hot slots — publish urgent discounted openings _(Premium)_
 - Model offers — recruit models for practice/portfolio sessions
 
 ### Studio cabinet
-- Multi-master team with role-based access: `OWNER · ADMIN · MASTER · FINANCE`
+
+- Multi-master team with role-based access: `OWNER В· ADMIN В· MASTER В· FINANCE`
 - Shared calendar across all masters
 - Master schedule change requests (master submits → owner approves)
 - Finance module: revenue by period, breakdown by master
 - Client base with history
-- YClients import *(Premium)*
+- YClients import _(Premium)_
 
 ### Notifications
+
 - In-app notification center
 - Real-time push via **Server-Sent Events** (custom EventEmitter, Redis Pub/Sub ready)
 - **Telegram bot** notifications (booking created, confirmed, cancelled, rescheduled)
-- **VK / Max** messenger integration *(in progress)*
-- **SMS** reminders *(PRO+, planned)*
+- **VK / Max** messenger integration _(in progress)_
+- **SMS** reminders _(PRO+, planned)_
 - PWA push — free on all tiers
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 15 (App Router, Turbopack) |
-| Language | TypeScript |
-| Styling | Tailwind CSS (custom design tokens) |
-| ORM | Prisma |
-| Database | PostgreSQL (Supabase) |
-| Cache / Pub-Sub | Redis |
-| Auth | OTP (phone), Telegram Login, VK OAuth |
-| Payments | ЮKassa (YooKassa) — *in integration* |
-| Realtime | Server-Sent Events (SSE) |
+| Layer           | Technology                              |
+| --------------- | --------------------------------------- |
+| Framework       | Next.js 15 (App Router, Turbopack)      |
+| Language        | TypeScript                              |
+| Styling         | Tailwind CSS (custom design tokens)     |
+| ORM             | Prisma                                  |
+| Database        | PostgreSQL (Supabase)                   |
+| Cache / Pub-Sub | Redis                                   |
+| Auth            | OTP (phone), Telegram Login, VK OAuth   |
+| Payments        | ЮKassa (YooKassa) — _in integration_    |
+| Realtime        | Server-Sent Events (SSE)                |
 | Background jobs | Custom in-memory queue + worker process |
-| Validation | Zod |
-| UI primitives | Radix UI |
+| Validation      | Zod                                     |
+| UI primitives   | Radix UI                                |
 
 ---
 
@@ -111,45 +119,45 @@ Create a studio → invite masters by phone → assign services → manage the w
 ```
 src/
 ├── app/                        # Next.js App Router
-│   ├── (public)/               # Public pages: catalog, profiles, hot slots
-│   ├── (cabinet)/cabinet/
-│   │   ├── (user)/             # Client cabinet
-│   │   ├── master/             # Solo master cabinet
-│   │   └── studio/             # Studio owner cabinet
-│   ├── (admin)/admin/          # Platform admin panel
-│   ├── api/                    # API route handlers
-│   │   ├── bookings/
-│   │   ├── master/
-│   │   ├── studio/
-│   │   ├── notifications/
-│   │   └── ...
-│   ├── about/                  # Marketing pages
-│   ├── pricing/
-│   ├── faq/
-│   ├── support/
-│   └── ...
+в”‚   ├── (public)/               # Public pages: catalog, profiles, hot slots
+в”‚   ├── (cabinet)/cabinet/
+в”‚   в”‚   ├── (user)/             # Client cabinet
+в”‚   в”‚   ├── master/             # Solo master cabinet
+в”‚   в”‚   └── studio/             # Studio owner cabinet
+в”‚   ├── (admin)/admin/          # Platform admin panel
+в”‚   ├── api/                    # API route handlers
+в”‚   в”‚   ├── bookings/
+в”‚   в”‚   ├── master/
+в”‚   в”‚   ├── studio/
+в”‚   в”‚   ├── notifications/
+в”‚   в”‚   └── ...
+в”‚   ├── about/                  # Marketing pages
+в”‚   ├── pricing/
+в”‚   ├── faq/
+в”‚   ├── support/
+в”‚   └── ...
 ├── features/                   # Feature modules (colocated UI + logic)
-│   ├── catalog/
-│   ├── public-profile/master/
-│   ├── public-studio/
-│   ├── hot-slots/
-│   ├── model-offers/
-│   ├── master/
-│   ├── studio/
-│   ├── studio-cabinet/
-│   ├── notifications/
-│   ├── schedule/
-│   ├── reviews/
-│   └── ...
+в”‚   ├── catalog/
+в”‚   ├── public-profile/master/
+в”‚   ├── public-studio/
+в”‚   ├── hot-slots/
+в”‚   ├── model-offers/
+в”‚   ├── master/
+в”‚   ├── studio/
+в”‚   ├── studio-cabinet/
+в”‚   ├── notifications/
+в”‚   ├── schedule/
+в”‚   ├── reviews/
+в”‚   └── ...
 ├── lib/                        # Shared services and utilities
-│   ├── auth/
-│   ├── billing/                # Plan features, feature gating
-│   ├── notifications/          # SSE notifier, Telegram, booking service
-│   ├── providers/              # Provider queries, mappers, URL helpers
-│   ├── queue/                  # Background job queue
-│   ├── redis/
-│   ├── studios/
-│   └── ...
+в”‚   ├── auth/
+в”‚   ├── billing/                # Plan features, feature gating
+в”‚   ├── notifications/          # SSE notifier, Telegram, booking service
+в”‚   ├── providers/              # Provider queries, mappers, URL helpers
+в”‚   ├── queue/                  # Background job queue
+в”‚   ├── redis/
+в”‚   ├── studios/
+в”‚   └── ...
 └── components/                 # Shared UI components
     ├── ui/                     # Buttons, cards, inputs, etc.
     └── layout/                 # Header, footer, navigation
@@ -193,34 +201,34 @@ Studio
 
 ### Solo masters
 
-| Feature | FREE | PRO · 990 ₽/mo | Premium · 1990 ₽/mo |
-|---|:---:|:---:|:---:|
-| Catalog listing | ✓ | ✓ | ✓ |
-| Map listing | — | ✓ | ✓ |
-| Priority in catalog | — | ↑ higher | ↑ + badge |
-| Portfolio | 15 photos | unlimited | unlimited |
-| All schedule types | ✓ | ✓ | ✓ |
-| Online booking | ✓ | ✓ | ✓ |
-| Online payments (per service) | — | ✓ | ✓ |
-| Telegram / SMS notifications | — | ✓ | ✓ |
-| Client list | basic | + history + notes | + history + notes |
-| Finance module | — | ✓ | ✓ |
-| Hot slots | — | — | ✓ |
-| Analytics | — | — | ✓ |
-| YClients import | — | — | ✓ |
+| Feature                       |   FREE    |  PRO В· 990 ₽/mo  | Premium В· 1990 ₽/mo |
+| ----------------------------- | :-------: | :---------------: | :------------------: |
+| Catalog listing               |     ✓     |         ✓         |          ✓           |
+| Map listing                   |     —     |         ✓         |          ✓           |
+| Priority in catalog           |     —     |    в†‘ higher     |     в†‘ + badge      |
+| Portfolio                     | 15 photos |     unlimited     |      unlimited       |
+| All schedule types            |     ✓     |         ✓         |          ✓           |
+| Online booking                |     ✓     |         ✓         |          ✓           |
+| Online payments (per service) |     —     |         ✓         |          ✓           |
+| Telegram / SMS notifications  |     —     |         ✓         |          ✓           |
+| Client list                   |   basic   | + history + notes |  + history + notes   |
+| Finance module                |     —     |         ✓         |          ✓           |
+| Hot slots                     |     —     |         —         |          ✓           |
+| Analytics                     |     —     |         —         |          ✓           |
+| YClients import               |     —     |         —         |          ✓           |
 
 ### Studios
 
-| Feature | FREE | PRO · 2490 ₽/mo | Premium · 4990 ₽/mo |
-|---|:---:|:---:|:---:|
-| Masters | up to 2 | up to 7 | unlimited |
-| Map listing | — | ✓ | ✓ |
-| Shared calendar | — | ✓ | ✓ |
-| Finance module | — | ✓ | ✓ |
-| Online payments | — | ✓ | ✓ |
-| Hot slots | — | — | ✓ |
-| Analytics | — | — | ✓ |
-| YClients import | — | — | ✓ |
+| Feature         |  FREE   | PRO В· 2490 ₽/mo | Premium В· 4990 ₽/mo |
+| --------------- | :-----: | :--------------: | :------------------: |
+| Masters         | up to 2 |     up to 7      |      unlimited       |
+| Map listing     |    —    |        ✓         |          ✓           |
+| Shared calendar |    —    |        ✓         |          ✓           |
+| Finance module  |    —    |        ✓         |          ✓           |
+| Online payments |    —    |        ✓         |          ✓           |
+| Hot slots       |    —    |        —         |          ✓           |
+| Analytics       |    —    |        —         |          ✓           |
+| YClients import |    —    |        —         |          ✓           |
 
 ---
 
@@ -242,6 +250,7 @@ Currently in-memory (single process). Redis client is already wired — switchin
 ## Webhooks
 
 ### YooKassa
+
 `/api/payments/yookassa/webhook` expects the token in the `Authorization` header:
 
 ```
@@ -280,7 +289,7 @@ SMTP_HOST="smtp.example.com"
 SMTP_PORT="587"
 SMTP_USER="smtp-user"
 SMTP_PASS="smtp-password"
-SMTP_FROM="BeautyHub <no-reply@example.com>"
+SMTP_FROM="МастерРядом <no-reply@example.com>"
 ```
 
 Supabase variables `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are no longer used.

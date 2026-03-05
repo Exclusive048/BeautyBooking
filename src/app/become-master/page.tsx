@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Стать мастером — BeautyHub",
+  title: "Стать мастером — МастерРядом",
   description:
-    "Зарегистрируйтесь как мастер на BeautyHub. Онлайн-запись, управление расписанием, клиентская база и продвижение в каталоге.",
+    "Зарегистрируйтесь как мастер на МастерРядом. Онлайн-запись, управление расписанием, клиентская Р±аза и продвижение в каталоге.",
 };
 
 const ADVANTAGES = [
@@ -21,7 +21,7 @@ const ADVANTAGES = [
   {
     icon: "📸",
     title: "Портфолио в ленте",
-    desc: "Ваши работы появляются на главной странице BeautyHub. Клиент видит фото — нажимает «Записаться» — попадает к вам.",
+    desc: "Ваши работы появляются на главной странице МастерРядом. Клиент видит фото — нажимает «Записаться» — попадает к вам.",
   },
   {
     icon: "⭐",
@@ -73,13 +73,13 @@ export default function BecomeMasterPage() {
           Для мастеров
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-text-main leading-tight tracking-tight">
-          Ваш бизнес —{" "}
+          Р’аС€ бизнес —{" "}
           <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
             без лишней суеты
           </span>
         </h1>
         <p className="text-text-sec text-lg max-w-[540px] mx-auto">
-          BeautyHub берёт на себя запись и напоминания. Вы занимаетесь тем, что умеете лучше всего.
+          МастерРядом берёт на себя запись и напоминания. Р’С‹ занимаетесь тем, что умеете лучше всего.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           <Link
@@ -154,7 +154,7 @@ export default function BecomeMasterPage() {
           <h2 className="text-xl font-semibold text-text-main">Работаете в студии?</h2>
         </div>
         <p className="text-text-sec text-sm leading-relaxed">
-          BeautyHub поддерживает режим студии: несколько мастеров, общий календарь,
+          МастерРядом поддерживает режим студии: несколько мастеров, общий календарь,
           разграничение ролей (владелец, администратор, мастер), финансовая отчётность
           по каждому специалисту. Мастера работают в своём кабинете, вы видите полную картину.
         </p>
@@ -162,9 +162,10 @@ export default function BecomeMasterPage() {
           href="/help/masters"
           className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
         >
-          Подробнее в базе знаний →
+          Подробнее в Р±азРµ знаний →
         </Link>
       </section>
     </main>
   );
 }
+
