@@ -144,7 +144,7 @@ export function RoleCardMaster(props: Props) {
               onClick={props.onDelete}
               className="mt-4 text-xs text-text-sec transition-colors underline-offset-2 hover:text-red-500 hover:underline"
             >
-              ??????? ??????? ???????
+              Удаление кабинета студии
             </button>
           ) : null}
         </div>
