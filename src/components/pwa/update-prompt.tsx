@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export function PWAUpdatePrompt() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
@@ -55,7 +56,7 @@ export function PWAUpdatePrompt() {
   return (
     <div className="fixed left-3 right-3 top-3 z-50 pt-safe">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-card px-4 py-3 shadow-card">
-        <div className="text-sm text-text-main">Доступно обновление приложения</div>
+        <div className="text-sm text-text-main">{UI_TEXT.pwa.update.title}</div>
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -63,7 +64,7 @@ export function PWAUpdatePrompt() {
             variant="secondary"
             onClick={() => setVisible(false)}
           >
-            Позже
+            {UI_TEXT.actions.later}
           </Button>
           <Button
             type="button"
@@ -75,7 +76,7 @@ export function PWAUpdatePrompt() {
               window.location.reload();
             }}
           >
-            Обновить
+            {UI_TEXT.pwa.update.update}
           </Button>
         </div>
       </div>

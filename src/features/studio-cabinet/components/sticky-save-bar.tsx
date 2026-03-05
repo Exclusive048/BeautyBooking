@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   onSave: () => void;
@@ -14,7 +15,7 @@ export function StickySaveBar({ onSave, loading = false, disabled = false }: Pro
       <div className="glass-panel rounded-[22px] p-3">
         <div className="flex items-center justify-end">
           <Button type="button" onClick={onSave} disabled={disabled || loading}>
-            {loading ? "Сохраняем..." : "Сохранить изменения"}
+            {loading ? UI_TEXT.status.savingInProgress : UI_TEXT.actions.saveChanges}
           </Button>
         </div>
       </div>

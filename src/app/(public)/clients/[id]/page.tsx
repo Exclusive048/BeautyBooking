@@ -1,13 +1,14 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   params: { id: string };
 };
 
 export const metadata: Metadata = {
-  title: "Профиль клиента | МастерРядом",
+  title: UI_TEXT.pages.publicClient.title,
   robots: { index: false, follow: false },
 };
 
@@ -28,7 +29,7 @@ export default async function ClientIdPage({ params }: Props) {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-text-muted">
-        Публичный профиль клиента недоступен.
+        {UI_TEXT.pages.publicClient.unavailable}
       </div>
     </div>
   );

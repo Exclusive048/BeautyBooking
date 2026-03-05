@@ -217,7 +217,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
       } catch {
         if (!cancelled) {
           setBookingConfig(null);
-          setBookingConfigError("Не удалось загрузить требования записи.");
+        setBookingConfigError(UI_TEXT.publicProfile.booking.bookingConfigLoadFailed);
         }
       } finally {
         if (!cancelled) {
@@ -358,7 +358,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     setSubmitSuccess(null);
     try {
       if (bookingConfig?.requiresReferencePhoto && !referencePhotoAssetId) {
-        setSubmitError("Нужен фото-референс для записи.");
+        setSubmitError(UI_TEXT.publicProfile.booking.referencePhotoRequired);
         setSubmitLoading(false);
         return;
       }
@@ -367,7 +367,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           (question) => question.required && !(bookingAnswers[question.id]?.trim() ?? "")
         );
         if (missingRequired) {
-          setSubmitError("Ответьте на обязательные вопросы.");
+          setSubmitError(UI_TEXT.publicProfile.booking.requiredQuestions);
           setSubmitLoading(false);
           return;
         }
@@ -572,13 +572,15 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
           <label
             className="mt-3 block cursor-pointer rounded-xl border border-border bg-surface p-3"
-            aria-label="Хочу помолчать"
+            aria-label={UI_TEXT.publicProfile.booking.silentModeAria}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-text">Хочу помолчать 🤫</div>
+                <div className="text-sm font-medium text-text">
+                  {UI_TEXT.publicProfile.booking.silentModeTitle}
+                </div>
                 <div className="mt-1 text-xs text-text-muted">
-                  Мастер поздоровается, уточнит детали и дальше будет работать без разговоров.
+                  {UI_TEXT.publicProfile.booking.silentModeDesc}
                 </div>
               </div>
               <span
@@ -610,18 +612,20 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
           
           {bookingConfigLoading ? (
-            <div className="mt-3 text-xs text-text-muted">????????? ?????????? ??????...</div>
+            <div className="mt-3 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.bookingConfigLoading}</div>
           ) : null}
           {bookingConfigError ? <div className="mt-3 text-xs text-red-600">{bookingConfigError}</div> : null}
 
           {bookingConfig && (bookingConfig.requiresReferencePhoto || bookingConfig.questions.length > 0) ? (
             <div className="mt-3 rounded-xl border border-border bg-surface p-3 text-sm">
-              <div className="text-sm font-semibold text-text">?????? ???????</div>
+              <div className="text-sm font-semibold text-text">
+                {UI_TEXT.publicProfile.booking.bookingConfigTitle}
+              </div>
 
               {bookingConfig.requiresReferencePhoto ? (
                 <div className="mt-3">
                   <label className="block text-xs text-text-muted">
-                    ????-???????? <span className="text-red-500">*</span>
+                    {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="file"
@@ -634,7 +638,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                     className="mt-2 block w-full text-xs text-text-muted"
                   />
                   {referenceUploading ? (
-                    <div className="mt-2 text-xs text-text-muted">????????? ????...</div>
+                    <div className="mt-2 text-xs text-text-muted">
+                      {UI_TEXT.publicProfile.booking.referencePhotoUploading}
+                    </div>
                   ) : null}
                   {referenceUploadError ? (
                     <div className="mt-2 text-xs text-red-600">{referenceUploadError}</div>
@@ -642,7 +648,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                   {referencePreviewUrl ? (
                     <img
                       src={referencePreviewUrl}
-                      alt="????????"
+                      alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
                       className="mt-3 max-h-48 w-full rounded-xl object-cover"
                     />
                   ) : null}
@@ -664,7 +670,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                           setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                         }
                         className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none"
-                        placeholder="??? ?????"
+                        placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
                       />
                     </label>
                   ))}

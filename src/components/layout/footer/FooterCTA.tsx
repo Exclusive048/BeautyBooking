@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { UI_TEXT } from "@/lib/ui/text";
 
-const CTA_TITLE = "Вы мастер красоты?";
-const CTA_SUBTITLE = "Начните принимать клиентов онлайн уже сегодня";
-const CTA_BUTTON_TEXT = "Создать профиль бесплатно";
 const CTA_HREF = "/become-master";
 
 export function FooterCTA() {
@@ -12,12 +10,12 @@ export function FooterCTA() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-2">
           <div className="text-[18px] font-semibold text-neutral-900 dark:text-neutral-100">
-            🎨 {CTA_TITLE}
+            🎨 {UI_TEXT.footer.cta.title}
           </div>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">{CTA_SUBTITLE}</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">{UI_TEXT.footer.cta.subtitle}</p>
         </div>
         <Button asChild size="md">
-          <Link href={CTA_HREF}>{CTA_BUTTON_TEXT}</Link>
+          <Link href={CTA_HREF}>{UI_TEXT.footer.cta.button}</Link>
         </Button>
       </div>
     </div>

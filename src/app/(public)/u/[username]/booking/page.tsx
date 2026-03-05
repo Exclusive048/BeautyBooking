@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +7,7 @@ import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { withQuery } from "@/lib/public-urls";
 import { looksLikeProviderId, resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -32,8 +33,8 @@ function buildDescription(input: {
     input.description?.trim() ||
     input.tagline?.trim() ||
     (input.type === "STUDIO"
-      ? `Запись онлайн в студию ${input.name}. Выберите услуги и свободное время.`
-      : `Запись онлайн к мастеру ${input.name}. Выберите услуги и свободное время.`);
+      ? UI_TEXT.pages.publicBooking.studioDescriptionFallback.replace("{name}", input.name)
+      : UI_TEXT.pages.publicBooking.masterDescriptionFallback.replace("{name}", input.name));
   return truncateText(base, 160);
 }
 
@@ -65,7 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!provider || !provider.publicUsername) {
     return {
-      title: "Запись онлайн | МастерРядом",
+      title: UI_TEXT.pages.publicBooking.notFoundTitle,
       robots: { index: false, follow: false },
     };
   }
@@ -75,7 +76,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  const title = `${provider.name} — запись онлайн | МастерРядом`;
+  const title = UI_TEXT.pages.publicBooking.titleTemplate.replace("{name}", provider.name);
   const description = buildDescription({
     name: provider.name,
     type: provider.type,

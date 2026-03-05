@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type TicketType = "bug" | "suggestion";
 
@@ -25,11 +26,11 @@ export default function SupportPageClient() {
     setError(null);
 
     if (!title.trim()) {
-      setError("Укажите заголовок обращения.");
+      setError(UI_TEXT.pages.support.form.errorTitleRequired);
       return;
     }
     if (!description.trim() || description.trim().length < 20) {
-      setError("Опишите проблему подробнее (минимум 20 символов).");
+      setError(UI_TEXT.pages.support.form.errorDescriptionRequired);
       return;
     }
 
@@ -58,18 +59,18 @@ export default function SupportPageClient() {
       }
 
       if (res.status === 429) {
-        setError("Слишком часто. Попробуйте через несколько минут.");
+        setError(UI_TEXT.pages.support.form.errorTooManyRequests);
         return;
       }
 
       if (!res.ok || !payload?.ok) {
-        setError(payload?.error ?? "Не удалось отправить обращение. Попробуйте позже.");
+        setError(payload?.error ?? UI_TEXT.pages.support.form.errorSendFailed);
         return;
       }
 
       setSent(true);
     } catch {
-      setError("Не удалось отправить обращение. Проверьте соединение и попробуйте снова.");
+      setError(UI_TEXT.pages.support.form.errorSendNetwork);
     } finally {
       setSending(false);
     }
@@ -82,10 +83,9 @@ export default function SupportPageClient() {
           ✅
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-text-main">Обращение отправлено</h2>
+          <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.support.form.successTitle}</h2>
           <p className="text-sm text-text-sec max-w-[360px]">
-            Мы получили ваше сообщение и ответим в ближайшее время.
-            Контакт для ответа — из вашего профиля.
+            {UI_TEXT.pages.support.form.successDescription}
           </p>
         </div>
         <button
@@ -102,7 +102,7 @@ export default function SupportPageClient() {
           }}
           className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
         >
-          Создать новое обращение
+          {UI_TEXT.pages.support.form.successAction}
         </button>
       </div>
     );
@@ -113,12 +113,20 @@ export default function SupportPageClient() {
 
       {/* Type selector */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-text-main">Тип обращения</label>
+        <label className="block text-sm font-medium text-text-main">{UI_TEXT.pages.support.form.typeLabel}</label>
         <div className="grid grid-cols-2 gap-3">
           {(
             [
-              { value: "bug", label: "🐛 Сообщить об ошибке", desc: "Что-то работает не так" },
-              { value: "suggestion", label: "💡 Предложение", desc: "Идея по улучшению" },
+              {
+                value: "bug",
+                label: UI_TEXT.pages.support.form.typeBugLabel,
+                desc: UI_TEXT.pages.support.form.typeBugDesc,
+              },
+              {
+                value: "suggestion",
+                label: UI_TEXT.pages.support.form.typeSuggestionLabel,
+                desc: UI_TEXT.pages.support.form.typeSuggestionDesc,
+              },
             ] as const
           ).map((opt) => (
             <button
@@ -141,14 +149,18 @@ export default function SupportPageClient() {
       {/* Title */}
       <div className="space-y-2">
         <label htmlFor="title" className="block text-sm font-medium text-text-main">
-          Заголовок <span className="text-red-500">*</span>
+          {UI_TEXT.pages.support.form.titleLabel} <span className="text-red-500">*</span>
         </label>
         <input
           id="title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={type === "bug" ? "Например: не могу подтвердить запись" : "Например: добавить фильтр по времени"}
+          placeholder={
+            type === "bug"
+              ? UI_TEXT.pages.support.form.titlePlaceholderBug
+              : UI_TEXT.pages.support.form.titlePlaceholderSuggestion
+          }
           maxLength={120}
           className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
         />
@@ -157,7 +169,7 @@ export default function SupportPageClient() {
       {/* Description */}
       <div className="space-y-2">
         <label htmlFor="description" className="block text-sm font-medium text-text-main">
-          Описание <span className="text-red-500">*</span>
+          {UI_TEXT.pages.support.form.descriptionLabel} <span className="text-red-500">*</span>
         </label>
         <textarea
           id="description"
@@ -166,8 +178,8 @@ export default function SupportPageClient() {
           rows={6}
           placeholder={
             type === "bug"
-              ? "Опишите что происходит, на каком шаге возникает ошибка, какое устройство и браузер используете."
-              : "Опишите идею подробно: зачем это нужно, как должно работать, кому поможет."
+              ? UI_TEXT.pages.support.form.descriptionPlaceholderBug
+              : UI_TEXT.pages.support.form.descriptionPlaceholderSuggestion
           }
           className="w-full resize-none rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
         />
@@ -177,8 +189,8 @@ export default function SupportPageClient() {
       {/* Attachment */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-text-main">
-          Вложение{" "}
-          <span className="text-text-sec font-normal">(необязательно)</span>
+          {UI_TEXT.pages.support.form.attachmentLabel}{" "}
+          <span className="text-text-sec font-normal">{UI_TEXT.pages.support.form.attachmentOptional}</span>
         </label>
         <div
           className="lux-card rounded-[16px] bg-bg-card border-2 border-dashed border-border-subtle p-6 text-center cursor-pointer hover:border-primary/40 transition-colors"
@@ -186,15 +198,15 @@ export default function SupportPageClient() {
         >
           {fileName ? (
             <div className="space-y-1">
-              <p className="text-sm font-medium text-text-main">📎 {fileName}</p>
-              <p className="text-xs text-text-sec">Нажмите чтобы заменить</p>
+              <p className="text-sm font-medium text-text-main">
+                {UI_TEXT.pages.support.form.attachmentFileLabel.replace("{fileName}", fileName)}
+              </p>
+              <p className="text-xs text-text-sec">{UI_TEXT.pages.support.form.attachmentReplace}</p>
             </div>
           ) : (
             <div className="space-y-1">
-              <p className="text-sm text-text-sec">
-                Скриншот или запись экрана
-              </p>
-              <p className="text-xs text-text-sec">PNG, JPG, GIF, MP4 — до 10 МБ</p>
+              <p className="text-sm text-text-sec">{UI_TEXT.pages.support.form.attachmentEmptyTitle}</p>
+              <p className="text-xs text-text-sec">{UI_TEXT.pages.support.form.attachmentEmptySubtitle}</p>
             </div>
           )}
         </div>
@@ -206,15 +218,15 @@ export default function SupportPageClient() {
           onChange={handleFileChange}
         />
         <p className="text-xs text-text-sec">
-          Файл пока не отправляется — передадим только имя.
+          {UI_TEXT.pages.support.form.attachmentNote}
         </p>
       </div>
 
       {/* Privacy note */}
       <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-xs text-text-sec leading-relaxed">
-        📌 При отправке обращения мы получим ваши контактные данные из профиля (имя и email или Telegram). Они используются только для ответа на ваш запрос.
+        {UI_TEXT.pages.support.form.privacyNote}
       </div>
-      <div className="text-xs text-text-sec">Ответ придет по email.</div>
+      <div className="text-xs text-text-sec">{UI_TEXT.pages.support.form.responseNote}</div>
 
       {/* Error */}
       {error && (
@@ -229,7 +241,7 @@ export default function SupportPageClient() {
         disabled={sending}
         className="w-full inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-sm font-semibold text-white shadow-card hover:brightness-105 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
       >
-        {sending ? "Отправляем…" : "Отправить обращение"}
+        {sending ? UI_TEXT.pages.support.form.submitSending : UI_TEXT.pages.support.form.submit}
       </button>
     </form>
   );

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { MasterClientsPage } from "@/features/master/components/master-clients-page";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export default async function MasterClientsRoute() {
   const user = await getSessionUser();
@@ -11,8 +12,8 @@ export default async function MasterClientsRoute() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-main">Клиенты</h1>
-      <p className="text-sm text-text-sec">База клиентов по вашим записям</p>
+      <h1 className="text-xl font-semibold text-text-main">{UI_TEXT.master.clients.title}</h1>
+      <p className="text-sm text-text-sec">{UI_TEXT.master.clients.subtitle}</p>
       <MasterClientsPage />
     </section>
   );

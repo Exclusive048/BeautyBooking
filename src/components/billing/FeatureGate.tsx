@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import type { PlanFeatures, PlanTier } from "@/lib/billing/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type BooleanFeatureKey = {
   [Key in keyof PlanFeatures]: PlanFeatures[Key] extends boolean ? Key : never;
@@ -25,7 +26,7 @@ export function FeatureGate({
   scope,
   title,
   description,
-  ctaLabel = "Посмотреть тарифы",
+  ctaLabel = UI_TEXT.billing.featureGate.ctaLabel,
   className,
   children,
 }: FeatureGateProps) {
@@ -34,7 +35,7 @@ export function FeatureGate({
   if (plan.loading) {
     return (
       <div className="rounded-2xl bg-bg-card/80 p-4 text-xs text-text-sec">
-        Загрузка компонента...
+        {UI_TEXT.billing.featureGate.loading}
       </div>
     );
   }
@@ -50,10 +51,11 @@ export function FeatureGate({
       <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-bg-card/80 p-4 text-center backdrop-blur-sm">
         <div className="max-w-sm">
           <div className="text-sm font-semibold text-text-main">
-            {title ?? "Функция недоступна"}
+            {title ?? UI_TEXT.billing.featureGate.title}
           </div>
           <div className="mt-1 text-xs text-text-sec">
-            {description ?? `Доступно на тарифе ${requiredLabel}.`}
+            {description ??
+              UI_TEXT.billing.featureGate.description.replace("{plan}", String(requiredLabel))}
           </div>
           <a
             href="/cabinet/billing"

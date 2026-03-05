@@ -3,6 +3,7 @@ import { DashboardNavCards } from "@/features/studio-cabinet/components/dashboar
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { getStudioDashboardStats } from "@/lib/studio/dashboard.service";
+import { UI_TEXT } from "@/lib/ui/text";
 
 function pluralize(value: number, one: string, few: string, many: string): string {
   const mod10 = value % 10;
@@ -14,10 +15,8 @@ function pluralize(value: number, one: string, few: string, many: string): strin
 }
 
 function formatMoney(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
+  return `${new Intl.NumberFormat("ru-RU").format(value)} ${UI_TEXT.common.currencyRub}`;
 }
-
-const EMPTY_HINT = "Данные появятся после первых записей";
 
 export default async function StudioCabinetIndexPage() {
   const user = await getSessionUser();
@@ -40,74 +39,82 @@ export default async function StudioCabinetIndexPage() {
   const items = stats
     ? [
         {
-          title: "Записи сегодня",
+          title: UI_TEXT.studioCabinet.dashboard.cards.bookingsToday,
           value: `${stats.bookingsTodayCount} ${pluralize(
             stats.bookingsTodayCount,
-            "запись",
-            "записи",
-            "записей"
+            UI_TEXT.studioCabinet.dashboard.plural.booking.one,
+            UI_TEXT.studioCabinet.dashboard.plural.booking.few,
+            UI_TEXT.studioCabinet.dashboard.plural.booking.many
           )}`,
-          subtitle: `На ${formatMoney(stats.bookingsTodayAmount)}`,
+          subtitle: UI_TEXT.studioCabinet.dashboard.bookingsAmountPrefix.replace(
+            "{amount}",
+            formatMoney(stats.bookingsTodayAmount)
+          ),
           href: "/cabinet/studio/calendar?view=day&date=today",
         },
         stats.mastersWorking === null
           ? {
-              title: "Мастера в смене",
+              title: UI_TEXT.studioCabinet.dashboard.cards.mastersOnShift,
               value: "—",
-              subtitle: EMPTY_HINT,
+              subtitle: UI_TEXT.studioCabinet.dashboard.emptyHint,
               href: "/cabinet/studio/team?filter=working_today",
               muted: true,
             }
           : {
-              title: "Мастера в смене",
-              value: `${stats.mastersWorking} из ${stats.mastersTotal}`,
-              subtitle: "Работают сегодня",
+              title: UI_TEXT.studioCabinet.dashboard.cards.mastersOnShift,
+              value: UI_TEXT.studioCabinet.dashboard.mastersCountTemplate
+                .replace("{working}", String(stats.mastersWorking))
+                .replace("{total}", String(stats.mastersTotal)),
+              subtitle: UI_TEXT.studioCabinet.dashboard.mastersWorking,
               href: "/cabinet/studio/team?filter=working_today",
             },
         {
-          title: "Новые клиенты",
+          title: UI_TEXT.studioCabinet.dashboard.cards.newClients,
           value: `${stats.newClientsCount} ${pluralize(
             stats.newClientsCount,
-            "клиент",
-            "клиента",
-            "клиентов"
+            UI_TEXT.studioCabinet.dashboard.plural.client.one,
+            UI_TEXT.studioCabinet.dashboard.plural.client.few,
+            UI_TEXT.studioCabinet.dashboard.plural.client.many
           )}`,
-          subtitle: "За последние 24 ч",
+          subtitle: UI_TEXT.studioCabinet.dashboard.newClientsWindow,
           href: "/cabinet/studio/clients?sort=newest",
         },
         {
-          title: "Отзывы",
-          value: `${stats.reviewsCount} новых`,
-          subtitle: "За последние 7 дней",
+          title: UI_TEXT.studioCabinet.dashboard.cards.reviews,
+          value: UI_TEXT.studioCabinet.dashboard.reviewsValue.replace(
+            "{count}",
+            String(stats.reviewsCount)
+          ),
+          subtitle: UI_TEXT.studioCabinet.dashboard.reviewsWindow,
           href: "/cabinet/studio/settings/profile#reviews",
         },
       ]
     : [
         {
-          title: "Записи сегодня",
+          title: UI_TEXT.studioCabinet.dashboard.cards.bookingsToday,
           value: "—",
-          subtitle: EMPTY_HINT,
+          subtitle: UI_TEXT.studioCabinet.dashboard.emptyHint,
           href: "/cabinet/studio/calendar?view=day&date=today",
           muted: true,
         },
         {
-          title: "Мастера в смене",
+          title: UI_TEXT.studioCabinet.dashboard.cards.mastersOnShift,
           value: "—",
-          subtitle: EMPTY_HINT,
+          subtitle: UI_TEXT.studioCabinet.dashboard.emptyHint,
           href: "/cabinet/studio/team?filter=working_today",
           muted: true,
         },
         {
-          title: "Новые клиенты",
+          title: UI_TEXT.studioCabinet.dashboard.cards.newClients,
           value: "—",
-          subtitle: EMPTY_HINT,
+          subtitle: UI_TEXT.studioCabinet.dashboard.emptyHint,
           href: "/cabinet/studio/clients?sort=newest",
           muted: true,
         },
         {
-          title: "Отзывы",
+          title: UI_TEXT.studioCabinet.dashboard.cards.reviews,
           value: "—",
-          subtitle: EMPTY_HINT,
+          subtitle: UI_TEXT.studioCabinet.dashboard.emptyHint,
           href: "/cabinet/studio/settings/profile#reviews",
           muted: true,
         },
@@ -116,8 +123,8 @@ export default async function StudioCabinetIndexPage() {
   return (
     <section className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-text-main">Главная</h1>
-        <p className="mt-1 text-sm text-text-sec">Ключевые показатели студии на сегодня.</p>
+        <h1 className="text-2xl font-semibold text-text-main">{UI_TEXT.studioCabinet.dashboard.title}</h1>
+        <p className="mt-1 text-sm text-text-sec">{UI_TEXT.studioCabinet.dashboard.subtitle}</p>
       </div>
 
       <DashboardNavCards items={items} />

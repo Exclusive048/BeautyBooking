@@ -1,4 +1,4 @@
-﻿/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
@@ -150,7 +150,7 @@ export async function Topbar() {
             <div className="h-10 w-10 rounded-2xl bg-primary/35" />
           )}
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold text-text-main">МастерРядом</div>
+            <div className="truncate text-sm font-semibold text-text-main">{UI_TEXT.brand.name}</div>
             <div className="hidden xs:block truncate text-xs text-text-sec">{UI_TEXT.nav.bookingToMasters}</div>
           </div>
         </Link>
@@ -160,7 +160,7 @@ export async function Topbar() {
             <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
           </Button>
           <Button asChild variant="secondary" className="hidden sm:inline-flex">
-            <Link href="/models">Для моделей</Link>
+            <Link href="/models">{UI_TEXT.nav.forModels}</Link>
           </Button>
           <Button asChild variant="secondary" className="hidden sm:inline-flex">
             <Link href="/cabinet/bookings">{UI_TEXT.nav.myBookings}</Link>

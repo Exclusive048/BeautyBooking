@@ -1,8 +1,9 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { resolvePublicClientUsername } from "@/lib/publicUsername";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
 
   return {
-    title: "Профиль клиента | МастерРядом",
+    title: UI_TEXT.pages.publicClient.title,
     metadataBase: baseUrl ? new URL(baseUrl) : undefined,
     alternates: { canonical: `/c/${username}` },
     robots: { index: false, follow: false },
@@ -56,7 +57,7 @@ export default async function ClientPublicPage({ params }: Props) {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-text-muted">
-        Публичный профиль клиента недоступен.
+        {UI_TEXT.pages.publicClient.unavailable}
       </div>
     </div>
   );

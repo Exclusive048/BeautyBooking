@@ -5,6 +5,7 @@ import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
 import { providerPublicUrl } from "@/lib/public-urls";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export default async function StudioCabinetLayout({
   children,
@@ -29,13 +30,13 @@ export default async function StudioCabinetLayout({
   }>(`/api/providers/me?studioId=${encodeURIComponent(studioId)}`);
 
   const provider = providerRes.ok ? providerRes.data.provider : null;
-  const studioName = provider?.name ?? "Студия";
+  const studioName = provider?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
   const publicHref = provider?.publicUsername
     ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-cabinet")
     : "/cabinet/studio/settings/profile";
   const publicHint = provider?.publicUsername
     ? null
-    : "Задайте публичный username, чтобы получить ссылку";
+    : UI_TEXT.studioCabinet.layout.publicUsernameHint;
 
   return (
     <div className="min-h-dvh bg-bg-page">

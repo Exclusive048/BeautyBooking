@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type SocialLink = {
   label: string;
@@ -8,7 +9,7 @@ type SocialLink = {
 
 const socials: SocialLink[] = [
   {
-    label: "VK",
+    label: UI_TEXT.footer.socials.vk,
     href: "https://vk.com/beautyhub",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
@@ -20,7 +21,7 @@ const socials: SocialLink[] = [
     ),
   },
   {
-    label: "Telegram",
+    label: UI_TEXT.footer.socials.telegram,
     href: "https://t.me/beautyhub_news",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">

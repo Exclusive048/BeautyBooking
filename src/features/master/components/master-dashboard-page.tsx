@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,6 +10,7 @@ import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { BookingChat } from "@/features/chat/components/booking-chat";
 import { MasterAdvisorSection } from "@/features/master/components/master-advisor-section";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type DayBooking = {
   id: string;
@@ -106,7 +107,7 @@ function dateShift(dateKey: string, days: number): string {
 const moneyFormatter = new Intl.NumberFormat("ru-RU");
 
 function formatMoney(value: number): string {
-  return `${moneyFormatter.format(value)} ₽`;
+  return `${moneyFormatter.format(value)} ${UI_TEXT.common.currencyRub}`;
 }
 
 function formatSlotLabel(value: string, timeZone: string): string {
@@ -240,7 +241,7 @@ export function MasterDashboardPage() {
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Не удалось загрузить данные дня");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.dashboard.errors.loadDay);
     } finally {
       if (!signal?.aborted) {
         setLoading(false);
@@ -338,7 +339,7 @@ export function MasterDashboardPage() {
         setFreeSlots(json.data.slots ?? []);
       } catch (slotError) {
         if (slotError instanceof DOMException && slotError.name === "AbortError") return;
-        setSlotsError(slotError instanceof Error ? slotError.message : "Не удалось загрузить свободные слоты");
+        setSlotsError(slotError instanceof Error ? slotError.message : UI_TEXT.master.dashboard.errors.loadSlots);
         setFreeSlots([]);
       } finally {
         if (!controller.signal.aborted) {
@@ -358,9 +359,9 @@ export function MasterDashboardPage() {
     let comment: string | undefined;
     if (status === "REJECTED") {
       const requiresComment = booking.status !== "CHANGE_REQUESTED";
-      const value = window.prompt("Причина отклонения", booking.changeComment ?? "")?.trim();
+      const value = window.prompt(UI_TEXT.master.dashboard.prompts.rejectReason, booking.changeComment ?? "")?.trim();
       if (requiresComment && !value) {
-        setError("Комментарий обязателен");
+        setError(UI_TEXT.master.dashboard.errors.commentRequired);
         return;
       }
       comment = value || undefined;
@@ -383,7 +384,7 @@ export function MasterDashboardPage() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить статус");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.dashboard.errors.updateStatus);
     } finally {
       setActionId(null);
     }
@@ -454,11 +455,13 @@ export function MasterDashboardPage() {
 
   const getStatusLabel = (status: string): string => {
     if (status === "PENDING" || status === "NEW") return "Awaiting confirmation";
-    if (status === "CONFIRMED") return "Confirmed";
+  if (status === "CONFIRMED") return UI_TEXT.master.dashboard.status.confirmed;
     if (status === "CHANGE_REQUESTED") return "Awaiting other side";
     if (status === "IN_PROGRESS" || status === "STARTED") return "In progress";
     if (status === "FINISHED") return "Finished";
-    if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") return "Rejected";
+  if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") {
+    return UI_TEXT.master.dashboard.status.rejected;
+  }
     return status;
   };
 
@@ -489,7 +492,7 @@ export function MasterDashboardPage() {
       setManualNotes("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось создать запись");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.dashboard.errors.createBooking);
     } finally {
       setSavingManual(false);
     }
@@ -512,7 +515,7 @@ export function MasterDashboardPage() {
     for (let i = 0; i < labels.length; i += STORIES_SLOTS_PER_CARD) {
       chunks.push(labels.slice(i, i + STORIES_SLOTS_PER_CARD));
     }
-    const pages = chunks.length > 0 ? chunks : [["Свободных слотов нет"]];
+    const pages = chunks.length > 0 ? chunks : [[UI_TEXT.master.dashboard.labels.noSlots]];
 
     return pages.map((pageSlots, pageIndex) => {
       const canvas = document.createElement("canvas");
@@ -526,14 +529,20 @@ export function MasterDashboardPage() {
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 56px sans-serif";
-      ctx.fillText("МастерРядом", 80, 170);
+      ctx.fillText(UI_TEXT.master.dashboard.stories.brand, 80, 170);
       ctx.font = "42px sans-serif";
-      ctx.fillText(`Свободные слоты · ${date}`, 80, 250);
+      ctx.fillText(UI_TEXT.master.dashboard.stories.slotsTitle.replace("{date}", date), 80, 250);
 
       if (pages.length > 1) {
         ctx.font = "28px sans-serif";
         ctx.fillStyle = "#c8cad0";
-        ctx.fillText(`Карточка ${pageIndex + 1}/${pages.length}`, 80, 305);
+        ctx.fillText(
+          UI_TEXT.master.dashboard.stories.cardTitle
+            .replace("{index}", String(pageIndex + 1))
+            .replace("{total}", String(pages.length)),
+          80,
+          305
+        );
       }
 
       ctx.font = "bold 52px sans-serif";
@@ -550,7 +559,7 @@ export function MasterDashboardPage() {
     new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
         if (!blob) {
-          reject(new Error("Не удалось создать изображение"));
+          reject(new Error(UI_TEXT.master.dashboard.errors.createImage));
           return;
         }
         resolve(new File([blob], name, { type: "image/png" }));
@@ -584,7 +593,7 @@ export function MasterDashboardPage() {
       }
       setStoryAssets(uploaded);
     } catch (uploadError) {
-      setStoryError(uploadError instanceof Error ? uploadError.message : "Не удалось сохранить stories");
+      setStoryError(uploadError instanceof Error ? uploadError.message : UI_TEXT.master.dashboard.errors.saveStories);
     } finally {
       setStoryGenerating(false);
     }
@@ -606,13 +615,20 @@ export function MasterDashboardPage() {
           <button type="button" onClick={() => setDate((d) => dateShift(d, 1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
             &gt;
           </button>
-          <button type="button" onClick={() => void load()} className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-2 text-sm" aria-label="Обновить">
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-2 text-sm"
+            aria-label={UI_TEXT.master.dashboard.labels.refresh}
+          >
             ↻
           </button>
         </div>
       </div>
 
-      {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div> : null}
+      {loading ? (
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{UI_TEXT.status.loading}</div>
+      ) : null}
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       {!loading ? (
@@ -620,9 +636,11 @@ export function MasterDashboardPage() {
           <div className="space-y-3">
             <div className="lux-card rounded-[24px] p-4">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Мой день</h3>
+                <h3 className="text-sm font-semibold">{UI_TEXT.master.dashboard.labels.dayTitle}</h3>
                 {data.newBookingsCount > 0 ? (
-                  <Badge className="px-2 py-0.5 text-[11px]">{"\u041d\u043e\u0432\u044b\u0435"}: {data.newBookingsCount}</Badge>
+                  <Badge className="px-2 py-0.5 text-[11px]">
+                    {UI_TEXT.master.dashboard.labels.newBookings}: {data.newBookingsCount}
+                  </Badge>
                 ) : null}
               </div>
               <button
@@ -630,35 +648,42 @@ export function MasterDashboardPage() {
                 onClick={() => setManualOpen(true)}
                 disabled={!data.isSolo}
                 className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm transition hover:bg-bg-card disabled:opacity-50"
-                title={data.isSolo ? "Добавить запись" : "Для студийного мастера пока недоступно"}
+                title={
+                  data.isSolo
+                    ? UI_TEXT.master.dashboard.labels.addBooking
+                    : UI_TEXT.master.dashboard.labels.addBookingDisabled
+                }
               >
-                + Записать клиента вручную
+                {UI_TEXT.master.dashboard.labels.manualBookingButton}
               </button>
             </div>
 
             <div className="lux-card rounded-[24px] p-4 text-sm">
               {data.workingHours.isDayOff ? (
                 <div className="flex items-center justify-between gap-2">
-                  <span>Сегодня выходной</span>
-                    <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
-                    Изменить
+                  <span>{UI_TEXT.master.dashboard.labels.todayOff}</span>
+                  <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
+                    {UI_TEXT.master.dashboard.labels.change}
                   </a>
                 </div>
               ) : data.workingHours.startLocal && data.workingHours.endLocal ? (
                 <div className="flex items-center justify-between gap-2">
                   <span>
-                    Рабочее время сегодня: {data.workingHours.startLocal}–{data.workingHours.endLocal} • буфер{" "}
-                    {data.workingHours.bufferBetweenBookingsMin} мин
+                    {UI_TEXT.master.dashboard.labels.workingHoursToday
+                      .replace("{start}", data.workingHours.startLocal)
+                      .replace("{end}", data.workingHours.endLocal)
+                      .replace("{buffer}", String(data.workingHours.bufferBetweenBookingsMin))
+                      .replace("{minutes}", UI_TEXT.common.minutesShort)}
                   </span>
-                    <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
-                    Изменить
+                  <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
+                    {UI_TEXT.master.dashboard.labels.change}
                   </a>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-2">
-                  <span>Рабочее время не настроено</span>
-                    <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
-                    Настроить
+                  <span>{UI_TEXT.master.dashboard.labels.workingHoursNotSet}</span>
+                  <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
+                    {UI_TEXT.master.dashboard.labels.setup}
                   </a>
                 </div>
               )}
@@ -677,7 +702,9 @@ export function MasterDashboardPage() {
                     <div className="flex items-center gap-2">
                       <div className="text-sm font-semibold">{booking.clientName}</div>
                       {booking.silentMode ? (
-                        <Badge className="px-2 py-0.5 text-[11px]">🤫 Тишина</Badge>
+                        <Badge className="px-2 py-0.5 text-[11px]">
+                          {UI_TEXT.master.dashboard.labels.silenceBadge}
+                        </Badge>
                       ) : null}
                     </div>
                     <div className="text-xs text-text-sec">{booking.clientPhone}</div>
@@ -692,12 +719,14 @@ export function MasterDashboardPage() {
                 </div>
                 {booking.notes ? <div className="mt-2 text-sm text-text-sec">{booking.notes}</div> : null}
                 {booking.silentMode ? (
-                  <div className="mt-2 text-xs text-text-sec">Режим тишины включён</div>
+                  <div className="mt-2 text-xs text-text-sec">{UI_TEXT.master.dashboard.silentModeEnabled}</div>
                 ) : null}
 
                 {booking.referencePhotoAssetId || (booking.bookingAnswers?.length ?? 0) > 0 ? (
                   <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-xs text-text-sec">
-                    <div className="text-xs font-semibold text-text-main">?????? ???????</div>
+                    <div className="text-xs font-semibold text-text-main">
+                      {UI_TEXT.master.dashboard.bookingQuestionsTitle}
+                    </div>
                     {booking.referencePhotoAssetId ? (
                       <a
                         href={`/api/media/file/${booking.referencePhotoAssetId}`}
@@ -707,7 +736,7 @@ export function MasterDashboardPage() {
                       >
                         <img
                           src={`/api/media/file/${booking.referencePhotoAssetId}`}
-                          alt="???????? ???????"
+                          alt={UI_TEXT.master.dashboard.referencePhotoAlt}
                           className="max-h-52 w-full rounded-xl object-cover"
                         />
                       </a>
@@ -716,7 +745,7 @@ export function MasterDashboardPage() {
                       <div className="mt-2 space-y-1">
                         {booking.bookingAnswers.map((answer) => (
                           <div key={answer.questionId}>
-                            ? {answer.questionText}: {answer.answer}
+                            {UI_TEXT.master.dashboard.answerPrefix} {answer.questionText}: {answer.answer}
                           </div>
                         ))}
                       </div>
@@ -736,7 +765,7 @@ export function MasterDashboardPage() {
                         onClick={() => void updateStatus(booking, "CONFIRMED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Confirm
+                        {UI_TEXT.master.dashboard.actions.confirm}
                       </button>
                       <button
                         type="button"
@@ -744,7 +773,7 @@ export function MasterDashboardPage() {
                         onClick={() => void updateStatus(booking, "REJECTED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Reject
+                        {UI_TEXT.master.dashboard.actions.reject}
                       </button>
                     </>
                   ) : null}
@@ -757,7 +786,7 @@ export function MasterDashboardPage() {
                         onClick={() => void updateStatus(booking, "CONFIRMED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Confirm move
+                        {UI_TEXT.master.dashboard.actions.confirmMove}
                       </button>
                       <button
                         type="button"
@@ -765,7 +794,7 @@ export function MasterDashboardPage() {
                         onClick={() => void updateStatus(booking, "REJECTED")}
                         className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
-                        Reject move
+                        {UI_TEXT.master.dashboard.actions.rejectMove}
                       </button>
                     </>
                   ) : null}
@@ -776,7 +805,7 @@ export function MasterDashboardPage() {
                       onClick={() => void requestReschedule(booking)}
                       className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                     >
-                      Request move
+                      {UI_TEXT.master.dashboard.actions.requestMove}
                     </button>
                   ) : null}
                 </div>
@@ -786,7 +815,7 @@ export function MasterDashboardPage() {
                     onClick={() => toggleChat(booking.id)}
                     className="flex w-full items-center justify-between text-sm font-medium"
                   >
-                    <span>Чат</span>
+                    <span>{UI_TEXT.master.dashboard.labels.chat}</span>
                     {chatUnreadMap[booking.id] ? (
                       <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[booking.id]}</Badge>
                     ) : null}
@@ -806,8 +835,8 @@ export function MasterDashboardPage() {
 
             {sortedBookings.length === 0 ? (
                <div className="lux-card rounded-[24px] p-5">
-                <div className="text-sm font-semibold">Пока нет записей</div>
-                <div className="mt-1 text-sm text-text-sec">Проверьте график и настройте услуги.</div>
+                <div className="text-sm font-semibold">{UI_TEXT.master.dashboard.labels.emptyBookingsTitle}</div>
+                <div className="mt-1 text-sm text-text-sec">{UI_TEXT.master.dashboard.labels.emptyBookingsDesc}</div>
               </div>
             ) : null}
           </div>
@@ -816,8 +845,13 @@ export function MasterDashboardPage() {
             <MasterAdvisorSection />
             <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Мой баланс (месяц)</h3>
-                <button type="button" onClick={() => setBalanceVisible((v) => !v)} className="text-sm" aria-label="Скрыть или показать баланс">
+                <h3 className="text-sm font-semibold">{UI_TEXT.master.dashboard.labels.balanceTitle}</h3>
+                <button
+                  type="button"
+                  onClick={() => setBalanceVisible((v) => !v)}
+                  className="text-sm"
+                  aria-label={UI_TEXT.master.dashboard.labels.balanceToggleAria}
+                >
                   {balanceVisible ? "🙈" : "👁️"}
                 </button>
               </div>
@@ -828,18 +862,18 @@ export function MasterDashboardPage() {
 
             <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Ближайшие свободные слоты</h3>
+                <h3 className="text-sm font-semibold">{UI_TEXT.master.dashboard.labels.nextSlotsTitle}</h3>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSlotsReloadTick((value) => value + 1)}
                     className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
-                    aria-label="Обновить слоты"
+                    aria-label={UI_TEXT.master.dashboard.labels.refreshSlotsAria}
                   >
                     ↻
                   </button>
                   <button type="button" onClick={() => setStoryOpen(true)} className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs">
-                    Опубликовать в Stories
+                    {UI_TEXT.master.dashboard.labels.publishStories}
                   </button>
                 </div>
               </div>
@@ -858,11 +892,13 @@ export function MasterDashboardPage() {
                 </select>
               ) : null}
 
-              {slotsLoading ? <div className="text-sm text-text-sec">Загрузка слотов...</div> : null}
+              {slotsLoading ? (
+                <div className="text-sm text-text-sec">{UI_TEXT.master.dashboard.labels.slotsLoading}</div>
+              ) : null}
               {slotsError ? <div className="text-sm text-red-600">{slotsError}</div> : null}
               {!slotsLoading && !slotsError ? (
                 displayFreeSlots.length === 0 ? (
-                  <div className="text-text-sec">Свободных слотов нет.</div>
+                  <div className="text-text-sec">{UI_TEXT.master.dashboard.labels.noSlots}</div>
                 ) : (
                   <div className="max-h-56 space-y-1 overflow-auto text-sm text-text-sec">
                     {displayFreeSlots.map((slot) => (
@@ -876,10 +912,10 @@ export function MasterDashboardPage() {
             </section>
 
             <section className="lux-card rounded-[24px] p-4">
-              <h3 className="mb-2 text-sm font-semibold">Уведомления (новые отзывы)</h3>
+              <h3 className="mb-2 text-sm font-semibold">{UI_TEXT.master.dashboard.labels.notificationsTitle}</h3>
               <div className="space-y-2">
                 {data.latestReviews.length === 0 ? (
-                    <div className="text-sm text-text-sec">Пока отзывов нет.</div>
+                    <div className="text-sm text-text-sec">{UI_TEXT.master.dashboard.labels.noReviews}</div>
                 ) : (
                   data.latestReviews.map((review) => (
                     <button
@@ -904,36 +940,46 @@ export function MasterDashboardPage() {
       {storyOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
-            <h3 className="text-base font-semibold">Stories preview</h3>
+            <h3 className="text-base font-semibold">{UI_TEXT.master.dashboard.stories.previewTitle}</h3>
             <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input p-3 text-sm">
-              <div className="font-medium">Окна на {date}</div>
+              <div className="font-medium">
+                {UI_TEXT.master.dashboard.labels.slotsOnDate.replace("{date}", date)}
+              </div>
               <div className="mt-2 space-y-1">
-                {freeSlots.length === 0 ? <div>Свободных слотов нет</div> : null}
+                {freeSlots.length === 0 ? <div>{UI_TEXT.master.dashboard.labels.noSlots}</div> : null}
                 {freeSlots.slice(0, STORIES_SLOTS_PER_CARD).map((slot) => (
                   <div key={slot.startAtUtc}>{formatAvailabilitySlot(slot, viewerTimeZone)}</div>
                 ))}
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setStoryOpen(false)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
-                  Закрыть
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void uploadStoriesToMedia()}
-                  disabled={storyGenerating}
-                  className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm disabled:opacity-60"
-                >
-                  {storyGenerating ? "Сохранение..." : "Сохранить в медиа"}
-                </button>
-                <button type="button" onClick={downloadStory} className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))]">
-                  Скачать
-                </button>
+              <button
+                type="button"
+                onClick={() => setStoryOpen(false)}
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+              >
+                {UI_TEXT.actions.close}
+              </button>
+              <button
+                type="button"
+                onClick={() => void uploadStoriesToMedia()}
+                disabled={storyGenerating}
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm disabled:opacity-60"
+              >
+                {storyGenerating ? UI_TEXT.status.saving : UI_TEXT.master.dashboard.stories.saveToMedia}
+              </button>
+              <button
+                type="button"
+                onClick={downloadStory}
+                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))]"
+              >
+                {UI_TEXT.master.dashboard.stories.download}
+              </button>
               </div>
             {storyError ? <div className="mt-3 text-sm text-red-600">{storyError}</div> : null}
             {storyAssets.length > 0 ? (
               <div className="mt-4 space-y-2">
-                <div className="text-sm font-medium">Сохраненные карточки</div>
+                <div className="text-sm font-medium">{UI_TEXT.master.dashboard.labels.savedCardsTitle}</div>
                 <div className="grid grid-cols-2 gap-2">
                   {storyAssets.map((asset) => (
                     <a
@@ -944,7 +990,7 @@ export function MasterDashboardPage() {
                       className="overflow-hidden rounded-xl border border-border-subtle"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={asset.url} alt="Story card" className="h-40 w-full object-cover" />
+                      <img src={asset.url} alt={UI_TEXT.master.dashboard.stories.cardAlt} className="h-40 w-full object-cover" />
                     </a>
                   ))}
                 </div>
@@ -957,7 +1003,7 @@ export function MasterDashboardPage() {
       {manualOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
-            <h3 className="text-base font-semibold">Ручная запись</h3>
+            <h3 className="text-base font-semibold">{UI_TEXT.master.dashboard.manualBooking.title}</h3>
             <div className="mt-3 space-y-2">
               <input
                 type="datetime-local"
@@ -970,10 +1016,10 @@ export function MasterDashboardPage() {
                 onChange={(event) => setManualServiceId(event.target.value)}
                 className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               >
-                <option value="">Выберите услугу</option>
+                <option value="">{UI_TEXT.master.dashboard.manualBooking.chooseService}</option>
                 {data.services.map((service) => (
                   <option key={service.id} value={service.id}>
-                    {service.title} · {service.durationMin} мин · {formatMoney(service.price)}
+                    {service.title} · {service.durationMin} {UI_TEXT.common.minutesShort} · {formatMoney(service.price)}
                   </option>
                 ))}
               </select>
@@ -981,26 +1027,30 @@ export function MasterDashboardPage() {
                 type="text"
                 value={manualClientName}
                 onChange={(event) => setManualClientName(event.target.value)}
-                placeholder="Имя клиента"
+                placeholder={UI_TEXT.master.dashboard.manualBooking.clientNamePlaceholder}
                 className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 value={manualClientPhone}
                 onChange={(event) => setManualClientPhone(event.target.value)}
-                placeholder="Телефон"
+                placeholder={UI_TEXT.master.dashboard.manualBooking.phonePlaceholder}
                 className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
               <textarea
                 value={manualNotes}
                 onChange={(event) => setManualNotes(event.target.value)}
-                placeholder="Комментарий"
+                placeholder={UI_TEXT.master.dashboard.manualBooking.commentPlaceholder}
                 className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setManualOpen(false)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
-                Отмена
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+              >
+                {UI_TEXT.actions.cancel}
               </button>
               <button
                 type="button"
@@ -1008,7 +1058,7 @@ export function MasterDashboardPage() {
                 disabled={savingManual}
                 className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
               >
-                {savingManual ? "Сохраняем..." : "Создать"}
+                {savingManual ? UI_TEXT.status.saving : UI_TEXT.master.dashboard.manualBooking.create}
               </button>
             </div>
           </div>

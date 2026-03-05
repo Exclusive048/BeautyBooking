@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationEvent } from "@/lib/notifications/notifier";
@@ -79,7 +80,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
         const json = (await res.json().catch(() => null)) as ApiResponse<ChatResponse> | null;
         if (!res.ok || !json || !json.ok) {
           if (res.status === 403 || res.status === 409) {
-            throw new Error("Чат недоступен");
+            throw new Error(UI_TEXT.chat.errors.unavailable);
           }
           throw new Error(toErrorMessage(json, `API error: ${res.status}`));
         }
@@ -88,7 +89,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
         setIsReadOnly(Boolean(json.data.isReadOnly));
         notifyUnread(json.data.unreadCount ?? 0);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить чат");
+        setError(loadError instanceof Error ? loadError.message : UI_TEXT.chat.errors.loadFailed);
       } finally {
         if (!silent) {
           setLoading(false);
@@ -151,7 +152,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
     const optimistic: ChatMessageDto = {
       id: tempId,
       senderType: currentRole,
-      senderName: "Вы",
+      senderName: UI_TEXT.chat.labels.you,
       body: text,
       readAt: null,
       createdAt: new Date().toISOString(),
@@ -176,7 +177,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
     } catch (sendError) {
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       setInput(text);
-      setError(sendError instanceof Error ? sendError.message : "Не удалось отправить сообщение");
+      setError(sendError instanceof Error ? sendError.message : UI_TEXT.chat.errors.sendFailed);
     } finally {
       setSending(false);
     }
@@ -194,10 +195,10 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
     );
   }
 
-  if (error === "Чат недоступен") {
+  if (error === UI_TEXT.chat.errors.unavailable) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-sm text-text-sec">
-        Чат недоступен.
+        {UI_TEXT.chat.errors.unavailable}
       </div>
     );
   }
@@ -208,7 +209,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
         {error}
         <div className="mt-2">
           <Button size="sm" variant="secondary" onClick={() => void loadChat()}>
-            Повторить
+            {UI_TEXT.chat.actions.retry}
           </Button>
         </div>
       </div>
@@ -219,12 +220,12 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
     <div className="space-y-3">
       {!isOpen && isReadOnly ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-xs text-text-sec">
-          Чат закрыт для отправки (после визита). История доступна 24 часа.
+          {UI_TEXT.chat.states.closedAfterVisit}
         </div>
       ) : null}
       {!isOpen && !isReadOnly ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-xs text-text-sec">
-          Чат закрыт. История доступна.
+          {UI_TEXT.chat.states.closed}
         </div>
       ) : null}
 
@@ -234,7 +235,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
         className="max-h-64 space-y-3 overflow-auto rounded-2xl border border-border-subtle bg-bg-input/40 p-3"
       >
         {messageGroups.length === 0 ? (
-          <div className="text-sm text-text-sec">Сообщений пока нет.</div>
+          <div className="text-sm text-text-sec">{UI_TEXT.chat.states.empty}</div>
         ) : null}
         {messageGroups.map((message) => {
           const isMine = message.senderType === currentRole;
@@ -264,7 +265,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
         <Textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="Напишите сообщение"
+          placeholder={UI_TEXT.chat.placeholder}
           maxLength={1000}
           disabled={!isOpen || sending}
           className="min-h-[90px]"
@@ -272,7 +273,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
         <div className="flex items-center justify-between text-xs text-text-sec">
           <span>{input.trim().length}/1000</span>
           <Button size="sm" onClick={() => void sendMessage()} disabled={!canSend || input.trim().length === 0}>
-            Отправить
+            {UI_TEXT.chat.actions.send}
           </Button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-﻿import { logError } from "@/lib/logging/logger";
+import { logError } from "@/lib/logging/logger";
 
 export type AlertLevel = "critical" | "error" | "warning";
 export type AlertContext = Record<string, unknown>;

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -96,7 +96,7 @@ export default function LoginClient({
     }
 
     if (!agreedToTerms) {
-      setErrorText("Необходимо согласие с условиями и политикой конфиденциальности.");
+      setErrorText(UI_TEXT.auth.loginPage.consentRequired);
       return;
     }
 
@@ -176,7 +176,7 @@ export default function LoginClient({
         <main className="flex h-full min-h-0 items-center justify-center lg:justify-start">
           <div className="w-full max-w-[420px] rounded-3xl border border-border/60 bg-card/90 p-6 shadow-sm sm:p-7">
             <div className="mb-7">
-              <div className="text-sm font-semibold text-muted-foreground">МастерРядом</div>
+              <div className="text-sm font-semibold text-muted-foreground">{UI_TEXT.brand.name}</div>
               <h1 className="mt-2 text-2xl font-semibold">{UI_TEXT.auth.loginPage.title}</h1>
               <p className="mt-2 text-sm text-muted-foreground">{UI_TEXT.auth.loginPage.subtitle}</p>
             </div>
@@ -195,7 +195,7 @@ export default function LoginClient({
                 <label className="block text-sm font-medium">{UI_TEXT.auth.loginPage.phoneLabel}</label>
                 <input
                   className="h-12 w-full rounded-2xl border border-border bg-background px-5 text-base outline-none transition focus:ring-2 focus:ring-primary/40"
-                  placeholder="+7 (___) ___-__-__"
+                  placeholder={UI_TEXT.auth.loginPage.phonePlaceholderMask}
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
                   inputMode="tel"

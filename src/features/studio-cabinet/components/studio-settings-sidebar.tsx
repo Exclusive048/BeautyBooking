@@ -2,11 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/ui/sidebar-item";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const SETTINGS_ITEMS = [
-  { href: "/cabinet/studio/settings/profile", label: "Профиль студии" },
-  { href: "/cabinet/studio/settings/services", label: "Услуги и прайс" },
-  { href: "/cabinet/studio/settings/portfolio", label: "Портфолио" },
+  { href: "/cabinet/studio/settings/profile", label: UI_TEXT.studioCabinet.settings.profile },
+  { href: "/cabinet/studio/settings/services", label: UI_TEXT.studioCabinet.settings.services },
+  { href: "/cabinet/studio/settings/portfolio", label: UI_TEXT.studioCabinet.settings.portfolio },
 ];
 
 function isActive(pathname: string, href: string) {

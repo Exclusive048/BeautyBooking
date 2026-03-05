@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { HeaderBlock } from "@/components/ui/header-block";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { ProfileForm } from "@/features/cabinet/components/profile-form";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type MeDto = {
   id: string;
@@ -27,7 +28,10 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <HeaderBlock title="Профиль" subtitle="Личные данные и контактная информация" />
+      <HeaderBlock
+        title={UI_TEXT.clientCabinet.common.profile}
+        subtitle={UI_TEXT.clientCabinet.profile.subtitle}
+      />
       <ProfileForm initialUser={meResponse.data.user} />
     </div>
   );

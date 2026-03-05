@@ -1,8 +1,9 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Подарочные сертификаты — МастерРядом",
-  description: "Подарочные сертификаты на услуги красоты. Скоро на МастерРядом.",
+  title: UI_TEXT.pages.giftCards.title,
+  description: UI_TEXT.pages.giftCards.description,
 };
 
 export default function GiftCardsPage() {
@@ -10,22 +11,15 @@ export default function GiftCardsPage() {
     <main className="mx-auto max-w-[720px] px-4 py-12 md:py-24 text-center space-y-8">
       <div className="text-6xl">🎁</div>
       <h1 className="text-4xl font-bold text-text-main tracking-tight">
-        Подарочные сертификаты
+        {UI_TEXT.pages.giftCards.heading}
       </h1>
       <p className="text-text-sec text-lg max-w-[460px] mx-auto leading-relaxed">
-        Скоро вы сможете дарить сертификаты на любые услуги у мастеров МастерРядом.
-        Именинница сама выберет мастера и запишется в удобное время.
+        {UI_TEXT.pages.giftCards.heroText}
       </p>
       <div className="lux-card rounded-[24px] bg-bg-card p-8 space-y-4 text-left max-w-[480px] mx-auto">
-        <p className="font-semibold text-text-main">Что планируется:</p>
+        <p className="font-semibold text-text-main">{UI_TEXT.pages.giftCards.plannedTitle}</p>
         <ul className="space-y-2 text-sm text-text-sec">
-          {[
-            "Сертификаты на фиксированную сумму",
-            "Электронная доставка на email или через мессенджер",
-            "Именной дизайн с текстом от вас",
-            "Срок действия — 12 месяцев",
-            "Принимается у любого мастера на платформе",
-          ].map((item) => (
+          {UI_TEXT.pages.giftCards.plannedItems.map((item) => (
             <li key={item} className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✦</span>
               {item}
@@ -34,14 +28,14 @@ export default function GiftCardsPage() {
         </ul>
       </div>
       <p className="text-sm text-text-sec">
-        Хотите узнать первыми о запуске?{" "}
+        {UI_TEXT.pages.giftCards.footerText}{" "}
         <a
           href="https://t.me/МастерРядом_news"
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
         >
-          Подпишитесь на Telegram-канал →
+          {UI_TEXT.pages.giftCards.footerCta}
         </a>
       </p>
     </main>

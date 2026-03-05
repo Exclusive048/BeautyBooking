@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/ui/sidebar-item";

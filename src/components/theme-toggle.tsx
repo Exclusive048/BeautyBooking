@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type ThemeMode = "light" | "dark";
 
@@ -23,7 +24,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="sm"
-      aria-label="Переключить тему"
+      aria-label={UI_TEXT.common.toggleTheme}
       onClick={() => {
         if (!canToggle) return;
         const next: ThemeMode = isDark ? "light" : "dark";

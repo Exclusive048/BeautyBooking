@@ -1,69 +1,13 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Часто задаваемые вопросы — МастерРядом",
-  description:
-    "Ответы на самые популярные вопросы о МастерРядом: для клиентов, мастеров и студий.",
+  title: UI_TEXT.pages.faq.title,
+  description: UI_TEXT.pages.faq.description,
 };
 
-const FAQS = [
-  {
-    group: "Для клиентов",
-    items: [
-      {
-        q: "Нужно Р»и регистрироваться чтобы записаться?",
-        a: "Нет. Чтобы записаться к мастеру, достаточно указать имя и номер телефона. Регистрация через Telegram иР»и VK делает процесс удобнее — данные подставляются автоматически, а история записей сохраняется в личном кабинете.",
-      },
-      {
-        q: "Как отменить иР»и перенести запись?",
-        a: "Откройте раздел «Мои записи» в личном кабинете. Там доступны кнопки отмены и переноса для каждой активной записи. Старайтесь отменять заблаговременно — мастер успеет освободить слот.",
-      },
-      {
-        q: "Безопасно Р»и указывать номер телефона?",
-        a: "Р”а. Р’аС€ номер телефона передаётся только конкретному мастеру, к которому вы записались. Мы не передаём контактные данные третьим лицам и не используем иС… для рекламных рассылок.",
-      },
-      {
-        q: "Что такое горячие слоты?",
-        a: "Горячие слоты — срочные свободные окошки у мастеров, которые публикуются со скидкой (10–30%). Появляются в специальной ленте «Горячие предложения». Отлично подходят если хотите записаться быстро иР»и сэкономить.",
-      },
-    ],
-  },
-  {
-    group: "Для мастеров",
-    items: [
-      {
-        q: "Сколько стоит размещение на МастерРядом?",
-        a: "Базовый тариф FREE — бесплатно навсегда. Он включает профиль в каталоге, онлайн-запись, расписание и портфолио до 15 фотографий. Карта не нужна. PRO и Premium дают карту, горячие слоты, аналитику и приоритет в каталоге — от 990 ₽/мес.",
-      },
-      {
-        q: "Как быстро появлюсь в каталоге после регистрации?",
-        a: "Сразу после заполнения профиля и нажатия кнопки «Опубликовать». Процесс занимает несколько минут. Модерация не требуется — вы управляете публикацией самостоятельно.",
-      },
-      {
-        q: "Могу Р»и я принимать оплату через МастерРядом?",
-        a: "Р”а — на тарифе PRO и выше доступна онлайн-оплата через ЮKassa. Поддерживаются карты и СБП. Р’С‹ можете включать оплату отдельно для каждой услуги. Средства поступают на ваш счёт за вычетом комиссии платёжной системы.",
-      },
-      {
-        q: "Что такое модельные офферы?",
-        a: "Инструмент для поиска моделей на практику иР»и пополнение портфолио. Р’С‹ публикуете оффер: описание, дата, цена (обычно сниженная). Желающие откликаются — вы выбираете подходящую кандидатуру и подтверждаете встречу.",
-      },
-      {
-        q: "Можно Р»и подключить МастерРядом если я работаю в студии?",
-        a: "Р”а. Работа в студии — отдельный режим. Владелец студии приглашает мастеров по номеру телефона. У каждого мастера свой кабинет, у владельца — общий календарь и финансовая отчётность.",
-      },
-    ],
-  },
-  {
-    group: "Общие вопросы",
-    items: [
-      {
-        q: "Р’ каких городах работает МастерРядом?",
-        a: "МастерРядом работает по всей России. Мастера могут указать любой город — клиенты ищут специалистов в своём городе иР»и районе через фильтры каталога и карту.",
-      },
-    ],
-  },
-];
+const FAQS = UI_TEXT.pages.faq.groups;
 
 export default function FaqPage() {
   return (
@@ -72,15 +16,15 @@ export default function FaqPage() {
       {/* Hero */}
       <section className="space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          FAQ
+          {UI_TEXT.pages.faq.heroBadge}
         </div>
         <h1 className="text-4xl font-bold text-text-main tracking-tight">
-          Часто задаваемые вопросы
+          {UI_TEXT.pages.faq.heroTitle}
         </h1>
         <p className="text-text-sec text-lg">
-          Не нашли ответ?{" "}
+          {UI_TEXT.pages.faq.heroSubtitlePrefix}{" "}
           <Link href="/support" className="text-primary hover:underline">
-            Напишите нам
+            {UI_TEXT.pages.faq.heroSubtitleLink}
           </Link>
           .
         </p>
@@ -106,16 +50,14 @@ export default function FaqPage() {
 
       {/* Contact */}
       <section className="lux-card rounded-[20px] bg-bg-card p-7 text-center space-y-3">
-        <p className="font-semibold text-text-main">Остались вопросы?</p>
-        <p className="text-sm text-text-sec">
-          Напишите в поддержку — обычно отвечаем в течение нескольких часов.
-        </p>
+        <p className="font-semibold text-text-main">{UI_TEXT.pages.faq.contactTitle}</p>
+        <p className="text-sm text-text-sec">{UI_TEXT.pages.faq.contactSubtitle}</p>
         <div className="flex gap-3 justify-center">
           <Link
             href="/support"
             className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-5 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
           >
-            Написать в поддержку
+            {UI_TEXT.pages.faq.contactPrimary}
           </Link>
           <a
             href="https://t.me/МастерРядом_support"
@@ -123,7 +65,7 @@ export default function FaqPage() {
             rel="noopener noreferrer"
             className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
           >
-            Telegram
+            {UI_TEXT.pages.faq.contactTelegram}
           </a>
         </div>
       </section>

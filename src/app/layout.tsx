@@ -1,4 +1,4 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { ViewerTimeZoneProvider } from "@/components/providers/viewer-timezone-provider";
@@ -8,6 +8,7 @@ import { PWAUpdatePrompt } from "@/components/pwa/update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { getNonce } from "@/lib/csp/nonce";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -22,13 +23,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "МастерРядом",
-  description: "Запись к мастерам",
+  title: UI_TEXT.meta.title,
+  description: UI_TEXT.meta.description,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "МастерРядом",
+    title: UI_TEXT.brand.name,
     startupImage: [
       {
         url: "/splash/apple-splash-1290-2796.png",

@@ -4,15 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const NAV_ITEMS = [
-  { href: "/cabinet/studio", label: "Главная" },
-  { href: "/cabinet/studio/calendar", label: "Календарь" },
-  { href: "/cabinet/studio/team", label: "Команда" },
-  { href: "/cabinet/studio/clients", label: "Клиенты" },
-  { href: "/cabinet/studio/analytics", label: "Аналитика" },
-  { href: "/cabinet/studio/finance", label: "Финансы" },
-  { href: "/cabinet/billing", label: "Подписка" },
+  { href: "/cabinet/studio", label: UI_TEXT.studioCabinet.nav.home },
+  { href: "/cabinet/studio/calendar", label: UI_TEXT.studioCabinet.nav.calendar },
+  { href: "/cabinet/studio/team", label: UI_TEXT.studioCabinet.nav.team },
+  { href: "/cabinet/studio/clients", label: UI_TEXT.studioCabinet.nav.clients },
+  { href: "/cabinet/studio/analytics", label: UI_TEXT.studioCabinet.nav.analytics },
+  { href: "/cabinet/studio/finance", label: UI_TEXT.studioCabinet.nav.finance },
+  { href: "/cabinet/billing", label: UI_TEXT.studioCabinet.nav.billing },
 ];
 
 type Props = {
@@ -65,7 +66,12 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
           })}
         </nav>
 
-        <Button asChild variant={settingsActive ? "secondary" : "icon"} size="icon" aria-label="Настройки">
+        <Button
+          asChild
+          variant={settingsActive ? "secondary" : "icon"}
+          size="icon"
+          aria-label={UI_TEXT.studioCabinet.nav.settingsAria}
+        >
           <Link href="/cabinet/studio/settings">⚙</Link>
         </Button>
       </div>

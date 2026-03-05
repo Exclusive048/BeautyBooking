@@ -1,10 +1,10 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Тарифы — МастерРядом",
-  description:
-    "Тарифные планы МастерРядом для мастеров и студий. Бесплатный тариф навсегда, PRO и Premium для роста.",
+  title: UI_TEXT.pages.pricing.title,
+  description: UI_TEXT.pages.pricing.description,
 };
 
 type Plan = {
@@ -15,137 +15,15 @@ type Plan = {
   badge?: string;
   badgeColor?: string;
   desc: string;
-  features: string[];
+  features: readonly string[];
   cta: string;
   ctaHref: string;
   highlight?: boolean;
 };
 
-const MASTER_PLANS: Plan[] = [
-  {
-    code: "free",
-    name: "FREE",
-    price: "0 ₽",
-    period: "навсегда",
-    desc: "Базовые инструменты для старта. Без ограничений по времени.",
-    features: [
-      "Профиль в каталоге",
-      "Онлайн-запись клиентов",
-      "Все виды расписания (недельное, цикличное, шаблоны)",
-      "Портфолио до 15 фотографий",
-      "Прайс-лист услуг",
-      "Отзывы и ответы на них",
-      "Список клиентов (без истории визитов)",
-      "Уведомления в приложении + PWA push",
-      "Вход через Telegram / VK",
-    ],
-    cta: "Начать бесплатно",
-    ctaHref: "/login",
-  },
-  {
-    code: "pro",
-    name: "PRO",
-    price: "990 ₽",
-    period: "в месяц",
-    badge: "Популярный",
-    badgeColor: "from-primary to-primary-magenta",
-    desc: "Полный инструментарий для активного мастера.",
-    features: [
-      "Всё из FREE",
-      "Отображение на карте",
-      "Приоритет в каталоге",
-      "Портфолио без ограничений",
-      "Онлайн-оплата записей (вкл/выкл по услугам)",
-      "Уведомления в Telegram и SMS",
-      "История визитов клиентов",
-      "Заметки о клиентах",
-      "Финансовая касса (при подключении оплаты)",
-    ],
-    cta: "Попробовать PRO",
-    ctaHref: "/login",
-    highlight: true,
-  },
-  {
-    code: "premium",
-    name: "PREMIUM",
-    price: "1 990 ₽",
-    period: "в месяц",
-    desc: "Максимальные возможности для роста и продвижения.",
-    features: [
-      "Всё из PRO",
-      "Горячие слоты со скидкой",
-      "Badge и выделение в каталоге",
-      "Аналитика с графиками",
-      "Импорт клиентской базы из YClients",
-    ],
-    cta: "Попробовать Premium",
-    ctaHref: "/login",
-  },
-];
-
-const STUDIO_PLANS: Plan[] = [
-  {
-    code: "studio_free",
-    name: "FREE",
-    price: "0 ₽",
-    period: "навсегда",
-    desc: "До 2 мастеров. Попробуйте без риска.",
-    features: [
-      "Профиль студии в каталоге",
-      "До 2 мастеров",
-      "Онлайн-запись",
-      "Все виды расписания",
-      "Портфолио студии до 15 фото + 10 фото/мастер",
-      "Отзывы",
-      "Список клиентов (без истории)",
-      "Роли: владелец, администратор, мастер",
-      "Уведомления в приложении + PWA push",
-    ],
-    cta: "Начать бесплатно",
-    ctaHref: "/login",
-  },
-  {
-    code: "studio_pro",
-    name: "PRO",
-    price: "2 490 ₽",
-    period: "в месяц",
-    badge: "Популярный",
-    badgeColor: "from-primary to-primary-magenta",
-    desc: "До 7 мастеров. Полный контроль над студией.",
-    features: [
-      "Всё из FREE",
-      "До 7 мастеров",
-      "Отображение на карте",
-      "Приоритет в каталоге",
-      "Портфолио без ограничений",
-      "Общий календарь всех мастеров",
-      "Финансовая отчётность по студии и мастерам",
-      "Онлайн-оплата записей",
-      "Уведомления в Telegram и SMS",
-      "История визитов и заметки о клиентах",
-    ],
-    cta: "Попробовать PRO",
-    ctaHref: "/login",
-    highlight: true,
-  },
-  {
-    code: "studio_premium",
-    name: "PREMIUM",
-    price: "4 990 ₽",
-    period: "в месяц",
-    desc: "Безлимит мастеров. Аналитика и максимум возможностей.",
-    features: [
-      "Всё из PRO",
-      "Неограниченное количество мастеров",
-      "Горячие слоты",
-      "Badge и выделение в каталоге",
-      "Аналитика с графиками",
-      "Импорт клиентской базы из YClients",
-    ],
-    cta: "Попробовать Premium",
-    ctaHref: "/login",
-  },
-];
+const MASTER_PLANS = UI_TEXT.pages.pricing.plans.master as readonly Plan[];
+const STUDIO_PLANS = UI_TEXT.pages.pricing.plans.studio as readonly Plan[];
+const PRICING_FAQ = UI_TEXT.pages.pricing.faqItems;
 
 function PricingCard({ plan }: { plan: Plan }) {
   return (
@@ -197,22 +75,22 @@ export default function PricingPage() {
       {/* Hero */}
       <section className="text-center space-y-4">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          Тарифы
+          {UI_TEXT.pages.pricing.heroBadge}
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-text-main tracking-tight">
-          Прозрачные цены,{" "}
+          {UI_TEXT.pages.pricing.heroTitleMain}{" "}
           <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-            никаких сюрпризов
+            {UI_TEXT.pages.pricing.heroTitleHighlight}
           </span>
         </h1>
         <p className="text-text-sec text-lg max-w-[480px] mx-auto">
-          Бесплатный тариф навсегда. Переходите на PRO или Premium когда будете готовы.
+          {UI_TEXT.pages.pricing.heroSubtitle}
         </p>
       </section>
 
       {/* Master plans */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main">Для соло-мастеров</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.pricing.masterTitle}</h2>
         <div className="grid md:grid-cols-3 gap-5">
           {MASTER_PLANS.map((plan) => (
             <PricingCard key={plan.code} plan={plan} />
@@ -222,7 +100,7 @@ export default function PricingPage() {
 
       {/* Studio plans */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main">Для студий</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.pricing.studioTitle}</h2>
         <div className="grid md:grid-cols-3 gap-5">
           {STUDIO_PLANS.map((plan) => (
             <PricingCard key={plan.code} plan={plan} />
@@ -232,14 +110,9 @@ export default function PricingPage() {
 
       {/* FAQ */}
       <section className="space-y-5 max-w-[720px] mx-auto">
-        <h2 className="text-xl font-semibold text-text-main">Вопросы о тарифах</h2>
+        <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.pricing.faqTitle}</h2>
         <div className="space-y-3">
-          {[
-            ["Нужна ли карта для бесплатного тарифа?", "Нет. Регистрация и использование бесплатного тарифа не требуют привязки карты."],
-            ["Могу ли я поменять тариф в любой момент?", "Да. Переход на более высокий тариф — мгновенный. При понижении тариф действует до конца оплаченного периода."],
-            ["Как работает онлайн-оплата записей?", "Оплата клиентами доступна с тарифа PRO. Используется ЮKassa — поддерживает карты и СБП. Вы можете включать оплату отдельно для каждой услуги."],
-            ["Есть ли скидка при оплате на год?", "Готовим годовые тарифы со скидкой — следите за обновлениями в нашем Telegram-канале."],
-          ].map(([q, a]) => (
+          {PRICING_FAQ.map(([q, a]) => (
             <details key={q} className="lux-card rounded-[16px] bg-bg-card group">
               <summary className="flex items-center justify-between cursor-pointer p-5 font-medium text-sm text-text-main list-none">
                 {q}

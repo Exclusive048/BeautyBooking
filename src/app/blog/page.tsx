@@ -1,36 +1,12 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Блог — МастерРядом",
-  description: "Анонсы новых функций, обновления платформы и полезные материалы для мастеров и клиентов.",
+  title: UI_TEXT.pages.blog.title,
+  description: UI_TEXT.pages.blog.description,
 };
 
-const COMING_SOON_POSTS = [
-  {
-    tag: "Анонс",
-    title: "Горячие слоты: заполняйте расписание за часы до приёма",
-    desc: "Публикуйте срочные окошки со скидкой — клиенты видят их в отдельной ленте и записываются мгновенно.",
-    date: "Скоро",
-  },
-  {
-    tag: "Обновление",
-    title: "Онлайн-оплата записей через ЮKassa",
-    desc: "Принимайте предоплату прямо в МастерРядом. Поддержка СБП, карт и автоплатежей.",
-    date: "Скоро",
-  },
-  {
-    tag: "Функция",
-    title: "Импорт клиентской базы из YClients",
-    desc: "Переходите на МастерРядом без потери данных — перенесите клиентов и историю визитов в один клик.",
-    date: "Скоро",
-  },
-  {
-    tag: "Гид",
-    title: "Как настроить расписание: полный разбор",
-    desc: "Недельный режим, цикличное расписание, шаблоны смен, исключения и блокировки времени.",
-    date: "Скоро",
-  },
-];
+const COMING_SOON_POSTS = UI_TEXT.pages.blog.comingSoonPosts;
 
 export default function BlogPage() {
   return (
@@ -39,13 +15,13 @@ export default function BlogPage() {
       {/* Hero */}
       <section className="space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          Блог
+          {UI_TEXT.pages.blog.heroBadge}
         </div>
         <h1 className="text-4xl font-bold text-text-main tracking-tight">
-          Новости и обновления
+          {UI_TEXT.pages.blog.heroTitle}
         </h1>
         <p className="text-text-sec text-lg">
-          Анонсы функций, гиды для мастеров и всё важное о платформе.
+          {UI_TEXT.pages.blog.heroSubtitle}
         </p>
       </section>
 
@@ -53,9 +29,9 @@ export default function BlogPage() {
       <div className="lux-card rounded-[20px] bg-bg-card border border-border-subtle p-6 flex items-center gap-4">
         <div className="text-3xl">✍️</div>
         <div>
-          <p className="font-semibold text-text-main">Блог скоро запустится</p>
+          <p className="font-semibold text-text-main">{UI_TEXT.pages.blog.comingSoonTitle}</p>
           <p className="text-sm text-text-sec mt-0.5">
-            Пока готовим материалы — вот анонсы того, что выйдет первым.
+            {UI_TEXT.pages.blog.comingSoonSubtitle}
           </p>
         </div>
       </div>
