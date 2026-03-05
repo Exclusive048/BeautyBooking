@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import SupportPageClient from "./support-client";
 
 export const metadata: Metadata = {
-  title: "Поддержка — BeautyHub",
-  description: "Создайте обращение в поддержку BeautyHub: сообщите об ошибке или предложите улучшение.",
+  title: "Поддержка — МастерРядом",
+  description: "Создайте обращение в поддержку МастерРядом: сообщите об ошибке или предложите улучшение.",
 };
 
 export default function SupportPage() {
@@ -37,7 +37,7 @@ export default function SupportPage() {
           </div>
         </Link>
         <a
-          href="https://t.me/beautyhub_support"
+          href="https://t.me/МастерРядом_support"
           target="_blank"
           rel="noopener noreferrer"
           className="lux-card rounded-[16px] bg-bg-card p-4 flex items-start gap-3 hover:ring-1 hover:ring-border-subtle transition-all"
@@ -58,3 +58,4 @@ export default function SupportPage() {
     </main>
   );
 }
+

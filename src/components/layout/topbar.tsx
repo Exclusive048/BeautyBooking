@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+﻿/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
@@ -150,7 +150,7 @@ export async function Topbar() {
             <div className="h-10 w-10 rounded-2xl bg-primary/35" />
           )}
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold text-text-main">BeautyHub</div>
+            <div className="truncate text-sm font-semibold text-text-main">МастерРядом</div>
             <div className="hidden xs:block truncate text-xs text-text-sec">{UI_TEXT.nav.bookingToMasters}</div>
           </div>
         </Link>
@@ -197,3 +197,4 @@ export async function Topbar() {
     </header>
   );
 }
+

@@ -420,9 +420,9 @@ export function StudioProfilePage({ providerId }: Props) {
       </div>
 
       <div className="rounded-2xl bg-bg-card/90 p-4">
-        <h3 className="text-sm font-semibold">РќР°РїРѕРјРёРЅР°РЅРёСЏ</h3>
+        <h3 className="text-sm font-semibold">Напоминания</h3>
         <p className="mt-1 text-xs text-text-sec">
-          РќР°РїРѕРјРёРЅР°РЅРёСЏ Рѕ Р·Р°РїРёСЃРё Р·Р° 24 С‡Р°СЃР° Рё 2 С‡Р°СЃР° РґРѕ РЅР°С‡Р°Р»Р°.
+          Напоминания о записи за 24 часа и 2 часа до начала.
         </p>
         <label className="mt-3 inline-flex items-center gap-2 text-sm">
           <input
@@ -430,7 +430,7 @@ export function StudioProfilePage({ providerId }: Props) {
             checked={remindersEnabled}
             onChange={(event) => setRemindersEnabled(event.target.checked)}
           />
-          {remindersEnabled ? "Р’РєР»СЋС‡РµРЅРѕ" : "Р’С‹РєР»СЋС‡РµРЅРѕ"}
+          {remindersEnabled ? "Включено" : "Выключено"}
         </label>
       </div>
 

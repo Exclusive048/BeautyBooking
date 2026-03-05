@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
@@ -110,7 +110,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!provider || !provider.publicUsername) {
     return {
-      title: "Профиль не найден | BeautyHub",
+      title: "Профиль не найден | МастерРядом",
       robots: { index: false, follow: false },
     };
   }
@@ -120,7 +120,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  const title = `${provider.name} — запись онлайн | BeautyHub`;
+  const title = `${provider.name} — запись онлайн | МастерРядом`;
   const description = buildDescription({
     name: provider.name,
     type: provider.type,
@@ -334,3 +334,4 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
     </>
   );
 }
+

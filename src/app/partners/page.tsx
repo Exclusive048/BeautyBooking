@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Партнёрам — BeautyHub",
-  description: "Сотрудничество с BeautyHub: интеграции, партнёрская программа, совместные проекты. Контакты для связи.",
+  title: "Партнёрам — МастерРядом",
+  description: "Сотрудничество с МастерРядом: интеграции, партнёрская программа, совместные проекты. Контакты для связи.",
 };
 
 const PARTNERSHIP_TYPES = [
@@ -44,7 +44,7 @@ export default function PartnersPage() {
           </span>
         </h1>
         <p className="text-text-sec text-lg max-w-[520px] mx-auto">
-          BeautyHub открыт к сотрудничеству. Если видите точку пересечения —
+          МастерРядом открыт к сотрудничеству. Если видите точку пересечения —
           напишите, разберёмся.
         </p>
       </section>
@@ -75,10 +75,10 @@ export default function PartnersPage() {
             <div>
               <p className="text-text-sec text-xs mb-0.5">Email</p>
               <a
-                href="mailto:partners@beautyhub.ru"
+                href="mailto:partners@МастерРядом.ru"
                 className="text-text-main font-medium hover:text-primary transition-colors"
               >
-                partners@beautyhub.ru
+                partners@МастерРядом.ru
               </a>
             </div>
           </div>
@@ -87,12 +87,12 @@ export default function PartnersPage() {
             <div>
               <p className="text-text-sec text-xs mb-0.5">Telegram</p>
               <a
-                href="https://t.me/beautyhub_partner"
+                href="https://t.me/МастерРядом_partner"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-text-main font-medium hover:text-primary transition-colors"
               >
-                @beautyhub_partner
+                @МастерРядом_partner
               </a>
             </div>
           </div>
@@ -104,3 +104,4 @@ export default function PartnersPage() {
     </main>
   );
 }
+

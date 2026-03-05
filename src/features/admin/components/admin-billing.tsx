@@ -124,8 +124,8 @@ function getPriceForPeriod(plan: BillingPlan, periodMonths: PeriodMonths) {
 
 function resolvePlanMonthlyLabel(plan: BillingPlan) {
   const monthly = getPriceForPeriod(plan, 1);
-  if (!monthly || monthly.priceKopeks <= 0) return "Р‘РµСЃРїР»Р°С‚РЅРѕ";
-  return `${moneyRUBFromKopeks(monthly.priceKopeks)} /РјРµСЃ.`;
+  if (!monthly || monthly.priceKopeks <= 0) return "Бесплатно";
+  return `${moneyRUBFromKopeks(monthly.priceKopeks)} /мес.`;
 }
 
 function formatPriceInput(priceKopeks: number) {
@@ -423,7 +423,7 @@ export function AdminBilling() {
     });
 
     if (pricesPayload.some((entry) => entry === null)) {
-      setError("РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Рµ С†РµРЅС‹ РґР»СЏ РІСЃРµС… СЃСЂРѕРєРѕРІ.");
+      setError("Укажите корректные цены для всех сроков.");
       setSaving(false);
       return;
     }
@@ -616,7 +616,7 @@ export function AdminBilling() {
                     <div className="mt-2 grid gap-3 sm:grid-cols-2">
                       {PERIODS.map((periodMonths) => (
                         <label key={periodMonths} className="text-xs text-text-sec">
-                          {periodMonths} ���.
+                          {periodMonths} мес.
                           <Input
                             type="number"
                             min={0}

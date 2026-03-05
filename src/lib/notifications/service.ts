@@ -511,17 +511,17 @@ function mapType(kind: BookingNotificationKind): NotificationType {
 function buildTitle(kind: BookingNotificationKind): string {
   switch (kind) {
     case "CANCELLED":
-      return "Р—Р°РїРёСЃСЊ РѕС‚РјРµРЅРµРЅР°";
+      return "Запись отменена";
     case "RESCHEDULED":
-      return "Р—Р°РїРёСЃСЊ РїРµСЂРµРЅРµСЃРµРЅР°";
+      return "Запись перенесена";
     case "CONFIRMED":
-      return "Р—Р°РїРёСЃСЊ РїРѕРґС‚РІРµСЂР¶РґРµРЅР°";
+      return "Запись подтверждена";
     case "REJECTED":
-      return "Р—Р°РїРёСЃСЊ РѕС‚РєР»РѕРЅРµРЅР°";
+      return "Запись отклонена";
     case "NO_SHOW":
-      return "РљР»РёРµРЅС‚ РЅРµ РїСЂРёС€РµР»";
+      return "Клиент не пришел";
     default:
-      return "РќРѕРІР°СЏ Р·Р°РїРёСЃСЊ";
+      return "Новая запись";
   }
 }
 

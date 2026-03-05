@@ -4,7 +4,7 @@ const dateString = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°." });
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Некорректная дата." });
 
 const bookingAnswerSchema = z.object({
   questionId: z.string().trim().min(1),
@@ -14,14 +14,14 @@ const bookingAnswerSchema = z.object({
 
 export const bookingCreateSchema = z
   .object({
-    providerId: z.string().trim().min(1, "РќРµ СѓРєР°Р·Р°РЅ РїСЂРѕРІР°Р№РґРµСЂ."),
-    serviceId: z.string().trim().min(1, "РќРµ СѓРєР°Р·Р°РЅР° СѓСЃР»СѓРіР°."),
+    providerId: z.string().trim().min(1, "Не указан провайдер."),
+    serviceId: z.string().trim().min(1, "Не указана услуга."),
     masterProviderId: z.string().trim().min(1).optional(),
     startAtUtc: dateString.optional(),
     endAtUtc: dateString.optional(),
-    slotLabel: z.string().trim().min(1, "РќРµ СѓРєР°Р·Р°РЅ СЃР»РѕС‚.").max(120),
-    clientName: z.string().trim().min(1, "РќРµ СѓРєР°Р·Р°РЅРѕ РёРјСЏ РєР»РёРµРЅС‚Р°.").max(120),
-    clientPhone: z.string().trim().min(1, "РќРµ СѓРєР°Р·Р°РЅ С‚РµР»РµС„РѕРЅ РєР»РёРµРЅС‚Р°.").max(40),
+    slotLabel: z.string().trim().min(1, "Не указан слот.").max(120),
+    clientName: z.string().trim().min(1, "Не указано имя клиента.").max(120),
+    clientPhone: z.string().trim().min(1, "Не указан телефон клиента.").max(40),
     comment: z.string().trim().max(500).nullable().optional(),
     silentMode: z.boolean().optional(),
     referencePhotoAssetId: z.string().trim().min(1).nullable().optional(),
@@ -31,7 +31,7 @@ export const bookingCreateSchema = z
     if (value.endAtUtc && !value.startAtUtc) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "startAtUtc РѕР±СЏР·Р°С‚РµР»РµРЅ, РµСЃР»Рё СѓРєР°Р·Р°РЅ endAtUtc.",
+        message: "startAtUtc обязателен, если указан endAtUtc.",
         path: ["startAtUtc"],
       });
     }
@@ -41,7 +41,7 @@ export const bookingCreateSchema = z
       if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "endAtUtc РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїРѕР·Р¶Рµ startAtUtc.",
+          message: "endAtUtc должен быть позже startAtUtc.",
           path: ["endAtUtc"],
         });
       }
@@ -66,7 +66,7 @@ export const bookingRescheduleSchema = z
     if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "endAtUtc РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїРѕР·Р¶Рµ startAtUtc.",
+        message: "endAtUtc должен быть позже startAtUtc.",
         path: ["endAtUtc"],
       });
     }

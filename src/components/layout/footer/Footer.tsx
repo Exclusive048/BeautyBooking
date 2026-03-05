@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { FooterCTA } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
@@ -49,8 +49,8 @@ function buildFooterLinks() {
     { label: "FAQ", href: "/faq" },
     hasSupportPage
       ? { label: "Написать нам", href: "/support" }
-      : { label: "Написать нам", href: "mailto:support@beautyhub.ru", external: true },
-    { label: "Telegram поддержка", href: "https://t.me/beautyhub_support", external: true },
+      : { label: "Написать нам", href: "mailto:support@МастерРядом.ru", external: true },
+    { label: "Telegram поддержка", href: "https://t.me/МастерРядом_support", external: true },
     { label: "Пользовательское соглашение", href: "/terms" },
     { label: "Политика конфиденциальности", href: "/privacy" },
   ];
@@ -74,7 +74,7 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,3fr)]">
           <div className="space-y-4">
             <div className="text-[18px] font-semibold" itemScope itemType="https://schema.org/Organization">
-              <span itemProp="name">BeautyHub</span>
+              <span itemProp="name">МастерРядом</span>
             </div>
             <p className="text-sm text-text-sec">
               Маркетплейс мастеров красоты. Находите лучших специалистов рядом и бронируйте
@@ -100,3 +100,4 @@ export function Footer() {
     </footer>
   );
 }
+

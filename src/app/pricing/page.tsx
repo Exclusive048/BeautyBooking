@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Тарифы — BeautyHub",
+  title: "Тарифы — МастерРядом",
   description:
-    "Тарифные планы BeautyHub для мастеров и студий. Бесплатный тариф навсегда, PRO и Premium для роста.",
+    "Тарифные планы МастерРядом для мастеров и студий. Бесплатный тариф навсегда, PRO и Premium для роста.",
 };
 
 type Plan = {
@@ -253,3 +253,4 @@ export default function PricingPage() {
     </main>
   );
 }
+

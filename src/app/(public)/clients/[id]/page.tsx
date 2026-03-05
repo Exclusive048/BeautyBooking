@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
@@ -7,7 +7,7 @@ type Props = {
 };
 
 export const metadata: Metadata = {
-  title: "Профиль клиента | BeautyHub",
+  title: "Профиль клиента | МастерРядом",
   robots: { index: false, follow: false },
 };
 
@@ -33,3 +33,4 @@ export default async function ClientIdPage({ params }: Props) {
     </div>
   );
 }
+

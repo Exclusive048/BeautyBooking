@@ -30,7 +30,7 @@ type SubscriptionSummary = {
 
 export async function GET() {
   const user = await getSessionUser();
-  if (!user) return fail("РќРµРѕР±С…РѕРґРёРјР° Р°РІС‚РѕСЂРёР·Р°С†РёСЏ.", 401, "UNAUTHORIZED");
+  if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
 
   const subscriptions = await prisma.userSubscription.findMany({
     where: { userId: user.id },

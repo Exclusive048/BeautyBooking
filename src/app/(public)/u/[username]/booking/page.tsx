@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!provider || !provider.publicUsername) {
     return {
-      title: "Запись онлайн | BeautyHub",
+      title: "Запись онлайн | МастерРядом",
       robots: { index: false, follow: false },
     };
   }
@@ -75,7 +75,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  const title = `${provider.name} — запись онлайн | BeautyHub`;
+  const title = `${provider.name} — запись онлайн | МастерРядом`;
   const description = buildDescription({
     name: provider.name,
     type: provider.type,
@@ -252,3 +252,4 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
     </Suspense>
   );
 }
+

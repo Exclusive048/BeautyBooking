@@ -37,10 +37,7 @@ export async function createClientBooking(
   },
   idempotencyKey?: string | null
 ): Promise<BookingDto> {
-  // AUDIT (СЃРѕР·РґР°РЅРёРµ Р·Р°РїРёСЃРё):
-  // - СЂРµР°Р»РёР·РѕРІР°РЅРѕ: СЃРѕР·РґР°С‘С‚СЃСЏ PENDING + actionRequiredBy=MASTER.
-  // - РёСЃРїСЂР°РІР»РµРЅРѕ РїРѕСЃР»Рµ Р°СѓРґРёС‚Р°: startAtUtc/endAtUtc С‚РµРїРµСЂСЊ РІС‹С‡РёСЃР»СЏСЋС‚СЃСЏ РёР· slotLabel + timezone.
-  // - СЂРµР°Р»РёР·РѕРІР°РЅРѕ С‡Р°СЃС‚РёС‡РЅРѕ: legacy path РјСЏРіС‡Рµ РїРѕ РїСЂРѕРІРµСЂРєР°Рј РєРѕРЅС„Р»РёРєС‚РѕРІ, С‡РµРј createBooking().
+
   let resolvedIdempotencyKey: string | null = null;
   let idempotencyLockAcquired = false;
   if (idempotencyKey) {
@@ -52,7 +49,7 @@ export async function createClientBooking(
     });
     if (idempotency.booking) return idempotency.booking;
     if (!idempotency.lockAcquired) {
-      throw new AppError("РџРѕРІС‚РѕСЂРЅС‹Р№ Р·Р°РїСЂРѕСЃ.", 409, "DUPLICATE_REQUEST");
+      throw new AppError("Повторный запрос.", 409, "DUPLICATE_REQUEST");
     }
     resolvedIdempotencyKey = key;
     idempotencyLockAcquired = true;
@@ -66,7 +63,7 @@ export async function createClientBooking(
       CREATE_BOOKING_RATE_LIMIT.windowSeconds
     );
     if (!allowed) {
-      throw new AppError("РЎР»РёС€РєРѕРј РјРЅРѕРіРѕ Р·Р°РїСЂРѕСЃРѕРІ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.", 429, "RATE_LIMITED");
+      throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
     }
 
     const {
@@ -123,7 +120,7 @@ export async function createClientBooking(
           });
           if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
             throw new AppError(
-              "РќРµР»СЊР·СЏ РїРѕРІС‚РѕСЂРЅРѕ Р·Р°РїРёСЃР°С‚СЊСЃСЏ РЅР° СЌС‚РѕС‚ СЃР»РѕС‚ СЃРѕ СЃРєРёРґРєРѕР№ РїРѕСЃР»Рµ РѕС‚РјРµРЅС‹. Р’С‹Р±РµСЂРёС‚Рµ РґСЂСѓРіРѕРµ РІСЂРµРјСЏ.",
+              "Нельзя повторно записаться на этот слот со скидкой после отмены. Выберите другое время.",
               409,
               "BOOKING_CONFLICT"
             );

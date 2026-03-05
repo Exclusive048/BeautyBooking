@@ -202,7 +202,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
                       variant="secondary"
                       onClick={() => void handleOpenChat(toast.id, toast.payloadJson)}
                     >
-                      РћС‚РєСЂС‹С‚СЊ С‡Р°С‚
+                      Открыть чат
                     </Button>
                   </div>
                 ) : null}

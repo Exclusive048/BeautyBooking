@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const LEGAL_ENTITY_NAME = "[Укажи свои данные: ИП Иванов Иван Иванович]";
@@ -6,9 +6,9 @@ const INN = "[укажи ИНН]";
 const OGRN = "[укажи ОГРН]";
 const LEGAL_ADDRESS = "[укажи юридический адрес]";
 const CONTACT_EMAILS = {
-  privacy: "privacy@beautyhub.ru",
-  legal: "legal@beautyhub.ru",
-  support: "support@beautyhub.ru",
+  privacy: "privacy@МастерРядом.ru",
+  legal: "legal@МастерРядом.ru",
+  support: "support@МастерРядом.ru",
 };
 
 const LISTED_PRICE_RUB = "X₽/мес";
@@ -20,9 +20,9 @@ const DOCUMENT_VERSION = "1.0";
 const UPDATED_AT = "17.02.2026";
 
 export const metadata: Metadata = {
-  title: "Пользовательское соглашение — BeautyHub",
+  title: "Пользовательское соглашение — МастерРядом",
   description:
-    "Пользовательское соглашение BeautyHub: правила использования сервиса, оплаты и ответственности.",
+    "Пользовательское соглашение МастерРядом: правила использования сервиса, оплаты и ответственности.",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -43,7 +43,7 @@ export default function TermsPage() {
         </p>
         <h1 className="text-3xl font-semibold text-text-main">Пользовательское соглашение</h1>
         <p className="text-sm text-text-sec">
-          Настоящее Соглашение регулирует использование платформы BeautyHub и порядок оказания
+          Настоящее Соглашение регулирует использование платформы МастерРядом и порядок оказания
           услуг между пользователями, провайдерами и оператором сервиса.
         </p>
       </header>
@@ -68,7 +68,7 @@ export default function TermsPage() {
         <CardContent className="space-y-6 text-sm text-text-sec">
           <Section title="1. Термины и определения">
             <p>
-              Платформа — сайт и сервисы BeautyHub. Пользователь — физическое лицо, использующее
+              Платформа — сайт и сервисы МастерРядом. Пользователь — физическое лицо, использующее
               сервис. Провайдер — мастер или студия, размещающие услуги и принимающие записи.
             </p>
           </Section>
@@ -140,3 +140,4 @@ export default function TermsPage() {
     </div>
   );
 }
+

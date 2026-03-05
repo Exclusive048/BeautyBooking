@@ -47,7 +47,7 @@ export function StudioProfileHero({
           </Button>
           {onEditFocal ? (
             <Button variant="secondary" size="sm" onClick={onEditFocal}>
-              РўРѕС‡РєР° С„РѕРєСѓСЃР°
+              Точка фокуса
             </Button>
           ) : null}
         </div>

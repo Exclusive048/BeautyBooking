@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
@@ -15,13 +15,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const offer = await getPublicModelOffer(offerId);
   if (!offer) {
     return {
-      title: "Предложение не найдено | BeautyHub",
+      title: "Предложение не найдено | МастерРядом",
       description: "Предложение для моделей недоступно или было закрыто.",
     };
   }
 
   return {
-    title: `${offer.service.title} для моделей | BeautyHub`,
+    title: `${offer.service.title} для моделей | МастерРядом`,
     description: `Предложение от мастера ${offer.master.name}: ${offer.dateLocal} ${offer.timeRangeStartLocal}-${offer.timeRangeEndLocal}.`,
   };
 }
@@ -132,3 +132,4 @@ export default async function ModelOfferPage({ params }: PageProps) {
     </section>
   );
 }
+

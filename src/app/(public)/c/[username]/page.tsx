@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/app-url";
@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
 
   return {
-    title: "Профиль клиента | BeautyHub",
+    title: "Профиль клиента | МастерРядом",
     metadataBase: baseUrl ? new URL(baseUrl) : undefined,
     alternates: { canonical: `/c/${username}` },
     robots: { index: false, follow: false },
@@ -61,3 +61,4 @@ export default async function ClientPublicPage({ params }: Props) {
     </div>
   );
 }
+

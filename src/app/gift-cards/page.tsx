@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Подарочные сертификаты — BeautyHub",
-  description: "Подарочные сертификаты на услуги красоты. Скоро на BeautyHub.",
+  title: "Подарочные сертификаты — МастерРядом",
+  description: "Подарочные сертификаты на услуги красоты. Скоро на МастерРядом.",
 };
 
 export default function GiftCardsPage() {
@@ -13,7 +13,7 @@ export default function GiftCardsPage() {
         Подарочные сертификаты
       </h1>
       <p className="text-text-sec text-lg max-w-[460px] mx-auto leading-relaxed">
-        Скоро вы сможете дарить сертификаты на любые услуги у мастеров BeautyHub.
+        Скоро вы сможете дарить сертификаты на любые услуги у мастеров МастерРядом.
         Именинница сама выберет мастера и запишется в удобное время.
       </p>
       <div className="lux-card rounded-[24px] bg-bg-card p-8 space-y-4 text-left max-w-[480px] mx-auto">
@@ -36,7 +36,7 @@ export default function GiftCardsPage() {
       <p className="text-sm text-text-sec">
         Хотите узнать первыми о запуске?{" "}
         <a
-          href="https://t.me/beautyhub_news"
+          href="https://t.me/МастерРядом_news"
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
@@ -47,3 +47,4 @@ export default function GiftCardsPage() {
     </main>
   );
 }
+

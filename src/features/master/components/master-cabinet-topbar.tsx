@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,7 +30,7 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm font-semibold">
-            BeautyHub
+            МастерРядом
           </Link>
           <nav className="flex flex-wrap items-center gap-2">
             {NAV_ITEMS.map((item) => {
@@ -71,3 +71,4 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
     </header>
   );
 }
+

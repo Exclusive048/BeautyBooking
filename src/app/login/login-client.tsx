@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -176,7 +176,7 @@ export default function LoginClient({
         <main className="flex h-full min-h-0 items-center justify-center lg:justify-start">
           <div className="w-full max-w-[420px] rounded-3xl border border-border/60 bg-card/90 p-6 shadow-sm sm:p-7">
             <div className="mb-7">
-              <div className="text-sm font-semibold text-muted-foreground">BeautyHub</div>
+              <div className="text-sm font-semibold text-muted-foreground">МастерРядом</div>
               <h1 className="mt-2 text-2xl font-semibold">{UI_TEXT.auth.loginPage.title}</h1>
               <p className="mt-2 text-sm text-muted-foreground">{UI_TEXT.auth.loginPage.subtitle}</p>
             </div>

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { CabinetLayout } from "@/features/cabinet/layout/cabinet-layout";
 import { getSessionUser } from "@/lib/auth/session";
 
@@ -12,7 +12,8 @@ export default async function UserCabinetLayout({ children }: Props) {
     user?.displayName?.trim() ||
     user?.firstName?.trim() ||
     user?.phone?.trim() ||
-    "BeautyHub";
+    "МастерРядом";
 
   return <CabinetLayout userLabel={userLabel}>{children}</CabinetLayout>;
 }
+

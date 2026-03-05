@@ -1,10 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import type { Metadata } from "next";
 import { listModelOfferFilterCategories, listPublicModelOffers } from "@/lib/model-offers/public.service";
 import { FocalImage } from "@/components/ui/focal-image";
 
 export const metadata: Metadata = {
-  title: "Предложения для моделей | BeautyHub",
+  title: "Предложения для моделей | МастерРядом",
   description:
     "Бесплатные и льготные процедуры для моделей от мастеров красоты. Стрижки, окрашивание, маникюр и другие услуги.",
 };
@@ -51,7 +51,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10">
       <header className="mb-8 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-sec">BeautyHub</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-sec">МастерРядом</p>
         <h1 className="text-3xl font-semibold text-text-main sm:text-4xl">Предложения для моделей</h1>
         <p className="max-w-2xl text-sm text-text-sec">
           Подберите актуальные офферы от мастеров красоты и откликнитесь на подходящий слот.
@@ -173,3 +173,4 @@ export default async function ModelsPage({ searchParams }: PageProps) {
     </section>
   );
 }
+

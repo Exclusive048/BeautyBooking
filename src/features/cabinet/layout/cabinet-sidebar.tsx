@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/ui/sidebar-item";
@@ -22,7 +22,7 @@ function isActivePath(pathname: string, href: string) {
 
 export function CabinetSidebar({ userLabel }: Props) {
   const pathname = usePathname();
-  const label = userLabel?.trim() || "BeautyHub";
+  const label = userLabel?.trim() || "МастерРядом";
 
   return (
     <aside className="w-full lg:w-[280px] lg:shrink-0">
@@ -50,3 +50,4 @@ export function CabinetSidebar({ userLabel }: Props) {
     </aside>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -526,7 +526,7 @@ export function MasterDashboardPage() {
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 56px sans-serif";
-      ctx.fillText("BeautyHub", 80, 170);
+      ctx.fillText("МастерРядом", 80, 170);
       ctx.font = "42px sans-serif";
       ctx.fillText(`Свободные слоты · ${date}`, 80, 250);
 
@@ -1017,3 +1017,4 @@ export function MasterDashboardPage() {
     </div>
   );
 }
+

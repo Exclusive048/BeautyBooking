@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Вакансии — BeautyHub",
-  description: "Открытые вакансии в BeautyHub. Строим лучший маркетплейс для мастеров красоты.",
+  title: "Вакансии — МастерРядом",
+  description: "Открытые вакансии в МастерРядом. Строим лучший маркетплейс для мастеров красоты.",
 };
 
 export default function CareersPage() {
@@ -18,7 +18,7 @@ export default function CareersPage() {
           Строим вместе
         </h1>
         <p className="text-text-sec text-lg max-w-[500px]">
-          BeautyHub — небольшая команда, которая делает большой продукт. Нам важны
+          МастерРядом — небольшая команда, которая делает большой продукт. Нам важны
           люди, которые думают о пользователях и умеют работать в условиях неопределённости.
         </p>
       </section>
@@ -32,7 +32,7 @@ export default function CareersPage() {
           полезны — напишите нам напрямую с рассказом о себе.
         </p>
         <a
-          href="mailto:jobs@beautyhub.ru"
+          href="mailto:jobs@МастерРядом.ru"
           className="inline-flex h-11 items-center justify-center rounded-xl border border-border-subtle bg-bg-input px-6 text-sm font-semibold text-text-main hover:bg-bg-card transition-colors"
         >
           Написать в команду →
@@ -62,3 +62,4 @@ export default function CareersPage() {
     </main>
   );
 }
+

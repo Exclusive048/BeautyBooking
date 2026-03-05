@@ -1,4 +1,4 @@
-export const UI_TEXT = {
+﻿export const UI_TEXT = {
   common: {
     loading: "Загрузка…",
     cancel: "Отмена",
@@ -11,8 +11,8 @@ export const UI_TEXT = {
     logoutPending: "Выход...",
     loginPage: {
       heroTitle: "Найдите своего мастера за 2 минуты",
-      heroSubtitle: "Присоединяйтесь к клиентам и мастерам BeautyHub",
-      title: "Вход в BeautyHub",
+      heroSubtitle: "Присоединяйтесь к клиентам и мастерам МастерРядом",
+      title: "Вход в МастерРядом",
       subtitle: "Введите номер телефона, чтобы войти или зарегистрироваться.",
       phoneLabel: "Телефон",
       phonePlaceholder: "+77001234567",
@@ -63,7 +63,7 @@ export const UI_TEXT = {
   },
   cabinetHub: {
     title: "Как вы хотите работать сегодня?",
-    subtitle: "Выберите ваше пространство в BeautyHub.",
+    subtitle: "Выберите ваше пространство в МастерРядом.",
     clientTitle: "Клиент",
     clientDescription: "Личный профиль, ваши записи и уведомления.",
     masterTitle: "Мастер",
@@ -262,7 +262,7 @@ export const UI_TEXT = {
   admin: {
     media: {
       siteLogoTitle: "Логотип сайта",
-      siteLogoDescription: "Используется в navbar рядом с BeautyHub.",
+      siteLogoDescription: "Используется в navbar рядом с МастерРядом.",
       loginHeroTitle: "Фото для страницы входа",
       loginHeroDescription: "Большое изображение в левой части страницы /login.",
       uploadImage: "Загрузить изображение",
@@ -709,4 +709,5 @@ export const UI_TEXT = {
     reviewsCountLabel: "отзывов",
   },
 } as const;
+
 
