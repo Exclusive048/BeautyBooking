@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type DashboardCardItem = {
   title: string;
@@ -37,7 +38,7 @@ export function DashboardNavCards({ items, className }: Props) {
                 </div>
               </div>
               <div className="flex items-center justify-between text-sm text-text-sec">
-                <span>Перейти</span>
+                <span>{UI_TEXT.actions.goTo}</span>
                 <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
               </div>
             </CardContent>

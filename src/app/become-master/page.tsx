@@ -1,67 +1,14 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Стать мастером — МастерРядом",
-  description:
-    "Зарегистрируйтесь как мастер на МастерРядом. Онлайн-запись, управление расписанием, клиентская Р±аза и продвижение в каталоге.",
+  title: UI_TEXT.pages.becomeMaster.title,
+  description: UI_TEXT.pages.becomeMaster.description,
 };
 
-const ADVANTAGES = [
-  {
-    icon: "📅",
-    title: "Онлайн-запись без звонков",
-    desc: "Клиенты бронируют сами — вы получаете уведомление и подтверждаете одним нажатием. Никаких переписок в директе.",
-  },
-  {
-    icon: "🗓️",
-    title: "Умное расписание",
-    desc: "Настройте рабочие часы, перерывы, выходные и буфер между записями. Поддерживается цикличный режим 2/2 и 3/3.",
-  },
-  {
-    icon: "📸",
-    title: "Портфолио в ленте",
-    desc: "Ваши работы появляются на главной странице МастерРядом. Клиент видит фото — нажимает «Записаться» — попадает к вам.",
-  },
-  {
-    icon: "⭐",
-    title: "Отзывы и рейтинг",
-    desc: "После каждого визита клиент может оставить отзыв. Рейтинг влияет на позицию в каталоге.",
-  },
-  {
-    icon: "🔔",
-    title: "Уведомления в Telegram",
-    desc: "Подключите бота — и новые записи, отмены и сообщения приходят прямо в мессенджер.",
-  },
-  {
-    icon: "👥",
-    title: "База клиентов",
-    desc: "Все кто записывался к вам — в одном месте. История визитов, контакты, заметки.",
-  },
-];
-
-const HOW_TO_START = [
-  {
-    step: "1",
-    title: "Зарегистрируйтесь",
-    desc: "Войдите через Telegram или VK. Выберите роль «Мастер» или «Студия».",
-  },
-  {
-    step: "2",
-    title: "Заполните профиль",
-    desc: "Добавьте имя, описание, категории услуг, фото профиля и загрузите первые работы в портфолио.",
-  },
-  {
-    step: "3",
-    title: "Настройте прайс",
-    desc: "Создайте услуги с названием, ценой и длительностью. Можно добавить несколько категорий.",
-  },
-  {
-    step: "4",
-    title: "Откройте расписание",
-    desc: "Укажите рабочие часы. Как только опубликуете профиль — появитесь в каталоге и клиенты смогут записываться.",
-  },
-];
+const ADVANTAGES = UI_TEXT.pages.becomeMaster.advantages;
+const HOW_TO_START = UI_TEXT.pages.becomeMaster.startSteps;
 
 export default function BecomeMasterPage() {
   return (
@@ -70,37 +17,39 @@ export default function BecomeMasterPage() {
       {/* Hero */}
       <section className="text-center space-y-5">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          Для мастеров
+          {UI_TEXT.pages.becomeMaster.heroBadge}
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-text-main leading-tight tracking-tight">
-          Р’аС€ бизнес —{" "}
+          {UI_TEXT.pages.becomeMaster.heroTitleMain}{" "}
           <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-            без лишней суеты
+            {UI_TEXT.pages.becomeMaster.heroTitleHighlight}
           </span>
         </h1>
         <p className="text-text-sec text-lg max-w-[540px] mx-auto">
-          МастерРядом берёт на себя запись и напоминания. Р’С‹ занимаетесь тем, что умеете лучше всего.
+          {UI_TEXT.pages.becomeMaster.heroSubtitle}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           <Link
             href="/login"
             className="inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-8 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
           >
-            Зарегистрироваться бесплатно
+            {UI_TEXT.pages.becomeMaster.ctaPrimary}
           </Link>
           <Link
             href="/pricing"
             className="inline-flex h-12 items-center justify-center rounded-xl border border-border-subtle bg-bg-card px-6 text-sm font-semibold text-text-main hover:bg-bg-input transition-colors"
           >
-            Смотреть тарифы
+            {UI_TEXT.pages.becomeMaster.ctaSecondary}
           </Link>
         </div>
-        <p className="text-xs text-text-sec">Бесплатный тариф навсегда. Карта не нужна.</p>
+        <p className="text-xs text-text-sec">{UI_TEXT.pages.becomeMaster.heroNote}</p>
       </section>
 
       {/* Advantages */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main text-center">Что вы получаете</h2>
+        <h2 className="text-2xl font-semibold text-text-main text-center">
+          {UI_TEXT.pages.becomeMaster.advantagesTitle}
+        </h2>
         <div className="grid md:grid-cols-3 gap-4">
           {ADVANTAGES.map((a) => (
             <div key={a.title} className="lux-card rounded-[20px] bg-bg-card p-6 space-y-3">
@@ -114,7 +63,7 @@ export default function BecomeMasterPage() {
 
       {/* How to start */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main">Как начать</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.becomeMaster.startTitle}</h2>
         <div className="grid md:grid-cols-2 gap-4">
           {HOW_TO_START.map((s) => (
             <div key={s.step} className="lux-card rounded-[20px] bg-bg-card p-6 flex gap-4">
@@ -133,17 +82,16 @@ export default function BecomeMasterPage() {
       {/* Pricing teaser */}
       <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-text-main">Тарифы</h2>
+          <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.becomeMaster.pricingTitle}</h2>
           <p className="text-text-sec text-sm max-w-[400px]">
-            Базовые функции — бесплатно навсегда. PRO и Premium открывают карту,
-            горячие слоты, аналитику и приоритет в каталоге.
+            {UI_TEXT.pages.becomeMaster.pricingText}
           </p>
         </div>
         <Link
           href="/pricing"
           className="shrink-0 inline-flex h-10 items-center justify-center rounded-xl border border-border-subtle bg-bg-input px-6 text-sm font-semibold text-text-main hover:bg-bg-card transition-colors"
         >
-          Сравнить тарифы →
+          {UI_TEXT.pages.becomeMaster.pricingCta}
         </Link>
       </section>
 
@@ -151,18 +99,16 @@ export default function BecomeMasterPage() {
       <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 space-y-4">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🏢</span>
-          <h2 className="text-xl font-semibold text-text-main">Работаете в студии?</h2>
+          <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.becomeMaster.studioTitle}</h2>
         </div>
         <p className="text-text-sec text-sm leading-relaxed">
-          МастерРядом поддерживает режим студии: несколько мастеров, общий календарь,
-          разграничение ролей (владелец, администратор, мастер), финансовая отчётность
-          по каждому специалисту. Мастера работают в своём кабинете, вы видите полную картину.
+          {UI_TEXT.pages.becomeMaster.studioText}
         </p>
         <Link
           href="/help/masters"
           className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
         >
-          Подробнее в Р±азРµ знаний →
+          {UI_TEXT.pages.becomeMaster.studioCta}
         </Link>
       </section>
     </main>

@@ -1,13 +1,14 @@
-﻿import { FooterLink } from "@/components/layout/footer/FooterLink";
+import { FooterLink } from "@/components/layout/footer/FooterLink";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const CURRENT_YEAR = new Date().getFullYear();
-const COPYRIGHT_TEXT = `В© ${CURRENT_YEAR} МастерРядом`;
+const COPYRIGHT_TEXT = UI_TEXT.footer.legal.copyright.replace("{year}", String(CURRENT_YEAR));
 // TODO: Replace legal entity details before production launch.
-const LEGAL_ENTITY_TEXT = "ИП Иванов Иван Иванович, ИНН 1234567890";
+const LEGAL_ENTITY_TEXT = UI_TEXT.footer.legal.entity;
 
 const LEGAL_LINKS = [
-  { label: "Политика конфиденциальности", href: "/privacy" },
-  { label: "Пользовательское соглашение", href: "/terms" },
+  { label: UI_TEXT.footer.links.privacy, href: "/privacy" },
+  { label: UI_TEXT.footer.links.terms, href: "/terms" },
 ];
 
 export function FooterCopyright() {

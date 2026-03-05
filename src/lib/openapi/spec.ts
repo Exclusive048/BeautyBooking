@@ -1,4 +1,4 @@
-﻿type SchemaObject = {
+type SchemaObject = {
   type?: "string" | "number" | "integer" | "boolean" | "object" | "array";
   properties?: Record<string, SchemaObject>;
   required?: readonly string[];

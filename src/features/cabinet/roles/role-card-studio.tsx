@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { FocalImage } from "@/components/ui/focal-image";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type StudioActiveData = {
   name: string;
@@ -41,9 +42,9 @@ export function RoleCardStudio(props: Props) {
               +
             </div>
             <div className="flex min-w-0 flex-col gap-1">
-              <div className="text-base font-semibold text-text-main">У меня студия</div>
+              <div className="text-base font-semibold text-text-main">{UI_TEXT.cabinetRoles.studio.title}</div>
               <div className="text-sm text-text-sec">
-                Управляйте командой мастеров, филиалами и общим расписанием
+                {UI_TEXT.cabinetRoles.studio.description}
               </div>
             </div>
           </div>
@@ -76,9 +77,9 @@ export function RoleCardStudio(props: Props) {
               +
             </div>
             <div className="flex min-w-0 flex-col gap-1">
-              <div className="text-base font-semibold text-text-main">Расширяйтесь до студии</div>
+              <div className="text-base font-semibold text-text-main">{UI_TEXT.cabinetRoles.studio.upsellTitle}</div>
               <div className="text-sm text-text-sec">
-                Добавьте команду мастеров и управляйте расписанием в одном месте
+                {UI_TEXT.cabinetRoles.studio.upsellDescription}
               </div>
             </div>
           </div>
@@ -104,11 +105,15 @@ export function RoleCardStudio(props: Props) {
 
   const { data } = props;
   const statusMetric =
-    data.metrics?.find((metric) => metric === "Опубликована" || metric === "Черновик") ?? null;
+    data.metrics?.find(
+      (metric) =>
+        metric === UI_TEXT.cabinetRoles.studio.statusPublished ||
+        metric === UI_TEXT.cabinetRoles.studio.statusDraft
+    ) ?? null;
   const otherMetrics = statusMetric
     ? data.metrics?.filter((metric) => metric !== statusMetric)
     : data.metrics;
-  const isPublished = statusMetric === "Опубликована";
+  const isPublished = statusMetric === UI_TEXT.cabinetRoles.studio.statusPublished;
 
   return (
     <Card className="h-full">
@@ -124,14 +129,14 @@ export function RoleCardStudio(props: Props) {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
-                Лого
-              </div>
+                <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
+                  {UI_TEXT.cabinetRoles.studio.logoFallback}
+                </div>
             )}
           </div>
           <div className="flex min-w-0 flex-col gap-1">
             <div className="truncate text-base font-semibold text-text-main">{data.name}</div>
-            <div className="text-sm text-text-sec">Студия</div>
+            <div className="text-sm text-text-sec">{UI_TEXT.cabinetRoles.studio.label}</div>
             {statusMetric ? (
               <div className="flex items-center gap-2 text-sm text-text-sec">
                 <span
@@ -155,10 +160,10 @@ export function RoleCardStudio(props: Props) {
         <div className="mt-5">
           {data.actionHref ? (
             <Button asChild className="w-full">
-              <Link href={data.actionHref}>{data.actionLabel ?? "Открыть кабинет"}</Link>
+              <Link href={data.actionHref}>{data.actionLabel ?? UI_TEXT.cabinetRoles.studio.openCabinet}</Link>
             </Button>
           ) : (
-            <Button className="w-full">{data.actionLabel ?? "Открыть кабинет"}</Button>
+            <Button className="w-full">{data.actionLabel ?? UI_TEXT.cabinetRoles.studio.openCabinet}</Button>
           )}
           {"onDelete" in props && props.onDelete ? (
             <button
@@ -166,7 +171,7 @@ export function RoleCardStudio(props: Props) {
               onClick={props.onDelete}
               className="mt-4 text-xs text-text-sec transition-colors underline-offset-2 hover:text-red-500 hover:underline"
             >
-              ??????? ??????? ??????
+              {UI_TEXT.cabinetRoles.studio.deleteRole}
             </button>
           ) : null}
         </div>

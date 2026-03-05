@@ -9,6 +9,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import type { NotificationEvent } from "@/lib/notifications/notifier";
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   ariaLabel: string;
@@ -129,7 +130,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
       const res = await fetch(`/api/bookings/${booking.bookingId}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Отклонено" }),
+        body: JSON.stringify({ reason: UI_TEXT.notifications.declineReason }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
@@ -179,19 +180,19 @@ export function NotificationsBell({ ariaLabel }: Props) {
                 key={toast.id}
                 className="rounded-2xl border border-border-subtle bg-bg-card/90 p-4 shadow-card"
               >
-                <div className="text-sm font-semibold text-text-main">У вас новое уведомление</div>
+                <div className="text-sm font-semibold text-text-main">{UI_TEXT.notifications.toastTitle}</div>
                 <div className="mt-1 text-sm text-text-sec">{toast.body}</div>
                 {canAct ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => void handleConfirm(toast.id, toast.payloadJson)}>
-                      Подтвердить
+                      {UI_TEXT.actions.confirm}
                     </Button>
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => void handleDecline(toast.id, toast.payloadJson)}
                     >
-                      Отклонить
+                      {UI_TEXT.actions.decline}
                     </Button>
                   </div>
                 ) : null}
@@ -202,7 +203,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
                       variant="secondary"
                       onClick={() => void handleOpenChat(toast.id, toast.payloadJson)}
                     >
-                      Открыть чат
+                      {UI_TEXT.actions.openChat}
                     </Button>
                   </div>
                 ) : null}

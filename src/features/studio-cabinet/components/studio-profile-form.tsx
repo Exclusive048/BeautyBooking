@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, type FormEvent, type Ref, type Keyboard
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   name: string;
@@ -158,29 +159,31 @@ export function StudioProfileForm({
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Название</div>
+            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.nameLabel}</div>
             <Input
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Название студии"
+              placeholder={UI_TEXT.studioCabinet.profile.namePlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Описание</div>
+            <div className="text-xs font-medium text-text-label">
+              {UI_TEXT.studioCabinet.profile.descriptionLabel}
+            </div>
             <Textarea
               ref={descriptionRef}
               value={description}
               onChange={(event) => onDescriptionChange(event.target.value)}
               onInput={onDescriptionInput}
-              placeholder="Расскажите о студии"
+              placeholder={UI_TEXT.studioCabinet.profile.descriptionPlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Адрес</div>
+            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.addressLabel}</div>
             <div ref={addressSuggestRootRef} className="relative">
               <Textarea
                 ref={addressInputRef}
@@ -195,7 +198,7 @@ export function StudioProfileForm({
                 onBlur={() => {
                   setIsAddressSuggestOpen(false);
                 }}
-                placeholder="Город, улица, дом"
+                placeholder={UI_TEXT.studioCabinet.profile.addressPlaceholder}
                 className={inputClass}
                 rows={2}
               />
@@ -211,7 +214,10 @@ export function StudioProfileForm({
                       className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
                         index === addressSuggestIndex ? "bg-bg-input" : ""
                       }`}
-                      aria-label={`Выбрать адрес ${item.value}`}
+                      aria-label={UI_TEXT.studioCabinet.profile.selectAddressAria.replace(
+                        "{address}",
+                        item.value
+                      )}
                     >
                       <span className="whitespace-normal break-words">{item.value}</span>
                     </button>
@@ -227,51 +233,55 @@ export function StudioProfileForm({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Телефон</div>
+            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.phoneLabel}</div>
             <Input
               value={phone}
               onChange={(event) => onPhoneChange(event.target.value)}
-              placeholder="+7 700 000 00 00"
+              placeholder={UI_TEXT.studioCabinet.profile.phonePlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Email</div>
+            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.emailLabel}</div>
             <Input
               value={email}
               onChange={(event) => onEmailChange(event.target.value)}
-              placeholder="studio@email.com"
+              placeholder={UI_TEXT.studioCabinet.profile.emailPlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Telegram</div>
+            <div className="text-xs font-medium text-text-label">
+              {UI_TEXT.studioCabinet.profile.telegramLabel}
+            </div>
             <Input
               value={telegram}
               onChange={(event) => onTelegramChange(event.target.value)}
-              placeholder="@studio"
+              placeholder={UI_TEXT.studioCabinet.profile.telegramPlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">Instagram</div>
+            <div className="text-xs font-medium text-text-label">
+              {UI_TEXT.studioCabinet.profile.instagramLabel}
+            </div>
             <Input
               value={instagram}
               onChange={(event) => onInstagramChange(event.target.value)}
-              placeholder="@studio"
+              placeholder={UI_TEXT.studioCabinet.profile.instagramPlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">VK</div>
+            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.vkLabel}</div>
             <Input
               value={vk}
               onChange={(event) => onVkChange(event.target.value)}
-              placeholder="vk.com/studio"
+              placeholder={UI_TEXT.studioCabinet.profile.vkPlaceholder}
               className={inputClass}
             />
           </div>

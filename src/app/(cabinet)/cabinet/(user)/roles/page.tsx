@@ -5,6 +5,7 @@ import { RolesCards } from "@/features/cabinet/roles/roles-cards";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getMeProfile } from "@/lib/users/profile";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const masterCabinetHref = "/cabinet/master";
 const studioCabinetHref = "/cabinet/studio";
@@ -64,17 +65,17 @@ export default async function RolesPage() {
           ratingAvg: masterProvider.ratingAvg,
           ratingCount: masterProvider.ratingCount,
           statusLabel: masterProvider.isPublished
-            ? "Профиль опубликован"
-            : "Профиль не опубликован",
+            ? UI_TEXT.cabinetRolesPage.masterPublished
+            : UI_TEXT.cabinetRolesPage.masterDraft,
           avatarUrl: masterProvider.avatarUrl,
           avatarFocalX: masterProvider.avatarFocalX ?? null,
           avatarFocalY: masterProvider.avatarFocalY ?? null,
-          actionLabel: "Открыть кабинет",
+          actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: masterCabinetHref,
         }
       : {
-          name: "Профиль мастера",
-          actionLabel: "Открыть кабинет",
+          name: UI_TEXT.cabinetRolesPage.masterProfileTitle,
+          actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: masterCabinetHref,
         }
     : null;
@@ -82,12 +83,19 @@ export default async function RolesPage() {
   const studioMetrics = studioProvider
     ? [
         studioProvider._count.masters
-          ? `Мастеров: ${studioProvider._count.masters}`
+          ? UI_TEXT.cabinetRolesPage.mastersCount.replace(
+              "{count}",
+              String(studioProvider._count.masters)
+            )
           : null,
         studioProvider.ratingCount
-          ? `★ ${studioProvider.ratingAvg.toFixed(1)} (${studioProvider.ratingCount})`
+          ? UI_TEXT.cabinetRolesPage.ratingTemplate
+              .replace("{rating}", studioProvider.ratingAvg.toFixed(1))
+              .replace("{count}", String(studioProvider.ratingCount))
           : null,
-        studioProvider.isPublished ? "Опубликована" : "Черновик",
+        studioProvider.isPublished
+          ? UI_TEXT.cabinetRolesPage.studioPublished
+          : UI_TEXT.cabinetRolesPage.studioDraft,
       ].filter((item): item is string => Boolean(item))
     : [];
 
@@ -99,12 +107,12 @@ export default async function RolesPage() {
           logoFocalX: studioProvider.avatarFocalX ?? null,
           logoFocalY: studioProvider.avatarFocalY ?? null,
           metrics: studioMetrics,
-          actionLabel: "Открыть кабинет",
+          actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: studioCabinetHref,
         }
       : {
-          name: "Студия",
-          actionLabel: "Открыть кабинет",
+          name: UI_TEXT.cabinetRolesPage.studioTitle,
+          actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: studioCabinetHref,
         }
     : null;
@@ -112,8 +120,8 @@ export default async function RolesPage() {
   return (
     <div className="space-y-6">
       <HeaderBlock
-        title="Профессиональные роли"
-        subtitle="Управляйте своим бизнесом или работой мастера"
+        title={UI_TEXT.cabinetRolesPage.title}
+        subtitle={UI_TEXT.cabinetRolesPage.subtitle}
       />
 
       <RolesCards

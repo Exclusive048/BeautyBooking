@@ -396,7 +396,7 @@ export function PublicBookingWidget({
       } catch {
         if (!cancelled) {
           setBookingConfig(null);
-          setBookingConfigError("Не удалось загрузить требования записи.");
+        setBookingConfigError(UI_TEXT.publicProfile.booking.bookingConfigLoadFailed);
         }
       } finally {
         if (!cancelled) {
@@ -537,7 +537,7 @@ export function PublicBookingWidget({
     setSubmitSuccess(null);
     try {
       if (bookingConfig?.requiresReferencePhoto && !referencePhotoAssetId) {
-        setSubmitError("Нужен фото-референс для записи.");
+        setSubmitError(UI_TEXT.publicProfile.booking.referencePhotoRequired);
         setSubmitLoading(false);
         return;
       }
@@ -546,7 +546,7 @@ export function PublicBookingWidget({
           (question) => question.required && !(bookingAnswers[question.id]?.trim() ?? "")
         );
         if (missingRequired) {
-          setSubmitError("Ответьте на обязательные вопросы.");
+          setSubmitError(UI_TEXT.publicProfile.booking.requiredQuestions);
           setSubmitLoading(false);
           return;
         }
@@ -670,7 +670,7 @@ export function PublicBookingWidget({
               disabled={slotsLoading}
               className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card disabled:opacity-60"
             >
-              Обновить
+              {UI_TEXT.publicProfile.slots.refresh}
             </button>
             <button
               type="button"
@@ -681,7 +681,7 @@ export function PublicBookingWidget({
               disabled={!loadedUntilExclusive || !hasMore || slotsLoading}
               className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card disabled:opacity-60"
             >
-              Показать ещё неделю
+              {UI_TEXT.publicProfile.slots.showMoreWeek}
             </button>
           </div>
 
@@ -748,7 +748,7 @@ export function PublicBookingWidget({
                 ) : (
                   <div className="text-sm text-text-sec">
                     {selectedDate
-                      ? "Всё занято"
+                      ? UI_TEXT.publicProfile.slots.allBusy
                       : slots.length > 0
                         ? UI_TEXT.publicProfile.slots.noSlotsForDay
                         : UI_TEXT.publicProfile.slots.noSlots}
@@ -792,13 +792,15 @@ export function PublicBookingWidget({
           <div>
             <label
               className="mb-2 block cursor-pointer rounded-xl border border-border-subtle bg-bg-input/70 p-3"
-              aria-label="Хочу помолчать"
+              aria-label={UI_TEXT.publicProfile.booking.silentModeAria}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-text-main">Хочу помолчать 🤫</div>
+                  <div className="text-sm font-medium text-text-main">
+                    {UI_TEXT.publicProfile.booking.silentModeTitle}
+                  </div>
                   <div className="mt-1 text-xs text-text-sec">
-                    Мастер поздоровается, уточнит детали и дальше будет работать без разговоров.
+                    {UI_TEXT.publicProfile.booking.silentModeDesc}
                   </div>
                 </div>
                 <span
@@ -831,18 +833,21 @@ export function PublicBookingWidget({
 
           
           {bookingConfigLoading ? (
-            <div className="text-xs text-text-sec">????????? ?????????? ??????...</div>
+            <div className="text-xs text-text-sec">{UI_TEXT.publicProfile.booking.bookingConfigLoading}</div>
           ) : null}
           {bookingConfigError ? <div className="text-xs text-rose-400">{bookingConfigError}</div> : null}
 
           {bookingConfig && (bookingConfig.requiresReferencePhoto || bookingConfig.questions.length > 0) ? (
             <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-sm">
-              <div className="text-sm font-semibold text-text-main">?????? ???????</div>
+              <div className="text-sm font-semibold text-text-main">
+                {UI_TEXT.publicProfile.booking.bookingConfigTitle}
+              </div>
 
               {bookingConfig.requiresReferencePhoto ? (
                 <div className="mt-3">
                   <label className="block text-xs text-text-sec">
-                    ????-???????? <span className="text-rose-400">*</span>
+                    {UI_TEXT.publicProfile.booking.referencePhotoLabel}{" "}
+                    <span className="text-rose-400">*</span>
                   </label>
                   <input
                     type="file"
@@ -855,7 +860,9 @@ export function PublicBookingWidget({
                     className="mt-2 block w-full text-xs text-text-sec"
                   />
                   {referenceUploading ? (
-                    <div className="mt-2 text-xs text-text-sec">????????? ????...</div>
+                    <div className="mt-2 text-xs text-text-sec">
+                      {UI_TEXT.publicProfile.booking.referencePhotoUploading}
+                    </div>
                   ) : null}
                   {referenceUploadError ? (
                     <div className="mt-2 text-xs text-rose-400">{referenceUploadError}</div>
@@ -863,7 +870,7 @@ export function PublicBookingWidget({
                   {referencePreviewUrl ? (
                     <img
                       src={referencePreviewUrl}
-                      alt="????????"
+                      alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
                       className="mt-3 max-h-48 w-full rounded-xl object-cover"
                     />
                   ) : null}
@@ -885,7 +892,7 @@ export function PublicBookingWidget({
                           setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                         }
                         className="lux-input mt-2 w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
-                        placeholder="??? ?????"
+                        placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
                       />
                     </label>
                   ))}

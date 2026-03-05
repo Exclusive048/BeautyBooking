@@ -1,41 +1,14 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "О платформе — МастерРядом",
-  description:
-    "МастерРядом — маркетплейс мастеров красоты. Узнайте, как мы помогаем клиентам находить специалистов, а мастерам — управлять записями и развивать бизнес.",
+  title: UI_TEXT.pages.about.title,
+  description: UI_TEXT.pages.about.description,
 };
 
-const STATS = [
-  { value: "1 000+", label: "мастеров и студий" },
-  { value: "50 000+", label: "бронирований" },
-  { value: "20+", label: "городов" },
-  { value: "4.9", label: "средний рейтинг" },
-];
-
-const VALUES = [
-  {
-    icon: "🎯",
-    title: "Прозрачность",
-    desc: "Реальные отзывы, честные цены и актуальное расписание без звонков и ожидания.",
-  },
-  {
-    icon: "⚡",
-    title: "Скорость",
-    desc: "Запись за пару касаний. Без мессенджеров, без «напишите в директ».",
-  },
-  {
-    icon: "🤝",
-    title: "Партнёрство",
-    desc: "Мы зарабатываем только тогда, когда зарабатывают мастера. Наш рост — общий.",
-  },
-  {
-    icon: "🔒",
-    title: "Надёжность",
-    desc: "Данные клиентов и платежи защищены. Расписание всегда под рукой.",
-  },
-];
+const STATS = UI_TEXT.pages.about.stats;
+const VALUES = UI_TEXT.pages.about.values;
 
 export default function AboutPage() {
   return (
@@ -44,44 +17,34 @@ export default function AboutPage() {
       {/* Hero */}
       <section className="text-center space-y-5">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          О платформе
+          {UI_TEXT.pages.about.heroBadge}
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-text-main leading-tight tracking-tight">
-          Красота — без лишних{" "}
+          {UI_TEXT.pages.about.heroTitleMain}{" "}
           <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-            сложностей
+            {UI_TEXT.pages.about.heroTitleHighlight}
           </span>
         </h1>
         <p className="text-lg text-text-sec max-w-[600px] mx-auto leading-relaxed">
-          МастерРядом — это маркетплейс, который соединяет клиентов с мастерами красоты.
-          Мы решаем простую, но болезненную проблему: найти хорошего специалиста и
-          записаться к нему — до сих пор С‚Р° РµС‰С‘ задача.
+          {UI_TEXT.pages.about.heroDescription}
         </p>
       </section>
 
       {/* Problem */}
       <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 space-y-4">
-        <h2 className="text-2xl font-semibold text-text-main">Какую проблему мы решаем</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.about.problemTitle}</h2>
         <div className="grid md:grid-cols-2 gap-6 text-text-sec text-sm leading-relaxed">
           <div className="space-y-2">
-            <p className="font-medium text-text-main">Для клиентов</p>
-            <p>
-              Поиск мастера — это часами листать Instagram, писать в директ, ждать ответа,
-              уточнять цену, узнавать свободные даты. Часть мастеров не отвечает вообще.
-            </p>
+            <p className="font-medium text-text-main">{UI_TEXT.pages.about.problemClientTitle}</p>
+            <p>{UI_TEXT.pages.about.problemClientText}</p>
           </div>
           <div className="space-y-2">
-            <p className="font-medium text-text-main">Для мастеров</p>
-            <p>
-              Управление записями вручную — через мессенджеры, заметки и память — отнимает
-              время, которое можно потратить на работу. Пропущенные записи, накладки,
-              потерянные клиенты.
-            </p>
+            <p className="font-medium text-text-main">{UI_TEXT.pages.about.problemMasterTitle}</p>
+            <p>{UI_TEXT.pages.about.problemMasterText}</p>
           </div>
         </div>
         <p className="text-text-sec text-sm leading-relaxed pt-2 border-t border-border-subtle">
-          МастерРядом закрывает оба конца: клиент видит реальное расписание и бронирует
-          онлайн, мастер получает уведомление и ведёт всю базу в одном месте.
+          {UI_TEXT.pages.about.problemSummary}
         </p>
       </section>
 
@@ -100,7 +63,7 @@ export default function AboutPage() {
 
       {/* Values */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main">Наши принципы</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.about.valuesTitle}</h2>
         <div className="grid md:grid-cols-2 gap-4">
           {VALUES.map((v) => (
             <div
@@ -119,22 +82,20 @@ export default function AboutPage() {
 
       {/* CTA */}
       <section className="text-center space-y-4">
-        <h2 className="text-2xl font-semibold text-text-main">Присоединяйтесь</h2>
-        <p className="text-text-sec text-sm">
-          Р’С‹ клиент — найдите мастера рядом. Р’С‹ мастер — попробуйте бесплатно.
-        </p>
+        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.about.ctaTitle}</h2>
+        <p className="text-text-sec text-sm">{UI_TEXT.pages.about.ctaText}</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/catalog"
             className="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
           >
-            Найти мастера
+            {UI_TEXT.pages.about.ctaFindMaster}
           </Link>
           <Link
             href="/become-master"
             className="inline-flex h-11 items-center justify-center rounded-xl border border-border-subtle bg-bg-card px-6 text-sm font-semibold text-text-main hover:bg-bg-input transition-colors"
           >
-            Стать мастером
+            {UI_TEXT.pages.about.ctaBecomeMaster}
           </Link>
         </div>
       </section>

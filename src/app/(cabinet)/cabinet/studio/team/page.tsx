@@ -5,6 +5,7 @@ import { StudioTeamPage, type StudioTeamMaster } from "@/features/studio/compone
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   searchParams?: Promise<{ filter?: string }> | { filter?: string };
@@ -32,8 +33,8 @@ export default async function StudioTeamRoute({ searchParams }: Props) {
   return (
     <section className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-text-main">Команда студии</h1>
-        <p className="mt-1 text-sm text-text-sec">Управляйте мастерами и расписанием смен.</p>
+        <h1 className="text-2xl font-semibold text-text-main">{UI_TEXT.studioCabinet.teamPage.title}</h1>
+        <p className="mt-1 text-sm text-text-sec">{UI_TEXT.studioCabinet.teamPage.subtitle}</p>
       </div>
 
       <TeamTabs
@@ -50,17 +51,21 @@ export default async function StudioTeamRoute({ searchParams }: Props) {
                 key={master.id}
                 name={master.name}
                 specialty={master.title}
-                statusLabel="🟢 Свободен"
+                statusLabel={UI_TEXT.studioCabinet.teamPage.statusFree}
                 statusTone="free"
-                shift="Смена 10:00–19:00"
-                bookingsInfo={`Записей: ${2 + index} • Следующее окно 15:30`}
+                shift={UI_TEXT.studioCabinet.teamPage.shiftTemplate
+                  .replace("{start}", "10:00")
+                  .replace("{end}", "19:00")}
+                bookingsInfo={UI_TEXT.studioCabinet.teamPage.bookingsInfoTemplate
+                  .replace("{count}", String(2 + index))
+                  .replace("{time}", "15:30")}
                 actionHref={`/cabinet/studio/calendar?masterId=${master.id}&view=day&date=today`}
               />
             ))}
           </div>
         ) : (
           <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">
-            Сегодня нет активных смен.
+            {UI_TEXT.studioCabinet.teamPage.emptyActiveShifts}
           </div>
         )
       ) : (

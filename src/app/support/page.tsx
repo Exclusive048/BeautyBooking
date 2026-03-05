@@ -1,10 +1,11 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import SupportPageClient from "./support-client";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Поддержка — МастерРядом",
-  description: "Создайте обращение в поддержку МастерРядом: сообщите об ошибке или предложите улучшение.",
+  title: UI_TEXT.pages.support.title,
+  description: UI_TEXT.pages.support.description,
 };
 
 export default function SupportPage() {
@@ -14,13 +15,13 @@ export default function SupportPage() {
       {/* Hero */}
       <section className="space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          Поддержка
+          {UI_TEXT.pages.support.heroBadge}
         </div>
         <h1 className="text-4xl font-bold text-text-main tracking-tight">
-          Напишите нам
+          {UI_TEXT.pages.support.heroTitle}
         </h1>
         <p className="text-text-sec">
-          Нашли ошибку или есть идея? Расскажите — разберёмся и ответим.
+          {UI_TEXT.pages.support.heroSubtitle}
         </p>
       </section>
 
@@ -32,8 +33,8 @@ export default function SupportPage() {
         >
           <span className="text-xl">❓</span>
           <div>
-            <p className="text-sm font-medium text-text-main">FAQ</p>
-            <p className="text-xs text-text-sec mt-0.5">Ответы на частые вопросы</p>
+            <p className="text-sm font-medium text-text-main">{UI_TEXT.pages.support.faqTitle}</p>
+            <p className="text-xs text-text-sec mt-0.5">{UI_TEXT.pages.support.faqDescription}</p>
           </div>
         </Link>
         <a
@@ -44,15 +45,15 @@ export default function SupportPage() {
         >
           <span className="text-xl">💬</span>
           <div>
-            <p className="text-sm font-medium text-text-main">Telegram</p>
-            <p className="text-xs text-text-sec mt-0.5">Быстрый ответ в чате</p>
+            <p className="text-sm font-medium text-text-main">{UI_TEXT.pages.support.telegramTitle}</p>
+            <p className="text-xs text-text-sec mt-0.5">{UI_TEXT.pages.support.telegramDescription}</p>
           </div>
         </a>
       </div>
 
       {/* Form */}
       <div className="lux-card rounded-[24px] bg-bg-card p-7">
-        <h2 className="text-lg font-semibold text-text-main mb-6">Новое обращение</h2>
+        <h2 className="text-lg font-semibold text-text-main mb-6">{UI_TEXT.pages.support.formTitle}</h2>
         <SupportPageClient />
       </div>
     </main>

@@ -1,9 +1,10 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import { FooterCTA } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
 import { FooterSocials } from "@/components/layout/footer/FooterSocials";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const APP_ROOT = path.join(process.cwd(), "src", "app");
 
@@ -23,36 +24,36 @@ function buildFooterLinks() {
   const hasSupportPage = hasPage("support");
 
   const about: FooterLinkItem[] = [
-    { label: "О нас", href: "/about" },
-    { label: "Как это работает", href: "/how-it-works" },
-    ...(showBlog ? [{ label: "Блог", href: "/blog" }] : []),
-    { label: "Партнёрам", href: "/partners" },
-    ...(showCareers ? [{ label: "Вакансии", href: "/careers" }] : []),
+    { label: UI_TEXT.footer.links.about, href: "/about" },
+    { label: UI_TEXT.footer.links.howItWorks, href: "/how-it-works" },
+    ...(showBlog ? [{ label: UI_TEXT.footer.links.blog, href: "/blog" }] : []),
+    { label: UI_TEXT.footer.links.partners, href: "/partners" },
+    ...(showCareers ? [{ label: UI_TEXT.footer.links.careers, href: "/careers" }] : []),
   ];
 
   const clients: FooterLinkItem[] = [
-    { label: "Как забронировать", href: "/how-to-book" },
-    { label: "Популярные услуги", href: "/catalog?sort=popular" },
-    { label: "Мастера рядом", href: "/catalog?available=today" },
-    { label: "Предложения для моделей", href: "/models" },
-    ...(showGiftCards ? [{ label: "Подарочные сертификаты", href: "/gift-cards" }] : []),
+    { label: UI_TEXT.footer.links.howToBook, href: "/how-to-book" },
+    { label: UI_TEXT.footer.links.popularServices, href: "/catalog?sort=popular" },
+    { label: UI_TEXT.footer.links.mastersNearby, href: "/catalog?available=today" },
+    { label: UI_TEXT.footer.links.offersForModels, href: "/models" },
+    ...(showGiftCards ? [{ label: UI_TEXT.footer.links.giftCards, href: "/gift-cards" }] : []),
   ];
 
   const masters: FooterLinkItem[] = [
-    { label: "Стать мастером", href: "/become-master" },
-    { label: "Тарифы", href: "/pricing" },
-    { label: "База знаний", href: "/help/masters" },
-    { label: "Партнёрская программа", href: "/partners" },
+    { label: UI_TEXT.footer.links.becomeMaster, href: "/become-master" },
+    { label: UI_TEXT.footer.links.pricing, href: "/pricing" },
+    { label: UI_TEXT.footer.links.knowledgeBase, href: "/help/masters" },
+    { label: UI_TEXT.footer.links.affiliateProgram, href: "/partners" },
   ];
 
   const support: FooterLinkItem[] = [
-    { label: "FAQ", href: "/faq" },
+    { label: UI_TEXT.footer.links.faq, href: "/faq" },
     hasSupportPage
-      ? { label: "Написать нам", href: "/support" }
-      : { label: "Написать нам", href: "mailto:support@МастерРядом.ru", external: true },
-    { label: "Telegram поддержка", href: "https://t.me/МастерРядом_support", external: true },
-    { label: "Пользовательское соглашение", href: "/terms" },
-    { label: "Политика конфиденциальности", href: "/privacy" },
+      ? { label: UI_TEXT.footer.links.contact, href: "/support" }
+      : { label: UI_TEXT.footer.links.contact, href: "mailto:support@МастерРядом.ru", external: true },
+    { label: UI_TEXT.footer.links.telegramSupport, href: "https://t.me/МастерРядом_support", external: true },
+    { label: UI_TEXT.footer.links.terms, href: "/terms" },
+    { label: UI_TEXT.footer.links.privacy, href: "/privacy" },
   ];
 
   return { about, clients, masters, support };
@@ -74,21 +75,18 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,3fr)]">
           <div className="space-y-4">
             <div className="text-[18px] font-semibold" itemScope itemType="https://schema.org/Organization">
-              <span itemProp="name">МастерРядом</span>
+              <span itemProp="name">{UI_TEXT.brand.name}</span>
             </div>
-            <p className="text-sm text-text-sec">
-              Маркетплейс мастеров красоты. Находите лучших специалистов рядом и бронируйте
-              услуги онлайн за пару минут.
-            </p>
+            <p className="text-sm text-text-sec">{UI_TEXT.footer.brandDescription}</p>
             <FooterSocials />
           </div>
 
-          <nav aria-label="Навигация футера">
+          <nav aria-label={UI_TEXT.footer.aria.nav}>
             <div className="grid gap-8 md:grid-cols-2 md:gap-12 lg:grid-cols-4">
-              <FooterColumn title="О платформе" links={about} />
-              <FooterColumn title="Для клиентов" links={clients} />
-              <FooterColumn title="Для мастеров" links={masters} />
-              <FooterColumn title="Поддержка" links={support} />
+              <FooterColumn title={UI_TEXT.footer.columns.about} links={about} />
+              <FooterColumn title={UI_TEXT.footer.columns.clients} links={clients} />
+              <FooterColumn title={UI_TEXT.footer.columns.masters} links={masters} />
+              <FooterColumn title={UI_TEXT.footer.columns.support} links={support} />
             </div>
           </nav>
         </div>

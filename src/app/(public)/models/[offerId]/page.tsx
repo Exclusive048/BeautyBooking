@@ -1,10 +1,11 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { getPublicModelOffer } from "@/lib/model-offers/public.service";
 import { ModelOfferApplyForm } from "@/features/model-offers/components/public-model-offer-apply";
 import { FocalImage } from "@/components/ui/focal-image";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type PageProps = {
   params: Promise<{ offerId: string }>;
@@ -15,14 +16,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const offer = await getPublicModelOffer(offerId);
   if (!offer) {
     return {
-      title: "Предложение не найдено | МастерРядом",
-      description: "Предложение для моделей недоступно или было закрыто.",
+      title: UI_TEXT.pages.modelOffer.notFoundTitle,
+      description: UI_TEXT.pages.modelOffer.notFoundDescription,
     };
   }
 
   return {
-    title: `${offer.service.title} для моделей | МастерРядом`,
-    description: `Предложение от мастера ${offer.master.name}: ${offer.dateLocal} ${offer.timeRangeStartLocal}-${offer.timeRangeEndLocal}.`,
+    title: UI_TEXT.pages.modelOffer.titleTemplate.replace("{service}", offer.service.title),
+    description: UI_TEXT.pages.modelOffer.descriptionTemplate
+      .replace("{name}", offer.master.name)
+      .replace("{date}", offer.dateLocal)
+      .replace("{start}", offer.timeRangeStartLocal)
+      .replace("{end}", offer.timeRangeEndLocal),
   };
 }
 
@@ -38,7 +43,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
     <section className="mx-auto w-full max-w-5xl px-4 pb-16 pt-10">
       <div className="mb-6">
         <Link href="/models" className="text-sm text-text-sec hover:text-text-main">
-          ← Все предложения
+          {UI_TEXT.pages.modelOffer.backToOffers}
         </Link>
       </div>
 
@@ -61,10 +66,11 @@ export default async function ModelOfferPage({ params }: PageProps) {
               )}
             </div>
             <div>
-              <div className="text-sm text-text-sec">Мастер</div>
+              <div className="text-sm text-text-sec">{UI_TEXT.pages.modelOffer.masterLabel}</div>
               <div className="text-lg font-semibold text-text-main">{offer.master.name}</div>
               <div className="text-xs text-text-sec">
-                {offer.master.city ?? "Город не указан"} • ⭐ {offer.master.ratingAvg.toFixed(1)}
+                {offer.master.city ?? UI_TEXT.pages.models.cityFallback} • ⭐{" "}
+                {offer.master.ratingAvg.toFixed(1)}
               </div>
             </div>
           </div>
@@ -74,13 +80,13 @@ export default async function ModelOfferPage({ params }: PageProps) {
               href={`/u/${offer.master.publicUsername}`}
               className="mt-4 inline-flex text-sm font-medium text-primary hover:opacity-80"
             >
-              Перейти в профиль мастера
+              {UI_TEXT.pages.modelOffer.masterProfileCta}
             </Link>
           ) : null}
 
           <div className="mt-6 border-t border-border-subtle/80 pt-6">
             <div className="text-xs uppercase tracking-wide text-text-sec">
-              {offer.service.category?.title ?? "Категория не указана"}
+              {offer.service.category?.title ?? UI_TEXT.pages.models.categoryFallback}
             </div>
             <h1 className="mt-2 text-2xl font-semibold text-text-main">{offer.service.title}</h1>
             {offer.service.description ? (
@@ -89,23 +95,27 @@ export default async function ModelOfferPage({ params }: PageProps) {
 
             <div className="mt-6 grid gap-3 rounded-2xl bg-bg-input/60 p-4 text-sm text-text-main">
               <div className="flex items-center justify-between">
-                <span>Дата и время</span>
+                <span>{UI_TEXT.pages.modelOffer.dateTimeLabel}</span>
                 <span>
                   {offer.dateLocal} • {offer.timeRangeStartLocal}-{offer.timeRangeEndLocal}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Длительность</span>
-                <span>{offer.service.durationMin} мин</span>
+                <span>{UI_TEXT.pages.modelOffer.durationLabel}</span>
+                <span>
+                  {offer.service.durationMin} {UI_TEXT.common.minutesShort}
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Стоимость</span>
-                <span>{offer.price !== null ? `${offer.price} ₽` : "Бесплатно"}</span>
+                <span>{UI_TEXT.pages.modelOffer.priceLabel}</span>
+                <span>
+                  {offer.price !== null ? `${offer.price} ₽` : UI_TEXT.pages.models.priceFree}
+                </span>
               </div>
             </div>
 
             <div className="mt-6">
-              <div className="text-sm font-semibold text-text-main">Требования</div>
+              <div className="text-sm font-semibold text-text-main">{UI_TEXT.pages.modelOffer.requirementsTitle}</div>
               {offer.requirements.length > 0 ? (
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-sec">
                   {offer.requirements.map((item) => (
@@ -113,16 +123,16 @@ export default async function ModelOfferPage({ params }: PageProps) {
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-text-sec">Нет дополнительных требований.</p>
+                <p className="mt-2 text-sm text-text-sec">{UI_TEXT.pages.modelOffer.requirementsEmpty}</p>
               )}
             </div>
           </div>
         </div>
 
         <aside className="rounded-3xl border border-border-subtle/80 bg-bg-card/80 p-6">
-          <div className="text-sm font-semibold text-text-main">Отклик на предложение</div>
+          <div className="text-sm font-semibold text-text-main">{UI_TEXT.pages.modelOffer.applyTitle}</div>
           <p className="mt-2 text-sm text-text-sec">
-            Загрузите 1–3 фото и коротко расскажите о себе. Мастер увидит вашу заявку в кабинете.
+            {UI_TEXT.pages.modelOffer.applySubtitle}
           </p>
           <div className="mt-5">
             <ModelOfferApplyForm offerId={offer.id} userId={user?.id ?? null} loginHref={loginHref} />

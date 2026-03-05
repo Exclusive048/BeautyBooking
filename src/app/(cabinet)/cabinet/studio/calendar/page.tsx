@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { StudioCalendarPage } from "@/features/studio/components/studio-calendar-page";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export default async function StudioCalendarRoute() {
   const user = await getSessionUser();
@@ -17,8 +18,8 @@ export default async function StudioCalendarRoute() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-xl font-semibold">Календарь</h2>
-        <p className="text-sm text-text-sec">Записи и блоки студии в одном месте.</p>
+        <h2 className="text-xl font-semibold">{UI_TEXT.studioCabinet.calendar.title}</h2>
+        <p className="text-sm text-text-sec">{UI_TEXT.studioCabinet.calendar.subtitle}</p>
       </header>
       <StudioCalendarPage studioId={studioId} />
     </section>

@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
@@ -10,6 +10,7 @@ import { withQuery } from "@/lib/public-urls";
 import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { getNonce } from "@/lib/csp/nonce";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -35,8 +36,8 @@ function buildDescription(input: {
     input.description?.trim() ||
     input.tagline?.trim() ||
     (input.type === "STUDIO"
-      ? `Запись онлайн в студию ${input.name}. Услуги, цены, отзывы и свободные окна.`
-      : `Запись онлайн к мастеру ${input.name}. Услуги, цены, отзывы и свободные окна.`);
+      ? UI_TEXT.pages.publicProfile.studioDescriptionFallback.replace("{name}", input.name)
+      : UI_TEXT.pages.publicProfile.masterDescriptionFallback.replace("{name}", input.name));
   return truncateText(base, 160);
 }
 
@@ -110,7 +111,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!provider || !provider.publicUsername) {
     return {
-      title: "Профиль не найден | МастерРядом",
+      title: UI_TEXT.pages.publicProfile.notFoundTitle,
       robots: { index: false, follow: false },
     };
   }
@@ -120,7 +121,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  const title = `${provider.name} — запись онлайн | МастерРядом`;
+  const title = UI_TEXT.pages.publicProfile.titleTemplate.replace("{name}", provider.name);
   const description = buildDescription({
     name: provider.name,
     type: provider.type,
@@ -178,17 +179,19 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
     if (result.status === "not-found") {
       const reason =
         result.reason === "unpublished"
-          ? "найден, но профиль не опубликован"
+          ? UI_TEXT.pages.publicProfile.debugReasons.unpublished
           : result.reason === "alias-unpublished"
-            ? "найден алиас, но профиль не опубликован"
+            ? UI_TEXT.pages.publicProfile.debugReasons.aliasUnpublished
             : result.reason === "invalid"
-              ? "некорректный username"
-              : "username не найден";
+              ? UI_TEXT.pages.publicProfile.debugReasons.invalid
+              : UI_TEXT.pages.publicProfile.debugReasons.notFound;
       console.info(`[public] /u/${username} -> ${reason}`);
     }
 
     if (result.status === "redirect") {
-      console.info(`[public] /u/${username} -> редирект по алиасу на /u/${result.username}`);
+      console.info(
+        `[public] /u/${username} -> ${UI_TEXT.pages.publicProfile.debugReasons.redirectAlias} /u/${result.username}`
+      );
     }
   }
 

@@ -1,28 +1,28 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { UI_TEXT } from "@/lib/ui/text";
 
-const LEGAL_ENTITY_NAME = "[Укажи свои данные: ИП Иванов Иван Иванович]";
-const INN = "[укажи ИНН]";
-const OGRN = "[укажи ОГРН]";
-const LEGAL_ADDRESS = "[укажи юридический адрес]";
+const LEGAL_ENTITY_NAME = UI_TEXT.pages.terms.legalEntityNamePlaceholder;
+const INN = UI_TEXT.pages.terms.innPlaceholder;
+const OGRN = UI_TEXT.pages.terms.ogrnPlaceholder;
+const LEGAL_ADDRESS = UI_TEXT.pages.terms.legalAddressPlaceholder;
 const CONTACT_EMAILS = {
   privacy: "privacy@МастерРядом.ru",
   legal: "legal@МастерРядом.ru",
   support: "support@МастерРядом.ru",
 };
 
-const LISTED_PRICE_RUB = "X₽/мес";
-const PROMOTED_PRICE_RUB = "Y₽/мес";
-const COMMISSION_PCT = "Z%";
-const MIN_PAYOUT_RUB = "W₽";
+const LISTED_PRICE_RUB = UI_TEXT.pages.terms.pricingPlaceholders.listedPrice;
+const PROMOTED_PRICE_RUB = UI_TEXT.pages.terms.pricingPlaceholders.promotedPrice;
+const COMMISSION_PCT = UI_TEXT.pages.terms.pricingPlaceholders.commission;
+const MIN_PAYOUT_RUB = UI_TEXT.pages.terms.pricingPlaceholders.minPayout;
 
 const DOCUMENT_VERSION = "1.0";
 const UPDATED_AT = "17.02.2026";
 
 export const metadata: Metadata = {
-  title: "Пользовательское соглашение — МастерРядом",
-  description:
-    "Пользовательское соглашение МастерРядом: правила использования сервиса, оплаты и ответственности.",
+  title: UI_TEXT.pages.terms.title,
+  description: UI_TEXT.pages.terms.description,
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -39,100 +39,95 @@ export default function TermsPage() {
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <header className="space-y-2">
         <p className="text-xs text-text-sec">
-          Версия документа: {DOCUMENT_VERSION} · Дата обновления: {UPDATED_AT}
+          {UI_TEXT.pages.terms.metaLine
+            .replace("{version}", DOCUMENT_VERSION)
+            .replace("{updatedAt}", UPDATED_AT)}
         </p>
-        <h1 className="text-3xl font-semibold text-text-main">Пользовательское соглашение</h1>
+        <h1 className="text-3xl font-semibold text-text-main">{UI_TEXT.pages.terms.heading}</h1>
         <p className="text-sm text-text-sec">
-          Настоящее Соглашение регулирует использование платформы МастерРядом и порядок оказания
-          услуг между пользователями, провайдерами и оператором сервиса.
+          {UI_TEXT.pages.terms.intro}
         </p>
       </header>
 
       <Card>
         <CardHeader className="space-y-1">
-          <div className="text-sm font-semibold text-text-main">TODO: заполнить реквизиты</div>
+          <div className="text-sm font-semibold text-text-main">{UI_TEXT.pages.terms.todoTitle}</div>
           <p className="text-xs text-text-sec">
-            Перед запуском в прод замените плейсхолдеры на реальные данные оператора.
+            {UI_TEXT.pages.terms.todoSubtitle}
           </p>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-text-sec">
           <div>{LEGAL_ENTITY_NAME}</div>
-          <div>ИНН: {INN}</div>
-          <div>ОГРН/ОГРНИП: {OGRN}</div>
-          <div>Юридический адрес: {LEGAL_ADDRESS}</div>
-          <div>Контакты: {CONTACT_EMAILS.legal}, {CONTACT_EMAILS.support}</div>
+          <div>
+            {UI_TEXT.pages.terms.innLabel}: {INN}
+          </div>
+          <div>
+            {UI_TEXT.pages.terms.ogrnLabel}: {OGRN}
+          </div>
+          <div>
+            {UI_TEXT.pages.terms.legalAddressLabel}: {LEGAL_ADDRESS}
+          </div>
+          <div>
+            {UI_TEXT.pages.terms.contactsLabel}: {CONTACT_EMAILS.legal}, {CONTACT_EMAILS.support}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="space-y-6 text-sm text-text-sec">
-          <Section title="1. Термины и определения">
-            <p>
-              Платформа — сайт и сервисы МастерРядом. Пользователь — физическое лицо, использующее
-              сервис. Провайдер — мастер или студия, размещающие услуги и принимающие записи.
-            </p>
+          <Section title={UI_TEXT.pages.terms.sections.termsTitle}>
+            <p>{UI_TEXT.pages.terms.sections.termsText}</p>
           </Section>
 
-          <Section title="2. Регистрация и доступ">
-            <p>
-              Доступ к функционалу сервиса предоставляется после подтверждения номера телефона.
-              Пользователь обязуется предоставлять достоверные данные и соблюдать правила сервиса.
-            </p>
+          <Section title={UI_TEXT.pages.terms.sections.accessTitle}>
+            <p>{UI_TEXT.pages.terms.sections.accessText}</p>
           </Section>
 
-          <Section title="3. Бронирования и услуги">
+          <Section title={UI_TEXT.pages.terms.sections.bookingsTitle}>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Пользователь выбирает услугу и свободный слот, подтверждает бронирование.</li>
-              <li>Провайдер подтверждает запись и оказывает услугу в согласованное время.</li>
-              <li>Сервис не является стороной договора между пользователем и провайдером.</li>
+              {UI_TEXT.pages.terms.sections.bookingsItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </Section>
 
-          <Section title="4. Оплата и возвраты">
-            <p>
-              Оплата может осуществляться онлайн через доступные платежные методы. Возвраты и
-              отмены регулируются политиками провайдера и условиями платформы.
-            </p>
+          <Section title={UI_TEXT.pages.terms.sections.paymentsTitle}>
+            <p>{UI_TEXT.pages.terms.sections.paymentsText}</p>
           </Section>
 
-          <Section title="5. Ответственность">
-            <p>
-              Оператор сервиса не несет ответственности за качество услуг, оказываемых провайдерами,
-              однако стремится обеспечивать надежность платформы и поддержку пользователей.
-            </p>
+          <Section title={UI_TEXT.pages.terms.sections.liabilityTitle}>
+            <p>{UI_TEXT.pages.terms.sections.liabilityText}</p>
           </Section>
 
-          <Section title="6. Интеллектуальная собственность">
-            <p>
-              Все материалы и функциональность сервиса принадлежат оператору или используются по
-              лицензии. Запрещено копирование и использование без разрешения.
-            </p>
+          <Section title={UI_TEXT.pages.terms.sections.ipTitle}>
+            <p>{UI_TEXT.pages.terms.sections.ipText}</p>
           </Section>
 
-          <Section title="7. Прекращение доступа">
-            <p>
-              Оператор вправе ограничить доступ при нарушении условий соглашения, а пользователь
-              может прекратить использование сервиса в любой момент.
-            </p>
+          <Section title={UI_TEXT.pages.terms.sections.terminationTitle}>
+            <p>{UI_TEXT.pages.terms.sections.terminationText}</p>
           </Section>
 
-          <Section title="8. Тарифы и комиссии">
-            <p className="font-medium text-text-main">8.1. Тарифные планы для Провайдеров</p>
+          <Section title={UI_TEXT.pages.terms.sections.pricingTitle}>
+            <p className="font-medium text-text-main">{UI_TEXT.pages.terms.sections.pricingSubtitle}</p>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Listed: {LISTED_PRICE_RUB} — базовый тариф для размещения услуг.</li>
-              <li>Promoted: {PROMOTED_PRICE_RUB} — расширенное продвижение в каталоге.</li>
-              <li>Комиссия с онлайн-платежей: {COMMISSION_PCT}.</li>
-              <li>Минимальная сумма вывода: {MIN_PAYOUT_RUB}.</li>
+              {UI_TEXT.pages.terms.sections.pricingItems.map((item) => (
+                <li key={item}>
+                  {item
+                    .replace("{listedPrice}", LISTED_PRICE_RUB)
+                    .replace("{promotedPrice}", PROMOTED_PRICE_RUB)
+                    .replace("{commission}", COMMISSION_PCT)
+                    .replace("{minPayout}", MIN_PAYOUT_RUB)}
+                </li>
+              ))}
             </ul>
-            <p className="text-xs text-text-sec">
-              Значения тарифов указаны как плейсхолдеры и должны быть обновлены перед запуском.
-            </p>
+            <p className="text-xs text-text-sec">{UI_TEXT.pages.terms.sections.pricingNote}</p>
           </Section>
 
-          <Section title="9. Контакты">
+          <Section title={UI_TEXT.pages.terms.sections.contactsTitle}>
             <p>
-              Юридические вопросы: {CONTACT_EMAILS.legal}. Техническая поддержка:{" "}
-              {CONTACT_EMAILS.support}.
+              {UI_TEXT.pages.terms.sections.contactsText
+                .replace("{legal}", CONTACT_EMAILS.legal)
+                .replace("{support}", CONTACT_EMAILS.support)}
             </p>
           </Section>
         </CardContent>

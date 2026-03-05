@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   active: "all" | "working_today";
@@ -18,13 +19,13 @@ export function TeamTabs({ active, allCount, workingCount }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Link href="/cabinet/studio/team" className={cn(base, active === "all" ? on : off)}>
-        Все мастера ({allCount})
+        {UI_TEXT.studioCabinet.teamTabs.all} ({allCount})
       </Link>
       <Link
         href="/cabinet/studio/team?filter=working_today"
         className={cn(base, active === "working_today" ? on : off)}
       >
-        Работают сегодня ({workingCount})
+        {UI_TEXT.studioCabinet.teamTabs.workingToday} ({workingCount})
       </Link>
     </div>
   );

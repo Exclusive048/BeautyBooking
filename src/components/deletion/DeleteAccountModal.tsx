@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   open: boolean;
@@ -39,11 +40,9 @@ export function DeleteAccountModal({
   const canConfirm = Boolean(checked && normalizedTarget && normalizedInput === normalizedTarget);
 
   return (
-    <ModalSurface open={open} onClose={onCancel} title="Удаление аккаунта">
+    <ModalSurface open={open} onClose={onCancel} title={UI_TEXT.deletion.accountTitle}>
       <div className="space-y-4">
-        <p className="text-sm text-text-sec">
-          Подтвердите, что вы понимаете последствия удаления аккаунта.
-        </p>
+        <p className="text-sm text-text-sec">{UI_TEXT.deletion.accountWarning}</p>
 
         <label className="flex items-start gap-2 text-sm text-text-sec">
           <input
@@ -52,11 +51,11 @@ export function DeleteAccountModal({
             onChange={(event) => setChecked(event.target.checked)}
             className="mt-1"
           />
-          Я понимаю, что это действие необратимо
+          {UI_TEXT.deletion.accountConfirmCheckbox}
         </label>
 
         <label className="block text-xs text-text-sec">
-          Введите номер телефона для подтверждения
+          {UI_TEXT.deletion.accountPhonePrompt}
           <input
             type="tel"
             value={value}
@@ -79,7 +78,7 @@ export function DeleteAccountModal({
             className="rounded-xl border border-border-subtle px-4 py-2 text-sm text-text-sec transition hover:bg-bg-input/60"
             disabled={loading}
           >
-            Отмена
+            {UI_TEXT.actions.cancel}
           </button>
           <button
             type="button"
@@ -87,7 +86,7 @@ export function DeleteAccountModal({
             disabled={!canConfirm || loading}
             className="rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50/50 disabled:opacity-50"
           >
-            {loading ? "Удаляем..." : "Удалить мой аккаунт навсегда"}
+            {loading ? UI_TEXT.status.deleting : UI_TEXT.deletion.accountDeleteForever}
           </button>
         </div>
       </div>

@@ -29,9 +29,11 @@ type PortfolioDetail = {
 function formatDuration(min: number): string {
   const hours = Math.floor(min / 60);
   const minutes = min % 60;
-  if (hours > 0 && minutes > 0) return `${hours}ч ${minutes}м`;
-  if (hours > 0) return `${hours}ч`;
-  return `${minutes}м`;
+  if (hours > 0 && minutes > 0) {
+    return `${hours}${UI_TEXT.common.hoursShortLetter} ${minutes}${UI_TEXT.common.minutesShortLetter}`;
+  }
+  if (hours > 0) return `${hours}${UI_TEXT.common.hoursShortLetter}`;
+  return `${minutes}${UI_TEXT.common.minutesShortLetter}`;
 }
 
 export default function BookFromPortfolioClient() {

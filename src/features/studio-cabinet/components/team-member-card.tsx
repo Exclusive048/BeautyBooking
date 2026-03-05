@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   name: string;
@@ -43,7 +44,7 @@ export function TeamMemberCard({
           </div>
         </div>
         <Button asChild variant="secondary" className="self-start md:self-center">
-          <Link href={actionHref}>Посмотреть расписание</Link>
+          <Link href={actionHref}>{UI_TEXT.studioCabinet.teamCard.viewSchedule}</Link>
         </Button>
       </CardContent>
     </Card>

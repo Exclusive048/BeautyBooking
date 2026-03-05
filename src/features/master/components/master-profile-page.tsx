@@ -21,6 +21,7 @@ import {
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type MasterServiceItem = {
   serviceId: string;
@@ -103,14 +104,14 @@ type ApiErrorShape = {
 type ProfileTab = "main" | "services" | "portfolio" | "settings";
 
 const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
-  { id: "main", label: "Основное" },
-  { id: "services", label: "Услуги и прайс" },
-  { id: "portfolio", label: "Портфолио" },
-  { id: "settings", label: "Настройки" },
+  { id: "main", label: UI_TEXT.master.profile.tabs.main },
+  { id: "services", label: UI_TEXT.master.profile.tabs.services },
+  { id: "portfolio", label: UI_TEXT.master.profile.tabs.portfolio },
+  { id: "settings", label: UI_TEXT.master.profile.tabs.settings },
 ];
 
 const SERVICE_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
-const SAVE_ADDRESS_ERROR_MESSAGE = "Не удалось сохранить адрес. Попробуйте ещё раз.";
+const SAVE_ADDRESS_ERROR_MESSAGE = UI_TEXT.master.profile.errors.saveAddress;
 
 function buildDurationOptions(value: number): number[] {
   if (!Number.isFinite(value) || value <= 0) return SERVICE_DURATION_OPTIONS;
@@ -438,7 +439,7 @@ export function MasterProfilePage() {
       profileHydratedRef.current = false;
       setAutosaveInfo(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить профиль");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadProfile);
     } finally {
       setLoading(false);
     }
@@ -547,7 +548,7 @@ export function MasterProfilePage() {
       } catch (err) {
         if (!cancelled) {
           setBookingConfigDraft(null);
-          setBookingConfigError(err instanceof Error ? err.message : "?? ??????? ????????? ????????? ??????");
+          setBookingConfigError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadBookingConfig);
         }
       } finally {
         if (!cancelled) {
@@ -642,7 +643,9 @@ export function MasterProfilePage() {
           const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
           setDeleteActiveCount(typeof details?.count === "number" ? details.count : 0);
         } else {
-          setDeleteError(json && !json.ok ? json.error.message : `Ошибка: ${res.status}`);
+          setDeleteError(
+            json && !json.ok ? json.error.message : `${UI_TEXT.master.profile.errors.apiErrorPrefix} ${res.status}`
+          );
         }
         return;
       }
@@ -650,7 +653,7 @@ export function MasterProfilePage() {
       router.push("/cabinet/roles");
       router.refresh();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Не удалось удалить кабинет мастера.");
+      setDeleteError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.deleteCabinet);
     } finally {
       setDeleteLoading(false);
     }
@@ -673,15 +676,15 @@ export function MasterProfilePage() {
   const portfolioLimitWarning =
     portfolioLimit !== null && portfolioCount >= Math.max(portfolioLimit - 1, 1);
   const portfolioLimitLabel =
-    portfolioLimit === null ? "Без лимита" : `${portfolioCount} / ${portfolioLimit}`;
+    portfolioLimit === null ? UI_TEXT.common.noLimit : `${portfolioCount} / ${portfolioLimit}`;
   const onlinePaymentsAllowed = plan.can("onlinePayments");
   const onlinePaymentsSystemEnabled = plan.system?.onlinePaymentsEnabled ?? false;
   const canOnlinePayments = onlinePaymentsAllowed && onlinePaymentsSystemEnabled;
   const showOnlinePaymentsToggle = data?.master.isSolo ?? false;
   const onlinePaymentsLockedMessage = !onlinePaymentsAllowed
-    ? "Онлайн-оплата доступна на PRO и выше."
+    ? UI_TEXT.master.profile.onlinePayments.proRequired
     : !onlinePaymentsSystemEnabled
-      ? "Функция временно отключена администрацией"
+      ? UI_TEXT.master.profile.onlinePayments.disabledByAdmin
       : null;
 
   function normalizePrice(value: number): number {
@@ -717,7 +720,7 @@ export function MasterProfilePage() {
 
         const nextDisplayName = snapshot.displayName.trim();
         if (!nextDisplayName) {
-          setProfileFieldErrors({ displayName: "Укажите имя" });
+          setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
           setProfileSaveStatus("error");
           return false;
         }
@@ -863,7 +866,7 @@ export function MasterProfilePage() {
     }
 
     if (!displayName.trim()) {
-      setProfileFieldErrors({ displayName: "Укажите имя" });
+      setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
       setProfileSaveStatus("error");
       return;
     }
@@ -957,7 +960,7 @@ export function MasterProfilePage() {
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить настройки");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateSettings);
     } finally {
       setAutoConfirmSaving(false);
     }
@@ -995,7 +998,7 @@ export function MasterProfilePage() {
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить напоминания");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateReminders);
     } finally {
       setRemindersSaving(false);
     }
@@ -1013,7 +1016,7 @@ export function MasterProfilePage() {
       } else {
         const parsed = Number(trimmed);
         if (!Number.isFinite(parsed) || parsed < 0 || parsed > 168) {
-          throw new Error("Укажите значение от 0 до 168.");
+          throw new Error(UI_TEXT.master.profile.errors.invalidCancellationHours);
         }
         value = Math.floor(parsed);
       }
@@ -1045,7 +1048,7 @@ export function MasterProfilePage() {
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить срок отмены");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateCancellationDeadline);
     } finally {
       setCancellationDeadlineSaving(false);
     }
@@ -1110,14 +1113,14 @@ export function MasterProfilePage() {
       window.clearTimeout(serviceAutosaveTimer.current);
     }
 
-    setAutosaveInfo("Сохраняем...");
+    setAutosaveInfo(UI_TEXT.master.profile.autosave.saving);
     serviceAutosaveTimer.current = window.setTimeout(() => {
       void saveServices(items)
         .then(() => {
-          setAutosaveInfo("Сохранено автоматически");
+          setAutosaveInfo(UI_TEXT.master.profile.autosave.savedAuto);
         })
         .catch((saveError) => {
-          setError(saveError instanceof Error ? saveError.message : "Не удалось сохранить услуги");
+          setError(saveError instanceof Error ? saveError.message : UI_TEXT.master.profile.errors.saveServices);
           setAutosaveInfo(null);
         });
     }, 700);
@@ -1138,10 +1141,12 @@ export function MasterProfilePage() {
     if (!data?.master.isSolo) return;
     const nextTitle = newSoloServiceTitle.trim();
     const errors: { title?: string; price?: string; durationMin?: string } = {};
-    if (!nextTitle) errors.title = "Укажите название";
-    if (!Number.isFinite(newSoloServicePrice) || newSoloServicePrice <= 0) errors.price = "Укажите цену";
+    if (!nextTitle) errors.title = UI_TEXT.master.profile.errors.addServiceTitleRequired;
+    if (!Number.isFinite(newSoloServicePrice) || newSoloServicePrice <= 0) {
+      errors.price = UI_TEXT.master.profile.errors.addServicePriceRequired;
+    }
     if (!Number.isFinite(newSoloServiceDuration) || newSoloServiceDuration <= 0) {
-      errors.durationMin = "Выберите длительность";
+      errors.durationMin = UI_TEXT.master.profile.errors.addServiceDurationRequired;
     }
     if (Object.keys(errors).length > 0) {
       setNewSoloServiceFieldErrors(errors);
@@ -1244,7 +1249,7 @@ export function MasterProfilePage() {
       setAvatarFocalY(asset.focalY ?? null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить аватар");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadAvatar);
     } finally {
       setSaving(false);
     }
@@ -1266,7 +1271,7 @@ export function MasterProfilePage() {
       setAvatarFocalY(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить аватар");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.deleteAvatar);
     } finally {
       setSaving(false);
     }
@@ -1275,7 +1280,7 @@ export function MasterProfilePage() {
   const uploadPortfolioFile = async (file: File): Promise<void> => {
     if (!data) return;
     if (portfolioLimitReached) {
-      setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+      setError(UI_TEXT.master.profile.errors.portfolioLimitReached);
       return;
     }
     setSaving(true);
@@ -1291,7 +1296,7 @@ export function MasterProfilePage() {
       setPortfolioServiceIds([]);
       setPortfolioMetaOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить фото");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.uploadPhoto);
     } finally {
       setSaving(false);
     }
@@ -1311,7 +1316,7 @@ export function MasterProfilePage() {
     event.preventDefault();
     setDropActive(false);
     if (portfolioLimitReached) {
-      setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+      setError(UI_TEXT.master.profile.errors.portfolioLimitReached);
       return;
     }
     const file = event.dataTransfer.files?.[0] ?? null;
@@ -1339,7 +1344,9 @@ export function MasterProfilePage() {
         | ApiErrorShape
         | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(extractApiErrorMessage(json && !json.ok ? json : null, "Не удалось сохранить описание фото"));
+        throw new Error(
+          extractApiErrorMessage(json && !json.ok ? json : null, UI_TEXT.master.profile.errors.savePhotoDescription)
+        );
       }
       setPendingPortfolioMeta(null);
       setPortfolioMetaOpen(false);
@@ -1347,7 +1354,7 @@ export function MasterProfilePage() {
       setPortfolioServiceIds([]);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить описание фото");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.savePhotoDescription);
     } finally {
       setSaving(false);
     }
@@ -1370,7 +1377,7 @@ export function MasterProfilePage() {
 
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить фото из портфолио");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.removePhoto);
     } finally {
       setSaving(false);
     }
@@ -1404,25 +1411,25 @@ export function MasterProfilePage() {
         throw new Error(
           extractApiErrorMessage(
             createJson && !createJson.ok ? createJson : null,
-            "Не удалось заменить фото"
+            UI_TEXT.master.profile.errors.replacePhoto
           )
         );
       }
 
       await removePortfolio(item);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось заменить фото");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.replacePhoto);
       setSaving(false);
     }
   };
 
   const profileStatusText =
     profileSaveStatus === "saving"
-      ? "Сохраняем..."
+      ? UI_TEXT.status.saving
       : profileSaveStatus === "saved"
-        ? "✓ Изменения сохранены"
+        ? UI_TEXT.master.profile.status.savedChanges
         : profileSaveStatus === "error"
-          ? "Не удалось сохранить"
+          ? UI_TEXT.master.profile.errors.saveFailed
           : "";
 
   const profileStatusTone =
@@ -1495,9 +1502,9 @@ export function MasterProfilePage() {
     ]
   );
 
-  const previewName = displayName.trim() || "Имя мастера";
-  const previewTagline = tagline.trim() || "Добавьте короткий слоган";
-  const previewAddress = addressText.trim() || "Адрес пока не указан";
+  const previewName = displayName.trim() || UI_TEXT.master.profile.preview.nameFallback;
+  const previewTagline = tagline.trim() || UI_TEXT.master.profile.preview.taglineFallback;
+  const previewAddress = addressText.trim() || UI_TEXT.master.profile.preview.addressFallback;
   const previewBio = bio.trim();
   const inputBaseClass =
     "mt-1 w-full rounded-lg border border-transparent bg-bg-input px-3 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle";
@@ -1507,14 +1514,14 @@ export function MasterProfilePage() {
   const previewAvatar = avatarUrl ? (
     <FocalImage
       src={avatarUrl}
-      alt="avatar"
+      alt={UI_TEXT.media.avatar.alt}
       focalX={avatarFocalX}
       focalY={avatarFocalY}
       className="h-full w-full rounded-2xl object-cover"
     />
   ) : (
     <div className="flex h-full w-full items-center justify-center rounded-2xl bg-bg-input text-xs text-text-sec">
-      Нет фото
+      {UI_TEXT.common.noPhoto}
     </div>
   );
 
@@ -1527,18 +1534,21 @@ export function MasterProfilePage() {
             <div className="truncate text-sm font-semibold text-text-main">{previewName}</div>
             <div className="mt-0.5 text-xs text-text-sec">{previewTagline}</div>
             <div className="mt-1 text-[11px] text-text-sec">
-              ⭐ {data?.master.ratingAvg.toFixed(1)} · {data?.master.ratingCount} отзывов
+              ⭐ {data?.master.ratingAvg.toFixed(1)} · {data?.master.ratingCount}{" "}
+              {UI_TEXT.master.profile.preview.reviewsLabel}
             </div>
           </div>
         </div>
 
         <div className="mt-3 rounded-xl bg-bg-input/70 p-3 text-xs text-text-sec">
-          <div className="text-[11px] font-medium uppercase text-text-sec">Адрес</div>
+          <div className="text-[11px] font-medium uppercase text-text-sec">
+            {UI_TEXT.master.profile.preview.addressLabel}
+          </div>
           <div className="mt-1 text-sm text-text-main">{previewAddress}</div>
         </div>
 
         <div className="mt-3 text-xs text-text-sec">
-          {previewBio || "Добавьте описание, чтобы клиенты лучше узнали о вас."}
+          {previewBio || UI_TEXT.master.profile.preview.bioFallback}
         </div>
 
         <div
@@ -1547,7 +1557,7 @@ export function MasterProfilePage() {
           }`}
         >
           <span className={`h-2 w-2 rounded-full ${isPublished ? "bg-emerald-400" : "bg-rose-400"}`} />
-          {isPublished ? "Профиль опубликован" : "Не опубликован"}
+          {isPublished ? UI_TEXT.master.profile.preview.published : UI_TEXT.master.profile.preview.unpublished}
         </div>
       </div>
     </div>
@@ -1642,14 +1652,18 @@ export function MasterProfilePage() {
       }
       closeBookingConfig();
     } catch (err) {
-      setBookingConfigError(err instanceof Error ? err.message : "?? ??????? ????????? ????????? ??????");
+      setBookingConfigError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadBookingConfig);
     } finally {
       setBookingConfigSaving(false);
     }
   }, [bookingConfigDraft, bookingConfigServiceId, closeBookingConfig]);
 
   if (loading || !data) {
-    return <div className="rounded-2xl bg-bg-card/90 p-5 text-sm text-text-sec">Загрузка профиля...</div>;
+    return (
+      <div className="rounded-2xl bg-bg-card/90 p-5 text-sm text-text-sec">
+        {UI_TEXT.master.profile.loading}
+      </div>
+    );
   }
 
   return (
@@ -1662,10 +1676,8 @@ export function MasterProfilePage() {
 
       {pendingInvites.length > 0 ? (
         <div className="rounded-2xl bg-amber-500/10 p-4">
-          <h3 className="text-sm font-semibold text-amber-200">Приглашение в студию</h3>
-          <p className="mt-1 text-xs text-amber-200/80">
-            Примите или отклоните приглашение, чтобы начать работать в студии.
-          </p>
+          <h3 className="text-sm font-semibold text-amber-200">{UI_TEXT.master.profile.invite.title}</h3>
+          <p className="mt-1 text-xs text-amber-200/80">{UI_TEXT.master.profile.invite.description}</p>
           <div className="mt-3">
             <StudioInviteCards invites={pendingInvites} onChanged={setPendingInvites} />
           </div>
@@ -1699,15 +1711,15 @@ export function MasterProfilePage() {
                 <div className="rounded-2xl bg-bg-card/90 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-semibold">Профиль и витрина</h3>
-                      <p className="mt-1 text-xs text-text-sec">То, что видят клиенты в поиске и на витрине.</p>
+                      <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.profileShowcaseTitle}</h3>
+                      <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.sections.profileShowcaseDesc}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setPreviewOpen(true)}
                       className="rounded-full border border-border-subtle px-3 py-1 text-xs text-text-sec transition hover:text-text-main lg:hidden"
                     >
-                      Посмотреть как клиент
+                      {UI_TEXT.master.profile.preview.openAsClient}
                     </button>
                   </div>
 
@@ -1717,14 +1729,14 @@ export function MasterProfilePage() {
                         {avatarUrl ? (
                           <FocalImage
                             src={avatarUrl}
-                            alt="avatar"
+                            alt={UI_TEXT.media.avatar.alt}
                             focalX={avatarFocalX}
                             focalY={avatarFocalY}
                             className="h-full w-full rounded-2xl object-cover"
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs text-text-sec">
-                            Нет фото
+                            {UI_TEXT.common.noPhoto}
                           </div>
                         )}
                         <div className="absolute right-1 top-1 flex gap-1">
@@ -1732,7 +1744,7 @@ export function MasterProfilePage() {
                             type="button"
                             onClick={openAvatarFileDialog}
                             className="rounded-lg bg-black/60 px-2 py-1 text-xs text-white"
-                            aria-label="Заменить аватар"
+                            aria-label={UI_TEXT.master.profile.form.replaceAvatarAria}
                           >
                             ✏️
                           </button>
@@ -1741,7 +1753,7 @@ export function MasterProfilePage() {
                               type="button"
                               onClick={() => void deleteAvatar()}
                               className="rounded-lg bg-black/60 px-2 py-1 text-xs text-white"
-                              aria-label="Удалить аватар"
+                              aria-label={UI_TEXT.master.profile.form.removeAvatarAria}
                             >
                               ✖️
                             </button>
@@ -1768,7 +1780,7 @@ export function MasterProfilePage() {
                           onClick={openAvatarFileDialog}
                           className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-left text-sm text-text-main transition hover:bg-bg-card"
                         >
-                          Заменить фото
+                          {UI_TEXT.master.profile.form.replaceAvatarAction}
                         </button>
                         {avatarAssetId ? (
                           <button
@@ -1776,7 +1788,7 @@ export function MasterProfilePage() {
                             onClick={() => void deleteAvatar()}
                             className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-left text-sm text-rose-400 transition hover:bg-bg-card"
                           >
-                            Удалить фото
+                            {UI_TEXT.master.profile.form.removeAvatarAction}
                           </button>
                         ) : null}
                       </div>
@@ -1784,7 +1796,7 @@ export function MasterProfilePage() {
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="text-xs text-text-sec">
-                        Имя
+                        {UI_TEXT.master.profile.form.nameLabel}
                         <input
                           className={`${inputBaseClass} ${profileFieldErrors.displayName ? inputErrorClass : ""}`}
                           value={displayName}
@@ -1796,10 +1808,10 @@ export function MasterProfilePage() {
                           }}
                           onBlur={() => {
                             if (!displayName.trim()) {
-                              setProfileFieldErrors({ displayName: "Укажите имя" });
+                              setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
                             }
                           }}
-                          placeholder="Имя"
+                          placeholder={UI_TEXT.master.profile.form.namePlaceholder}
                         />
                         {profileFieldErrors.displayName ? (
                           <div className="mt-1 text-xs text-rose-400">{profileFieldErrors.displayName}</div>
@@ -1807,19 +1819,19 @@ export function MasterProfilePage() {
                       </label>
 
                       <label className="text-xs text-text-sec">
-                        Тэглайн
+                        {UI_TEXT.master.profile.form.taglineLabel}
                         <input
                           className={inputBaseClass}
                           value={tagline}
                           onChange={(event) => setTagline(event.target.value)}
-                          placeholder="Например, свадебный макияж"
+                          placeholder={UI_TEXT.master.profile.form.taglinePlaceholder}
                         />
                       </label>
                     </div>
 
                     <div ref={addressSuggestRootRef} className="relative">
                       <label className="text-xs text-text-sec">
-                        Адрес
+                        {UI_TEXT.master.profile.form.addressLabel}
                         <textarea
                           ref={addressInputRef}
                           className={inputBaseClass}
@@ -1838,7 +1850,7 @@ export function MasterProfilePage() {
                           onBlur={() => {
                             setIsAddressSuggestOpen(false);
                           }}
-                          placeholder="Адрес приёма"
+                          placeholder={UI_TEXT.master.profile.form.addressPlaceholder}
                         />
                       </label>
                       {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
@@ -1853,7 +1865,7 @@ export function MasterProfilePage() {
                               className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
                                 index === addressSuggestIndex ? "bg-bg-input" : ""
                               }`}
-                              aria-label={`Выбрать адрес ${item.value}`}
+                              aria-label={`${UI_TEXT.master.profile.form.selectAddressAria} ${item.value}`}
                             >
                               <span className="whitespace-normal break-words">{item.value}</span>
                             </button>
@@ -1866,36 +1878,34 @@ export function MasterProfilePage() {
                     </div>
 
                     <label className="text-xs text-text-sec">
-                      Описание
+                      {UI_TEXT.master.profile.form.bioLabel}
                       <textarea
                         className={inputBaseClass}
                         value={bio}
                         rows={4}
                         onChange={(event) => setBio(event.target.value)}
-                        placeholder="О себе"
+                        placeholder={UI_TEXT.master.profile.form.bioPlaceholder}
                       />
                     </label>
                   </div>
                 </div>
 
                 <div className="rounded-2xl bg-bg-card/90 p-4">
-                  <h3 className="text-sm font-semibold">Публикация профиля</h3>
-                  <p className="mt-1 text-xs text-text-sec">
-                    Без публикации профиль не отображается в поиске и витрине.
-                  </p>
+                  <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.publication.title}</h3>
+                  <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.publication.desc}</p>
                   <label className="mt-3 inline-flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={isPublished}
                       onChange={(event) => setIsPublished(event.target.checked)}
                     />
-                    Опубликовать профиль
+                    {UI_TEXT.master.profile.publication.publishAction}
                   </label>
                 </div>
               </div>
 
               <aside className="sticky top-6 hidden lg:block">
-                <div className="mb-2 text-xs text-text-sec">Предпросмотр витрины</div>
+                <div className="mb-2 text-xs text-text-sec">{UI_TEXT.master.profile.preview.title}</div>
                 {previewPanel}
               </aside>
             </div>
@@ -1904,21 +1914,21 @@ export function MasterProfilePage() {
           {activeTab === "settings" ? (
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-semibold">Настройки</h3>
-                <p className="mt-1 text-xs text-text-sec">Автоматизация и внешние каналы уведомлений.</p>
+                <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.settingsTitle}</h3>
+                <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.sections.settingsDesc}</p>
               </div>
               <PublicUsernameCard endpoint="/api/cabinet/master/public-username" />
               <div className="grid gap-4 lg:grid-cols-2">
                 {data.master.isSolo ? (
                   <div className="rounded-2xl bg-bg-card/90 p-4">
-                    <h4 className="text-sm font-semibold">Автоматизация</h4>
-                    <p className="mt-1 text-xs text-text-sec">Настройки подтверждения записей.</p>
+                    <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.automation.title}</h4>
+                    <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.automation.desc}</p>
                     <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-medium">Автоподтверждение записи</div>
+                          <div className="text-sm font-medium">{UI_TEXT.master.profile.automation.autoConfirmTitle}</div>
                           <div className="mt-1 text-xs text-text-sec">
-                            Если включено, новые записи будут подтверждаться автоматически.
+                            {UI_TEXT.master.profile.automation.autoConfirmDesc}
                           </div>
                         </div>
                         <label className="flex items-center gap-2 text-sm">
@@ -1928,7 +1938,11 @@ export function MasterProfilePage() {
                             disabled={autoConfirmLoading || autoConfirmSaving}
                             onChange={(event) => void updateAutoConfirm(event.target.checked)}
                           />
-                          {autoConfirmLoading ? "Загрузка..." : autoConfirmBookings ? "Включено" : "Выключено"}
+                          {autoConfirmLoading
+                            ? UI_TEXT.status.loading
+                            : autoConfirmBookings
+                              ? UI_TEXT.status.enabled
+                              : UI_TEXT.status.disabled}
                         </label>
                       </div>
                     </div>
@@ -1936,19 +1950,17 @@ export function MasterProfilePage() {
                   ) : null}
 
                 {data.master.isSolo ? (
-                  <div className="rounded-2xl bg-bg-card/90 p-4">
-                    <h4 className="text-sm font-semibold">Напоминания</h4>
-                    <p className="mt-1 text-xs text-text-sec">
-                      Отправлять клиенту и мастеру напоминания о записи.
-                    </p>
-                    <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium">Напоминания о записи</div>
-                          <div className="mt-1 text-xs text-text-sec">
-                            Можно отключить, если не нужны уведомления за 24 часа и 2 часа.
-                          </div>
+                <div className="rounded-2xl bg-bg-card/90 p-4">
+                  <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.reminders.title}</h4>
+                  <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.reminders.desc}</p>
+                  <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium">{UI_TEXT.master.profile.reminders.label}</div>
+                        <div className="mt-1 text-xs text-text-sec">
+                          {UI_TEXT.master.profile.reminders.hint}
                         </div>
+                      </div>
                         <label className="flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"
@@ -1957,10 +1969,10 @@ export function MasterProfilePage() {
                             onChange={(event) => void updateRemindersEnabled(event.target.checked)}
                           />
                           {remindersSaving
-                            ? "Сохраняем..."
+                            ? UI_TEXT.status.saving
                             : remindersEnabled
-                              ? "Включено"
-                              : "Выключено"}
+                            ? UI_TEXT.status.enabled
+                            : UI_TEXT.status.disabled}
                         </label>
                       </div>
                     </div>
@@ -1969,12 +1981,10 @@ export function MasterProfilePage() {
 
                 {data.master.isSolo ? (
                   <div className="rounded-2xl bg-bg-card/90 p-4">
-                    <h4 className="text-sm font-semibold">Политика отмены</h4>
-                    <p className="mt-1 text-xs text-text-sec">
-                      Клиент может отменить запись не позднее указанного срока. Пустое значение — без ограничений, 0 — отмена запрещена.
-                    </p>
+                    <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.cancellation.title}</h4>
+                    <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.cancellation.desc}</p>
                     <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
-                      <label className="block text-xs text-text-sec">Срок отмены (часы)</label>
+                      <label className="block text-xs text-text-sec">{UI_TEXT.master.profile.cancellation.label}</label>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
                         <input
                           type="number"
@@ -1984,7 +1994,7 @@ export function MasterProfilePage() {
                           value={cancellationDeadlineInput}
                           onChange={(event) => setCancellationDeadlineInput(event.target.value)}
                           disabled={autoConfirmLoading || cancellationDeadlineSaving}
-                          placeholder="Например, 24"
+                          placeholder={UI_TEXT.master.profile.cancellation.placeholder}
                           className="h-10 w-[160px] rounded-xl border border-border-subtle bg-bg-card px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
                         />
                         <button
@@ -1993,14 +2003,14 @@ export function MasterProfilePage() {
                           disabled={autoConfirmLoading || cancellationDeadlineSaving}
                           className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
                         >
-                          {cancellationDeadlineSaving ? "Сохраняем..." : "Сохранить"}
+                          {cancellationDeadlineSaving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
                         </button>
                       </div>
                       <div className="mt-2 text-xs text-text-sec">
-                        Текущее значение:{" "}
+                        {UI_TEXT.master.profile.cancellation.currentValue}{" "}
                         {cancellationDeadlineHours === null
-                          ? "Без ограничений"
-                          : `${cancellationDeadlineHours} ч.`}
+                          ? UI_TEXT.common.noLimit
+                          : `${cancellationDeadlineHours} ${UI_TEXT.master.profile.cancellation.hoursShort}`}
                       </div>
                     </div>
                   </div>
@@ -2011,17 +2021,16 @@ export function MasterProfilePage() {
                     feature="hotSlots"
                     requiredPlan="PREMIUM"
                     scope="MASTER"
-                    title="Горячие слоты"
-                    description="Подсветите свободные окна и получите больше записей."
+                    title={UI_TEXT.master.profile.hotSlots.title}
+                    description={UI_TEXT.master.profile.hotSlots.desc}
                   >
                     <HotSlotsSettingsSection services={serviceList} />
                   </FeatureGate>
                 </div>
               <section className="mt-12 border-t border-red-200/40 pt-8">
-                <h2 className="text-sm font-semibold text-red-500">Удаление кабинета мастера</h2>
+                <h2 className="text-sm font-semibold text-red-500">{UI_TEXT.master.profile.deleteCabinet.title}</h2>
                 <p className="mt-1 text-xs text-text-sec">
-                  Удаление кабинета мастера необратимо. Все услуги, расписание и портфолио будут удалены.
-    История завершённых записей сохраняется в обезличенном виде согласно требованиям законодательства.
+                  {UI_TEXT.master.profile.deleteCabinet.descMain} {UI_TEXT.master.profile.deleteCabinet.descLegal}
                 </p>
                 <button
                   type="button"
@@ -2032,7 +2041,7 @@ export function MasterProfilePage() {
                   }}
                   className="mt-4 rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-500 hover:bg-red-50/10 transition-colors"
                 >
-                  Удалить
+                  {UI_TEXT.master.profile.deleteCabinet.action}
                 </button>
               </section>
               </div>
@@ -2042,9 +2051,9 @@ export function MasterProfilePage() {
             <div className="space-y-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold">Услуги и прайс</h3>
+                  <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.servicesTitle}</h3>
                   <p className="mt-1 text-xs text-text-sec">
-                    Управляйте стоимостью, длительностью и доступностью услуг.
+                    {UI_TEXT.master.profile.sections.servicesDesc}
                   </p>
                 </div>
                 {autosaveInfo ? <div className="text-xs text-text-sec">{autosaveInfo}</div> : null}
@@ -2053,13 +2062,13 @@ export function MasterProfilePage() {
         {showAddServicePanel ? (
           <div className="rounded-2xl bg-bg-card/90 p-4">
             <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold">Новая услуга</h4>
+              <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.services.newServiceTitle}</h4>
               <button
                 type="button"
                 onClick={() => setShowAddServicePanel(false)}
                 className="text-xs text-text-sec"
               >
-                Скрыть
+                {UI_TEXT.master.profile.services.hide}
               </button>
             </div>
             <div className="mt-3 space-y-3">
@@ -2067,13 +2076,13 @@ export function MasterProfilePage() {
                 <>
                   <div className="space-y-2">
                     <label className="text-xs text-text-sec">
-                      Глобальная категория
+                      {UI_TEXT.master.profile.services.globalCategoryLabel}
                       <select
                         value={newSoloServiceGlobalCategoryId}
                         onChange={(event) => setNewSoloServiceGlobalCategoryId(event.target.value)}
                         className={selectBaseClass}
                       >
-                        <option value="">Выберите категорию</option>
+                        <option value="">{UI_TEXT.master.profile.services.selectCategory}</option>
                         {globalCategories.map((category) => (
                           <option key={category.id} value={category.id}>
                             {category.icon ? `${category.icon} ` : ""}{category.title}
@@ -2083,13 +2092,13 @@ export function MasterProfilePage() {
                     </label>
                     {!newSoloServiceGlobalCategoryId ? (
                       <div className="text-xs text-text-sec">
-                        Выберите категорию, чтобы услуга отображалась на сайте.
+                        {UI_TEXT.master.profile.services.selectCategoryHint}
                       </div>
                     ) : null}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_140px_150px]">
                     <label className="text-xs text-text-sec">
-                      Название услуги
+                      {UI_TEXT.master.profile.services.serviceTitleLabel}
                       <input
                         type="text"
                         value={newSoloServiceTitle}
@@ -2098,11 +2107,11 @@ export function MasterProfilePage() {
                           setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
                         }}
                         className={`${inputBaseClass} ${newSoloServiceFieldErrors.title ? inputErrorClass : ""}`}
-                        placeholder="Название"
+                        placeholder={UI_TEXT.master.profile.services.serviceTitlePlaceholder}
                       />
                     </label>
                     <label className="text-xs text-text-sec">
-                      Цена
+                      {UI_TEXT.master.profile.services.priceLabel}
                       <div className="mt-1 flex items-center gap-2">
                         <input
                           type="number"
@@ -2120,11 +2129,11 @@ export function MasterProfilePage() {
                           className={`${selectBaseClass} ${newSoloServiceFieldErrors.price ? inputErrorClass : ""}`}
                           placeholder="0"
                         />
-                        <span className="text-xs text-text-sec">₽</span>
+                        <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
                       </div>
                     </label>
                     <label className="text-xs text-text-sec">
-                      Длительность
+                      {UI_TEXT.master.profile.services.durationLabel}
                       <div className="mt-1 flex items-center gap-2">
                         <select
                           value={newSoloServiceDuration}
@@ -2140,7 +2149,7 @@ export function MasterProfilePage() {
                             </option>
                           ))}
                         </select>
-                        <span className="text-xs text-text-sec">мин</span>
+                        <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
                       </div>
                     </label>
                   </div>
@@ -2159,7 +2168,7 @@ export function MasterProfilePage() {
                     disabled={saving}
                     className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
                   >
-                    {saving ? "Сохраняем..." : "Добавить услугу"}
+                    {saving ? UI_TEXT.status.saving : UI_TEXT.master.profile.services.addService}
                   </button>
                 </>
               ) : (
@@ -2169,7 +2178,7 @@ export function MasterProfilePage() {
                     onChange={(event) => setSelectedStudioServiceId(event.target.value)}
                     className={selectBaseClass}
                   >
-                    <option value="">Выберите услугу из каталога студии</option>
+                    <option value="">{UI_TEXT.master.profile.services.selectStudioService}</option>
                     {disabledServices.map((service) => (
                       <option key={service.serviceId} value={service.serviceId}>
                         {service.title}
@@ -2181,7 +2190,7 @@ export function MasterProfilePage() {
                     onClick={addStudioService}
                     className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card"
                   >
-                    Добавить
+                    {UI_TEXT.actions.add}
                   </button>
                 </div>
               )}
@@ -2191,10 +2200,10 @@ export function MasterProfilePage() {
 
         <div className="rounded-2xl bg-bg-card/90 p-4">
           <div className="grid grid-cols-[minmax(0,2fr)_150px_150px_90px] items-center gap-3 border-b border-border-subtle pb-2 text-xs text-text-sec">
-            <div>Название услуги</div>
-            <div>Цена</div>
-            <div>Длительность</div>
-            <div className="text-center">Вкл.</div>
+            <div>{UI_TEXT.master.profile.services.columnTitle}</div>
+            <div>{UI_TEXT.master.profile.services.columnPrice}</div>
+            <div>{UI_TEXT.master.profile.services.columnDuration}</div>
+            <div className="text-center">{UI_TEXT.master.profile.services.columnEnabled}</div>
           </div>
           <div className="divide-y divide-border-subtle">
             {serviceList.map((service) => {
@@ -2205,7 +2214,9 @@ export function MasterProfilePage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-text-main">{service.title}</div>
                     {!service.canEditPrice ? (
-                      <div className="mt-1 text-xs text-text-sec">Цена управляется студией, доступен только тайминг.</div>
+                      <div className="mt-1 text-xs text-text-sec">
+                        {UI_TEXT.master.profile.services.priceManagedHint}
+                      </div>
                     ) : null}
                     {showOnlinePaymentsToggle ? (
                       <label
@@ -2226,7 +2237,7 @@ export function MasterProfilePage() {
                             }))
                           }
                         />
-                        Онлайн-оплата
+                        {UI_TEXT.master.profile.services.onlinePaymentsLabel}
                       </label>
                     ) : null}
                     <button
@@ -2234,7 +2245,7 @@ export function MasterProfilePage() {
                       onClick={() => setBookingConfigServiceId(service.serviceId)}
                       className="mt-2 inline-flex text-xs font-medium text-primary underline"
                     >
-                      ????????? ??????
+                      {UI_TEXT.master.profile.bookingConfig.open}
                     </button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2270,7 +2281,10 @@ export function MasterProfilePage() {
                         if (!Number.isFinite(currentValue) || currentValue <= 0) {
                           setServiceFieldErrors((current) => ({
                             ...current,
-                            [service.serviceId]: { ...current[service.serviceId], price: "Введите цену больше 0." },
+                            [service.serviceId]: {
+                              ...current[service.serviceId],
+                              price: UI_TEXT.master.profile.errors.priceTooLow,
+                            },
                           }));
                           return;
                         }
@@ -2315,7 +2329,7 @@ export function MasterProfilePage() {
                         </option>
                       ))}
                     </select>
-                    <span className="text-xs text-text-sec">мин</span>
+                    <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
                   </div>
                   <label className="flex items-center justify-center">
                     <input
@@ -2340,7 +2354,7 @@ export function MasterProfilePage() {
           onClick={() => setShowAddServicePanel(true)}
           className="w-full rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 px-4 py-3 text-sm text-text-main transition hover:bg-bg-card"
         >
-          + Добавить услугу
+          {UI_TEXT.master.profile.services.addServiceCta}
         </button>
       </div>
           ) : null}
@@ -2348,8 +2362,8 @@ export function MasterProfilePage() {
           {activeTab === "portfolio" ? (
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-semibold">Портфолио</h3>
-                <p className="mt-1 text-xs text-text-sec">Добавляйте работы и связывайте их с услугами.</p>
+                <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.portfolioTitle}</h3>
+                <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.sections.portfolioDesc}</p>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -2358,9 +2372,9 @@ export function MasterProfilePage() {
                 </span>
                 {portfolioLimitReached ? (
                   <span className="text-rose-400">
-                    Лимит достигнут.{" "}
+                    {UI_TEXT.master.profile.portfolio.limitReached}{" "}
                     <a href="/cabinet/billing" className="underline">
-                      Тарифы
+                      {UI_TEXT.master.profile.portfolio.plans}
                     </a>
                   </span>
                 ) : null}
@@ -2384,7 +2398,7 @@ export function MasterProfilePage() {
                 } ${portfolioLimitReached ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                 onClick={() => {
                   if (portfolioLimitReached) {
-                    setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+                    setError(UI_TEXT.master.profile.errors.portfolioLimitReached);
                     return;
                   }
                   newPortfolioInputRef.current?.click();
@@ -2393,18 +2407,21 @@ export function MasterProfilePage() {
                 onDragLeave={handlePortfolioDragLeave}
                 onDrop={handlePortfolioDrop}
               >
-                <div className="text-sm font-medium text-text-main">Перетащите фото сюда</div>
+                <div className="text-sm font-medium text-text-main">
+                  {UI_TEXT.master.profile.portfolio.dropTitle}
+                </div>
                 <div className="mt-1 text-xs text-text-sec">
-                  или нажмите, чтобы выбрать файл {saving ? "— загружаем..." : ""}
+                  {UI_TEXT.master.profile.portfolio.dropSubtitle}{" "}
+                  {saving ? UI_TEXT.master.profile.portfolio.uploadingSuffix : ""}
                 </div>
               </div>
 
               {pendingPortfolioMeta ? (
                 <div className="rounded-2xl bg-bg-card/90 p-4">
-                  <div className="text-xs text-text-sec">Черновик загрузки</div>
+                  <div className="text-xs text-text-sec">{UI_TEXT.master.profile.portfolio.draftLabel}</div>
                   <img
                     src={pendingPortfolioMeta.mediaUrl}
-                    alt="pending"
+                    alt={UI_TEXT.master.profile.portfolio.draftAlt}
                     className="mt-3 h-48 w-full rounded-2xl object-cover"
                   />
                   <button
@@ -2412,7 +2429,7 @@ export function MasterProfilePage() {
                     onClick={() => setPortfolioMetaOpen(true)}
                     className="mt-3 rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main transition hover:bg-bg-card"
                   >
-                    Добавить описание
+                    {UI_TEXT.master.profile.portfolio.addDescription}
                   </button>
                 </div>
               ) : null}
@@ -2428,12 +2445,12 @@ export function MasterProfilePage() {
                     <div key={item.id} className="relative overflow-hidden rounded-2xl bg-bg-card/90 p-3">
                       {isBroken ? (
                         <div className="flex h-40 w-full items-center justify-center rounded-xl bg-bg-input text-xs text-text-sec">
-                          Фото недоступно
+                          {UI_TEXT.master.profile.portfolio.photoUnavailable}
                         </div>
                       ) : (
                         <img
                           src={item.mediaUrl}
-                          alt="portfolio"
+                          alt={item.caption ?? UI_TEXT.master.profile.portfolio.photoAlt}
                           className="h-40 w-full rounded-xl object-cover"
                           onError={() =>
                             setBrokenPortfolio((current) => ({
@@ -2445,7 +2462,10 @@ export function MasterProfilePage() {
                       )}
 
                       <div className="absolute right-3 top-3 flex gap-2">
-                        <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-sm text-white" title="Заменить">
+                        <label
+                          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-sm text-white"
+                          title={UI_TEXT.master.profile.portfolio.replace}
+                        >
                           ✏️
                           <input
                             type="file"
@@ -2464,14 +2484,14 @@ export function MasterProfilePage() {
                           type="button"
                           onClick={() => void removePortfolio(item)}
                           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm text-white"
-                          title="Удалить"
+                          title={UI_TEXT.master.profile.portfolio.remove}
                         >
                           ✖️
                         </button>
                       </div>
 
                       {item.caption ? <div className="mt-2 text-xs text-text-sec">{item.caption}</div> : null}
-                      <div className="mt-2 text-xs text-text-sec">Привязано к услугам</div>
+                      <div className="mt-2 text-xs text-text-sec">{UI_TEXT.master.profile.portfolio.linkedServices}</div>
                       {linkedServices.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {linkedServices.map((title) => (
@@ -2484,7 +2504,7 @@ export function MasterProfilePage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="mt-1 text-xs text-text-sec">Не указано</div>
+                        <div className="mt-1 text-xs text-text-sec">{UI_TEXT.common.notSpecified}</div>
                       )}
                     </div>
                   );
@@ -2496,10 +2516,10 @@ export function MasterProfilePage() {
       </div>
 
       {bookingConfigServiceId ? (
-        <ModalSurface open onClose={closeBookingConfig} title="????????? ??????">
+        <ModalSurface open onClose={closeBookingConfig} title={UI_TEXT.master.profile.bookingConfig.title}>
           <div className="space-y-4">
             {bookingConfigLoading ? (
-              <div className="text-sm text-text-sec">????????? ?????????...</div>
+              <div className="text-sm text-text-sec">{UI_TEXT.master.profile.bookingConfig.loading}</div>
             ) : null}
             {bookingConfigError ? <div className="text-sm text-rose-400">{bookingConfigError}</div> : null}
 
@@ -2517,31 +2537,33 @@ export function MasterProfilePage() {
                       )
                     }
                   />
-                  ????????? ????-???????? ?? ???????
+                  {UI_TEXT.master.profile.bookingConfig.referencePhotoRequiredLabel}
                 </label>
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">??????? ??? ???????</div>
+                    <div className="text-sm font-semibold">{UI_TEXT.master.profile.bookingConfig.questionsTitle}</div>
                     <button
                       type="button"
                       onClick={addBookingQuestion}
                       disabled={bookingConfigDraft.questions.length >= 5}
                       className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-xs text-text-main transition hover:bg-bg-card disabled:opacity-60"
                     >
-                      + ???????? ??????
+                      {UI_TEXT.master.profile.bookingConfig.addQuestion}
                     </button>
                   </div>
 
                   {bookingConfigDraft.questions.length === 0 ? (
-                    <div className="text-xs text-text-sec">???????? ???? ???.</div>
+                    <div className="text-xs text-text-sec">{UI_TEXT.master.profile.bookingConfig.empty}</div>
                   ) : null}
 
                   {bookingConfigDraft.questions.map((question, index) => (
                     <div key={question.tempId} className="rounded-xl border border-border-subtle bg-bg-input/70 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <label className="block text-xs text-text-sec">?????? {index + 1}</label>
+                          <label className="block text-xs text-text-sec">
+                            {UI_TEXT.master.profile.bookingConfig.questionLabel} {index + 1}
+                          </label>
                           <input
                             type="text"
                             value={question.text}
@@ -2549,7 +2571,7 @@ export function MasterProfilePage() {
                               updateBookingQuestion(question.tempId, { text: event.target.value })
                             }
                             className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-card px-3 py-2 text-sm text-text-main outline-none"
-                            placeholder="??????? ??????"
+                            placeholder={UI_TEXT.master.profile.bookingConfig.questionPlaceholder}
                           />
                         </div>
                         <div className="flex items-center gap-2 text-xs">
@@ -2559,7 +2581,7 @@ export function MasterProfilePage() {
                             disabled={index === 0}
                             className="rounded-lg border border-border-subtle bg-bg-card px-2 py-1 disabled:opacity-40"
                           >
-                            ?
+                            {UI_TEXT.master.profile.bookingConfig.moveUp}
                           </button>
                           <button
                             type="button"
@@ -2567,14 +2589,14 @@ export function MasterProfilePage() {
                             disabled={index === bookingConfigDraft.questions.length - 1}
                             className="rounded-lg border border-border-subtle bg-bg-card px-2 py-1 disabled:opacity-40"
                           >
-                            ?
+                            {UI_TEXT.master.profile.bookingConfig.moveDown}
                           </button>
                           <button
                             type="button"
                             onClick={() => removeBookingQuestion(question.tempId)}
                             className="rounded-lg border border-border-subtle bg-bg-card px-2 py-1 text-rose-500"
                           >
-                            ???????
+                            {UI_TEXT.master.profile.bookingConfig.remove}
                           </button>
                         </div>
                       </div>
@@ -2586,7 +2608,7 @@ export function MasterProfilePage() {
                             updateBookingQuestion(question.tempId, { required: event.target.checked })
                           }
                         />
-                        ????????????
+                        {UI_TEXT.master.profile.bookingConfig.required}
                       </label>
                     </div>
                   ))}
@@ -2600,7 +2622,7 @@ export function MasterProfilePage() {
                 onClick={closeBookingConfig}
                 className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main"
               >
-                ??????
+                {UI_TEXT.actions.close}
               </button>
               <button
                 type="button"
@@ -2608,7 +2630,7 @@ export function MasterProfilePage() {
                 disabled={bookingConfigSaving || bookingConfigLoading || !bookingConfigDraft}
                 className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
               >
-                {bookingConfigSaving ? "?????????..." : "?????????"}
+                {bookingConfigSaving ? UI_TEXT.status.saving : UI_TEXT.status.saved}
               </button>
             </div>
           </div>
@@ -2616,7 +2638,11 @@ export function MasterProfilePage() {
       ) : null}
 
 {previewOpen ? (
-        <ModalSurface open onClose={() => setPreviewOpen(false)} title="Предпросмотр витрины">
+        <ModalSurface
+          open
+          onClose={() => setPreviewOpen(false)}
+          title={UI_TEXT.master.profile.portfolioMeta.modalTitle}
+        >
           <div className="flex justify-center">{previewPanel}</div>
         </ModalSurface>
       ) : null}
@@ -2624,16 +2650,16 @@ export function MasterProfilePage() {
       {portfolioMetaOpen && pendingPortfolioMeta ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-bg-card p-4">
-            <h3 className="text-base font-semibold">Описание фото</h3>
+            <h3 className="text-base font-semibold">{UI_TEXT.master.profile.portfolioMeta.photoDescriptionTitle}</h3>
             <div className="mt-3 space-y-2">
               <input
                 className={inputBaseClass}
                 value={portfolioCaption}
                 onChange={(event) => setPortfolioCaption(event.target.value)}
-                placeholder="Подпись (необязательно)"
+                placeholder={UI_TEXT.master.profile.portfolioMeta.captionPlaceholder}
               />
               <div className="rounded-lg bg-bg-input/70 p-3">
-                <div className="mb-1 text-xs text-text-sec">Какая это услуга? (необязательно)</div>
+                <div className="mb-1 text-xs text-text-sec">{UI_TEXT.master.profile.portfolioMeta.serviceHint}</div>
                 <div className="flex flex-wrap gap-2">
                   {serviceList.map((service) => (
                     <label key={`portfolio-${service.serviceId}`} className="text-xs">
@@ -2660,7 +2686,7 @@ export function MasterProfilePage() {
                 onClick={() => setPortfolioMetaOpen(false)}
                 className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
               >
-                Закрыть
+                {UI_TEXT.actions.close}
               </button>
               <button
                 type="button"
@@ -2668,7 +2694,7 @@ export function MasterProfilePage() {
                 disabled={saving}
                 className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
               >
-                Сохранить
+                {UI_TEXT.actions.save}
               </button>
             </div>
           </div>

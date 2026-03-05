@@ -1,10 +1,11 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { UI_TEXT } from "@/lib/ui/text";
 
-const LEGAL_ENTITY_NAME = "[Укажи свои данные: ИП Иванов Иван Иванович]";
-const INN = "[укажи ИНН]";
-const OGRN = "[укажи ОГРН]";
-const LEGAL_ADDRESS = "[укажи юридический адрес]";
+const LEGAL_ENTITY_NAME = UI_TEXT.pages.privacy.legalEntityNamePlaceholder;
+const INN = UI_TEXT.pages.privacy.innPlaceholder;
+const OGRN = UI_TEXT.pages.privacy.ogrnPlaceholder;
+const LEGAL_ADDRESS = UI_TEXT.pages.privacy.legalAddressPlaceholder;
 const CONTACT_EMAILS = {
   privacy: "privacy@МастерРядом.ru",
   legal: "legal@МастерРядом.ru",
@@ -15,9 +16,8 @@ const DOCUMENT_VERSION = "1.0";
 const UPDATED_AT = "17.02.2026";
 
 export const metadata: Metadata = {
-  title: "Политика конфиденциальности — МастерРядом",
-  description:
-    "Политика конфиденциальности МастерРядом: какие данные собираем, как используем и как защищаем.",
+  title: UI_TEXT.pages.privacy.title,
+  description: UI_TEXT.pages.privacy.description,
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -34,95 +34,90 @@ export default function PrivacyPage() {
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <header className="space-y-2">
         <p className="text-xs text-text-sec">
-          Версия документа: {DOCUMENT_VERSION} · Дата обновления: {UPDATED_AT}
+          {UI_TEXT.pages.privacy.metaLine
+            .replace("{version}", DOCUMENT_VERSION)
+            .replace("{updatedAt}", UPDATED_AT)}
         </p>
-        <h1 className="text-3xl font-semibold text-text-main">Политика конфиденциальности</h1>
+        <h1 className="text-3xl font-semibold text-text-main">{UI_TEXT.pages.privacy.heading}</h1>
         <p className="text-sm text-text-sec">
-          Настоящая Политика описывает, какие персональные данные мы собираем, как их используем и
-          какие права есть у пользователей сервиса МастерРядом.
+          {UI_TEXT.pages.privacy.intro}
         </p>
       </header>
 
       <Card>
         <CardHeader className="space-y-1">
-          <div className="text-sm font-semibold text-text-main">TODO: заполнить реквизиты</div>
+          <div className="text-sm font-semibold text-text-main">{UI_TEXT.pages.privacy.todoTitle}</div>
           <p className="text-xs text-text-sec">
-            Перед запуском в прод замените плейсхолдеры на реальные данные оператора.
+            {UI_TEXT.pages.privacy.todoSubtitle}
           </p>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-text-sec">
           <div>{LEGAL_ENTITY_NAME}</div>
-          <div>ИНН: {INN}</div>
-          <div>ОГРН/ОГРНИП: {OGRN}</div>
-          <div>Юридический адрес: {LEGAL_ADDRESS}</div>
-          <div>Контакты: {CONTACT_EMAILS.privacy}, {CONTACT_EMAILS.legal}</div>
+          <div>
+            {UI_TEXT.pages.privacy.innLabel}: {INN}
+          </div>
+          <div>
+            {UI_TEXT.pages.privacy.ogrnLabel}: {OGRN}
+          </div>
+          <div>
+            {UI_TEXT.pages.privacy.legalAddressLabel}: {LEGAL_ADDRESS}
+          </div>
+          <div>
+            {UI_TEXT.pages.privacy.contactsLabel}: {CONTACT_EMAILS.privacy}, {CONTACT_EMAILS.legal}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="space-y-6 text-sm text-text-sec">
-          <Section title="1. Общие положения">
-            <p>
-              Оператор обрабатывает персональные данные в соответствии с законодательством РФ и
-              настоящей Политикой. Используя сервис МастерРядом, пользователь подтверждает согласие с
-              условиями обработки данных.
-            </p>
+          <Section title={UI_TEXT.pages.privacy.sections.generalTitle}>
+            <p>{UI_TEXT.pages.privacy.sections.generalText}</p>
           </Section>
 
-          <Section title="2. Какие данные мы собираем">
+          <Section title={UI_TEXT.pages.privacy.sections.dataTitle}>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Контактные данные: телефон, электронная почта.</li>
-              <li>Данные профиля: имя, фото, предпочтения, история записей.</li>
-              <li>Технические данные: IP-адрес, cookies, пользовательский агент, логи действий.</li>
+              {UI_TEXT.pages.privacy.sections.dataItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </Section>
 
-          <Section title="3. Цели обработки">
+          <Section title={UI_TEXT.pages.privacy.sections.purposesTitle}>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Регистрация и авторизация пользователей.</li>
-              <li>Организация и управление бронированиями услуг.</li>
-              <li>Поддержка, уведомления и улучшение качества сервиса.</li>
-              <li>Выполнение требований законодательства.</li>
+              {UI_TEXT.pages.privacy.sections.purposesItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </Section>
 
-          <Section title="4. Правовые основания">
-            <p>
-              Основанием обработки является согласие пользователя, заключение и исполнение договора
-              на оказание услуг, а также требования законодательства.
-            </p>
+          <Section title={UI_TEXT.pages.privacy.sections.legalBasisTitle}>
+            <p>{UI_TEXT.pages.privacy.sections.legalBasisText}</p>
           </Section>
 
-          <Section title="5. Хранение и защита данных">
-            <p>
-              Мы применяем технические и организационные меры безопасности для защиты данных от
-              несанкционированного доступа, изменения, раскрытия или уничтожения.
-            </p>
+          <Section title={UI_TEXT.pages.privacy.sections.securityTitle}>
+            <p>{UI_TEXT.pages.privacy.sections.securityText}</p>
           </Section>
 
-          <Section title="6. Передача третьим лицам">
-            <p>
-              Данные могут передаваться партнерам и подрядчикам (например, платежным провайдерам,
-              сервисам уведомлений) только в объеме, необходимом для оказания услуг, и при соблюдении
-              конфиденциальности.
-            </p>
+          <Section title={UI_TEXT.pages.privacy.sections.sharingTitle}>
+            <p>{UI_TEXT.pages.privacy.sections.sharingText}</p>
           </Section>
 
-          <Section title="7. Права пользователя">
+          <Section title={UI_TEXT.pages.privacy.sections.rightsTitle}>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Получать информацию об обработке своих данных.</li>
-              <li>Требовать уточнения, блокирования или удаления данных.</li>
-              <li>Отозвать согласие на обработку данных.</li>
+              {UI_TEXT.pages.privacy.sections.rightsItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </Section>
 
-          <Section title="8. Контакты">
+          <Section title={UI_TEXT.pages.privacy.sections.contactsTitle}>
             <p>
-              По вопросам обработки персональных данных пишите на {CONTACT_EMAILS.privacy} или{" "}
-              {CONTACT_EMAILS.legal}.
+              {UI_TEXT.pages.privacy.sections.contactsPrivacy
+                .replace("{privacy}", CONTACT_EMAILS.privacy)
+                .replace("{legal}", CONTACT_EMAILS.legal)}
             </p>
             <p>
-              Техническая поддержка: {CONTACT_EMAILS.support}.
+              {UI_TEXT.pages.privacy.sections.contactsSupport.replace("{support}", CONTACT_EMAILS.support)}
             </p>
           </Section>
         </CardContent>

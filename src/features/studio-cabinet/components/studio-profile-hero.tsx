@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   bannerUrl?: string | null;
@@ -38,16 +39,16 @@ export function StudioProfileHero({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
-            Обложка студии
+            {UI_TEXT.studioCabinet.profile.bannerPlaceholder}
           </div>
         )}
         <div className="absolute right-4 top-4 flex flex-col gap-2">
           <Button variant="secondary" size="sm" onClick={onEditBanner}>
-            Изменить обложку
+            {UI_TEXT.studioCabinet.profile.changeBanner}
           </Button>
           {onEditFocal ? (
             <Button variant="secondary" size="sm" onClick={onEditFocal}>
-              Точка фокуса
+              {UI_TEXT.studioCabinet.profile.focalPoint}
             </Button>
           ) : null}
         </div>

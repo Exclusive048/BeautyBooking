@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
 import { useMemo } from "react";
 import { useMe } from "@/lib/hooks/use-me";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type NavItem = {
   label: string;
@@ -80,38 +81,38 @@ function IconSpark({ className }: { className?: string }) {
 }
 
 const NAV_ITEMS_GUEST: NavItem[] = [
-  { label: "Главная", href: "/", icon: IconHome },
-  { label: "Каталог", href: "/catalog", icon: IconSearch },
-  { label: "Запись", href: "/book", icon: IconCalendar },
-  { label: "Войти", href: "/login", icon: IconUser },
+  { label: UI_TEXT.nav.home, href: "/", icon: IconHome },
+  { label: UI_TEXT.nav.catalog, href: "/catalog", icon: IconSearch },
+  { label: UI_TEXT.nav.book, href: "/book", icon: IconCalendar },
+  { label: UI_TEXT.nav.loginAction, href: "/login", icon: IconUser },
 ];
 
 const NAV_ITEMS_CLIENT: NavItem[] = [
-  { label: "Главная", href: "/", icon: IconHome },
-  { label: "Каталог", href: "/catalog", icon: IconSearch },
-  { label: "Записи", href: "/cabinet/bookings", icon: IconCalendar },
-  { label: "Профиль", href: "/cabinet/profile", icon: IconUser },
+  { label: UI_TEXT.nav.home, href: "/", icon: IconHome },
+  { label: UI_TEXT.nav.catalog, href: "/catalog", icon: IconSearch },
+  { label: UI_TEXT.nav.bookings, href: "/cabinet/bookings", icon: IconCalendar },
+  { label: UI_TEXT.nav.profile, href: "/cabinet/profile", icon: IconUser },
 ];
 
 const NAV_ITEMS_MASTER: NavItem[] = [
-  { label: "Главная", href: "/", icon: IconHome },
-  { label: "Клиенты", href: "/cabinet/master/clients", icon: IconUser },
-  { label: "Расписание", href: "/cabinet/master/schedule", icon: IconCalendar },
-  { label: "Профиль", href: "/cabinet/master/profile", icon: IconSpark },
+  { label: UI_TEXT.nav.home, href: "/", icon: IconHome },
+  { label: UI_TEXT.nav.clients, href: "/cabinet/master/clients", icon: IconUser },
+  { label: UI_TEXT.nav.schedule, href: "/cabinet/master/schedule", icon: IconCalendar },
+  { label: UI_TEXT.nav.profile, href: "/cabinet/master/profile", icon: IconSpark },
 ];
 
 const NAV_ITEMS_STUDIO: NavItem[] = [
-  { label: "Главная", href: "/", icon: IconHome },
-  { label: "Клиенты", href: "/cabinet/studio/clients", icon: IconUser },
-  { label: "Календарь", href: "/cabinet/studio/calendar", icon: IconCalendar },
-  { label: "Услуги", href: "/cabinet/studio/services", icon: IconGrid },
+  { label: UI_TEXT.nav.home, href: "/", icon: IconHome },
+  { label: UI_TEXT.nav.clients, href: "/cabinet/studio/clients", icon: IconUser },
+  { label: UI_TEXT.nav.calendar, href: "/cabinet/studio/calendar", icon: IconCalendar },
+  { label: UI_TEXT.nav.services, href: "/cabinet/studio/services", icon: IconGrid },
 ];
 
 const NAV_ITEMS_ADMIN: NavItem[] = [
-  { label: "Главная", href: "/", icon: IconHome },
-  { label: "Админ", href: "/admin", icon: IconGrid },
-  { label: "Каталог", href: "/catalog", icon: IconSearch },
-  { label: "Профиль", href: "/cabinet/profile", icon: IconUser },
+  { label: UI_TEXT.nav.home, href: "/", icon: IconHome },
+  { label: UI_TEXT.nav.adminShort, href: "/admin", icon: IconGrid },
+  { label: UI_TEXT.nav.catalog, href: "/catalog", icon: IconSearch },
+  { label: UI_TEXT.nav.profile, href: "/cabinet/profile", icon: IconUser },
 ];
 
 export function BottomNav() {
