@@ -267,14 +267,9 @@ export default function LoginClient({
             </div>
 
             <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
-              <div className="text-sm font-medium">{UI_TEXT.auth.loginPage.telegramSectionTitle}</div>
               <TelegramLoginButton />
-              <div className="pt-2 text-sm font-medium">{UI_TEXT.auth.loginPage.vkSectionTitle}</div>
               <VkLoginButton />
             </div>
-
-            <p className="mt-6 text-center text-xs text-muted-foreground">{UI_TEXT.auth.loginPage.noAccountHint}</p>
-
             {nextPath ? (
               <div className="mt-4 text-xs text-muted-foreground">
                 {UI_TEXT.auth.loginPage.returnAfterLogin} <span className="font-mono">{nextPath}</span>
