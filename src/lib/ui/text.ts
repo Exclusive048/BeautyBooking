@@ -335,6 +335,36 @@ export const UI_TEXT = {
       categoriesTitle: "Что ищем?",
       tagsTitle: "Какой стиль?",
     },
+    visualSearch: {
+      button: "🔍 Найти по фото",
+      modalTitle: "Визуальный поиск",
+      dropzoneTitle: "Перетащите фото сюда",
+      dropzoneSubtitle: "или выберите файл",
+      chooseFile: "Выбрать фото",
+      fileRequirements: "JPEG, PNG или WebP до 5 МБ",
+      analyzing: "Анализируем фото...",
+      searchingCategory: "Ищем похожие работы: {category}",
+      resultsTitle: "Найденные мастера",
+      actions: {
+        close: "Закрыть",
+        searchAgain: "Выбрать другое фото",
+        startSearch: "Найти похожие работы",
+        book: "Записаться",
+        profileUnavailable: "Профиль недоступен",
+      },
+      selectedFile: "Файл: {name}",
+      messages: {
+        unrecognized: "Не удалось определить тип услуги. Попробуйте другое фото.",
+        lowConfidence:
+          "Фото не распознано с достаточной уверенностью. Попробуйте более чёткое фото.",
+        notEnoughIndexed: "Пока мало работ в этой категории — попробуйте позже.",
+        disabled: "Поиск по фото временно недоступен.",
+        fileRequired: "Выберите файл изображения.",
+        invalidFile: "Поддерживаются только JPEG, PNG или WebP до 5 МБ.",
+        rateLimited: "Слишком много запросов. Попробуйте через минуту.",
+        searchFailed: "Не удалось выполнить поиск. Попробуйте позже.",
+      },
+    },
     loading: "Загрузка ленты…",
     loadFailed: "Не удалось загрузить ленту",
     empty: "Пока нет работ",
@@ -718,6 +748,12 @@ export const UI_TEXT = {
       deleteFailed: "Не удалось удалить изображение",
       loadFailed: "Не удалось загрузить настройки изображения",
     },
+    visualSearch: {
+      unauthorized: "Необходима авторизация.",
+      forbidden: "Доступ запрещён.",
+      validationError: "Ошибка валидации.",
+      unknownCategory: "Неизвестная категория visual search.",
+    },
   },
   media: {
     avatar: {
@@ -883,6 +919,7 @@ export const UI_TEXT = {
       empty: "Пока нет работ",
       viewError: "Не удалось загрузить работу",
       untitledWork: "Работа мастера",
+      indexedBadge: "✓ В поиске",
     },
     reviews: {
       title: "Отзывы",

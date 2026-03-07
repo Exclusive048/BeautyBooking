@@ -16,12 +16,14 @@ type SettingsResponse = {
 
 type SystemConfigResponse = {
   onlinePaymentsEnabled: boolean;
+  visualSearchEnabled: boolean;
 };
 
 export function AdminSettings() {
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState(false);
+  const [visualSearchEnabled, setVisualSearchEnabled] = useState(false);
   const [flagsSaving, setFlagsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,6 +49,7 @@ export function AdminSettings() {
         const flagsJson = (await flagsRes.json().catch(() => null)) as ApiResponse<SystemConfigResponse> | null;
         if (flagsRes.ok && flagsJson && flagsJson.ok) {
           setOnlinePaymentsEnabled(Boolean(flagsJson.data.onlinePaymentsEnabled));
+          setVisualSearchEnabled(Boolean(flagsJson.data.visualSearchEnabled));
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load settings");
@@ -91,13 +94,14 @@ export function AdminSettings() {
       const res = await fetch("/api/admin/system-config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ onlinePaymentsEnabled }),
+        body: JSON.stringify({ onlinePaymentsEnabled, visualSearchEnabled }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<SystemConfigResponse> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : "Failed to save settings");
       }
       setOnlinePaymentsEnabled(Boolean(json.data.onlinePaymentsEnabled));
+      setVisualSearchEnabled(Boolean(json.data.visualSearchEnabled));
       setSuccess("Settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
@@ -158,6 +162,15 @@ export function AdminSettings() {
               type="checkbox"
               checked={onlinePaymentsEnabled}
               onChange={(event) => setOnlinePaymentsEnabled(event.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 text-sm text-text-main">
+            <span>Visual search enabled (global)</span>
+            <input
+              type="checkbox"
+              checked={visualSearchEnabled}
+              onChange={(event) => setVisualSearchEnabled(event.target.checked)}
               className="h-4 w-4 accent-primary"
             />
           </label>

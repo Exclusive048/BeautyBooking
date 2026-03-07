@@ -13,6 +13,10 @@ export type BookingReminderPayload = {
   startAtUtc: string;
 };
 
+export type VisualSearchIndexPayload = {
+  assetId: string;
+};
+
 export type TelegramSendJob = {
   id: string;
   type: "telegram.send";
@@ -33,10 +37,21 @@ export type BookingReminderJob = {
   createdAt: number;
 };
 
-export type Job = TelegramSendJob | BookingReminderJob;
+export type VisualSearchIndexJob = {
+  id: string;
+  type: "visual_search_index";
+  payload: VisualSearchIndexPayload;
+  attempts: number;
+  maxAttempts: number;
+  runAt?: number;
+  createdAt: number;
+};
+
+export type Job = TelegramSendJob | BookingReminderJob | VisualSearchIndexJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
+export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
 export const DEFAULT_JOB_MAX_ATTEMPTS = 5;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,6 +71,11 @@ function isBookingReminderPayload(value: unknown): value is BookingReminderPaylo
   return true;
 }
 
+function isVisualSearchIndexPayload(value: unknown): value is VisualSearchIndexPayload {
+  if (!isRecord(value)) return false;
+  return typeof value.assetId === "string" && value.assetId.length > 0;
+}
+
 export function isJob(value: unknown): value is Job {
   if (!isRecord(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -70,6 +90,10 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === BOOKING_REMINDER_JOB_TYPE) {
     return isBookingReminderPayload(value.payload);
+  }
+
+  if (value.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
+    return isVisualSearchIndexPayload(value.payload);
   }
 
   return false;
@@ -97,6 +121,23 @@ export function createBookingReminderJob(
   return {
     id: input?.id ?? randomUUID(),
     type: BOOKING_REMINDER_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  };
+}
+
+export function createVisualSearchIndexJob(
+  payload: VisualSearchIndexPayload,
+  input?: Partial<
+    Pick<VisualSearchIndexJob, "id" | "attempts" | "maxAttempts" | "runAt" | "createdAt">
+  >
+): VisualSearchIndexJob {
+  return {
+    id: input?.id ?? randomUUID(),
+    type: VISUAL_SEARCH_INDEX_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

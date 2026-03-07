@@ -21,6 +21,9 @@ import {
   SITE_LOGO_SETTING_KEY,
 } from "@/lib/media/settings";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { enqueue } from "@/lib/queue/queue";
+import { createVisualSearchIndexJob } from "@/lib/queue/types";
+import { logError } from "@/lib/logging/logger";
 
 type UploadMediaInput = {
   entityType: MediaEntityType;
@@ -369,6 +372,19 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
     (input.kind === MediaKind.AVATAR || input.kind === MediaKind.PORTFOLIO)
   ) {
     await invalidateAdvisorCache(entityId);
+  }
+
+  if (input.kind === MediaKind.PORTFOLIO) {
+    void enqueue(
+      createVisualSearchIndexJob({
+        assetId: created.id,
+      })
+    ).catch((error) => {
+      logError("Failed to enqueue visual search index job", {
+        assetId: created.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   }
 
   return toMediaAssetDto(created);

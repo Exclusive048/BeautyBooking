@@ -8,6 +8,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 type PortfolioItemPreview = {
   id: string;
   mediaUrl: string;
+  visualSearchReady: boolean;
   caption: string | null;
   primaryServiceTitle: string | null;
   masterName: string;
@@ -89,7 +90,12 @@ export function PortfolioStrip({ items }: Props) {
               }}
               className="group overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card"
             >
-              <div className="aspect-square overflow-hidden">
+              <div className="relative aspect-square overflow-hidden">
+                {item.visualSearchReady ? (
+                  <div className="absolute left-2 top-2 z-10 rounded-full bg-emerald-600/90 px-2 py-1 text-[11px] font-semibold text-white">
+                    {UI_TEXT.publicProfile.portfolio.indexedBadge}
+                  </div>
+                ) : null}
                 <img
                   src={item.mediaUrl}
                   alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
