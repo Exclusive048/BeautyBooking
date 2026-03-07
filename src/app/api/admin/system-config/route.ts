@@ -4,9 +4,13 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
+import { clearVisualSearchEnabledCache } from "@/lib/visual-search/config";
 
 const updateSchema = z.object({
-  onlinePaymentsEnabled: z.boolean(),
+  onlinePaymentsEnabled: z.boolean().optional(),
+  visualSearchEnabled: z.boolean().optional(),
+}).refine((value) => value.onlinePaymentsEnabled !== undefined || value.visualSearchEnabled !== undefined, {
+  message: "At least one setting is required",
 });
 
 function parseFlag(value: unknown, fallback: boolean): boolean {
@@ -17,12 +21,21 @@ export async function GET() {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
-  const record = await prisma.systemConfig.findUnique({
-    where: { key: "onlinePaymentsEnabled" },
-    select: { value: true },
-  });
+  const [onlinePayments, visualSearch] = await Promise.all([
+    prisma.systemConfig.findUnique({
+      where: { key: "onlinePaymentsEnabled" },
+      select: { value: true },
+    }),
+    prisma.systemConfig.findUnique({
+      where: { key: "visualSearchEnabled" },
+      select: { value: true },
+    }),
+  ]);
 
-  return ok({ onlinePaymentsEnabled: parseFlag(record?.value, false) });
+  return ok({
+    onlinePaymentsEnabled: parseFlag(onlinePayments?.value, false),
+    visualSearchEnabled: parseFlag(visualSearch?.value, false),
+  });
 }
 
 export async function PATCH(req: Request) {
@@ -36,14 +49,38 @@ export async function PATCH(req: Request) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
 
-    const updated = await prisma.systemConfig.upsert({
-      where: { key: "onlinePaymentsEnabled" },
-      update: { value: parsed.data.onlinePaymentsEnabled },
-      create: { key: "onlinePaymentsEnabled", value: parsed.data.onlinePaymentsEnabled },
-      select: { value: true },
-    });
+    if (parsed.data.onlinePaymentsEnabled !== undefined) {
+      await prisma.systemConfig.upsert({
+        where: { key: "onlinePaymentsEnabled" },
+        update: { value: parsed.data.onlinePaymentsEnabled },
+        create: { key: "onlinePaymentsEnabled", value: parsed.data.onlinePaymentsEnabled },
+      });
+    }
 
-    return ok({ onlinePaymentsEnabled: parseFlag(updated.value, false) });
+    if (parsed.data.visualSearchEnabled !== undefined) {
+      await prisma.systemConfig.upsert({
+        where: { key: "visualSearchEnabled" },
+        update: { value: parsed.data.visualSearchEnabled },
+        create: { key: "visualSearchEnabled", value: parsed.data.visualSearchEnabled },
+      });
+      await clearVisualSearchEnabledCache();
+    }
+
+    const [onlinePayments, visualSearch] = await Promise.all([
+      prisma.systemConfig.findUnique({
+        where: { key: "onlinePaymentsEnabled" },
+        select: { value: true },
+      }),
+      prisma.systemConfig.findUnique({
+        where: { key: "visualSearchEnabled" },
+        select: { value: true },
+      }),
+    ]);
+
+    return ok({
+      onlinePaymentsEnabled: parseFlag(onlinePayments?.value, false),
+      visualSearchEnabled: parseFlag(visualSearch?.value, false),
+    });
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);
     return fail(appError.message, appError.status, appError.code, appError.details);

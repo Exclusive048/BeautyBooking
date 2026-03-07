@@ -5,6 +5,7 @@ import { serverApiFetch } from "@/lib/api/server-fetch";
 type PortfolioItemPreview = {
   id: string;
   mediaUrl: string;
+  visualSearchReady: boolean;
   caption: string | null;
   primaryServiceTitle: string | null;
   masterName: string;

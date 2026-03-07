@@ -1861,12 +1861,19 @@ model MediaAsset {
   originalFilename String
   focalX           Float?
   focalY           Float?
+  visualIndexed       Boolean   @default(false)
+  visualIndexedAt     DateTime?
+  visualPromptVersion String?
+  visualDescription   String?
+  visualMeta          Json?
+  visualCategory      String?
 
   createdByUserId  String?
 
   createdBy        UserProfile?    @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   clientCardPhotos ClientCardPhoto[] @relation("ClientCardPhotoAsset")
   bookingReferences Booking[] @relation("BookingReferencePhoto")
+  embedding         MediaAssetEmbedding?
 
   createdAt        DateTime        @default(now())
 
@@ -1881,7 +1888,20 @@ model MediaAsset {
   @@index([storageKey])
 
   @@index([createdByUserId])
+  @@index([kind, visualIndexed, visualCategory])
 
+}
+
+model MediaAssetEmbedding {
+  id        String   @id @default(cuid())
+  assetId   String   @unique @map("asset_id")
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("media_asset_embeddings")
 }
 
 

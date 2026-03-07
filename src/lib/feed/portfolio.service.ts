@@ -11,6 +11,7 @@ type PortfolioServiceOption = {
 export type PortfolioFeedItem = {
   id: string;
   mediaUrl: string;
+  visualSearchReady: boolean;
   caption: string | null;
   width: number | null;
   height: number | null;
@@ -64,6 +65,60 @@ function resolveServiceOption(input: {
     durationMin: override?.durationOverrideMin ?? input.service.durationMin,
     price: override?.priceOverride ?? input.service.price,
   };
+}
+
+function extractMediaAssetId(mediaUrl: string): string | null {
+  const directMatch = mediaUrl.match(/\/api\/media\/file\/([^/?#]+)/i);
+  if (directMatch?.[1]) return directMatch[1];
+
+  try {
+    const parsed = new URL(mediaUrl);
+    const pathMatch = parsed.pathname.match(/\/api\/media\/file\/([^/?#]+)/i);
+    return pathMatch?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function buildVisualSearchReadyMapByUrl(mediaUrls: string[]): Promise<Map<string, boolean>> {
+  if (mediaUrls.length === 0) return new Map<string, boolean>();
+
+  const assetIdByUrl = new Map<string, string>();
+  for (const mediaUrl of mediaUrls) {
+    const assetId = extractMediaAssetId(mediaUrl);
+    if (assetId) {
+      assetIdByUrl.set(mediaUrl, assetId);
+    }
+  }
+
+  const assetIds = Array.from(new Set(assetIdByUrl.values()));
+  if (assetIds.length === 0) {
+    return new Map(mediaUrls.map((mediaUrl) => [mediaUrl, false]));
+  }
+
+  const assets = await prisma.mediaAsset.findMany({
+    where: {
+      id: { in: assetIds },
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      visualIndexed: true,
+      visualCategory: true,
+    },
+  });
+
+  const readyByAssetId = new Map<string, boolean>(
+    assets.map((asset) => [asset.id, asset.visualIndexed && asset.visualCategory !== null])
+  );
+
+  const readyByUrl = new Map<string, boolean>();
+  for (const mediaUrl of mediaUrls) {
+    const assetId = assetIdByUrl.get(mediaUrl);
+    readyByUrl.set(mediaUrl, assetId ? readyByAssetId.get(assetId) === true : false);
+  }
+
+  return readyByUrl;
 }
 
 function buildPortfolioSnapshot(input: {
@@ -202,11 +257,15 @@ export async function listPortfolioFeed(input: {
   });
 
   const hasMore = rows.length > pageSize;
-  const items = (hasMore ? rows.slice(0, -1) : rows).map((row) => {
+  const pageRows = hasMore ? rows.slice(0, -1) : rows;
+  const visualReadyByUrl = await buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl));
+
+  const items = pageRows.map((row) => {
     const snapshot = buildPortfolioSnapshot({ masterId: row.master.id, services: row.services });
     return {
       id: row.id,
       mediaUrl: row.mediaUrl,
+      visualSearchReady: visualReadyByUrl.get(row.mediaUrl) === true,
       caption: row.caption ?? null,
       width: row.width ?? null,
       height: row.height ?? null,
@@ -309,11 +368,15 @@ export async function listHomePortfolioFeed(input: {
   });
 
   const hasMore = rows.length > pageSize;
-  const items = (hasMore ? rows.slice(0, -1) : rows).map((row) => {
+  const pageRows = hasMore ? rows.slice(0, -1) : rows;
+  const visualReadyByUrl = await buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl));
+
+  const items = pageRows.map((row) => {
     const snapshot = buildPortfolioSnapshot({ masterId: row.master.id, services: row.services });
     return {
       id: row.id,
       mediaUrl: row.mediaUrl,
+      visualSearchReady: visualReadyByUrl.get(row.mediaUrl) === true,
       caption: row.caption ?? null,
       width: row.width ?? null,
       height: row.height ?? null,
@@ -389,6 +452,7 @@ export async function getPortfolioDetail(
   }
 
   const snapshot = buildPortfolioSnapshot({ masterId: item.master.id, services: item.services });
+  const visualReadyByUrl = await buildVisualSearchReadyMapByUrl([item.mediaUrl]);
 
   const similarRows = await prisma.portfolioItem.findMany({
     where: {
@@ -451,6 +515,7 @@ export async function getPortfolioDetail(
   return {
     id: item.id,
     mediaUrl: item.mediaUrl,
+    visualSearchReady: visualReadyByUrl.get(item.mediaUrl) === true,
     caption: item.caption ?? null,
     width: item.width ?? null,
     height: item.height ?? null,

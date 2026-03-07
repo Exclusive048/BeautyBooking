@@ -9,6 +9,9 @@ import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
+import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
+
+ensureVisualSearchStartupConfig();
 
 export const viewport: Viewport = {
   width: "device-width",
