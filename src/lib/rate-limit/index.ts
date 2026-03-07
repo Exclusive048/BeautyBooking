@@ -16,9 +16,25 @@ type MemoryBucket = {
 };
 
 const memoryBuckets = new Map<string, MemoryBucket>();
+const SENSITIVE_ROUTE_PREFIXES = ["/api/auth", "/api/bookings", "/api/payments"] as const;
+const RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS = 60;
 
 function nowMs() {
   return Date.now();
+}
+
+function extractApiPathFromKey(key: string): string | null {
+  const index = key.indexOf("/api/");
+  if (index === -1) return null;
+  return key.slice(index);
+}
+
+function isSensitiveRouteKey(key: string): boolean {
+  const path = extractApiPathFromKey(key);
+  if (!path) return false;
+  return SENSITIVE_ROUTE_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`)
+  );
 }
 
 function checkMemoryLimit(key: string, limit: number, windowSeconds: number): boolean {
@@ -40,7 +56,12 @@ async function checkRateLimitConfig(
 ): Promise<RateLimitResult> {
   try {
     const client = await getRedisConnection();
-    if (!client) return { limited: false };
+    if (!client) {
+      if (isSensitiveRouteKey(key)) {
+        return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
+      }
+      return { limited: false };
+    }
 
     const count = await client.incr(key);
     if (count === 1) {
@@ -57,6 +78,9 @@ async function checkRateLimitConfig(
       key,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (isSensitiveRouteKey(key)) {
+      return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
+    }
     return { limited: false };
   }
 }
@@ -69,6 +93,9 @@ async function checkRateLimitLegacy(
   try {
     const client = await getRedisConnection();
     if (!client) {
+      if (isSensitiveRouteKey(key)) {
+        return false;
+      }
       return checkMemoryLimit(key, limit, windowSeconds);
     }
 
@@ -82,6 +109,9 @@ async function checkRateLimitLegacy(
       key,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (isSensitiveRouteKey(key)) {
+      return false;
+    }
     return true;
   }
 }

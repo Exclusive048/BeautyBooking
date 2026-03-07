@@ -18,7 +18,9 @@ import {
   isVisualSearchRetryableError,
 } from "@/lib/visual-search/indexer";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
+import { validateEnv } from "@/lib/env";
 
+validateEnv();
 ensureVisualSearchStartupConfig();
 
 process.on("uncaughtException", (error) => {

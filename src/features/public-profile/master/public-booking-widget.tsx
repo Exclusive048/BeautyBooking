@@ -723,11 +723,7 @@ export function PublicBookingWidget({
                       <Profiler
                         id="SlotPickerOptimized"
                         onRender={(_id, _phase, actualDuration) => {
-                          if (actualDuration > PROFILER_THRESHOLD_MS) {
-                            console.info(
-                              `[profiler] SlotPickerOptimized commit ${Math.round(actualDuration)}ms`
-                            );
-                          }
+                          if (actualDuration > PROFILER_THRESHOLD_MS) return;
                         }}
                       >
                         <SlotPickerOptimized

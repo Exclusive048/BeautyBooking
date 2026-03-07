@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
 import { PublicMasterProfilePage } from "@/features/public-profile/master/public-profile-page";
@@ -11,6 +12,11 @@ import { SelectedServicesProvider } from "@/features/public-profile/master/selec
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
+import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
+import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
+import { PortfolioSkeleton } from "@/components/blocks/skeletons/PortfolioSkeleton";
+import { ReviewsSkeleton } from "@/components/blocks/skeletons/ReviewsSkeleton";
+import { ServicesSkeleton } from "@/components/blocks/skeletons/ServicesSkeleton";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -69,6 +75,24 @@ function mapReviewsForSchema(reviews: ReviewSnippet[]) {
     authorName: buildReviewAuthorName(review.author),
     createdAt: review.createdAt,
   }));
+}
+
+function PublicProfilePageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <HeroSkeleton />
+      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div className="space-y-4">
+          <ServicesSkeleton />
+          <PortfolioSkeleton />
+          <ReviewsSkeleton />
+        </div>
+        <div className="h-fit">
+          <BookingSkeleton />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 async function findProviderForMeta(username: string) {
@@ -152,48 +176,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicUsernamePage({ params, searchParams }: Props) {
-  const nonce = await getNonce();
-  const { username: raw } = await Promise.resolve(params);
-  const sp = (await Promise.resolve(searchParams)) ?? {};
+  const [nonce, resolvedParams, resolvedSearchParams] = await Promise.all([
+    getNonce(),
+    Promise.resolve(params),
+    Promise.resolve(searchParams),
+  ]);
+  const { username: raw } = resolvedParams;
+  const sp = resolvedSearchParams ?? {};
   const username = normalizeUsername(raw);
 
   const result = await resolvePublicUsername(
     {
       findProviderByUsernameOrAlias: async (username: string) => {
-        const direct = await resolveProviderBySlugOrId({
-          key: username,
-          select: { id: true, publicUsername: true, isPublished: true, type: true },
-        });
-        if (direct) return direct;
-
-        return prisma.provider.findFirst({
-          where: { publicUsernameAliases: { some: { username } } },
-          select: { id: true, publicUsername: true, isPublished: true, type: true },
-        });
+        const [direct, alias] = await Promise.all([
+          resolveProviderBySlugOrId({
+            key: username,
+            select: { id: true, publicUsername: true, isPublished: true, type: true },
+          }),
+          prisma.provider.findFirst({
+            where: { publicUsernameAliases: { some: { username } } },
+            select: { id: true, publicUsername: true, isPublished: true, type: true },
+          }),
+        ]);
+        return direct ?? alias;
       },
     },
     username
   );
-
-  if (process.env.NODE_ENV !== "production") {
-    if (result.status === "not-found") {
-      const reason =
-        result.reason === "unpublished"
-          ? UI_TEXT.pages.publicProfile.debugReasons.unpublished
-          : result.reason === "alias-unpublished"
-            ? UI_TEXT.pages.publicProfile.debugReasons.aliasUnpublished
-            : result.reason === "invalid"
-              ? UI_TEXT.pages.publicProfile.debugReasons.invalid
-              : UI_TEXT.pages.publicProfile.debugReasons.notFound;
-      console.info(`[public] /u/${username} -> ${reason}`);
-    }
-
-    if (result.status === "redirect") {
-      console.info(
-        `[public] /u/${username} -> ${UI_TEXT.pages.publicProfile.debugReasons.redirectAlias} /u/${result.username}`
-      );
-    }
-  }
 
   if (result.status === "not-found") {
     notFound();
@@ -310,7 +319,9 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
             dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
           />
         ) : null}
-        <PublicStudioProfilePage studioId={result.providerId} bookingParams={bookingParams} />
+        <Suspense fallback={<PublicProfilePageSkeleton />}>
+          <PublicStudioProfilePage studioId={result.providerId} bookingParams={bookingParams} />
+        </Suspense>
       </>
     );
   }
@@ -327,13 +338,15 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
         />
       ) : null}
-      <SelectedServicesProvider>
-        <PublicMasterProfilePage
-          providerId={result.providerId}
-          initialServiceId={initialServiceId}
-          initialSlotStartAt={initialSlotStartAt}
-        />
-      </SelectedServicesProvider>
+      <Suspense fallback={<PublicProfilePageSkeleton />}>
+        <SelectedServicesProvider>
+          <PublicMasterProfilePage
+            providerId={result.providerId}
+            initialServiceId={initialServiceId}
+            initialSlotStartAt={initialSlotStartAt}
+          />
+        </SelectedServicesProvider>
+      </Suspense>
     </>
   );
 }

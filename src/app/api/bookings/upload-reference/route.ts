@@ -1,5 +1,7 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { fail } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { uploadBookingReferenceAsset } from "@/lib/media/service";
@@ -10,21 +12,28 @@ import {
 } from "@/lib/media/types";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
+import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const uploadReferenceBodySchema = z.object({
+  image: z
+    .instanceof(File)
+    .refine((file) => file.size > 0, "Image is required")
+    .refine((file) => file.size <= MEDIA_MAX_FILE_SIZE_BYTES, "File is too large"),
+});
 
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     const formData = await req.formData();
-    const fileValue = formData.get("image");
-    if (!(fileValue instanceof File)) {
-      return jsonFail(400, "Image is required", "MEDIA_FILE_REQUIRED");
+    const parsed = uploadReferenceBodySchema.safeParse({
+      image: formData.get("image"),
+    });
+    if (!parsed.success) {
+      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
-
-    if (fileValue.size <= 0 || fileValue.size > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(400, "File is too large", "MEDIA_FILE_TOO_LARGE");
-    }
+    const { image: fileValue } = parsed.data;
 
     const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
     const detected = await fileTypeFromBuffer(rawBuffer);

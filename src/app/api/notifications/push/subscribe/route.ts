@@ -1,29 +1,34 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { fail } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
-type SubscribeBody = {
-  endpoint?: unknown;
-  keys?: { p256dh?: unknown; auth?: unknown };
-};
+const subscribeBodySchema = z.object({
+  endpoint: z.string().trim().min(1),
+  keys: z.object({
+    p256dh: z.string().trim().min(1),
+    auth: z.string().trim().min(1),
+  }),
+});
 
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
 
-    const body = (await req.json().catch(() => null)) as SubscribeBody | null;
-    const endpoint = typeof body?.endpoint === "string" ? body.endpoint.trim() : "";
-    const p256dh = typeof body?.keys?.p256dh === "string" ? body.keys.p256dh.trim() : "";
-    const auth = typeof body?.keys?.auth === "string" ? body.keys.auth.trim() : "";
-
-    if (!endpoint || !p256dh || !auth) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    const body = await req.json().catch(() => null);
+    const parsed = subscribeBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
+    const { endpoint, keys } = parsed.data;
+    const { p256dh, auth } = keys;
 
     await prisma.pushSubscription.upsert({
       where: { endpoint },

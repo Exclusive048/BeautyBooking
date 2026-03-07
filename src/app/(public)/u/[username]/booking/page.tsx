@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
+import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { withQuery } from "@/lib/public-urls";
 import { looksLikeProviderId, resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
@@ -107,8 +108,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicUsernameBookingPage({ params, searchParams }: Props) {
-  const { username: raw } = await Promise.resolve(params);
-  const sp = (await Promise.resolve(searchParams)) ?? {};
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([
+    Promise.resolve(params),
+    Promise.resolve(searchParams),
+  ]);
+  const { username: raw } = resolvedParams;
+  const sp = resolvedSearchParams ?? {};
   const username = normalizeUsername(raw);
   const masterParam = typeof sp.master === "string" ? sp.master : undefined;
   const legacyMasterId = typeof sp.masterId === "string" ? sp.masterId : undefined;
@@ -173,7 +178,7 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
     const initialServiceId = serviceParam;
 
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<BookingSkeleton />}>
         <StudioBookingFlow
           studioId={provider.id}
           initialMasterId={initialMasterId}
@@ -186,16 +191,17 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
   const result = await resolvePublicUsername(
     {
       findProviderByUsernameOrAlias: async (username: string) => {
-        const direct = await resolveProviderBySlugOrId({
-          key: username,
-          select: { id: true, publicUsername: true, isPublished: true, type: true },
-        });
-        if (direct) return direct;
-
-        return prisma.provider.findFirst({
-          where: { publicUsernameAliases: { some: { username } } },
-          select: { id: true, publicUsername: true, isPublished: true, type: true },
-        });
+        const [direct, alias] = await Promise.all([
+          resolveProviderBySlugOrId({
+            key: username,
+            select: { id: true, publicUsername: true, isPublished: true, type: true },
+          }),
+          prisma.provider.findFirst({
+            where: { publicUsernameAliases: { some: { username } } },
+            select: { id: true, publicUsername: true, isPublished: true, type: true },
+          }),
+        ]);
+        return direct ?? alias;
       },
     },
     username
@@ -244,7 +250,7 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
   const initialServiceId = serviceParam;
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<BookingSkeleton />}>
       <StudioBookingFlow
         studioId={result.providerId}
         initialMasterId={initialMasterId}

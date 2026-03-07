@@ -1,25 +1,29 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { fail } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
-type UnsubscribeBody = {
-  endpoint?: unknown;
-};
+const unsubscribeBodySchema = z.object({
+  endpoint: z.string().trim().min(1),
+});
 
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
 
-    const body = (await req.json().catch(() => null)) as UnsubscribeBody | null;
-    const endpoint = typeof body?.endpoint === "string" ? body.endpoint.trim() : "";
-    if (!endpoint) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    const body = await req.json().catch(() => null);
+    const parsed = unsubscribeBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
+    const { endpoint } = parsed.data;
 
     await prisma.pushSubscription.deleteMany({
       where: { endpoint, userId: user.id },

@@ -1,4 +1,4 @@
-import { AccountType, ProviderType } from "@prisma/client";
+import { AccountType, Prisma, ProviderType } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
@@ -9,6 +9,8 @@ import { formatZodError } from "@/lib/api/validation";
 
 const querySchema = z.object({
   filter: z.enum(["all", "masters", "studios", "clients"]).optional(),
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 const patchSchema = z.object({
@@ -17,6 +19,41 @@ const patchSchema = z.object({
 });
 
 type UserType = "client" | "master" | "studio";
+type UserFilter = "all" | "masters" | "studios" | "clients";
+
+const MASTER_WHERE: Prisma.UserProfileWhereInput = {
+  OR: [
+    { roles: { has: AccountType.MASTER } },
+    { providers: { some: { type: ProviderType.MASTER } } },
+  ],
+};
+
+const STUDIO_WHERE: Prisma.UserProfileWhereInput = {
+  OR: [
+    { roles: { has: AccountType.STUDIO } },
+    { roles: { has: AccountType.STUDIO_ADMIN } },
+    { providers: { some: { type: ProviderType.STUDIO } } },
+  ],
+};
+
+function buildUserFilterWhere(filter: UserFilter): Prisma.UserProfileWhereInput | undefined {
+  if (filter === "masters") {
+    return {
+      AND: [MASTER_WHERE, { NOT: STUDIO_WHERE }],
+    };
+  }
+  if (filter === "studios") {
+    return STUDIO_WHERE;
+  }
+  if (filter === "clients") {
+    return {
+      NOT: {
+        OR: [MASTER_WHERE, STUDIO_WHERE],
+      },
+    };
+  }
+  return undefined;
+}
 
 function resolveUserType(roles: AccountType[], providerTypes: ProviderType[]): UserType {
   const isStudio =
@@ -38,9 +75,13 @@ export async function GET(req: Request) {
   try {
     const query = parseQuery(new URL(req.url), querySchema);
     const filter = query.filter ?? "all";
+    const where = buildUserFilterWhere(filter);
 
     const users = await prisma.userProfile.findMany({
-      orderBy: { createdAt: "desc" },
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       select: {
         id: true,
         displayName: true,
@@ -61,8 +102,11 @@ export async function GET(req: Request) {
         },
       },
     });
+    const hasMore = users.length > query.limit;
+    const pageUsers = hasMore ? users.slice(0, query.limit) : users;
+    const nextCursor = hasMore ? pageUsers[pageUsers.length - 1]?.id ?? null : null;
 
-    const mapped = users.map((user) => {
+    const mapped = pageUsers.map((user) => {
       const providerTypes = user.providers.map((p) => p.type);
       const type = resolveUserType(user.roles, providerTypes);
       const subscriptions = user.subscriptions ?? [];
@@ -85,22 +129,31 @@ export async function GET(req: Request) {
       };
     });
 
-    const filtered = mapped.filter((user) => {
-      if (filter === "all") return true;
-      if (filter === "masters") return user.type === "master";
-      if (filter === "studios") return user.type === "studio";
-      if (filter === "clients") return user.type === "client";
-      return true;
-    });
+    const [total, clients, masters, studios] = await Promise.all([
+      prisma.userProfile.count(),
+      prisma.userProfile.count({
+        where: {
+          NOT: {
+            OR: [MASTER_WHERE, STUDIO_WHERE],
+          },
+        },
+      }),
+      prisma.userProfile.count({
+        where: {
+          AND: [MASTER_WHERE, { NOT: STUDIO_WHERE }],
+        },
+      }),
+      prisma.userProfile.count({ where: STUDIO_WHERE }),
+    ]);
 
     const summary = {
-      total: mapped.length,
-      clients: mapped.filter((u) => u.type === "client").length,
-      masters: mapped.filter((u) => u.type === "master").length,
-      studios: mapped.filter((u) => u.type === "studio").length,
+      total,
+      clients,
+      masters,
+      studios,
     };
 
-    return ok({ users: filtered, summary });
+    return ok({ users: mapped, summary, nextCursor });
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);
     return fail(appError.message, appError.status, appError.code, appError.details);
