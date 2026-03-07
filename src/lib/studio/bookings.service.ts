@@ -177,22 +177,30 @@ export async function moveStudioBooking(input: {
     });
 
     if (input.strategy === "CHANGE_SERVICE" || input.pricing === "APPLY_TARGET") {
+      const serviceIds = Array.from(
+        new Set(booking.serviceItems.map((item) => item.serviceId).filter((serviceId): serviceId is string => Boolean(serviceId)))
+      );
+      const overrides =
+        serviceIds.length > 0
+          ? await tx.masterService.findMany({
+              where: {
+                masterProviderId: input.targetMasterId,
+                serviceId: { in: serviceIds },
+              },
+              select: {
+                serviceId: true,
+                isEnabled: true,
+                priceOverride: true,
+                durationOverrideMin: true,
+                service: { select: { price: true, durationMin: true } },
+              },
+            })
+          : [];
+      const overrideByServiceId = new Map(overrides.map((override) => [override.serviceId, override]));
+
       for (const item of booking.serviceItems) {
         if (!item.serviceId) continue;
-        const override = await tx.masterService.findUnique({
-          where: {
-            masterProviderId_serviceId: {
-              masterProviderId: input.targetMasterId,
-              serviceId: item.serviceId,
-            },
-          },
-          select: {
-            isEnabled: true,
-            priceOverride: true,
-            durationOverrideMin: true,
-            service: { select: { price: true, durationMin: true } },
-          },
-        });
+        const override = overrideByServiceId.get(item.serviceId);
 
         if (!override || !override.isEnabled) continue;
 

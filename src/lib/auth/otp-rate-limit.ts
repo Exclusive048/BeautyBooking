@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { AppError } from "@/lib/api/errors";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 
@@ -9,6 +10,7 @@ const OTP_REQUEST_PHONE_WINDOW_SECONDS = 5 * 60;
 
 const OTP_VERIFY_FAIL_LIMIT = 5;
 const OTP_VERIFY_LOCK_SECONDS = 15 * 60;
+const OTP_VERIFY_RETRY_AFTER_SECONDS = 60;
 
 type RateLimitResult =
   | { ok: true }
@@ -82,7 +84,9 @@ export async function checkOtpRequestRateLimit(input: {
 export async function checkOtpVerifyLock(phone: string): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
-    return { ok: true };
+    throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
+      retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
+    });
   }
 
   try {
@@ -95,6 +99,9 @@ export async function checkOtpVerifyLock(phone: string): Promise<RateLimitResult
     logError("OTP verify lock check failed", {
       error: error instanceof Error ? error.message : String(error),
     });
+    throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
+      retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
+    });
   }
 
   return { ok: true };
@@ -103,7 +110,9 @@ export async function checkOtpVerifyLock(phone: string): Promise<RateLimitResult
 export async function registerOtpVerifyFailure(phone: string): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
-    return { ok: true };
+    throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
+      retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
+    });
   }
 
   try {
@@ -121,6 +130,9 @@ export async function registerOtpVerifyFailure(phone: string): Promise<RateLimit
   } catch (error) {
     logError("OTP verify failure count failed", {
       error: error instanceof Error ? error.message : String(error),
+    });
+    throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
+      retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
 

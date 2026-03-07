@@ -4,6 +4,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { otpRequestSchema } from "@/lib/auth/schemas";
 import { checkOtpRequestRateLimit } from "@/lib/auth/otp-rate-limit";
+import { logInfo } from "@/lib/logging/logger";
 import { NextResponse } from "next/server";
 
 function extractClientIp(req: Request): string | null {
@@ -46,7 +47,11 @@ export async function POST(req: Request) {
   });
 
   // MVP: пока без доставки — печатаем в консоль сервера
-  console.log(`[OTP] phone=${phone} code=${code} expiresAt=${expiresAt.toISOString()}`);
+  logInfo("OTP requested", {
+    phone,
+    code,
+    expiresAt: expiresAt.toISOString(),
+  });
 
   return ok({});
 }

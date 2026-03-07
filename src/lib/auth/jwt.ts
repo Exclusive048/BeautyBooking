@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { AppError } from "@/lib/api/errors";
 
 function base64url(input: Buffer | string) {
   const b = Buffer.isBuffer(input) ? input : Buffer.from(input);
@@ -59,7 +60,12 @@ export function verifySessionToken(token: string): SessionPayload | null {
   if (expectedBuf.length !== sigBuf.length) return null;
   if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
 
-  const payload = JSON.parse(fromBase64url(p)) as SessionPayload;
+  let payload: SessionPayload;
+  try {
+    payload = JSON.parse(fromBase64url(p)) as SessionPayload;
+  } catch {
+    throw new AppError("Invalid token", 401, "UNAUTHORIZED");
+  }
 
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp <= now) return null;

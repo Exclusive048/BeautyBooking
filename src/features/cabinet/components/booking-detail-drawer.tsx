@@ -9,7 +9,6 @@ import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
-import { MissingPublicUsernameError } from "@/lib/public-urls";
 import type { BookingItem, BookingReviewState } from "@/features/cabinet/components/client-bookings-panel";
 import { FocalImage } from "@/components/ui/focal-image";
 
@@ -82,13 +81,6 @@ function canCancelByClient(booking: BookingItem): boolean {
 function buildRebookUrl(booking: BookingItem): string | null {
   const target = booking.masterProvider ?? booking.provider;
   if (!target.publicUsername) {
-    if (process.env.NODE_ENV !== "production") {
-      const error = new MissingPublicUsernameError({
-        providerId: target.id,
-        context: "client-bookings-rebook",
-      });
-      console.warn(error);
-    }
     return null;
   }
   const url = `/u/${target.publicUsername}`;

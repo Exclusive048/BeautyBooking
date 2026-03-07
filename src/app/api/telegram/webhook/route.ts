@@ -1,9 +1,13 @@
 import { fail, ok } from "@/lib/api/response";
+import { formatZodError } from "@/lib/api/validation";
 import { getTelegramWebhookSecret } from "@/lib/telegram/config";
 import { handleTelegramWebhook } from "@/lib/telegram/webhook";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
 import { checkTelegramWebhookRateLimit } from "@/lib/telegram/webhookRateLimit";
+import { z } from "zod";
+
+const telegramWebhookBodySchema = z.record(z.string(), z.unknown());
 
 export async function POST(req: Request) {
   const secret = getTelegramWebhookSecret();
@@ -23,9 +27,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json().catch(() => null);
-    if (body) {
-      await handleTelegramWebhook(body, { requestId });
+    const parsed = telegramWebhookBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
+    await handleTelegramWebhook(parsed.data, { requestId });
   } catch (error) {
     logError("POST /api/telegram/webhook failed", {
       requestId,

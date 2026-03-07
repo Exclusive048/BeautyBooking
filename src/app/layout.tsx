@@ -10,7 +10,9 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
+import { validateEnv } from "@/lib/env";
 
+validateEnv();
 ensureVisualSearchStartupConfig();
 
 export const viewport: Viewport = {

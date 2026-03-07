@@ -11,6 +11,8 @@ const hotSlotsQuerySchema = z.object({
   category: z.string().trim().min(1).optional(),
   tag: z.string().trim().min(1).optional(),
   geo: z.string().trim().min(1).optional(),
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 export const runtime = "nodejs";
@@ -79,10 +81,15 @@ export async function GET(req: Request) {
           },
         },
       },
-      orderBy: { startAtUtc: "asc" },
+      orderBy: [{ startAtUtc: "asc" }, { id: "asc" }],
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
+    const hasMore = hotSlots.length > query.limit;
+    const pageHotSlots = hasMore ? hotSlots.slice(0, query.limit) : hotSlots;
+    const nextCursor = hasMore ? pageHotSlots[pageHotSlots.length - 1]?.id ?? null : null;
 
-    const providerIds = Array.from(new Set(hotSlots.map((slot) => slot.providerId)));
+    const providerIds = Array.from(new Set(pageHotSlots.map((slot) => slot.providerId)));
     const bookingConflicts =
       providerIds.length > 0
         ? await prisma.booking.findMany({
@@ -108,7 +115,7 @@ export async function GET(req: Request) {
         .filter((key): key is string => Boolean(key))
     );
 
-    const items = hotSlots
+    const items = pageHotSlots
       .filter((slot) => slot.provider.publicUsername)
       .filter((slot) => {
         const key = `${slot.providerId}:${slot.startAtUtc.toISOString()}:${slot.endAtUtc.toISOString()}`;
@@ -151,7 +158,7 @@ export async function GET(req: Request) {
         return b.provider.ratingAvg - a.provider.ratingAvg;
       });
 
-    return jsonOk({ items });
+    return jsonOk({ items, nextCursor });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {
