@@ -15,16 +15,16 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 }
 
 export function usePushSubscription() {
-  const [isSupported, setIsSupported] = useState(false);
+  const [isSupported] = useState(
+    () => typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window
+  );
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [permission, setPermission] = useState<NotificationPermission>(
+    () => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default")
+  );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-
-    setIsSupported(true);
-    setPermission(Notification.permission);
+    if (!isSupported) return;
 
     navigator.serviceWorker.ready
       .then((registration) => registration.pushManager.getSubscription())
@@ -34,7 +34,7 @@ export function usePushSubscription() {
       .catch(() => {
         setIsSubscribed(false);
       });
-  }, []);
+  }, [isSupported]);
 
   const subscribe = useCallback(async () => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;

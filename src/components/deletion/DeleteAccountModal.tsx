@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -25,12 +25,6 @@ export function DeleteAccountModal({
   const [checked, setChecked] = useState(false);
   const [value, setValue] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    setChecked(false);
-    setValue("");
-  }, [open]);
-
   const normalizedTarget = useMemo(() => (phone ? normalizeRussianPhone(phone) ?? phone : null), [phone]);
   const normalizedInput = useMemo(
     () => (value.trim() ? normalizeRussianPhone(value.trim()) ?? value.trim() : null),
@@ -40,7 +34,7 @@ export function DeleteAccountModal({
   const canConfirm = Boolean(checked && normalizedTarget && normalizedInput === normalizedTarget);
 
   return (
-    <ModalSurface open={open} onClose={onCancel} title={UI_TEXT.deletion.accountTitle}>
+    <ModalSurface key={open ? "open" : "closed"} open={open} onClose={onCancel} title={UI_TEXT.deletion.accountTitle}>
       <div className="space-y-4">
         <p className="text-sm text-text-sec">{UI_TEXT.deletion.accountWarning}</p>
 

@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { UI_TEXT } from "@/lib/ui/text";
 
-function subscribe(cb: () => void) {
+function subscribe() {
   return () => {};
 }
 

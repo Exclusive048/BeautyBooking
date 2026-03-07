@@ -1,5 +1,5 @@
 import { ADVISOR_RULES } from "@/lib/advisor/rules";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 describe("advisor/rules", () => {
   const baseStats = {

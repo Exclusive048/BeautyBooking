@@ -1,6 +1,7 @@
 "use client";
 
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -868,11 +869,15 @@ export function PublicBookingWidget({
                     <div className="mt-2 text-xs text-rose-400">{referenceUploadError}</div>
                   ) : null}
                   {referencePreviewUrl ? (
-                    <img
-                      src={referencePreviewUrl}
-                      alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
-                      className="mt-3 max-h-48 w-full rounded-xl object-cover"
-                    />
+                    <div className="relative mt-3 h-48 w-full overflow-hidden rounded-xl">
+                      <Image
+                        src={referencePreviewUrl}
+                        alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 640px"
+                        className="object-cover"
+                      />
+                    </div>
                   ) : null}
                 </div>
               ) : null}

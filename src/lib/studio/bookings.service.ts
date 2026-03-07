@@ -286,7 +286,6 @@ export async function updateMasterBookingStatus(input: {
 
   const isRejectAction = input.status === "REJECTED";
   const isCancelAction = input.status === "CANCELLED";
-  const isNoShowAction = input.status === "NO_SHOW";
   const comment = input.comment?.trim() ?? "";
   const rejectsChangeRequest =
     isRejectAction &&

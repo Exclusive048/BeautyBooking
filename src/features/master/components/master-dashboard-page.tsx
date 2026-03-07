@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -734,11 +735,15 @@ export function MasterDashboardPage() {
                         rel="noreferrer"
                         className="mt-2 block"
                       >
-                        <img
-                          src={`/api/media/file/${booking.referencePhotoAssetId}`}
-                          alt={UI_TEXT.master.dashboard.referencePhotoAlt}
-                          className="max-h-52 w-full rounded-xl object-cover"
-                        />
+                        <div className="relative h-52 w-full overflow-hidden rounded-xl">
+                          <Image
+                            src={`/api/media/file/${booking.referencePhotoAssetId}`}
+                            alt={UI_TEXT.master.dashboard.referencePhotoAlt}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 520px"
+                            className="object-cover"
+                          />
+                        </div>
                       </a>
                     ) : null}
                     {booking.bookingAnswers && booking.bookingAnswers.length > 0 ? (
@@ -987,10 +992,15 @@ export function MasterDashboardPage() {
                       href={asset.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="overflow-hidden rounded-xl border border-border-subtle"
+                      className="relative block h-40 overflow-hidden rounded-xl border border-border-subtle"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={asset.url} alt={UI_TEXT.master.dashboard.stories.cardAlt} className="h-40 w-full object-cover" />
+                      <Image
+                        src={asset.url}
+                        alt={UI_TEXT.master.dashboard.stories.cardAlt}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 320px"
+                        className="object-cover"
+                      />
                     </a>
                   ))}
                 </div>

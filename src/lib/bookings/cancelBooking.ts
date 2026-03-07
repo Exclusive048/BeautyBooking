@@ -9,7 +9,6 @@ import {
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
-import { logError } from "@/lib/logging/logger";
 
 export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
   // AUDIT (отмена/отклонение):

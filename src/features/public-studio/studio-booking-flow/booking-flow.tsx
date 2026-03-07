@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -646,11 +647,15 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                     <div className="mt-2 text-xs text-red-600">{referenceUploadError}</div>
                   ) : null}
                   {referencePreviewUrl ? (
-                    <img
-                      src={referencePreviewUrl}
-                      alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
-                      className="mt-3 max-h-48 w-full rounded-xl object-cover"
-                    />
+                    <div className="relative mt-3 h-48 w-full overflow-hidden rounded-xl">
+                      <Image
+                        src={referencePreviewUrl}
+                        alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 640px"
+                        className="object-cover"
+                      />
+                    </div>
                   ) : null}
                 </div>
               ) : null}

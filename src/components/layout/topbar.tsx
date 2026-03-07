@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";

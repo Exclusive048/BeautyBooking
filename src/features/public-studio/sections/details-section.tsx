@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { FocalImage } from "@/components/ui/focal-image";

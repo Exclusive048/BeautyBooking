@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -27,11 +27,6 @@ export function DeleteCabinetModal({
 }: Props) {
   const [value, setValue] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    setValue("");
-  }, [open]);
-
   const isConfirmed = useMemo(
     () => value.trim().toUpperCase() === CONFIRM_KEYWORD,
     [value]
@@ -45,7 +40,7 @@ export function DeleteCabinetModal({
   const title = type === "master" ? UI_TEXT.deletion.masterTitle : UI_TEXT.deletion.studioTitle;
 
   return (
-    <ModalSurface open={open} onClose={onCancel} title={title}>
+    <ModalSurface key={open ? "open" : "closed"} open={open} onClose={onCancel} title={title}>
       <div className="space-y-4">
         <p className="text-sm text-text-sec">{warning}</p>
 

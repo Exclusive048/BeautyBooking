@@ -1,6 +1,4 @@
 "use client";
-
-/* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
