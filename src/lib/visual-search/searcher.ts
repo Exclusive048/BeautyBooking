@@ -245,6 +245,9 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
   }
 
   const queryEmbedding = await createTextEmbedding(described.text_description);
+  if (!queryEmbedding) {
+    return { ok: false, reason: "not_enough_indexed" };
+  }
   const similarities = await searchSimilarities(
     filtered.map((item) => item.id),
     queryEmbedding

@@ -129,6 +129,10 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
   }
 
   const embedding = await createTextEmbedding(visualResult.text_description);
+  if (!embedding) {
+    await markAssetAsUnrecognized(asset.id);
+    return;
+  }
   const vectorLiteral = toVectorLiteral(embedding);
   const mappedCategory = await prisma.globalCategory.findFirst({
     where: {

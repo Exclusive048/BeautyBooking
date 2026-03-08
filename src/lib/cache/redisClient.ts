@@ -69,7 +69,9 @@ export const redisClient: CacheClient = {
   async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
     try {
       const client = await getRedisConnection();
-      if (!client) return true;
+      if (!client) {
+        throw new Error("Redis unavailable");
+      }
       const result =
         ttlSeconds > 0
           ? await client.set(key, value, { NX: true, EX: ttlSeconds })
@@ -77,7 +79,7 @@ export const redisClient: CacheClient = {
       return result === "OK";
     } catch (error) {
       logError("Redis setNx failed", { key, error: error instanceof Error ? error.message : String(error) });
-      return true;
+      throw error;
     }
   },
 };

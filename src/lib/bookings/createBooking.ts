@@ -17,7 +17,7 @@ import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-co
 import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
 import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
 import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
-import { logError, logInfo } from "@/lib/logging/logger";
+import { logInfo } from "@/lib/logging/logger";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
@@ -78,6 +78,7 @@ export async function createBooking(input: {
       providerId: input.providerId,
       serviceId: input.serviceId,
       masterProviderId: input.masterProviderId ?? null,
+      clientUserId: input.clientUserId,
       startAtUtc: input.startAtUtc,
       endAtUtc: input.endAtUtc,
     });
@@ -220,14 +221,7 @@ export async function createBooking(input: {
   }
 
   if (shouldAutoConfirm) {
-    try {
-      await scheduleBookingReminders(created.id);
-    } catch (error) {
-      logError("Failed to schedule booking reminders", {
-        bookingId: created.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    await scheduleBookingReminders(created.id);
   }
 
   await invalidateSlotsForBookingRange({

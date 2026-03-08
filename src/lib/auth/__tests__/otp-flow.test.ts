@@ -6,9 +6,11 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 describe("OTP flow", () => {
   const originalSecret = process.env.AUTH_JWT_SECRET;
+  const originalOtpSecret = process.env.OTP_HMAC_SECRET;
 
   beforeAll(() => {
     process.env.AUTH_JWT_SECRET = "test-secret";
+    process.env.OTP_HMAC_SECRET = "test-otp-secret";
   });
 
   afterAll(() => {
@@ -16,6 +18,12 @@ describe("OTP flow", () => {
       delete process.env.AUTH_JWT_SECRET;
     } else {
       process.env.AUTH_JWT_SECRET = originalSecret;
+    }
+
+    if (originalOtpSecret === undefined) {
+      delete process.env.OTP_HMAC_SECRET;
+    } else {
+      process.env.OTP_HMAC_SECRET = originalOtpSecret;
     }
   });
 

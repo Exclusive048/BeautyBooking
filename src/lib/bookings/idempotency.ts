@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { AppError } from "@/lib/api/errors";
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import {
@@ -80,7 +81,12 @@ export async function resolveBookingIdempotency(input: {
     return { booking: await waitForIdempotencyResult(input.key, input.userId), lockAcquired: false };
   }
 
-  const acquired = await setIdempotencyPending(input.key, input.ttlSeconds);
+  let acquired: boolean;
+  try {
+    acquired = await setIdempotencyPending(input.key, input.ttlSeconds);
+  } catch {
+    throw new AppError("Service temporarily unavailable", 503, "INTERNAL_ERROR");
+  }
   if (!acquired) {
     const booking = await waitForIdempotencyResult(input.key, input.userId);
     return { booking, lockAcquired: false };

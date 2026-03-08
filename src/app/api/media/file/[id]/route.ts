@@ -29,7 +29,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       headers: {
         "Content-Type": file.contentType,
         "Content-Length": String(file.contentLength),
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

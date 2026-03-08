@@ -4,6 +4,7 @@ import { fail } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { uploadBookingReferenceAsset } from "@/lib/media/service";
 import {
   MEDIA_ALLOWED_MIME_TYPES,
@@ -23,9 +24,36 @@ const uploadReferenceBodySchema = z.object({
     .refine((file) => file.size <= MEDIA_MAX_FILE_SIZE_BYTES, "File is too large"),
 });
 
+const BOOKING_REFERENCE_UPLOAD_RATE_LIMIT = {
+  windowSeconds: 60 * 60,
+  maxRequests: 10,
+};
+
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
+    if (!user) {
+      return fail("Unauthorized", 401, "UNAUTHORIZED");
+    }
+
+    const rateLimit = await checkRateLimit(
+      `rl:/api/bookings/upload-reference:user:${user.id}`,
+      BOOKING_REFERENCE_UPLOAD_RATE_LIMIT
+    );
+    if (rateLimit.limited) {
+      return fail("Too many uploads. Try again later.", 429, "RATE_LIMITED", {
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+      });
+    }
+
+    const contentLengthHeader = req.headers.get("content-length");
+    if (contentLengthHeader) {
+      const contentLength = Number.parseInt(contentLengthHeader, 10);
+      if (Number.isFinite(contentLength) && contentLength > MEDIA_MAX_FILE_SIZE_BYTES) {
+        return jsonFail(413, "File is too large", "MEDIA_FILE_TOO_LARGE");
+      }
+    }
+
     const formData = await req.formData();
     const parsed = uploadReferenceBodySchema.safeParse({
       image: formData.get("image"),
@@ -34,6 +62,10 @@ export async function POST(req: Request) {
       return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
     const { image: fileValue } = parsed.data;
+
+    if (fileValue.size > MEDIA_MAX_FILE_SIZE_BYTES) {
+      return jsonFail(413, "File is too large", "MEDIA_FILE_TOO_LARGE");
+    }
 
     const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
     const detected = await fileTypeFromBuffer(rawBuffer);

@@ -1,5 +1,6 @@
 import { getRedisConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
+import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 
 export type RateLimitConfig = {
   windowSeconds: number;
@@ -16,7 +17,25 @@ type MemoryBucket = {
 };
 
 const memoryBuckets = new Map<string, MemoryBucket>();
-const SENSITIVE_ROUTE_PREFIXES = ["/api/auth", "/api/bookings", "/api/payments"] as const;
+const SENSITIVE_ROUTE_PREFIXES = [
+  "/api/auth",
+  "/api/bookings",
+  "/api/payments",
+  "/api/categories/propose",
+  "/api/master/portfolio",
+  "/api/studio",
+  "/api/studios",
+  "/api/reviews",
+] as const;
+const SENSITIVE_KEY_PREFIXES = [
+  "rate:createBooking:",
+  "rl:categories:propose:",
+  "rl:/api/bookings",
+  "rl:/api/master/portfolio",
+  "rl:/api/studio",
+  "rl:/api/studios",
+  "rl:/api/reviews",
+] as const;
 const RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS = 60;
 
 function nowMs() {
@@ -30,6 +49,9 @@ function extractApiPathFromKey(key: string): string | null {
 }
 
 function isSensitiveRouteKey(key: string): boolean {
+  if (SENSITIVE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+    return true;
+  }
   const path = extractApiPathFromKey(key);
   if (!path) return false;
   return SENSITIVE_ROUTE_PREFIXES.some(
@@ -50,6 +72,16 @@ function checkMemoryLimit(key: string, limit: number, windowSeconds: number): bo
   return true;
 }
 
+function maybeAlertRedisRateLimitFailOpen(): void {
+  const count = trackError("redis:rate-limit");
+  if (count === 3) {
+    sendTelegramAlert(
+      "\u26A0\uFE0F Redis \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 rate limit \u043E\u0442\u043A\u043B\u044E\u0447\u0451\u043D (3 \u043E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430 \u043C\u0438\u043D\u0443\u0442\u0443)",
+      "redis:rate-limit:unavailable"
+    );
+  }
+}
+
 async function checkRateLimitConfig(
   key: string,
   config: RateLimitConfig
@@ -60,6 +92,8 @@ async function checkRateLimitConfig(
       if (isSensitiveRouteKey(key)) {
         return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
       }
+      logError("Rate limit Redis unavailable, fail-open", { key, mode: "config", __skipAlert: true });
+      maybeAlertRedisRateLimitFailOpen();
       return { limited: false };
     }
 
@@ -81,6 +115,7 @@ async function checkRateLimitConfig(
     if (isSensitiveRouteKey(key)) {
       return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
     }
+    maybeAlertRedisRateLimitFailOpen();
     return { limited: false };
   }
 }
@@ -96,6 +131,8 @@ async function checkRateLimitLegacy(
       if (isSensitiveRouteKey(key)) {
         return false;
       }
+      logError("Rate limit Redis unavailable, fail-open", { key, mode: "legacy", __skipAlert: true });
+      maybeAlertRedisRateLimitFailOpen();
       return checkMemoryLimit(key, limit, windowSeconds);
     }
 
@@ -112,6 +149,7 @@ async function checkRateLimitLegacy(
     if (isSensitiveRouteKey(key)) {
       return false;
     }
+    maybeAlertRedisRateLimitFailOpen();
     return true;
   }
 }

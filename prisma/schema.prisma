@@ -950,6 +950,8 @@ model HotSlot {
 
   @@unique([providerId, startAtUtc, endAtUtc])
   @@index([providerId, startAtUtc])
+  @@index([isActive, expiresAtUtc])
+  @@index([providerId, isActive])
 }
 
 model HotSlotSubscription {

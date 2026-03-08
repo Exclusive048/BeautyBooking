@@ -5,11 +5,11 @@
 // - src/lib/cache/cache.ts (REDIS_URL)
 // - src/lib/auth/access.ts (AUTH_COOKIE_NAME)
 // - src/lib/auth/jwt.ts (AUTH_JWT_SECRET)
-// - src/lib/auth/otp.ts (AUTH_JWT_SECRET)
+// - src/lib/auth/otp.ts (OTP_HMAC_SECRET)
 // - src/lib/auth/session.ts (AUTH_COOKIE_NAME)
 // - src/lib/auth/jwt.test.ts (AUTH_JWT_SECRET)
-// - src/lib/auth/otp.test.ts (AUTH_JWT_SECRET)
-// - src/lib/auth/__tests__/otp-flow.test.ts (AUTH_JWT_SECRET)
+// - src/lib/auth/otp.test.ts (OTP_HMAC_SECRET)
+// - src/lib/auth/__tests__/otp-flow.test.ts (OTP_HMAC_SECRET)
 // - src/components/pwa/install-prompt.tsx (NODE_ENV)
 // - src/components/pwa/update-prompt.tsx (NODE_ENV)
 // - src/components/auth/telegram-login-button.tsx (NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)
@@ -25,6 +25,7 @@
 // - src/lib/media/storage/local.ts (MEDIA_LOCAL_ROOT)
 // - src/lib/media/storage/s3.ts (S3_ACCESS_KEY, S3_BUCKET, S3_ENDPOINT, S3_REGION, S3_SECRET_KEY)
 // - src/lib/notifications/push/vapid.ts (NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_EMAIL, VAPID_PRIVATE_KEY)
+// - src/worker.ts (APP_PUBLIC_URL, NEXT_PUBLIC_APP_URL, WORKER_SECRET)
 // - src/lib/schedule/usecases.ts (NODE_ENV)
 // - src/features/admin/components/admin-billing.tsx (NODE_ENV)
 // - src/features/booking/components/slot-picker/slot-picker.tsx (NODE_ENV)
@@ -44,6 +45,7 @@
 // - src/app/api/integrations/vk/callback/route.ts (NODE_ENV)
 // - src/app/api/billing/renew/run/route.ts (BILLING_RENEW_SECRET)
 // - src/app/api/payments/yookassa/webhook/route.ts (YOOKASSA_SECRET_KEY, YOOKASSA_WEBHOOK_TOKEN)
+// - src/app/api/health/worker/route.ts (WORKER_SECRET)
 // - src/app/api/support/tickets/route.ts (SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER, SUPPORT_TO)
 // - src/app/api/me/delete/route.ts (AUTH_COOKIE_NAME, NODE_ENV)
 import { z } from "zod";
@@ -56,7 +58,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(NODE_ENVS).default("development"),
   DATABASE_URL: z.string().trim().optional(),
   AUTH_JWT_SECRET: z.string().trim().optional(),
+  OTP_HMAC_SECRET: z.string().trim().optional(),
   AUTH_COOKIE_NAME: z.string().trim().min(1).default("bh_session"),
+  WORKER_SECRET: z.string().trim().default("dev-worker-secret"),
   STORAGE_PROVIDER: z.enum(STORAGE_PROVIDERS).default("local"),
   VISUAL_SEARCH_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
   YOOKASSA_SECRET_KEY: z.string().trim().optional(),
@@ -96,6 +100,7 @@ export function validateEnv(): ValidatedEnv {
   };
 
   requireVar("AUTH_JWT_SECRET");
+  requireVar("OTP_HMAC_SECRET");
   requireVar("DATABASE_URL");
 
   requireVar("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
