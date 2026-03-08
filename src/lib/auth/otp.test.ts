@@ -2,9 +2,11 @@ import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 describe("auth/otp", () => {
   const originalSecret = process.env.AUTH_JWT_SECRET;
+  const originalOtpSecret = process.env.OTP_HMAC_SECRET;
 
   beforeEach(() => {
     process.env.AUTH_JWT_SECRET = "test-secret";
+    process.env.OTP_HMAC_SECRET = "test-otp-secret";
   });
 
   afterEach(() => {
@@ -12,6 +14,12 @@ describe("auth/otp", () => {
       delete process.env.AUTH_JWT_SECRET;
     } else {
       process.env.AUTH_JWT_SECRET = originalSecret;
+    }
+
+    if (originalOtpSecret === undefined) {
+      delete process.env.OTP_HMAC_SECRET;
+    } else {
+      process.env.OTP_HMAC_SECRET = originalOtpSecret;
     }
   });
 

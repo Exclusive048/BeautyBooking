@@ -147,12 +147,21 @@ export const serviceBookingConfigSchema = z.object({
 });
 
 export const createMasterPortfolioSchema = z.object({
-  mediaUrl: z.string().url().max(2000),
+  mediaAssetId: z.string().trim().min(1).optional(),
+  mediaUrl: z.string().url().max(2000).optional(),
   caption: z.string().trim().max(2000).optional(),
   serviceIds: z.array(z.string().trim().min(1)).max(20),
   tagIds: z.array(z.string().trim().min(1)).max(20).optional(),
   globalCategoryId: z.string().trim().min(1).optional(),
   categorySource: z.enum(["ai", "user"]).optional(),
+}).superRefine((value, ctx) => {
+  if (!value.mediaAssetId && !value.mediaUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["mediaAssetId"],
+      message: "mediaAssetId or mediaUrl is required",
+    });
+  }
 });
 
 export const updateMasterPortfolioCategorySchema = z.object({

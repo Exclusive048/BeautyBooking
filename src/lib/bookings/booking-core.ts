@@ -11,6 +11,7 @@ export type BookingCoreContext = {
   provider: {
     id: string;
     type: ProviderType;
+    ownerUserId: string | null;
     timezone: string;
     studioId: string | null;
     autoConfirmBookings: boolean;
@@ -20,6 +21,8 @@ export type BookingCoreContext = {
     id: string;
     providerId: string;
     name: string;
+    isEnabled: boolean;
+    isActive: boolean;
     durationMin: number;
     baseDurationMin: number | null;
     price: number;
@@ -159,6 +162,7 @@ export async function resolveBookingCore(input: {
   providerId: string;
   serviceId: string;
   masterProviderId: string | null;
+  clientUserId: string;
   startAtUtc?: Date;
   endAtUtc?: Date | null;
   slotLabel?: string;
@@ -169,6 +173,7 @@ export async function resolveBookingCore(input: {
       select: {
         id: true,
         type: true,
+        ownerUserId: true,
         timezone: true,
         studioId: true,
         autoConfirmBookings: true,
@@ -181,6 +186,8 @@ export async function resolveBookingCore(input: {
         id: true,
         providerId: true,
         name: true,
+        isEnabled: true,
+        isActive: true,
         durationMin: true,
         baseDurationMin: true,
         price: true,
@@ -195,6 +202,14 @@ export async function resolveBookingCore(input: {
 
   if (!service) {
     throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
+  }
+
+  if (!service.isEnabled || !service.isActive) {
+    throw new AppError("Service is not available", 400, "SERVICE_DISABLED");
+  }
+
+  if (provider.ownerUserId && provider.ownerUserId === input.clientUserId) {
+    throw new AppError("Cannot book your own services", 400, "FORBIDDEN");
   }
 
   const providerServiceMismatch =

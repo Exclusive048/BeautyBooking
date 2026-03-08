@@ -37,7 +37,24 @@ export async function POST(req: Request) {
     update: {
       phone: phone ?? undefined,
     },
+    select: {
+      id: true,
+      roles: true,
+      displayName: true,
+      phone: true,
+      externalPhotoUrl: true,
+      publicUsername: true,
+    },
   });
 
-  return ok({ profile });
+  return ok({
+    profile: {
+      id: profile.id,
+      roles: profile.roles,
+      displayName: profile.displayName,
+      phone: profile.phone,
+      avatarUrl: profile.externalPhotoUrl,
+      publicUsername: profile.publicUsername,
+    },
+  });
 }

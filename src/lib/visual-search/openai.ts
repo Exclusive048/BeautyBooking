@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import sharp from "sharp";
 import { AppError } from "@/lib/api/errors";
+import { logError } from "@/lib/logging/logger";
+import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 import type { VisualSearchResult, VisualSearchStrategy } from "@/lib/visual-search/prompt";
 
 const OPENAI_VISION_MODEL = "gpt-4o-mini";
@@ -31,16 +33,57 @@ function toDataUrlJpeg(imageBytes: Uint8Array): string {
 }
 
 function parseJsonObject(raw: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new AppError("OpenAI returned invalid JSON", 502, "INTERNAL_ERROR");
-  }
+  const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new AppError("OpenAI returned invalid JSON object", 502, "INTERNAL_ERROR");
+    throw new Error("Invalid JSON object");
   }
   return parsed as Record<string, unknown>;
+}
+
+function getErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null;
+  const status = (error as { status?: unknown }).status;
+  return typeof status === "number" ? status : null;
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
+function logOpenAiFailure(scope: string, error: unknown): void {
+  const status = getErrorStatus(error);
+  if (status === 429) {
+    const count = trackError("openai:rate-limit");
+    if (count === 5) {
+      sendTelegramAlert(
+        "\u26A0\uFE0F OpenAI rate limit \u2014 visual search \u0437\u0430\u043C\u0435\u0434\u043B\u0435\u043D",
+        "openai:rate-limit"
+      );
+    }
+    logError("OpenAI rate limit hit", { scope, status, __skipAlert: true });
+    return;
+  }
+  if (status === 402) {
+    sendTelegramAlert(
+      "\uD83D\uDEA8 OpenAI \u0431\u0430\u043B\u0430\u043D\u0441 \u0438\u0441\u0447\u0435\u0440\u043F\u0430\u043D \u2014 visual search \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442",
+      "openai:balance-exhausted"
+    );
+    logError("OpenAI balance exhausted", { scope, status, __skipAlert: true });
+    return;
+  }
+  if (isAbortError(error)) {
+    logError("OpenAI request timed out", { scope, __skipAlert: true });
+    return;
+  }
+  logError("OpenAI request failed", {
+    scope,
+    status,
+    error: error instanceof Error ? error.message : String(error),
+    __skipAlert: true,
+  });
 }
 
 export async function resizeForOpenAI(imageBytes: Uint8Array): Promise<Uint8Array> {
@@ -72,29 +115,47 @@ export async function requestVisionJson(input: {
   imageBytes: Uint8Array;
   systemPrompt: string;
   userPrompt: string;
-}): Promise<Record<string, unknown>> {
-  const completion = await getClient().chat.completions.create({
-    model: OPENAI_VISION_MODEL,
-    temperature: 0.1,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: input.systemPrompt },
+}): Promise<Record<string, unknown> | null> {
+  try {
+    const completion = await getClient().chat.completions.create(
       {
-        role: "user",
-        content: [
-          { type: "text", text: `${input.userPrompt}\nОтвет должен быть только JSON.` },
-          { type: "image_url", image_url: { url: toDataUrlJpeg(input.imageBytes) } },
+        model: OPENAI_VISION_MODEL,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: input.systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `${input.userPrompt}\nAnswer must be JSON only.` },
+              { type: "image_url", image_url: { url: toDataUrlJpeg(input.imageBytes) } },
+            ],
+          },
         ],
       },
-    ],
-  });
+      { signal: AbortSignal.timeout(30_000) }
+    );
 
-  const content = completion.choices[0]?.message?.content;
-  if (typeof content !== "string" || content.trim().length === 0) {
-    throw new AppError("OpenAI returned an empty response", 502, "INTERNAL_ERROR");
+    const content = completion.choices[0]?.message?.content;
+    if (typeof content !== "string" || content.trim().length === 0) {
+      logError("OpenAI returned an empty response", { scope: "vision", __skipAlert: true });
+      return null;
+    }
+
+    try {
+      return parseJsonObject(content);
+    } catch (error) {
+      logError("OpenAI returned invalid JSON payload", {
+        scope: "vision",
+        error: error instanceof Error ? error.message : String(error),
+        __skipAlert: true,
+      });
+      return null;
+    }
+  } catch (error) {
+    logOpenAiFailure("vision", error);
+    return null;
   }
-
-  return parseJsonObject(content);
 }
 
 export async function describeImageWithStrategy(
@@ -107,17 +168,21 @@ export async function describeImageWithStrategy(
     userPrompt: strategy.userPrompt,
   });
 
-  if (json.error === "not_applicable") {
+  if (!json || json.error === "not_applicable") {
     return {
       text_description: "",
-      meta: json,
+      meta: json ?? {},
       error: "not_applicable",
     };
   }
 
   const textDescription = json.text_description;
   if (typeof textDescription !== "string" || textDescription.trim().length === 0) {
-    throw new AppError("OpenAI result does not contain text_description", 502, "INTERNAL_ERROR");
+    return {
+      text_description: "",
+      meta: json,
+      error: "not_applicable",
+    };
   }
 
   return {
@@ -126,16 +191,25 @@ export async function describeImageWithStrategy(
   };
 }
 
-export async function createTextEmbedding(text: string): Promise<number[]> {
-  const response = await getClient().embeddings.create({
-    model: OPENAI_EMBEDDING_MODEL,
-    input: text,
-  });
-  const embedding = response.data[0]?.embedding;
-  if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
-    throw new AppError("OpenAI returned an invalid embedding", 502, "INTERNAL_ERROR");
+export async function createTextEmbedding(text: string): Promise<number[] | null> {
+  try {
+    const response = await getClient().embeddings.create(
+      {
+        model: OPENAI_EMBEDDING_MODEL,
+        input: text,
+      },
+      { signal: AbortSignal.timeout(30_000) }
+    );
+    const embedding = response.data[0]?.embedding;
+    if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
+      logError("OpenAI returned an invalid embedding", { scope: "embedding", __skipAlert: true });
+      return null;
+    }
+    return embedding;
+  } catch (error) {
+    logOpenAiFailure("embedding", error);
+    return null;
   }
-  return embedding;
 }
 
 export function isRetryableOpenAiError(error: unknown): boolean {
@@ -169,4 +243,3 @@ export function isRetryableOpenAiError(error: unknown): boolean {
 
   return false;
 }
-

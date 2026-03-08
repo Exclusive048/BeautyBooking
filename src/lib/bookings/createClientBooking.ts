@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
-import { logError, logInfo } from "@/lib/logging/logger";
+import { logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
@@ -78,6 +78,7 @@ export async function createClientBooking(
       providerId: data.providerId,
       serviceId: data.serviceId,
       masterProviderId: null,
+      clientUserId: userId,
       slotLabel: data.slotLabel,
     });
 
@@ -219,14 +220,7 @@ export async function createClientBooking(
     }
 
     if (shouldAutoConfirm) {
-      try {
-        await scheduleBookingReminders(booking.id);
-      } catch (error) {
-        logError("Failed to schedule booking reminders", {
-          bookingId: booking.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      await scheduleBookingReminders(booking.id);
     }
 
     await invalidateSlotsForBookingRange({

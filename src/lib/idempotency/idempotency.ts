@@ -9,7 +9,11 @@ export async function checkAndSetIdempotency(
   ttlSeconds: number
 ): Promise<boolean> {
   const payload = JSON.stringify({ status: "pending" } satisfies IdempotencyRecord);
-  return cache.setNx(key, payload, ttlSeconds);
+  try {
+    return await cache.setNx(key, payload, ttlSeconds);
+  } catch {
+    throw new Error("Service temporarily unavailable");
+  }
 }
 
 export async function getIdempotencyRecord(key: string): Promise<IdempotencyRecord | null> {
@@ -18,7 +22,11 @@ export async function getIdempotencyRecord(key: string): Promise<IdempotencyReco
 
 export async function setIdempotencyPending(key: string, ttlSeconds: number): Promise<boolean> {
   const payload = JSON.stringify({ status: "pending" } satisfies IdempotencyRecord);
-  return cache.setNx(key, payload, ttlSeconds);
+  try {
+    return await cache.setNx(key, payload, ttlSeconds);
+  } catch {
+    throw new Error("Service temporarily unavailable");
+  }
 }
 
 export async function setIdempotencyResult(

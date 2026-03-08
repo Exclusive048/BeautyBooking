@@ -1,9 +1,10 @@
 import { AppError } from "@/lib/api/errors";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
+import { validateEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import { CategoryStatus, Prisma } from "@prisma/client";
+import { CategoryStatus, MediaEntityType, MediaKind, Prisma } from "@prisma/client";
 
 type MasterContext = {
   id: string;
@@ -313,6 +314,69 @@ function uniqueIds(ids: string[]): string[] {
   return Array.from(new Set(ids));
 }
 
+const MEDIA_FILE_PATH_PREFIX = "/api/media/file/";
+
+function extractMediaAssetIdFromUrl(mediaUrl: string): string | null {
+  try {
+    const parsedUrl = new URL(mediaUrl);
+    if (!parsedUrl.pathname.startsWith(MEDIA_FILE_PATH_PREFIX)) return null;
+    const id = parsedUrl.pathname.slice(MEDIA_FILE_PATH_PREFIX.length).split("/")[0];
+    return id || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolvePortfolioMediaUrl(input: {
+  userId: string;
+  masterId: string;
+  mediaAssetId?: string;
+  mediaUrl?: string;
+}): Promise<string> {
+  const resolvedAssetId =
+    input.mediaAssetId?.trim() ||
+    (input.mediaUrl ? extractMediaAssetIdFromUrl(input.mediaUrl) : null);
+
+  if (resolvedAssetId) {
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: resolvedAssetId },
+      select: {
+        id: true,
+        deletedAt: true,
+        createdByUserId: true,
+        entityType: true,
+        entityId: true,
+        kind: true,
+      },
+    });
+
+    if (
+      !asset ||
+      asset.deletedAt ||
+      asset.createdByUserId !== input.userId ||
+      asset.entityType !== MediaEntityType.MASTER ||
+      asset.entityId !== input.masterId ||
+      asset.kind !== MediaKind.PORTFOLIO
+    ) {
+      throw new AppError("Invalid media asset", 400, "FORBIDDEN");
+    }
+
+    return `${MEDIA_FILE_PATH_PREFIX}${asset.id}`;
+  }
+
+  const mediaUrl = input.mediaUrl?.trim();
+  if (!mediaUrl) {
+    throw new AppError("Invalid media URL", 400, "VALIDATION_ERROR");
+  }
+
+  const allowedS3Endpoint = validateEnv().S3_ENDPOINT?.trim();
+  if (allowedS3Endpoint && mediaUrl.startsWith(allowedS3Endpoint)) {
+    return mediaUrl;
+  }
+
+  throw new AppError("Invalid media URL", 400, "VALIDATION_ERROR");
+}
+
 export async function upsertMasterServices(
   masterId: string,
   items: Array<{
@@ -520,7 +584,8 @@ export async function createMasterPortfolioItem(
   userId: string,
   masterId: string,
   input: {
-    mediaUrl: string;
+    mediaAssetId?: string;
+    mediaUrl?: string;
     caption?: string;
     serviceIds: string[];
     tagIds?: string[];
@@ -595,12 +660,19 @@ export async function createMasterPortfolioItem(
     }
   }
 
+  const mediaUrl = await resolvePortfolioMediaUrl({
+    userId,
+    masterId,
+    mediaAssetId: input.mediaAssetId,
+    mediaUrl: input.mediaUrl,
+  });
+
   const created = await prisma.$transaction(async (tx) => {
     const item = await tx.portfolioItem.create({
       data: {
         masterId,
         studioId: context.studioId,
-        mediaUrl: input.mediaUrl,
+        mediaUrl,
         caption: input.caption?.trim() || null,
         globalCategoryId: selectedGlobalCategoryId,
         categorySource: selectedGlobalCategoryId ? (input.categorySource ?? "user") : null,

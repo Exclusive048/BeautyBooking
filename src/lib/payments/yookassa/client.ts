@@ -1,3 +1,5 @@
+import { AppError } from "@/lib/api/errors";
+
 type YookassaConfirmation = {
   type: string;
   confirmation_url?: string;
@@ -65,15 +67,32 @@ function getAuthHeader(): string {
 }
 
 async function yookassaFetch<T>(url: string, body: unknown, idempotenceKey: string): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: getAuthHeader(),
-      "Content-Type": "application/json",
-      "Idempotence-Key": idempotenceKey,
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: getAuthHeader(),
+        "Content-Type": "application/json",
+        "Idempotence-Key": idempotenceKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (
+      (error instanceof DOMException && error.name === "AbortError") ||
+      (error instanceof Error && error.name === "AbortError")
+    ) {
+      throw new AppError("Payment service timeout", 503, "PAYMENT_TIMEOUT");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const json = (await res.json().catch(() => null)) as T | null;
   if (!res.ok || !json) {

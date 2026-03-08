@@ -12,9 +12,9 @@ export function generateOtpCode(): string {
 }
 
 export function hashOtpCode(phone: string, code: string): string {
-  const secret = process.env.AUTH_JWT_SECRET;
+  const secret = process.env.OTP_HMAC_SECRET;
   if (!secret) {
-    throw new Error("AUTH_JWT_SECRET is not set");
+    throw new Error("OTP_HMAC_SECRET is not set");
   }
   return crypto.createHmac("sha256", secret).update(`${phone}:${code}`).digest("hex");
 }

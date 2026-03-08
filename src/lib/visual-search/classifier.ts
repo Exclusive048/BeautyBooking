@@ -26,6 +26,10 @@ export async function classifyImage(imageBytes: Uint8Array): Promise<Classificat
     userPrompt: CLASSIFIER_USER_PROMPT,
   });
 
+  if (!json) {
+    return { category: "none", confidence: "low" };
+  }
+
   const parsed = classificationSchema.safeParse(json);
   if (!parsed.success) {
     return { category: "none", confidence: "low" };
