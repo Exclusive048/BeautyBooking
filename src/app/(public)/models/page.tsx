@@ -10,11 +10,11 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams?: {
+  searchParams: Promise<{
     categoryId?: string;
     city?: string;
     page?: string;
-  };
+  }>;
 };
 
 function parsePage(value: string | undefined): number {
@@ -38,9 +38,10 @@ function buildPageHref(input: {
 }
 
 export default async function ModelsPage({ searchParams }: PageProps) {
-  const categoryId = searchParams?.categoryId?.trim() || undefined;
-  const city = searchParams?.city?.trim() || undefined;
-  const page = parsePage(searchParams?.page);
+  const resolvedParams = await searchParams;
+  const categoryId = resolvedParams?.categoryId?.trim() || undefined;
+  const city = resolvedParams?.city?.trim() || undefined;
+  const page = parsePage(resolvedParams?.page);
   const limit = 12;
 
   const [categories, offers] = await Promise.all([

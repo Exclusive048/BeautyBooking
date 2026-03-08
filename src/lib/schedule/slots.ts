@@ -66,7 +66,7 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
   const nowParts = getLocalTimeParts(input.now, input.timeZone);
   const nowMinutes = nowParts.hour * 60 + nowParts.minute;
 
-  const stepMin = 5;
+  const stepMin = 30;
   const slots: AvailabilitySlot[] = [];
   const blockIntervals = buildBlockIntervals(input.dayPlan.breaks);
   const dateForLocal = dateFromLocalDateKey(input.dateKey, input.timeZone);

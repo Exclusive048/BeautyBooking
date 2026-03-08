@@ -4,18 +4,10 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
 import { CategoryStatus, type Prisma } from "@prisma/client";
 
-function parseStatus(value: string | null): CategoryStatus {
-  if (value === CategoryStatus.PENDING) return CategoryStatus.PENDING;
-  if (value === CategoryStatus.REJECTED) return CategoryStatus.REJECTED;
-  return CategoryStatus.APPROVED;
-}
-
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const url = new URL(req.url);
-    const status = parseStatus(url.searchParams.get("status"));
     const where: Prisma.GlobalCategoryWhereInput = {
-      status,
+      status: CategoryStatus.APPROVED,
       isSystem: false,
       NOT: [{ visualSearchSlug: "hot" }],
     };
@@ -33,6 +25,7 @@ export async function GET(req: Request) {
         status: true,
         proposedBy: true,
         proposedAt: true,
+        context: true,
         reviewedAt: true,
         isSystem: true,
         visualSearchSlug: true,

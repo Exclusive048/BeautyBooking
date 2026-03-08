@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export const metadata: Metadata = {
@@ -13,8 +13,9 @@ export const metadata: Metadata = {
 };
 
 export default async function ClientIdPage({ params }: Props) {
+  const resolvedParams = await params;
   const client = await prisma.userProfile.findUnique({
-    where: { id: params.id },
+    where: { id: resolvedParams.id },
     select: { id: true, publicUsername: true },
   });
 

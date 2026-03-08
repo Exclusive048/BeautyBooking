@@ -1,3 +1,4 @@
+import "@/lib/startup";
 import { dequeue } from "@/lib/queue/queue";
 import { enqueue } from "@/lib/queue/queue";
 import { sendTelegramMessage } from "@/lib/telegram/client";
@@ -18,9 +19,7 @@ import {
   isVisualSearchRetryableError,
 } from "@/lib/visual-search/indexer";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
-import { validateEnv } from "@/lib/env";
 
-validateEnv();
 ensureVisualSearchStartupConfig();
 
 process.on("uncaughtException", (error) => {

@@ -6,14 +6,15 @@ import { SelectedServicesProvider } from "@/features/public-profile/master/selec
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
 };
 
 export default async function ProviderProfilePage({ params, searchParams }: Props) {
+  const resolvedParams = await params;
   const sp = (await Promise.resolve(searchParams)) ?? {};
   const provider = await resolveProviderBySlugOrId({
-    key: params.id,
+    key: resolvedParams.id,
     select: { id: true, publicUsername: true, isPublished: true, type: true },
   });
 

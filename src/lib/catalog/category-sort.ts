@@ -1,4 +1,5 @@
 import type { GlobalCategory } from "@prisma/client";
+import { logError } from "@/lib/logging/logger";
 
 export type SortedCategory = GlobalCategory & {
   depth: number;
@@ -51,6 +52,17 @@ export function sortCategoriesHierarchically(categories: GlobalCategory[]): Sort
 
   for (const root of byParent.get(null) ?? []) {
     visit(root, 0, "");
+  }
+
+  for (const category of categories) {
+    if (visited.has(category.id)) continue;
+    visited.add(category.id);
+    logError("Category orphan or cycle detected", { id: category.id });
+    result.push({
+      ...category,
+      depth: 0,
+      fullPath: category.name,
+    });
   }
 
   return result;

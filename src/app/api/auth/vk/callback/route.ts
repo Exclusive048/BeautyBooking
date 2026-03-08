@@ -7,11 +7,13 @@ import { createSessionToken } from "@/lib/auth/jwt";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { getSessionUser } from "@/lib/auth/session";
+import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { exchangeVkCodeForToken, fetchVkProfile, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { readSignedVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
 import { nextRedirect } from "@/lib/http/origin";
+import { logError } from "@/lib/logging/logger";
 
 const callbackSchema = z.object({
   code: z.string().trim().min(1),
@@ -165,6 +167,14 @@ export async function GET(req: Request) {
         refreshToken: token.refreshToken,
         deviceId: token.deviceId,
       });
+      try {
+        await ensureFreeSubscriptionsForRoles(sessionUser.id, sessionUser.roles);
+      } catch (error) {
+        logError("ensureFreeSubscriptionsForRoles failed after vk link", {
+          userProfileId: sessionUser.id,
+          error: error instanceof Error ? error.stack : error,
+        });
+      }
 
       const redirectDecision = await resolveCabinetRedirect(sessionUser.id);
       return nextRedirect(req, redirectDecision.target);
@@ -223,6 +233,15 @@ export async function GET(req: Request) {
       if (nextRoles !== user.roles) {
         user = { ...user, roles: nextRoles };
       }
+    }
+
+    try {
+      await ensureFreeSubscriptionsForRoles(user.id, user.roles);
+    } catch (error) {
+      logError("ensureFreeSubscriptionsForRoles failed after vk auth", {
+        userProfileId: user.id,
+        error: error instanceof Error ? error.stack : error,
+      });
     }
 
     await upsertVkLink({

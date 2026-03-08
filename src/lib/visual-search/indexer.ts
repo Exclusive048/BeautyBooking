@@ -153,7 +153,7 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
     });
 
     if (mappedCategory) {
-      await tx.portfolioItem.updateMany({
+      const updatedPortfolioItems = await tx.portfolioItem.updateMany({
         where: {
           mediaUrl: { endsWith: mediaUrlSuffix },
           OR: [{ globalCategoryId: null }, { categorySource: "ai" }, { inSearch: false }],
@@ -164,6 +164,13 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
           inSearch: true,
         },
       });
+
+      if (updatedPortfolioItems.count > 0) {
+        await tx.globalCategory.update({
+          where: { id: mappedCategory.id },
+          data: { usageCount: { increment: updatedPortfolioItems.count } },
+        });
+      }
     }
 
     await tx.$executeRaw`

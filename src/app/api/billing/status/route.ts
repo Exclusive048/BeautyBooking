@@ -1,5 +1,7 @@
 import { ok, fail } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
+import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
+import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import type { SubscriptionScope } from "@prisma/client";
 
@@ -31,6 +33,15 @@ type SubscriptionSummary = {
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
+
+  try {
+    await ensureFreeSubscriptionsForRoles(user.id, user.roles);
+  } catch (error) {
+    logError("ensureFreeSubscriptionsForRoles failed in billing status", {
+      userProfileId: user.id,
+      error: error instanceof Error ? error.stack : error,
+    });
+  }
 
   const subscriptions = await prisma.userSubscription.findMany({
     where: { userId: user.id },

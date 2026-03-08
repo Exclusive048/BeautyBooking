@@ -1,14 +1,6 @@
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
-import { AppError, toAppError } from "@/lib/api/errors";
-import { formatZodError } from "@/lib/api/validation";
-
-const patchSchema = z.object({
-  id: z.string().trim().min(1),
-  action: z.enum(["approve", "reject"]),
-});
 
 export async function GET() {
   const auth = await requireAdminAuth();
@@ -22,6 +14,7 @@ export async function GET() {
       slug: true,
       icon: true,
       status: true,
+      context: true,
       usageCount: true,
       createdAt: true,
       createdBy: {
@@ -51,36 +44,6 @@ export async function PATCH(req: Request) {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
-  try {
-    const body = await req.json().catch(() => null);
-    const parsed = patchSchema.safeParse(body);
-    if (!parsed.success) {
-      return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
-    }
-
-    const { id, action } = parsed.data;
-
-    const category = await prisma.globalCategory.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!category) {
-      return fail("Категория не найдена", 404, "NOT_FOUND");
-    }
-
-    const updated = await prisma.globalCategory.update({
-      where: { id },
-      data: {
-        status: action === "approve" ? "APPROVED" : "REJECTED",
-        reviewedAt: new Date(),
-      },
-      select: { id: true, status: true },
-    });
-
-    return ok({ category: updated });
-  } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
-  }
+  void req;
+  return fail("Use /api/admin/catalog/categories endpoints", 410, "GONE");
 }
