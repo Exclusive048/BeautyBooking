@@ -151,4 +151,10 @@ export const createMasterPortfolioSchema = z.object({
   caption: z.string().trim().max(2000).optional(),
   serviceIds: z.array(z.string().trim().min(1)).max(20),
   tagIds: z.array(z.string().trim().min(1)).max(20).optional(),
+  globalCategoryId: z.string().trim().min(1).optional(),
+  categorySource: z.enum(["ai", "user"]).optional(),
+});
+
+export const updateMasterPortfolioCategorySchema = z.object({
+  globalCategoryId: z.string().trim().min(1).nullable(),
 });

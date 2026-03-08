@@ -1,3 +1,4 @@
+import { CategoryStatus } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
@@ -12,7 +13,8 @@ type RouteContext = {
 const patchSchema = z.object({
   title: z.string().trim().min(2).max(60).optional(),
   icon: z.string().trim().max(10).nullable().optional(),
-  isActive: z.boolean().optional(),
+  parentId: z.string().trim().min(1).nullable().optional(),
+  status: z.nativeEnum(CategoryStatus).optional(),
 });
 
 export async function PATCH(req: Request, ctx: RouteContext) {
@@ -32,7 +34,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     if (
       parsed.data.title === undefined &&
       parsed.data.icon === undefined &&
-      parsed.data.isActive === undefined
+      parsed.data.parentId === undefined &&
+      parsed.data.status === undefined
     ) {
       return fail("Нет данных для обновления.", 400, "VALIDATION_ERROR");
     }
@@ -53,10 +56,25 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       const trimmed = parsed.data.icon?.trim();
       data.icon = trimmed && trimmed.length > 0 ? trimmed : null;
     }
-    if (typeof parsed.data.isActive === "boolean") {
-      data.isActive = parsed.data.isActive;
-      data.isValidated = parsed.data.isActive;
-      data.isRejected = !parsed.data.isActive;
+    if (parsed.data.parentId !== undefined) {
+      const parentId = parsed.data.parentId?.trim() || null;
+      if (parentId) {
+        if (parentId === id) {
+          return fail("Категория не может быть родителем самой себе.", 400, "VALIDATION_ERROR");
+        }
+        const parent = await prisma.globalCategory.findUnique({
+          where: { id: parentId },
+          select: { id: true },
+        });
+        if (!parent) {
+          return fail("Родительская категория не найдена.", 404, "NOT_FOUND");
+        }
+      }
+      data.parentId = parentId;
+    }
+    if (parsed.data.status !== undefined) {
+      data.status = parsed.data.status;
+      data.reviewedAt = parsed.data.status === CategoryStatus.PENDING ? null : new Date();
     }
 
     const updated = await prisma.globalCategory.update({
@@ -67,7 +85,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         name: true,
         slug: true,
         icon: true,
-        isActive: true,
+        parentId: true,
+        status: true,
         usageCount: true,
         createdAt: true,
       },
@@ -79,7 +98,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         title: updated.name,
         slug: updated.slug,
         icon: updated.icon,
-        isActive: updated.isActive,
+        parentId: updated.parentId,
+        status: updated.status,
         usageCount: updated.usageCount,
         createdAt: updated.createdAt.toISOString(),
       },

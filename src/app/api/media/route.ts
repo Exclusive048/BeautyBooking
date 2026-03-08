@@ -110,6 +110,19 @@ export async function POST(req: Request) {
       bytes,
       originalFilename: fileValue.name || "upload",
     });
+
+    if ((parsedBody.data.kind as MediaKind) === MediaKind.PORTFOLIO) {
+      return jsonOk(
+        {
+          asset,
+          assetId: asset.id,
+          url: asset.url,
+          aiClassificationPending: true,
+        },
+        { status: 201 }
+      );
+    }
+
     return jsonOk({ asset }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

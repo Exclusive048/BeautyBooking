@@ -9,10 +9,10 @@ import {
   type BookingReminderPayload,
 } from "@/lib/queue/types";
 import {
-  loadBookingWithRelations,
-  notifyBookingReminder24h,
-  notifyBookingReminder2h,
-} from "@/lib/notifications/booking-notifications";
+  createBookingReminderNotifications,
+  publishNotifications,
+} from "@/lib/notifications/service";
+import { sendBookingReminderTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
 
 const MINUTES = 60 * 1000;
 const HOURS = 60 * MINUTES;
@@ -149,26 +149,23 @@ export async function processBookingReminder(payload: BookingReminderPayload): P
     const updated = await markReminderSent(tx, booking.id, payload.kind);
     if (!updated) return { sent: false };
 
-    return { sent: true };
+    const notifications = await createBookingReminderNotifications({
+      bookingId: booking.id,
+      kind: payload.kind,
+      db: tx,
+    });
+
+    return { sent: true, notifications };
   });
 
   if (!result.sent) return;
 
-  try {
-    const booking = await loadBookingWithRelations(payload.bookingId);
-    if (!booking) return;
-    if (payload.kind === "REMINDER_24H") {
-      await notifyBookingReminder24h(booking);
-    } else {
-      await notifyBookingReminder2h(booking);
-    }
-  } catch (error) {
-    logError("Failed to send booking reminder notifications", {
-      bookingId: payload.bookingId,
-      kind: payload.kind,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  const notifications = result.notifications ?? [];
+  if (notifications.length > 0) {
+    publishNotifications(notifications);
   }
+
+  await sendBookingReminderTelegramNotifications(payload.bookingId, payload.kind);
 }
 
 export function isBookingReminderJob(job: { type: string }): job is { type: typeof BOOKING_REMINDER_JOB_TYPE } {

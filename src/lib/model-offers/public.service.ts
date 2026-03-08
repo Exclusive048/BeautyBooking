@@ -269,7 +269,11 @@ export type PublicModelOfferFilterCategory = {
 
 export async function listModelOfferFilterCategories(): Promise<PublicModelOfferFilterCategory[]> {
   return prisma.globalCategory.findMany({
-    where: { isActive: true },
+    where: {
+      status: "APPROVED",
+      isSystem: false,
+      NOT: [{ visualSearchSlug: "hot" }],
+    },
     select: { id: true, name: true },
     orderBy: [{ usageCount: "desc" }, { name: "asc" }],
   });

@@ -14,35 +14,14 @@ export async function GET() {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
-  await prisma.globalCategory.upsert({
-    where: { slug: "hot" },
-    update: {
-      isActive: true,
-      isValidated: true,
-      isRejected: false,
-      icon: "🔥",
-      name: "Горящие",
-    },
-    create: {
-      name: "Горящие",
-      slug: "hot",
-      icon: "🔥",
-      isActive: true,
-      isValidated: true,
-      isRejected: false,
-    },
-  });
-
   const categories = await prisma.globalCategory.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }],
     select: {
       id: true,
       name: true,
       slug: true,
       icon: true,
-      isActive: true,
-      isValidated: true,
-      isRejected: true,
+      status: true,
       usageCount: true,
       createdAt: true,
       createdBy: {
@@ -51,7 +30,7 @@ export async function GET() {
     },
   });
 
-  const pending = categories.filter((category) => !category.isValidated && !category.isRejected);
+  const pending = categories.filter((category) => category.status === "PENDING");
 
   return ok({
     categories: categories.map((category) => ({
@@ -92,11 +71,11 @@ export async function PATCH(req: Request) {
 
     const updated = await prisma.globalCategory.update({
       where: { id },
-      data:
-        action === "approve"
-          ? { isActive: true, isValidated: true, isRejected: false }
-          : { isActive: false, isValidated: false, isRejected: true },
-      select: { id: true, isActive: true, isValidated: true, isRejected: true },
+      data: {
+        status: action === "approve" ? "APPROVED" : "REJECTED",
+        reviewedAt: new Date(),
+      },
+      select: { id: true, status: true },
     });
 
     return ok({ category: updated });

@@ -22,7 +22,10 @@ type CategoryItem = {
   title: string;
   slug: string;
   icon: string | null;
-  isActive: boolean;
+  parentId: string | null;
+  depth: number;
+  fullPath: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
   usageCount: number;
   createdAt: string;
   createdBy: CreatorInfo | null;
@@ -42,8 +45,14 @@ function formatDate(value: string, timeZone: string) {
 }
 
 function creatorLabel(creator: CreatorInfo | null) {
-  if (!creator) return "—";
-  return creator.displayName || creator.phone || creator.email || "—";
+  if (!creator) return "-";
+  return creator.displayName || creator.phone || creator.email || "-";
+}
+
+function statusLabel(status: CategoryItem["status"]) {
+  if (status === "APPROVED") return "Активна";
+  if (status === "PENDING") return "На модерации";
+  return "Отклонена";
 }
 
 export function AdminCatalog() {
@@ -124,6 +133,7 @@ export function AdminCatalog() {
       setError("Укажите название категории.");
       return;
     }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -140,6 +150,7 @@ export function AdminCatalog() {
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : "Не удалось создать категорию");
       }
+
       setShowCreateModal(false);
       resetCreateForm();
       setToast("Категория добавлена");
@@ -151,22 +162,20 @@ export function AdminCatalog() {
     }
   };
 
-  const inactiveCategories = useMemo(
-    () => categories.filter((category) => !category.isActive),
+  const pendingCategories = useMemo(
+    () => categories.filter((category) => category.status === "PENDING"),
     [categories]
   );
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка…</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>;
   }
 
   return (
     <section className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold text-text-main">Каталог и модерация</h1>
-        <p className="mt-1 text-sm text-text-sec">
-          Проверяйте категории и управляйте статусом публикации.
-        </p>
+        <p className="mt-1 text-sm text-text-sec">Проверяйте категории и управляйте статусом публикации.</p>
       </header>
 
       {toast ? (
@@ -208,17 +217,15 @@ export function AdminCatalog() {
                       <td className="px-4 py-3 text-sm text-text-main">
                         <div className="flex items-center gap-2">
                           <span className="text-base">{category.icon ?? "•"}</span>
-                          <span>{category.title}</span>
+                          <span>{category.fullPath || category.title}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-text-sec">{category.slug}</td>
-                      <td className="px-4 py-3 text-sm text-text-sec">
-                        {category.isActive ? "Активна" : "Отключена"}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-text-sec">{statusLabel(category.status)}</td>
                       <td className="px-4 py-3 text-sm font-medium text-text-main">{category.usageCount}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-2">
-                          {category.isActive ? (
+                          {category.status === "APPROVED" ? (
                             <Button
                               size="sm"
                               variant="secondary"
@@ -267,16 +274,24 @@ export function AdminCatalog() {
                 </tr>
               </thead>
               <tbody>
-                {inactiveCategories.length ? (
-                  inactiveCategories.map((category, index) => (
+                {pendingCategories.length ? (
+                  pendingCategories.map((category, index) => (
                     <tr key={category.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
-                      <td className="px-4 py-3 text-sm text-text-main">{category.title}</td>
+                      <td className="px-4 py-3 text-sm text-text-main">{category.fullPath || category.title}</td>
                       <td className="px-4 py-3 text-sm text-text-sec">{creatorLabel(category.createdBy)}</td>
                       <td className="px-4 py-3 text-sm text-text-sec">
                         {formatDate(category.createdAt, viewerTimeZone)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busyId === category.id}
+                            onClick={() => handleStatus(category.id, "reject")}
+                          >
+                            Отклонить
+                          </Button>
                           <Button
                             size="sm"
                             variant="secondary"
@@ -331,7 +346,7 @@ export function AdminCatalog() {
           <Input
             value={newIcon}
             onChange={(event) => setNewIcon(event.target.value)}
-            placeholder="Иконка (например 💅)"
+            placeholder="Иконка (например •)"
           />
           <div className="flex justify-end gap-2">
             <Button

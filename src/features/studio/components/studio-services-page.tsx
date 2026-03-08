@@ -43,6 +43,9 @@ type GlobalCategoryOption = {
   title: string;
   slug: string;
   icon: string | null;
+  parentId?: string | null;
+  depth?: number;
+  fullPath?: string;
 };
 
 type ServicesData = {
@@ -130,7 +133,7 @@ export function StudioServicesPage({ studioId }: Props) {
 
       const [mastersRes, categoriesRes] = await Promise.all([
         fetch(`/api/studio/masters?${servicesParams.toString()}`, { cache: "no-store" }),
-        fetch("/api/catalog/global-categories", { cache: "no-store" }),
+        fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
       ]);
       const mastersJson = (await mastersRes.json().catch(() => null)) as ApiResponse<MastersData> | null;
       if (mastersRes.ok && mastersJson && mastersJson.ok) {
@@ -435,7 +438,7 @@ export function StudioServicesPage({ studioId }: Props) {
               <option value="">Глобальная категория</option>
               {globalCategories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.icon ? `${category.icon} ` : ""}{category.title}
+                  {category.icon ? `${category.icon} ` : ""}{category.fullPath || category.title}
                 </option>
               ))}
             </Select>

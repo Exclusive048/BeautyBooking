@@ -70,6 +70,8 @@ type CatalogSearchInput = {
   priceMax?: number;
   availableToday?: boolean;
   hot?: boolean;
+  globalCategoryId?: string;
+  includeChildCategories?: boolean;
   ratingMin?: number;
   smartTag?: CatalogSmartTagPreset;
   entityType?: CatalogEntityType;
@@ -162,10 +164,57 @@ function parseBbox(value: string | undefined): MapBounds | null {
   return { minLat, minLng, maxLat, maxLng };
 }
 
+async function resolveCategoryFilterIds(
+  globalCategoryId: string | undefined,
+  includeChildCategories: boolean | undefined
+): Promise<string[]> {
+  const normalizedId = globalCategoryId?.trim();
+  if (!normalizedId) return [];
+
+  const root = await prisma.globalCategory.findUnique({
+    where: { id: normalizedId },
+    select: { id: true, status: true, isSystem: true },
+  });
+  if (!root || root.status !== "APPROVED" || root.isSystem) return [];
+
+  if (includeChildCategories === false) {
+    return [root.id];
+  }
+
+  const rows = await prisma.globalCategory.findMany({
+    where: { status: "APPROVED", isSystem: false },
+    select: { id: true, parentId: true },
+  });
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!row.parentId) continue;
+    const bucket = childrenByParent.get(row.parentId) ?? [];
+    bucket.push(row.id);
+    childrenByParent.set(row.parentId, bucket);
+  }
+
+  const ids = new Set<string>([root.id]);
+  const queue: string[] = [root.id];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) break;
+    const children = childrenByParent.get(current) ?? [];
+    for (const childId of children) {
+      if (ids.has(childId)) continue;
+      ids.add(childId);
+      queue.push(childId);
+    }
+  }
+
+  return Array.from(ids);
+}
+
 function buildWhere(
   input: CatalogSearchInput,
   hotProviderIds?: string[],
-  bounds?: MapBounds | null
+  bounds?: MapBounds | null,
+  categoryIds?: string[]
 ): Prisma.ProviderWhereInput {
   const and: Prisma.ProviderWhereInput[] = [];
   const serviceQuery = input.serviceQuery?.trim();
@@ -229,6 +278,56 @@ function buildWhere(
 
   if (hotProviderIds) {
     and.push({ id: { in: hotProviderIds } });
+  }
+
+  if (categoryIds && categoryIds.length > 0) {
+    and.push({
+      OR: [
+        {
+          services: {
+            some: {
+              isEnabled: true,
+              isActive: true,
+              globalCategoryId: { in: categoryIds },
+            },
+          },
+        },
+        {
+          masterServices: {
+            some: {
+              isEnabled: true,
+              service: {
+                isEnabled: true,
+                isActive: true,
+                globalCategoryId: { in: categoryIds },
+              },
+            },
+          },
+        },
+        {
+          portfolioItems: {
+            some: {
+              isPublic: true,
+              inSearch: true,
+              globalCategoryId: { in: categoryIds },
+            },
+          },
+        },
+        {
+          masters: {
+            some: {
+              portfolioItems: {
+                some: {
+                  isPublic: true,
+                  inSearch: true,
+                  globalCategoryId: { in: categoryIds },
+                },
+              },
+            },
+          },
+        },
+      ],
+    });
   }
 
   if (bounds) {
@@ -335,7 +434,21 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   if (input.hot && (!hotProviderIds || hotProviderIds.length === 0)) {
     return { items: [], nextCursor: null };
   }
-  const where = buildWhere(input, hotProviderIds ?? undefined, parseBbox(input.bbox));
+
+  const categoryIds = await resolveCategoryFilterIds(
+    input.globalCategoryId,
+    input.includeChildCategories
+  );
+  if (input.globalCategoryId && categoryIds.length === 0) {
+    return { items: [], nextCursor: null };
+  }
+
+  const where = buildWhere(
+    input,
+    hotProviderIds ?? undefined,
+    parseBbox(input.bbox),
+    categoryIds.length > 0 ? categoryIds : undefined
+  );
   const skip = input.cursor ?? 0;
   const take = Math.min(Math.max(input.limit, 1), 40);
 
@@ -490,6 +603,23 @@ function toPriceNumber(value: Prisma.Decimal | null): number | null {
 
 async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSearchResult> {
   const and: Prisma.ModelOfferWhereInput[] = [{ status: "ACTIVE" }];
+  const categoryIds = await resolveCategoryFilterIds(
+    input.globalCategoryId,
+    input.includeChildCategories
+  );
+  if (input.globalCategoryId && categoryIds.length === 0) {
+    return { items: [], nextCursor: null };
+  }
+
+  if (categoryIds.length > 0) {
+    and.push({
+      masterService: {
+        service: {
+          globalCategoryId: { in: categoryIds },
+        },
+      },
+    });
+  }
 
   const serviceQuery = input.serviceQuery?.trim();
   if (serviceQuery) {
