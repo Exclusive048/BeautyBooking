@@ -1,3 +1,4 @@
+import { CategoryStatus, type Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
@@ -5,8 +6,8 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { slugifyCategory } from "@/lib/slug";
+import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
 
-const STATUS_VALUES = new Set(["active", "inactive"]);
 const MAX_SLUG_LENGTH = 60;
 
 const createSchema = z.object({
@@ -19,6 +20,7 @@ const createSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   icon: z.string().trim().max(10).optional().nullable(),
+  parentId: z.string().trim().min(1).optional().nullable(),
 });
 
 function normalizeOptional(value: string | null | undefined): string | null {
@@ -43,48 +45,108 @@ async function ensureUniqueSlug(base: string): Promise<string> {
   }
 }
 
+function parseStatus(value: string | null): CategoryStatus | null {
+  if (value === CategoryStatus.PENDING) return CategoryStatus.PENDING;
+  if (value === CategoryStatus.APPROVED) return CategoryStatus.APPROVED;
+  if (value === CategoryStatus.REJECTED) return CategoryStatus.REJECTED;
+  return null;
+}
+
+function statusOrder(status: CategoryStatus): number {
+  if (status === CategoryStatus.PENDING) return 0;
+  if (status === CategoryStatus.APPROVED) return 1;
+  return 2;
+}
+
 export async function GET(req: Request) {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
   try {
     const url = new URL(req.url);
-    const status = url.searchParams.get("status")?.toLowerCase() ?? null;
+    const statusParam = parseStatus(url.searchParams.get("status"));
     const tab = url.searchParams.get("tab")?.toLowerCase() ?? null;
-    const where =
-      status && STATUS_VALUES.has(status)
-        ? { isActive: status === "active" }
-        : tab === "moderation"
-          ? { isActive: false }
-          : {};
 
-    const categories = await prisma.globalCategory.findMany({
+    const where: Prisma.GlobalCategoryWhereInput = {};
+    if (statusParam) {
+      where.status = statusParam;
+    } else if (tab === "moderation") {
+      where.status = CategoryStatus.PENDING;
+    }
+
+    const rows = await prisma.globalCategory.findMany({
       where,
-      orderBy: [{ isActive: "desc" }, { usageCount: "desc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,
         slug: true,
         icon: true,
-        isActive: true,
+        parentId: true,
+        orderIndex: true,
+        status: true,
+        proposedBy: true,
+        proposedAt: true,
+        reviewedAt: true,
+        isSystem: true,
+        visualSearchSlug: true,
         usageCount: true,
+        createdByUserId: true,
+        createdByProviderId: true,
         createdAt: true,
+        updatedAt: true,
         createdBy: {
           select: { id: true, displayName: true, phone: true, email: true },
         },
       },
     });
 
+    const creatorById = new Map(rows.map((row) => [row.id, row.createdBy]));
+    const sortableCategories = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      icon: row.icon,
+      parentId: row.parentId,
+      orderIndex: row.orderIndex,
+      status: row.status,
+      proposedBy: row.proposedBy,
+      proposedAt: row.proposedAt,
+      reviewedAt: row.reviewedAt,
+      isSystem: row.isSystem,
+      visualSearchSlug: row.visualSearchSlug,
+      usageCount: row.usageCount,
+      createdByUserId: row.createdByUserId,
+      createdByProviderId: row.createdByProviderId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }));
+    const hierarchySorted = sortCategoriesHierarchically(sortableCategories);
+    const hierarchyOrder = new Map(hierarchySorted.map((category, index) => [category.id, index]));
+
+    const sorted = [...hierarchySorted].sort((left, right) => {
+      const byStatus = statusOrder(left.status) - statusOrder(right.status);
+      if (byStatus !== 0) return byStatus;
+      return (hierarchyOrder.get(left.id) ?? 0) - (hierarchyOrder.get(right.id) ?? 0);
+    });
+
     return ok({
-      categories: categories.map((category) => ({
+      categories: sorted.map((category) => ({
         id: category.id,
         title: category.name,
         slug: category.slug,
         icon: category.icon,
-        isActive: category.isActive,
+        parentId: category.parentId,
+        depth: category.depth,
+        fullPath: category.fullPath,
+        status: category.status,
+        proposedBy: category.proposedBy,
+        proposedAt: category.proposedAt?.toISOString() ?? null,
+        reviewedAt: category.reviewedAt?.toISOString() ?? null,
+        isSystem: category.isSystem,
+        visualSearchSlug: category.visualSearchSlug,
         usageCount: category.usageCount,
         createdAt: category.createdAt.toISOString(),
-        createdBy: category.createdBy,
+        createdBy: creatorById.get(category.id) ?? null,
       })),
     });
   } catch (error) {
@@ -106,9 +168,11 @@ export async function POST(req: Request) {
 
     const title = parsed.data.title.trim();
     const icon = normalizeOptional(parsed.data.icon ?? null);
+    const parentId = normalizeOptional(parsed.data.parentId ?? null);
     const rawSlug = normalizeOptional(parsed.data.slug ?? null);
     const normalizedSlug = rawSlug ? rawSlug.toLowerCase() : null;
     const generated = normalizedSlug ?? slugifyCategory(title, MAX_SLUG_LENGTH);
+
     if (!generated || generated.length < 2) {
       return fail("Не удалось сформировать slug, укажите его вручную.", 400, "VALIDATION_ERROR");
     }
@@ -119,7 +183,17 @@ export async function POST(req: Request) {
         select: { id: true },
       });
       if (existing) {
-        return fail("Slug уже занят другой категорией.", 409, "SLUG_TAKEN");
+        return fail("Slug уже занят другой категорией.", 409, "ALREADY_EXISTS");
+      }
+    }
+
+    if (parentId) {
+      const parent = await prisma.globalCategory.findUnique({
+        where: { id: parentId },
+        select: { id: true },
+      });
+      if (!parent) {
+        return fail("Родительская категория не найдена.", 404, "NOT_FOUND");
       }
     }
 
@@ -129,16 +203,20 @@ export async function POST(req: Request) {
         name: title,
         slug: uniqueSlug,
         icon,
-        isActive: true,
-        isValidated: true,
-        isRejected: false,
+        parentId,
+        status: CategoryStatus.APPROVED,
+        reviewedAt: new Date(),
+        proposedBy: null,
+        proposedAt: null,
+        isSystem: false,
       },
       select: {
         id: true,
         name: true,
         slug: true,
         icon: true,
-        isActive: true,
+        parentId: true,
+        status: true,
         usageCount: true,
         createdAt: true,
       },
@@ -151,7 +229,8 @@ export async function POST(req: Request) {
           title: created.name,
           slug: created.slug,
           icon: created.icon,
-          isActive: created.isActive,
+          parentId: created.parentId,
+          status: created.status,
           usageCount: created.usageCount,
           createdAt: created.createdAt.toISOString(),
         },
@@ -163,3 +242,4 @@ export async function POST(req: Request) {
     return fail(appError.message, appError.status, appError.code, appError.details);
   }
 }
+

@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { UI_TEXT } from "@/lib/ui/text";
+import type { ApiResponse } from "@/lib/types/api";
 
-// AUDIT (section 6 UI):
-// - Smart preset chips are implemented and map to review-tag intents.
 type FilterChipsProps = {
   availableToday: boolean;
   rating45plus: boolean;
   hot: boolean;
   smartTag?: "rush" | "relax" | "design" | "safe" | "silent" | null;
   entityType: "all" | "master" | "studio";
+  globalCategoryId?: string | null;
   priceMin: string;
   priceMax: string;
   onToggleAvailableToday: () => void;
@@ -21,8 +21,17 @@ type FilterChipsProps = {
   onToggleHot: () => void;
   onSmartTagChange?: (value: "rush" | "relax" | "design" | "safe" | "silent" | null) => void;
   onEntityTypeChange: (value: "all" | "master" | "studio") => void;
+  onGlobalCategoryChange?: (value: string | null) => void;
   onPriceApply: (nextMin: string, nextMax: string) => void;
   onPriceReset: () => void;
+};
+
+type CatalogCategoryChip = {
+  id: string;
+  title: string;
+  icon: string | null;
+  parentId: string | null;
+  depth?: number;
 };
 
 export function FilterChips({
@@ -30,18 +39,21 @@ export function FilterChips({
   rating45plus,
   hot,
   entityType,
+  globalCategoryId,
   priceMin,
   priceMax,
   onToggleAvailableToday,
   onToggleRating45plus,
   onToggleHot,
   onEntityTypeChange,
+  onGlobalCategoryChange,
   onPriceApply,
   onPriceReset,
 }: FilterChipsProps) {
   const [priceOpen, setPriceOpen] = useState(false);
   const [draftMin, setDraftMin] = useState(priceMin);
   const [draftMax, setDraftMax] = useState(priceMax);
+  const [categories, setCategories] = useState<CatalogCategoryChip[]>([]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -58,6 +70,34 @@ export function FilterChips({
     document.addEventListener("mousedown", onDocumentClick);
     return () => document.removeEventListener("mousedown", onDocumentClick);
   }, [priceOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ categories: CatalogCategoryChip[] }>
+          | null;
+        if (!res.ok || !json || !json.ok || cancelled) {
+          if (!cancelled) setCategories([]);
+          return;
+        }
+        setCategories(json.data.categories);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const topLevelCategories = useMemo(
+    () => categories.filter((category) => category.parentId === null && (category.depth ?? 0) === 0),
+    [categories]
+  );
 
   const priceActive = priceMin.length > 0 || priceMax.length > 0;
 
@@ -131,8 +171,19 @@ export function FilterChips({
         {UI_TEXT.catalog.chips.rating45plus}
       </Chip>
       <Chip type="button" onClick={onToggleHot} variant={hot ? "active" : "default"}>
-        🔥 {UI_TEXT.catalog.chips.hot}
+        ?? {UI_TEXT.catalog.chips.hot}
       </Chip>
+      {topLevelCategories.map((category) => (
+        <Chip
+          key={category.id}
+          type="button"
+          variant={globalCategoryId === category.id ? "active" : "default"}
+          onClick={() => onGlobalCategoryChange?.(globalCategoryId === category.id ? null : category.id)}
+        >
+          {category.icon ? `${category.icon} ` : ""}
+          {category.title}
+        </Chip>
+      ))}
       <Chip
         type="button"
         onClick={() => onEntityTypeChange(entityType === "studio" ? "all" : "studio")}

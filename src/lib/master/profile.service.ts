@@ -3,7 +3,7 @@ import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
 import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import { Prisma } from "@prisma/client";
+import { CategoryStatus, Prisma } from "@prisma/client";
 
 type MasterContext = {
   id: string;
@@ -109,6 +109,9 @@ export type MasterPortfolioItem = {
   mediaUrl: string;
   caption: string | null;
   serviceIds: string[];
+  globalCategoryId: string | null;
+  categorySource: string | null;
+  inSearch: boolean;
   createdAt: string;
 };
 
@@ -190,6 +193,9 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         mediaUrl: item.mediaUrl,
         caption: item.caption ?? null,
         serviceIds: item.services.map((link) => link.serviceId),
+        globalCategoryId: item.globalCategoryId ?? null,
+        categorySource: item.categorySource ?? null,
+        inSearch: item.inSearch,
         createdAt: item.createdAt.toISOString(),
       })),
     };
@@ -263,6 +269,9 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       mediaUrl: item.mediaUrl,
       caption: item.caption ?? null,
       serviceIds: item.services.map((link) => link.serviceId),
+      globalCategoryId: item.globalCategoryId ?? null,
+      categorySource: item.categorySource ?? null,
+      inSearch: item.inSearch,
       createdAt: item.createdAt.toISOString(),
     })),
   };
@@ -411,9 +420,14 @@ export async function createSoloMasterService(
   if (globalCategoryId) {
     const globalCategory = await prisma.globalCategory.findUnique({
       where: { id: globalCategoryId },
-      select: { id: true, isActive: true },
+      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
     });
-    if (!globalCategory || !globalCategory.isActive) {
+    if (
+      !globalCategory ||
+      globalCategory.status !== CategoryStatus.APPROVED ||
+      globalCategory.isSystem ||
+      globalCategory.visualSearchSlug === "hot"
+    ) {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
     }
   }
@@ -494,6 +508,9 @@ export async function listMasterPortfolio(masterId: string): Promise<{ items: Ma
       mediaUrl: item.mediaUrl,
       caption: item.caption ?? null,
       serviceIds: item.services.map((link) => link.serviceId),
+      globalCategoryId: item.globalCategoryId ?? null,
+      categorySource: item.categorySource ?? null,
+      inSearch: item.inSearch,
       createdAt: item.createdAt.toISOString(),
     })),
   };
@@ -502,12 +519,19 @@ export async function listMasterPortfolio(masterId: string): Promise<{ items: Ma
 export async function createMasterPortfolioItem(
   userId: string,
   masterId: string,
-  input: { mediaUrl: string; caption?: string; serviceIds: string[]; tagIds?: string[] }
+  input: {
+    mediaUrl: string;
+    caption?: string;
+    serviceIds: string[];
+    tagIds?: string[];
+    globalCategoryId?: string;
+    categorySource?: "ai" | "user";
+  }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
   const uniqueServiceIds = uniqueIds(input.serviceIds);
   const uniqueTagIds = uniqueIds(input.tagIds ?? []);
-  let categoryIds: string[] = [];
+  const serviceCategoryIds: string[] = [];
 
   if (uniqueServiceIds.length > 0) {
     const services = await prisma.service.findMany({
@@ -520,11 +544,29 @@ export async function createMasterPortfolioItem(
     if (services.length !== uniqueServiceIds.length) {
       throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
     }
-    categoryIds = uniqueIds(
+    serviceCategoryIds.push(
+      ...uniqueIds(
       services
         .map((service) => service.globalCategoryId)
         .filter((value): value is string => Boolean(value))
+      )
     );
+  }
+
+  const selectedGlobalCategoryId = input.globalCategoryId?.trim() || null;
+  if (selectedGlobalCategoryId) {
+    const category = await prisma.globalCategory.findUnique({
+      where: { id: selectedGlobalCategoryId },
+      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+    });
+    if (
+      !category ||
+      category.status !== CategoryStatus.APPROVED ||
+      category.isSystem ||
+      category.visualSearchSlug === "hot"
+    ) {
+      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    }
   }
 
   if (uniqueTagIds.length > 0) {
@@ -560,6 +602,9 @@ export async function createMasterPortfolioItem(
         studioId: context.studioId,
         mediaUrl: input.mediaUrl,
         caption: input.caption?.trim() || null,
+        globalCategoryId: selectedGlobalCategoryId,
+        categorySource: selectedGlobalCategoryId ? (input.categorySource ?? "user") : null,
+        inSearch: Boolean(selectedGlobalCategoryId),
         isPublic: true,
       },
       select: { id: true },
@@ -583,9 +628,15 @@ export async function createMasterPortfolioItem(
       });
     }
 
-    if (categoryIds.length > 0) {
+    const usageCategoryIds = uniqueIds(
+      selectedGlobalCategoryId
+        ? [...serviceCategoryIds, selectedGlobalCategoryId]
+        : [...serviceCategoryIds]
+    );
+
+    if (usageCategoryIds.length > 0) {
       await tx.globalCategory.updateMany({
-        where: { id: { in: categoryIds } },
+        where: { id: { in: usageCategoryIds } },
         data: { usageCount: { increment: 1 } },
       });
     }
@@ -604,6 +655,70 @@ export async function createMasterPortfolioItem(
   return { id: created.id };
 }
 
+export async function updateMasterPortfolioCategory(
+  masterId: string,
+  portfolioId: string,
+  globalCategoryId: string | null
+): Promise<{ id: string; globalCategoryId: string | null; inSearch: boolean }> {
+  const item = await prisma.portfolioItem.findUnique({
+    where: { id: portfolioId },
+    select: { id: true, masterId: true, globalCategoryId: true },
+  });
+  if (!item || item.masterId !== masterId) {
+    throw new AppError("Not found", 404, "NOT_FOUND");
+  }
+
+  const nextGlobalCategoryId = globalCategoryId?.trim() || null;
+  if (nextGlobalCategoryId) {
+    const category = await prisma.globalCategory.findUnique({
+      where: { id: nextGlobalCategoryId },
+      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+    });
+    if (
+      !category ||
+      category.status !== CategoryStatus.APPROVED ||
+      category.isSystem ||
+      category.visualSearchSlug === "hot"
+    ) {
+      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    }
+  }
+
+  const changed = (item.globalCategoryId ?? null) !== nextGlobalCategoryId;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.portfolioItem.update({
+      where: { id: portfolioId },
+      data: {
+        globalCategoryId: nextGlobalCategoryId,
+        categorySource: "user",
+        inSearch: Boolean(nextGlobalCategoryId),
+      },
+      select: { id: true, globalCategoryId: true, inSearch: true },
+    });
+
+    if (changed) {
+      if (item.globalCategoryId) {
+        await tx.globalCategory.updateMany({
+          where: { id: item.globalCategoryId, usageCount: { gt: 0 } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+      if (nextGlobalCategoryId) {
+        await tx.globalCategory.update({
+          where: { id: nextGlobalCategoryId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+    }
+
+    return row;
+  });
+
+  await invalidateAdvisorCache(masterId);
+  return updated;
+}
+
 export async function deleteMasterPortfolioItem(
   masterId: string,
   portfolioId: string
@@ -613,6 +728,7 @@ export async function deleteMasterPortfolioItem(
     select: {
       id: true,
       masterId: true,
+      globalCategoryId: true,
       services: { select: { service: { select: { globalCategoryId: true } } } },
       tags: { select: { tagId: true } },
     },
@@ -620,11 +736,12 @@ export async function deleteMasterPortfolioItem(
   if (!item || item.masterId !== masterId) {
     throw new AppError("Not found", 404, "NOT_FOUND");
   }
-  const categoryIds = uniqueIds(
-    item.services
+  const categoryIds = uniqueIds([
+    ...item.services
       .map((link) => link.service.globalCategoryId)
-      .filter((value): value is string => Boolean(value))
-  );
+      .filter((value): value is string => Boolean(value)),
+    ...(item.globalCategoryId ? [item.globalCategoryId] : []),
+  ]);
   const tagIds = uniqueIds(item.tags.map((link) => link.tagId));
 
   await prisma.$transaction(async (tx) => {
@@ -645,3 +762,5 @@ export async function deleteMasterPortfolioItem(
   await invalidateAdvisorCache(masterId);
   return { id: item.id };
 }
+
+

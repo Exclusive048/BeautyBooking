@@ -189,6 +189,7 @@ export default function CatalogPageClient() {
   const timeTo = searchParams.get("timeTo") ?? "";
   const priceMin = searchParams.get("priceMin") ?? "";
   const priceMax = searchParams.get("priceMax") ?? "";
+  const globalCategoryId = searchParams.get("globalCategoryId") ?? "";
   const availableToday = searchParams.get("availableToday") === "true";
   const rating45plus = searchParams.get("ratingMin") === "4.5";
   const hot = searchParams.get("hot") === "true";
@@ -277,6 +278,7 @@ export default function CatalogPageClient() {
       if (date) params.set("date", date);
       if (priceMin) params.set("priceMin", priceMin);
       if (priceMax) params.set("priceMax", priceMax);
+      if (globalCategoryId) params.set("globalCategoryId", globalCategoryId);
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (rating45plus) params.set("ratingMin", "4.5");
       if (hot) params.set("hot", "true");
@@ -302,6 +304,7 @@ export default function CatalogPageClient() {
       effectiveAvailableToday,
       entityType,
       hot,
+      globalCategoryId,
       mapSearch,
       priceMax,
       priceMin,
@@ -322,6 +325,7 @@ export default function CatalogPageClient() {
       if (district) params.set("district", district);
       if (priceMin) params.set("priceMin", priceMin);
       if (priceMax) params.set("priceMax", priceMax);
+      if (globalCategoryId) params.set("globalCategoryId", globalCategoryId);
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (rating45plus) params.set("ratingMin", "4.5");
       if (hot) params.set("hot", "true");
@@ -346,6 +350,7 @@ export default function CatalogPageClient() {
       effectiveTimeTo,
       entityType,
       hot,
+      globalCategoryId,
       priceMax,
       priceMin,
       rating45plus,
@@ -542,6 +547,7 @@ export default function CatalogPageClient() {
               hot={hot}
               smartTag={smartTag}
               entityType={entityType}
+              globalCategoryId={globalCategoryId || null}
               priceMin={priceMin}
               priceMax={priceMax}
               onToggleAvailableToday={() => updateParams({ availableToday: availableToday ? null : "true" })}
@@ -549,6 +555,7 @@ export default function CatalogPageClient() {
               onToggleHot={() => updateParams({ hot: hot ? null : "true" })}
               onSmartTagChange={(value) => updateParams({ smartTag: value })}
               onEntityTypeChange={(value) => updateParams({ entityType: value === "all" ? null : value })}
+              onGlobalCategoryChange={(value) => updateParams({ globalCategoryId: value })}
               onPriceApply={(nextMin, nextMax) =>
                 updateParams({
                   priceMin: nextMin.length > 0 ? nextMin : null,

@@ -130,6 +130,14 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
 
   const embedding = await createTextEmbedding(visualResult.text_description);
   const vectorLiteral = toVectorLiteral(embedding);
+  const mappedCategory = await prisma.globalCategory.findFirst({
+    where: {
+      visualSearchSlug: classification.category,
+      status: "APPROVED",
+    },
+    select: { id: true },
+  });
+  const mediaUrlSuffix = `/api/media/file/${asset.id}`;
 
   await prisma.$transaction(async (tx) => {
     await tx.mediaAsset.update({
@@ -143,6 +151,20 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
         visualIndexedAt: new Date(),
       },
     });
+
+    if (mappedCategory) {
+      await tx.portfolioItem.updateMany({
+        where: {
+          mediaUrl: { endsWith: mediaUrlSuffix },
+          OR: [{ globalCategoryId: null }, { categorySource: "ai" }, { inSearch: false }],
+        },
+        data: {
+          globalCategoryId: mappedCategory.id,
+          categorySource: "ai",
+          inSearch: true,
+        },
+      });
+    }
 
     await tx.$executeRaw`
       INSERT INTO "media_asset_embeddings" ("id", "asset_id", "embedding")

@@ -55,6 +55,9 @@ type PortfolioItem = {
   mediaUrl: string;
   caption: string | null;
   serviceIds: string[];
+  globalCategoryId: string | null;
+  categorySource: string | null;
+  inSearch: boolean;
   createdAt: string;
 };
 
@@ -82,6 +85,9 @@ type GlobalCategoryOption = {
   title: string;
   slug: string;
   icon: string | null;
+  parentId?: string | null;
+  depth?: number;
+  fullPath?: string;
 };
 
 type PendingPortfolioMeta = {
@@ -321,8 +327,12 @@ export function MasterProfilePage() {
   const [pendingPortfolioMeta, setPendingPortfolioMeta] = useState<PendingPortfolioMeta | null>(null);
   const [portfolioCaption, setPortfolioCaption] = useState("");
   const [portfolioServiceIds, setPortfolioServiceIds] = useState<string[]>([]);
+  const [portfolioGlobalCategoryId, setPortfolioGlobalCategoryId] = useState("");
   const [portfolioMetaOpen, setPortfolioMetaOpen] = useState(false);
   const [portfolioAssetIdsByUrl, setPortfolioAssetIdsByUrl] = useState<Record<string, string>>({});
+  const [portfolioCategoryTarget, setPortfolioCategoryTarget] = useState<PortfolioItem | null>(null);
+  const [portfolioCategoryDraft, setPortfolioCategoryDraft] = useState("");
+  const [portfolioCategorySaving, setPortfolioCategorySaving] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
@@ -399,7 +409,9 @@ export function MasterProfilePage() {
       setProfileFieldErrors({});
       setServicesDraft(Object.fromEntries(profileData.services.map((item) => [item.serviceId, item])));
 
-      const categoriesRes = await fetch("/api/catalog/global-categories", { cache: "no-store" });
+      const categoriesRes = await fetch("/api/catalog/global-categories?status=APPROVED", {
+        cache: "no-store",
+      });
       const categoriesJson = (await categoriesRes.json().catch(() => null)) as
         | ApiResponse<{ categories: GlobalCategoryOption[] }>
         | null;
@@ -1294,6 +1306,7 @@ export function MasterProfilePage() {
       setPendingPortfolioMeta({ assetId: asset.id, mediaUrl: asset.url });
       setPortfolioCaption("");
       setPortfolioServiceIds([]);
+      setPortfolioGlobalCategoryId("");
       setPortfolioMetaOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.uploadPhoto);
@@ -1337,6 +1350,8 @@ export function MasterProfilePage() {
           mediaUrl: toAbsoluteMediaUrl(pendingPortfolioMeta.mediaUrl),
           caption: portfolioCaption.trim() || undefined,
           serviceIds: portfolioServiceIds,
+          globalCategoryId: portfolioGlobalCategoryId || undefined,
+          categorySource: portfolioGlobalCategoryId ? "user" : undefined,
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -1352,6 +1367,7 @@ export function MasterProfilePage() {
       setPortfolioMetaOpen(false);
       setPortfolioCaption("");
       setPortfolioServiceIds([]);
+      setPortfolioGlobalCategoryId("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.savePhotoDescription);
@@ -1401,6 +1417,8 @@ export function MasterProfilePage() {
           mediaUrl: toAbsoluteMediaUrl(asset.url),
           caption: item.caption ?? undefined,
           serviceIds: item.serviceIds,
+          globalCategoryId: item.globalCategoryId ?? undefined,
+          categorySource: item.globalCategoryId ? "user" : undefined,
         }),
       });
       const createJson = (await createRes.json().catch(() => null)) as
@@ -1420,6 +1438,42 @@ export function MasterProfilePage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.replacePhoto);
       setSaving(false);
+    }
+  };
+
+  const openPortfolioCategoryModal = (item: PortfolioItem) => {
+    setPortfolioCategoryTarget(item);
+    setPortfolioCategoryDraft(item.globalCategoryId ?? "");
+  };
+
+  const savePortfolioCategory = async (): Promise<void> => {
+    if (!portfolioCategoryTarget) return;
+    setPortfolioCategorySaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/master/portfolio/${portfolioCategoryTarget.id}/category`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          globalCategoryId: portfolioCategoryDraft || null,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ id: string; globalCategoryId: string | null; inSearch: boolean }>
+        | ApiErrorShape
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(
+          extractApiErrorMessage(json && !json.ok ? json : null, UI_TEXT.master.profile.errors.savePhotoDescription)
+        );
+      }
+      setPortfolioCategoryTarget(null);
+      setPortfolioCategoryDraft("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.savePhotoDescription);
+    } finally {
+      setPortfolioCategorySaving(false);
     }
   };
 
@@ -2085,7 +2139,7 @@ export function MasterProfilePage() {
                         <option value="">{UI_TEXT.master.profile.services.selectCategory}</option>
                         {globalCategories.map((category) => (
                           <option key={category.id} value={category.id}>
-                            {category.icon ? `${category.icon} ` : ""}{category.title}
+                            {category.icon ? `${category.icon} ` : ""}{category.fullPath || category.title}
                           </option>
                         ))}
                       </select>
@@ -2461,6 +2515,17 @@ export function MasterProfilePage() {
                         />
                       )}
 
+                      {!item.inSearch ? (
+                        <button
+                          type="button"
+                          onClick={() => openPortfolioCategoryModal(item)}
+                          title="Добавьте категорию чтобы фото появилось в поиске"
+                          className="absolute left-3 top-3 rounded-full bg-amber-500/90 px-2 py-1 text-[11px] font-medium text-white"
+                        >
+                          Не в поиске
+                        </button>
+                      ) : null}
+
                       <div className="absolute right-3 top-3 flex gap-2">
                         <label
                           className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-sm text-white"
@@ -2647,6 +2712,60 @@ export function MasterProfilePage() {
         </ModalSurface>
       ) : null}
 
+      {portfolioCategoryTarget ? (
+        <ModalSurface
+          open
+          onClose={() => {
+            if (!portfolioCategorySaving) {
+              setPortfolioCategoryTarget(null);
+              setPortfolioCategoryDraft("");
+            }
+          }}
+          title="Категория фото"
+        >
+          <div className="space-y-3">
+            <select
+              value={portfolioCategoryDraft}
+              onChange={(event) => setPortfolioCategoryDraft(event.target.value)}
+              className={selectBaseClass}
+              disabled={portfolioCategorySaving}
+            >
+              <option value="">Без категории</option>
+              {globalCategories.map((category) => (
+                <option key={`portfolio-category-${category.id}`} value={category.id}>
+                  {category.icon ? `${category.icon} ` : ""}
+                  {category.fullPath || category.title}
+                </option>
+              ))}
+            </select>
+            <div className="text-xs text-text-sec">
+              Добавьте категорию чтобы фото появилось в поиске
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPortfolioCategoryTarget(null);
+                  setPortfolioCategoryDraft("");
+                }}
+                disabled={portfolioCategorySaving}
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+              >
+                {UI_TEXT.actions.close}
+              </button>
+              <button
+                type="button"
+                onClick={() => void savePortfolioCategory()}
+                disabled={portfolioCategorySaving}
+                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+              >
+                {portfolioCategorySaving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
+              </button>
+            </div>
+          </div>
+        </ModalSurface>
+      ) : null}
+
       {portfolioMetaOpen && pendingPortfolioMeta ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-bg-card p-4">
@@ -2658,6 +2777,26 @@ export function MasterProfilePage() {
                 onChange={(event) => setPortfolioCaption(event.target.value)}
                 placeholder={UI_TEXT.master.profile.portfolioMeta.captionPlaceholder}
               />
+              <div className="space-y-1">
+                <select
+                  value={portfolioGlobalCategoryId}
+                  onChange={(event) => setPortfolioGlobalCategoryId(event.target.value)}
+                  className={selectBaseClass}
+                >
+                  <option value="">Категория (необязательно)</option>
+                  {globalCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.icon ? `${category.icon} ` : ""}
+                      {category.fullPath || category.title}
+                    </option>
+                  ))}
+                </select>
+                {!portfolioGlobalCategoryId ? (
+                  <div className="text-xs text-text-sec">
+                    Если категорию не выбрать, фото сохранится, но может не попасть в поиск сразу.
+                  </div>
+                ) : null}
+              </div>
               <div className="rounded-lg bg-bg-input/70 p-3">
                 <div className="mb-1 text-xs text-text-sec">{UI_TEXT.master.profile.portfolioMeta.serviceHint}</div>
                 <div className="flex flex-wrap gap-2">
@@ -2683,7 +2822,10 @@ export function MasterProfilePage() {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setPortfolioMetaOpen(false)}
+                onClick={() => {
+                  setPortfolioMetaOpen(false);
+                  setPortfolioGlobalCategoryId("");
+                }}
                 className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
               >
                 {UI_TEXT.actions.close}
