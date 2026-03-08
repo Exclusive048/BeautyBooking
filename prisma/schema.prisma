@@ -1719,6 +1719,7 @@ model GlobalCategory {
   status           CategoryStatus   @default(PENDING)
   proposedBy       String?
   proposedAt       DateTime?
+  context          String?
   reviewedAt       DateTime?
   isSystem         Boolean          @default(false)
   visualSearchSlug String?          @unique

@@ -9,6 +9,7 @@ import { slugifyCategory } from "@/lib/slug";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
 
 const MAX_SLUG_LENGTH = 60;
+const MAX_CATEGORY_DEPTH = 3;
 
 const createSchema = z.object({
   title: z.string().trim().min(2).max(60),
@@ -27,6 +28,25 @@ function normalizeOptional(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+async function wouldCreateCycle(categoryId: string | null, newParentId: string): Promise<boolean> {
+  let current: string | null = newParentId;
+  let depth = 0;
+
+  while (current !== null) {
+    if (categoryId && current === categoryId) return true;
+    depth += 1;
+    if (depth > MAX_CATEGORY_DEPTH) return true;
+
+    const parentRecord: { parentId: string | null } | null = await prisma.globalCategory.findUnique({
+      where: { id: current },
+      select: { parentId: true },
+    });
+    current = parentRecord?.parentId ?? null;
+  }
+
+  return false;
 }
 
 async function ensureUniqueSlug(base: string): Promise<string> {
@@ -86,6 +106,7 @@ export async function GET(req: Request) {
         status: true,
         proposedBy: true,
         proposedAt: true,
+        context: true,
         reviewedAt: true,
         isSystem: true,
         visualSearchSlug: true,
@@ -111,6 +132,7 @@ export async function GET(req: Request) {
       status: row.status,
       proposedBy: row.proposedBy,
       proposedAt: row.proposedAt,
+      context: row.context,
       reviewedAt: row.reviewedAt,
       isSystem: row.isSystem,
       visualSearchSlug: row.visualSearchSlug,
@@ -141,6 +163,7 @@ export async function GET(req: Request) {
         status: category.status,
         proposedBy: category.proposedBy,
         proposedAt: category.proposedAt?.toISOString() ?? null,
+        context: category.context,
         reviewedAt: category.reviewedAt?.toISOString() ?? null,
         isSystem: category.isSystem,
         visualSearchSlug: category.visualSearchSlug,
@@ -195,6 +218,10 @@ export async function POST(req: Request) {
       if (!parent) {
         return fail("Родительская категория не найдена.", 404, "NOT_FOUND");
       }
+      const hasCycle = await wouldCreateCycle(null, parentId);
+      if (hasCycle) {
+        return fail("Circular category reference", 400, "BAD_REQUEST");
+      }
     }
 
     const uniqueSlug = normalizedSlug ? normalizedSlug : await ensureUniqueSlug(generated);
@@ -242,4 +269,3 @@ export async function POST(req: Request) {
     return fail(appError.message, appError.status, appError.code, appError.details);
   }
 }
-

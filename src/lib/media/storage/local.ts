@@ -5,9 +5,19 @@ import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/li
 
 const MEDIA_ROOT = process.env.MEDIA_LOCAL_ROOT?.trim() || join(process.cwd(), "storage", "media");
 
+function sanitizePathSegment(segment: string): string {
+  return segment.replace(/[:\*\?"<>\|\\\/]/g, "_");
+}
+
 function resolvePathFromKey(key: string): string {
-  const safe = normalize(key).replace(/^(\.\.(\/|\\|$))+/, "");
-  return join(MEDIA_ROOT, safe);
+  const normalized = normalize(key).replace(/^(\.\.(\/|\\|$))+/, "");
+  const segments = normalized
+    .split(/[\\/]+/)
+    .filter((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+    .map((segment) => sanitizePathSegment(segment))
+    .filter((segment) => segment.length > 0);
+
+  return join(MEDIA_ROOT, ...segments);
 }
 
 export class LocalStorageProvider implements StorageProvider {

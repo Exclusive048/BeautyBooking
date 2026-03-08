@@ -3,8 +3,10 @@ import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { createSessionToken } from "@/lib/auth/jwt";
 import { authenticateTelegramLogin } from "@/lib/auth/telegram-login";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
+import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
+import { logError } from "@/lib/logging/logger";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -21,6 +23,15 @@ export async function POST(req: Request) {
   const result = await authenticateTelegramLogin(parsed.data, botToken);
   if (!result.ok) {
     return fail(result.message, result.status, result.code);
+  }
+
+  try {
+    await ensureFreeSubscriptionsForRoles(result.user.id, result.user.roles);
+  } catch (error) {
+    logError("ensureFreeSubscriptionsForRoles failed after telegram login", {
+      userProfileId: result.user.id,
+      error: error instanceof Error ? error.stack : error,
+    });
   }
 
   const token = createSessionToken(

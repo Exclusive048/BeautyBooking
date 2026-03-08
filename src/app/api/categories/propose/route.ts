@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     const title = parsed.data.title.trim();
     const parentId = parsed.data.parentId?.trim() || null;
-    void parsed.data.context;
+    const context = parsed.data.context?.trim() || null;
 
     if (parentId) {
       const parent = await prisma.globalCategory.findUnique({
@@ -81,6 +81,7 @@ export async function POST(req: Request) {
         status: CategoryStatus.PENDING,
         proposedBy: auth.user.id,
         proposedAt: new Date(),
+        context,
         reviewedAt: null,
         isSystem: false,
       },

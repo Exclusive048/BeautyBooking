@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { logError } from "@/lib/logging/logger";
 import { enqueue } from "@/lib/queue/queue";
 import {
   BOOKING_REMINDER_JOB_TYPE,

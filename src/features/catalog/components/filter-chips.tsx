@@ -171,7 +171,7 @@ export function FilterChips({
         {UI_TEXT.catalog.chips.rating45plus}
       </Chip>
       <Chip type="button" onClick={onToggleHot} variant={hot ? "active" : "default"}>
-        ?? {UI_TEXT.catalog.chips.hot}
+        {UI_TEXT.catalog.chips.hot}
       </Chip>
       {topLevelCategories.map((category) => (
         <Chip

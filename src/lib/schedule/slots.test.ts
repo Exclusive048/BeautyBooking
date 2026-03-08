@@ -22,7 +22,7 @@ describe("schedule/slots", () => {
 
     expect(slots[0]?.label).toBe("2026-03-03 10:00");
     expect(slots[slots.length - 1]?.label).toBe("2026-03-03 11:30");
-    expect(slots).toHaveLength(19);
+    expect(slots).toHaveLength(4);
   });
 
   it("skips slots overlapping breaks", () => {

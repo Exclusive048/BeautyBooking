@@ -8,6 +8,7 @@ import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { linkGuestBookingsToUserByPhone } from "@/lib/bookings/link-guest-bookings";
 import { logError } from "@/lib/logging/logger";
 import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
@@ -76,6 +77,15 @@ export async function POST(req: Request) {
     if (nextRoles !== profile.roles) {
       profile = { ...profile, roles: nextRoles };
     }
+  }
+
+  try {
+    await ensureFreeSubscriptionsForRoles(profile.id, profile.roles);
+  } catch (error) {
+    logError("ensureFreeSubscriptionsForRoles failed after otp verify", {
+      userProfileId: profile.id,
+      error: error instanceof Error ? error.stack : error,
+    });
   }
 
   if (profile.phone) {
