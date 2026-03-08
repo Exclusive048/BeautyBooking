@@ -1080,7 +1080,6 @@ export function MasterProfilePage() {
       const payloadItems = snapshot.map((item) => ({
         serviceId: item.serviceId,
         isEnabled: item.isEnabled,
-        onlinePaymentEnabled: item.onlinePaymentEnabled,
         durationOverrideMin: item.isEnabled ? normalizeDuration(item.effectiveDurationMin) : item.durationOverrideMin,
         priceOverride:
           item.canEditPrice && item.isEnabled ? normalizePrice(item.effectivePrice) : undefined,
@@ -2272,28 +2271,33 @@ export function MasterProfilePage() {
                         {UI_TEXT.master.profile.services.priceManagedHint}
                       </div>
                     ) : null}
-                    {showOnlinePaymentsToggle ? (
-                      <label
-                        className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec"
-                        title={onlinePaymentsLockedMessage ?? undefined}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={service.onlinePaymentEnabled}
-                          disabled={!canOnlinePayments}
-                          onChange={(event) =>
-                            setServicesDraft((current) => ({
-                              ...current,
-                              [service.serviceId]: {
-                                ...current[service.serviceId],
-                                onlinePaymentEnabled: event.target.checked,
-                              },
-                            }))
-                          }
-                        />
-                        {UI_TEXT.master.profile.services.onlinePaymentsLabel}
-                      </label>
-                    ) : null}
+                    {false && (
+                      <>
+                        {/* TODO: Online payments for services - not yet implemented */}
+                        {showOnlinePaymentsToggle ? (
+                          <label
+                            className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec"
+                            title={onlinePaymentsLockedMessage ?? undefined}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={service.onlinePaymentEnabled}
+                              disabled={!canOnlinePayments}
+                              onChange={(event) =>
+                                setServicesDraft((current) => ({
+                                  ...current,
+                                  [service.serviceId]: {
+                                    ...current[service.serviceId],
+                                    onlinePaymentEnabled: event.target.checked,
+                                  },
+                                }))
+                              }
+                            />
+                            {UI_TEXT.master.profile.services.onlinePaymentsLabel}
+                          </label>
+                        ) : null}
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => setBookingConfigServiceId(service.serviceId)}

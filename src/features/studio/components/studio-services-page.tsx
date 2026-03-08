@@ -196,7 +196,6 @@ export function StudioServicesPage({ studioId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studioId,
-          onlinePaymentEnabled: nextValue,
         }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
@@ -335,19 +334,24 @@ export function StudioServicesPage({ studioId }: Props) {
                       <span>{t.visibleInSearch}</span>
                       <TooltipHint text={t.visibleInSearchHint} />
                     </label>
-                    <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
-                      <input
-                        type="checkbox"
-                        checked={service.onlinePaymentEnabled}
-                        disabled={!canOnlinePayments || togglingServiceId === service.id}
-                        onChange={(event) => void toggleOnlinePayment(service, event.target.checked)}
-                        className="h-4 w-4 rounded border-border-subtle accent-primary disabled:opacity-60"
-                      />
-                      <span>Онлайн-оплата</span>
-                      {onlinePaymentsLockedMessage ? (
-                        <TooltipHint text={onlinePaymentsLockedMessage} />
-                      ) : null}
-                    </label>
+                    {false && (
+                      <>
+                        {/* TODO: Online payments for services - not yet implemented */}
+                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
+                          <input
+                            type="checkbox"
+                            checked={service.onlinePaymentEnabled}
+                            disabled={!canOnlinePayments || togglingServiceId === service.id}
+                            onChange={(event) => void toggleOnlinePayment(service, event.target.checked)}
+                            className="h-4 w-4 rounded border-border-subtle accent-primary disabled:opacity-60"
+                          />
+                          <span>Онлайн-оплата</span>
+                          {onlinePaymentsLockedMessage ? (
+                            <TooltipHint text={onlinePaymentsLockedMessage ?? ""} />
+                          ) : null}
+                        </label>
+                      </>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Select
