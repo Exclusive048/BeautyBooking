@@ -36,6 +36,18 @@ function toPriceNumber(value: Prisma.Decimal | null): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+function uniqueStringIds(input: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of input) {
+    const value = item.trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
@@ -59,6 +71,7 @@ export async function GET(req: Request) {
           dateLocal: true,
           timeRangeStartLocal: true,
           timeRangeEndLocal: true,
+          serviceIds: true,
           price: true,
           requirements: true,
           extraBusyMin: true,
@@ -95,6 +108,7 @@ export async function GET(req: Request) {
         select: {
           id: true,
           durationOverrideMin: true,
+          priceOverride: true,
           service: {
             select: {
               id: true,
@@ -102,6 +116,8 @@ export async function GET(req: Request) {
               title: true,
               durationMin: true,
               baseDurationMin: true,
+              price: true,
+              basePrice: true,
               category: { select: { title: true } },
             },
           },
@@ -109,37 +125,87 @@ export async function GET(req: Request) {
       }),
     ]);
 
-    const offerItems = offers.map((offer) => ({
-      id: offer.id,
-      masterId: offer.masterId,
-      masterName: offer.master?.name ?? "Master",
-      masterAvatarUrl: offer.master?.avatarUrl ?? null,
-      masterServiceId: offer.masterService.id,
-      serviceId: offer.masterService.service.id,
-      serviceTitle: offer.masterService.service.title?.trim() || offer.masterService.service.name,
-      serviceCategory: offer.masterService.service.category?.title ?? null,
-      durationMin: resolveServiceDuration({
-        durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
-        baseDurationMin: offer.masterService.service.baseDurationMin ?? null,
-        durationMin: offer.masterService.service.durationMin,
-      }),
-      dateLocal: offer.dateLocal,
-      timeRangeStartLocal: offer.timeRangeStartLocal,
-      timeRangeEndLocal: offer.timeRangeEndLocal,
-      price: toPriceNumber(offer.price),
-      requirements: offer.requirements,
-      extraBusyMin: offer.extraBusyMin,
-      status: offer.status,
-      applicationsCount: offer._count.applications,
-      createdAt: offer.createdAt.toISOString(),
-      updatedAt: offer.updatedAt.toISOString(),
-    }));
+    const serviceLookup = new Map(
+      services.map((item) => [
+        item.service.id,
+        {
+          id: item.service.id,
+          title: item.service.title?.trim() || item.service.name,
+          categoryTitle: item.service.category?.title ?? null,
+          durationMin: resolveServiceDuration({
+            durationOverrideMin: item.durationOverrideMin ?? null,
+            baseDurationMin: item.service.baseDurationMin ?? null,
+            durationMin: item.service.durationMin,
+          }),
+          price:
+            item.priceOverride ??
+            item.service.basePrice ??
+            item.service.price,
+        },
+      ])
+    );
+
+    const offerItems = offers.map((offer) => {
+      const primaryServiceId = offer.masterService.service.id;
+      const primaryServiceFallback = {
+        id: primaryServiceId,
+        title: offer.masterService.service.title?.trim() || offer.masterService.service.name,
+        categoryTitle: offer.masterService.service.category?.title ?? null,
+        durationMin: resolveServiceDuration({
+          durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
+          baseDurationMin: offer.masterService.service.baseDurationMin ?? null,
+          durationMin: offer.masterService.service.durationMin,
+        }),
+        price: null,
+      };
+      const selectedServiceIds = uniqueStringIds([
+        ...(offer.serviceIds ?? []),
+        primaryServiceId,
+      ]);
+      const selectedServices = selectedServiceIds
+        .map((serviceId) =>
+          serviceLookup.get(serviceId) ?? (serviceId === primaryServiceId ? primaryServiceFallback : null)
+        )
+        .filter((service): service is NonNullable<typeof service> => Boolean(service));
+
+      return {
+        id: offer.id,
+        masterId: offer.masterId,
+        masterName: offer.master?.name ?? "Master",
+        masterAvatarUrl: offer.master?.avatarUrl ?? null,
+        masterServiceId: offer.masterService.id,
+        serviceId: offer.masterService.service.id,
+        serviceIds: selectedServiceIds,
+        selectedServices,
+        serviceTitle: offer.masterService.service.title?.trim() || offer.masterService.service.name,
+        serviceCategory: offer.masterService.service.category?.title ?? null,
+        durationMin: resolveServiceDuration({
+          durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
+          baseDurationMin: offer.masterService.service.baseDurationMin ?? null,
+          durationMin: offer.masterService.service.durationMin,
+        }),
+        dateLocal: offer.dateLocal,
+        timeRangeStartLocal: offer.timeRangeStartLocal,
+        timeRangeEndLocal: offer.timeRangeEndLocal,
+        price: toPriceNumber(offer.price),
+        requirements: offer.requirements,
+        extraBusyMin: offer.extraBusyMin,
+        status: offer.status,
+        applicationsCount: offer._count.applications,
+        createdAt: offer.createdAt.toISOString(),
+        updatedAt: offer.updatedAt.toISOString(),
+      };
+    });
 
     const serviceItems = services.map((item) => ({
       id: item.id,
       serviceId: item.service.id,
       title: item.service.title?.trim() || item.service.name,
       categoryTitle: item.service.category?.title ?? null,
+      price:
+        item.priceOverride ??
+        item.service.basePrice ??
+        item.service.price,
       durationMin: resolveServiceDuration({
         durationOverrideMin: item.durationOverrideMin ?? null,
         baseDurationMin: item.service.baseDurationMin ?? null,
@@ -177,6 +243,7 @@ export async function POST(req: Request) {
         isEnabled: true,
         masterProviderId: true,
         durationOverrideMin: true,
+        priceOverride: true,
         service: {
           select: {
             id: true,
@@ -184,6 +251,8 @@ export async function POST(req: Request) {
             title: true,
             durationMin: true,
             baseDurationMin: true,
+            price: true,
+            basePrice: true,
             isEnabled: true,
             isActive: true,
             category: { select: { title: true } },
@@ -199,10 +268,45 @@ export async function POST(req: Request) {
     const requirements = normalizeRequirements(body.requirements);
     const priceValue = normalizePrice(body.price);
 
+    const availableMasterServices = await prisma.masterService.findMany({
+      where: {
+        masterProviderId: master.id,
+        isEnabled: true,
+        service: { isEnabled: true, isActive: true },
+      },
+      select: {
+        serviceId: true,
+        durationOverrideMin: true,
+        priceOverride: true,
+        service: {
+          select: {
+            id: true,
+            name: true,
+            title: true,
+            durationMin: true,
+            baseDurationMin: true,
+            price: true,
+            basePrice: true,
+          },
+        },
+      },
+    });
+    const availableServiceIds = new Set(availableMasterServices.map((item) => item.serviceId));
+    const requestedServiceIds = uniqueStringIds(body.serviceIds ?? []);
+    const invalidServiceIds = requestedServiceIds.filter((serviceId) => !availableServiceIds.has(serviceId));
+    if (invalidServiceIds.length > 0) {
+      return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+    }
+    const selectedServiceIds = uniqueStringIds([
+      ...requestedServiceIds,
+      masterService.service.id,
+    ]);
+
     const created = await prisma.modelOffer.create({
       data: {
         masterId: master.id,
         masterServiceId: masterService.id,
+        serviceIds: selectedServiceIds,
         dateLocal: body.dateLocal,
         timeRangeStartLocal: body.timeRangeStartLocal,
         timeRangeEndLocal: body.timeRangeEndLocal,
@@ -213,6 +317,8 @@ export async function POST(req: Request) {
       select: {
         id: true,
         masterId: true,
+        masterServiceId: true,
+        serviceIds: true,
         dateLocal: true,
         timeRangeStartLocal: true,
         timeRangeEndLocal: true,
@@ -222,14 +328,63 @@ export async function POST(req: Request) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        masterService: {
+          select: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+              },
+            },
+          },
+        },
       },
     });
+
+    const selectedServiceLookup = new Map(
+      availableMasterServices.map((item) => [
+        item.service.id,
+        {
+          id: item.service.id,
+          title: item.service.title?.trim() || item.service.name,
+          durationMin: resolveServiceDuration({
+            durationOverrideMin: item.durationOverrideMin ?? null,
+            baseDurationMin: item.service.baseDurationMin ?? null,
+            durationMin: item.service.durationMin,
+          }),
+          price:
+            item.priceOverride ??
+            item.service.basePrice ??
+            item.service.price,
+        },
+      ])
+    );
+    const createdPrimaryServiceId = created.masterService.service.id;
+    const createdPrimaryFallback = {
+      id: createdPrimaryServiceId,
+      title: created.masterService.service.title?.trim() || created.masterService.service.name,
+      durationMin: masterService.durationOverrideMin ?? masterService.service.baseDurationMin ?? masterService.service.durationMin,
+      price: masterService.priceOverride ?? masterService.service.basePrice ?? masterService.service.price,
+    };
+    const createdServiceIds = uniqueStringIds([
+      ...(created.serviceIds ?? []),
+      createdPrimaryServiceId,
+    ]);
+    const selectedServices = createdServiceIds
+      .map((serviceId) =>
+        selectedServiceLookup.get(serviceId) ?? (serviceId === createdPrimaryServiceId ? createdPrimaryFallback : null)
+      )
+      .filter((service): service is NonNullable<typeof service> => Boolean(service));
 
     return jsonOk(
       {
         offer: {
           id: created.id,
           masterId: created.masterId,
+          masterServiceId: created.masterServiceId,
+          serviceIds: createdServiceIds,
+          selectedServices,
           dateLocal: created.dateLocal,
           timeRangeStartLocal: created.timeRangeStartLocal,
           timeRangeEndLocal: created.timeRangeEndLocal,

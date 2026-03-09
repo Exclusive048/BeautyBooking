@@ -17,6 +17,24 @@ export type VisualSearchIndexPayload = {
   assetId: string;
 };
 
+export type MediaCleanupPayload = Record<string, never>;
+
+export type YookassaWebhookPayload = {
+  event?: string;
+  type?: string;
+  object?: {
+    id?: string;
+    status?: string;
+    metadata?: Record<string, unknown> | null;
+    payment_method?: { id?: string; saved?: boolean };
+    confirmation?: { confirmation_url?: string };
+    payment_id?: string;
+  };
+  payment?: {
+    id?: string;
+  };
+};
+
 type JobMeta = {
   attempts?: number;
   maxAttempts?: number;
@@ -46,11 +64,30 @@ export type VisualSearchIndexJob = {
   payload: VisualSearchIndexPayload;
 } & JobMeta;
 
-export type Job = TelegramSendJob | BookingReminderJob | VisualSearchIndexJob;
+export type YookassaWebhookJob = {
+  id: string;
+  type: "yookassa.webhook";
+  payload: YookassaWebhookPayload;
+} & JobMeta;
+
+export type MediaCleanupJob = {
+  id: string;
+  type: "media.cleanup";
+  payload: MediaCleanupPayload;
+} & JobMeta;
+
+export type Job =
+  | TelegramSendJob
+  | BookingReminderJob
+  | VisualSearchIndexJob
+  | MediaCleanupJob
+  | YookassaWebhookJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
 export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
+export const MEDIA_CLEANUP_JOB_TYPE = "media.cleanup";
+export const YOOKASSA_WEBHOOK_JOB_TYPE = "yookassa.webhook";
 export const DEFAULT_JOB_MAX_ATTEMPTS = 5;
 
 export function normalizeJobMeta<T extends Job>(job: T): T {
@@ -87,6 +124,22 @@ function isVisualSearchIndexPayload(value: unknown): value is VisualSearchIndexP
   return typeof value.assetId === "string" && value.assetId.length > 0;
 }
 
+function isMediaCleanupPayload(value: unknown): value is MediaCleanupPayload {
+  return isRecord(value);
+}
+
+function isYookassaWebhookPayload(value: unknown): value is YookassaWebhookPayload {
+  if (!isRecord(value)) return false;
+
+  const object = value.object;
+  if (typeof object !== "undefined" && !isRecord(object)) return false;
+
+  const payment = value.payment;
+  if (typeof payment !== "undefined" && !isRecord(payment)) return false;
+
+  return true;
+}
+
 export function isJob(value: unknown): value is Job {
   if (!isRecord(value)) return false;
   if (typeof value.id !== "string") return false;
@@ -113,6 +166,14 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
     return isVisualSearchIndexPayload(value.payload);
+  }
+
+  if (value.type === MEDIA_CLEANUP_JOB_TYPE) {
+    return isMediaCleanupPayload(value.payload);
+  }
+
+  if (value.type === YOOKASSA_WEBHOOK_JOB_TYPE) {
+    return isYookassaWebhookPayload(value.payload);
   }
 
   return false;
@@ -172,6 +233,48 @@ export function createVisualSearchIndexJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: VISUAL_SEARCH_INDEX_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createYookassaWebhookJob(
+  payload: YookassaWebhookPayload,
+  input?: Partial<
+    Pick<
+      YookassaWebhookJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): YookassaWebhookJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: YOOKASSA_WEBHOOK_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createMediaCleanupJob(
+  payload: MediaCleanupPayload = {},
+  input?: Partial<
+    Pick<
+      MediaCleanupJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): MediaCleanupJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: MEDIA_CLEANUP_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

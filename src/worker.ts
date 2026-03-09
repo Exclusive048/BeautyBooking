@@ -16,8 +16,11 @@ import type { Job } from "@/lib/queue/types";
 import {
   BOOKING_REMINDER_JOB_TYPE,
   DEFAULT_JOB_MAX_ATTEMPTS,
+  MEDIA_CLEANUP_JOB_TYPE,
   TELEGRAM_SEND_JOB_TYPE,
   VISUAL_SEARCH_INDEX_JOB_TYPE,
+  YOOKASSA_WEBHOOK_JOB_TYPE,
+  createMediaCleanupJob,
   normalizeJobMeta,
 } from "@/lib/queue/types";
 import { runHotSlotExpiringJob } from "@/lib/hot-slots/job";
@@ -27,7 +30,9 @@ import {
   isVisualSearchMissingAssetError,
   isVisualSearchRetryableError,
 } from "@/lib/visual-search/indexer";
-import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
+import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
+import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
+import { runMediaCleanup } from "@/lib/media/cleanup";
 
 ensureVisualSearchStartupConfig();
 
@@ -93,6 +98,15 @@ function startPeriodicJobs() {
       });
     });
   }, intervalMs);
+
+  const mediaCleanupIntervalMs = 60 * 60 * 1000;
+  setInterval(() => {
+    void enqueue(createMediaCleanupJob()).catch((error) => {
+      logError("Failed to enqueue media cleanup job", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, mediaCleanupIntervalMs);
 }
 
 function getRetryDelaySeconds(attempts: number): number {
@@ -267,6 +281,15 @@ async function processVisualSearchIndexJob(
   }
 
   try {
+    const config = await getVisualSearchConfig();
+    if (!config.enabled) {
+      logInfo("Visual search disabled - skipping indexing", {
+        jobId: job.id,
+        assetId: job.payload.assetId,
+      });
+      return;
+    }
+
     await indexMediaAsset(job.payload.assetId);
   } catch (error) {
     if (isVisualSearchMissingAssetError(error)) {
@@ -305,6 +328,30 @@ async function processVisualSearchIndexJob(
   }
 }
 
+async function processYookassaWebhookJob(
+  job: Extract<Job, { type: typeof YOOKASSA_WEBHOOK_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  await processYookassaWebhookPayload(job.payload);
+}
+
+async function processMediaCleanupJob(
+  job: Extract<Job, { type: typeof MEDIA_CLEANUP_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  await runMediaCleanup();
+}
+
 async function processJob(job: Job): Promise<void> {
   try {
     if (job.type === TELEGRAM_SEND_JOB_TYPE) {
@@ -319,6 +366,16 @@ async function processJob(job: Job): Promise<void> {
 
     if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
       await processVisualSearchIndexJob(job);
+      return;
+    }
+
+    if (job.type === YOOKASSA_WEBHOOK_JOB_TYPE) {
+      await processYookassaWebhookJob(job);
+      return;
+    }
+
+    if (job.type === MEDIA_CLEANUP_JOB_TYPE) {
+      await processMediaCleanupJob(job);
       return;
     }
 

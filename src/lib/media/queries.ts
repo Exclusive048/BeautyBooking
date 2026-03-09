@@ -1,4 +1,4 @@
-import { MediaEntityType, MediaKind } from "@prisma/client";
+import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAvatarUrlForEntity } from "@/lib/media/service";
 import {
@@ -39,10 +39,26 @@ async function getSiteAssetBySettingKey(
 
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: setting.value },
-    select: { id: true, deletedAt: true, kind: true, entityType: true, entityId: true, focalX: true, focalY: true },
+    select: {
+      id: true,
+      deletedAt: true,
+      kind: true,
+      entityType: true,
+      entityId: true,
+      focalX: true,
+      focalY: true,
+      status: true,
+    },
   });
 
-  if (!asset || asset.deletedAt || asset.entityType !== MediaEntityType.SITE || asset.entityId !== "site" || asset.kind !== kind) {
+  if (
+    !asset ||
+    asset.deletedAt ||
+    asset.status !== MediaAssetStatus.READY ||
+    asset.entityType !== MediaEntityType.SITE ||
+    asset.entityId !== "site" ||
+    asset.kind !== kind
+  ) {
     return null;
   }
 

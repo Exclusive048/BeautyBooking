@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 type PortfolioServiceOption = {
   serviceId: string;
@@ -161,6 +162,10 @@ function buildPortfolioSnapshot(input: {
   };
 }
 
+function isDeletedCursorError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
+}
+
 export async function listPortfolioFeed(input: {
   limit: number;
   cursor?: string;
@@ -173,88 +178,98 @@ export async function listPortfolioFeed(input: {
 }): Promise<{ items: PortfolioFeedItem[]; nextCursor: string | null }> {
   const pageSize = Math.max(1, Math.min(50, input.limit));
 
-  const rows = await prisma.portfolioItem.findMany({
-    where: {
-      isPublic: true,
-      ...(input.masterId ? { masterId: input.masterId } : {}),
-      ...(input.q
-        ? {
-            OR: [
-              { caption: { contains: input.q, mode: "insensitive" } },
-              { master: { name: { contains: input.q, mode: "insensitive" } } },
-              { services: { some: { service: { name: { contains: input.q, mode: "insensitive" } } } } },
-              { services: { some: { service: { title: { contains: input.q, mode: "insensitive" } } } } },
-            ],
-          }
-        : {}),
-      ...(input.categoryId
-        ? {
-            OR: [
-              { services: { some: { service: { categoryId: input.categoryId } } } },
-              { services: { some: { service: { name: { contains: input.categoryId, mode: "insensitive" } } } } },
-              { services: { some: { service: { title: { contains: input.categoryId, mode: "insensitive" } } } } },
-              { master: { categories: { has: input.categoryId } } },
-            ],
-          }
-        : {}),
-      ...(input.tag
-        ? {
-            OR: [
-              { caption: { contains: input.tag, mode: "insensitive" } },
-              { services: { some: { service: { title: { contains: input.tag, mode: "insensitive" } } } } },
-              { services: { some: { service: { name: { contains: input.tag, mode: "insensitive" } } } } },
-            ],
-          }
-        : {}),
-    },
-    include: {
-      master: {
-        select: {
-          id: true,
-          name: true,
-          publicUsername: true,
-          avatarUrl: true,
-          studio: { select: { name: true } },
-        },
+  const loadRows = (cursor?: string) =>
+    prisma.portfolioItem.findMany({
+      where: {
+        isPublic: true,
+        ...(input.masterId ? { masterId: input.masterId } : {}),
+        ...(input.q
+          ? {
+              OR: [
+                { caption: { contains: input.q, mode: "insensitive" } },
+                { master: { name: { contains: input.q, mode: "insensitive" } } },
+                { services: { some: { service: { name: { contains: input.q, mode: "insensitive" } } } } },
+                { services: { some: { service: { title: { contains: input.q, mode: "insensitive" } } } } },
+              ],
+            }
+          : {}),
+        ...(input.categoryId
+          ? {
+              OR: [
+                { services: { some: { service: { categoryId: input.categoryId } } } },
+                { services: { some: { service: { name: { contains: input.categoryId, mode: "insensitive" } } } } },
+                { services: { some: { service: { title: { contains: input.categoryId, mode: "insensitive" } } } } },
+                { master: { categories: { has: input.categoryId } } },
+              ],
+            }
+          : {}),
+        ...(input.tag
+          ? {
+              OR: [
+                { caption: { contains: input.tag, mode: "insensitive" } },
+                { services: { some: { service: { title: { contains: input.tag, mode: "insensitive" } } } } },
+                { services: { some: { service: { name: { contains: input.tag, mode: "insensitive" } } } } },
+              ],
+            }
+          : {}),
       },
-      services: {
-        include: {
-          service: {
-            select: {
-              id: true,
-              name: true,
-              title: true,
-              price: true,
-              durationMin: true,
-              masterServices: {
-                select: {
-                  masterProviderId: true,
-                  isEnabled: true,
-                  priceOverride: true,
-                  durationOverrideMin: true,
+      include: {
+        master: {
+          select: {
+            id: true,
+            name: true,
+            publicUsername: true,
+            avatarUrl: true,
+            studio: { select: { name: true } },
+          },
+        },
+        services: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+                price: true,
+                durationMin: true,
+                masterServices: {
+                  select: {
+                    masterProviderId: true,
+                    isEnabled: true,
+                    priceOverride: true,
+                    durationOverrideMin: true,
+                  },
                 },
               },
             },
           },
         },
+        favorites: input.currentUserId
+          ? {
+              where: { userId: input.currentUserId },
+              select: { id: true },
+            }
+          : false,
+        _count: { select: { favorites: true } },
       },
-      favorites: input.currentUserId
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      take: pageSize + 1,
+      ...(cursor
         ? {
-            where: { userId: input.currentUserId },
-            select: { id: true },
+            skip: 1,
+            cursor: { id: cursor },
           }
-        : false,
-      _count: { select: { favorites: true } },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: pageSize + 1,
-    ...(input.cursor
-      ? {
-          skip: 1,
-          cursor: { id: input.cursor },
-        }
-      : {}),
-  });
+        : {}),
+    });
+
+  const rows = await (async () => {
+    try {
+      return await loadRows(input.cursor);
+    } catch (error) {
+      if (!input.cursor || !isDeletedCursorError(error)) throw error;
+      return loadRows();
+    }
+  })();
 
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, -1) : rows;
@@ -298,74 +313,84 @@ export async function listHomePortfolioFeed(input: {
 }): Promise<{ items: PortfolioFeedItem[]; nextCursor: string | null }> {
   const pageSize = Math.max(1, Math.min(50, input.limit));
 
-  const rows = await prisma.portfolioItem.findMany({
-    where: {
-      isPublic: true,
-      ...(input.categoryId
-        ? {
-            services: {
-              some: {
-                service: { globalCategoryId: input.categoryId },
+  const loadRows = (cursor?: string) =>
+    prisma.portfolioItem.findMany({
+      where: {
+        isPublic: true,
+        ...(input.categoryId
+          ? {
+              services: {
+                some: {
+                  service: { globalCategoryId: input.categoryId },
+                },
               },
-            },
-          }
-        : {}),
-      ...(input.tagId
-        ? {
-            tags: {
-              some: { tagId: input.tagId },
-            },
-          }
-        : {}),
-    },
-    include: {
-      master: {
-        select: {
-          id: true,
-          name: true,
-          publicUsername: true,
-          avatarUrl: true,
-          studio: { select: { name: true } },
-        },
+            }
+          : {}),
+        ...(input.tagId
+          ? {
+              tags: {
+                some: { tagId: input.tagId },
+              },
+            }
+          : {}),
       },
-      services: {
-        include: {
-          service: {
-            select: {
-              id: true,
-              name: true,
-              title: true,
-              price: true,
-              durationMin: true,
-              masterServices: {
-                select: {
-                  masterProviderId: true,
-                  isEnabled: true,
-                  priceOverride: true,
-                  durationOverrideMin: true,
+      include: {
+        master: {
+          select: {
+            id: true,
+            name: true,
+            publicUsername: true,
+            avatarUrl: true,
+            studio: { select: { name: true } },
+          },
+        },
+        services: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+                price: true,
+                durationMin: true,
+                masterServices: {
+                  select: {
+                    masterProviderId: true,
+                    isEnabled: true,
+                    priceOverride: true,
+                    durationOverrideMin: true,
+                  },
                 },
               },
             },
           },
         },
+        favorites: input.currentUserId
+          ? {
+              where: { userId: input.currentUserId },
+              select: { id: true },
+            }
+          : false,
+        _count: { select: { favorites: true } },
       },
-      favorites: input.currentUserId
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      take: pageSize + 1,
+      ...(cursor
         ? {
-            where: { userId: input.currentUserId },
-            select: { id: true },
+            skip: 1,
+            cursor: { id: cursor },
           }
-        : false,
-      _count: { select: { favorites: true } },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: pageSize + 1,
-    ...(input.cursor
-      ? {
-          skip: 1,
-          cursor: { id: input.cursor },
-        }
-      : {}),
-  });
+        : {}),
+    });
+
+  const rows = await (async () => {
+    try {
+      return await loadRows(input.cursor);
+    } catch (error) {
+      if (!input.cursor || !isDeletedCursorError(error)) throw error;
+      return loadRows();
+    }
+  })();
 
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, -1) : rows;

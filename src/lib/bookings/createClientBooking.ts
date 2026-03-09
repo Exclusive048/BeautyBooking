@@ -22,6 +22,19 @@ import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-co
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
 
+function mapPrismaBookingConflict(error: unknown): AppError | null {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002" || error.code === "P2034") {
+      return new AppError(
+        "Это время уже занято. Пожалуйста, выберите другой слот.",
+        409,
+        "BOOKING_CONFLICT"
+      );
+    }
+  }
+  return null;
+}
+
 export async function createClientBooking(
   userId: string,
   data: {
@@ -139,74 +152,81 @@ export async function createClientBooking(
     });
 
     const transactionStartedAt = Date.now();
-    const booking = await prisma.$transaction(
-      async (tx) => {
-        await ensureNoConflicts(tx, {
-          providerId: data.providerId,
-          masterProviderId: resolvedMasterProviderId,
-          startAtUtc,
-          endAtUtc,
-          bufferMin,
-        });
-
-        const created = await tx.booking.create({
-          data: {
+    let booking;
+    try {
+      booking = await prisma.$transaction(
+        async (tx) => {
+          await ensureNoConflicts(tx, {
             providerId: data.providerId,
-            serviceId: data.serviceId,
             masterProviderId: resolvedMasterProviderId,
-            masterId: resolvedMasterProviderId,
             startAtUtc,
             endAtUtc,
-            startAt: startAtUtc,
-            endAt: endAtUtc,
-            slotLabel: data.slotLabel,
-            clientName: data.clientName,
-            clientPhone: data.clientPhone,
-            comment: data.comment,
-            silentMode: data.silentMode ?? false,
-            referencePhotoAssetId: bookingExtras.referencePhotoAssetId,
-            bookingAnswers: bookingExtras.bookingAnswers ?? undefined,
-            clientUserId: userId,
-            status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
-            actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
-          },
-          select: {
-            id: true,
-            slotLabel: true,
-            status: true,
-            providerId: true,
-            masterProviderId: true,
-            clientName: true,
-            clientPhone: true,
-            comment: true,
-            silentMode: true,
-            startAtUtc: true,
-            endAtUtc: true,
-            proposedStartAt: true,
-            proposedEndAt: true,
-            requestedBy: true,
-            actionRequiredBy: true,
-            changeComment: true,
-            clientChangeRequestsCount: true,
-            masterChangeRequestsCount: true,
-            service: { select: { id: true, name: true } },
-          },
-        });
+            bufferMin,
+          });
 
-        if (bookingExtras.referencePhotoAssetId) {
-          await tx.mediaAsset.update({
-            where: { id: bookingExtras.referencePhotoAssetId },
+          const created = await tx.booking.create({
             data: {
-              entityType: MediaEntityType.BOOKING,
-              entityId: created.id,
+              providerId: data.providerId,
+              serviceId: data.serviceId,
+              masterProviderId: resolvedMasterProviderId,
+              masterId: resolvedMasterProviderId ?? provider.id,
+              startAtUtc,
+              endAtUtc,
+              startAt: startAtUtc,
+              endAt: endAtUtc,
+              slotLabel: data.slotLabel,
+              clientName: data.clientName,
+              clientPhone: data.clientPhone,
+              comment: data.comment,
+              silentMode: data.silentMode ?? false,
+              referencePhotoAssetId: bookingExtras.referencePhotoAssetId,
+              bookingAnswers: bookingExtras.bookingAnswers ?? undefined,
+              clientUserId: userId,
+              status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
+              actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
+            },
+            select: {
+              id: true,
+              slotLabel: true,
+              status: true,
+              providerId: true,
+              masterProviderId: true,
+              clientName: true,
+              clientPhone: true,
+              comment: true,
+              silentMode: true,
+              startAtUtc: true,
+              endAtUtc: true,
+              proposedStartAt: true,
+              proposedEndAt: true,
+              requestedBy: true,
+              actionRequiredBy: true,
+              changeComment: true,
+              clientChangeRequestsCount: true,
+              masterChangeRequestsCount: true,
+              service: { select: { id: true, name: true } },
             },
           });
-        }
 
-        return created;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-    );
+          if (bookingExtras.referencePhotoAssetId) {
+            await tx.mediaAsset.update({
+              where: { id: bookingExtras.referencePhotoAssetId },
+              data: {
+                entityType: MediaEntityType.BOOKING,
+                entityId: created.id,
+              },
+            });
+          }
+
+          return created;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+    } catch (error) {
+      const conflictError = mapPrismaBookingConflict(error);
+      if (conflictError) throw conflictError;
+      throw error;
+    }
     const transactionMs = Date.now() - transactionStartedAt;
     logInfo("[booking:create:legacy] transaction complete", { transactionMs });
     createdBookingId = booking.id;

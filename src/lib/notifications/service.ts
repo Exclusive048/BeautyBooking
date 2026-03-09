@@ -688,22 +688,22 @@ export async function listNotifications(input: {
   limit?: number;
 }): Promise<{ items: NotificationRecord[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
-  const cursorDate = input.cursor ? new Date(input.cursor) : null;
-  const where: Prisma.NotificationWhereInput = {
-    userId: input.userId,
-    ...(cursorDate && !Number.isNaN(cursorDate.getTime())
-      ? { createdAt: { lt: cursorDate } }
-      : {}),
-  };
+  const cursorId = input.cursor?.trim();
 
   const items = await prisma.notification.findMany({
-    where,
-    orderBy: [{ isRead: "asc" }, { createdAt: "desc" }],
+    where: { userId: input.userId },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     take: limit,
+    ...(cursorId
+      ? {
+          skip: 1,
+          cursor: { id: cursorId },
+        }
+      : {}),
     select: notificationSelect,
   });
 
-  const nextCursor = items.length === limit ? items[items.length - 1]?.createdAt.toISOString() ?? null : null;
+  const nextCursor = items.length === limit ? items[items.length - 1]?.id ?? null : null;
   return { items, nextCursor };
 }
 

@@ -114,65 +114,41 @@ export async function ensureDefaultPlans() {
   });
   const byCode = new Map(existing.map((plan) => [plan.code, plan]));
 
-  const missing = DEFAULT_PLANS.filter((plan) => !byCode.has(plan.code));
-  if (missing.length > 0) {
-    for (const plan of missing) {
-      const inheritsFromPlanId = plan.inheritsFrom ? byCode.get(plan.inheritsFrom)?.id ?? null : null;
-      const created = await prisma.billingPlan.create({
-        data: {
-          code: plan.code,
-          name: plan.name,
-          tier: plan.tier,
-          scope: plan.scope,
-          features: plan.features as Prisma.InputJsonValue,
-          sortOrder: plan.sortOrder ?? 0,
-          inheritsFromPlanId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          code: true,
-          inheritsFromPlanId: true,
-          sortOrder: true,
-          tier: true,
-          scope: true,
-          name: true,
-          features: true,
-        },
-      });
-      byCode.set(created.code, created);
-    }
-  }
-
-  const updates = DEFAULT_PLANS.flatMap((plan) => {
-    const existingPlan = byCode.get(plan.code);
-    if (!existingPlan) return [];
-    const desiredInheritsFromId = plan.inheritsFrom ? byCode.get(plan.inheritsFrom)?.id ?? null : null;
-    const desiredSortOrder = plan.sortOrder ?? 0;
-    const needsTier = existingPlan.tier !== plan.tier;
-    const needsScope = existingPlan.scope !== plan.scope;
-    const needsSort = existingPlan.sortOrder !== desiredSortOrder;
-    const needsParent = (existingPlan.inheritsFromPlanId ?? null) !== (desiredInheritsFromId ?? null);
-
-    if (!needsSort && !needsParent && !needsTier && !needsScope) {
-      return [];
-    }
-
-    return [
-      prisma.billingPlan.update({
-        where: { id: existingPlan.id },
-        data: {
-          sortOrder: desiredSortOrder,
-          inheritsFromPlanId: desiredInheritsFromId,
-          ...(needsTier ? { tier: plan.tier } : {}),
-          ...(needsScope ? { scope: plan.scope } : {}),
-        },
-      }),
-    ];
-  });
-
-  if (updates.length > 0) {
-    await prisma.$transaction(updates);
+  for (const plan of DEFAULT_PLANS) {
+    const inheritsFromPlanId = plan.inheritsFrom ? byCode.get(plan.inheritsFrom)?.id ?? null : null;
+    const upserted = await prisma.billingPlan.upsert({
+      where: { code: plan.code },
+      create: {
+        code: plan.code,
+        name: plan.name,
+        tier: plan.tier,
+        scope: plan.scope,
+        features: plan.features as Prisma.InputJsonValue,
+        sortOrder: plan.sortOrder ?? 0,
+        inheritsFromPlanId,
+        isActive: true,
+      },
+      update: {
+        name: plan.name,
+        tier: plan.tier,
+        scope: plan.scope,
+        features: plan.features as Prisma.InputJsonValue,
+        sortOrder: plan.sortOrder ?? 0,
+        inheritsFromPlanId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        code: true,
+        inheritsFromPlanId: true,
+        sortOrder: true,
+        tier: true,
+        scope: true,
+        name: true,
+        features: true,
+      },
+    });
+    byCode.set(upserted.code, upserted);
   }
 
   const planIds = Array.from(byCode.values()).map((plan) => plan.id);

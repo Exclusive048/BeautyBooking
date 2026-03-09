@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ErrorCode } from "@/lib/api/errors";
+import { getRequestId } from "@/lib/logging/logger";
 
 export type ApiSuccess<T> = {
   ok: true;
@@ -10,6 +11,7 @@ export type ApiFieldErrors = Record<string, string | string[]>;
 
 export type ApiError = {
   ok: false;
+  requestId: string;
   error: {
     message: string;
     code?: ErrorCode;
@@ -31,6 +33,7 @@ export function fail(
   details?: unknown,
   fieldErrors?: ApiFieldErrors
 ): { response: ApiError; status: number } {
+  const requestId = getRequestId();
   const errorPayload: ApiError["error"] =
     details === undefined && fieldErrors === undefined
       ? { message, code }
@@ -40,7 +43,7 @@ export function fail(
           ...(details === undefined ? {} : { details }),
           ...(fieldErrors === undefined ? {} : { fieldErrors }),
         };
-  return { response: { ok: false, error: errorPayload }, status };
+  return { response: { ok: false, requestId, error: errorPayload }, status };
 }
 
 export function jsonOk<T>(data: T, init?: ResponseInit) {

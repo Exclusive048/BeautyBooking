@@ -8,7 +8,10 @@ import { isDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import type { CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 
-const SEARCH_TIMEZONE = "Asia/Almaty";
+const DEFAULT_SEARCH_TIMEZONE =
+  process.env.DEFAULT_TIMEZONE?.trim() && process.env.DEFAULT_TIMEZONE.trim().length > 0
+    ? process.env.DEFAULT_TIMEZONE.trim()
+    : "Europe/Moscow";
 const MAX_SLOTS_PER_PROVIDER = 12;
 const CANDIDATE_MULTIPLIER = 3;
 const MAX_CANDIDATES = 120;
@@ -64,6 +67,17 @@ function formatTimeLabel(date: Date, timeZone: string): string {
   const hours = String(parts.hour).padStart(2, "0");
   const minutes = String(parts.minute).padStart(2, "0");
   return `${hours}:${minutes}`;
+}
+
+function resolveProviderTimezone(timezone: string | null | undefined): string {
+  const candidate = timezone?.trim();
+  const selected = candidate && candidate.length > 0 ? candidate : DEFAULT_SEARCH_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: selected }).format(new Date());
+    return selected;
+  } catch {
+    return DEFAULT_SEARCH_TIMEZONE;
+  }
 }
 
 function buildWhere(
@@ -281,7 +295,6 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
   });
 
   const now = new Date();
-  const timeZone = SEARCH_TIMEZONE;
   const items: AvailabilityProviderItem[] = [];
 
   await Promise.all(
@@ -297,6 +310,7 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
       const serviceTitle = baseService.title?.trim() || baseService.name;
       const durationMin = masterService?.durationOverrideMin ?? baseService.durationMin;
       const servicePrice = masterService?.priceOverride ?? baseService.price;
+      const providerTimezone = resolveProviderTimezone(provider.timezone);
 
       const result = await listAvailabilitySlotsPaginated(provider.id, baseService.id, durationMin, {
         fromKey: dateKey,
@@ -307,7 +321,7 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
       const filtered = result.data.slots
         .filter((slot) => slot.startAtUtc > now)
         .filter((slot) => {
-          const parts = getLocalTimeParts(slot.startAtUtc, timeZone);
+          const parts = getLocalTimeParts(slot.startAtUtc, providerTimezone);
           const minutes = parts.hour * 60 + parts.minute;
           return minutes >= fromMin && minutes < toMin;
         })
@@ -315,7 +329,7 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
         .slice(0, MAX_SLOTS_PER_PROVIDER)
         .map((slot) => ({
           startAtUtc: slot.startAtUtc.toISOString(),
-          label: formatTimeLabel(slot.startAtUtc, timeZone),
+          label: formatTimeLabel(slot.startAtUtc, providerTimezone),
         }));
 
       if (filtered.length === 0) return;

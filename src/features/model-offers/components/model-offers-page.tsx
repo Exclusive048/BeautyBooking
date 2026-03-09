@@ -16,6 +16,9 @@ type ModelOfferStatus = "ACTIVE" | "CLOSED" | "ARCHIVED";
 type ModelOfferItem = {
   id: string;
   masterId: string;
+  masterServiceId: string;
+  serviceIds: string[];
+  selectedServices: OfferServiceItem[];
   dateLocal: string;
   timeRangeStartLocal: string;
   timeRangeEndLocal: string;
@@ -27,12 +30,22 @@ type ModelOfferItem = {
   updatedAt: string;
 };
 
-type ServiceOption = {
+type OfferServiceItem = {
   id: string;
+  title: string;
+  durationMin: number;
+  price: number | null;
+  categoryTitle?: string | null;
+};
+
+type ServiceOption = {
+  id: string | null;
+  serviceId: string;
   title: string;
   categoryTitle?: string | null;
   durationMin: number;
-  serviceId?: string;
+  price: number | null;
+  isEnabled?: boolean;
 };
 
 type OffersResponse = {
@@ -42,6 +55,7 @@ type OffersResponse = {
 
 type FieldErrors = {
   masterServiceId?: string;
+  serviceIds?: string;
   dateLocal?: string;
   timeRange?: string;
   price?: string;
@@ -75,10 +89,15 @@ function extractServices(data: unknown): ServiceOption[] {
   return listCandidate.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
-    const id =
-      (typeof record.id === "string" && record.id.trim()) ||
-      (typeof record.masterServiceId === "string" && record.masterServiceId.trim()) ||
-      null;
+    const hasExplicitServiceId = typeof record.serviceId === "string" && record.serviceId.trim().length > 0;
+    const masterServiceId = hasExplicitServiceId
+      ? (typeof record.id === "string" && record.id.trim()) ||
+        (typeof record.masterServiceId === "string" && record.masterServiceId.trim()) ||
+        null
+      : null;
+    const serviceId = hasExplicitServiceId
+      ? (record.serviceId as string).trim()
+      : (typeof record.id === "string" && record.id.trim()) || null;
     const title =
       (typeof record.title === "string" && record.title.trim()) ||
       (typeof record.serviceTitle === "string" && record.serviceTitle.trim()) ||
@@ -90,24 +109,54 @@ function extractServices(data: unknown): ServiceOption[] {
         : typeof record.duration === "number"
           ? record.duration
           : null;
-    if (!id || !title || duration === null) return [];
+    const price =
+      typeof record.price === "number"
+        ? record.price
+        : typeof record.effectivePrice === "number"
+          ? record.effectivePrice
+          : typeof record.basePrice === "number"
+            ? record.basePrice
+            : null;
+    if (!serviceId || !title || duration === null) return [];
     const categoryTitle =
       typeof record.categoryTitle === "string"
         ? record.categoryTitle
         : typeof record.category === "string"
           ? record.category
           : null;
-    const serviceId = typeof record.serviceId === "string" ? record.serviceId : undefined;
+    const isEnabled = typeof record.isEnabled === "boolean" ? record.isEnabled : undefined;
     return [
       {
-        id,
+        id: masterServiceId,
+        serviceId,
         title,
         categoryTitle,
         durationMin: duration,
-        serviceId,
+        price,
+        isEnabled,
       },
     ];
   });
+}
+
+function mergeServiceOptions(prev: ServiceOption[], next: ServiceOption[]): ServiceOption[] {
+  const byServiceId = new Map<string, ServiceOption>();
+  for (const item of prev) byServiceId.set(item.serviceId, item);
+  for (const item of next) {
+    const existing = byServiceId.get(item.serviceId);
+    if (!existing) {
+      byServiceId.set(item.serviceId, item);
+      continue;
+    }
+    byServiceId.set(item.serviceId, {
+      ...existing,
+      ...item,
+      id: item.id ?? existing.id,
+      price: item.price ?? existing.price,
+      durationMin: item.durationMin || existing.durationMin,
+    });
+  }
+  return Array.from(byServiceId.values());
 }
 
 export function ModelOffersPage() {
@@ -121,6 +170,7 @@ export function ModelOffersPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const [masterServiceId, setMasterServiceId] = useState("");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [dateLocal, setDateLocal] = useState("");
   const [timeRangeStartLocal, setTimeRangeStartLocal] = useState("");
   const [timeRangeEndLocal, setTimeRangeEndLocal] = useState("");
@@ -160,6 +210,7 @@ export function ModelOffersPage() {
 
   const serviceOptions = useMemo(() => {
     return [...services]
+      .filter((service) => service.isEnabled !== false)
       .map((service) => {
         const title = service.title.trim();
         const category = service.categoryTitle?.trim();
@@ -171,6 +222,16 @@ export function ModelOffersPage() {
       })
       .sort((a, b) => a.label.localeCompare(b.label, "ru"));
   }, [services]);
+
+  const masterServiceOptions = useMemo(
+    () => serviceOptions.filter((item) => typeof item.id === "string" && item.id.length > 0),
+    [serviceOptions]
+  );
+
+  const selectedServicesPreview = useMemo(() => {
+    const selectedSet = new Set(selectedServiceIds);
+    return serviceOptions.filter((item) => selectedSet.has(item.serviceId));
+  }, [selectedServiceIds, serviceOptions]);
 
   const isEmptyState = useMemo(
     () => !loading && !error && offers.length === 0,
@@ -197,7 +258,9 @@ export function ModelOffersPage() {
       }
       setOffers(Array.isArray(json.data.offers) ? json.data.offers : []);
       if (Array.isArray(json.data.services)) {
-        setServices(json.data.services);
+        setServices((prev) =>
+          mergeServiceOptions(prev, extractServices({ services: json.data.services }))
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить офферы.");
@@ -215,7 +278,7 @@ export function ModelOffersPage() {
       if (!json || !json.ok) return;
       const options = extractServices(json.data);
       if (options.length > 0) {
-        setServices(options);
+        setServices((prev) => mergeServiceOptions(prev, options));
       }
     } catch {
       return;
@@ -225,6 +288,15 @@ export function ModelOffersPage() {
   useEffect(() => {
     void loadOffers().then(() => loadServices());
   }, [loadOffers, loadServices]);
+
+  useEffect(() => {
+    if (!masterServiceId) return;
+    const primaryService = masterServiceOptions.find((item) => item.id === masterServiceId);
+    if (!primaryService) return;
+    setSelectedServiceIds((prev) =>
+      prev.includes(primaryService.serviceId) ? prev : [...prev, primaryService.serviceId]
+    );
+  }, [masterServiceId, masterServiceOptions]);
 
   const toggleCreate = useCallback(() => {
     setShowCreate((prev) => !prev);
@@ -250,6 +322,14 @@ export function ModelOffersPage() {
     setRequirementsError(null);
   }, []);
 
+  const toggleServiceSelection = useCallback((serviceId: string) => {
+    setSelectedServiceIds((prev) =>
+      prev.includes(serviceId)
+        ? prev.filter((item) => item !== serviceId)
+        : [...prev, serviceId]
+    );
+  }, []);
+
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -262,8 +342,18 @@ export function ModelOffersPage() {
       const normalizedDate = dateLocal.trim();
       const normalizedStart = timeRangeStartLocal.trim();
       const normalizedEnd = timeRangeEndLocal.trim();
+      const primaryService = masterServiceOptions.find((item) => item.id === masterServiceId) ?? null;
+      const normalizedServiceIds = Array.from(
+        new Set(selectedServiceIds.map((item) => item.trim()).filter((item) => item.length > 0))
+      );
+      if (primaryService && !normalizedServiceIds.includes(primaryService.serviceId)) {
+        normalizedServiceIds.push(primaryService.serviceId);
+      }
 
       if (!masterServiceId) nextErrors.masterServiceId = "Выберите услугу";
+      if (normalizedServiceIds.length === 0) {
+        nextErrors.serviceIds = "Выберите хотя бы одну услугу";
+      }
       if (!normalizedDate) nextErrors.dateLocal = "Укажите дату";
       if (!normalizedStart || !normalizedEnd) {
         nextErrors.timeRange = "Укажите диапазон времени";
@@ -307,6 +397,7 @@ export function ModelOffersPage() {
 
       const payload: Record<string, unknown> = {
         masterServiceId,
+        serviceIds: normalizedServiceIds,
         dateLocal: normalizedDate,
         timeRangeStartLocal: normalizedStart,
         timeRangeEndLocal: normalizedEnd,
@@ -330,6 +421,7 @@ export function ModelOffersPage() {
         }
 
         setMasterServiceId("");
+        setSelectedServiceIds([]);
         setDateLocal("");
         setTimeRangeStartLocal("");
         setTimeRangeEndLocal("");
@@ -353,9 +445,11 @@ export function ModelOffersPage() {
       extraBusyMin,
       loadOffers,
       masterServiceId,
+      masterServiceOptions,
       price,
       requirements,
       saving,
+      selectedServiceIds,
       timeRangeEndLocal,
       timeRangeStartLocal,
     ]
@@ -392,14 +486,63 @@ export function ModelOffersPage() {
                     className="mt-2"
                   >
                     <option value="">Выберите услугу</option>
-                    {serviceOptions.map((service) => (
-                      <option key={service.id} value={service.id}>
+                    {masterServiceOptions.map((service) => (
+                      <option key={service.id ?? service.serviceId} value={service.id ?? ""}>
                         {service.label} · {service.durationMin} мин
                       </option>
                     ))}
                   </Select>
                   {fieldErrors.masterServiceId ? (
                     <p className="mt-2 text-xs text-rose-500">{fieldErrors.masterServiceId}</p>
+                  ) : null}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-text-sec">Услуги в оффере</label>
+                  <div className="mt-2 space-y-2 rounded-2xl border border-border-subtle/80 bg-bg-input/50 p-3">
+                    {serviceOptions.length > 0 ? (
+                      serviceOptions.map((service) => {
+                        const isChecked = selectedServiceIds.includes(service.serviceId);
+                        const isPrimary = service.id === masterServiceId;
+                        return (
+                          <label
+                            key={`${service.serviceId}:${service.id ?? "no-master-service"}`}
+                            className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-1.5 hover:bg-bg-card/60"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleServiceSelection(service.serviceId)}
+                              className="mt-1 h-4 w-4 rounded border-border-subtle"
+                            />
+                            <span className="min-w-0 text-sm text-text-main">
+                              <span className="font-medium">{service.title}</span>
+                              <span className="ml-2 text-xs text-text-sec">
+                                {service.durationMin} мин
+                                {typeof service.price === "number" ? ` • ${UI_FMT.priceLabel(service.price)}` : ""}
+                              </span>
+                              {isPrimary ? (
+                                <span className="ml-2 text-xs text-primary">основная</span>
+                              ) : null}
+                            </span>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <div className="text-xs text-text-sec">Нет доступных услуг для выбора.</div>
+                    )}
+                  </div>
+                  {fieldErrors.serviceIds ? (
+                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.serviceIds}</p>
+                  ) : null}
+                  {selectedServicesPreview.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedServicesPreview.map((service) => (
+                        <Chip key={`preview:${service.serviceId}`}>
+                          {service.title} · {service.durationMin} мин
+                        </Chip>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
 
@@ -573,6 +716,18 @@ export function ModelOffersPage() {
                     {offer.extraBusyMin > 0 ? (
                       <span className="text-xs text-text-sec">+{offer.extraBusyMin} мин съемки</span>
                     ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {offer.selectedServices.length > 0 ? (
+                      offer.selectedServices.map((service) => (
+                        <Chip key={`${offer.id}:${service.id}`}>
+                          {service.title} · {service.durationMin} мин
+                        </Chip>
+                      ))
+                    ) : (
+                      <span className="text-xs text-text-sec">Услуги не выбраны</span>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-2">

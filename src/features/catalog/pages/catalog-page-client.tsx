@@ -7,6 +7,7 @@ import { CatalogCard } from "@/features/catalog/components/catalog-card";
 import { FilterChips } from "@/features/catalog/components/filter-chips";
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
+import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
@@ -46,7 +47,7 @@ type CatalogSearchItem = {
 
 type CatalogSearchData = {
   items: CatalogSearchItem[];
-  nextCursor: number | null;
+  nextCursor: string | null;
 };
 
 type AvailabilitySearchData = AvailabilitySearchResponse;
@@ -175,7 +176,11 @@ function CatalogSkeletonGrid() {
   );
 }
 
-export default function CatalogPageClient() {
+type CatalogPageClientProps = {
+  visualSearchEnabled: boolean;
+};
+
+export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -220,6 +225,7 @@ export default function CatalogPageClient() {
   const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
   const [mapSidebarOpen, setMapSidebarOpen] = useState(false);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
+  const [visualSearchOpen, setVisualSearchOpen] = useState(false);
 
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -269,7 +275,7 @@ export default function CatalogPageClient() {
   );
 
   const requestCatalog = useCallback(
-    async (cursor?: number, overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
+    async (cursor?: string, overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
       const params = new URLSearchParams();
       const activeMapSearch = overrideMapSearch ?? mapSearch;
       params.set("limit", "20");
@@ -284,7 +290,7 @@ export default function CatalogPageClient() {
       if (hot) params.set("hot", "true");
       if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
-      if (typeof cursor === "number") params.set("cursor", String(cursor));
+      if (cursor) params.set("cursor", cursor);
       if (activeMapSearch) {
         params.set("lat", String(activeMapSearch.center.lat));
         params.set("lng", String(activeMapSearch.center.lng));
@@ -528,6 +534,10 @@ export default function CatalogPageClient() {
           }
           onCustomTimeChange={(from, to) => updateParams({ timePreset: null, timeFrom: from, timeTo: to })}
           onClearTime={() => updateParams({ timePreset: null, timeFrom: null, timeTo: null })}
+          showPhotoSearch={visualSearchEnabled}
+          onOpenPhotoSearch={() => {
+            if (visualSearchEnabled) setVisualSearchOpen(true);
+          }}
           onSubmit={onSubmit}
         />
         <div className="flex flex-wrap items-center gap-3">
@@ -677,6 +687,10 @@ export default function CatalogPageClient() {
           </button>
           {loadMoreError ? <div className="text-xs text-red-600">{loadMoreError}</div> : null}
         </div>
+      ) : null}
+
+      {visualSearchEnabled ? (
+        <VisualSearchModal open={visualSearchOpen} onClose={() => setVisualSearchOpen(false)} />
       ) : null}
     </div>
   );

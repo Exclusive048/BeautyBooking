@@ -7,6 +7,10 @@ export const VISUAL_SEARCH_SYSTEM_CONFIG_KEY = "visualSearchEnabled";
 export const VISUAL_SEARCH_CACHE_KEY = "system:visual-search-enabled";
 const VISUAL_SEARCH_CACHE_TTL_SECONDS = 30;
 
+export type VisualSearchConfig = {
+  enabled: boolean;
+};
+
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
@@ -48,6 +52,12 @@ export async function getVisualSearchEnabled(): Promise<boolean> {
 
   await set(VISUAL_SEARCH_CACHE_KEY, resolved, VISUAL_SEARCH_CACHE_TTL_SECONDS);
   return resolved;
+}
+
+export async function getVisualSearchConfig(): Promise<VisualSearchConfig> {
+  return {
+    enabled: await getVisualSearchEnabled(),
+  };
 }
 
 export async function clearVisualSearchEnabledCache(): Promise<void> {

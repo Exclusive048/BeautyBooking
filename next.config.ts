@@ -1,8 +1,5 @@
-import type { NextConfig } from "next";
-import path from "path";
-import withPWA from "next-pwa";
-
-const withPWAConfig = withPWA({
+const path = require("path");
+const withPWA = require("next-pwa")({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
@@ -74,7 +71,7 @@ const withPWAConfig = withPWA({
 
 const isProd = process.env.NODE_ENV === "production";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   serverExternalPackages: ["redis", "@redis/client"],
   turbopack: {
     root: path.resolve(__dirname),
@@ -103,4 +100,4 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default withPWAConfig(nextConfig);
+module.exports = withPWA(nextConfig);

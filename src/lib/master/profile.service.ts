@@ -817,7 +817,10 @@ export async function deleteMasterPortfolioItem(
   const tagIds = uniqueIds(item.tags.map((link) => link.tagId));
 
   await prisma.$transaction(async (tx) => {
-    await tx.portfolioItem.delete({ where: { id: item.id } });
+    const deleted = await tx.portfolioItem.deleteMany({
+      where: { id: item.id, masterId },
+    });
+    if (deleted.count === 0) return;
     if (categoryIds.length > 0) {
       await tx.globalCategory.updateMany({
         where: { id: { in: categoryIds }, usageCount: { gt: 0 } },

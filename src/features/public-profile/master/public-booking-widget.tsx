@@ -280,7 +280,7 @@ export function PublicBookingWidget({
         const normalizedSlots: SlotItem[] = (slotsJson.data.slots ?? []).map((slot) => {
           const label = slot.label;
           return {
-            id: label,
+            id: `${slot.startAtUtc}-${label}`,
             label,
             timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
             dayKey: toLocalDateKey(slot.startAtUtc, providerTimeZone),

@@ -4,13 +4,53 @@ import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
-import { createSoloMasterService, upsertMasterServices } from "@/lib/master/profile.service";
+import {
+  createSoloMasterService,
+  getMasterProfileData,
+  upsertMasterServices,
+} from "@/lib/master/profile.service";
 import { createMasterServiceSchema, upsertMasterServicesSchema } from "@/lib/master/schemas";
 import { parseBody } from "@/lib/validation";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createFeatureGateError, createSystemDisabledError } from "@/lib/billing/guards";
 
 export const runtime = "nodejs";
+
+export async function GET(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+
+    const masterId = await getCurrentMasterProviderId(user.id);
+    const data = await getMasterProfileData(masterId);
+
+    return jsonOk({
+      services: data.services.map((item) => ({
+        id: item.serviceId,
+        title: item.title,
+        durationMin: item.effectiveDurationMin,
+        price: item.effectivePrice,
+        isEnabled: item.isEnabled,
+      })),
+    });
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.status >= 500) {
+      logError("GET /api/master/services failed", {
+        requestId: getRequestId(req),
+        route: "GET /api/master/services",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return jsonFail(
+      appError.status,
+      appError.message,
+      appError.code,
+      appError.details,
+      extractFieldErrors(appError.details)
+    );
+  }
+}
 
 function extractFieldErrors(details: unknown): Record<string, string> | undefined {
   if (typeof details !== "object" || details === null) return undefined;
