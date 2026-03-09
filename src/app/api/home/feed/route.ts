@@ -5,6 +5,7 @@ import { homeFeedQuerySchema } from "@/lib/home/schemas";
 import { parseQuery } from "@/lib/validation";
 import { listHomePortfolioFeed } from "@/lib/feed/portfolio.service";
 import { getSessionUser } from "@/lib/auth/session";
+import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -12,13 +13,26 @@ export async function GET(req: Request) {
   try {
     const query = parseQuery(new URL(req.url), homeFeedQuerySchema);
     const user = await getSessionUser();
-    const data = await listHomePortfolioFeed({
+    const input = {
       limit: query.limit,
       cursor: query.cursor,
       categoryId: query.categoryId,
       tagId: query.tagId,
       currentUserId: user?.id,
-    });
+    };
+
+    let data: Awaited<ReturnType<typeof listHomePortfolioFeed>>;
+    try {
+      data = await listHomePortfolioFeed(input);
+    } catch (error) {
+      const isDeletedCursorError =
+        query.cursor &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025";
+      if (!isDeletedCursorError) throw error;
+      data = await listHomePortfolioFeed({ ...input, cursor: undefined });
+    }
+
     return jsonOk(data);
   } catch (error) {
     const appError = toAppError(error);

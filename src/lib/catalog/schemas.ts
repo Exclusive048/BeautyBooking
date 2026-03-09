@@ -28,7 +28,7 @@ export const catalogSearchQuerySchema = z.object({
   lng: z.coerce.number().optional(),
   bbox: z.string().trim().optional(),
   limit: z.coerce.number().int().min(1).max(40).default(20),
-  cursor: z.coerce.number().int().min(0).optional(),
+  cursor: z.string().trim().min(1).optional(),
 });
 
 export type CatalogSearchQuery = z.infer<typeof catalogSearchQuerySchema>;

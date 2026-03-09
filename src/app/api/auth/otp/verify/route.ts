@@ -1,151 +1,144 @@
-import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { createSessionToken } from "@/lib/auth/jwt";
+import { NextResponse } from "next/server";
 import { AccountType, ConsentType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
+import { withRequestContext } from "@/lib/api/with-request-context";
 import { formatZodError } from "@/lib/api/validation";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
-import { otpVerifySchema } from "@/lib/auth/schemas";
+import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import { otpVerifySchema } from "@/lib/auth/schemas";
+import { setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { linkGuestBookingsToUserByPhone } from "@/lib/bookings/link-guest-bookings";
 import { logError } from "@/lib/logging/logger";
-import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
-import { NextResponse } from "next/server";
+import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 
 const CONSENT_DOCUMENT_VERSION = "1.0";
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  const parsed = otpVerifySchema.safeParse(body);
-  if (!parsed.success) {
-    return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
-  }
-  const { phone, code } = parsed.data;
+  return withRequestContext(req, async () => {
+    const body = await req.json().catch(() => null);
+    const parsed = otpVerifySchema.safeParse(body);
+    if (!parsed.success) {
+      return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
+    }
+    const { phone, code } = parsed.data;
 
-  const lockCheck = await checkOtpVerifyLock(phone);
-  if (!lockCheck.ok) {
-    return NextResponse.json(
-      { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
-      { status: lockCheck.status, headers: { "Retry-After": String(lockCheck.retryAfterSec) } }
-    );
-  }
-
-  const now = new Date();
-  const codeHash = hashOtpCode(phone, code);
-
-  const otp = await prisma.otpCode.findFirst({
-    where: {
-      phone,
-      codeHash,
-      usedAt: null,
-      expiresAt: { gt: now },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!otp) {
-    const failResult = await registerOtpVerifyFailure(phone);
-    if (!failResult.ok) {
+    const lockCheck = await checkOtpVerifyLock(phone);
+    if (!lockCheck.ok) {
       return NextResponse.json(
-        { error: failResult.error, retryAfterSec: failResult.retryAfterSec },
-        { status: failResult.status, headers: { "Retry-After": String(failResult.retryAfterSec) } }
+        { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
+        { status: lockCheck.status, headers: { "Retry-After": String(lockCheck.retryAfterSec) } }
       );
     }
-    return fail("Code not found", 401, "CODE_NOT_FOUND");
-  }
 
-  await clearOtpVerifyFailures(phone);
+    const now = new Date();
+    const codeHash = hashOtpCode(phone, code);
 
-  await prisma.otpCode.update({
-    where: { id: otp.id },
-    data: { usedAt: now },
-  });
-
-  let profile = await prisma.userProfile.findUnique({ where: { phone } });
-
-  if (!profile) {
-    profile = await prisma.userProfile.create({
-      data: {
+    const otp = await prisma.otpCode.findFirst({
+      where: {
         phone,
-        roles: [AccountType.CLIENT],
+        codeHash,
+        usedAt: null,
+        expiresAt: { gt: now },
       },
+      orderBy: { createdAt: "desc" },
     });
-  } else {
-    const nextRoles = await ensureClientRoleForUser(profile.id, profile.roles);
-    if (nextRoles !== profile.roles) {
-      profile = { ...profile, roles: nextRoles };
+
+    if (!otp) {
+      const failResult = await registerOtpVerifyFailure(phone);
+      if (!failResult.ok) {
+        return NextResponse.json(
+          { error: failResult.error, retryAfterSec: failResult.retryAfterSec },
+          { status: failResult.status, headers: { "Retry-After": String(failResult.retryAfterSec) } }
+        );
+      }
+      return fail("Code not found", 401, "CODE_NOT_FOUND");
     }
-  }
 
-  try {
-    await ensureFreeSubscriptionsForRoles(profile.id, profile.roles);
-  } catch (error) {
-    logError("ensureFreeSubscriptionsForRoles failed after otp verify", {
-      userProfileId: profile.id,
-      error: error instanceof Error ? error.stack : error,
+    await clearOtpVerifyFailures(phone);
+
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { usedAt: now },
     });
-  }
 
-  if (profile.phone) {
+    let profile = await prisma.userProfile.findUnique({ where: { phone } });
+
+    if (!profile) {
+      profile = await prisma.userProfile.create({
+        data: {
+          phone,
+          roles: [AccountType.CLIENT],
+        },
+      });
+    } else {
+      const nextRoles = await ensureClientRoleForUser(profile.id, profile.roles);
+      if (nextRoles !== profile.roles) {
+        profile = { ...profile, roles: nextRoles };
+      }
+    }
+
     try {
-      await linkGuestBookingsToUserByPhone({ userProfileId: profile.id, phoneRaw: profile.phone });
+      await ensureFreeSubscriptionsForRoles(profile.id, profile.roles);
     } catch (error) {
-      logError("linkGuestBookingsToUserByPhone failed after otp verify", {
+      logError("ensureFreeSubscriptionsForRoles failed after otp verify", {
         userProfileId: profile.id,
         error: error instanceof Error ? error.stack : error,
       });
+      sendTelegramAlert(
+        `User ${profile.id} logged in without free subscription`,
+        `auth:free-subscription:otp:${profile.id}`
+      );
     }
-  }
 
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  const ipAddress = forwardedFor?.split(",")[0]?.trim() ?? null;
-  const userAgent = req.headers.get("user-agent");
+    if (profile.phone) {
+      try {
+        await linkGuestBookingsToUserByPhone({ userProfileId: profile.id, phoneRaw: profile.phone });
+      } catch (error) {
+        logError("linkGuestBookingsToUserByPhone failed after otp verify", {
+          userProfileId: profile.id,
+          error: error instanceof Error ? error.stack : error,
+        });
+      }
+    }
 
-  try {
-    await prisma.userConsent.createMany({
-      data: [
-        {
-          userId: profile.id,
-          consentType: ConsentType.TERMS,
-          documentVersion: CONSENT_DOCUMENT_VERSION,
-          ipAddress,
-          userAgent,
-        },
-        {
-          userId: profile.id,
-          consentType: ConsentType.PRIVACY,
-          documentVersion: CONSENT_DOCUMENT_VERSION,
-          ipAddress,
-          userAgent,
-        },
-      ],
-      skipDuplicates: true,
-    });
-  } catch (error) {
-    logError("Failed to save user consents", {
-      userId: profile.id,
-      error: error instanceof Error ? error.stack : String(error),
-    });
-  }
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const ipAddress = forwardedFor?.split(",")[0]?.trim() ?? null;
+    const userAgent = req.headers.get("user-agent");
 
-  const token = createSessionToken(
-    { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles },
-    60 * 60 * 24 * 30
-  );
+    try {
+      await prisma.userConsent.createMany({
+        data: [
+          {
+            userId: profile.id,
+            consentType: ConsentType.TERMS,
+            documentVersion: CONSENT_DOCUMENT_VERSION,
+            ipAddress,
+            userAgent,
+          },
+          {
+            userId: profile.id,
+            consentType: ConsentType.PRIVACY,
+            documentVersion: CONSENT_DOCUMENT_VERSION,
+            ipAddress,
+            userAgent,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    } catch (error) {
+      logError("Failed to save user consents", {
+        userId: profile.id,
+        error: error instanceof Error ? error.stack : String(error),
+      });
+    }
 
-  const cookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
-  const cookieStore = await cookies();
-
-  cookieStore.set(cookieName, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    const redirectDecision = await resolveCabinetRedirect(profile.id);
+    const response = ok({ redirect: redirectDecision.target });
+    setSessionCookies(response, { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles });
+    return response;
   });
-
-  const redirectDecision = await resolveCabinetRedirect(profile.id);
-  return ok({ redirect: redirectDecision.target });
 }

@@ -228,6 +228,14 @@ enum MediaKind {
   BOOKING_REFERENCE
 }
 
+enum MediaAssetStatus {
+  PENDING
+
+  READY
+
+  BROKEN
+}
+
 enum StudioMemberRole {
   OWNER
 
@@ -1072,6 +1080,7 @@ model Booking {
 
   modelApplication ModelApplication? @relation("ModelApplicationBooking")
 
+  @@index([providerId, startAtUtc, endAtUtc])
   @@index([providerId])
   @@index([masterProviderId])
   @@index([startAtUtc])
@@ -1453,6 +1462,7 @@ model MediaAsset {
   visualDescription   String?
   visualMeta          Json?
   visualCategory      String?
+  status              MediaAssetStatus @default(READY)
 
   createdByUserId String?
 
@@ -1471,6 +1481,7 @@ model MediaAsset {
   @@index([storageKey])
   @@index([createdByUserId])
   @@index([kind, visualIndexed, visualCategory])
+  @@index([status, deletedAt, createdAt])
 }
 
 model MediaAssetEmbedding {
@@ -1495,6 +1506,8 @@ model ModelOffer {
   masterServiceId String
 
   masterService MasterService @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
+
+  serviceIds String[] @default([])
 
   dateLocal String
 

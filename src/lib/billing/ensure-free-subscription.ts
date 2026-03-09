@@ -1,6 +1,8 @@
 import { AccountType, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
+import { ensureBillingPlans } from "@/lib/billing/ensure-billing-plans";
+import { AppError } from "@/lib/api/errors";
 
 const FREE_PLAN_CODES: Record<SubscriptionScope, string> = {
   MASTER: "MASTER_FREE",
@@ -26,14 +28,32 @@ export async function ensureFreeSubscriptionsForRoles(userId: string, roles: Acc
 
 export async function ensureFreeSubscription(userId: string, scope: SubscriptionScope): Promise<void> {
   const planCode = FREE_PLAN_CODES[scope];
-  const plan = await prisma.billingPlan.findUnique({
+  let plan = await prisma.billingPlan.findUnique({
     where: { code: planCode },
     select: { id: true, code: true },
   });
 
   if (!plan) {
+    try {
+      await ensureBillingPlans();
+      plan = await prisma.billingPlan.findUnique({
+        where: { code: planCode },
+        select: { id: true, code: true },
+      });
+    } catch (error) {
+      logError("ensureBillingPlans failed while ensuring free subscription", {
+        userId,
+        scope,
+        planCode,
+        error: error instanceof Error ? error.stack : error,
+      });
+      throw new AppError("Subscription setup failed", 503, "SERVICE_UNAVAILABLE");
+    }
+  }
+
+  if (!plan) {
     logError("Free billing plan not found", { userId, scope, planCode });
-    return;
+    throw new AppError("Subscription setup failed", 503, "SERVICE_UNAVAILABLE");
   }
 
   const existing = await prisma.userSubscription.findUnique({

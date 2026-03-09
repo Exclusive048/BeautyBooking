@@ -10,6 +10,7 @@ import {
 
 type SystemFlags = {
   onlinePaymentsEnabled: boolean;
+  visualSearchEnabled: boolean;
 };
 
 export type CurrentPlanInfo = {
@@ -26,12 +27,20 @@ function parseSystemFlag(value: unknown, fallback: boolean): boolean {
 }
 
 async function getSystemFlags(): Promise<SystemFlags> {
-  const onlinePayments = await prisma.systemConfig.findUnique({
-    where: { key: "onlinePaymentsEnabled" },
-    select: { value: true },
-  });
+  const [onlinePayments, visualSearch] = await Promise.all([
+    prisma.systemConfig.findUnique({
+      where: { key: "onlinePaymentsEnabled" },
+      select: { value: true },
+    }),
+    prisma.systemConfig.findUnique({
+      where: { key: "visualSearchEnabled" },
+      select: { value: true },
+    }),
+  ]);
+
   return {
     onlinePaymentsEnabled: parseSystemFlag(onlinePayments?.value, false),
+    visualSearchEnabled: parseSystemFlag(visualSearch?.value, false),
   };
 }
 

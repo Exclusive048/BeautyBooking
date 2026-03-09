@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Prisma, MediaKind } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { getStorageProvider } from "@/lib/media/storage";
 import { getStrategy } from "@/lib/visual-search/category-registry";
@@ -14,6 +15,20 @@ import {
 } from "@/lib/visual-search/openai";
 
 const EMBEDDING_DIMENSIONS = 1536;
+/*
+Debug query for indexing state:
+SELECT
+  m.id,
+  m."visualCategory",
+  EXISTS (
+    SELECT 1
+    FROM "media_asset_embeddings" e
+    WHERE e."asset_id" = m.id
+  ) AS has_embedding
+FROM "MediaAsset" m
+WHERE m.kind = 'PORTFOLIO'
+LIMIT 10;
+*/
 
 type PortfolioAsset = {
   id: string;
@@ -102,88 +117,97 @@ async function getPortfolioAsset(assetId: string): Promise<PortfolioAsset | null
 }
 
 export async function indexMediaAsset(assetId: string): Promise<void> {
-  const asset = await getPortfolioAsset(assetId);
-  if (!asset) return;
+  try {
+    const asset = await getPortfolioAsset(assetId);
+    if (!asset) return;
 
-  await assertVisualSearchEnabled();
+    await assertVisualSearchEnabled();
 
-  const originalBytes = await readStorageBytes(asset.storageKey, asset.mimeType);
-  const resizedBytes = await resizeForOpenAI(originalBytes);
+    const originalBytes = await readStorageBytes(asset.storageKey, asset.mimeType);
+    const resizedBytes = await resizeForOpenAI(originalBytes);
 
-  const classification = await classifyImage(resizedBytes);
-  if (classification.category === "none" || classification.confidence === "low") {
-    await markAssetAsUnrecognized(asset.id);
-    return;
-  }
+    const classification = await classifyImage(resizedBytes);
+    if (classification.category === "none" || classification.confidence === "low") {
+      await markAssetAsUnrecognized(asset.id);
+      return;
+    }
 
-  const strategy = getStrategy(classification.category);
-  if (!strategy) {
-    await markAssetAsUnrecognized(asset.id);
-    return;
-  }
+    const strategy = getStrategy(classification.category);
+    if (!strategy) {
+      await markAssetAsUnrecognized(asset.id);
+      return;
+    }
 
-  const visualResult = await describeImageWithStrategy(resizedBytes, strategy);
-  if (visualResult.error === "not_applicable") {
-    await markAssetAsUnrecognized(asset.id);
-    return;
-  }
+    const visualResult = await describeImageWithStrategy(resizedBytes, strategy);
+    if (visualResult.error === "not_applicable") {
+      await markAssetAsUnrecognized(asset.id);
+      return;
+    }
 
-  const embedding = await createTextEmbedding(visualResult.text_description);
-  if (!embedding) {
-    await markAssetAsUnrecognized(asset.id);
-    return;
-  }
-  const vectorLiteral = toVectorLiteral(embedding);
-  const mappedCategory = await prisma.globalCategory.findFirst({
-    where: {
-      visualSearchSlug: classification.category,
-      status: "APPROVED",
-    },
-    select: { id: true },
-  });
-  const mediaUrlSuffix = `/api/media/file/${asset.id}`;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.mediaAsset.update({
-      where: { id: asset.id },
-      data: {
-        visualMeta: visualResult.meta as Prisma.InputJsonValue,
-        visualDescription: visualResult.text_description,
-        visualPromptVersion: strategy.promptVersion,
-        visualCategory: classification.category,
-        visualIndexed: true,
-        visualIndexedAt: new Date(),
+    const embedding = await createTextEmbedding(visualResult.text_description);
+    if (!embedding) {
+      await markAssetAsUnrecognized(asset.id);
+      return;
+    }
+    const vectorLiteral = toVectorLiteral(embedding);
+    const mappedCategory = await prisma.globalCategory.findFirst({
+      where: {
+        visualSearchSlug: classification.category,
+        status: "APPROVED",
       },
+      select: { id: true },
     });
+    const mediaUrlSuffix = `/api/media/file/${asset.id}`;
 
-    if (mappedCategory) {
-      const updatedPortfolioItems = await tx.portfolioItem.updateMany({
-        where: {
-          mediaUrl: { endsWith: mediaUrlSuffix },
-          OR: [{ globalCategoryId: null }, { categorySource: "ai" }, { inSearch: false }],
-        },
+    await prisma.$transaction(async (tx) => {
+      await tx.mediaAsset.update({
+        where: { id: asset.id },
         data: {
-          globalCategoryId: mappedCategory.id,
-          categorySource: "ai",
-          inSearch: true,
+          visualMeta: visualResult.meta as Prisma.InputJsonValue,
+          visualDescription: visualResult.text_description,
+          visualPromptVersion: strategy.promptVersion,
+          visualCategory: classification.category,
+          visualIndexed: true,
+          visualIndexedAt: new Date(),
         },
       });
 
-      if (updatedPortfolioItems.count > 0) {
-        await tx.globalCategory.update({
-          where: { id: mappedCategory.id },
-          data: { usageCount: { increment: updatedPortfolioItems.count } },
+      if (mappedCategory) {
+        const updatedPortfolioItems = await tx.portfolioItem.updateMany({
+          where: {
+            mediaUrl: { endsWith: mediaUrlSuffix },
+            OR: [{ globalCategoryId: null }, { categorySource: "ai" }, { inSearch: false }],
+          },
+          data: {
+            globalCategoryId: mappedCategory.id,
+            categorySource: "ai",
+            inSearch: true,
+          },
         });
-      }
-    }
 
-    await tx.$executeRaw`
-      INSERT INTO "media_asset_embeddings" ("id", "asset_id", "embedding")
-      VALUES (${randomUUID()}, ${asset.id}, ${vectorLiteral}::vector)
-      ON CONFLICT ("asset_id")
-      DO UPDATE SET "embedding" = EXCLUDED."embedding"
-    `;
-  });
+        if (updatedPortfolioItems.count > 0) {
+          await tx.globalCategory.update({
+            where: { id: mappedCategory.id },
+            data: { usageCount: { increment: updatedPortfolioItems.count } },
+          });
+        }
+      }
+
+      await tx.$executeRaw`
+        INSERT INTO "media_asset_embeddings" ("id", "asset_id", "embedding")
+        VALUES (${randomUUID()}, ${asset.id}, ${vectorLiteral}::vector)
+        ON CONFLICT ("asset_id")
+        DO UPDATE SET "embedding" = EXCLUDED."embedding"
+      `;
+    });
+  } catch (error) {
+    logError("Visual search indexing failed", {
+      assetId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      __skipAlert: true,
+    });
+  }
 }
 
 export function isVisualSearchMissingAssetError(error: unknown): boolean {

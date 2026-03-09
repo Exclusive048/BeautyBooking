@@ -8,7 +8,6 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { HomeFilters } from "@/features/home/components/home-filters";
 import { PortfolioGrid } from "@/features/home/components/portfolio-grid";
 import { PortfolioPreviewModal } from "@/features/home/components/portfolio-preview-modal";
-import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 
 type HomeCategory = {
   id: string;
@@ -18,10 +17,12 @@ type HomeCategory = {
   usageCount: number;
 };
 
-type HomeTag = {
+type CatalogCategory = {
   id: string;
-  name: string;
-  slug: string;
+  title: string;
+  slug: string | null;
+  icon: string | null;
+  parentId: string | null;
   usageCount: number;
 };
 
@@ -35,13 +36,11 @@ const FEED_LIMIT = 24;
 function buildFeedUrl(params: {
   cursor?: string | null;
   categoryId?: string | null;
-  tagId?: string | null;
 }) {
   const query = new URLSearchParams();
   query.set("limit", String(FEED_LIMIT));
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.categoryId) query.set("categoryId", params.categoryId);
-  if (params.tagId) query.set("tagId", params.tagId);
   return `/api/home/feed?${query.toString()}`;
 }
 
@@ -50,16 +49,13 @@ export function HomeFeed() {
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | null>(null);
   const [categories, setCategories] = useState<HomeCategory[]>([]);
-  const [tags, setTags] = useState<HomeTag[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [items, setItems] = useState<PortfolioFeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [visualSearchOpen, setVisualSearchOpen] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const fetchFeed = useCallback(
@@ -68,7 +64,6 @@ export function HomeFeed() {
         buildFeedUrl({
           cursor,
           categoryId: selectedCategoryId,
-          tagId: selectedTagId,
         }),
         { cache: "no-store" }
       );
@@ -78,7 +73,7 @@ export function HomeFeed() {
       }
       return json.data;
     },
-    [selectedCategoryId, selectedTagId]
+    [selectedCategoryId]
   );
 
   useEffect(() => {
@@ -97,15 +92,25 @@ export function HomeFeed() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/home/categories", { cache: "no-store" });
+        const res = await fetch("/api/catalog/global-categories", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: HomeCategory[] }>
+          | ApiResponse<{ categories: CatalogCategory[] }>
           | null;
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : UI_TEXT.home.loadFailed);
         }
         if (!cancelled) {
-          setCategories(json.data.categories);
+          setCategories(
+            json.data.categories
+              .filter((item) => item.parentId === null)
+              .map((item) => ({
+                id: item.id,
+                name: item.title,
+                slug: item.slug ?? item.id,
+                icon: item.icon,
+                usageCount: item.usageCount,
+              }))
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -117,30 +122,6 @@ export function HomeFeed() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const query = selectedCategoryId ? `?categoryId=${encodeURIComponent(selectedCategoryId)}` : "";
-        const res = await fetch(`/api/home/tags${query}`, { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ tags: HomeTag[] }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : UI_TEXT.home.loadFailed);
-        }
-        if (!cancelled) {
-          setTags(json.data.tags);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : UI_TEXT.home.loadFailed);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCategoryId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,26 +185,12 @@ export function HomeFeed() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-start">
-        <button
-          type="button"
-          className="rounded-xl border border-border-subtle bg-bg-card px-4 py-2 text-sm font-semibold text-text-main transition-colors hover:bg-bg-input"
-          onClick={() => setVisualSearchOpen(true)}
-        >
-          {UI_TEXT.home.visualSearch.button}
-        </button>
-      </div>
-
       <HomeFilters
         categories={categories}
-        tags={tags}
         selectedCategoryId={selectedCategoryId}
-        selectedTagId={selectedTagId}
         onSelectCategory={(next) => {
           setSelectedCategoryId((prev) => (prev === next ? null : next));
-          setSelectedTagId(null);
         }}
-        onSelectTag={(next) => setSelectedTagId((prev) => (prev === next ? null : next))}
       />
 
       {toast ? (
@@ -256,10 +223,6 @@ export function HomeFeed() {
         itemId={selectedItemId}
         open={Boolean(selectedItemId)}
         onClose={() => setSelectedItemId(null)}
-      />
-      <VisualSearchModal
-        open={visualSearchOpen}
-        onClose={() => setVisualSearchOpen(false)}
       />
     </div>
   );

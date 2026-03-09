@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ErrorCode } from "@/lib/api/errors";
+import { getRequestId } from "@/lib/logging/logger";
 
 type ApiOk<T> = {
   ok: true;
@@ -8,6 +9,7 @@ type ApiOk<T> = {
 
 type ApiError = {
   ok: false;
+  requestId: string;
   error: {
     message: string;
     code?: ErrorCode | string;
@@ -25,8 +27,9 @@ export function fail(
   code?: ErrorCode | string,
   details?: unknown
 ) {
+  const requestId = getRequestId();
   return NextResponse.json<ApiError>(
-    { ok: false, error: { message, code, details } },
+    { ok: false, requestId, error: { message, code, details } },
     { status }
   );
 }

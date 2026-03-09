@@ -21,6 +21,7 @@ function ensureValidTimeRange(start: string, end: string) {
 export const createModelOfferSchema = z
   .object({
     masterServiceId: z.string().trim().min(1),
+    serviceIds: z.array(z.string().trim().min(1)).min(1).max(20),
     dateLocal: dateLocalSchema,
     timeRangeStartLocal: timeLocalSchema,
     timeRangeEndLocal: timeLocalSchema,

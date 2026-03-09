@@ -59,7 +59,7 @@ export type CatalogSearchItem = CatalogProviderItem | CatalogModelOfferItem;
 
 export type CatalogSearchResult = {
   items: CatalogSearchItem[];
-  nextCursor: number | null;
+  nextCursor: string | null;
 };
 
 type CatalogSearchInput = {
@@ -77,7 +77,7 @@ type CatalogSearchInput = {
   entityType?: CatalogEntityType;
   modelOffers?: boolean;
   limit: number;
-  cursor?: number;
+  cursor?: string;
   lat?: number;
   lng?: number;
   bbox?: string;
@@ -449,14 +449,19 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     parseBbox(input.bbox),
     categoryIds.length > 0 ? categoryIds : undefined
   );
-  const skip = input.cursor ?? 0;
+  const cursorId = input.cursor?.trim();
   const take = Math.min(Math.max(input.limit, 1), 40);
 
   const providers = await prisma.provider.findMany({
     where,
-    orderBy: [{ ratingAvg: "desc" }, { reviews: "desc" }, { createdAt: "desc" }],
-    skip,
+    orderBy: [{ ratingAvg: "desc" }, { reviews: "desc" }, { createdAt: "desc" }, { id: "asc" }],
     take: take + 1,
+    ...(cursorId
+      ? {
+          skip: 1,
+          cursor: { id: cursorId },
+        }
+      : {}),
     select: {
       id: true,
       type: true,
@@ -583,7 +588,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
 
   return {
     items,
-    nextCursor: hasMore ? skip + take : null,
+    nextCursor: hasMore ? rows[rows.length - 1]?.id ?? null : null,
   };
 }
 
@@ -664,14 +669,24 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
   const where: Prisma.ModelOfferWhereInput =
     and.length > 0 ? { AND: and, master: { isPublished: true } } : { master: { isPublished: true } };
 
-  const skip = input.cursor ?? 0;
+  const cursorId = input.cursor?.trim();
   const take = Math.min(Math.max(input.limit, 1), 40);
 
   const offers = await prisma.modelOffer.findMany({
     where,
-    orderBy: [{ dateLocal: "asc" }, { timeRangeStartLocal: "asc" }, { createdAt: "desc" }],
-    skip,
+    orderBy: [
+      { dateLocal: "asc" },
+      { timeRangeStartLocal: "asc" },
+      { createdAt: "desc" },
+      { id: "asc" },
+    ],
     take: take + 1,
+    ...(cursorId
+      ? {
+          skip: 1,
+          cursor: { id: cursorId },
+        }
+      : {}),
     select: {
       id: true,
       masterId: true,
@@ -735,7 +750,7 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
 
   return {
     items,
-    nextCursor: hasMore ? skip + take : null,
+    nextCursor: hasMore ? rows[rows.length - 1]?.id ?? null : null,
   };
 }
 

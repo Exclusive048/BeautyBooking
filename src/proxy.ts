@@ -1,8 +1,9 @@
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
+import { verifyToken } from "@/lib/auth/jwt";
 
 type RateLimitTier =
   | "bookingCreate"
@@ -14,6 +15,19 @@ type RateLimitTier =
   | "publicApi";
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const PROTECTED_ROUTE_PREFIXES = ["/cabinet", "/admin", "/notifications"];
+const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
+
+function resolveRequestId(request: NextRequest): string {
+  const header = request.headers.get("x-request-id");
+  if (header && header.trim().length > 0) return header.trim();
+  return randomUUID();
+}
+
+function withRequestId(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set("x-request-id", requestId);
+  return response;
+}
 
 function normalizePathname(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -37,6 +51,7 @@ function extractIp(request: NextRequest): string {
 
 function resolveRateLimitTier(method: string, pathname: string): RateLimitTier | null {
   if (!pathname.startsWith("/api/")) return null;
+  if (pathname === REFRESH_ENDPOINT_PATH) return null;
 
   if (method === "POST") {
     if (pathname === "/api/bookings") return "bookingCreate";
@@ -58,9 +73,38 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
   return "publicApi";
 }
 
+function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function isAccessTokenValid(token: string | undefined): boolean {
+  if (!token) return false;
+  try {
+    return Boolean(verifyToken(token, "access"));
+  } catch {
+    return false;
+  }
+}
+
 export async function proxy(request: NextRequest) {
+  const requestId = resolveRequestId(request);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-request-id", requestId);
+
   const method = request.method.toUpperCase();
   const pathname = normalizePathname(request.nextUrl.pathname);
+
+  if (isProtectedRoute(pathname) && pathname !== REFRESH_ENDPOINT_PATH) {
+    const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
+    const accessToken = request.cookies.get(accessCookieName)?.value;
+    if (!isAccessTokenValid(accessToken)) {
+      const refreshUrl = new URL(REFRESH_ENDPOINT_PATH, request.url);
+      const nextPath = `${pathname}${request.nextUrl.search}`;
+      refreshUrl.searchParams.set("next", nextPath);
+      return withRequestId(NextResponse.redirect(refreshUrl), requestId);
+    }
+  }
+
   const tier = resolveRateLimitTier(method, pathname);
 
   if (tier) {
@@ -69,14 +113,17 @@ export async function proxy(request: NextRequest) {
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
     if (result.limited) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(result.retryAfterSeconds),
+      return withRequestId(
+        NextResponse.json(
+          { error: "Too many requests" },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(result.retryAfterSeconds),
+            },
           },
-        }
+        ),
+        requestId
       );
     }
   }
@@ -98,7 +145,6 @@ export async function proxy(request: NextRequest) {
     ...(!isDev ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 
-  const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
 
   // В dev не устанавливаем CSP — нужен eval для Fast Refresh
@@ -114,7 +160,7 @@ export async function proxy(request: NextRequest) {
     response.headers.set("content-security-policy", csp);
   }
 
-  return response;
+  return withRequestId(response, requestId);
 }
 
 export const config = {

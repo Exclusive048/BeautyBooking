@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimePresetChips, type TimePreset } from "@/features/search-by-time/components/time-preset-chips";
@@ -23,6 +24,8 @@ type Props = {
   onPresetChange: (preset: Exclude<TimePreset, "custom">, timeFrom: string, timeTo: string) => void;
   onCustomTimeChange: (timeFrom: string, timeTo: string) => void;
   onClearTime: () => void;
+  showPhotoSearch?: boolean;
+  onOpenPhotoSearch: () => void;
   onSubmit: () => void;
 };
 
@@ -49,6 +52,8 @@ export function DateTimeFilterBar({
   onPresetChange,
   onCustomTimeChange,
   onClearTime,
+  showPhotoSearch = true,
+  onOpenPhotoSearch,
   onSubmit,
 }: Props) {
   const [suggestions, setSuggestions] = useState<ServiceSuggestion[]>([]);
@@ -143,7 +148,7 @@ export function DateTimeFilterBar({
   return (
     <div className="glass-panel rounded-3xl p-4" ref={rootRef}>
       <div className="grid grid-cols-12 gap-3 md:items-center">
-        <div className="relative col-span-12 md:col-span-7">
+        <div className="relative col-span-12 md:col-span-6">
           <Input
             value={serviceQuery}
             onChange={(event) => onServiceQueryChange(event.target.value)}
@@ -189,7 +194,23 @@ export function DateTimeFilterBar({
           />
         </div>
 
-        <div className="col-span-12 md:col-span-2">
+        {showPhotoSearch ? (
+          <div className="col-span-12 md:col-span-1">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="h-10 w-full rounded-full md:w-10"
+              aria-label={UI_TEXT.home.visualSearch.button}
+              title={UI_TEXT.home.visualSearch.button}
+              onClick={onOpenPhotoSearch}
+            >
+              <Camera className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
+        ) : null}
+
+        <div className={showPhotoSearch ? "col-span-12 md:col-span-2" : "col-span-12 md:col-span-3"}>
           <Button type="button" onClick={onSubmit} className="h-10 w-full rounded-full px-5 text-sm">
             {UI_TEXT.catalog.capsule.find}
           </Button>

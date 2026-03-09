@@ -19,13 +19,23 @@ export type SessionPayload = {
   sub: string; // userId
   phone?: string | null;
   roles?: string[];
+  tokenType?: "access" | "refresh";
+  jti?: string;
   iat: number;
   exp: number;
 };
 
-export function createSessionToken(
-  payload: Omit<SessionPayload, "iat" | "exp">,
-  ttlSeconds: number
+const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+type AccessTokenPayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti">;
+type RefreshTokenPayload = Pick<SessionPayload, "sub">;
+
+function createToken(
+  payload: Record<string, unknown>,
+  ttlSeconds: number,
+  tokenType: "access" | "refresh",
+  input?: { jti?: string }
 ) {
   const secret = process.env.AUTH_JWT_SECRET!;
   if (!secret) throw new Error("AUTH_JWT_SECRET is not set");
@@ -34,7 +44,13 @@ export function createSessionToken(
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + ttlSeconds;
 
-  const fullPayload: SessionPayload = { ...payload, iat, exp };
+  const fullPayload: SessionPayload = {
+    ...(payload as Omit<SessionPayload, "iat" | "exp">),
+    tokenType,
+    ...(input?.jti ? { jti: input.jti } : {}),
+    iat,
+    exp,
+  };
 
   const encHeader = base64url(JSON.stringify(header));
   const encPayload = base64url(JSON.stringify(fullPayload));
@@ -44,7 +60,24 @@ export function createSessionToken(
   return `${data}.${sig}`;
 }
 
-export function verifySessionToken(token: string): SessionPayload | null {
+export function createSessionToken(
+  payload: Omit<SessionPayload, "iat" | "exp">,
+  ttlSeconds: number
+) {
+  return createToken(payload, ttlSeconds, "access");
+}
+
+export function signAccessToken(payload: AccessTokenPayload): string {
+  return createToken(payload, ACCESS_TOKEN_TTL_SECONDS, "access");
+}
+
+export function signRefreshToken(payload: RefreshTokenPayload): string {
+  return createToken(payload, REFRESH_TOKEN_TTL_SECONDS, "refresh", {
+    jti: crypto.randomUUID(),
+  });
+}
+
+export function verifyToken(token: string, type: "access" | "refresh" = "access"): SessionPayload | null {
   const secret = process.env.AUTH_JWT_SECRET!;
   if (!secret) throw new Error("AUTH_JWT_SECRET is not set");
 
@@ -70,5 +103,13 @@ export function verifySessionToken(token: string): SessionPayload | null {
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp <= now) return null;
 
+  const tokenType = payload.tokenType ?? "access";
+  if (type === "refresh" && tokenType !== "refresh") return null;
+  if (type === "access" && tokenType === "refresh") return null;
+
   return payload;
+}
+
+export function verifySessionToken(token: string): SessionPayload | null {
+  return verifyToken(token, "access");
 }

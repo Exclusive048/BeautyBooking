@@ -14,6 +14,9 @@ function VkIcon({ className }: { className?: string }) {
 }
 
 export default function VkLoginButton() {
+  const vkEnabled = process.env.NEXT_PUBLIC_VK_ENABLED === "true";
+  if (!vkEnabled) return null;
+
   return (
     <Button asChild variant="secondary" size="lg" className="w-full gap-2">
       <Link href="/api/auth/vk/start">

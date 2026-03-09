@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { deleteMasterPortfolioItem } from "@/lib/master/profile.service";
+import { Prisma } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -19,6 +20,9 @@ export async function DELETE(req: Request, ctx: RouteContext) {
     const data = await deleteMasterPortfolioItem(masterId, id);
     return jsonOk(data);
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return jsonOk({ deleted: true });
+    }
     const appError = toAppError(error);
     if (appError.status >= 500) {
       logError("DELETE /api/master/portfolio/[id] failed", {

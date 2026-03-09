@@ -1,5 +1,11 @@
 import { randomUUID } from "crypto";
-import { MediaEntityType, MediaKind, type MediaAsset, type UserProfile } from "@prisma/client";
+import {
+  MediaAssetStatus,
+  MediaEntityType,
+  MediaKind,
+  type MediaAsset,
+  type UserProfile,
+} from "@prisma/client";
 import { Readable } from "stream";
 import { AppError } from "@/lib/api/errors";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
@@ -22,7 +28,6 @@ import {
 } from "@/lib/media/settings";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { enqueue } from "@/lib/queue/queue";
-import { createVisualSearchIndexJob } from "@/lib/queue/types";
 import { logError } from "@/lib/logging/logger";
 
 type UploadMediaInput = {
@@ -184,6 +189,7 @@ async function enforcePortfolioLimit(
       entityId,
       kind: MediaKind.PORTFOLIO,
       deletedAt: null,
+      status: MediaAssetStatus.READY,
       ...(excludedAssetIds.length > 0 ? { id: { notIn: excludedAssetIds } } : {}),
     },
   });
@@ -255,6 +261,7 @@ export async function listMediaAssets(
       entityId,
       kind: input.kind,
       deletedAt: null,
+      status: MediaAssetStatus.READY,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -304,12 +311,6 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
 
   const storage = getStorageProvider();
   const storageKey = buildStorageKey({ ...input, entityId });
-  await storage.putObject({
-    key: storageKey,
-    bytes: input.bytes,
-    contentType: input.mimeType,
-  });
-
   const created = await prisma.mediaAsset.create({
     data: {
       entityType: input.entityType,
@@ -321,8 +322,29 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
       sizeBytes: input.sizeBytes,
       originalFilename: input.originalFilename,
       createdByUserId: user.id,
+      status: MediaAssetStatus.PENDING,
     },
   });
+  let readyAsset: MediaAsset;
+  try {
+    await storage.putObject({
+      key: storageKey,
+      bytes: input.bytes,
+      contentType: input.mimeType,
+    });
+    readyAsset = await prisma.mediaAsset.update({
+      where: { id: created.id },
+      data: { status: MediaAssetStatus.READY },
+    });
+  } catch (error) {
+    await prisma.mediaAsset.delete({ where: { id: created.id } }).catch((cleanupError) => {
+      logError("Failed to rollback media asset after upload failure", {
+        assetId: created.id,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    });
+    throw error;
+  }
 
   if (
     input.entityType === MediaEntityType.SITE &&
@@ -331,8 +353,8 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
   ) {
     await prisma.appSetting.upsert({
       where: { key: SITE_LOGO_SETTING_KEY },
-      update: { value: created.id },
-      create: { key: SITE_LOGO_SETTING_KEY, value: created.id },
+      update: { value: readyAsset.id },
+      create: { key: SITE_LOGO_SETTING_KEY, value: readyAsset.id },
     });
     await clearSystemConfigFocal(SITE_LOGO_FOCAL_SETTING_KEY);
   }
@@ -344,8 +366,8 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
   ) {
     await prisma.appSetting.upsert({
       where: { key: SITE_LOGIN_HERO_SETTING_KEY },
-      update: { value: created.id },
-      create: { key: SITE_LOGIN_HERO_SETTING_KEY, value: created.id },
+      update: { value: readyAsset.id },
+      create: { key: SITE_LOGIN_HERO_SETTING_KEY, value: readyAsset.id },
     });
     await clearSystemConfigFocal(SITE_LOGIN_HERO_FOCAL_SETTING_KEY);
   }
@@ -356,7 +378,7 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
   ) {
     await prisma.provider.update({
       where: { id: entityId },
-      data: { avatarUrl: `/api/media/file/${created.id}`, avatarFocalX: null, avatarFocalY: null },
+      data: { avatarUrl: `/api/media/file/${readyAsset.id}`, avatarFocalX: null, avatarFocalY: null },
     });
   }
 
@@ -375,19 +397,19 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
   }
 
   if (input.kind === MediaKind.PORTFOLIO) {
-    void enqueue(
-      createVisualSearchIndexJob({
-        assetId: created.id,
-      })
-    ).catch((error) => {
+    void enqueue({
+      id: randomUUID(),
+      type: "visual_search_index",
+      payload: { assetId: readyAsset.id },
+    }).catch((error) => {
       logError("Failed to enqueue visual search index job", {
-        assetId: created.id,
+        assetId: readyAsset.id,
         error: error instanceof Error ? error.message : String(error),
       });
     });
   }
 
-  return toMediaAssetDto(created);
+  return toMediaAssetDto(readyAsset);
 }
 
 export async function uploadBookingReferenceAsset(
@@ -420,12 +442,6 @@ export async function uploadBookingReferenceAsset(
     bytes: input.bytes,
     originalFilename: input.originalFilename,
   });
-  await storage.putObject({
-    key: storageKey,
-    bytes: input.bytes,
-    contentType: input.mimeType,
-  });
-
   const created = await prisma.mediaAsset.create({
     data: {
       entityType: MediaEntityType.BOOKING,
@@ -437,9 +453,29 @@ export async function uploadBookingReferenceAsset(
       sizeBytes: input.sizeBytes,
       originalFilename: input.originalFilename,
       createdByUserId: user?.id ?? null,
+      status: MediaAssetStatus.PENDING,
     },
     select: { id: true },
   });
+  try {
+    await storage.putObject({
+      key: storageKey,
+      bytes: input.bytes,
+      contentType: input.mimeType,
+    });
+    await prisma.mediaAsset.update({
+      where: { id: created.id },
+      data: { status: MediaAssetStatus.READY },
+    });
+  } catch (error) {
+    await prisma.mediaAsset.delete({ where: { id: created.id } }).catch((cleanupError) => {
+      logError("Failed to rollback booking reference asset after upload failure", {
+        assetId: created.id,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    });
+    throw error;
+  }
 
   return { id: created.id };
 }
@@ -497,6 +533,7 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
         entityId: asset.entityId,
         kind: MediaKind.AVATAR,
         deletedAt: null,
+        status: MediaAssetStatus.READY,
       },
       orderBy: { createdAt: "desc" },
       select: { id: true, focalX: true, focalY: true },
@@ -555,13 +592,19 @@ export async function getMediaFile(
   if (!asset || asset.deletedAt) {
     throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
   }
+  if (asset.status !== MediaAssetStatus.READY) {
+    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+  }
 
   await ensureCanReadMedia(user, asset.entityType, asset.entityId);
 
   const storage = getStorageProvider();
   const file = await storage.getObject(asset.storageKey, asset.mimeType);
   if (!file) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND", {
+      reason: "STORAGE_MISSING",
+      assetId: asset.id,
+    });
   }
 
   return {
@@ -582,6 +625,7 @@ export async function getAvatarUrlForEntity(input: {
       entityId: input.entityId,
       kind: MediaKind.AVATAR,
       deletedAt: null,
+      status: MediaAssetStatus.READY,
     },
     orderBy: { createdAt: "desc" },
     select: { id: true },
