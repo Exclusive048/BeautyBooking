@@ -18,17 +18,17 @@ export class ApiClientError extends Error {
   }
 }
 
-const DEFAULT_ERROR_MESSAGE = "Request failed";
+const DEFAULT_ERROR_MESSAGE = "Что-то пошло не так - попробуйте еще раз.";
 
 export function getErrorMessageByCode(code?: ErrorCode): string | null {
   if (!code) return null;
   const map: Partial<Record<ErrorCode, string>> = {
-    VALIDATION_ERROR: "Please check the form fields.",
-    UNAUTHORIZED: "Please sign in to continue.",
-    FORBIDDEN: "You do not have access to this action.",
-    BOOKING_CONFLICT: "This time slot is no longer available.",
-    SLOT_CONFLICT: "This time slot is no longer available.",
-    SERVICE_DISABLED: "Selected service is not available.",
+    VALIDATION_ERROR: "Проверьте заполненные поля.",
+    UNAUTHORIZED: "Сначала нужно войти.",
+    FORBIDDEN: "У вас нет доступа к этому действию.",
+    BOOKING_CONFLICT: "Этот слот уже занят.",
+    SLOT_CONFLICT: "Этот слот уже занят.",
+    SERVICE_DISABLED: "Эта услуга сейчас недоступна.",
     CANCELLATION_DEADLINE_PASSED: "Отмена недоступна: срок отмены истёк.",
   };
   return map[code] ?? null;

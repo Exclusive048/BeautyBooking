@@ -1931,7 +1931,7 @@ export function MasterProfilePage() {
                               setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
                             }
                           }}
-                          placeholder={UI_TEXT.master.profile.form.namePlaceholder}
+                          placeholder="Например: Анна Смирнова"
                         />
                         {profileFieldErrors.displayName ? (
                           <div className="mt-1 text-xs text-rose-400">{profileFieldErrors.displayName}</div>
@@ -1970,7 +1970,7 @@ export function MasterProfilePage() {
                           onBlur={() => {
                             setIsAddressSuggestOpen(false);
                           }}
-                          placeholder={UI_TEXT.master.profile.form.addressPlaceholder}
+                          placeholder="Начни вводить адрес..."
                         />
                       </label>
                       {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
@@ -2004,7 +2004,7 @@ export function MasterProfilePage() {
                         value={bio}
                         rows={4}
                         onChange={(event) => setBio(event.target.value)}
-                        placeholder={UI_TEXT.master.profile.form.bioPlaceholder}
+                        placeholder="Расскажи клиентам о себе — опыт, специализация, подход"
                       />
                     </label>
                   </div>
@@ -2237,7 +2237,7 @@ export function MasterProfilePage() {
                           setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
                         }}
                         className={`${inputBaseClass} ${newSoloServiceFieldErrors.title ? inputErrorClass : ""}`}
-                        placeholder={UI_TEXT.master.profile.services.serviceTitlePlaceholder}
+                        placeholder="Например: Маникюр с гель-лаком"
                       />
                     </label>
                     <label className="text-xs text-text-sec">
@@ -2248,16 +2248,17 @@ export function MasterProfilePage() {
                           min={0}
                           step={100}
                           inputMode="numeric"
-                          value={newSoloServicePrice}
+                          value={newSoloServicePrice === 0 ? "" : String(newSoloServicePrice)}
                           onChange={(event) => {
-                            setNewSoloServicePrice(Number(event.target.value) || 0);
+                            const raw = event.target.value;
+                            setNewSoloServicePrice(raw === "" ? 0 : Number(raw) || 0);
                             setNewSoloServiceFieldErrors((current) => ({ ...current, price: undefined }));
                           }}
                           onBlur={() =>
                             setNewSoloServicePrice((value) => (value > 0 ? normalizePrice(value) : value))
                           }
                           className={`${selectBaseClass} ${newSoloServiceFieldErrors.price ? inputErrorClass : ""}`}
-                          placeholder="0"
+                          placeholder="1500"
                         />
                         <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
                       </div>
@@ -2428,20 +2429,21 @@ export function MasterProfilePage() {
                       className={`${selectBaseClass} ${
                         serviceFieldErrors[service.serviceId]?.price ? inputErrorClass : ""
                       }`}
-                      value={service.effectivePrice}
+                      value={service.effectivePrice === 0 ? "" : String(service.effectivePrice)}
                       disabled={!service.canEditPrice}
-                      placeholder="0"
+                      placeholder="1500"
                       inputMode="numeric"
                       step={100}
                       min={0}
                       onChange={(event) => {
-                        const raw = Number(event.target.value);
+                        const rawValue = event.target.value;
+                        const raw = rawValue === "" ? 0 : Number(rawValue);
                         setServicesDraft((current) => ({
                           ...current,
                           [service.serviceId]: {
                             ...current[service.serviceId],
                             effectivePrice: Number.isFinite(raw) ? raw : 0,
-                            priceOverride: Number.isFinite(raw) ? raw : null,
+                            priceOverride: Number.isFinite(raw) && raw > 0 ? raw : null,
                           },
                         }));
                         setServiceFieldErrors((current) => ({

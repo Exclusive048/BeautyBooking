@@ -428,7 +428,6 @@ export async function upsertMasterServices(
         where: {
           id: { in: requestedGlobalCategoryIds },
           status: CategoryStatus.APPROVED,
-          isSystem: false,
           visualSearchSlug: { not: "hot" },
         },
         select: { id: true },
@@ -548,12 +547,11 @@ export async function createSoloMasterService(
   if (globalCategoryId) {
     const globalCategory = await prisma.globalCategory.findUnique({
       where: { id: globalCategoryId },
-      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+      select: { id: true, status: true, visualSearchSlug: true },
     });
     if (
       !globalCategory ||
       globalCategory.status !== CategoryStatus.APPROVED ||
-      globalCategory.isSystem ||
       globalCategory.visualSearchSlug === "hot"
     ) {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
@@ -686,12 +684,11 @@ export async function createMasterPortfolioItem(
   if (selectedGlobalCategoryId) {
     const category = await prisma.globalCategory.findUnique({
       where: { id: selectedGlobalCategoryId },
-      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+      select: { id: true, status: true, visualSearchSlug: true },
     });
     if (
       !category ||
       category.status !== CategoryStatus.APPROVED ||
-      category.isSystem ||
       category.visualSearchSlug === "hot"
     ) {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
@@ -808,12 +805,11 @@ export async function updateMasterPortfolioCategory(
   if (nextGlobalCategoryId) {
     const category = await prisma.globalCategory.findUnique({
       where: { id: nextGlobalCategoryId },
-      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+      select: { id: true, status: true, visualSearchSlug: true },
     });
     if (
       !category ||
       category.status !== CategoryStatus.APPROVED ||
-      category.isSystem ||
       category.visualSearchSlug === "hot"
     ) {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");

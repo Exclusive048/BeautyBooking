@@ -32,6 +32,7 @@ type HomeFeedResponse = {
 };
 
 const FEED_LIMIT = 24;
+const CATEGORY_CHIPS_LIMIT = 8;
 
 function buildFeedUrl(params: {
   cursor?: string | null;
@@ -92,7 +93,7 @@ export function HomeFeed() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/catalog/global-categories", { cache: "no-store" });
+        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
           | ApiResponse<{ categories: CatalogCategory[] }>
           | null;
@@ -103,6 +104,7 @@ export function HomeFeed() {
           setCategories(
             json.data.categories
               .filter((item) => item.parentId === null)
+              .slice(0, CATEGORY_CHIPS_LIMIT)
               .map((item) => ({
                 id: item.id,
                 name: item.title,
@@ -188,9 +190,7 @@ export function HomeFeed() {
       <HomeFilters
         categories={categories}
         selectedCategoryId={selectedCategoryId}
-        onSelectCategory={(next) => {
-          setSelectedCategoryId((prev) => (prev === next ? null : next));
-        }}
+        onSelectCategory={(next) => setSelectedCategoryId(next)}
       />
 
       {toast ? (

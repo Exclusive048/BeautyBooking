@@ -220,9 +220,9 @@ export async function createStudioService(input: {
   if (globalCategoryId) {
     const globalCategory = await prisma.globalCategory.findUnique({
       where: { id: globalCategoryId },
-      select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+      select: { id: true, status: true, visualSearchSlug: true },
     });
-    if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.isSystem || globalCategory.visualSearchSlug === "hot") {
+    if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.visualSearchSlug === "hot") {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
     }
   }
@@ -307,9 +307,9 @@ export async function updateStudioService(input: {
     if (nextGlobalCategoryId) {
       const globalCategory = await prisma.globalCategory.findUnique({
         where: { id: nextGlobalCategoryId },
-        select: { id: true, status: true, isSystem: true, visualSearchSlug: true },
+        select: { id: true, status: true, visualSearchSlug: true },
       });
-      if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.isSystem || globalCategory.visualSearchSlug === "hot") {
+      if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.visualSearchSlug === "hot") {
         throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
       }
     }

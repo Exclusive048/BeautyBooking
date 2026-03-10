@@ -36,15 +36,25 @@ function buildDescription(input: {
   name: string;
   type: "MASTER" | "STUDIO";
   description: string | null;
-  tagline: string | null;
+  services: Array<{ name: string }>;
 }): string {
-  const base =
-    input.description?.trim() ||
-    input.tagline?.trim() ||
-    (input.type === "STUDIO"
+  const bio = input.description?.trim();
+  if (bio) return truncateText(bio, 160);
+
+  const serviceNames = input.services
+    .map((service) => service.name.trim())
+    .filter((name) => name.length > 0)
+    .slice(0, 5);
+
+  if (serviceNames.length > 0) {
+    return truncateText(`Услуги: ${serviceNames.join(", ")}. Запись онлайн.`, 160);
+  }
+
+  const fallback =
+    input.type === "STUDIO"
       ? UI_TEXT.pages.publicProfile.studioDescriptionFallback.replace("{name}", input.name)
-      : UI_TEXT.pages.publicProfile.masterDescriptionFallback.replace("{name}", input.name));
-  return truncateText(base, 160);
+      : UI_TEXT.pages.publicProfile.masterDescriptionFallback.replace("{name}", input.name);
+  return truncateText(fallback, 160);
 }
 
 type ReviewAuthor = {
@@ -110,7 +120,6 @@ async function findProviderForMeta(username: string) {
       isPublished: true,
       type: true,
       description: true,
-      tagline: true,
       avatarUrl: true,
       address: true,
       district: true,
@@ -150,7 +159,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     name: provider.name,
     type: provider.type,
     description: provider.description,
-    tagline: provider.tagline,
+    services: provider.services,
   });
 
   return {

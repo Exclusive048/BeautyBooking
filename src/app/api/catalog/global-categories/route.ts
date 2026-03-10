@@ -4,11 +4,21 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
 import { CategoryStatus, type Prisma } from "@prisma/client";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+function parseStatus(value: string | null): CategoryStatus | null {
+  if (value === CategoryStatus.PENDING) return CategoryStatus.PENDING;
+  if (value === CategoryStatus.APPROVED) return CategoryStatus.APPROVED;
+  if (value === CategoryStatus.REJECTED) return CategoryStatus.REJECTED;
+  return null;
+}
+
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const status = parseStatus(url.searchParams.get("status")) ?? CategoryStatus.APPROVED;
     const where: Prisma.GlobalCategoryWhereInput = {
-      status: CategoryStatus.APPROVED,
-      isSystem: false,
+      status,
       NOT: [{ visualSearchSlug: "hot" }],
     };
 

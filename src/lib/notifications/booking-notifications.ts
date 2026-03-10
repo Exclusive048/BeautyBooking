@@ -112,10 +112,10 @@ export async function notifyBookingCreated(booking: BookingWithRelations): Promi
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Новая запись";
+  const title = "У тебя новая запись!";
   const body = whenLabel
-    ? `К вам записался клиент ${booking.clientName} на ${serviceName} ${whenLabel}`
-    : `К вам записался клиент ${booking.clientName} на ${serviceName}`;
+    ? `${booking.clientName} записался на ${serviceName} ${whenLabel}`
+    : `${booking.clientName} записался на ${serviceName}`;
 
   await deliverNotification({
     userId: masterUserId,
@@ -135,10 +135,10 @@ export async function notifyBookingConfirmed(booking: BookingWithRelations): Pro
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Запись подтверждена";
+  const title = "Готово! Запись подтверждена";
   const body = whenLabel
-    ? `Ваша запись подтверждена: ${serviceName} ${whenLabel}`
-    : `Ваша запись подтверждена: ${serviceName}`;
+    ? `${serviceName} — ${whenLabel}`
+    : `${serviceName}`;
 
   await deliverNotification({
     userId: clientUserId,
@@ -204,10 +204,10 @@ export async function notifyCancelledByClient(booking: BookingWithRelations): Pr
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Клиент отменил запись";
+  const title = "Запись отменена клиентом";
   const body = whenLabel
-    ? `Клиент ${booking.clientName} отменил запись на ${serviceName} ${whenLabel}.`
-    : `Клиент ${booking.clientName} отменил запись на ${serviceName}.`;
+    ? `${booking.clientName} отменил запись на ${serviceName} ${whenLabel}.`
+    : `${booking.clientName} отменил запись на ${serviceName}.`;
 
   await deliverNotification({
     userId: masterUserId,
@@ -275,10 +275,10 @@ export async function notifyBookingReminder24h(booking: BookingWithRelations): P
 
   const clientUserId = resolveClientUserId(booking);
   if (clientUserId) {
-    const title = "Напоминание за 24 часа";
+    const title = "Напоминание о записи";
     const body = whenLabel
-      ? `Ваша запись на ${serviceName} ${whenLabel}`
-      : `Ваша запись на ${serviceName}`;
+      ? `Завтра ${serviceName} в ${whenLabel}`
+      : `Завтра запись на ${serviceName}`;
     await deliverNotification({
       userId: clientUserId,
       type: NotificationType.BOOKING_REMINDER_24H,
@@ -293,10 +293,10 @@ export async function notifyBookingReminder24h(booking: BookingWithRelations): P
 
   const masterUserId = resolveMasterUserId(booking);
   if (masterUserId) {
-    const title = "Напоминание о записи за 24 часа";
+    const title = "Напоминание о записи";
     const body = whenLabel
-      ? `Клиент ${booking.clientName} на ${serviceName} ${whenLabel}`
-      : `Клиент ${booking.clientName} на ${serviceName}`;
+      ? `Завтра в ${whenLabel} — ${booking.clientName} (${serviceName})`
+      : `Завтра запись: ${booking.clientName} (${serviceName})`;
     await deliverNotification({
       userId: masterUserId,
       type: NotificationType.BOOKING_REMINDER_24H,
@@ -316,10 +316,10 @@ export async function notifyBookingReminder2h(booking: BookingWithRelations): Pr
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Напоминание за 2 часа";
+  const title = "Напоминание о записи";
   const body = whenLabel
-    ? `Ваша запись на ${serviceName} ${whenLabel}`
-    : `Ваша запись на ${serviceName}`;
+    ? `Через 2 часа: ${serviceName} ${whenLabel}`
+    : `Через 2 часа: ${serviceName}`;
 
   await deliverNotification({
     userId: clientUserId,

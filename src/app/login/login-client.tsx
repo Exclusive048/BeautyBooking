@@ -176,7 +176,6 @@ export default function LoginClient({
             <div className="mb-7">
               <div className="text-sm font-semibold text-muted-foreground">{UI_TEXT.brand.name}</div>
               <h1 className="mt-2 text-2xl font-semibold">{UI_TEXT.auth.loginPage.title}</h1>
-              <p className="mt-2 text-sm text-muted-foreground">{UI_TEXT.auth.loginPage.subtitle}</p>
             </div>
 
             {errorText ? (
@@ -268,11 +267,6 @@ export default function LoginClient({
               <TelegramLoginButton />
               <VkLoginButton />
             </div>
-            {nextPath ? (
-              <div className="mt-4 text-xs text-muted-foreground">
-                {UI_TEXT.auth.loginPage.returnAfterLogin} <span className="font-mono">{nextPath}</span>
-              </div>
-            ) : null}
           </div>
         </main>
       </div>

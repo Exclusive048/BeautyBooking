@@ -195,7 +195,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
 
       <textarea
         className="mt-3 w-full rounded-xl border px-3 py-2 text-sm min-h-[100px]"
-        placeholder="Comment (optional)"
+        placeholder="Расскажи как прошло — это поможет другим клиентам"
         value={text}
         onChange={(e) => setText(e.target.value)}
         maxLength={1000}

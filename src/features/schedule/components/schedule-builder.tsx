@@ -155,15 +155,15 @@ export function ScheduleBuilder() {
   const [templateDraft, setTemplateDraft] = useState<ScheduleTemplate>({
     clientId: createClientId(),
     name: "",
-    startLocal: "10:00",
-    endLocal: "19:00",
+    startLocal: "",
+    endLocal: "",
     breaks: [],
     color: null,
   });
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
-  const [rangeStart, setRangeStart] = useState("10:00");
-  const [rangeEnd, setRangeEnd] = useState("19:00");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
   const [rangeBreaks, setRangeBreaks] = useState<ScheduleBreak[]>([]);
 
   const monthOverrides = overridesByMonth[month];
@@ -332,8 +332,8 @@ export function ScheduleBuilder() {
 
   useEffect(() => {
     if (selectedOverride?.type === "TIME_RANGE") {
-      setRangeStart(selectedOverride.startLocal ?? "10:00");
-      setRangeEnd(selectedOverride.endLocal ?? "19:00");
+      setRangeStart(selectedOverride.startLocal ?? "");
+      setRangeEnd(selectedOverride.endLocal ?? "");
       setRangeBreaks(selectedOverride.breaks ?? []);
       return;
     }
@@ -386,8 +386,8 @@ export function ScheduleBuilder() {
     setTemplateDraft({
       clientId: createClientId(),
       name: "",
-      startLocal: "10:00",
-      endLocal: "19:00",
+      startLocal: "",
+      endLocal: "",
       breaks: [],
       color: null,
     });
@@ -403,6 +403,10 @@ export function ScheduleBuilder() {
     const name = templateDraft.name.trim();
     if (!name) {
       setError("Название шаблона обязательно.");
+      return;
+    }
+    if (!templateDraft.startLocal || !templateDraft.endLocal) {
+      setError("Укажите время начала и окончания.");
       return;
     }
     setTemplates((current) => {
@@ -464,6 +468,10 @@ export function ScheduleBuilder() {
       });
       return;
     }
+    if (!rangeStart || !rangeEnd) {
+      setError("Укажите время начала и окончания.");
+      return;
+    }
     updateOverride(selectedDate, {
       date: selectedDate,
       type: "TIME_RANGE",
@@ -474,6 +482,10 @@ export function ScheduleBuilder() {
   };
 
   const applyTimeRange = () => {
+    if (!rangeStart || !rangeEnd) {
+      setError("Укажите время начала и окончания.");
+      return;
+    }
     updateOverride(selectedDate, {
       date: selectedDate,
       type: "TIME_RANGE",
@@ -805,6 +817,7 @@ export function ScheduleBuilder() {
                     <div className="grid gap-2 sm:grid-cols-2">
                       <Input
                         type="time"
+                        placeholder="09:00"
                         value={templateDraft.startLocal}
                         onChange={(event) =>
                           setTemplateDraft((current) => ({ ...current, startLocal: event.target.value }))
@@ -813,6 +826,7 @@ export function ScheduleBuilder() {
                       />
                       <Input
                         type="time"
+                        placeholder="09:00"
                         value={templateDraft.endLocal}
                         onChange={(event) =>
                           setTemplateDraft((current) => ({ ...current, endLocal: event.target.value }))
@@ -831,7 +845,7 @@ export function ScheduleBuilder() {
                                 ? current
                                 : {
                                     ...current,
-                                    breaks: [...current.breaks, { startLocal: "13:00", endLocal: "14:00" }],
+                                    breaks: [...current.breaks, { startLocal: "", endLocal: "" }],
                                   }
                             )
                           }
@@ -845,6 +859,7 @@ export function ScheduleBuilder() {
                         <div key={`draft-break-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                           <Input
                             type="time"
+                            placeholder="09:00"
                             value={item.startLocal}
                             onChange={(event) =>
                               setTemplateDraft((current) => ({
@@ -858,6 +873,7 @@ export function ScheduleBuilder() {
                           />
                           <Input
                             type="time"
+                            placeholder="09:00"
                             value={item.endLocal}
                             onChange={(event) =>
                               setTemplateDraft((current) => ({
@@ -1110,8 +1126,20 @@ export function ScheduleBuilder() {
             <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
               <div className="text-sm font-semibold text-text-main">Изменить время</div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <Input type="time" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} disabled={readOnly} />
-                <Input type="time" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} disabled={readOnly} />
+                <Input
+                  type="time"
+                  placeholder="09:00"
+                  value={rangeStart}
+                  onChange={(event) => setRangeStart(event.target.value)}
+                  disabled={readOnly}
+                />
+                <Input
+                  type="time"
+                  placeholder="09:00"
+                  value={rangeEnd}
+                  onChange={(event) => setRangeEnd(event.target.value)}
+                  disabled={readOnly}
+                />
               </div>
               <div className="mt-2 space-y-2">
                 <div className="flex items-center justify-between text-xs text-text-sec">
@@ -1120,7 +1148,7 @@ export function ScheduleBuilder() {
                     type="button"
                     onClick={() =>
                       setRangeBreaks((current) =>
-                        current.length >= 3 ? current : [...current, { startLocal: "13:00", endLocal: "14:00" }]
+                        current.length >= 3 ? current : [...current, { startLocal: "", endLocal: "" }]
                       )
                     }
                     disabled={readOnly}
@@ -1133,6 +1161,7 @@ export function ScheduleBuilder() {
                   <div key={`range-break-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                     <Input
                       type="time"
+                      placeholder="09:00"
                       value={item.startLocal}
                       onChange={(event) =>
                         setRangeBreaks((current) =>
@@ -1145,6 +1174,7 @@ export function ScheduleBuilder() {
                     />
                     <Input
                       type="time"
+                      placeholder="09:00"
                       value={item.endLocal}
                       onChange={(event) =>
                         setRangeBreaks((current) =>
