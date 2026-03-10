@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
@@ -25,10 +25,68 @@ type ChatPayload = {
   senderType?: unknown;
 };
 
+type BookingPayload = {
+  bookingId?: unknown;
+  bookingStatus?: unknown;
+};
+
+const BOOKING_ACTION_NOTIFICATION_TYPES = new Set(["BOOKING_CREATED", "BOOKING_REQUEST"]);
+
+function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {
+  if (!payload) return null;
+  if (typeof payload === "string") {
+    try {
+      const parsed = JSON.parse(payload) as unknown;
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof payload === "object") return payload as Record<string, unknown>;
+  return null;
+}
+
+function parseBookingPayload(payload: unknown): { bookingId: string; bookingStatus?: string } | null {
+  const record = parsePayloadRecord(payload) as BookingPayload | null;
+  if (!record) return null;
+  if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
+  const bookingStatus = typeof record.bookingStatus === "string" ? record.bookingStatus : undefined;
+  return { bookingId: record.bookingId, bookingStatus };
+}
+
+function resolveBookingStatusMeta(status: string | undefined): { label: string; className: string } | null {
+  if (!status) return null;
+  const normalized = status.toUpperCase();
+  switch (normalized) {
+    case "CONFIRMED":
+      return {
+        label: "Подтверждено",
+        className: "border border-emerald-500/35 bg-emerald-500/10 text-emerald-300",
+      };
+    case "REJECTED":
+      return {
+        label: "Отклонено",
+        className: "border border-rose-500/35 bg-rose-500/10 text-rose-300",
+      };
+    case "CANCELLED":
+      return {
+        label: "Отменено",
+        className: "border border-border-subtle bg-bg-input/65 text-text-sec",
+      };
+    case "NO_SHOW":
+      return {
+        label: "Неявка",
+        className: "border border-border-subtle bg-bg-input/65 text-text-sec",
+      };
+    default:
+      return null;
+  }
+}
+
 function resolveIncomingChannel(event: NotificationEvent): NotificationChannel {
-  const payload = event.payloadJson;
-  if (payload && typeof payload === "object") {
-    const providerType = (payload as { providerType?: unknown }).providerType;
+  const payload = parsePayloadRecord(event.payloadJson);
+  if (payload) {
+    const providerType = payload.providerType;
     if (providerType === "STUDIO") return "STUDIO";
     if (providerType === "MASTER") return "MASTER";
   }
@@ -50,8 +108,8 @@ function resolveIncomingChannel(event: NotificationEvent): NotificationChannel {
 }
 
 function parseChatPayload(payload: unknown): { bookingId: string; senderType?: "CLIENT" | "MASTER" } | null {
-  if (!payload || typeof payload !== "object") return null;
-  const record = payload as ChatPayload;
+  const record = parsePayloadRecord(payload) as ChatPayload | null;
+  if (!record) return null;
   if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
   const senderType =
     record.senderType === "CLIENT" || record.senderType === "MASTER" ? record.senderType : undefined;
@@ -78,18 +136,20 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
     ) {
       if (event.type !== "CHAT_MESSAGE_RECEIVED") return undefined;
     }
-    const payload = event.payloadJson;
-    if (!payload || typeof payload !== "object") return undefined;
+    const payload = parsePayloadRecord(event.payloadJson);
+    if (!payload) return undefined;
     if (event.type === "CHAT_MESSAGE_RECEIVED") {
       const chatPayload = parseChatPayload(payload);
       return chatPayload ? resolveChatOpenHref(chatPayload) : undefined;
     }
-    const record = payload as { offerId?: unknown; applicationId?: unknown };
-    if ((event.type === "MODEL_TIME_PROPOSED" || event.type === "MODEL_APPLICATION_REJECTED") && typeof record.applicationId === "string") {
-      return `/cabinet/model-applications?applicationId=${record.applicationId}`;
+    if (
+      (event.type === "MODEL_TIME_PROPOSED" || event.type === "MODEL_APPLICATION_REJECTED") &&
+      typeof payload.applicationId === "string"
+    ) {
+      return `/cabinet/model-applications?applicationId=${payload.applicationId}`;
     }
-    if (typeof record.offerId === "string") {
-      return `/cabinet/master/model-offers?offerId=${record.offerId}`;
+    if (typeof payload.offerId === "string") {
+      return `/cabinet/master/model-offers?offerId=${payload.offerId}`;
     }
     return undefined;
   };
@@ -122,6 +182,8 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
   const [notifications, setNotifications] = useState(initialData.notifications);
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const actionNoticeTimerRef = useRef<number | null>(null);
 
   const emitBellRefresh = (notificationId?: string) => {
     emitNotificationEvent({
@@ -133,6 +195,25 @@ export function NotificationsCenterPage({ initialData }: Props) {
   useEffect(() => {
     setNotifications(initialData.notifications);
   }, [initialData.notifications]);
+
+  useEffect(() => {
+    return () => {
+      if (actionNoticeTimerRef.current !== null) {
+        window.clearTimeout(actionNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showActionNotice = useCallback((tone: "success" | "error", text: string) => {
+    if (actionNoticeTimerRef.current !== null) {
+      window.clearTimeout(actionNoticeTimerRef.current);
+    }
+    setActionNotice({ tone, text });
+    actionNoticeTimerRef.current = window.setTimeout(() => {
+      setActionNotice(null);
+      actionNoticeTimerRef.current = null;
+    }, 3000);
+  }, []);
 
   useEffect(() => {
     const markAllRead = async () => {
@@ -148,7 +229,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
         )
       );
       try {
-        await fetch("/api/notifications/read-all", { method: "POST" });
+        await fetch("/api/notifications/read-all", { method: "POST", credentials: "include" });
         emitBellRefresh();
       } catch {
         // Ignore errors on mark-all.
@@ -169,7 +250,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
       )
     );
     try {
-      await fetch(`/api/notifications/${noteId}/read`, { method: "POST" });
+      await fetch(`/api/notifications/${noteId}/read`, { method: "POST", credentials: "include" });
       emitBellRefresh(noteId);
     } catch {
       // Ignore errors on mark read.
@@ -177,56 +258,28 @@ export function NotificationsCenterPage({ initialData }: Props) {
     }
   };
 
-  const parseBookingPayload = (payload: unknown): { bookingId: string; bookingStatus?: string } | null => {
-    if (!payload || typeof payload !== "object") return null;
-    const record = payload as { bookingId?: unknown; bookingStatus?: unknown };
-    if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
-    const bookingStatus = typeof record.bookingStatus === "string" ? record.bookingStatus : undefined;
-    return { bookingId: record.bookingId, bookingStatus };
-  };
+  const reloadCenterData = useCallback(async () => {
+    const res = await fetch("/api/notifications/center", { cache: "no-store", credentials: "include" });
+    const json = (await res.json().catch(() => null)) as ApiResponse<NotificationCenterData> | null;
+    if (!res.ok || !json || !json.ok) {
+      throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+    }
+    setNotifications(json.data.notifications);
+    setInvitesCount(json.data.invites.length);
+    emitBellRefresh();
+  }, []);
 
   const handleBookingConfirm = async (noteId: string, payload: unknown) => {
     const booking = parseBookingPayload(payload);
-    if (!booking) return;
-    setActionPendingId(noteId);
-    try {
-      const res = await fetch(`/api/bookings/${booking.bookingId}/confirm`, { method: "POST" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-      }
-      setNotifications((current) =>
-        current.map((note) => {
-          if (note.id !== noteId) return note;
-          const payloadJson =
-            note.payloadJson && typeof note.payloadJson === "object"
-              ? { ...(note.payloadJson as Record<string, unknown>), bookingStatus: "CONFIRMED" }
-              : note.payloadJson;
-          return {
-            ...note,
-            isRead: true,
-            readAt: note.readAt ?? new Date().toISOString(),
-            payloadJson,
-          };
-        })
-      );
-      await markNotificationRead(noteId);
-    } catch (error) {
-      console.error("Failed to confirm booking from notification", error);
-    } finally {
-      setActionPendingId(null);
+    if (!booking) {
+      showActionNotice("error", "Не удалось определить запись для подтверждения");
+      return;
     }
-  };
-
-  const handleBookingDecline = async (noteId: string, payload: unknown) => {
-    const booking = parseBookingPayload(payload);
-    if (!booking) return;
     setActionPendingId(noteId);
     try {
-      const res = await fetch(`/api/bookings/${booking.bookingId}/cancel`, {
+      const res = await fetch(`/api/bookings/${booking.bookingId}/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Отклонено" }),
+        credentials: "include",
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
@@ -235,9 +288,10 @@ export function NotificationsCenterPage({ initialData }: Props) {
       setNotifications((current) =>
         current.map((note) => {
           if (note.id !== noteId) return note;
+          const payloadRecord = parsePayloadRecord(note.payloadJson);
           const payloadJson =
-            note.payloadJson && typeof note.payloadJson === "object"
-              ? { ...(note.payloadJson as Record<string, unknown>), bookingStatus: "DECLINED" }
+            payloadRecord
+              ? { ...payloadRecord, bookingStatus: "CONFIRMED" }
               : note.payloadJson;
           return {
             ...note,
@@ -248,8 +302,64 @@ export function NotificationsCenterPage({ initialData }: Props) {
         })
       );
       await markNotificationRead(noteId);
+      try {
+        await reloadCenterData();
+      } catch (reloadError) {
+        console.error("Failed to refresh notification center after confirm", reloadError);
+      }
+      showActionNotice("success", "Запись подтверждена");
+    } catch (error) {
+      console.error("Failed to confirm booking from notification", error);
+      showActionNotice("error", "Не удалось подтвердить запись — попробуйте ещё раз");
+    } finally {
+      setActionPendingId(null);
+    }
+  };
+
+  const handleBookingDecline = async (noteId: string, payload: unknown) => {
+    const booking = parseBookingPayload(payload);
+    if (!booking) {
+      showActionNotice("error", "Не удалось определить запись для отклонения");
+      return;
+    }
+    setActionPendingId(noteId);
+    try {
+      const res = await fetch(`/api/bookings/${booking.bookingId}/cancel`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: UI_TEXT.notifications.declineReason }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      setNotifications((current) =>
+        current.map((note) => {
+          if (note.id !== noteId) return note;
+          const payloadRecord = parsePayloadRecord(note.payloadJson);
+          const payloadJson =
+            payloadRecord
+              ? { ...payloadRecord, bookingStatus: "REJECTED" }
+              : note.payloadJson;
+          return {
+            ...note,
+            isRead: true,
+            readAt: note.readAt ?? new Date().toISOString(),
+            payloadJson,
+          };
+        })
+      );
+      await markNotificationRead(noteId);
+      try {
+        await reloadCenterData();
+      } catch (reloadError) {
+        console.error("Failed to refresh notification center after decline", reloadError);
+      }
+      showActionNotice("success", "Запись отклонена");
     } catch (error) {
       console.error("Failed to decline booking from notification", error);
+      showActionNotice("error", "Не удалось отклонить запись — попробуйте ещё раз");
     } finally {
       setActionPendingId(null);
     }
@@ -319,6 +429,17 @@ export function NotificationsCenterPage({ initialData }: Props) {
       </Card>
 
       <Tabs items={filterItems} value={filter} onChange={(value) => setFilter(value as FilterKey)} />
+      {actionNotice ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            actionNotice.tone === "success"
+              ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
+              : "border-rose-500/35 bg-rose-500/10 text-rose-300"
+          }`}
+        >
+          {actionNotice.text}
+        </div>
+      ) : null}
 
       {showInvites ? (
         <Card>
@@ -350,10 +471,15 @@ export function NotificationsCenterPage({ initialData }: Props) {
           <CardContent className="space-y-2 px-5 pb-5 md:px-6 md:pb-6">
             {filteredNotifications.map((note) => {
               const bookingPayload = parseBookingPayload(note.payloadJson);
+              const bookingStatus = bookingPayload?.bookingStatus?.toUpperCase();
               const canAct =
-                (note.type === "BOOKING_CREATED" || note.type === "BOOKING_REQUEST") &&
+                BOOKING_ACTION_NOTIFICATION_TYPES.has(note.type) &&
                 bookingPayload?.bookingId &&
-                (!bookingPayload.bookingStatus || bookingPayload.bookingStatus === "PENDING");
+                (!bookingStatus || bookingStatus === "PENDING" || bookingStatus === "NEW");
+              const statusMeta =
+                BOOKING_ACTION_NOTIFICATION_TYPES.has(note.type) && bookingPayload?.bookingId
+                  ? resolveBookingStatusMeta(bookingStatus)
+                  : null;
               const isUnread = !note.isRead;
 
               return (
@@ -394,7 +520,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
                         }}
                         disabled={actionPendingId === note.id}
                       >
-                        Подтвердить
+                        {UI_TEXT.actions.confirm}
                       </Button>
                       <Button
                         size="sm"
@@ -405,8 +531,17 @@ export function NotificationsCenterPage({ initialData }: Props) {
                         }}
                         disabled={actionPendingId === note.id}
                       >
-                        Отклонить
+                        {UI_TEXT.actions.decline}
                       </Button>
+                    </div>
+                  ) : null}
+                  {!canAct && statusMeta ? (
+                    <div className="mt-3">
+                      <span
+                        className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-medium ${statusMeta.className}`}
+                      >
+                        {statusMeta.label}
+                      </span>
                     </div>
                   ) : null}
 

@@ -153,7 +153,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 {UI_TEXT.home.visualSearch.modalTitle}
               </p>
               <p className="mt-1 text-[11px] leading-none text-text-sec">
-                Загрузите фото — найдём похожие работы
+                {UI_TEXT.home.visualSearch.modalSubtitle}
               </p>
             </div>
           </div>
@@ -198,7 +198,9 @@ export function VisualSearchModal({ open, onClose }: Props) {
 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-text-main">
-                  {isDragging ? "Отпустите файл" : UI_TEXT.home.visualSearch.dropzoneTitle}
+                  {isDragging
+                    ? UI_TEXT.home.visualSearch.dropzoneRelease
+                    : UI_TEXT.home.visualSearch.dropzoneTitle}
                 </p>
                 <p className="text-xs text-text-sec">
                   {UI_TEXT.home.visualSearch.dropzoneSubtitle}
@@ -238,7 +240,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                   className="flex shrink-0 items-center gap-1.5 rounded-lg bg-white/12 px-2.5 py-1 text-xs font-medium text-white/80 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
                 >
                   <RotateCcw className="h-3 w-3" />
-                  Сменить
+                  {UI_TEXT.home.visualSearch.changeFile}
                 </button>
               </div>
             </div>
@@ -358,9 +360,9 @@ export function VisualSearchModal({ open, onClose }: Props) {
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/6">
                 <Sparkles className="h-5 w-5 text-text-sec" />
               </div>
-              <p className="text-sm font-medium text-text-main">Мастера не найдены</p>
+              <p className="text-sm font-medium text-text-main">{UI_TEXT.home.visualSearch.noResultsTitle}</p>
               <p className="text-xs text-text-sec">
-                Попробуйте загрузить другое фото
+                {UI_TEXT.home.visualSearch.noResultsSubtitle}
               </p>
             </div>
           )}

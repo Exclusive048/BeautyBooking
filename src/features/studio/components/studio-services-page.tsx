@@ -95,8 +95,8 @@ export function StudioServicesPage({ studioId }: Props) {
   const [proposedCategoryTitle, setProposedCategoryTitle] = useState("");
   const [proposingCategory, setProposingCategory] = useState(false);
   const [proposeCategoryMessage, setProposeCategoryMessage] = useState<string | null>(null);
-  const [newServicePrice, setNewServicePrice] = useState("10000");
-  const [newServiceDuration, setNewServiceDuration] = useState("60");
+  const [newServicePrice, setNewServicePrice] = useState("");
+  const [newServiceDuration, setNewServiceDuration] = useState("");
   const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
 
   const totalServices = useMemo(
@@ -254,8 +254,12 @@ export function StudioServicesPage({ studioId }: Props) {
 
   const submitService = async (): Promise<void> => {
     if (!newServiceTitle.trim() || !newServiceCategoryId) return;
-    const normalizedPrice = normalizeStudioServicePrice(Number(newServicePrice));
-    const normalizedDuration = normalizeStudioServiceDurationMin(Number(newServiceDuration));
+    const normalizedPrice = normalizeStudioServicePrice(
+      Number(newServicePrice.trim() === "" ? "0" : newServicePrice)
+    );
+    const normalizedDuration = normalizeStudioServiceDurationMin(
+      Number(newServiceDuration.trim() === "" ? "60" : newServiceDuration)
+    );
     setNewServicePrice(String(normalizedPrice));
     setNewServiceDuration(String(normalizedDuration));
 
@@ -281,6 +285,8 @@ export function StudioServicesPage({ studioId }: Props) {
       setShowServiceModal(false);
       setNewServiceTitle("");
       setNewServiceGlobalCategoryId("");
+      setNewServicePrice("");
+      setNewServiceDuration("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.createServiceFailed);
@@ -582,7 +588,9 @@ export function StudioServicesPage({ studioId }: Props) {
               value={newServicePrice}
               onChange={(event) => setNewServicePrice(event.target.value)}
               onBlur={() => {
-                setNewServicePrice((current) => String(normalizeStudioServicePrice(Number(current))));
+                setNewServicePrice((current) =>
+                  current.trim() === "" ? "" : String(normalizeStudioServicePrice(Number(current)))
+                );
               }}
               placeholder={t.pricePlaceholder}
             />
@@ -593,7 +601,9 @@ export function StudioServicesPage({ studioId }: Props) {
               value={newServiceDuration}
               onChange={(event) => setNewServiceDuration(event.target.value)}
               onBlur={() => {
-                setNewServiceDuration((current) => String(normalizeStudioServiceDurationMin(Number(current))));
+                setNewServiceDuration((current) =>
+                  current.trim() === "" ? "" : String(normalizeStudioServiceDurationMin(Number(current)))
+                );
               }}
               placeholder={t.durationPlaceholder}
             />
@@ -624,7 +634,7 @@ export function StudioServicesPage({ studioId }: Props) {
             type="text"
             value={proposedCategoryTitle}
             onChange={(event) => setProposedCategoryTitle(event.target.value)}
-            placeholder="Название категории"
+            placeholder={t.categoryTitlePlaceholder}
             maxLength={60}
           />
           <div className="text-xs text-text-sec">

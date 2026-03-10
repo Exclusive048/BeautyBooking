@@ -565,7 +565,11 @@ export function AdminBilling() {
 
                   <label className="text-xs text-text-sec">
                     Название
-                    <Input value={editingName} onChange={(event) => setEditingName(event.target.value)} />
+                    <Input
+                      value={editingName}
+                      onChange={(event) => setEditingName(event.target.value)}
+                      placeholder="Название тарифа"
+                    />
                   </label>
 
                   <label className="text-xs text-text-sec">

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type ModelOfferStatus = "ACTIVE" | "CLOSED" | "ARCHIVED";
 
@@ -167,16 +168,16 @@ export function ModelOffersPage() {
   const [timeRangeStartLocal, setTimeRangeStartLocal] = useState("");
   const [calculatedEndTime, setCalculatedEndTime] = useState<string | null>(null);
   const [price, setPrice] = useState("");
-  const [extraBusyMin, setExtraBusyMin] = useState("0");
+  const [extraBusyMin, setExtraBusyMin] = useState("");
   const [requirements, setRequirements] = useState<string[]>([]);
   const [requirementInput, setRequirementInput] = useState("");
   const [requirementsError, setRequirementsError] = useState<string | null>(null);
 
   const statusLabels = useMemo(
     () => ({
-      ACTIVE: "Активен",
-      CLOSED: "Закрыт",
-      ARCHIVED: "Архив",
+      ACTIVE: UI_TEXT.master.modelOffers.status.active,
+      CLOSED: UI_TEXT.master.modelOffers.status.closed,
+      ARCHIVED: UI_TEXT.master.modelOffers.status.archived,
     }),
     []
   );
@@ -213,7 +214,10 @@ export function ModelOffersPage() {
       const categoryName = service.categoryTitle?.trim();
       byId.set(categoryId, {
         id: categoryId,
-        name: categoryName && categoryName.length > 0 ? categoryName : "Без категории",
+        name:
+          categoryName && categoryName.length > 0
+            ? categoryName
+            : UI_TEXT.master.modelOffers.messages.uncategorizedCategoryName,
       });
     }
     return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -266,7 +270,7 @@ export function ModelOffersPage() {
         | ApiResponse<{ services: unknown[] }>
         | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(extractApiError(json, "Не удалось загрузить офферы."));
+        throw new Error(extractApiError(json, UI_TEXT.master.modelOffers.errors.loadOffers));
       }
       setOffers(Array.isArray(json.data.offers) ? json.data.offers : []);
       const offerServices = Array.isArray(json.data.services)
@@ -292,7 +296,9 @@ export function ModelOffersPage() {
       }
       setServices(Array.from(mergedByServiceId.values()));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить офферы.");
+      setError(
+        err instanceof Error ? err.message : UI_TEXT.master.modelOffers.errors.loadOffers
+      );
       setOffers([]);
       setServices([]);
     } finally {
@@ -348,7 +354,7 @@ export function ModelOffersPage() {
     const value = requirementInput.trim();
     if (!value) return;
     if (requirements.length >= 5) {
-      setRequirementsError("Максимум 5 требований.");
+      setRequirementsError(UI_TEXT.master.modelOffers.validation.maxRequirements);
       return;
     }
     const exists = requirements.some((item) => item.toLowerCase() === value.toLowerCase());
@@ -367,7 +373,7 @@ export function ModelOffersPage() {
   const handleExtraBusyBlur = useCallback(() => {
     const raw = Number(extraBusyMin);
     if (!Number.isFinite(raw) || raw <= 0) {
-      setExtraBusyMin("0");
+      setExtraBusyMin("");
       return;
     }
     const rounded = Math.round(raw / 15) * 15;
@@ -378,7 +384,7 @@ export function ModelOffersPage() {
   const handlePriceBlur = useCallback(() => {
     const raw = Number(price);
     if (!Number.isFinite(raw) || raw <= 0) {
-      setPrice("0");
+      setPrice("");
       return;
     }
     const rounded = Math.ceil(raw / 100) * 100;
@@ -400,16 +406,16 @@ export function ModelOffersPage() {
       const normalizedCategory = selectedCategoryId.trim();
       const primaryService = selectedService;
 
-      if (!normalizedCategory) nextErrors.categoryId = "Выберите категорию";
-      if (!masterServiceId) nextErrors.masterServiceId = "Выберите услугу";
-      if (!normalizedDate) nextErrors.dateLocal = "Укажите дату";
+      if (!normalizedCategory) nextErrors.categoryId = UI_TEXT.master.modelOffers.validation.categoryRequired;
+      if (!masterServiceId) nextErrors.masterServiceId = UI_TEXT.master.modelOffers.validation.serviceRequired;
+      if (!normalizedDate) nextErrors.dateLocal = UI_TEXT.master.modelOffers.validation.dateRequired;
       if (!normalizedStart || !normalizedEnd) {
-        nextErrors.timeRange = "Укажите диапазон времени";
+        nextErrors.timeRange = UI_TEXT.master.modelOffers.validation.timeRangeRequired;
       } else {
         const startMin = toMinutes(normalizedStart);
         const endMin = toMinutes(normalizedEnd);
         if (startMin === null || endMin === null || startMin >= endMin) {
-          nextErrors.timeRange = "Время начала должно быть раньше времени окончания";
+          nextErrors.timeRange = UI_TEXT.master.modelOffers.validation.timeRangeInvalid;
         }
       }
 
@@ -417,7 +423,7 @@ export function ModelOffersPage() {
       if (price.trim() !== "") {
         const parsed = Number(price);
         if (!Number.isFinite(parsed) || parsed < 0) {
-          nextErrors.price = "Укажите корректную цену";
+          nextErrors.price = UI_TEXT.master.modelOffers.validation.invalidPrice;
         } else {
           priceValue = parsed;
         }
@@ -427,7 +433,7 @@ export function ModelOffersPage() {
       if (extraBusyMin.trim() !== "") {
         const parsed = Number(extraBusyMin);
         if (!Number.isFinite(parsed) || parsed < 0 || parsed > 240) {
-          nextErrors.extraBusyMin = "Введите значение от 0 до 240";
+          nextErrors.extraBusyMin = UI_TEXT.master.modelOffers.validation.invalidExtraBusy;
         } else {
           extraBusyValue = parsed;
         }
@@ -435,7 +441,7 @@ export function ModelOffersPage() {
 
       const normalizedRequirements = requirements.map((item) => item.trim()).filter(Boolean);
       if (normalizedRequirements.length > 5) {
-        nextErrors.requirements = "Можно добавить не более 5 требований";
+        nextErrors.requirements = UI_TEXT.master.modelOffers.validation.tooManyRequirements;
       }
 
       if (Object.keys(nextErrors).length > 0) {
@@ -465,7 +471,7 @@ export function ModelOffersPage() {
         });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ offer: ModelOfferItem }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(extractApiError(json, "Не удалось создать оффер."));
+          throw new Error(extractApiError(json, UI_TEXT.master.modelOffers.errors.createOffer));
         }
 
         setSelectedCategoryId("");
@@ -473,8 +479,8 @@ export function ModelOffersPage() {
         setDateLocal("");
         setTimeRangeStartLocal("");
         setCalculatedEndTime(null);
-        setPrice("0");
-        setExtraBusyMin("0");
+        setPrice("");
+        setExtraBusyMin("");
         setRequirements([]);
         setRequirementInput("");
         setFieldErrors({});
@@ -483,7 +489,9 @@ export function ModelOffersPage() {
 
         await loadOffers();
       } catch (err) {
-        setFormError(err instanceof Error ? err.message : "Не удалось создать оффер.");
+        setFormError(
+          err instanceof Error ? err.message : UI_TEXT.master.modelOffers.errors.createOffer
+        );
       } finally {
         setSaving(false);
       }
@@ -514,11 +522,13 @@ export function ModelOffersPage() {
   return (
     <section className="space-y-6">
       <HeaderBlock
-        title="Ищу модель"
-        subtitle="Создайте оффер, чтобы найти модель на удобное время."
+        title={UI_TEXT.master.modelOffers.header.title}
+        subtitle={UI_TEXT.master.modelOffers.header.subtitle}
         right={
           <Button variant="secondary" onClick={toggleCreate}>
-            {showCreate ? "Скрыть форму" : "Создать оффер"}
+            {showCreate
+              ? UI_TEXT.master.modelOffers.header.hideForm
+              : UI_TEXT.master.modelOffers.header.showForm}
           </Button>
         }
       />
@@ -526,30 +536,32 @@ export function ModelOffersPage() {
       {showCreate ? (
         <Card className="border border-border-subtle bg-bg-card/90">
           <CardHeader className="space-y-1">
-            <h3 className="text-lg font-semibold text-text-main">Новый оффер</h3>
+            <h3 className="text-lg font-semibold text-text-main">
+              {UI_TEXT.master.modelOffers.create.title}
+            </h3>
             <p className="text-sm text-text-sec">
-              Заполните детали, чтобы оффер появился в каталоге моделей.
+              {UI_TEXT.master.modelOffers.create.subtitle}
             </p>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
               {hasOnlyUncategorizedServices ? (
                 <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-700">
-                  Сначала добавьте категорию к вашим услугам в разделе{" "}
+                  {UI_TEXT.master.modelOffers.messages.uncategorizedServicesWarning}{" "}
                   <a href="/cabinet/master/profile" className="underline">
-                    Профиль → Услуги
+                    {UI_TEXT.master.modelOffers.messages.servicesSectionLink}
                   </a>
                 </div>
               ) : null}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm text-text-sec">Категория</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.category}</label>
                   <Select
                     value={selectedCategoryId}
                     onChange={(event) => setSelectedCategoryId(event.target.value)}
                     className="mt-2"
                   >
-                    <option value="">Выберите категорию</option>
+                    <option value="">{UI_TEXT.master.modelOffers.placeholders.category}</option>
                     {categoryOptions.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
@@ -562,26 +574,26 @@ export function ModelOffersPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-text-sec">Услуга</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.service}</label>
                   {selectedCategoryId ? (
                     <Select
                       value={masterServiceId}
                       onChange={(event) => setMasterServiceId(event.target.value)}
                       className="mt-2"
                     >
-                      <option value="">Выберите услугу</option>
+                      <option value="">{UI_TEXT.master.modelOffers.placeholders.service}</option>
                       {filteredServices.map((service) => (
-                        <option key={service.id ?? service.serviceId} value={service.id ?? ""}>
-                          {service.title} • {service.durationMin} мин •{" "}
+                      <option key={service.id ?? service.serviceId} value={service.id ?? ""}>
+                          {service.title} • {service.durationMin} {UI_TEXT.common.minutesShort} •{" "}
                           {service.price && service.price > 0
                             ? `${new Intl.NumberFormat("ru-RU").format(service.price)} ₽`
-                            : "Бесплатно"}
+                            : UI_TEXT.master.modelOffers.placeholders.price}
                         </option>
                       ))}
                     </Select>
                   ) : (
                     <div className="mt-2 rounded-2xl border border-border-subtle/70 bg-bg-input/50 px-4 py-3 text-sm text-text-sec">
-                      Сначала выберите категорию.
+                      {UI_TEXT.master.modelOffers.messages.categoryFirstHint}
                     </div>
                   )}
                   {fieldErrors.masterServiceId ? (
@@ -590,7 +602,7 @@ export function ModelOffersPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-text-sec">Дата</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.date}</label>
                   <Input
                     type="date"
                     value={dateLocal}
@@ -604,7 +616,7 @@ export function ModelOffersPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-text-sec">Время начала</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.startTime}</label>
                   <Input
                     type="time"
                     step={900}
@@ -616,7 +628,7 @@ export function ModelOffersPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-text-sec">Время окончания</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.endTime}</label>
                   <p className="mt-2 rounded-2xl border border-border-subtle/70 bg-bg-input/50 px-4 py-2.5 text-sm text-text-main">
                     {calculatedEndTime ?? "—"}
                   </p>
@@ -626,31 +638,34 @@ export function ModelOffersPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-text-sec">Доп. занятость (мин.)</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.extraBusy}</label>
                   <Input
                     type="number"
                     min={0}
                     max={240}
                     step={15}
+                    placeholder="0"
                     value={extraBusyMin}
                     onChange={(event) => setExtraBusyMin(event.target.value)}
                     onBlur={handleExtraBusyBlur}
                     disabled={!isServiceSelected}
                     className="mt-2"
                   />
-                  <p className="mt-2 text-xs text-text-sec">время на съёмку/контент</p>
+                  <p className="mt-2 text-xs text-text-sec">
+                    {UI_TEXT.master.modelOffers.messages.extraBusyHint}
+                  </p>
                   {fieldErrors.extraBusyMin ? (
                     <p className="mt-2 text-xs text-rose-500">{fieldErrors.extraBusyMin}</p>
                   ) : null}
                 </div>
 
                 <div>
-                  <label className="text-sm text-text-sec">Цена</label>
+                  <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.price}</label>
                   <Input
                     type="number"
                     min={0}
                     step={100}
-                    placeholder="Бесплатно"
+                    placeholder={UI_TEXT.master.modelOffers.placeholders.price}
                     value={price}
                     onChange={(event) => setPrice(event.target.value)}
                     onBlur={handlePriceBlur}
@@ -664,7 +679,7 @@ export function ModelOffersPage() {
               </div>
 
               <div>
-                <label className="text-sm text-text-sec">Требования</label>
+                <label className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.labels.requirements}</label>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Input
                     value={requirementInput}
@@ -675,7 +690,7 @@ export function ModelOffersPage() {
                         addRequirement();
                       }
                     }}
-                    placeholder="Например: без тату"
+                    placeholder={UI_TEXT.master.modelOffers.placeholders.requirement}
                     className="max-w-xs"
                   />
                   <Button type="button" variant="secondary" size="icon" onClick={addRequirement}>
@@ -705,16 +720,22 @@ export function ModelOffersPage() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={isSubmitDisabled}>
-                  {saving ? "Сохраняем..." : "Опубликовать оффер"}
+                  {saving
+                    ? UI_TEXT.master.modelOffers.actions.publishing
+                    : UI_TEXT.master.modelOffers.actions.publish}
                 </Button>
-                <span className="text-xs text-text-sec">После публикации оффер станет видимым в каталоге.</span>
+                <span className="text-xs text-text-sec">
+                  {UI_TEXT.master.modelOffers.messages.offerVisibleHint}
+                </span>
               </div>
             </form>
           </CardContent>
         </Card>
       ) : null}
 
-      {loading ? <div className="text-sm text-text-sec">Загружаем офферы...</div> : null}
+      {loading ? (
+        <div className="text-sm text-text-sec">{UI_TEXT.master.modelOffers.messages.loadingOffers}</div>
+      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
@@ -724,16 +745,18 @@ export function ModelOffersPage() {
             onClick={() => void loadOffers()}
             className="mt-3 rounded-full border border-rose-300 px-4 py-2 text-sm"
           >
-            Повторить
+            {UI_TEXT.master.modelOffers.actions.retry}
           </button>
         </div>
       ) : null}
 
       {isEmptyState ? (
         <div className="rounded-2xl border border-border bg-bg-card/80 p-8 text-center">
-          <div className="text-base font-semibold text-text-main">Пока нет офферов</div>
+          <div className="text-base font-semibold text-text-main">
+            {UI_TEXT.master.modelOffers.messages.emptyTitle}
+          </div>
           <div className="mt-2 text-sm text-text-sec">
-            Создайте первый оффер, чтобы найти модель на удобное время.
+            {UI_TEXT.master.modelOffers.messages.emptySubtitle}
           </div>
         </div>
       ) : null}
@@ -759,9 +782,15 @@ export function ModelOffersPage() {
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-text-main">
-                    <span className="font-semibold">{(offer.price && offer.price > 0 ? UI_FMT.priceLabel(offer.price) : "Бесплатно")}</span>
+                    <span className="font-semibold">
+                      {offer.price && offer.price > 0
+                        ? UI_FMT.priceLabel(offer.price)
+                        : UI_TEXT.master.modelOffers.placeholders.price}
+                    </span>
                     {offer.extraBusyMin > 0 ? (
-                      <span className="text-xs text-text-sec">+{offer.extraBusyMin} мин съемки</span>
+                      <span className="text-xs text-text-sec">
+                        +{offer.extraBusyMin} {UI_TEXT.master.modelOffers.messages.extraBusyHint}
+                      </span>
                     ) : null}
                   </div>
 
@@ -769,11 +798,13 @@ export function ModelOffersPage() {
                     {offer.selectedServices.length > 0 ? (
                       offer.selectedServices.map((service) => (
                         <Chip key={`${offer.id}:${service.id}`}>
-                          {service.title} · {service.durationMin} мин
+                          {service.title} · {service.durationMin} {UI_TEXT.common.minutesShort}
                         </Chip>
                       ))
                     ) : (
-                      <span className="text-xs text-text-sec">Услуги не выбраны</span>
+                      <span className="text-xs text-text-sec">
+                        {UI_TEXT.master.modelOffers.messages.servicesNotSelected}
+                      </span>
                     )}
                   </div>
 
@@ -783,7 +814,9 @@ export function ModelOffersPage() {
                         <Chip key={item}>{item}</Chip>
                       ))
                     ) : (
-                      <span className="text-xs text-text-sec">Требования не указаны</span>
+                      <span className="text-xs text-text-sec">
+                        {UI_TEXT.master.modelOffers.messages.requirementsNotProvided}
+                      </span>
                     )}
                   </div>
                 </CardContent>

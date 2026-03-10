@@ -821,7 +821,9 @@ export function PublicBookingWidget({
                     )}
                   </>
                 ) : selectedDate ? (
-                  <div className="py-6 text-center text-sm text-text-sec">Нет доступных окон на этот день</div>
+                  <div className="py-6 text-center text-sm text-text-sec">
+                    {UI_TEXT.publicProfile.slots.emptyForDay}
+                  </div>
                 ) : (
                   <div className="text-sm text-text-sec">
                     {selectedDate
@@ -854,7 +856,7 @@ export function PublicBookingWidget({
               <input
                 value={guestPhone}
                 onChange={(event) => setGuestPhone(event.target.value)}
-                placeholder={UI_TEXT.publicProfile.booking.phonePlaceholder}
+                placeholder="+7 900 000 00 00"
                 className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
               />
               <a
@@ -925,7 +927,7 @@ export function PublicBookingWidget({
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
+              placeholder="Пожелания мастеру — необязательно"
               className="lux-input min-h-[84px] w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
             />
           </div>

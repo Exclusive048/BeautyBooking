@@ -26,6 +26,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
   const [draft, setDraft] = useState("");
 
   const canAct = Boolean(url && username);
+  const usernamePlaceholder = endpoint.includes("/studio/") ? "my-studio" : "anna-manicure";
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -176,7 +177,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               className="mt-1 w-full rounded-lg border border-transparent bg-bg-input px-3 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle"
-              placeholder="например, anna-beauty"
+              placeholder={usernamePlaceholder}
             />
           </label>
           <div className="text-xs text-text-sec">Правила: {RULES_TEXT}</div>

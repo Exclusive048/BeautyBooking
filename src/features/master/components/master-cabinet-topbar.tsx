@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   ratingLabel: string;
@@ -9,13 +10,13 @@ type Props = {
 };
 
 const NAV_ITEMS: Array<{ href: string; label: string }> = [
-  { href: "/cabinet/master/dashboard", label: "Главная" },
-  { href: "/cabinet/master/schedule", label: "Мой график" },
-  { href: "/cabinet/master/clients", label: "Клиенты" },
-  { href: "/cabinet/master/analytics", label: "Аналитика" },
-  { href: "/cabinet/billing?scope=MASTER", label: "Подписка" },
-  { href: "/cabinet/master/model-offers", label: "Ищу модель" },
-  { href: "/cabinet/master/profile", label: "Профиль" },
+  { href: "/cabinet/master/dashboard", label: UI_TEXT.master.topbar.nav.home },
+  { href: "/cabinet/master/schedule", label: UI_TEXT.master.topbar.nav.schedule },
+  { href: "/cabinet/master/clients", label: UI_TEXT.master.topbar.nav.clients },
+  { href: "/cabinet/master/analytics", label: UI_TEXT.master.topbar.nav.analytics },
+  { href: "/cabinet/billing?scope=MASTER", label: UI_TEXT.master.topbar.nav.billing },
+  { href: "/cabinet/master/model-offers", label: UI_TEXT.master.topbar.nav.models },
+  { href: "/cabinet/master/profile", label: UI_TEXT.master.topbar.nav.profile },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -31,7 +32,7 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm font-semibold">
-            МастерРядом
+            {UI_TEXT.master.topbar.brand}
           </Link>
           <nav className="flex flex-wrap items-center gap-2">
             {NAV_ITEMS.map((item) => {
@@ -58,7 +59,7 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
                   : "text-text-sec hover:bg-bg-input hover:text-text-main"
               }`}
             >
-              Отзывы {ratingLabel}
+              {UI_TEXT.master.topbar.reviews} {ratingLabel}
             </Link>
           </nav>
         </div>

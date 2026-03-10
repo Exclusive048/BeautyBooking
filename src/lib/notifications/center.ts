@@ -72,6 +72,21 @@ function parseJsonPayload(payloadJson: unknown): unknown {
   return payloadJson ?? null;
 }
 
+function mergeBookingPayload(
+  payloadJson: unknown,
+  booking: { id: string; status: string } | null | undefined
+): unknown {
+  const parsed = parseJsonPayload(payloadJson);
+  if (!booking) return parsed;
+
+  const record = parsed && typeof parsed === "object" ? { ...(parsed as Record<string, unknown>) } : {};
+  if (typeof record.bookingId !== "string" || record.bookingId.length === 0) {
+    record.bookingId = booking.id;
+  }
+  record.bookingStatus = booking.status;
+  return record;
+}
+
 function resolveModelOpenHref(type: NotificationCenterNotificationItem["type"], payloadJson: unknown): string | undefined {
   if (
     type !== "MODEL_NEW_APPLICATION" &&
@@ -197,6 +212,8 @@ export async function getNotificationCenterData(input: {
         createdAt: true,
         booking: {
           select: {
+            id: true,
+            status: true,
             studioId: true,
             provider: {
               select: {
@@ -286,25 +303,28 @@ export async function getNotificationCenterData(input: {
     });
 
   const timelineNotifications: NotificationCenterNotificationItem[] = [
-    ...notifications.map((item) => ({
-      id: item.id,
-      title: item.title,
-      body: item.body,
-      type: item.type,
-      channel:
-        resolveModelChannel(item.type) ??
-        (item.type.startsWith("STUDIO_") ? "STUDIO" : null) ??
-        classifyNotificationChannel({
-          userId: input.userId,
-          studioIds,
-          booking: item.booking,
-        }),
-      isRead: item.isRead,
-      readAt: item.readAt ? item.readAt.toISOString() : null,
-      createdAt: item.createdAt.toISOString(),
-      payloadJson: item.payloadJson ?? null,
-      openHref: resolveModelOpenHref(item.type, item.payloadJson) ?? resolveChatOpenHref(item.type, item.payloadJson),
-    })),
+    ...notifications.map((item) => {
+      const payloadJson = mergeBookingPayload(item.payloadJson, item.booking);
+      return {
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        type: item.type,
+        channel:
+          resolveModelChannel(item.type) ??
+          (item.type.startsWith("STUDIO_") ? "STUDIO" : null) ??
+          classifyNotificationChannel({
+            userId: input.userId,
+            studioIds,
+            booking: item.booking,
+          }),
+        isRead: item.isRead,
+        readAt: item.readAt ? item.readAt.toISOString() : null,
+        createdAt: item.createdAt.toISOString(),
+        payloadJson,
+        openHref: resolveModelOpenHref(item.type, payloadJson) ?? resolveChatOpenHref(item.type, payloadJson),
+      };
+    }),
     ...scheduleRequestNotifications,
   ].sort((a, b) => {
     if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
