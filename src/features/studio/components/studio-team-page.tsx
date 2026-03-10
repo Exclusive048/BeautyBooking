@@ -140,7 +140,7 @@ export function StudioTeamPage({ studioId }: Props) {
       {limitReached ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
           Team limit reached. Upgrade your plan to add more мастеров.{" "}
-          <a href="/cabinet/billing" className="underline">
+          <a href="/cabinet/billing?scope=STUDIO" className="underline">
             View plans
           </a>
           .

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { MediaAssetStatus } from "@prisma/client";
+import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/session";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { getMediaFile } from "@/lib/media/service";
+import { getStorageProvider } from "@/lib/media/storage";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -12,6 +13,12 @@ type RouteContext = {
 };
 
 export const runtime = "nodejs";
+const PUBLIC_MEDIA_KINDS = new Set<MediaKind>([MediaKind.PORTFOLIO, MediaKind.AVATAR]);
+const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
+  MediaEntityType.MASTER,
+  MediaEntityType.STUDIO,
+  MediaEntityType.SITE,
+]);
 
 function isStorageMissingErrorDetails(details: unknown): boolean {
   if (!details || typeof details !== "object") return false;
@@ -30,6 +37,39 @@ export async function GET(req: Request, ctx: RouteContext) {
       );
     }
     assetId = parsed.data.id;
+
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: assetId },
+      select: {
+        id: true,
+        storageKey: true,
+        status: true,
+        kind: true,
+        entityType: true,
+        deletedAt: true,
+      },
+    });
+    if (!asset || asset.deletedAt || asset.status !== MediaAssetStatus.READY) {
+      return NextResponse.json(
+        { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
+        { status: 404 }
+      );
+    }
+
+    if (PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType)) {
+      const storage = getStorageProvider();
+      const publicUrl = storage.getPublicUrl?.(asset.storageKey);
+      if (publicUrl) {
+        const location = new URL(publicUrl, req.url).toString();
+        return new NextResponse(null, {
+          status: 302,
+          headers: {
+            Location: location,
+            "Cache-Control": "public, max-age=86400",
+          },
+        });
+      }
+    }
 
     const user = await getSessionUser();
     const file = await getMediaFile(user, assetId);

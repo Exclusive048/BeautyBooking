@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: "/cabinet/studio/clients", label: UI_TEXT.studioCabinet.nav.clients },
   { href: "/cabinet/studio/analytics", label: UI_TEXT.studioCabinet.nav.analytics },
   { href: "/cabinet/studio/finance", label: UI_TEXT.studioCabinet.nav.finance },
-  { href: "/cabinet/billing", label: UI_TEXT.studioCabinet.nav.billing },
+  { href: "/cabinet/billing?scope=STUDIO", label: UI_TEXT.studioCabinet.nav.billing },
 ];
 
 type Props = {
@@ -23,8 +23,9 @@ type Props = {
 };
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/cabinet/studio") return pathname === href;
-  return pathname.startsWith(`${href}/`) || pathname === href;
+  const path = href.split("?")[0] ?? href;
+  if (path === "/cabinet/studio") return pathname === path;
+  return pathname.startsWith(`${path}/`) || pathname === path;
 }
 
 export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {

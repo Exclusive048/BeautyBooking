@@ -17,7 +17,7 @@ import { toBookingDto } from "@/lib/bookings/mappers";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
 import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
-import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
+import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-core";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
@@ -40,6 +40,7 @@ export async function createClientBooking(
   data: {
     providerId: string;
     serviceId: string;
+    hotSlotId?: string | null;
     slotLabel: string;
     clientName: string;
     clientPhone: string;
@@ -82,7 +83,9 @@ export async function createClientBooking(
     const {
       provider,
       service,
+      master,
       resolvedMasterProviderId,
+      durationMin,
       startAtUtc,
       endAtUtc,
       bufferMin,
@@ -101,44 +104,53 @@ export async function createClientBooking(
       referencePhotoAssetId: data.referencePhotoAssetId ?? null,
       bookingAnswers: data.bookingAnswers ?? null,
     });
+    let bookedServicePrice = service.effectivePrice;
 
     const hotProviderId = provider.type === ProviderType.MASTER ? provider.id : resolvedMasterProviderId;
     if (hotProviderId) {
       const rule = await prisma.discountRule.findUnique({
         where: { providerId: hotProviderId },
-        select: { isEnabled: true, applyMode: true, minPriceFrom: true, serviceIds: true },
+        select: {
+          isEnabled: true,
+          triggerHours: true,
+          discountType: true,
+          discountValue: true,
+          applyMode: true,
+          minPriceFrom: true,
+          serviceIds: true,
+        },
       });
-      const isEligible = isServiceEligibleForHotRule(rule, service.id, service.price);
-      if (isEligible) {
-        const hotSlot = await prisma.hotSlot.findFirst({
+      const now = new Date();
+      const hotPricing = resolveDynamicHotSlotPricing({
+        rule,
+        slotStartAtUtc: startAtUtc,
+        serviceId: service.id,
+        servicePrice: service.effectivePrice,
+        providerTimeZone: master?.timezone ?? provider.timezone,
+        now,
+      });
+      if (data.hotSlotId && !hotPricing.isHot) {
+        throw new AppError("Selected hot slot is no longer available.", 409, "BOOKING_CONFLICT");
+      }
+      if (hotPricing.isHot && hotPricing.discountedPrice !== null) {
+        bookedServicePrice = hotPricing.discountedPrice;
+        const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
+        const recentCancel = await prisma.booking.findFirst({
           where: {
-            providerId: hotProviderId,
+            providerId: data.providerId,
+            clientUserId: userId,
+            status: { in: ["REJECTED", "CANCELLED"] },
             startAtUtc,
-            isActive: true,
-            expiresAtUtc: { gt: new Date() },
-            OR: [{ endAtUtc }, { serviceId: null }],
+            cancelledAtUtc: { gt: cutoff },
           },
-          select: { id: true },
+          select: { id: true, cancelledAtUtc: true },
         });
-        if (hotSlot) {
-          const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
-          const recentCancel = await prisma.booking.findFirst({
-            where: {
-              providerId: data.providerId,
-              clientUserId: userId,
-              status: { in: ["REJECTED", "CANCELLED"] },
-              startAtUtc,
-              cancelledAtUtc: { gt: cutoff },
-            },
-            select: { id: true, cancelledAtUtc: true },
-          });
-          if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
-            throw new AppError(
-              "Нельзя повторно записаться на этот слот со скидкой после отмены. Выберите другое время.",
-              409,
-              "BOOKING_CONFLICT"
-            );
-          }
+        if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
+          throw new AppError(
+            "Cannot rebook the same discounted hot slot after cancellation. Please choose another time.",
+            409,
+            "BOOKING_CONFLICT"
+          );
         }
       }
     }
@@ -205,6 +217,16 @@ export async function createClientBooking(
               clientChangeRequestsCount: true,
               masterChangeRequestsCount: true,
               service: { select: { id: true, name: true } },
+            },
+          });
+
+          await tx.bookingServiceItem.create({
+            data: {
+              bookingId: created.id,
+              serviceId: service.id,
+              titleSnapshot: service.title?.trim() || service.name,
+              priceSnapshot: bookedServicePrice,
+              durationSnapshotMin: durationMin,
             },
           });
 

@@ -1,23 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { logError, logInfo } from "@/lib/logging/logger";
-import { ProviderType } from "@prisma/client";
 import { addDaysToDateKey, dateFromLocalDateKey, diffDateKeys } from "@/lib/schedule/dateKey";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
-import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { resolveProviderForHotSlots } from "@/lib/hot-slots/service";
 import { notifyHotSlotSubscribers } from "@/lib/hot-slots/notifications";
-import { notifyHotSlotExpiring, notifyHotSlotPublished } from "@/lib/notifications/hot-slot-notifications";
 
 type HotSlotsJobStats = {
   processed: number;
   skipped: number;
   activated: number;
 };
-
-function slotKey(startAtUtc: Date, endAtUtc: Date): string {
-  return `${startAtUtc.toISOString()}::${endAtUtc.toISOString()}`;
-}
 
 function resolveWindow(now: Date, timeZone: string, triggerHours: number) {
   if (triggerHours === 0) {
@@ -62,11 +55,6 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
   for (const rule of rules) {
     try {
       const { provider, services } = await resolveProviderForHotSlots(rule.providerId);
-      if (provider.type !== ProviderType.MASTER) {
-        stats.skipped += 1;
-        continue;
-      }
-
       let eligible = services;
       if (rule.applyMode === "MANUAL") {
         const allowed = new Set(rule.serviceIds);
@@ -89,23 +77,6 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
       }
 
       const window = resolveWindow(now, provider.timezone, rule.triggerHours);
-      const existingActive = await prisma.hotSlot.findMany({
-        where: {
-          providerId: provider.id,
-          isActive: true,
-          startAtUtc: { gte: window.windowStart, lte: window.windowEnd },
-        },
-        select: { startAtUtc: true, endAtUtc: true },
-      });
-      const existingKeys = new Set(
-        existingActive.map((slot) => slotKey(slot.startAtUtc, slot.endAtUtc))
-      );
-
-      await prisma.hotSlot.updateMany({
-        where: { providerId: provider.id },
-        data: { isActive: false },
-      });
-      await invalidateSlotsForMaster(provider.id);
       const days = Math.max(1, Math.min(14, diffDateKeys(window.fromKey, window.toKeyExclusive)));
 
       const slotsResult = await listAvailabilitySlotsPaginated(provider.id, anchor.id, anchor.durationMin, {
@@ -137,78 +108,7 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
         ? eligible.find((service) => service.id === hotServiceId)?.title ?? null
         : null;
 
-      const reasonBase =
-        rule.applyMode === "ALL_SERVICES"
-          ? "all_services"
-          : rule.applyMode === "PRICE_FROM"
-            ? `price_from:${rule.minPriceFrom ?? 0}`
-            : "manual";
-      const reason = hotServiceId ? reasonBase : `${reasonBase};anchor=${anchor.id}`;
-
-      const ops = visibleSlots.map((slot) =>
-        prisma.hotSlot.upsert({
-          where: {
-            providerId_startAtUtc_endAtUtc: {
-              providerId: provider.id,
-              startAtUtc: slot.startAtUtc,
-              endAtUtc: slot.endAtUtc,
-            },
-          },
-          create: {
-            providerId: provider.id,
-            serviceId: hotServiceId,
-            startAtUtc: slot.startAtUtc,
-            endAtUtc: slot.endAtUtc,
-            discountType: rule.discountType,
-            discountValue: rule.discountValue,
-            isActive: true,
-            activatedAt: now,
-            expiresAtUtc: slot.startAtUtc,
-            reason,
-          },
-          update: {
-            serviceId: hotServiceId,
-            discountType: rule.discountType,
-            discountValue: rule.discountValue,
-            isActive: true,
-            activatedAt: now,
-            expiresAtUtc: slot.startAtUtc,
-            reason,
-          },
-        })
-      );
-
-      if (ops.length > 0) {
-        await prisma.$transaction(ops);
-      }
-
-      const newSlots = visibleSlots.filter(
-        (slot) => !existingKeys.has(slotKey(slot.startAtUtc, slot.endAtUtc))
-      );
-      if (newSlots.length > 0) {
-        const publishedSlots = await prisma.hotSlot.findMany({
-          where: {
-            providerId: provider.id,
-            startAtUtc: { in: newSlots.map((slot) => slot.startAtUtc) },
-            isActive: true,
-          },
-          include: {
-            provider: {
-              select: {
-                id: true,
-                name: true,
-                timezone: true,
-                ownerUserId: true,
-                masterProfile: { select: { userId: true } },
-              },
-            },
-            service: { select: { id: true, name: true, title: true } },
-          },
-        });
-        for (const slot of publishedSlots) {
-          await notifyHotSlotPublished(slot);
-        }
-
+      if (visibleSlots.length > 0) {
         await notifyHotSlotSubscribers({
           providerId: provider.id,
           providerName: provider.name,
@@ -217,7 +117,7 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
           discountType: rule.discountType,
           discountValue: rule.discountValue,
           serviceTitle: hotServiceTitle,
-          slots: newSlots.map((slot) => ({ startAtUtc: slot.startAtUtc })),
+          slots: visibleSlots.map((slot) => ({ startAtUtc: slot.startAtUtc })),
         });
       }
 
@@ -237,51 +137,5 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
 }
 
 export async function runHotSlotExpiringJob(now = new Date()): Promise<void> {
-  const windowEnd = new Date(now.getTime() + 60 * 60 * 1000);
-  const slots = await prisma.hotSlot.findMany({
-    where: {
-      isActive: true,
-      expiresAtUtc: { gt: now, lte: windowEnd },
-    },
-    include: {
-      provider: {
-        select: {
-          id: true,
-          name: true,
-          timezone: true,
-          ownerUserId: true,
-          masterProfile: { select: { userId: true } },
-        },
-      },
-      service: { select: { id: true, name: true, title: true } },
-    },
-  });
-  if (slots.length === 0) return;
-
-  const providerIds = Array.from(new Set(slots.map((slot) => slot.providerId)));
-  const startTimes = Array.from(new Set(slots.map((slot) => slot.startAtUtc)));
-
-  const bookings = await prisma.booking.findMany({
-    where: {
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { in: startTimes },
-      OR: [
-        { masterProviderId: { in: providerIds } },
-        { masterProviderId: null, providerId: { in: providerIds } },
-      ],
-    },
-    select: { masterProviderId: true, providerId: true, startAtUtc: true },
-  });
-
-  const bookedKeys = new Set(
-    bookings
-      .filter((item) => item.startAtUtc)
-      .map((item) => `${item.masterProviderId ?? item.providerId}:${item.startAtUtc?.toISOString()}`)
-  );
-
-  for (const slot of slots) {
-    const key = `${slot.providerId}:${slot.startAtUtc.toISOString()}`;
-    if (bookedKeys.has(key)) continue;
-    await notifyHotSlotExpiring(slot);
-  }
+  void now;
 }

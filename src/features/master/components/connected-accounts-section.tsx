@@ -1,19 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
-
-type TelegramStatus = {
-  linked: boolean;
-  enabled: boolean;
-  botUsername: string;
-};
 
 type TelegramLinkResponse = {
   url: string;
@@ -36,35 +31,12 @@ function formatExpiresAt(value: string, timeZone: string): string {
 export function ConnectedAccountsSection() {
   const t = UI_TEXT.clientCabinet.telegram;
   const viewerTimeZone = useViewerTimeZoneContext();
-  const [status, setStatus] = useState<TelegramStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { status, loading, error: statusError, reload } = useTelegramStatus();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectUrl, setConnectUrl] = useState<string | null>(null);
   const [connectExpiresAt, setConnectExpiresAt] = useState<string | null>(null);
   const [showConnectModal, setShowConnectModal] = useState(false);
-
-  const loadStatus = useCallback(async (): Promise<TelegramStatus | null> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/telegram/status", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<TelegramStatus> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, t.loadFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.loadFailed));
-      setStatus(json.data);
-      return json.data;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.unknownError);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [t.loadFailed, t.unknownError]);
-
-  useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
 
   const onConnect = async () => {
     setSaving(true);
@@ -97,7 +69,7 @@ export function ConnectedAccountsSection() {
       const json = (await res.json().catch(() => null)) as ApiResponse<TelegramSettingsResponse> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, t.settingsFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.settingsFailed));
-      setStatus((prev) => (prev ? { ...prev, enabled: json.data.enabled } : prev));
+      await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.unknownError);
     } finally {
@@ -106,7 +78,7 @@ export function ConnectedAccountsSection() {
   };
 
   const refreshAfterConnect = async () => {
-    const next = await loadStatus();
+    const next = await reload();
     if (next?.linked) {
       setShowConnectModal(false);
     }
@@ -154,7 +126,7 @@ export function ConnectedAccountsSection() {
             )
           }
         />
-        {error ? <div className="text-xs text-red-600">{error}</div> : null}
+        {error ?? statusError ? <div className="text-xs text-red-600">{error ?? statusError}</div> : null}
       </div>
 
       {showConnectModal ? (

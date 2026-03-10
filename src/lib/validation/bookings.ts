@@ -16,6 +16,7 @@ export const bookingCreateSchema = z
   .object({
     providerId: z.string().trim().min(1, "Не указан провайдер."),
     serviceId: z.string().trim().min(1, "Не указана услуга."),
+    hotSlotId: z.string().trim().min(1).nullable().optional(),
     masterProviderId: z.string().trim().min(1).optional(),
     startAtUtc: dateString.optional(),
     endAtUtc: dateString.optional(),

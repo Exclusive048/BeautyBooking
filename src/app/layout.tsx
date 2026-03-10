@@ -7,12 +7,46 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { NetworkBanner } from "@/components/ui/network-banner";
 import { PWAUpdatePrompt } from "@/components/pwa/update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
+import { DevServiceWorkerReset } from "@/components/pwa/dev-sw-reset";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
 
 ensureVisualSearchStartupConfig();
+
+const LOCAL_SW_RESET_SCRIPT = `
+(() => {
+  try {
+    const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (!isLocalHost || !("serviceWorker" in navigator)) return;
+    const resetDoneKey = "__local_sw_reset_done__";
+    const reloadDoneKey = "__local_sw_reset_reloaded__";
+    if (window.sessionStorage.getItem(resetDoneKey) === "1") return;
+
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    window.sessionStorage.setItem(resetDoneKey, "1");
+
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+      .then(() => {
+        if (!("caches" in window)) return;
+        return window.caches
+          .keys()
+          .then((keys) => Promise.all(keys.map((key) => window.caches.delete(key))));
+      })
+      .then(() => {
+        if (!hadController || window.sessionStorage.getItem(reloadDoneKey) === "1") return;
+        window.sessionStorage.setItem(reloadDoneKey, "1");
+        window.location.reload();
+      })
+      .catch(() => null);
+  } catch {
+    // no-op
+  }
+})();
+`;
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -69,10 +103,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ru" suppressHydrationWarning>
       <head>
         <meta property="csp-nonce" content={nonce} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: LOCAL_SW_RESET_SCRIPT }} />
       </head>
       <body>
         <ThemeProvider>
           <ViewerTimeZoneProvider>
+            <DevServiceWorkerReset />
             <NetworkBanner />
             <PWAUpdatePrompt />
             <PWAInstallPrompt />

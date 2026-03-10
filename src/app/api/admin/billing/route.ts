@@ -6,6 +6,7 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { BILLING_PERIODS } from "@/lib/billing/constants";
+import { getRequestId, logError } from "@/lib/logging/logger";
 import {
   FEATURE_CATALOG,
   type LimitFeatureKey,
@@ -292,7 +293,7 @@ export async function PATCH(req: Request) {
       assertRelaxedLimits(overrides, parentEffective);
     }
 
-    const updated = await prisma.billingPlan.update({
+    await prisma.billingPlan.update({
       where: { id },
       data: {
         ...(code ? { code } : {}),
@@ -345,8 +346,37 @@ export async function PATCH(req: Request) {
       }
     }
 
-    return ok({ plan: updated });
+    const plan = await prisma.billingPlan.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        tier: true,
+        scope: true,
+        features: true,
+        sortOrder: true,
+        inheritsFromPlanId: true,
+        isActive: true,
+        updatedAt: true,
+        prices: {
+          select: { id: true, periodMonths: true, priceKopeks: true, isActive: true },
+          orderBy: { periodMonths: "asc" },
+        },
+      },
+    });
+
+    if (!plan) {
+      return fail("Plan not found", 404, "NOT_FOUND");
+    }
+
+    return ok({ plan });
   } catch (error) {
+    logError("PATCH /api/admin/billing failed", {
+      requestId: getRequestId(req),
+      route: "PATCH /api/admin/billing",
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     const appError = error instanceof AppError ? error : toAppError(error);
     return fail(appError.message, appError.status, appError.code, appError.details);
   }

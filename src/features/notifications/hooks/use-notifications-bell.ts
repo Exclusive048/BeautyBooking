@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NotificationEvent } from "@/lib/notifications/notifier";
 import type { ApiResponse } from "@/lib/types/api";
 import {
   emitNotificationEvent,
   subscribeNotificationEvent,
   type NotificationBusEvent,
 } from "@/lib/notifications/client-bus";
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 type Options = {
   onEvent?: (event: NotificationEvent) => void;

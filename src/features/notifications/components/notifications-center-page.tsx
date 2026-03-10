@@ -8,7 +8,7 @@ import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
-import type { NotificationEvent } from "@/lib/notifications/notifier";
+import type { NotificationEvent } from "@/lib/notifications/types";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -98,7 +98,7 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
     id: event.id,
     title: event.title,
     body: event.body,
-    type: event.type,
+    type: event.type as NotificationCenterNotificationItem["type"],
     channel: resolveIncomingChannel(event),
     isRead: false,
     readAt: null,

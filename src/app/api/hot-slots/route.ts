@@ -1,9 +1,15 @@
+import { z } from "zod";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
+import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
+import { listHotSlotServices } from "@/lib/hot-slots/service";
+import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
+import { diffDateKeys } from "@/lib/schedule/dateKey";
+import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
+import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
 
 const hotSlotsQuerySchema = z.object({
   from: z.string().datetime().optional(),
@@ -15,6 +21,43 @@ const hotSlotsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
+type FeedItem = {
+  id: string;
+  provider: {
+    id: string;
+    publicUsername: string;
+    name: string;
+    avatarUrl: string | null;
+    avatarFocalX: number | null;
+    avatarFocalY: number | null;
+    address: string;
+    district: string;
+    ratingAvg: number;
+    ratingCount: number;
+    timezone: string;
+  };
+  slot: {
+    startAtUtc: string;
+    endAtUtc: string;
+    discountType: "PERCENT" | "FIXED";
+    discountValue: number;
+    isActive: true;
+  };
+  service: {
+    id: string;
+    title: string;
+    price: number;
+    durationMin: number;
+  } | null;
+};
+
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
@@ -25,37 +68,30 @@ export async function GET(req: Request) {
     const to = query.to ? new Date(query.to) : new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-      return jsonFail(400, "Некорректный диапазон дат.", "DATE_INVALID");
+      return jsonFail(400, "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РґРёР°РїР°Р·РѕРЅ РґР°С‚.", "DATE_INVALID");
     }
     if (from > to) {
-      return jsonFail(400, "Дата начала позже даты окончания.", "RANGE_INVALID");
+      return jsonFail(400, "Р”Р°С‚Р° РЅР°С‡Р°Р»Р° РїРѕР·Р¶Рµ РґР°С‚С‹ РѕРєРѕРЅС‡Р°РЅРёСЏ.", "RANGE_INVALID");
     }
 
-    const whereProvider =
-      query.category
-        ? {
-            provider: {
-              categories: { has: query.category },
-            },
-          }
-        : {};
-
-    const hotSlots = await prisma.hotSlot.findMany({
+    const rules = await prisma.discountRule.findMany({
       where: {
-        isActive: true,
-        startAtUtc: { gte: from, lt: to },
-        expiresAtUtc: { gt: now },
-        ...whereProvider,
+        isEnabled: true,
+        provider: {
+          type: "MASTER",
+          publicUsername: { not: null },
+          ...(query.category ? { categories: { has: query.category } } : {}),
+        },
       },
       select: {
-        id: true,
         providerId: true,
-        serviceId: true,
-        startAtUtc: true,
-        endAtUtc: true,
+        isEnabled: true,
+        triggerHours: true,
         discountType: true,
         discountValue: true,
-        isActive: true,
+        applyMode: true,
+        minPriceFrom: true,
+        serviceIds: true,
         provider: {
           select: {
             id: true,
@@ -71,94 +107,103 @@ export async function GET(req: Request) {
             timezone: true,
           },
         },
-        service: {
-          select: {
-            id: true,
-            name: true,
-            title: true,
-            price: true,
-            durationMin: true,
-          },
-        },
       },
-      orderBy: [{ startAtUtc: "asc" }, { id: "asc" }],
-      take: query.limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
-    const hasMore = hotSlots.length > query.limit;
-    const pageHotSlots = hasMore ? hotSlots.slice(0, query.limit) : hotSlots;
-    const nextCursor = hasMore ? pageHotSlots[pageHotSlots.length - 1]?.id ?? null : null;
 
-    const providerIds = Array.from(new Set(pageHotSlots.map((slot) => slot.providerId)));
-    const bookingConflicts =
-      providerIds.length > 0
-        ? await prisma.booking.findMany({
-            where: {
-              OR: [
-                { providerId: { in: providerIds } },
-                { masterProviderId: { in: providerIds } },
-              ],
-              status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-              startAtUtc: { not: null, gte: from, lt: to },
+    const items: FeedItem[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const rule of rules) {
+      if (!rule.provider.publicUsername) continue;
+
+      const services = await listHotSlotServices(rule.providerId);
+      const eligibleServices = services.filter((service) =>
+        isServiceEligibleForHotRule(rule, service.id, service.price)
+      );
+      if (eligibleServices.length === 0) continue;
+
+      const fromKey = toLocalDateKey(from, rule.provider.timezone);
+      const toKeyExclusive = toLocalDateKeyExclusive(to, rule.provider.timezone);
+      const days = Math.max(1, Math.min(14, diffDateKeys(fromKey, toKeyExclusive)));
+
+      for (const service of eligibleServices) {
+        const slotsResult = await listAvailabilitySlotsPaginated(rule.providerId, service.id, service.durationMin, {
+          fromKey,
+          toKeyExclusive,
+          limit: days,
+        });
+        if (!slotsResult.ok) continue;
+
+        for (const slot of slotsResult.data.slots) {
+          const slotStartAt = toDate(slot.startAtUtc);
+          const slotEndAt = toDate(slot.endAtUtc);
+          if (!slotStartAt || !slotEndAt) continue;
+          if (slotStartAt < from || slotStartAt >= to) continue;
+
+          const hot = resolveDynamicHotSlotPricing({
+            rule,
+            slotStartAtUtc: slotStartAt,
+            serviceId: service.id,
+            servicePrice: service.price,
+            providerTimeZone: rule.provider.timezone,
+            now,
+          });
+          if (!hot.isHot) continue;
+
+          const id = `${rule.providerId}:${service.id}:${slotStartAt.toISOString()}:${slotEndAt.toISOString()}`;
+          if (seenKeys.has(id)) continue;
+          seenKeys.add(id);
+
+          items.push({
+            id,
+            provider: {
+              id: rule.provider.id,
+              publicUsername: rule.provider.publicUsername,
+              name: rule.provider.name,
+              avatarUrl: rule.provider.avatarUrl,
+              avatarFocalX: rule.provider.avatarFocalX ?? null,
+              avatarFocalY: rule.provider.avatarFocalY ?? null,
+              address: rule.provider.address,
+              district: rule.provider.district,
+              ratingAvg: rule.provider.ratingAvg,
+              ratingCount: rule.provider.ratingCount,
+              timezone: rule.provider.timezone,
             },
-            select: { providerId: true, masterProviderId: true, startAtUtc: true, endAtUtc: true },
-          })
-        : [];
+            slot: {
+              startAtUtc: slotStartAt.toISOString(),
+              endAtUtc: slotEndAt.toISOString(),
+              discountType: hot.discountType ?? rule.discountType,
+              discountValue: hot.discountValue ?? rule.discountValue,
+              isActive: true,
+            },
+            service: {
+              id: service.id,
+              title: service.title,
+              price: service.price,
+              durationMin: service.durationMin,
+            },
+          });
+        }
+      }
+    }
 
-    const conflictKeys = new Set(
-      bookingConflicts
-        .map((booking) =>
-          booking.startAtUtc && booking.endAtUtc
-            ? `${booking.masterProviderId ?? booking.providerId}:${booking.startAtUtc.toISOString()}:${booking.endAtUtc.toISOString()}`
-            : null
-        )
-        .filter((key): key is string => Boolean(key))
-    );
+    items.sort((a, b) => {
+      const timeDiff = new Date(a.slot.startAtUtc).getTime() - new Date(b.slot.startAtUtc).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return b.provider.ratingAvg - a.provider.ratingAvg;
+    });
 
-    const items = pageHotSlots
-      .filter((slot) => slot.provider.publicUsername)
-      .filter((slot) => {
-        const key = `${slot.providerId}:${slot.startAtUtc.toISOString()}:${slot.endAtUtc.toISOString()}`;
-        return !conflictKeys.has(key);
-      })
-      .map((slot) => ({
-        id: slot.id,
-        provider: {
-          id: slot.provider.id,
-          publicUsername: slot.provider.publicUsername,
-          name: slot.provider.name,
-          avatarUrl: slot.provider.avatarUrl,
-          avatarFocalX: slot.provider.avatarFocalX ?? null,
-          avatarFocalY: slot.provider.avatarFocalY ?? null,
-          address: slot.provider.address,
-          district: slot.provider.district,
-          ratingAvg: slot.provider.ratingAvg,
-          ratingCount: slot.provider.ratingCount,
-          timezone: slot.provider.timezone,
-        },
-        slot: {
-          startAtUtc: slot.startAtUtc.toISOString(),
-          endAtUtc: slot.endAtUtc.toISOString(),
-          discountType: slot.discountType,
-          discountValue: slot.discountValue,
-          isActive: slot.isActive,
-        },
-        service: slot.service
-          ? {
-              id: slot.service.id,
-              title: slot.service.title?.trim() || slot.service.name,
-              price: slot.service.price,
-              durationMin: slot.service.durationMin,
-            }
-          : null,
-      }))
-      .sort((a, b) => {
-        const timeDiff = new Date(a.slot.startAtUtc).getTime() - new Date(b.slot.startAtUtc).getTime();
-        if (timeDiff !== 0) return timeDiff;
-        return b.provider.ratingAvg - a.provider.ratingAvg;
-      });
+    let startIndex = 0;
+    if (query.cursor) {
+      const cursorIndex = items.findIndex((item) => item.id === query.cursor);
+      startIndex = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+    }
 
-    return jsonOk({ items, nextCursor });
+    const pageItems = items.slice(startIndex, startIndex + query.limit);
+    const hasMore = startIndex + query.limit < items.length;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
+
+    return jsonOk({ items: pageItems, nextCursor });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {
@@ -168,7 +213,7 @@ export async function GET(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    const message = appError.code === "VALIDATION_ERROR" ? "Ошибка валидации." : appError.message;
+    const message = appError.code === "VALIDATION_ERROR" ? "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё." : appError.message;
     return jsonFail(appError.status, message, appError.code, appError.details);
   }
 }

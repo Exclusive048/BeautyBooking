@@ -199,7 +199,7 @@ export function StudioClientsPage({ studioId }: Props) {
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <a
-            href="/cabinet/billing"
+            href="/cabinet/billing?scope=STUDIO"
             className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm text-[rgb(var(--accent-foreground))]"
           >
             Перейти к тарифам

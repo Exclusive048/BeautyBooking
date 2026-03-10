@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
-import type { NotificationEvent } from "@/lib/notifications/notifier";
+import type { NotificationEvent } from "@/lib/notifications/types";
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";

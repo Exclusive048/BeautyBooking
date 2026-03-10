@@ -45,6 +45,7 @@ export function FeatureGate({
   }
 
   const requiredLabel = requiredPlan ?? "PRO";
+  const billingHref = `/cabinet/billing?scope=${scope === "STUDIO" ? "STUDIO" : "MASTER"}`;
   return (
     <div className={`relative ${className ?? ""}`}>
       <div className="pointer-events-none opacity-40">{children}</div>
@@ -58,7 +59,7 @@ export function FeatureGate({
               UI_TEXT.billing.featureGate.description.replace("{plan}", String(requiredLabel))}
           </div>
           <a
-            href="/cabinet/billing"
+            href={billingHref}
             className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-xs text-text-main transition hover:bg-bg-card"
           >
             {ctaLabel}

@@ -1,10 +1,15 @@
 "use client";
 
 import { MediaEntityType } from "@prisma/client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
+import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
+import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
+import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
@@ -44,9 +49,26 @@ type StudioProfileData = {
 
 type Props = {
   providerId: string;
+  studioId: string;
 };
 
-export function StudioProfilePage({ providerId }: Props) {
+type StudioServicesResponse = {
+  categories: Array<{
+    id: string;
+    title: string;
+    services: Array<{
+      id: string;
+      title: string;
+      basePrice: number;
+      baseDurationMin: number;
+      isActive: boolean;
+    }>;
+  }>;
+};
+
+type StudioSettingsTab = "notifications" | "features" | "studioSettings";
+
+export function StudioProfilePage({ providerId, studioId }: Props) {
   const t = UI_TEXT.studioCabinet.profile;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -69,6 +91,16 @@ export function StudioProfilePage({ providerId }: Props) {
   const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
   const [cancellationDeadlineInput, setCancellationDeadlineInput] = useState("");
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [settingsTab, setSettingsTab] = useState<StudioSettingsTab>("notifications");
+  const [hotSlotServices, setHotSlotServices] = useState<
+    Array<{
+      serviceId: string;
+      title: string;
+      isEnabled: boolean;
+      effectivePrice: number;
+      effectiveDurationMin: number;
+    }>
+  >([]);
 
   const [telegram, setTelegram] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -96,6 +128,14 @@ export function StudioProfilePage({ providerId }: Props) {
   const [pickingBannerFocal, setPickingBannerFocal] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const settingsTabs = useMemo<TabItem[]>(
+    () => [
+      { id: "notifications", label: "Уведомления" },
+      { id: "features", label: "Функции" },
+      { id: "studioSettings", label: "Настройки студии" },
+    ],
+    []
+  );
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -146,6 +186,36 @@ export function StudioProfilePage({ providerId }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadHotSlotServices = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch(`/api/studio/services?studioId=${encodeURIComponent(studioId)}`, {
+        cache: "no-store",
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<StudioServicesResponse> | null;
+      if (!res.ok || !json || !json.ok) {
+        setHotSlotServices([]);
+        return;
+      }
+
+      const mapped = json.data.categories.flatMap((category) =>
+        category.services.map((service) => ({
+          serviceId: service.id,
+          title: service.title,
+          isEnabled: service.isActive,
+          effectivePrice: service.basePrice,
+          effectiveDurationMin: service.baseDurationMin,
+        }))
+      );
+      setHotSlotServices(mapped);
+    } catch {
+      setHotSlotServices([]);
+    }
+  }, [studioId]);
+
+  useEffect(() => {
+    void loadHotSlotServices();
+  }, [loadHotSlotServices]);
 
   const resizeDescription = useCallback(() => {
     if (!descriptionRef.current) return;
@@ -378,62 +448,6 @@ export function StudioProfilePage({ providerId }: Props) {
         </ModalSurface>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
-        <div className="rounded-2xl bg-bg-card/90 p-4">
-          <h3 className="text-sm font-semibold">Публикация профиля</h3>
-          <p className="mt-1 text-xs text-text-sec">
-            Без публикации профиль не отображается в поиске и витрине.
-          </p>
-          <label className="mt-3 inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isPublished}
-              onChange={(event) => setIsPublished(event.target.checked)}
-            />
-            Опубликовать профиль
-          </label>
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-bg-card/90 p-4">
-        <h3 className="text-sm font-semibold">Политика отмены</h3>
-        <p className="mt-1 text-xs text-text-sec">
-          Клиент может отменить запись не позднее указанного срока. Пустое значение — без ограничений, 0 — отмена запрещена.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <input
-            type="number"
-            min={0}
-            max={168}
-            inputMode="numeric"
-            value={cancellationDeadlineInput}
-            onChange={(event) => setCancellationDeadlineInput(event.target.value)}
-            placeholder="Например, 24"
-            className="h-10 w-[180px] rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          <div className="text-xs text-text-sec">
-            Текущее значение:{" "}
-            {cancellationDeadlineHours === null ? "Без ограничений" : `${cancellationDeadlineHours} ч.`}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-bg-card/90 p-4">
-        <h3 className="text-sm font-semibold">Напоминания</h3>
-        <p className="mt-1 text-xs text-text-sec">
-          Напоминания о записи за 24 часа и 2 часа до начала.
-        </p>
-        <label className="mt-3 inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={remindersEnabled}
-            onChange={(event) => setRemindersEnabled(event.target.checked)}
-          />
-          {remindersEnabled ? "Включено" : "Выключено"}
-        </label>
-      </div>
-
       <StudioProfileForm
         name={name}
         description={description}
@@ -464,6 +478,98 @@ export function StudioProfilePage({ providerId }: Props) {
         onInstagramChange={setInstagram}
         onVkChange={setVk}
       />
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
+        <div className="rounded-2xl bg-bg-card/90 p-4">
+          <h3 className="text-sm font-semibold">Публикация профиля</h3>
+          <p className="mt-1 text-xs text-text-sec">
+            Без публикации профиль не отображается в поиске и витрине.
+          </p>
+          <label className="mt-3 inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isPublished}
+              onChange={(event) => setIsPublished(event.target.checked)}
+            />
+            Опубликовать профиль
+          </label>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-2xl bg-bg-card/90 p-4">
+        <Tabs
+          items={settingsTabs}
+          value={settingsTab}
+          onChange={(value) => setSettingsTab(value as StudioSettingsTab)}
+          className="w-full"
+        />
+
+        {settingsTab === "notifications" ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-bg-card p-4">
+              <TelegramNotificationsSection embedded />
+            </div>
+            <div className="rounded-2xl bg-bg-card p-4">
+              <VkNotificationsSection embedded />
+            </div>
+          </div>
+        ) : null}
+
+        {settingsTab === "features" ? (
+          <FeatureGate
+            feature="hotSlots"
+            requiredPlan="PREMIUM"
+            scope="STUDIO"
+            title="Горящие слоты"
+            description="Автоскидки на свободные окна по правилам студии."
+          >
+            <HotSlotsSettingsSection services={hotSlotServices} scope="STUDIO" />
+          </FeatureGate>
+        ) : null}
+
+        {settingsTab === "studioSettings" ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl bg-bg-card p-4">
+              <h3 className="text-sm font-semibold">Политика отмены</h3>
+              <p className="mt-1 text-xs text-text-sec">
+                Клиент может отменить запись не позднее указанного срока. Пустое значение - без ограничений, 0 - отмена запрещена.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <input
+                  type="number"
+                  min={0}
+                  max={168}
+                  inputMode="numeric"
+                  value={cancellationDeadlineInput}
+                  onChange={(event) => setCancellationDeadlineInput(event.target.value)}
+                  placeholder="Например, 24"
+                  className="h-10 w-[180px] rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <div className="text-xs text-text-sec">
+                  Текущее значение:{" "}
+                  {cancellationDeadlineHours === null ? "Без ограничений" : `${cancellationDeadlineHours} ч.`}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-bg-card p-4">
+              <h3 className="text-sm font-semibold">Напоминания</h3>
+              <p className="mt-1 text-xs text-text-sec">
+                Напоминания о записи за 24 часа и 2 часа до начала.
+              </p>
+              <label className="mt-3 inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={remindersEnabled}
+                  onChange={(event) => setRemindersEnabled(event.target.checked)}
+                />
+                {remindersEnabled ? "Включено" : "Выключено"}
+              </label>
+            </div>
+          </div>
+        ) : null}
+      </div>
       <section className="mt-12 border-t border-red-200/40 pt-8">
         <h2 className="text-sm font-semibold text-red-500">Удаление студии</h2>
         <p className="mt-1 text-xs text-text-sec">

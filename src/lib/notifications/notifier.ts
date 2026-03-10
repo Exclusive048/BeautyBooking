@@ -1,18 +1,9 @@
 import { EventEmitter } from "node:events";
 import type { RedisClientType } from "redis";
-import type { NotificationType, Prisma } from "@prisma/client";
 
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, getRedisSubscriberConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
-
-export type NotificationEvent = {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  payloadJson: Prisma.JsonValue;
-  createdAt: string;
-};
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 export type NotificationSubscriber = (event: NotificationEvent) => void;
 
@@ -93,7 +84,7 @@ class RedisNotificationNotifier implements NotificationNotifier {
 
 async function createNotifier(): Promise<NotificationNotifier> {
   const publisherClient = await getRedisConnection();
-  const subscriberClient = await getRedisConnection();
+  const subscriberClient = await getRedisSubscriberConnection();
   if (!publisherClient || !subscriberClient) {
     return new MemoryNotificationNotifier();
   }

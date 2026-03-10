@@ -3,7 +3,7 @@ import { mkdir, rm, stat, writeFile } from "fs/promises";
 import { dirname, join, normalize } from "path";
 import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/lib/media/storage/types";
 
-const MEDIA_ROOT = process.env.MEDIA_LOCAL_ROOT?.trim() || join(process.cwd(), "storage", "media");
+const MEDIA_ROOT = process.env.MEDIA_LOCAL_ROOT?.trim() || join(process.cwd(), "public", "uploads");
 
 function sanitizePathSegment(segment: string): string {
   return segment.replace(/[:\*\?"<>\|\\\/]/g, "_");
@@ -22,6 +22,14 @@ function resolvePathFromKey(key: string): string {
 
 export class LocalStorageProvider implements StorageProvider {
   readonly name = "local";
+
+  getPublicUrl(key: string): string | null {
+    const baseUrl = process.env.MEDIA_LOCAL_PUBLIC_URL?.trim();
+    if (!baseUrl) return null;
+    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    const urlPath = key.replace(/\\/g, "/").replace(/^\/+/, "");
+    return `${normalizedBase}/${urlPath}`;
+  }
 
   async putObject(input: StorageWriteInput): Promise<void> {
     const fullPath = resolvePathFromKey(input.key);

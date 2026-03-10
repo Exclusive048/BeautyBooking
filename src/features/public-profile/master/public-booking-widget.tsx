@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { calculateDiscountedPrice, calculateDiscountPercent } from "@/lib/hot-slots/pricing";
 import { compareDateKeys, listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -23,6 +24,10 @@ type SlotItem = SlotPickerItem & {
   startAtUtc: string;
   endAtUtc: string;
   dayKey: string;
+  hotSlotId?: string | null;
+  originalPrice?: number | null;
+  discountedPrice?: number | null;
+  discountPercent?: number | null;
 };
 
 type Props = {
@@ -144,6 +149,39 @@ export function PublicBookingWidget({
     () => slots.find((slot) => slot.label === selectedSlotLabel) ?? null,
     [selectedSlotLabel, slots]
   );
+  const selectedService = useMemo(
+    () => (slotServiceId ? selectedServices.find((service) => service.id === slotServiceId) ?? null : null),
+    [selectedServices, slotServiceId]
+  );
+  const selectedSlotOriginalPrice = useMemo(() => {
+    if (!selectedSlot) return null;
+    if (typeof selectedSlot.originalPrice === "number") return selectedSlot.originalPrice;
+    return selectedService?.price ?? null;
+  }, [selectedService?.price, selectedSlot]);
+  const selectedSlotDiscountedPrice = useMemo(() => {
+    if (!selectedSlot || !selectedSlot.isHot) return null;
+    if (typeof selectedSlot.discountedPrice === "number") return selectedSlot.discountedPrice;
+    if (
+      selectedSlotOriginalPrice === null ||
+      selectedSlot.discountType === undefined ||
+      typeof selectedSlot.discountValue !== "number"
+    ) {
+      return null;
+    }
+    return calculateDiscountedPrice(selectedSlot.discountType, selectedSlot.discountValue, selectedSlotOriginalPrice);
+  }, [selectedSlot, selectedSlotOriginalPrice]);
+  const selectedSlotDiscountPercent = useMemo(() => {
+    if (!selectedSlot || !selectedSlot.isHot) return null;
+    if (typeof selectedSlot.discountPercent === "number") return selectedSlot.discountPercent;
+    if (
+      selectedSlotOriginalPrice === null ||
+      selectedSlot.discountType === undefined ||
+      typeof selectedSlot.discountValue !== "number"
+    ) {
+      return null;
+    }
+    return calculateDiscountPercent(selectedSlot.discountType, selectedSlot.discountValue, selectedSlotOriginalPrice);
+  }, [selectedSlot, selectedSlotOriginalPrice]);
   const dayItems = useMemo(
     () =>
       dayKeys.map((dayKey) => ({
@@ -152,6 +190,11 @@ export function PublicBookingWidget({
         count: slotsByDay[dayKey]?.length ?? 0,
       })),
     [dayKeys, slotsByDay]
+  );
+  const datesWithSlots = useMemo(() => dayItems.filter((item) => item.count > 0), [dayItems]);
+  const slotGroupsWithItems = useMemo(
+    () => slotGroups.filter((group) => group.items.length > 0),
+    [slotGroups]
   );
 
   const abortActiveRequest = useCallback(() => {
@@ -262,9 +305,13 @@ export function PublicBookingWidget({
                   startAtUtc: string;
                   endAtUtc: string;
                   label: string;
+                  hotSlotId?: string | null;
                   isHot?: boolean;
                   discountType?: "PERCENT" | "FIXED";
                   discountValue?: number;
+                  originalPrice?: number | null;
+                  discountedPrice?: number | null;
+                  discountPercent?: number | null;
                 }>;
                 meta: { fromDate: string; toDateExclusive: string; hasMore: boolean };
               };
@@ -286,9 +333,13 @@ export function PublicBookingWidget({
             dayKey: toLocalDateKey(slot.startAtUtc, providerTimeZone),
             startAtUtc: slot.startAtUtc,
             endAtUtc: slot.endAtUtc,
+            hotSlotId: slot.hotSlotId ?? null,
             isHot: slot.isHot ?? false,
             discountType: slot.discountType,
             discountValue: slot.discountValue,
+            originalPrice: slot.originalPrice ?? null,
+            discountedPrice: slot.discountedPrice ?? null,
+            discountPercent: slot.discountPercent ?? null,
           };
         });
         const meta = slotsJson.data.meta;
@@ -489,6 +540,24 @@ export function PublicBookingWidget({
   }, [selectedSlotLabel, slots]);
 
   useEffect(() => {
+    if (datesWithSlots.length === 0) {
+      if (selectedDate) {
+        setSelectedDate("");
+        setSelectedSlotLabel("");
+      }
+      return;
+    }
+    if (!selectedDate) {
+      setSelectedDate(datesWithSlots[0]?.dayKey ?? "");
+      return;
+    }
+    const selectedDateHasSlots = datesWithSlots.some((item) => item.dayKey === selectedDate);
+    if (selectedDateHasSlots) return;
+    setSelectedDate(datesWithSlots[0]?.dayKey ?? "");
+    setSelectedSlotLabel("");
+  }, [datesWithSlots, selectedDate]);
+
+  useEffect(() => {
     if (!slotNotice) return;
     const timer = window.setTimeout(() => {
       setSlotNotice(null);
@@ -580,6 +649,7 @@ export function PublicBookingWidget({
         body: JSON.stringify({
           providerId,
           serviceId: slotServiceId,
+          hotSlotId: selectedSlot.hotSlotId ?? null,
           startAtUtc: selectedSlot.startAtUtc,
           endAtUtc: selectedSlot.endAtUtc,
           slotLabel: selectedSlot.label,
@@ -696,7 +766,7 @@ export function PublicBookingWidget({
               <div>
                 <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseDay}</div>
                 <div className="flex flex-wrap gap-2">
-                  {dayItems.map((item) => {
+                  {datesWithSlots.map((item) => {
                     const active = selectedDate === item.dayKey;
                     return (
                       <button
@@ -717,7 +787,15 @@ export function PublicBookingWidget({
               <div>
                 <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseSlot}</div>
                 {slotNotice ? <div className="mb-2 text-xs text-amber-600">{slotNotice}</div> : null}
-                {slotsForSelectedDate.length > 0 ? (
+                {selectedSlot?.isHot ? (
+                  <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-2 py-1 text-[11px] font-semibold text-orange-400">
+                    <span>HOT</span>
+                    <span>
+                      -{selectedSlotDiscountPercent ?? selectedSlot.discountValue ?? 0}%
+                    </span>
+                  </div>
+                ) : null}
+                {slotGroupsWithItems.length > 0 ? (
                   <>
                     {isDev ? (
                       <Profiler
@@ -727,7 +805,7 @@ export function PublicBookingWidget({
                         }}
                       >
                         <SlotPickerOptimized
-                          groups={slotGroups}
+                          groups={slotGroupsWithItems}
                           value={selectedSlotLabel}
                           onChange={handleSelectSlot}
                           disabled={slotsLoading}
@@ -735,13 +813,15 @@ export function PublicBookingWidget({
                       </Profiler>
                     ) : (
                       <SlotPickerOptimized
-                        groups={slotGroups}
+                        groups={slotGroupsWithItems}
                         value={selectedSlotLabel}
                         onChange={handleSelectSlot}
                         disabled={slotsLoading}
                       />
                     )}
                   </>
+                ) : selectedDate ? (
+                  <div className="py-6 text-center text-sm text-text-sec">Нет доступных окон на этот день</div>
                 ) : (
                   <div className="text-sm text-text-sec">
                     {selectedDate
@@ -783,6 +863,28 @@ export function PublicBookingWidget({
               >
                 {UI_TEXT.publicProfile.booking.loginAndContinue}
               </a>
+            </div>
+          ) : null}
+
+          {selectedSlot ? (
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3 text-sm">
+              <div className="text-xs text-text-sec">{UI_TEXT.publicProfile.booking.total}</div>
+              {selectedSlot.isHot &&
+              selectedSlotOriginalPrice !== null &&
+              selectedSlotDiscountedPrice !== null &&
+              selectedSlotDiscountedPrice < selectedSlotOriginalPrice ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-text-sec line-through">{UI_FMT.priceLabel(selectedSlotOriginalPrice)}</span>
+                  <span className="font-semibold text-text-main">{UI_FMT.priceLabel(selectedSlotDiscountedPrice)}</span>
+                  <span className="text-[11px] font-semibold text-orange-400">
+                    (-{selectedSlotDiscountPercent ?? 0}%)
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-1 font-semibold text-text-main">
+                  {UI_FMT.priceLabel(selectedSlotOriginalPrice ?? selectedService?.price ?? 0)}
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -946,4 +1048,6 @@ export function PublicBookingWidget({
     </div>
   );
 }
+
+
 

@@ -7,7 +7,8 @@ import {
 } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
-import { notificationsNotifier, type NotificationEvent } from "@/lib/notifications/notifier";
+import { notificationsNotifier } from "@/lib/notifications/notifier";
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 

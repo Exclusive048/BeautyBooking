@@ -31,6 +31,10 @@ export async function GET(req: Request) {
         durationMin: item.effectiveDurationMin,
         price: item.effectivePrice,
         isEnabled: item.isEnabled,
+        globalCategoryId: item.globalCategoryId ?? null,
+        globalCategory: item.globalCategory
+          ? { id: item.globalCategory.id, name: item.globalCategory.name }
+          : null,
       })),
     });
   } catch (error) {

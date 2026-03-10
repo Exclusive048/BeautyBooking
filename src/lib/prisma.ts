@@ -6,7 +6,7 @@ const globalForPrisma = globalThis as typeof globalThis & {
 
 const createPrismaClient = (): PrismaClient =>
   new PrismaClient({
-    log: ["error", "warn"],
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
 export const prisma = globalForPrisma.__beautyhubPrisma ?? createPrismaClient();

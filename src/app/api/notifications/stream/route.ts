@@ -1,9 +1,9 @@
-import type { NotificationEvent } from "@/lib/notifications/notifier";
 import { jsonFail } from "@/lib/api/contracts";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { getSessionUser } from "@/lib/auth/session";
 import { logError } from "@/lib/logging/logger";
 import { notificationsNotifier } from "@/lib/notifications/notifier";
+import type { NotificationEvent } from "@/lib/notifications/types";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";

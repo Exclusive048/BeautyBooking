@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import useSWR from "swr";
 import type { CurrentPlanInfo, PlanFeatures } from "@/lib/billing/types";
+import type { ApiResponse } from "@/lib/types/api";
 
 type SubscriptionScope = "MASTER" | "STUDIO";
 
@@ -13,51 +15,32 @@ type LimitFeatureKey = {
   [Key in keyof PlanFeatures]: PlanFeatures[Key] extends number | null ? Key : never;
 }[keyof PlanFeatures];
 
-type PlanState = {
-  loading: boolean;
-  error: string | null;
-  data: CurrentPlanInfo | null;
-};
+const PLAN_LOAD_ERROR = "Не удалось загрузить тариф";
+
+async function fetchCurrentPlan(url: string): Promise<CurrentPlanInfo> {
+  const res = await fetch(url, { cache: "no-store" });
+  const json = (await res.json().catch(() => null)) as ApiResponse<CurrentPlanInfo> | null;
+  if (!res.ok || !json || json.ok !== true) {
+    const message = json && json.ok === false ? json.error.message ?? PLAN_LOAD_ERROR : PLAN_LOAD_ERROR;
+    throw new Error(message);
+  }
+  return json.data;
+}
 
 export function usePlanFeatures(scope?: SubscriptionScope) {
-  const [state, setState] = useState<PlanState>({
-    loading: true,
-    error: null,
-    data: null,
+  const url = scope ? `/api/me/plan?scope=${scope}` : "/api/me/plan";
+  const { data, error, isLoading, mutate } = useSWR<CurrentPlanInfo>(url, fetchCurrentPlan, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30_000,
   });
 
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const url = scope ? `/api/me/plan?scope=${scope}` : "/api/me/plan";
-      const res = await fetch(url, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: CurrentPlanInfo }
-        | { ok: false; error?: { message?: string } }
-        | null;
-      if (!res.ok || !json || !("ok" in json) || !json.ok) {
-        const message =
-          json && "error" in json && json.error?.message
-            ? json.error.message
-            : "Не удалось загрузить тариф";
-        throw new Error(message);
-      }
-      setState({ loading: false, error: null, data: json.data });
-    } catch (error) {
-      setState({
-        loading: false,
-        error: error instanceof Error ? error.message : "Не удалось загрузить тариф",
-        data: null,
-      });
-    }
-  }, [scope]);
+  const reload = useCallback(async () => {
+    const next = await mutate();
+    return next ?? null;
+  }, [mutate]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const features = state.data?.features ?? null;
-  const system = state.data?.system ?? null;
+  const features = data?.features ?? null;
+  const system = data?.system ?? null;
 
   const can = useCallback(
     (key: BooleanFeatureKey) => {
@@ -77,18 +60,19 @@ export function usePlanFeatures(scope?: SubscriptionScope) {
 
   return useMemo(
     () => ({
-      loading: state.loading,
-      error: state.error,
-      planCode: state.data?.planCode ?? null,
-      tier: state.data?.tier ?? null,
-      scope: state.data?.scope ?? null,
-      planId: state.data?.planId ?? null,
+      loading: isLoading,
+      error: error instanceof Error ? error.message : null,
+      planCode: data?.planCode ?? null,
+      tier: data?.tier ?? null,
+      scope: data?.scope ?? null,
+      planId: data?.planId ?? null,
       features,
       system,
       can,
       limit,
-      reload: load,
+      reload,
     }),
-    [state, features, system, can, limit, load]
+    [can, data, error, features, isLoading, limit, reload, system]
   );
 }
+

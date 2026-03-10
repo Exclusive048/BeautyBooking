@@ -17,4 +17,7 @@ export interface StorageProvider {
   putObject(input: StorageWriteInput): Promise<void>;
   getObject(key: string, contentType: string): Promise<StorageReadResult | null>;
   deleteObject(key: string): Promise<void>;
+  // Returns a direct public URL when provider supports it.
+  // Return null to force proxy streaming through /api/media/file/[id].
+  getPublicUrl?(key: string): string | null;
 }
