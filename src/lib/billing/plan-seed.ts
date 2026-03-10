@@ -115,20 +115,15 @@ export async function ensureDefaultPlans() {
   const byCode = new Map(existing.map((plan) => [plan.code, plan]));
 
   for (const plan of DEFAULT_PLANS) {
+    if (byCode.has(plan.code)) {
+      // Preserve admin-managed plan settings; seed should only fill gaps.
+      continue;
+    }
+
     const inheritsFromPlanId = plan.inheritsFrom ? byCode.get(plan.inheritsFrom)?.id ?? null : null;
-    const upserted = await prisma.billingPlan.upsert({
-      where: { code: plan.code },
-      create: {
+    const created = await prisma.billingPlan.create({
+      data: {
         code: plan.code,
-        name: plan.name,
-        tier: plan.tier,
-        scope: plan.scope,
-        features: plan.features as Prisma.InputJsonValue,
-        sortOrder: plan.sortOrder ?? 0,
-        inheritsFromPlanId,
-        isActive: true,
-      },
-      update: {
         name: plan.name,
         tier: plan.tier,
         scope: plan.scope,
@@ -148,7 +143,7 @@ export async function ensureDefaultPlans() {
         features: true,
       },
     });
-    byCode.set(upserted.code, upserted);
+    byCode.set(created.code, created);
   }
 
   const planIds = Array.from(byCode.values()).map((plan) => plan.id);

@@ -227,8 +227,8 @@ const SlotButton = memo(function SlotButton({
   const hotLabel =
     isHot && typeof discountValue === "number"
       ? discountType === "FIXED"
-        ? `-${discountValue} ₽`
-        : `-${discountValue}%`
+        ? `HOT -${discountValue} RUB`
+        : `HOT -${discountValue}%`
       : null;
 
   return (
@@ -310,3 +310,4 @@ const VirtualizedSlotList = memo(function VirtualizedSlotList({
     </div>
   );
 });
+

@@ -25,6 +25,7 @@ type ServiceItem = {
 
 type HotSlotsSettingsSectionProps = {
   services: ServiceItem[];
+  scope?: "MASTER" | "STUDIO";
 };
 
 const TRIGGER_OPTIONS = [
@@ -37,7 +38,7 @@ const TRIGGER_OPTIONS = [
 const PERCENT_OPTIONS = [10, 20, 30];
 
 
-export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionProps) {
+export function HotSlotsSettingsSection({ services, scope = "MASTER" }: HotSlotsSettingsSectionProps) {
   const [rule, setRule] = useState<RuleState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,12 +46,13 @@ export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionPro
   const [status, setStatus] = useState<string | null>(null);
 
   const enabledServices = useMemo(() => services.filter((service) => service.isEnabled), [services]);
+  const scopeQuery = scope === "STUDIO" ? "?scope=STUDIO" : "?scope=MASTER";
 
   const loadRule = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/provider/hot-slots/rule", { cache: "no-store" });
+      const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ rule: RuleState }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить правила.");
@@ -62,7 +64,7 @@ export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionPro
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scopeQuery]);
 
   useEffect(() => {
     void loadRule();
@@ -93,7 +95,7 @@ export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionPro
       if (rule.applyMode === "PRICE_FROM" && (!rule.minPriceFrom || rule.minPriceFrom <= 0)) {
         throw new Error("Укажите минимальную цену для правила.");
       }
-      const res = await fetch("/api/provider/hot-slots/rule", {
+      const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rule),
@@ -109,7 +111,7 @@ export function HotSlotsSettingsSection({ services }: HotSlotsSettingsSectionPro
     } finally {
       setSaving(false);
     }
-  }, [rule]);
+  }, [rule, scopeQuery]);
 
   if (loading) {
     return (

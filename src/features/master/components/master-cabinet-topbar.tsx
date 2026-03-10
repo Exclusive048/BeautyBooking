@@ -13,13 +13,14 @@ const NAV_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/cabinet/master/schedule", label: "Мой график" },
   { href: "/cabinet/master/clients", label: "Клиенты" },
   { href: "/cabinet/master/analytics", label: "Аналитика" },
-  { href: "/cabinet/billing", label: "Подписка" },
+  { href: "/cabinet/billing?scope=MASTER", label: "Подписка" },
   { href: "/cabinet/master/model-offers", label: "Ищу модель" },
   { href: "/cabinet/master/profile", label: "Профиль" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const path = href.split("?")[0] ?? href;
+  return pathname === path || pathname.startsWith(`${path}/`);
 }
 
 export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {

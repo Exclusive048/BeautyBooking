@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
@@ -55,7 +55,6 @@ export default function LoginClient({
   heroImageFocalX,
   heroImageFocalY,
 }: LoginClientProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
 
@@ -137,8 +136,7 @@ export default function LoginClient({
         body: JSON.stringify({ phone: normalized, code }),
       });
 
-      router.replace(nextPath ?? result.redirect);
-      router.refresh();
+      window.location.replace(nextPath ?? result.redirect);
     } catch (error) {
       if (error instanceof ApiClientError) {
         const mapped = getErrorMessageByCode(error.code);

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const path = require("path");
 const withPWA = require("next-pwa")({
   dest: "public",
@@ -7,19 +8,10 @@ const withPWA = require("next-pwa")({
   importScripts: ["/sw-push.js"],
   runtimeCaching: [
     {
-      urlPattern: ({ request }) => request.mode === "navigate",
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "pages-cache",
-        networkTimeoutSeconds: 5,
-        expiration: {
-          maxEntries: 60,
-          maxAgeSeconds: 7 * 24 * 60 * 60,
-        },
-        cacheableResponse: {
-          statuses: [0, 200],
-        },
-      },
+      urlPattern: ({ request }: { request: Request }) => request.mode === "navigate",
+      // Avoid serving stale HTML that can reference outdated chunk/module ids.
+      handler: "NetworkOnly",
+      options: {},
     },
     {
       urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
@@ -72,6 +64,9 @@ const withPWA = require("next-pwa")({
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig = {
+  // Note: duplicate API calls in dev logs are caused by React StrictMode.
+  // This does NOT happen in production builds.
+  reactStrictMode: true,
   serverExternalPackages: ["redis", "@redis/client"],
   turbopack: {
     root: path.resolve(__dirname),

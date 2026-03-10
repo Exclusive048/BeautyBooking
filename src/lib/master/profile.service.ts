@@ -4,7 +4,7 @@ import { createLimitReachedError } from "@/lib/billing/guards";
 import { validateEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import { CategoryStatus, MediaEntityType, MediaKind, Prisma } from "@prisma/client";
+import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
 
 type MasterContext = {
   id: string;
@@ -96,6 +96,8 @@ export type MasterProfileServiceItem = {
   title: string;
   isEnabled: boolean;
   onlinePaymentEnabled: boolean;
+  globalCategoryId: string | null;
+  globalCategory: { id: string; name: string } | null;
   basePrice: number;
   baseDurationMin: number;
   priceOverride: number | null;
@@ -156,6 +158,8 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         isEnabled: true,
         isActive: true,
         onlinePaymentEnabled: true,
+        globalCategoryId: true,
+        globalCategory: { select: { id: true, name: true } },
         price: true,
         durationMin: true,
       },
@@ -181,6 +185,10 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         title: service.title?.trim() || service.name,
         isEnabled: service.isEnabled && service.isActive,
         onlinePaymentEnabled: service.onlinePaymentEnabled,
+        globalCategoryId: service.globalCategoryId ?? null,
+        globalCategory: service.globalCategory
+          ? { id: service.globalCategory.id, name: service.globalCategory.name }
+          : null,
         basePrice: service.price,
         baseDurationMin: service.durationMin,
         priceOverride: null,
@@ -211,6 +219,8 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       title: true,
       isActive: true,
       onlinePaymentEnabled: true,
+      globalCategoryId: true,
+      globalCategory: { select: { id: true, name: true } },
       price: true,
       durationMin: true,
       basePrice: true,
@@ -256,6 +266,10 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         title: service.title?.trim() || service.name,
         isEnabled: Boolean(service.isActive && override?.isEnabled),
         onlinePaymentEnabled: service.onlinePaymentEnabled,
+        globalCategoryId: service.globalCategoryId ?? null,
+        globalCategory: service.globalCategory
+          ? { id: service.globalCategory.id, name: service.globalCategory.name }
+          : null,
         basePrice,
         baseDurationMin,
         priceOverride: override?.priceOverride ?? null,
@@ -644,7 +658,7 @@ export async function createMasterPortfolioItem(
     }
   }
 
-  const plan = await getCurrentPlan(userId);
+  const plan = await getCurrentPlan(userId, SubscriptionScope.MASTER);
   const limitKey = context.isSolo
     ? "maxPortfolioPhotosSolo"
     : "maxPortfolioPhotosPerStudioMaster";

@@ -7,7 +7,7 @@ import type { MeProfile } from "@/lib/users/profile";
 export type MeUser = MeProfile;
 
 const fetcher = async (url: string): Promise<{ user: MeUser | null } | null> => {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { cache: "no-store", credentials: "include" });
   const json = (await res.json().catch(() => null)) as ApiResponse<{ user: MeUser | null }> | null;
   if (!res.ok || !json || json.ok !== true) return null;
   return json.data;

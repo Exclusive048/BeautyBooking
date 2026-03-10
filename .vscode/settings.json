@@ -1,4 +1,9 @@
 {
+  "css.customData": [
+    ".vscode/tailwind.json"
+  ],
+  "css.validate": false,
+  "scss.validate": false,
   "files.watcherExclude": {
     "**/.next/**": true,
     "**/node_modules/**": true

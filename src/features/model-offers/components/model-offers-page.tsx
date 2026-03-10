@@ -42,6 +42,7 @@ type ServiceOption = {
   id: string | null;
   serviceId: string;
   title: string;
+  globalCategoryId?: string | null;
   categoryTitle?: string | null;
   durationMin: number;
   price: number | null;
@@ -54,8 +55,8 @@ type OffersResponse = {
 };
 
 type FieldErrors = {
+  categoryId?: string;
   masterServiceId?: string;
-  serviceIds?: string;
   dateLocal?: string;
   timeRange?: string;
   price?: string;
@@ -118,11 +119,21 @@ function extractServices(data: unknown): ServiceOption[] {
             ? record.basePrice
             : null;
     if (!serviceId || !title || duration === null) return [];
+    const globalCategoryRecord =
+      record.globalCategory && typeof record.globalCategory === "object"
+        ? (record.globalCategory as Record<string, unknown>)
+        : null;
     const categoryTitle =
       typeof record.categoryTitle === "string"
         ? record.categoryTitle
-        : typeof record.category === "string"
-          ? record.category
+        : typeof globalCategoryRecord?.name === "string"
+          ? globalCategoryRecord.name
+          : null;
+    const globalCategoryId =
+      typeof record.globalCategoryId === "string" && record.globalCategoryId.trim().length > 0
+        ? record.globalCategoryId
+        : typeof globalCategoryRecord?.id === "string" && globalCategoryRecord.id.trim().length > 0
+          ? globalCategoryRecord.id
           : null;
     const isEnabled = typeof record.isEnabled === "boolean" ? record.isEnabled : undefined;
     return [
@@ -130,6 +141,7 @@ function extractServices(data: unknown): ServiceOption[] {
         id: masterServiceId,
         serviceId,
         title,
+        globalCategoryId,
         categoryTitle,
         durationMin: duration,
         price,
@@ -137,26 +149,6 @@ function extractServices(data: unknown): ServiceOption[] {
       },
     ];
   });
-}
-
-function mergeServiceOptions(prev: ServiceOption[], next: ServiceOption[]): ServiceOption[] {
-  const byServiceId = new Map<string, ServiceOption>();
-  for (const item of prev) byServiceId.set(item.serviceId, item);
-  for (const item of next) {
-    const existing = byServiceId.get(item.serviceId);
-    if (!existing) {
-      byServiceId.set(item.serviceId, item);
-      continue;
-    }
-    byServiceId.set(item.serviceId, {
-      ...existing,
-      ...item,
-      id: item.id ?? existing.id,
-      price: item.price ?? existing.price,
-      durationMin: item.durationMin || existing.durationMin,
-    });
-  }
-  return Array.from(byServiceId.values());
 }
 
 export function ModelOffersPage() {
@@ -169,11 +161,11 @@ export function ModelOffersPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [masterServiceId, setMasterServiceId] = useState("");
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [dateLocal, setDateLocal] = useState("");
   const [timeRangeStartLocal, setTimeRangeStartLocal] = useState("");
-  const [timeRangeEndLocal, setTimeRangeEndLocal] = useState("");
+  const [calculatedEndTime, setCalculatedEndTime] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [extraBusyMin, setExtraBusyMin] = useState("0");
   const [requirements, setRequirements] = useState<string[]>([]);
@@ -208,30 +200,40 @@ export function ModelOffersPage() {
     []
   );
 
-  const serviceOptions = useMemo(() => {
-    return [...services]
-      .filter((service) => service.isEnabled !== false)
-      .map((service) => {
-        const title = service.title.trim();
-        const category = service.categoryTitle?.trim();
-        const label = category ? `${title} · ${category}` : title;
-        return {
-          ...service,
-          label,
-        };
-      })
-      .sort((a, b) => a.label.localeCompare(b.label, "ru"));
-  }, [services]);
-
-  const masterServiceOptions = useMemo(
-    () => serviceOptions.filter((item) => typeof item.id === "string" && item.id.length > 0),
-    [serviceOptions]
+  const serviceOptions = useMemo(
+    () => [...services].filter((service) => service.isEnabled !== false).sort((a, b) => a.title.localeCompare(b.title, "ru")),
+    [services]
   );
 
-  const selectedServicesPreview = useMemo(() => {
-    const selectedSet = new Set(selectedServiceIds);
-    return serviceOptions.filter((item) => selectedSet.has(item.serviceId));
-  }, [selectedServiceIds, serviceOptions]);
+  const categoryOptions = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string }>();
+    for (const service of serviceOptions) {
+      const categoryId = service.globalCategoryId?.trim();
+      if (!categoryId) continue;
+      const categoryName = service.categoryTitle?.trim();
+      byId.set(categoryId, {
+        id: categoryId,
+        name: categoryName && categoryName.length > 0 ? categoryName : "Без категории",
+      });
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  }, [serviceOptions]);
+
+  const filteredServices = useMemo(
+    () =>
+      serviceOptions.filter(
+        (service) =>
+          typeof service.id === "string" &&
+          service.id.length > 0 &&
+          service.globalCategoryId === selectedCategoryId
+      ),
+    [selectedCategoryId, serviceOptions]
+  );
+
+  const selectedService = useMemo(
+    () => filteredServices.find((service) => service.id === masterServiceId) ?? null,
+    [filteredServices, masterServiceId]
+  );
 
   const isEmptyState = useMemo(
     () => !loading && !error && offers.length === 0,
@@ -251,52 +253,85 @@ export function ModelOffersPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/master/model-offers", { cache: "no-store" });
+      const [res, servicesRes] = await Promise.all([
+        fetch("/api/master/model-offers", { cache: "no-store" }),
+        fetch("/api/master/services", { cache: "no-store" }),
+      ]);
       const json = (await res.json().catch(() => null)) as ApiResponse<OffersResponse> | null;
+      const servicesJson = (await servicesRes.json().catch(() => null)) as
+        | ApiResponse<{ services: unknown[] }>
+        | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(extractApiError(json, "Не удалось загрузить офферы."));
       }
       setOffers(Array.isArray(json.data.offers) ? json.data.offers : []);
-      if (Array.isArray(json.data.services)) {
-        setServices((prev) =>
-          mergeServiceOptions(prev, extractServices({ services: json.data.services }))
-        );
-      }
+      const offerServices = Array.isArray(json.data.services)
+        ? extractServices({ services: json.data.services })
+        : [];
+      const fallbackServices =
+        servicesRes.ok && servicesJson && servicesJson.ok && Array.isArray(servicesJson.data.services)
+          ? extractServices({ services: servicesJson.data.services })
+          : [];
+      const fallbackByServiceId = new Map(fallbackServices.map((service) => [service.serviceId, service]));
+      setServices(
+        offerServices.map((service) => {
+          const fallback = fallbackByServiceId.get(service.serviceId);
+          if (!fallback) return service;
+          return {
+            ...service,
+            globalCategoryId: service.globalCategoryId ?? fallback.globalCategoryId ?? null,
+            categoryTitle: service.categoryTitle ?? fallback.categoryTitle ?? null,
+          };
+        })
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить офферы.");
       setOffers([]);
+      setServices([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const loadServices = useCallback(async () => {
-    try {
-      const res = await fetch("/api/master/services", { cache: "no-store" });
-      if (!res.ok) return;
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!json || !json.ok) return;
-      const options = extractServices(json.data);
-      if (options.length > 0) {
-        setServices((prev) => mergeServiceOptions(prev, options));
-      }
-    } catch {
+  useEffect(() => {
+    void loadOffers();
+  }, [loadOffers]);
+
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      setMasterServiceId("");
       return;
     }
-  }, []);
+    if (!filteredServices.some((item) => item.id === masterServiceId)) {
+      setMasterServiceId("");
+    }
+  }, [filteredServices, masterServiceId, selectedCategoryId]);
 
   useEffect(() => {
-    void loadOffers().then(() => loadServices());
-  }, [loadOffers, loadServices]);
+    if (!timeRangeStartLocal || !selectedService) {
+      setCalculatedEndTime(null);
+      return;
+    }
 
-  useEffect(() => {
-    if (!masterServiceId) return;
-    const primaryService = masterServiceOptions.find((item) => item.id === masterServiceId);
-    if (!primaryService) return;
-    setSelectedServiceIds((prev) =>
-      prev.includes(primaryService.serviceId) ? prev : [...prev, primaryService.serviceId]
+    const [hoursRaw, minutesRaw] = timeRangeStartLocal.split(":");
+    const hours = Number(hoursRaw);
+    const minutes = Number(minutesRaw);
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+      setCalculatedEndTime(null);
+      return;
+    }
+
+    const extraBusyValue = Number(extraBusyMin);
+    const normalizedExtraBusy =
+      Number.isFinite(extraBusyValue) && extraBusyValue >= 0 ? extraBusyValue : 0;
+    const totalMinutes =
+      hours * 60 + minutes + selectedService.durationMin + normalizedExtraBusy;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    setCalculatedEndTime(
+      `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`
     );
-  }, [masterServiceId, masterServiceOptions]);
+  }, [extraBusyMin, selectedService, timeRangeStartLocal]);
 
   const toggleCreate = useCallback(() => {
     setShowCreate((prev) => !prev);
@@ -322,13 +357,26 @@ export function ModelOffersPage() {
     setRequirementsError(null);
   }, []);
 
-  const toggleServiceSelection = useCallback((serviceId: string) => {
-    setSelectedServiceIds((prev) =>
-      prev.includes(serviceId)
-        ? prev.filter((item) => item !== serviceId)
-        : [...prev, serviceId]
-    );
-  }, []);
+  const handleExtraBusyBlur = useCallback(() => {
+    const raw = Number(extraBusyMin);
+    if (!Number.isFinite(raw) || raw <= 0) {
+      setExtraBusyMin("0");
+      return;
+    }
+    const rounded = Math.round(raw / 15) * 15;
+    const clamped = Math.min(240, Math.max(0, rounded));
+    setExtraBusyMin(String(clamped));
+  }, [extraBusyMin]);
+
+  const handlePriceBlur = useCallback(() => {
+    const raw = Number(price);
+    if (!Number.isFinite(raw) || raw <= 0) {
+      setPrice("0");
+      return;
+    }
+    const rounded = Math.ceil(raw / 100) * 100;
+    setPrice(String(rounded));
+  }, [price]);
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -341,19 +389,12 @@ export function ModelOffersPage() {
       const nextErrors: FieldErrors = {};
       const normalizedDate = dateLocal.trim();
       const normalizedStart = timeRangeStartLocal.trim();
-      const normalizedEnd = timeRangeEndLocal.trim();
-      const primaryService = masterServiceOptions.find((item) => item.id === masterServiceId) ?? null;
-      const normalizedServiceIds = Array.from(
-        new Set(selectedServiceIds.map((item) => item.trim()).filter((item) => item.length > 0))
-      );
-      if (primaryService && !normalizedServiceIds.includes(primaryService.serviceId)) {
-        normalizedServiceIds.push(primaryService.serviceId);
-      }
+      const normalizedEnd = calculatedEndTime?.trim() ?? "";
+      const normalizedCategory = selectedCategoryId.trim();
+      const primaryService = selectedService;
 
+      if (!normalizedCategory) nextErrors.categoryId = "Выберите категорию";
       if (!masterServiceId) nextErrors.masterServiceId = "Выберите услугу";
-      if (normalizedServiceIds.length === 0) {
-        nextErrors.serviceIds = "Выберите хотя бы одну услугу";
-      }
       if (!normalizedDate) nextErrors.dateLocal = "Укажите дату";
       if (!normalizedStart || !normalizedEnd) {
         nextErrors.timeRange = "Укажите диапазон времени";
@@ -397,7 +438,7 @@ export function ModelOffersPage() {
 
       const payload: Record<string, unknown> = {
         masterServiceId,
-        serviceIds: normalizedServiceIds,
+        serviceIds: primaryService ? [primaryService.serviceId] : [],
         dateLocal: normalizedDate,
         timeRangeStartLocal: normalizedStart,
         timeRangeEndLocal: normalizedEnd,
@@ -420,12 +461,12 @@ export function ModelOffersPage() {
           throw new Error(extractApiError(json, "Не удалось создать оффер."));
         }
 
+        setSelectedCategoryId("");
         setMasterServiceId("");
-        setSelectedServiceIds([]);
         setDateLocal("");
         setTimeRangeStartLocal("");
-        setTimeRangeEndLocal("");
-        setPrice("");
+        setCalculatedEndTime(null);
+        setPrice("0");
         setExtraBusyMin("0");
         setRequirements([]);
         setRequirementInput("");
@@ -441,19 +482,27 @@ export function ModelOffersPage() {
       }
     },
     [
+      calculatedEndTime,
       dateLocal,
       extraBusyMin,
       loadOffers,
       masterServiceId,
-      masterServiceOptions,
       price,
       requirements,
       saving,
-      selectedServiceIds,
-      timeRangeEndLocal,
+      selectedCategoryId,
+      selectedService,
       timeRangeStartLocal,
     ]
   );
+
+  const isServiceSelected = Boolean(selectedService);
+  const isSubmitDisabled =
+    saving ||
+    !selectedCategoryId.trim() ||
+    !masterServiceId.trim() ||
+    !dateLocal.trim() ||
+    !timeRangeStartLocal.trim();
 
   return (
     <section className="space-y-6">
@@ -479,70 +528,49 @@ export function ModelOffersPage() {
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm text-text-sec">Услуга</label>
+                  <label className="text-sm text-text-sec">Категория</label>
                   <Select
-                    value={masterServiceId}
-                    onChange={(event) => setMasterServiceId(event.target.value)}
+                    value={selectedCategoryId}
+                    onChange={(event) => setSelectedCategoryId(event.target.value)}
                     className="mt-2"
                   >
-                    <option value="">Выберите услугу</option>
-                    {masterServiceOptions.map((service) => (
-                      <option key={service.id ?? service.serviceId} value={service.id ?? ""}>
-                        {service.label} · {service.durationMin} мин
+                    <option value="">Выберите категорию</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
                       </option>
                     ))}
                   </Select>
-                  {fieldErrors.masterServiceId ? (
-                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.masterServiceId}</p>
+                  {fieldErrors.categoryId ? (
+                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.categoryId}</p>
                   ) : null}
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="text-sm text-text-sec">Услуги в оффере</label>
-                  <div className="mt-2 space-y-2 rounded-2xl border border-border-subtle/80 bg-bg-input/50 p-3">
-                    {serviceOptions.length > 0 ? (
-                      serviceOptions.map((service) => {
-                        const isChecked = selectedServiceIds.includes(service.serviceId);
-                        const isPrimary = service.id === masterServiceId;
-                        return (
-                          <label
-                            key={`${service.serviceId}:${service.id ?? "no-master-service"}`}
-                            className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-1.5 hover:bg-bg-card/60"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleServiceSelection(service.serviceId)}
-                              className="mt-1 h-4 w-4 rounded border-border-subtle"
-                            />
-                            <span className="min-w-0 text-sm text-text-main">
-                              <span className="font-medium">{service.title}</span>
-                              <span className="ml-2 text-xs text-text-sec">
-                                {service.durationMin} мин
-                                {typeof service.price === "number" ? ` • ${UI_FMT.priceLabel(service.price)}` : ""}
-                              </span>
-                              {isPrimary ? (
-                                <span className="ml-2 text-xs text-primary">основная</span>
-                              ) : null}
-                            </span>
-                          </label>
-                        );
-                      })
-                    ) : (
-                      <div className="text-xs text-text-sec">Нет доступных услуг для выбора.</div>
-                    )}
-                  </div>
-                  {fieldErrors.serviceIds ? (
-                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.serviceIds}</p>
-                  ) : null}
-                  {selectedServicesPreview.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedServicesPreview.map((service) => (
-                        <Chip key={`preview:${service.serviceId}`}>
-                          {service.title} · {service.durationMin} мин
-                        </Chip>
+                <div>
+                  <label className="text-sm text-text-sec">Услуга</label>
+                  {selectedCategoryId ? (
+                    <Select
+                      value={masterServiceId}
+                      onChange={(event) => setMasterServiceId(event.target.value)}
+                      className="mt-2"
+                    >
+                      <option value="">Выберите услугу</option>
+                      {filteredServices.map((service) => (
+                        <option key={service.id ?? service.serviceId} value={service.id ?? ""}>
+                          {service.title} • {service.durationMin} мин •{" "}
+                          {service.price && service.price > 0
+                            ? `${new Intl.NumberFormat("ru-RU").format(service.price)} ₽`
+                            : "Бесплатно"}
+                        </option>
                       ))}
+                    </Select>
+                  ) : (
+                    <div className="mt-2 rounded-2xl border border-border-subtle/70 bg-bg-input/50 px-4 py-3 text-sm text-text-sec">
+                      Сначала выберите категорию.
                     </div>
+                  )}
+                  {fieldErrors.masterServiceId ? (
+                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.masterServiceId}</p>
                   ) : null}
                 </div>
 
@@ -552,6 +580,7 @@ export function ModelOffersPage() {
                     type="date"
                     value={dateLocal}
                     onChange={(event) => setDateLocal(event.target.value)}
+                    disabled={!isServiceSelected}
                     className="mt-2"
                   />
                   {fieldErrors.dateLocal ? (
@@ -563,38 +592,21 @@ export function ModelOffersPage() {
                   <label className="text-sm text-text-sec">Время начала</label>
                   <Input
                     type="time"
+                    step={900}
                     value={timeRangeStartLocal}
                     onChange={(event) => setTimeRangeStartLocal(event.target.value)}
+                    disabled={!isServiceSelected}
                     className="mt-2"
                   />
                 </div>
 
                 <div>
                   <label className="text-sm text-text-sec">Время окончания</label>
-                  <Input
-                    type="time"
-                    value={timeRangeEndLocal}
-                    onChange={(event) => setTimeRangeEndLocal(event.target.value)}
-                    className="mt-2"
-                  />
+                  <p className="mt-2 rounded-2xl border border-border-subtle/70 bg-bg-input/50 px-4 py-2.5 text-sm text-text-main">
+                    {calculatedEndTime ?? "—"}
+                  </p>
                   {fieldErrors.timeRange ? (
                     <p className="mt-2 text-xs text-rose-500">{fieldErrors.timeRange}</p>
-                  ) : null}
-                </div>
-
-                <div>
-                  <label className="text-sm text-text-sec">Цена</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="Бесплатно"
-                    value={price}
-                    onChange={(event) => setPrice(event.target.value)}
-                    className="mt-2"
-                  />
-                  {fieldErrors.price ? (
-                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.price}</p>
                   ) : null}
                 </div>
 
@@ -604,14 +616,34 @@ export function ModelOffersPage() {
                     type="number"
                     min={0}
                     max={240}
-                    step={1}
+                    step={15}
                     value={extraBusyMin}
                     onChange={(event) => setExtraBusyMin(event.target.value)}
+                    onBlur={handleExtraBusyBlur}
+                    disabled={!isServiceSelected}
                     className="mt-2"
                   />
-                  <p className="mt-2 text-xs text-text-sec">время на съемку/контент</p>
+                  <p className="mt-2 text-xs text-text-sec">время на съёмку/контент</p>
                   {fieldErrors.extraBusyMin ? (
                     <p className="mt-2 text-xs text-rose-500">{fieldErrors.extraBusyMin}</p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="text-sm text-text-sec">Цена</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={100}
+                    placeholder="Бесплатно"
+                    value={price}
+                    onChange={(event) => setPrice(event.target.value)}
+                    onBlur={handlePriceBlur}
+                    disabled={!isServiceSelected}
+                    className="mt-2"
+                  />
+                  {fieldErrors.price ? (
+                    <p className="mt-2 text-xs text-rose-500">{fieldErrors.price}</p>
                   ) : null}
                 </div>
               </div>
@@ -657,7 +689,7 @@ export function ModelOffersPage() {
               ) : null}
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" disabled={isSubmitDisabled}>
                   {saving ? "Сохраняем..." : "Опубликовать оффер"}
                 </Button>
                 <span className="text-xs text-text-sec">После публикации оффер станет видимым в каталоге.</span>

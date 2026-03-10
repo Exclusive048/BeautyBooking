@@ -14,6 +14,7 @@ import { getSiteLogoAsset } from "@/lib/media/queries";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 import { FocalImage } from "@/components/ui/focal-image";
+import { TopbarAuthButton } from "@/components/layout/topbar-auth-button";
 
 type WorkspaceLink = {
   href: string;
@@ -186,9 +187,7 @@ export async function Topbar() {
           ) : (
             <>
               <ThemeToggle />
-              <Button asChild>
-                <Link href="/login">{UI_TEXT.auth.login}</Link>
-              </Button>
+              <TopbarAuthButton />
             </>
           )}
         </nav>

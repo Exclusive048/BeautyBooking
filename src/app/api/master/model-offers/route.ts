@@ -90,7 +90,8 @@ export async function GET(req: Request) {
                   title: true,
                   durationMin: true,
                   baseDurationMin: true,
-                  category: { select: { title: true } },
+                  globalCategoryId: true,
+                  globalCategory: { select: { id: true, name: true } },
                 },
               },
             },
@@ -118,7 +119,8 @@ export async function GET(req: Request) {
               baseDurationMin: true,
               price: true,
               basePrice: true,
-              category: { select: { title: true } },
+              globalCategoryId: true,
+              globalCategory: { select: { id: true, name: true } },
             },
           },
         },
@@ -131,7 +133,8 @@ export async function GET(req: Request) {
         {
           id: item.service.id,
           title: item.service.title?.trim() || item.service.name,
-          categoryTitle: item.service.category?.title ?? null,
+          globalCategoryId: item.service.globalCategoryId ?? null,
+          categoryTitle: item.service.globalCategory?.name ?? null,
           durationMin: resolveServiceDuration({
             durationOverrideMin: item.durationOverrideMin ?? null,
             baseDurationMin: item.service.baseDurationMin ?? null,
@@ -150,7 +153,8 @@ export async function GET(req: Request) {
       const primaryServiceFallback = {
         id: primaryServiceId,
         title: offer.masterService.service.title?.trim() || offer.masterService.service.name,
-        categoryTitle: offer.masterService.service.category?.title ?? null,
+        globalCategoryId: offer.masterService.service.globalCategoryId ?? null,
+        categoryTitle: offer.masterService.service.globalCategory?.name ?? null,
         durationMin: resolveServiceDuration({
           durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
           baseDurationMin: offer.masterService.service.baseDurationMin ?? null,
@@ -178,7 +182,7 @@ export async function GET(req: Request) {
         serviceIds: selectedServiceIds,
         selectedServices,
         serviceTitle: offer.masterService.service.title?.trim() || offer.masterService.service.name,
-        serviceCategory: offer.masterService.service.category?.title ?? null,
+        serviceCategory: offer.masterService.service.globalCategory?.name ?? null,
         durationMin: resolveServiceDuration({
           durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
           baseDurationMin: offer.masterService.service.baseDurationMin ?? null,
@@ -201,7 +205,8 @@ export async function GET(req: Request) {
       id: item.id,
       serviceId: item.service.id,
       title: item.service.title?.trim() || item.service.name,
-      categoryTitle: item.service.category?.title ?? null,
+      globalCategoryId: item.service.globalCategoryId ?? null,
+      categoryTitle: item.service.globalCategory?.name ?? null,
       price:
         item.priceOverride ??
         item.service.basePrice ??
@@ -255,7 +260,8 @@ export async function POST(req: Request) {
             basePrice: true,
             isEnabled: true,
             isActive: true,
-            category: { select: { title: true } },
+            globalCategoryId: true,
+            globalCategory: { select: { id: true, name: true } },
           },
         },
       },

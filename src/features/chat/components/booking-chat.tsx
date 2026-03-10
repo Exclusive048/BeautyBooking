@@ -9,7 +9,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
-import type { NotificationEvent } from "@/lib/notifications/notifier";
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 type ChatMessageDto = {
   id: string;
@@ -61,13 +61,16 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
   const listRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const onUnreadCountChangeRef = useRef<Props["onUnreadCountChange"]>(onUnreadCountChange);
+  const hasMarkedInitialReadRef = useRef(false);
 
-  const notifyUnread = useCallback(
-    (count: number) => {
-      onUnreadCountChange?.(count);
-    },
-    [onUnreadCountChange]
-  );
+  useEffect(() => {
+    onUnreadCountChangeRef.current = onUnreadCountChange;
+  }, [onUnreadCountChange]);
+
+  const notifyUnread = useCallback((count: number) => {
+    onUnreadCountChangeRef.current?.(count);
+  }, []);
 
   const loadChat = useCallback(
     async (silent = false) => {
@@ -110,11 +113,13 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
   }, [bookingId, notifyUnread]);
 
   useEffect(() => {
+    hasMarkedInitialReadRef.current = false;
     void loadChat();
   }, [loadChat]);
 
   useEffect(() => {
-    if (loading || error) return;
+    if (loading || error || hasMarkedInitialReadRef.current) return;
+    hasMarkedInitialReadRef.current = true;
     void markRead();
   }, [error, loading, markRead]);
 

@@ -44,6 +44,14 @@ export class S3StorageProvider implements StorageProvider {
   private readonly client: S3Client;
   private readonly bucket: string;
 
+  getPublicUrl(key: string): string | null {
+    const publicUrl = process.env.S3_PUBLIC_URL?.trim();
+    if (!publicUrl) return null;
+    const normalizedBase = publicUrl.replace(/\/+$/, "");
+    const normalizedKey = key.replace(/\\/g, "/").replace(/^\/+/, "");
+    return `${normalizedBase}/${normalizedKey}`;
+  }
+
   constructor() {
     const env = requireS3Env();
     this.bucket = env.bucket;

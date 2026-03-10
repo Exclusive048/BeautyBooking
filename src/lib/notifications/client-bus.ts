@@ -1,7 +1,7 @@
 "use client";
 
-import type { NotificationEvent } from "@/lib/notifications/notifier";
 import { NOTIFICATIONS_UPDATED_EVENT } from "@/lib/notifications/constants";
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 export type NotificationBusEvent = {
   kind: "incoming" | "updated" | "read";

@@ -8,11 +8,12 @@ export default async function StudioSettingsProfilePage() {
   if (!user) redirect("/login");
 
   let providerId: string;
+  let studioId: string;
   try {
-    ({ providerId } = await resolveCurrentStudioAccess(user.id));
+    ({ providerId, studioId } = await resolveCurrentStudioAccess(user.id));
   } catch {
     redirect("/403");
   }
 
-  return <StudioProfilePage providerId={providerId} />;
+  return <StudioProfilePage providerId={providerId} studioId={studioId} />;
 }

@@ -3,6 +3,7 @@ import {
   MediaAssetStatus,
   MediaEntityType,
   MediaKind,
+  SubscriptionScope,
   type MediaAsset,
   type UserProfile,
 } from "@prisma/client";
@@ -126,7 +127,7 @@ async function resolvePortfolioLimit(input: {
   entityId: string;
 }): Promise<{ limitKey: string | null; limit: number | null }> {
   if (input.entityType === MediaEntityType.STUDIO) {
-    const plan = await getCurrentPlan(input.userId);
+    const plan = await getCurrentPlan(input.userId, SubscriptionScope.STUDIO);
     return {
       limitKey: "maxPortfolioPhotosStudioDesign",
       limit: plan.features.maxPortfolioPhotosStudioDesign,
@@ -141,7 +142,7 @@ async function resolvePortfolioLimit(input: {
     if (!provider || provider.type !== "MASTER") {
       return { limitKey: null, limit: MEDIA_PORTFOLIO_LIMIT };
     }
-    const plan = await getCurrentPlan(input.userId);
+    const plan = await getCurrentPlan(input.userId, SubscriptionScope.MASTER);
     return provider.studioId
       ? {
           limitKey: "maxPortfolioPhotosPerStudioMaster",

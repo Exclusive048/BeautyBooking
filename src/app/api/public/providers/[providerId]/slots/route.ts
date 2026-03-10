@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
-import { isServiceEligibleForHotRule } from "@/lib/hot-slots/eligibility";
+import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 function toIso(value: Date | string | null | undefined): string | null {
@@ -94,68 +94,63 @@ export async function GET(
 
   const rule = await prisma.discountRule.findUnique({
     where: { providerId: provider.id },
-    select: { isEnabled: true, applyMode: true, minPriceFrom: true, serviceIds: true },
+    select: {
+      isEnabled: true,
+      triggerHours: true,
+      discountType: true,
+      discountValue: true,
+      applyMode: true,
+      minPriceFrom: true,
+      serviceIds: true,
+    },
   });
-
-  const isServiceEligible = isServiceEligibleForHotRule(rule, serviceId, service.price);
 
   const baseSlots = result.data.slots;
   type SlotLike = (typeof baseSlots)[number] & {
+    hotSlotId?: string | null;
     isHot?: boolean;
-    discountType?: string;
+    discountType?: "PERCENT" | "FIXED";
     discountValue?: number;
+    originalPrice?: number | null;
+    discountedPrice?: number | null;
+    discountPercent?: number | null;
   };
-  let decoratedSlots: SlotLike[] = baseSlots;
-
-  if (isServiceEligible && baseSlots.length > 0) {
-    const now = new Date();
-    const rangeStart = toDate(baseSlots[0]?.startAtUtc ?? null);
-    const rangeEnd = toDate(baseSlots[baseSlots.length - 1]?.endAtUtc ?? null);
-    if (rangeStart && rangeEnd) {
-      const hotSlots = await prisma.hotSlot.findMany({
-        where: {
-          providerId: provider.id,
-          isActive: true,
-          expiresAtUtc: { gt: now },
-          startAtUtc: { gte: rangeStart, lte: rangeEnd },
-        },
-        select: {
-          startAtUtc: true,
-          endAtUtc: true,
-          discountType: true,
-          discountValue: true,
-          serviceId: true,
-        },
-      });
-      const exactMap = new Map<string, (typeof hotSlots)[number]>();
-      const startMap = new Map<string, (typeof hotSlots)[number]>();
-      for (const slot of hotSlots) {
-        const startKey = toIso(slot.startAtUtc);
-        const endKey = toIso(slot.endAtUtc);
-        if (!startKey || !endKey) continue;
-        if (slot.serviceId) {
-          exactMap.set(`${startKey}:${endKey}`, slot);
-        } else {
-          startMap.set(startKey, slot);
-        }
-      }
-      decoratedSlots = baseSlots.map((slot) => {
-        const startKey = toIso(slot.startAtUtc);
-        const endKey = toIso(slot.endAtUtc);
-        if (!startKey || !endKey) return { ...slot, isHot: false };
-        const key = `${startKey}:${endKey}`;
-        const hot = exactMap.get(key) ?? startMap.get(startKey);
-        return hot
-          ? {
-              ...slot,
-              isHot: true,
-              discountType: hot.discountType,
-              discountValue: hot.discountValue,
-            }
-          : { ...slot, isHot: false };
-      });
+  const now = new Date();
+  const decoratedSlots: SlotLike[] = baseSlots.map((slot) => {
+    const startAtUtc = toDate(slot.startAtUtc);
+    if (!startAtUtc) {
+      return {
+        ...slot,
+        hotSlotId: null,
+        isHot: false,
+        discountType: undefined,
+        discountValue: undefined,
+        originalPrice: null,
+        discountedPrice: null,
+        discountPercent: null,
+      };
     }
-  }
+
+    const hot = resolveDynamicHotSlotPricing({
+      rule,
+      slotStartAtUtc: startAtUtc,
+      serviceId,
+      servicePrice: service.price,
+      providerTimeZone: provider.timezone,
+      now,
+    });
+
+    return {
+      ...slot,
+      hotSlotId: null,
+      isHot: hot.isHot,
+      discountType: hot.discountType,
+      discountValue: hot.discountValue,
+      originalPrice: hot.originalPrice,
+      discountedPrice: hot.discountedPrice,
+      discountPercent: hot.discountPercent,
+    };
+  });
 
   const serializedSlots = decoratedSlots.map((slot) => ({
     ...slot,

@@ -146,18 +146,14 @@ function buildWhere(
 }
 
 async function loadHotProviderIds(): Promise<string[]> {
-  const now = new Date();
-  const to = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-  const items = await prisma.hotSlot.findMany({
+  const items = await prisma.discountRule.findMany({
     where: {
-      isActive: true,
-      expiresAtUtc: { gt: now },
-      startAtUtc: { gte: now, lt: to },
+      isEnabled: true,
+      provider: { type: "MASTER" },
     },
-    distinct: ["providerId"],
     select: { providerId: true },
   });
-  return items.map((item) => item.providerId);
+  return Array.from(new Set(items.map((item) => item.providerId)));
 }
 
 async function loadSmartTagCounts(

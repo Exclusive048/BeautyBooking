@@ -50,9 +50,7 @@ async function loadProvider(providerId: string): Promise<ProviderForHotSlots> {
 }
 
 async function loadServicesForProvider(provider: ProviderForHotSlots): Promise<HotSlotServiceCandidate[]> {
-  if (provider.type !== ProviderType.MASTER) return [];
-
-  if (provider.studioId) {
+  if (provider.type === ProviderType.MASTER && provider.studioId) {
     const masterServices = await prisma.masterService.findMany({
       where: { masterProviderId: provider.id, isEnabled: true, service: { isActive: true, isEnabled: true } },
       select: {
@@ -67,6 +65,19 @@ async function loadServicesForProvider(provider: ProviderForHotSlots): Promise<H
       title: item.service.title?.trim() || item.service.name,
       price: item.priceOverride ?? item.service.price,
       durationMin: item.durationOverrideMin ?? item.service.durationMin,
+    }));
+  }
+
+  if (provider.type === ProviderType.STUDIO) {
+    const services = await prisma.service.findMany({
+      where: { providerId: provider.id, isActive: true, isEnabled: true },
+      select: { id: true, name: true, title: true, durationMin: true, price: true },
+    });
+    return services.map((service) => ({
+      id: service.id,
+      title: service.title?.trim() || service.name,
+      price: service.price,
+      durationMin: service.durationMin,
     }));
   }
 
@@ -110,16 +121,12 @@ export async function getOrCreateDiscountRule(providerId: string) {
 
 export async function saveDiscountRule(providerId: string, input: HotSlotRuleInput) {
   const provider = await loadProvider(providerId);
-  if (provider.type !== ProviderType.MASTER) {
-    throw new AppError("Правило доступно только для мастеров.", 403, "FORBIDDEN_ROLE");
-  }
-
   const services = await loadServicesForProvider(provider);
   if (input.applyMode === "MANUAL") {
     const availableIds = new Set(services.map((service) => service.id));
     const invalid = input.serviceIds.filter((id) => !availableIds.has(id));
     if (invalid.length > 0) {
-      throw new AppError("Выберите доступные услуги мастера.", 400, "VALIDATION_ERROR", {
+      throw new AppError("Выберите доступные услуги.", 400, "VALIDATION_ERROR", {
         invalidServiceIds: invalid,
       });
     }
@@ -147,13 +154,6 @@ export async function saveDiscountRule(providerId: string, input: HotSlotRuleInp
       serviceIds: input.serviceIds ?? [],
     },
   });
-
-  if (!input.isEnabled) {
-    await prisma.hotSlot.updateMany({
-      where: { providerId },
-      data: { isActive: false },
-    });
-  }
 
   return { rule: next, services };
 }

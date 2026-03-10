@@ -26,6 +26,8 @@ import { UI_TEXT } from "@/lib/ui/text";
 type MasterServiceItem = {
   serviceId: string;
   title: string;
+  globalCategoryId: string | null;
+  globalCategory: { id: string; name: string } | null;
   isEnabled: boolean;
   onlinePaymentEnabled: boolean;
   basePrice: number;
@@ -326,7 +328,7 @@ export function MasterProfilePage() {
 
   const [pendingPortfolioMeta, setPendingPortfolioMeta] = useState<PendingPortfolioMeta | null>(null);
   const [portfolioCaption, setPortfolioCaption] = useState("");
-  const [portfolioServiceIds, setPortfolioServiceIds] = useState<string[]>([]);
+  const [portfolioServiceId, setPortfolioServiceId] = useState("");
   const [portfolioGlobalCategoryId, setPortfolioGlobalCategoryId] = useState("");
   const [portfolioMetaOpen, setPortfolioMetaOpen] = useState(false);
   const [portfolioAssetIdsByUrl, setPortfolioAssetIdsByUrl] = useState<Record<string, string>>({});
@@ -679,6 +681,38 @@ export function MasterProfilePage() {
   const serviceTitleById = useMemo(
     () => new Map(serviceList.map((service) => [service.serviceId, service.title])),
     [serviceList]
+  );
+  const portfolioCategoryOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return serviceList
+      .filter((service) => service.isEnabled)
+      .filter(
+        (service) =>
+          typeof service.globalCategoryId === "string" &&
+          service.globalCategoryId.length > 0 &&
+          typeof service.globalCategory?.name === "string" &&
+          service.globalCategory.name.length > 0
+      )
+      .filter((service) => {
+        const categoryId = service.globalCategoryId as string;
+        if (seen.has(categoryId)) return false;
+        seen.add(categoryId);
+        return true;
+      })
+      .map((service) => ({
+        id: service.globalCategoryId as string,
+        name: service.globalCategory?.name as string,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  }, [serviceList]);
+  const portfolioFilteredServices = useMemo(
+    () =>
+      portfolioGlobalCategoryId
+        ? serviceList
+            .filter((service) => service.isEnabled && service.globalCategoryId === portfolioGlobalCategoryId)
+            .sort((a, b) => a.title.localeCompare(b.title, "ru"))
+        : [],
+    [portfolioGlobalCategoryId, serviceList]
   );
   const portfolioLimit = data?.master.isSolo
     ? plan.limit("maxPortfolioPhotosSolo")
@@ -1304,7 +1338,7 @@ export function MasterProfilePage() {
       });
       setPendingPortfolioMeta({ assetId: asset.id, mediaUrl: asset.url });
       setPortfolioCaption("");
-      setPortfolioServiceIds([]);
+      setPortfolioServiceId("");
       setPortfolioGlobalCategoryId("");
       setPortfolioMetaOpen(true);
     } catch (err) {
@@ -1348,7 +1382,7 @@ export function MasterProfilePage() {
         body: JSON.stringify({
           mediaUrl: toAbsoluteMediaUrl(pendingPortfolioMeta.mediaUrl),
           caption: portfolioCaption.trim() || undefined,
-          serviceIds: portfolioServiceIds,
+          serviceIds: portfolioServiceId ? [portfolioServiceId] : [],
           globalCategoryId: portfolioGlobalCategoryId || undefined,
           categorySource: portfolioGlobalCategoryId ? "user" : undefined,
         }),
@@ -1365,7 +1399,7 @@ export function MasterProfilePage() {
       setPendingPortfolioMeta(null);
       setPortfolioMetaOpen(false);
       setPortfolioCaption("");
-      setPortfolioServiceIds([]);
+      setPortfolioServiceId("");
       setPortfolioGlobalCategoryId("");
       await load();
     } catch (err) {
@@ -2431,7 +2465,7 @@ export function MasterProfilePage() {
                 {portfolioLimitReached ? (
                   <span className="text-rose-400">
                     {UI_TEXT.master.profile.portfolio.limitReached}{" "}
-                    <a href="/cabinet/billing" className="underline">
+                    <a href="/cabinet/billing?scope=MASTER" className="underline">
                       {UI_TEXT.master.profile.portfolio.plans}
                     </a>
                   </span>
@@ -2784,14 +2818,16 @@ export function MasterProfilePage() {
               <div className="space-y-1">
                 <select
                   value={portfolioGlobalCategoryId}
-                  onChange={(event) => setPortfolioGlobalCategoryId(event.target.value)}
+                  onChange={(event) => {
+                    setPortfolioGlobalCategoryId(event.target.value);
+                    setPortfolioServiceId("");
+                  }}
                   className={selectBaseClass}
                 >
-                  <option value="">Категория (необязательно)</option>
-                  {globalCategories.map((category) => (
+                  <option value="">{"\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f (\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e)"}</option>
+                  {portfolioCategoryOptions.map((category) => (
                     <option key={category.id} value={category.id}>
-                      {category.icon ? `${category.icon} ` : ""}
-                      {category.fullPath || category.title}
+                      {category.name}
                     </option>
                   ))}
                 </select>
@@ -2801,33 +2837,30 @@ export function MasterProfilePage() {
                   </div>
                 ) : null}
               </div>
-              <div className="rounded-lg bg-bg-input/70 p-3">
-                <div className="mb-1 text-xs text-text-sec">{UI_TEXT.master.profile.portfolioMeta.serviceHint}</div>
-                <div className="flex flex-wrap gap-2">
-                  {serviceList.map((service) => (
-                    <label key={`portfolio-${service.serviceId}`} className="text-xs">
-                      <input
-                        type="checkbox"
-                        checked={portfolioServiceIds.includes(service.serviceId)}
-                        onChange={(event) =>
-                          setPortfolioServiceIds((current) =>
-                            event.target.checked
-                              ? [...current, service.serviceId]
-                              : current.filter((id) => id !== service.serviceId)
-                          )
-                        }
-                      />{" "}
-                      {service.title}
-                    </label>
-                  ))}
+              {portfolioGlobalCategoryId ? (
+                <div className="space-y-1">
+                  <select
+                    value={portfolioServiceId}
+                    onChange={(event) => setPortfolioServiceId(event.target.value)}
+                    className={selectBaseClass}
+                  >
+                    <option value="">{"\u0423\u0441\u043b\u0443\u0433\u0430 (\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e)"}</option>
+                    {portfolioFilteredServices.map((service) => (
+                      <option key={`portfolio-service-${service.serviceId}`} value={service.serviceId}>
+                        {service.title} - {service.effectiveDurationMin} {"\u043c\u0438\u043d"}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-xs text-text-sec">{UI_TEXT.master.profile.portfolioMeta.serviceHint}</div>
                 </div>
-              </div>
+              ) : null}
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setPortfolioMetaOpen(false);
+                  setPortfolioServiceId("");
                   setPortfolioGlobalCategoryId("");
                 }}
                 className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
@@ -2858,5 +2891,4 @@ export function MasterProfilePage() {
     </section>
   );
 }
-
 

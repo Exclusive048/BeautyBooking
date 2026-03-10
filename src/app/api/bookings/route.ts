@@ -13,8 +13,6 @@ import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { listProviderBookingsForOwner } from "@/lib/bookings/list";
 import { loadBookingWithRelations, notifyBookingConfirmed, notifyBookingCreated } from "@/lib/notifications/booking-notifications";
-import { loadHotSlotWithRelations, notifyHotSlotBooked } from "@/lib/notifications/hot-slot-notifications";
-import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
@@ -61,6 +59,7 @@ export async function POST(req: Request) {
     const {
       providerId,
       serviceId,
+      hotSlotId,
       masterProviderId,
       startAtUtc: startAtUtcRaw,
       endAtUtc: endAtUtcRaw,
@@ -86,6 +85,7 @@ export async function POST(req: Request) {
       const created = await createBooking({
         providerId,
         serviceId,
+        hotSlotId: hotSlotId ?? null,
         masterProviderId: masterProviderId ?? null,
         startAtUtc,
         endAtUtc: endAtUtc ?? null,
@@ -106,27 +106,6 @@ export async function POST(req: Request) {
           if (fullBooking.status === "CONFIRMED") {
             await notifyBookingConfirmed(fullBooking);
           }
-          const hotProviderId =
-            fullBooking.masterProvider?.id ??
-            (fullBooking.provider.type === "MASTER" ? fullBooking.provider.id : null);
-          if (hotProviderId && fullBooking.startAtUtc) {
-            const hotSlot = await prisma.hotSlot.findFirst({
-              where: {
-                providerId: hotProviderId,
-                startAtUtc: fullBooking.startAtUtc,
-                isActive: true,
-                expiresAtUtc: { gt: new Date() },
-                OR: [{ serviceId: null }, { serviceId: fullBooking.serviceId }],
-              },
-              select: { id: true },
-            });
-            if (hotSlot) {
-              const fullHotSlot = await loadHotSlotWithRelations(hotSlot.id);
-              if (fullHotSlot) {
-                await notifyHotSlotBooked(fullHotSlot, fullBooking.clientName);
-              }
-            }
-          }
         }
       } catch (error) {
         logError("POST /api/bookings notifications failed", {
@@ -142,6 +121,7 @@ export async function POST(req: Request) {
     const booking = await createClientBooking(user.userId, {
       providerId,
       serviceId,
+      hotSlotId: hotSlotId ?? null,
       slotLabel,
       clientName,
       clientPhone,
@@ -156,27 +136,6 @@ export async function POST(req: Request) {
         await notifyBookingCreated(fullBooking);
         if (fullBooking.status === "CONFIRMED") {
           await notifyBookingConfirmed(fullBooking);
-        }
-        const hotProviderId =
-          fullBooking.masterProvider?.id ??
-          (fullBooking.provider.type === "MASTER" ? fullBooking.provider.id : null);
-        if (hotProviderId && fullBooking.startAtUtc) {
-          const hotSlot = await prisma.hotSlot.findFirst({
-            where: {
-              providerId: hotProviderId,
-              startAtUtc: fullBooking.startAtUtc,
-              isActive: true,
-              expiresAtUtc: { gt: new Date() },
-              OR: [{ serviceId: null }, { serviceId: fullBooking.serviceId }],
-            },
-            select: { id: true },
-          });
-          if (hotSlot) {
-            const fullHotSlot = await loadHotSlotWithRelations(hotSlot.id);
-            if (fullHotSlot) {
-              await notifyHotSlotBooked(fullHotSlot, fullBooking.clientName);
-            }
-          }
         }
       }
     } catch (error) {

@@ -20,6 +20,7 @@ export type BookingCoreContext = {
   service: {
     id: string;
     providerId: string;
+    title: string | null;
     name: string;
     isEnabled: boolean;
     isActive: boolean;
@@ -27,6 +28,7 @@ export type BookingCoreContext = {
     baseDurationMin: number | null;
     price: number;
     basePrice: number | null;
+    effectivePrice: number;
   };
   master: {
     id: string;
@@ -185,6 +187,7 @@ export async function resolveBookingCore(input: {
       select: {
         id: true,
         providerId: true,
+        title: true,
         name: true,
         isEnabled: true,
         isActive: true,
@@ -274,6 +277,11 @@ export async function resolveBookingCore(input: {
     throw new AppError("Некорректная длительность услуги.", 400, "DURATION_INVALID");
   }
 
+  const effectivePrice = override?.priceOverride ?? service.basePrice ?? service.price;
+  if (!Number.isInteger(effectivePrice) || effectivePrice < 0) {
+    throw new AppError("Service price is invalid.", 400, "VALIDATION_ERROR");
+  }
+
   const startAtUtc =
     input.startAtUtc ??
     (input.slotLabel ? parseSlotStartAtUtc(input.slotLabel, provider.timezone) : null);
@@ -328,7 +336,10 @@ export async function resolveBookingCore(input: {
 
   return {
     provider,
-    service,
+    service: {
+      ...service,
+      effectivePrice,
+    },
     master,
     resolvedMasterProviderId,
     durationMin,

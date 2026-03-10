@@ -283,7 +283,7 @@ export function ClientBookingsPanel() {
   };
 
   const handleUnreadChange = (id: string, count: number) => {
-    setChatUnreadMap((prev) => ({ ...prev, [id]: count }));
+    setChatUnreadMap((prev) => (prev[id] === count ? prev : { ...prev, [id]: count }));
   };
 
   if (loading) {
