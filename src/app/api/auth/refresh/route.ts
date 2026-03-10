@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { prisma } from "@/lib/prisma";
@@ -50,10 +51,9 @@ export async function POST(req: Request) {
   });
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   return withRequestContext(req, async () => {
-    const cookieStore = await cookies();
-    const refreshToken = cookieStore.get(REFRESH_COOKIE_NAME)?.value;
+    const refreshToken = req.cookies.get(REFRESH_COOKIE_NAME)?.value;
     const nextPath = resolveNextPath(req);
 
     if (!refreshToken) {

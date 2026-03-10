@@ -399,6 +399,7 @@ export async function upsertMasterServices(
     onlinePaymentEnabled?: boolean;
     durationOverrideMin?: number | null;
     priceOverride?: number | null;
+    globalCategoryId?: string | null;
   }>
 ): Promise<{ updated: number }> {
   const context = await getMasterContext(masterId);
@@ -408,15 +409,43 @@ export async function upsertMasterServices(
     const serviceIds = uniqueIds(items.map((item) => item.serviceId));
     const existing = await prisma.service.findMany({
       where: { id: { in: serviceIds }, providerId: masterId },
-      select: { id: true },
+      select: { id: true, globalCategoryId: true },
     });
     if (existing.length !== serviceIds.length) {
       throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
     }
+    const existingById = new Map(existing.map((service) => [service.id, service]));
 
-    await prisma.$transaction(
-      items.map((item) =>
-        prisma.service.update({
+    const requestedGlobalCategoryIds = uniqueIds(
+      items
+        .map((item) =>
+          item.globalCategoryId === undefined ? null : item.globalCategoryId?.trim() || null
+        )
+        .filter((value): value is string => Boolean(value))
+    );
+    if (requestedGlobalCategoryIds.length > 0) {
+      const categories = await prisma.globalCategory.findMany({
+        where: {
+          id: { in: requestedGlobalCategoryIds },
+          status: CategoryStatus.APPROVED,
+          isSystem: false,
+          visualSearchSlug: { not: "hot" },
+        },
+        select: { id: true },
+      });
+      if (categories.length !== requestedGlobalCategoryIds.length) {
+        throw new AppError("Р“Р»РѕР±Р°Р»СЊРЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404, "NOT_FOUND");
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const previousGlobalCategoryId =
+          existingById.get(item.serviceId)?.globalCategoryId ?? null;
+        const nextGlobalCategoryId =
+          item.globalCategoryId === undefined ? undefined : item.globalCategoryId?.trim() || null;
+
+        await tx.service.update({
           where: { id: item.serviceId },
           data: {
             isEnabled: item.isEnabled,
@@ -428,10 +457,31 @@ export async function upsertMasterServices(
               ? { durationMin: item.durationOverrideMin }
               : {}),
             ...(typeof item.priceOverride === "number" ? { price: item.priceOverride } : {}),
+            ...(nextGlobalCategoryId !== undefined
+              ? { globalCategoryId: nextGlobalCategoryId }
+              : {}),
           },
-        })
-      )
-    );
+        });
+
+        if (
+          nextGlobalCategoryId !== undefined &&
+          nextGlobalCategoryId !== previousGlobalCategoryId
+        ) {
+          if (previousGlobalCategoryId) {
+            await tx.globalCategory.updateMany({
+              where: { id: previousGlobalCategoryId, usageCount: { gt: 0 } },
+              data: { usageCount: { decrement: 1 } },
+            });
+          }
+          if (nextGlobalCategoryId) {
+            await tx.globalCategory.update({
+              where: { id: nextGlobalCategoryId },
+              data: { usageCount: { increment: 1 } },
+            });
+          }
+        }
+      }
+    });
     return { updated: items.length };
   }
 

@@ -122,6 +122,7 @@ export const upsertMasterServicesSchema = z.object({
         onlinePaymentEnabled: z.boolean().optional(),
         durationOverrideMin: z.number().int().min(1).max(24 * 60).nullable().optional(),
         priceOverride: z.number().int().min(0).nullable().optional(),
+        globalCategoryId: z.string().trim().min(1).nullable().optional(),
       })
     )
     .max(500),

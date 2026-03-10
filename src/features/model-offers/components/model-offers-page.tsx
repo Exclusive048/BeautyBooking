@@ -234,6 +234,10 @@ export function ModelOffersPage() {
     () => filteredServices.find((service) => service.id === masterServiceId) ?? null,
     [filteredServices, masterServiceId]
   );
+  const hasOnlyUncategorizedServices = useMemo(
+    () => serviceOptions.length > 0 && categoryOptions.length === 0,
+    [categoryOptions.length, serviceOptions.length]
+  );
 
   const isEmptyState = useMemo(
     () => !loading && !error && offers.length === 0,
@@ -272,18 +276,21 @@ export function ModelOffersPage() {
         servicesRes.ok && servicesJson && servicesJson.ok && Array.isArray(servicesJson.data.services)
           ? extractServices({ services: servicesJson.data.services })
           : [];
-      const fallbackByServiceId = new Map(fallbackServices.map((service) => [service.serviceId, service]));
-      setServices(
-        offerServices.map((service) => {
-          const fallback = fallbackByServiceId.get(service.serviceId);
-          if (!fallback) return service;
-          return {
-            ...service,
-            globalCategoryId: service.globalCategoryId ?? fallback.globalCategoryId ?? null,
-            categoryTitle: service.categoryTitle ?? fallback.categoryTitle ?? null,
-          };
-        })
-      );
+      const mergedByServiceId = new Map<string, ServiceOption>();
+      for (const service of fallbackServices) {
+        mergedByServiceId.set(service.serviceId, service);
+      }
+      for (const service of offerServices) {
+        const fallback = mergedByServiceId.get(service.serviceId);
+        mergedByServiceId.set(service.serviceId, {
+          ...(fallback ?? service),
+          ...service,
+          globalCategoryId: service.globalCategoryId ?? fallback?.globalCategoryId ?? null,
+          categoryTitle: service.categoryTitle ?? fallback?.categoryTitle ?? null,
+          isEnabled: service.isEnabled ?? fallback?.isEnabled,
+        });
+      }
+      setServices(Array.from(mergedByServiceId.values()));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить офферы.");
       setOffers([]);
@@ -526,6 +533,14 @@ export function ModelOffersPage() {
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
+              {hasOnlyUncategorizedServices ? (
+                <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-700">
+                  Сначала добавьте категорию к вашим услугам в разделе{" "}
+                  <a href="/cabinet/master/profile" className="underline">
+                    Профиль → Услуги
+                  </a>
+                </div>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-sm text-text-sec">Категория</label>

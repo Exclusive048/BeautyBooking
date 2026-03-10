@@ -11,6 +11,8 @@ export type StudioServiceAssignedMaster = {
 export type StudioServiceView = {
   id: string;
   categoryId: string | null;
+  globalCategoryId: string | null;
+  globalCategory: { id: string; name: string } | null;
   title: string;
   basePrice: number;
   baseDurationMin: number;
@@ -60,6 +62,8 @@ export async function getStudioServices(studioId: string): Promise<{ categories:
     select: {
       id: true,
       categoryId: true,
+      globalCategoryId: true,
+      globalCategory: { select: { id: true, name: true } },
       name: true,
       title: true,
       basePrice: true,
@@ -84,6 +88,10 @@ export async function getStudioServices(studioId: string): Promise<{ categories:
     const item: StudioServiceView = {
       id: service.id,
       categoryId: service.categoryId ?? null,
+      globalCategoryId: service.globalCategoryId ?? null,
+      globalCategory: service.globalCategory
+        ? { id: service.globalCategory.id, name: service.globalCategory.name }
+        : null,
       title: service.title?.trim() || service.name,
       basePrice: service.basePrice ?? service.price,
       baseDurationMin: service.baseDurationMin ?? service.durationMin,

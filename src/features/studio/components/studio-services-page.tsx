@@ -24,6 +24,8 @@ type StudioServiceAssignedMaster = {
 
 type StudioServiceView = {
   id: string;
+  globalCategoryId: string | null;
+  globalCategory: { id: string; name: string } | null;
   title: string;
   basePrice: number;
   baseDurationMin: number;
@@ -87,6 +89,12 @@ export function StudioServicesPage({ studioId }: Props) {
   const [newServiceTitle, setNewServiceTitle] = useState("");
   const [newServiceCategoryId, setNewServiceCategoryId] = useState("");
   const [newServiceGlobalCategoryId, setNewServiceGlobalCategoryId] = useState("");
+  const [serviceGlobalCategoryById, setServiceGlobalCategoryById] = useState<Record<string, string>>({});
+  const [savingServiceCategoryId, setSavingServiceCategoryId] = useState<string | null>(null);
+  const [showProposeCategoryModal, setShowProposeCategoryModal] = useState(false);
+  const [proposedCategoryTitle, setProposedCategoryTitle] = useState("");
+  const [proposingCategory, setProposingCategory] = useState(false);
+  const [proposeCategoryMessage, setProposeCategoryMessage] = useState<string | null>(null);
   const [newServicePrice, setNewServicePrice] = useState("10000");
   const [newServiceDuration, setNewServiceDuration] = useState("60");
   const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
@@ -127,6 +135,13 @@ export function StudioServicesPage({ studioId }: Props) {
         );
       }
       setData(servicesJson.data);
+      const nextServiceCategories: Record<string, string> = {};
+      for (const category of servicesJson.data.categories) {
+        for (const service of category.services) {
+          nextServiceCategories[service.id] = service.globalCategoryId ?? "";
+        }
+      }
+      setServiceGlobalCategoryById(nextServiceCategories);
       if (!newServiceCategoryId && servicesJson.data.categories.length > 0) {
         setNewServiceCategoryId(servicesJson.data.categories[0].id);
       }
@@ -274,6 +289,59 @@ export function StudioServicesPage({ studioId }: Props) {
     }
   };
 
+  const saveServiceGlobalCategory = async (service: StudioServiceView): Promise<void> => {
+    const nextGlobalCategoryId = (serviceGlobalCategoryById[service.id] ?? "").trim();
+    setSavingServiceCategoryId(service.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/studio/services/${service.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studioId,
+          globalCategoryId: nextGlobalCategoryId || null,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обновить категорию услуги");
+    } finally {
+      setSavingServiceCategoryId(null);
+    }
+  };
+
+  const submitCategoryProposal = async (): Promise<void> => {
+    const title = proposedCategoryTitle.trim();
+    if (!title) return;
+    setProposingCategory(true);
+    setError(null);
+    setProposeCategoryMessage(null);
+    try {
+      const res = await fetch("/api/categories/propose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, context: "SERVICE" }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+      setShowProposeCategoryModal(false);
+      setProposedCategoryTitle("");
+      setProposeCategoryMessage(
+        "Категория отправлена на модерацию. Пока можете сохранить услугу без категории."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось отправить категорию на модерацию");
+    } finally {
+      setProposingCategory(false);
+    }
+  };
+
   if (loading) {
     return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
   }
@@ -334,6 +402,46 @@ export function StudioServicesPage({ studioId }: Props) {
                       <span>{t.visibleInSearch}</span>
                       <TooltipHint text={t.visibleInSearchHint} />
                     </label>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      {service.globalCategory ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                          {service.globalCategory.name}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">
+                          Нет категории
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Select
+                        className="min-w-[220px] rounded-xl px-2 py-1 text-sm"
+                        value={serviceGlobalCategoryById[service.id] ?? service.globalCategoryId ?? ""}
+                        onChange={(event) =>
+                          setServiceGlobalCategoryById((current) => ({
+                            ...current,
+                            [service.id]: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">Без категории</option>
+                        {globalCategories.map((category) => (
+                          <option key={`service-global-category-${service.id}-${category.id}`} value={category.id}>
+                            {category.icon ? `${category.icon} ` : ""}
+                            {category.fullPath || category.title}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void saveServiceGlobalCategory(service)}
+                        disabled={savingServiceCategoryId === service.id}
+                      >
+                        {savingServiceCategoryId === service.id ? "Сохраняем..." : "Сохранить категорию"}
+                      </Button>
+                    </div>
                     {false && (
                       <>
                         {/* TODO: Online payments for services - not yet implemented */}
@@ -451,6 +559,16 @@ export function StudioServicesPage({ studioId }: Props) {
                 Выберите категорию, чтобы услуга отображалась на сайте.
               </div>
             ) : null}
+            <button
+              type="button"
+              onClick={() => setShowProposeCategoryModal(true)}
+              className="w-fit text-xs font-medium text-primary underline"
+            >
+              + Предложить свою категорию
+            </button>
+            {proposeCategoryMessage ? (
+              <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
+            ) : null}
             <Input
               type="text"
               value={newServiceTitle}
@@ -486,6 +604,50 @@ export function StudioServicesPage({ studioId }: Props) {
             </Button>
             <Button type="button" onClick={() => void submitService()} disabled={submittingService}>
               {submittingService ? t.creating : t.save}
+            </Button>
+          </div>
+        </div>
+      </ModalSurface>
+
+      <ModalSurface
+        open={showProposeCategoryModal}
+        onClose={() => {
+          if (!proposingCategory) {
+            setShowProposeCategoryModal(false);
+            setProposedCategoryTitle("");
+          }
+        }}
+      >
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold text-text-main">Предложить категорию</h3>
+          <Input
+            type="text"
+            value={proposedCategoryTitle}
+            onChange={(event) => setProposedCategoryTitle(event.target.value)}
+            placeholder="Название категории"
+            maxLength={60}
+          />
+          <div className="text-xs text-text-sec">
+            Категория отправится на модерацию. Пока можете сохранить услугу без категории.
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              onClick={() => {
+                setShowProposeCategoryModal(false);
+                setProposedCategoryTitle("");
+              }}
+              variant="secondary"
+              disabled={proposingCategory}
+            >
+              {t.cancel}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void submitCategoryProposal()}
+              disabled={proposingCategory || !proposedCategoryTitle.trim()}
+            >
+              {proposingCategory ? t.creating : "Отправить"}
             </Button>
           </div>
         </div>

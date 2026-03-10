@@ -305,6 +305,10 @@ export function MasterProfilePage() {
   const [newSoloServicePrice, setNewSoloServicePrice] = useState<number>(0);
   const [newSoloServiceDuration, setNewSoloServiceDuration] = useState<number>(60);
   const [newSoloServiceGlobalCategoryId, setNewSoloServiceGlobalCategoryId] = useState("");
+  const [proposeCategoryOpen, setProposeCategoryOpen] = useState(false);
+  const [proposeCategoryTitle, setProposeCategoryTitle] = useState("");
+  const [proposeCategorySaving, setProposeCategorySaving] = useState(false);
+  const [proposeCategoryMessage, setProposeCategoryMessage] = useState<string | null>(null);
   const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
   const [newSoloServiceFieldErrors, setNewSoloServiceFieldErrors] = useState<{
     title?: string;
@@ -1117,6 +1121,7 @@ export function MasterProfilePage() {
         durationOverrideMin: item.isEnabled ? normalizeDuration(item.effectiveDurationMin) : item.durationOverrideMin,
         priceOverride:
           item.canEditPrice && item.isEnabled ? normalizePrice(item.effectivePrice) : undefined,
+        globalCategoryId: item.canEditPrice ? item.globalCategoryId ?? null : undefined,
       }));
 
       try {
@@ -1256,6 +1261,34 @@ export function MasterProfilePage() {
       setError(err instanceof Error ? err.message : "Failed to add service");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submitCategoryProposal = async (): Promise<void> => {
+    const title = proposeCategoryTitle.trim();
+    if (!title) return;
+    setProposeCategorySaving(true);
+    setError(null);
+    setProposeCategoryMessage(null);
+    try {
+      const res = await fetch("/api/categories/propose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, context: "SERVICE" }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
+      setProposeCategoryTitle("");
+      setProposeCategoryOpen(false);
+      setProposeCategoryMessage(
+        "Категория отправлена на модерацию. Пока можете сохранить услугу без категории."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось отправить категорию на модерацию");
+    } finally {
+      setProposeCategorySaving(false);
     }
   };
 
@@ -2182,6 +2215,16 @@ export function MasterProfilePage() {
                         {UI_TEXT.master.profile.services.selectCategoryHint}
                       </div>
                     ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setProposeCategoryOpen(true)}
+                      className="text-xs font-medium text-primary underline"
+                    >
+                      + Предложить свою категорию
+                    </button>
+                    {proposeCategoryMessage ? (
+                      <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
+                    ) : null}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_140px_150px]">
                     <label className="text-xs text-text-sec">
@@ -2303,6 +2346,45 @@ export function MasterProfilePage() {
                     {!service.canEditPrice ? (
                       <div className="mt-1 text-xs text-text-sec">
                         {UI_TEXT.master.profile.services.priceManagedHint}
+                      </div>
+                    ) : null}
+                    {service.canEditPrice ? (
+                      <div className="mt-2 space-y-1">
+                        <select
+                          value={service.globalCategoryId ?? ""}
+                          onChange={(event) =>
+                            setServicesDraft((current) => ({
+                              ...current,
+                              [service.serviceId]: {
+                                ...current[service.serviceId],
+                                globalCategoryId: event.target.value || null,
+                                globalCategory:
+                                  globalCategories.find((category) => category.id === event.target.value)
+                                    ? {
+                                        id: event.target.value,
+                                        name:
+                                          globalCategories.find((category) => category.id === event.target.value)
+                                            ?.title ?? "",
+                                      }
+                                    : null,
+                              },
+                            }))
+                          }
+                          className={selectBaseClass}
+                        >
+                          <option value="">Нет категории</option>
+                          {globalCategories.map((category) => (
+                            <option key={`service-category-${service.serviceId}-${category.id}`} value={category.id}>
+                              {category.icon ? `${category.icon} ` : ""}
+                              {category.fullPath || category.title}
+                            </option>
+                          ))}
+                        </select>
+                        {!service.globalCategoryId ? (
+                          <div className="text-xs text-amber-500">
+                            Нет категории. Добавьте категорию, чтобы услуга участвовала в поиске и офферах.
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     {false && (
@@ -2750,6 +2832,54 @@ export function MasterProfilePage() {
         </ModalSurface>
       ) : null}
 
+      {proposeCategoryOpen ? (
+        <ModalSurface
+          open
+          onClose={() => {
+            if (!proposeCategorySaving) {
+              setProposeCategoryOpen(false);
+              setProposeCategoryTitle("");
+            }
+          }}
+          title="Предложить категорию"
+        >
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={proposeCategoryTitle}
+              onChange={(event) => setProposeCategoryTitle(event.target.value)}
+              className={inputBaseClass}
+              placeholder="Название категории"
+              maxLength={60}
+            />
+            <div className="text-xs text-text-sec">
+              Категория отправится на модерацию. Пока можете сохранить услугу без категории.
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setProposeCategoryOpen(false);
+                  setProposeCategoryTitle("");
+                }}
+                disabled={proposeCategorySaving}
+                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+              >
+                {UI_TEXT.actions.close}
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitCategoryProposal()}
+                disabled={proposeCategorySaving || !proposeCategoryTitle.trim()}
+                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+              >
+                {proposeCategorySaving ? UI_TEXT.status.saving : "Отправить"}
+              </button>
+            </div>
+          </div>
+        </ModalSurface>
+      ) : null}
+
       {portfolioCategoryTarget ? (
         <ModalSurface
           open
@@ -2816,6 +2946,14 @@ export function MasterProfilePage() {
                 placeholder={UI_TEXT.master.profile.portfolioMeta.captionPlaceholder}
               />
               <div className="space-y-1">
+                {portfolioCategoryOptions.length === 0 ? (
+                  <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
+                    Добавьте категорию к услугам, чтобы фото попало в поиск.{" "}
+                    <a href="/cabinet/master/profile" className="underline">
+                      Перейти к услугам
+                    </a>
+                  </div>
+                ) : null}
                 <select
                   value={portfolioGlobalCategoryId}
                   onChange={(event) => {
@@ -2823,6 +2961,7 @@ export function MasterProfilePage() {
                     setPortfolioServiceId("");
                   }}
                   className={selectBaseClass}
+                  disabled={portfolioCategoryOptions.length === 0}
                 >
                   <option value="">{"\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f (\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e)"}</option>
                   {portfolioCategoryOptions.map((category) => (
