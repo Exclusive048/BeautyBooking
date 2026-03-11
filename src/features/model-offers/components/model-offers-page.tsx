@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -206,9 +207,19 @@ export function ModelOffersPage() {
     [services]
   );
 
+  const servicesWithCategory = useMemo(
+    () => serviceOptions.filter((service) => Boolean(service.globalCategoryId)),
+    [serviceOptions]
+  );
+
+  const servicesWithoutCategory = useMemo(
+    () => serviceOptions.filter((service) => !service.globalCategoryId),
+    [serviceOptions]
+  );
+
   const categoryOptions = useMemo(() => {
     const byId = new Map<string, { id: string; name: string }>();
-    for (const service of serviceOptions) {
+    for (const service of servicesWithCategory) {
       const categoryId = service.globalCategoryId?.trim();
       if (!categoryId) continue;
       const categoryName = service.categoryTitle?.trim();
@@ -221,26 +232,26 @@ export function ModelOffersPage() {
       });
     }
     return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "ru"));
-  }, [serviceOptions]);
+  }, [servicesWithCategory]);
 
   const filteredServices = useMemo(
     () =>
-      serviceOptions.filter(
+      servicesWithCategory.filter(
         (service) =>
           typeof service.id === "string" &&
           service.id.length > 0 &&
           service.globalCategoryId === selectedCategoryId
       ),
-    [selectedCategoryId, serviceOptions]
+    [selectedCategoryId, servicesWithCategory]
   );
 
   const selectedService = useMemo(
     () => filteredServices.find((service) => service.id === masterServiceId) ?? null,
     [filteredServices, masterServiceId]
   );
-  const hasOnlyUncategorizedServices = useMemo(
-    () => serviceOptions.length > 0 && categoryOptions.length === 0,
-    [categoryOptions.length, serviceOptions.length]
+  const hasNoCategorizedServices = useMemo(
+    () => servicesWithCategory.length === 0 && servicesWithoutCategory.length > 0,
+    [servicesWithCategory.length, servicesWithoutCategory.length]
   );
 
   const isEmptyState = useMemo(
@@ -545,12 +556,14 @@ export function ModelOffersPage() {
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
-              {hasOnlyUncategorizedServices ? (
-                <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-700">
-                  {UI_TEXT.master.modelOffers.messages.uncategorizedServicesWarning}{" "}
-                  <a href="/cabinet/master/profile" className="underline">
-                    {UI_TEXT.master.modelOffers.messages.servicesSectionLink}
-                  </a>
+              {hasNoCategorizedServices ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-300">
+                    {UI_TEXT.master.modelOffers.noCategoryWarning}
+                  </p>
+                  <Link href="/cabinet/master/profile?tab=services" className="mt-1 block text-xs text-amber-300/70 underline">
+                    {UI_TEXT.master.modelOffers.goToServices}
+                  </Link>
                 </div>
               ) : null}
               <div className="grid gap-4 md:grid-cols-2">

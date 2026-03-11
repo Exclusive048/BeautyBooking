@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type SubscriptionScope = "MASTER" | "STUDIO";
 type PeriodMonths = 1 | 3 | 6 | 12;
@@ -60,13 +61,18 @@ type BillingPageProps = {
   scope: SubscriptionScope;
 };
 
-const PERIODS: PeriodMonths[] = [1, 3, 6, 12];
+const PERIODS: PeriodMonths[] = [1, 12];
+const PERIOD_BUTTON_BASE = "rounded-xl px-4 py-2 text-sm font-semibold transition-colors";
+const PERIOD_BUTTON_SELECTED = `${PERIOD_BUTTON_BASE} bg-primary text-white`;
+const PERIOD_BUTTON_UNSELECTED = `${PERIOD_BUTTON_BASE} bg-white/8 text-text-main hover:bg-white/12`;
 
 function getPrice(plan: BillingPlan, periodMonths: PeriodMonths): PlanPrice | null {
   return plan.prices.find((price) => price.periodMonths === periodMonths) ?? null;
 }
 
 function formatPeriodLabel(periodMonths: PeriodMonths) {
+  if (periodMonths === 1) return UI_TEXT.billing.period.month;
+  if (periodMonths === 12) return UI_TEXT.billing.period.year;
   return `${periodMonths} мес.`;
 }
 
@@ -267,14 +273,12 @@ export function BillingPage({ scope }: BillingPageProps) {
                   [scope]: periodMonths,
                 }))
               }
-              className={cn(
-                "rounded-full border px-3 py-1 transition",
-                selectedPeriod[scope] === periodMonths
-                  ? "border-text-main bg-text-main text-white"
-                  : "border-border-subtle text-text-sec hover:bg-bg-card"
-              )}
+              className={selectedPeriod[scope] === periodMonths ? PERIOD_BUTTON_SELECTED : PERIOD_BUTTON_UNSELECTED}
             >
-              {formatPeriodLabel(periodMonths)}
+              <span>{formatPeriodLabel(periodMonths)}</span>
+              {periodMonths === 12 ? (
+                <span className="ml-2 text-xs opacity-80">{UI_TEXT.billing.period.yearDiscount}</span>
+              ) : null}
             </button>
           ))}
         </div>

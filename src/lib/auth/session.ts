@@ -18,6 +18,13 @@ function isSecureCookie(): boolean {
 
 type SessionCookiePayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti">;
 
+async function getAccessSessionPayload(): Promise<SessionPayload | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getAccessCookieName())?.value;
+  if (!token) return null;
+  return verifyToken(token, "access");
+}
+
 export function setSessionCookies(response: NextResponse, payload: SessionCookiePayload): void {
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken({ sub: payload.sub });
@@ -68,14 +75,13 @@ export function clearSessionCookies(response: NextResponse): void {
   });
 }
 
+export async function getSessionUserId(): Promise<string | null> {
+  const payload = await getAccessSessionPayload();
+  return payload?.sub ?? null;
+}
+
 export async function getSessionUser() {
-  const cookieStore = await cookies();
-  const name = getAccessCookieName();
-  const token = cookieStore.get(name)?.value;
-
-  if (!token) return null;
-
-  const payload = verifyToken(token, "access");
+  const payload = await getAccessSessionPayload();
   if (!payload) return null;
 
   const user = await prisma.userProfile.findFirst({

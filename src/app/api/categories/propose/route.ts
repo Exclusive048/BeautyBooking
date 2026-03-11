@@ -15,9 +15,11 @@ const PROPOSAL_RATE_LIMIT = {
 };
 
 const proposeSchema = z.object({
-  title: z.string().trim().min(2).max(60),
+  title: z.string().trim().min(2).max(60).optional(),
+  name: z.string().trim().min(2).max(60).optional(),
   parentId: z.string().trim().min(1).optional(),
   context: z.string().trim().max(500).optional(),
+  isPersonalOnly: z.boolean().optional(),
 });
 
 async function ensureUniqueSlug(base: string): Promise<string> {
@@ -57,9 +59,13 @@ export async function POST(req: Request) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
 
-    const title = parsed.data.title.trim();
+    const title = (parsed.data.name ?? parsed.data.title ?? "").trim();
+    if (!title) {
+      return fail("Название категории обязательно.", 400, "VALIDATION_ERROR");
+    }
     const parentId = parsed.data.parentId?.trim() || null;
     const context = parsed.data.context?.trim() || null;
+    const isPersonalOnly = parsed.data.isPersonalOnly === true;
 
     if (parentId) {
       const parent = await prisma.globalCategory.findUnique({
@@ -78,12 +84,14 @@ export async function POST(req: Request) {
         name: title,
         slug: uniqueSlug,
         parentId,
-        status: CategoryStatus.PENDING,
+        status: isPersonalOnly ? CategoryStatus.APPROVED : CategoryStatus.PENDING,
         proposedBy: auth.user.id,
         proposedAt: new Date(),
         context,
-        reviewedAt: null,
+        reviewedAt: isPersonalOnly ? new Date() : null,
         isSystem: false,
+        visibleToAll: !isPersonalOnly,
+        createdByUserId: auth.user.id,
       },
       select: { id: true, name: true, status: true },
     });

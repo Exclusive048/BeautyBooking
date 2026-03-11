@@ -84,15 +84,27 @@ type DayData = {
   services: DayService[];
 };
 
-type AvailabilitySlot = {
-  startAtUtc: string;
-  endAtUtc: string;
-  label: string;
+type DashboardFreeSlot = {
+  time: string;
+  startsAt: string;
+  categoryId: string;
+  categoryName: string;
+  maxFitDuration: number;
+  allFit: boolean;
+  serviceId: string | null;
 };
 
-type DisplayAvailabilitySlot = {
+type DashboardFreeSlotsResponse = {
+  date: string;
+  timezone: string;
+  slots: DashboardFreeSlot[];
+};
+
+type DisplayFreeSlotHour = {
   key: string;
-  label: string;
+  time: string;
+  startsAt: string;
+  slots: DashboardFreeSlot[];
 };
 
 function todayDateKey(): string {
@@ -111,10 +123,6 @@ function formatMoney(value: number): string {
   return `${moneyFormatter.format(value)} ${UI_TEXT.common.currencyRub}`;
 }
 
-function formatSlotLabel(value: string, timeZone: string): string {
-  return UI_FMT.dateTimeShort(value, { timeZone });
-}
-
 function formatBookingStart(value: string | null, timezone: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -130,12 +138,18 @@ function canMasterRequestMove(booking: DayBooking): boolean {
   return Number.isFinite(minutesLeft) && minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
 }
 
-function formatAvailabilitySlot(slot: AvailabilitySlot, timeZone: string): string {
-  return UI_FMT.dateTimeShort(slot.startAtUtc, { timeZone });
-}
-
 const STORIES_SLOTS_PER_CARD = 10;
-const DISPLAY_SLOT_STEP_MS = 60 * 60 * 1000;
+
+function toDateTimeLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return `${todayDateKey()}T10:00`;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
 
 export function MasterDashboardPage() {
   const router = useRouter();
@@ -185,8 +199,9 @@ export function MasterDashboardPage() {
   const [chatOpenMap, setChatOpenMap] = useState<Record<string, boolean>>({});
   const [chatUnreadMap, setChatUnreadMap] = useState<Record<string, number>>({});
 
-  const [slotsServiceId, setSlotsServiceId] = useState("");
-  const [freeSlots, setFreeSlots] = useState<AvailabilitySlot[]>([]);
+  const [freeSlots, setFreeSlots] = useState<DashboardFreeSlot[]>([]);
+  const [freeSlotsDate, setFreeSlotsDate] = useState(new Date().toISOString());
+  const [freeSlotsTimezone, setFreeSlotsTimezone] = useState("Europe/Moscow");
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slotsReloadTick, setSlotsReloadTick] = useState(0);
@@ -199,29 +214,30 @@ export function MasterDashboardPage() {
     });
   }, [data.bookings]);
 
-  const displayFreeSlots = useMemo<DisplayAvailabilitySlot[]>(() => {
-    const result: DisplayAvailabilitySlot[] = [];
-    let lastSlotStartMs: number | null = null;
-
+  const displayFreeSlots = useMemo<DisplayFreeSlotHour[]>(() => {
+    const byHour = new Map<string, DisplayFreeSlotHour>();
     for (const slot of freeSlots) {
-      const slotStartMs = new Date(slot.startAtUtc).getTime();
-      if (!Number.isFinite(slotStartMs)) continue;
-
-      const roundedStartMs = Math.ceil(slotStartMs / DISPLAY_SLOT_STEP_MS) * DISPLAY_SLOT_STEP_MS;
-      if (lastSlotStartMs !== null && roundedStartMs < lastSlotStartMs + DISPLAY_SLOT_STEP_MS) {
+      const existing = byHour.get(slot.time);
+      if (existing) {
+        existing.slots.push(slot);
         continue;
       }
 
-      const roundedIso = new Date(roundedStartMs).toISOString();
-      result.push({
-        key: `${slot.startAtUtc}-${roundedStartMs}`,
-        label: formatSlotLabel(roundedIso, viewerTimeZone),
+      byHour.set(slot.time, {
+        key: slot.time,
+        time: slot.time,
+        startsAt: slot.startsAt,
+        slots: [slot],
       });
-      lastSlotStartMs = roundedStartMs;
     }
 
-    return result;
-  }, [freeSlots, viewerTimeZone]);
+    return Array.from(byHour.values())
+      .sort((a, b) => a.time.localeCompare(b.time))
+      .map((group) => ({
+        ...group,
+        slots: group.slots.slice().sort((a, b) => a.categoryName.localeCompare(b.categoryName, "ru")),
+      }));
+  }, [freeSlots]);
 
   const load = async (signal?: AbortSignal): Promise<void> => {
     setLoading(true);
@@ -236,9 +252,6 @@ export function MasterDashboardPage() {
       setData(json.data);
       if (!manualServiceId && json.data.services.length > 0) {
         setManualServiceId(json.data.services[0].id);
-      }
-      if (!slotsServiceId && json.data.services.length > 0) {
-        setSlotsServiceId(json.data.services[0].id);
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -312,7 +325,7 @@ export function MasterDashboardPage() {
   useEffect(() => {
     const controller = new AbortController();
     const loadSlots = async (): Promise<void> => {
-      if (!data.masterId || !slotsServiceId) {
+      if (!data.masterId) {
         setFreeSlots([]);
         return;
       }
@@ -320,17 +333,12 @@ export function MasterDashboardPage() {
       setSlotsLoading(true);
       setSlotsError(null);
       try {
-        const params = new URLSearchParams({
-          serviceId: slotsServiceId,
-          from: date,
-          limit: "7",
-        });
-        const res = await fetch(`/api/masters/${data.masterId}/availability?${params.toString()}`, {
+        const res = await fetch("/api/cabinet/master/dashboard/free-slots", {
           cache: "no-store",
           signal: controller.signal,
         });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ slots: AvailabilitySlot[]; meta: { toDateExclusive: string } }>
+          | ApiResponse<DashboardFreeSlotsResponse>
           | null;
 
         if (!res.ok || !json || !json.ok) {
@@ -338,6 +346,8 @@ export function MasterDashboardPage() {
         }
 
         setFreeSlots(json.data.slots ?? []);
+        setFreeSlotsDate(json.data.date);
+        setFreeSlotsTimezone(json.data.timezone);
       } catch (slotError) {
         if (slotError instanceof DOMException && slotError.name === "AbortError") return;
         setSlotsError(slotError instanceof Error ? slotError.message : UI_TEXT.master.dashboard.errors.loadSlots);
@@ -351,7 +361,7 @@ export function MasterDashboardPage() {
 
     void loadSlots();
     return () => controller.abort();
-  }, [data.masterId, date, slotsServiceId, slotsReloadTick]);
+  }, [data.masterId, slotsReloadTick]);
 
   const updateStatus = async (
     booking: DayBooking,
@@ -454,6 +464,26 @@ export function MasterDashboardPage() {
     setChatUnreadMap((prev) => (prev[id] === count ? prev : { ...prev, [id]: count }));
   };
 
+  const formatFreeSlotDuration = (slot: DashboardFreeSlot): string => {
+    const template = slot.allFit
+      ? UI_TEXT.master.dashboard.freeSlots.allFit
+      : UI_TEXT.master.dashboard.freeSlots.partialFit;
+    return template.replace("{duration}", String(slot.maxFitDuration));
+  };
+
+  const openManualBookingFromFreeSlot = (slot: DashboardFreeSlot): void => {
+    if (!data.isSolo) return;
+
+    if (slot.serviceId) {
+      setManualServiceId(slot.serviceId);
+    } else if (!manualServiceId && data.services.length > 0) {
+      setManualServiceId(data.services[0].id);
+    }
+
+    setManualStartAt(toDateTimeLocalInputValue(slot.startsAt));
+    setManualOpen(true);
+  };
+
   const getStatusLabel = (status: string): string => {
     if (status === "PENDING" || status === "NEW") return "Awaiting confirmation";
   if (status === "CONFIRMED") return UI_TEXT.master.dashboard.status.confirmed;
@@ -511,7 +541,12 @@ export function MasterDashboardPage() {
   };
 
   const generateStoryCards = (): HTMLCanvasElement[] => {
-    const labels = freeSlots.map((slot) => formatAvailabilitySlot(slot, viewerTimeZone));
+    const labels = displayFreeSlots.map((hour) => {
+      const categories = hour.slots
+        .map((slot) => `${slot.categoryName} (${formatFreeSlotDuration(slot)})`)
+        .join(", ");
+      return `${hour.time} - ${categories}`;
+    });
     const chunks: string[][] = [];
     for (let i = 0; i < labels.length; i += STORIES_SLOTS_PER_CARD) {
       chunks.push(labels.slice(i, i + STORIES_SLOTS_PER_CARD));
@@ -532,7 +567,14 @@ export function MasterDashboardPage() {
       ctx.font = "bold 56px sans-serif";
       ctx.fillText(UI_TEXT.master.dashboard.stories.brand, 80, 170);
       ctx.font = "42px sans-serif";
-      ctx.fillText(UI_TEXT.master.dashboard.stories.slotsTitle.replace("{date}", date), 80, 250);
+      ctx.fillText(
+        UI_TEXT.master.dashboard.stories.slotsTitle.replace(
+          "{date}",
+          UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })
+        ),
+        80,
+        250
+      );
 
       if (pages.length > 1) {
         ctx.font = "28px sans-serif";
@@ -867,7 +909,10 @@ export function MasterDashboardPage() {
 
             <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">{UI_TEXT.master.dashboard.labels.nextSlotsTitle}</h3>
+                <h3 className="text-sm font-semibold">
+                  {UI_TEXT.master.dashboard.freeSlots.title},{" "}
+                  {UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })}
+                </h3>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -883,32 +928,37 @@ export function MasterDashboardPage() {
                 </div>
               </div>
 
-              {data.services.length > 0 ? (
-                <select
-                  value={slotsServiceId}
-                  onChange={(event) => setSlotsServiceId(event.target.value)}
-                  className="lux-input mb-3 w-full rounded-lg px-2 py-1.5 text-xs"
-                >
-                  {data.services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.title}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-
               {slotsLoading ? (
                 <div className="text-sm text-text-sec">{UI_TEXT.master.dashboard.labels.slotsLoading}</div>
               ) : null}
               {slotsError ? <div className="text-sm text-red-600">{slotsError}</div> : null}
               {!slotsLoading && !slotsError ? (
                 displayFreeSlots.length === 0 ? (
-                  <div className="text-text-sec">{UI_TEXT.master.dashboard.labels.noSlots}</div>
+                  <div className="text-text-sec">{UI_TEXT.master.dashboard.freeSlots.empty}</div>
                 ) : (
-                  <div className="max-h-56 space-y-1 overflow-auto text-sm text-text-sec">
+                  <div className="max-h-56 space-y-2 overflow-auto text-sm text-text-sec">
                     {displayFreeSlots.map((slot) => (
-                      <div key={slot.key} className="rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-1">
-                        {slot.label}
+                      <div key={slot.key} className="flex flex-wrap items-start gap-2 rounded-xl border border-border-subtle bg-bg-input/70 px-2 py-2">
+                        <div className="w-12 shrink-0 text-sm font-semibold text-text-main">{slot.time}</div>
+                        <div className="flex flex-1 flex-wrap gap-1.5">
+                          {slot.slots.map((categorySlot) => (
+                            <button
+                              key={`${slot.key}:${categorySlot.categoryId}`}
+                              type="button"
+                              onClick={() => openManualBookingFromFreeSlot(categorySlot)}
+                              disabled={!data.isSolo || !categorySlot.serviceId}
+                              className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-xs text-text-main transition hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-60"
+                              title={
+                                data.isSolo
+                                  ? UI_TEXT.master.dashboard.labels.manualBookingButton
+                                  : UI_TEXT.master.dashboard.labels.addBookingDisabled
+                              }
+                            >
+                              <span>{categorySlot.categoryName}</span>
+                              <span className="text-text-sec">{formatFreeSlotDuration(categorySlot)}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -948,12 +998,20 @@ export function MasterDashboardPage() {
             <h3 className="text-base font-semibold">{UI_TEXT.master.dashboard.stories.previewTitle}</h3>
             <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input p-3 text-sm">
               <div className="font-medium">
-                {UI_TEXT.master.dashboard.labels.slotsOnDate.replace("{date}", date)}
+                {UI_TEXT.master.dashboard.labels.slotsOnDate.replace(
+                  "{date}",
+                  UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })
+                )}
               </div>
               <div className="mt-2 space-y-1">
-                {freeSlots.length === 0 ? <div>{UI_TEXT.master.dashboard.labels.noSlots}</div> : null}
-                {freeSlots.slice(0, STORIES_SLOTS_PER_CARD).map((slot) => (
-                  <div key={slot.startAtUtc}>{formatAvailabilitySlot(slot, viewerTimeZone)}</div>
+                {displayFreeSlots.length === 0 ? <div>{UI_TEXT.master.dashboard.freeSlots.empty}</div> : null}
+                {displayFreeSlots.slice(0, STORIES_SLOTS_PER_CARD).map((slot) => (
+                  <div key={slot.key}>
+                    {slot.time}:{" "}
+                    {slot.slots
+                      .map((categorySlot) => `${categorySlot.categoryName} (${formatFreeSlotDuration(categorySlot)})`)
+                      .join(", ")}
+                  </div>
                 ))}
               </div>
             </div>

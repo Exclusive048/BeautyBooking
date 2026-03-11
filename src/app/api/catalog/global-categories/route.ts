@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { getSessionUser } from "@/lib/auth/session";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
 import { CategoryStatus, type Prisma } from "@prisma/client";
 
@@ -16,14 +17,20 @@ function parseStatus(value: string | null): CategoryStatus | null {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const sessionUser = await getSessionUser();
     const status = parseStatus(url.searchParams.get("status")) ?? CategoryStatus.APPROVED;
     const where: Prisma.GlobalCategoryWhereInput = {
       status,
-      NOT: [{ visualSearchSlug: "hot" }],
     };
+    if (status === CategoryStatus.APPROVED) {
+      where.OR = sessionUser
+        ? [{ visibleToAll: true }, { createdByUserId: sessionUser.id }, { proposedBy: sessionUser.id }]
+        : [{ visibleToAll: true }];
+    }
 
     const categories = await prisma.globalCategory.findMany({
       where,
+      orderBy: { name: "asc" },
       select: {
         id: true,
         name: true,
@@ -38,6 +45,7 @@ export async function GET(req: Request) {
         context: true,
         reviewedAt: true,
         isSystem: true,
+        visibleToAll: true,
         visualSearchSlug: true,
         createdByUserId: true,
         createdByProviderId: true,
@@ -50,6 +58,7 @@ export async function GET(req: Request) {
     return ok({
       categories: sorted.map((category) => ({
         id: category.id,
+        name: category.name,
         title: category.name,
         slug: category.slug,
         icon: category.icon,
@@ -57,6 +66,8 @@ export async function GET(req: Request) {
         depth: category.depth,
         fullPath: category.fullPath,
         usageCount: category.usageCount,
+        isPersonal: !category.visibleToAll,
+        visibleToAll: category.visibleToAll,
       })),
     });
   } catch (error) {

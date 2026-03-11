@@ -33,36 +33,32 @@ type Props = {
 export function ProfileForm({ initialUser }: Props) {
   const t = UI_TEXT.clientCabinet;
   const [pending, startTransition] = useTransition();
-  const [saved, setSaved] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    displayName: initialUser.displayName ?? "",
     phone: initialUser.phone ?? "",
     email: initialUser.email ?? "",
     firstName: initialUser.firstName ?? "",
     lastName: initialUser.lastName ?? "",
     middleName: initialUser.middleName ?? "",
     birthDate: initialUser.birthDate ?? "",
-    address: initialUser.address ?? "",
   });
 
   const changed = useMemo(() => {
     const normalize = (s: string) => s.trim();
     return (
-      normalize(form.displayName) !== (initialUser.displayName ?? "") ||
       normalize(form.phone) !== (initialUser.phone ?? "") ||
       normalize(form.email) !== (initialUser.email ?? "") ||
       normalize(form.firstName) !== (initialUser.firstName ?? "") ||
       normalize(form.lastName) !== (initialUser.lastName ?? "") ||
       normalize(form.middleName) !== (initialUser.middleName ?? "") ||
-      normalize(form.birthDate) !== (initialUser.birthDate ?? "") ||
-      normalize(form.address) !== (initialUser.address ?? "")
+      normalize(form.birthDate) !== (initialUser.birthDate ?? "")
     );
   }, [form, initialUser]);
 
   const onSave = () => {
-    setSaved(null);
+    setSaved(false);
     setError(null);
 
     startTransition(async () => {
@@ -71,14 +67,12 @@ export function ProfileForm({ initialUser }: Props) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            displayName: form.displayName,
             phone: form.phone,
             email: form.email,
             firstName: form.firstName,
             lastName: form.lastName,
             middleName: form.middleName,
             birthDate: form.birthDate,
-            address: form.address,
           }),
         });
 
@@ -98,7 +92,7 @@ export function ProfileForm({ initialUser }: Props) {
           return;
         }
 
-        setSaved(t.profile.saved);
+        setSaved(true);
       } catch {
         setError(t.profile.networkError);
       }
@@ -115,12 +109,6 @@ export function ProfileForm({ initialUser }: Props) {
         fallbackUrl={initialUser.externalPhotoUrl}
         showAddButton={false}
       />
-
-      {saved ? (
-        <div className="rounded-2xl border border-border-subtle bg-bg-input/70 px-4 py-3 text-sm text-text-main">
-          {saved}
-        </div>
-      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -158,12 +146,13 @@ export function ProfileForm({ initialUser }: Props) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-1 md:col-span-1">
-          <div className="text-xs font-medium text-text-label">{t.profile.displayName}</div>
+
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-text-label">{t.profile.birthDate}</div>
           <Input
-            value={form.displayName}
-            onChange={(e) => setForm((s) => ({ ...s, displayName: e.target.value }))}
-            placeholder={t.profile.displayNamePlaceholder}
+            type="date"
+            value={form.birthDate}
+            onChange={(e) => setForm((s) => ({ ...s, birthDate: e.target.value }))}
           />
         </div>
 
@@ -186,28 +175,8 @@ export function ProfileForm({ initialUser }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-text-label">{t.profile.birthDate}</div>
-          <Input
-            type="date"
-            value={form.birthDate}
-            onChange={(e) => setForm((s) => ({ ...s, birthDate: e.target.value }))}
-          />
-        </div>
-
-        <div className="space-y-1 md:col-span-2">
-          <div className="text-xs font-medium text-text-label">{t.profile.address}</div>
-          <Input
-            value={form.address}
-            onChange={(e) => setForm((s) => ({ ...s, address: e.target.value }))}
-            placeholder={t.profile.addressPlaceholder}
-          />
-          <div className="mt-1 text-xs text-text-sec">{t.profile.mapHint}</div>
-        </div>
-      </div>
-
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {saved ? <span className="text-sm text-text-sec">{UI_TEXT.common.saved}</span> : null}
         <Button type="button" disabled={pending || !changed} onClick={onSave}>
           {pending ? t.profile.saving : t.common.save}
         </Button>

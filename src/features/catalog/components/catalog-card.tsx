@@ -14,6 +14,7 @@ type CatalogCardItem = {
   id: string;
   publicUsername: string | null;
   title: string;
+  tagline: string | null;
   avatarUrl: string | null;
   avatarFocalX: number | null;
   avatarFocalY: number | null;
@@ -56,6 +57,10 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
       : UI_TEXT.catalog.noSlots;
 
   const showNew = item.reviewsCount <= 0;
+  const masterHashtag =
+    item.type === "master" && item.tagline
+      ? item.tagline.trim().replace(/^#+/, "")
+      : "";
 
   const cardBody = (
     <article>
@@ -77,6 +82,11 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
           )}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-text-main">{item.title}</div>
+            {masterHashtag ? (
+              <span className="mt-1 inline-flex rounded-full bg-primary/15 px-2 py-0.5 text-[11px] text-primary">
+                #{masterHashtag}
+              </span>
+            ) : null}
             <div className="text-xs text-text-sec">
               {showNew
                 ? UI_TEXT.catalog.newLabel

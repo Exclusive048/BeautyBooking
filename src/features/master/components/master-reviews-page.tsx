@@ -6,6 +6,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import type { ReviewDto } from "@/lib/reviews/types";
 import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 
 // AUDIT (sections 4,7):
 // - Master cabinet renders both public tags and private "improve" tags.
@@ -51,6 +52,7 @@ function collectTopPrivateTags(reviews: ReviewDto[]): Array<{ code: string; labe
 }
 
 export function MasterReviewsPage({ masterId }: Props) {
+  const t = UI_TEXT.master.reviews;
   const viewerTimeZone = useViewerTimeZoneContext();
   const [reviews, setReviews] = useState<ReviewDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,18 +77,18 @@ export function MasterReviewsPage({ masterId }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `Ошибка API: ${res.status}`);
       }
       setReviews(json.data.reviews);
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-      setError(loadError instanceof Error ? loadError.message : "Failed to load reviews");
+      setError(loadError instanceof Error ? loadError.message : t.loadFailed);
     } finally {
       if (!signal || !signal.aborted) {
         setLoading(false);
       }
     }
-  }, [masterId]);
+  }, [masterId, t.loadFailed]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -130,7 +132,7 @@ export function MasterReviewsPage({ masterId }: Props) {
   const replyToReview = async (review: ReviewDto): Promise<void> => {
     if (review.replyText) return;
 
-    const text = window.prompt("Reply to review");
+    const text = window.prompt(t.replyPlaceholder);
     const normalized = text?.trim() ?? "";
     if (!normalized) return;
 
@@ -144,11 +146,11 @@ export function MasterReviewsPage({ masterId }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `Ошибка API: ${res.status}`);
       }
       setReviews((prev) => updateReview(prev, json.data.review));
     } catch (actionErrorValue) {
-      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : "Failed to reply");
+      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : t.replyFailed);
     } finally {
       setActionId(null);
     }
@@ -157,7 +159,7 @@ export function MasterReviewsPage({ masterId }: Props) {
   const reportReview = async (review: ReviewDto): Promise<void> => {
     if (!canReportReview(review)) return;
 
-    const comment = window.prompt("Report reason");
+    const comment = window.prompt(t.reportPrompt);
     const normalized = comment?.trim() ?? "";
     if (!normalized) return;
 
@@ -171,11 +173,11 @@ export function MasterReviewsPage({ masterId }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `Ошибка API: ${res.status}`);
       }
       setReviews((prev) => updateReview(prev, json.data.review));
     } catch (actionErrorValue) {
-      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : "Failed to report review");
+      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : t.reportFailed);
     } finally {
       setActionId(null);
     }
@@ -186,14 +188,14 @@ export function MasterReviewsPage({ masterId }: Props) {
       <section className="lux-card rounded-[24px] p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold">Review stats</h3>
+            <h3 className="text-sm font-semibold">{t.rating}</h3>
             <p className="mt-1 text-sm text-text-sec">
-              Total: {reviews.length} - Avg: {averageRating.toFixed(1)}
+              {t.totalReviews(reviews.length)} - {averageRating.toFixed(1)}
             </p>
             <div className="mt-2">
-              <div className="text-xs font-medium text-text-main">What can be improved</div>
+              <div className="text-xs font-medium text-text-main">{t.canImprove}</div>
               {topPrivateTags.length === 0 ? (
-                <div className="mt-1 text-xs text-text-sec">No private tags yet</div>
+                <div className="mt-1 text-xs text-text-sec">{t.noPrivateTags}</div>
               ) : (
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {topPrivateTags.map((tag) => (
@@ -209,23 +211,23 @@ export function MasterReviewsPage({ masterId }: Props) {
             </div>
           </div>
           <label className="text-sm text-text-sec">
-            Sort
+            {t.sortBy.label}
             <select
               value={sortMode}
               onChange={(event) => setSortMode(event.target.value as SortMode)}
               className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm"
             >
-              <option value="DATE_ASC">Date: old to new</option>
-              <option value="DATE_DESC">Date: new to old</option>
-              <option value="RATING_ASC">Rating: 1 to 5</option>
-              <option value="RATING_DESC">Rating: 5 to 1</option>
+              <option value="DATE_ASC">{t.sortBy.oldest}</option>
+              <option value="DATE_DESC">{t.sortBy.newest}</option>
+              <option value="RATING_ASC">{t.sortBy.lowest}</option>
+              <option value="RATING_DESC">{t.sortBy.highest}</option>
             </select>
           </label>
         </div>
       </section>
 
       {loading ? (
-        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Loading reviews...</div>
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>
       ) : null}
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
@@ -236,10 +238,11 @@ export function MasterReviewsPage({ masterId }: Props) {
 
       {!loading && !error ? (
         <section className="lux-card rounded-[24px] p-4">
-          <h3 className="mb-3 text-sm font-semibold">Reviews</h3>
+          <h3 className="mb-3 text-sm font-semibold">{t.title}</h3>
           {sortedReviews.length === 0 ? (
             <div className="rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-sm text-text-sec">
-              No reviews yet.
+              {t.empty}
+              <div className="mt-1 text-xs">{t.emptyHint}</div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -254,7 +257,7 @@ export function MasterReviewsPage({ masterId }: Props) {
                     </div>
                   </div>
                   <div className="mt-2 text-sm text-text-sec">
-                    {review.text?.trim() ? review.text : "No comment"}
+                    {review.text?.trim() ? review.text : t.noText}
                   </div>
                   {review.publicTags.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -272,7 +275,7 @@ export function MasterReviewsPage({ masterId }: Props) {
                   {(review.privateTags?.length ?? 0) > 0 ? (
                     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-2">
                       <div className="text-[11px] font-medium uppercase tracking-wide text-amber-800">
-                        Can improve
+                        {t.privateTagsTitle}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {(review.privateTags ?? []).map((tag) => (
@@ -289,7 +292,7 @@ export function MasterReviewsPage({ masterId }: Props) {
 
                   {review.replyText ? (
                     <div className="mt-3 rounded-lg border border-border-subtle bg-white/70 p-2 text-sm text-text-main">
-                      <div className="text-xs uppercase tracking-wide text-text-sec">Master reply</div>
+                      <div className="text-xs uppercase tracking-wide text-text-sec">{t.masterReply}</div>
                       <div className="mt-1">{review.replyText}</div>
                     </div>
                   ) : null}
@@ -302,7 +305,7 @@ export function MasterReviewsPage({ masterId }: Props) {
                         disabled={actionId === review.id}
                         className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs disabled:opacity-60"
                       >
-                        Reply
+                        {t.reply}
                       </button>
                     ) : null}
                     {canReportReview(review) ? (
@@ -312,12 +315,12 @@ export function MasterReviewsPage({ masterId }: Props) {
                         disabled={actionId === review.id}
                         className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-700 disabled:opacity-60"
                       >
-                        Report
+                        {t.report}
                       </button>
                     ) : null}
                     {review.reportedAt ? (
                       <div className="text-xs text-text-sec">
-                        Reported {formatReviewDate(review.reportedAt, viewerTimeZone)}
+                        {t.reportedAt} {formatReviewDate(review.reportedAt, viewerTimeZone)}
                       </div>
                     ) : null}
                   </div>

@@ -15,6 +15,7 @@ type HomeCategory = {
   slug: string;
   icon: string | null;
   usageCount: number;
+  parentId: string | null;
 };
 
 type CatalogCategory = {
@@ -36,12 +37,12 @@ const CATEGORY_CHIPS_LIMIT = 8;
 
 function buildFeedUrl(params: {
   cursor?: string | null;
-  categoryId?: string | null;
+  globalCategoryId?: string | null;
 }) {
   const query = new URLSearchParams();
   query.set("limit", String(FEED_LIMIT));
   if (params.cursor) query.set("cursor", params.cursor);
-  if (params.categoryId) query.set("categoryId", params.categoryId);
+  if (params.globalCategoryId) query.set("globalCategoryId", params.globalCategoryId);
   return `/api/home/feed?${query.toString()}`;
 }
 
@@ -50,7 +51,7 @@ export function HomeFeed() {
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | null>(null);
   const [categories, setCategories] = useState<HomeCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [items, setItems] = useState<PortfolioFeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,7 @@ export function HomeFeed() {
       const res = await fetch(
         buildFeedUrl({
           cursor,
-          categoryId: selectedCategoryId,
+          globalCategoryId: activeCategory,
         }),
         { cache: "no-store" }
       );
@@ -74,7 +75,7 @@ export function HomeFeed() {
       }
       return json.data;
     },
-    [selectedCategoryId]
+    [activeCategory]
   );
 
   useEffect(() => {
@@ -95,14 +96,18 @@ export function HomeFeed() {
       try {
         const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: CatalogCategory[] }>
+          | ApiResponse<{ categories: CatalogCategory[] } | CatalogCategory[]>
           | null;
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : UI_TEXT.home.loadFailed);
         }
+        const payload = Array.isArray(json.data) ? json.data : (json.data?.categories ?? []);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[home] global categories response", payload);
+        }
         if (!cancelled) {
           setCategories(
-            json.data.categories
+            payload
               .filter((item) => item.parentId === null)
               .slice(0, CATEGORY_CHIPS_LIMIT)
               .map((item) => ({
@@ -111,6 +116,7 @@ export function HomeFeed() {
                 slug: item.slug ?? item.id,
                 icon: item.icon,
                 usageCount: item.usageCount,
+                parentId: item.parentId,
               }))
           );
         }
@@ -189,8 +195,8 @@ export function HomeFeed() {
     <div className="space-y-6">
       <HomeFilters
         categories={categories}
-        selectedCategoryId={selectedCategoryId}
-        onSelectCategory={(next) => setSelectedCategoryId(next)}
+        selectedCategoryId={activeCategory}
+        onSelectCategory={(next) => setActiveCategory(next)}
       />
 
       {toast ? (

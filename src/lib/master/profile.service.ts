@@ -8,6 +8,7 @@ import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope }
 
 type MasterContext = {
   id: string;
+  ownerUserId: string | null;
   studioProviderId: string | null;
   studioId: string | null;
   isSolo: boolean;
@@ -29,6 +30,7 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
     select: {
       id: true,
       type: true,
+      ownerUserId: true,
       studioId: true,
       name: true,
       tagline: true,
@@ -49,6 +51,7 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
   if (!master.studioId) {
     return {
       id: master.id,
+      ownerUserId: master.ownerUserId,
       studioProviderId: null,
       studioId: null,
       isSolo: true,
@@ -75,6 +78,7 @@ async function getMasterContext(masterId: string): Promise<MasterContext> {
 
   return {
     id: master.id,
+    ownerUserId: master.ownerUserId,
     studioProviderId: master.studioId,
     studioId: studio.id,
     isSolo: false,
@@ -424,16 +428,21 @@ export async function upsertMasterServices(
         .filter((value): value is string => Boolean(value))
     );
     if (requestedGlobalCategoryIds.length > 0) {
+      const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [{ status: CategoryStatus.APPROVED, visibleToAll: true }];
+      if (context.ownerUserId) {
+        visibilityConditions.push({ createdByUserId: context.ownerUserId });
+        visibilityConditions.push({ proposedBy: context.ownerUserId });
+      }
       const categories = await prisma.globalCategory.findMany({
         where: {
           id: { in: requestedGlobalCategoryIds },
-          status: CategoryStatus.APPROVED,
           visualSearchSlug: { not: "hot" },
+          OR: visibilityConditions,
         },
         select: { id: true },
       });
       if (categories.length !== requestedGlobalCategoryIds.length) {
-        throw new AppError("Р“Р»РѕР±Р°Р»СЊРЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404, "NOT_FOUND");
+        throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
       }
     }
 
@@ -545,16 +554,22 @@ export async function createSoloMasterService(
 
   const globalCategoryId = input.globalCategoryId?.trim() || null;
   if (globalCategoryId) {
-    const globalCategory = await prisma.globalCategory.findUnique({
-      where: { id: globalCategoryId },
+    const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [
+      { status: CategoryStatus.APPROVED, visibleToAll: true },
+    ];
+    if (context.ownerUserId) {
+      visibilityConditions.push({ createdByUserId: context.ownerUserId });
+      visibilityConditions.push({ proposedBy: context.ownerUserId });
+    }
+    const globalCategory = await prisma.globalCategory.findFirst({
+      where: {
+        id: globalCategoryId,
+        OR: visibilityConditions,
+      },
       select: { id: true, status: true, visualSearchSlug: true },
     });
-    if (
-      !globalCategory ||
-      globalCategory.status !== CategoryStatus.APPROVED ||
-      globalCategory.visualSearchSlug === "hot"
-    ) {
-      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    if (!globalCategory || globalCategory.visualSearchSlug === "hot") {
+      throw new AppError("Global category not found", 404, "NOT_FOUND");
     }
   }
 
@@ -682,16 +697,22 @@ export async function createMasterPortfolioItem(
 
   const selectedGlobalCategoryId = input.globalCategoryId?.trim() || null;
   if (selectedGlobalCategoryId) {
-    const category = await prisma.globalCategory.findUnique({
-      where: { id: selectedGlobalCategoryId },
+    const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [
+      { status: CategoryStatus.APPROVED, visibleToAll: true },
+    ];
+    if (context.ownerUserId) {
+      visibilityConditions.push({ createdByUserId: context.ownerUserId });
+      visibilityConditions.push({ proposedBy: context.ownerUserId });
+    }
+    const category = await prisma.globalCategory.findFirst({
+      where: {
+        id: selectedGlobalCategoryId,
+        OR: visibilityConditions,
+      },
       select: { id: true, status: true, visualSearchSlug: true },
     });
-    if (
-      !category ||
-      category.status !== CategoryStatus.APPROVED ||
-      category.visualSearchSlug === "hot"
-    ) {
-      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    if (!category || category.visualSearchSlug === "hot") {
+      throw new AppError("Global category not found", 404, "NOT_FOUND");
     }
   }
 
@@ -803,16 +824,23 @@ export async function updateMasterPortfolioCategory(
 
   const nextGlobalCategoryId = globalCategoryId?.trim() || null;
   if (nextGlobalCategoryId) {
-    const category = await prisma.globalCategory.findUnique({
-      where: { id: nextGlobalCategoryId },
+    const context = await getMasterContext(masterId);
+    const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [
+      { status: CategoryStatus.APPROVED, visibleToAll: true },
+    ];
+    if (context.ownerUserId) {
+      visibilityConditions.push({ createdByUserId: context.ownerUserId });
+      visibilityConditions.push({ proposedBy: context.ownerUserId });
+    }
+    const category = await prisma.globalCategory.findFirst({
+      where: {
+        id: nextGlobalCategoryId,
+        OR: visibilityConditions,
+      },
       select: { id: true, status: true, visualSearchSlug: true },
     });
-    if (
-      !category ||
-      category.status !== CategoryStatus.APPROVED ||
-      category.visualSearchSlug === "hot"
-    ) {
-      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    if (!category || category.visualSearchSlug === "hot") {
+      throw new AppError("Global category not found", 404, "NOT_FOUND");
     }
   }
 

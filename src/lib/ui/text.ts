@@ -1,3 +1,5 @@
+import { pluralize } from "@/lib/utils/pluralize";
+
 export const UI_TEXT = {
   common: {
     loading: "Загрузка…",
@@ -12,6 +14,7 @@ export const UI_TEXT = {
     currencyRub: "₽",
     requiredField: "Обязательное поле",
     namePlaceholder: "Имя",
+    saved: "Сохранено",
     toggleTheme: "Переключить тему",
   },
   brand: {
@@ -211,6 +214,36 @@ export const UI_TEXT = {
       loading: "Загрузка компонента...",
       title: "Функция недоступна",
       description: "Доступно на тарифе {plan}.",
+      notificationsTitle: "Уведомления — тариф Про",
+      notificationsHint: "Подключи Telegram и ВК чтобы не пропустить ни одной записи",
+      cta: "Попробовать Про",
+    },
+    period: {
+      month: "Ежемесячно",
+      year: "Ежегодно",
+      yearDiscount: "Экономия 20%",
+    },
+  },
+  schedule: {
+    mode: {
+      label: "\u0420\u0435\u0436\u0438\u043c \u0440\u0430\u0441\u043f\u0438\u0441\u0430\u043d\u0438\u044f",
+      flexible: "\u0413\u0438\u0431\u043a\u0438\u0439 \u2014 \u043a\u043b\u0438\u0435\u043d\u0442 \u0432\u044b\u0431\u0438\u0440\u0430\u0435\u0442 \u043b\u044e\u0431\u043e\u0435 \u0432\u0440\u0435\u043c\u044f",
+      fixed: "\u0424\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0439 \u2014 \u0442\u043e\u043b\u044c\u043a\u043e \u0437\u0430\u0434\u0430\u043d\u043d\u044b\u0435 \u043e\u043a\u043d\u0430",
+    },
+    fixedSlots: {
+      title: "\u0424\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 \u043e\u043a\u043d\u0430",
+      add: "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043e\u043a\u043d\u043e",
+      hint: "\u041a\u043b\u0438\u0435\u043d\u0442\u044b \u0441\u043c\u043e\u0433\u0443\u0442 \u0437\u0430\u043f\u0438\u0441\u0430\u0442\u044c\u0441\u044f \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u044d\u0442\u0438 \u0447\u0430\u0441\u044b",
+    },
+  },
+  settings: {
+    notifications: {
+      vk: {
+        title: "Уведомления ВКонтакте",
+        connect: "Подключить ВК",
+        connected: "ВК подключён",
+        enable: "Получать уведомления в ВК",
+      },
     },
   },
   cabinetHub: {
@@ -333,6 +366,8 @@ export const UI_TEXT = {
   },
   home: {
     filters: {
+      reset: "Сбросить фильтры",
+      all: "Все",
       categoriesTitle: "Что ищем?",
       tagsTitle: "Какой стиль?",
     },
@@ -377,6 +412,14 @@ export const UI_TEXT = {
     detailsFailed: "Не удалось загрузить работу",
     bookService: "Записаться на услугу",
     goToMaster: "К мастеру",
+  },
+  services: {
+    fields: {
+      duration: "\u0414\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c (\u043c\u0438\u043d)",
+      durationHint:
+        "\u041e\u0442 15 \u0434\u043e 720 \u043c\u0438\u043d\u0443\u0442, \u0448\u0430\u0433 15 \u043c\u0438\u043d\u0443\u0442",
+      durationPlaceholder: "60",
+    },
   },
   catalog: {
     capsule: {
@@ -531,6 +574,12 @@ export const UI_TEXT = {
         slotsOnDate: "Окна на {date}",
         savedCardsTitle: "Сохраненные карточки",
       },
+      freeSlots: {
+        title: "\u0421\u0432\u043e\u0431\u043e\u0434\u043d\u044b\u0435 \u043e\u043a\u043d\u0430 \u0441\u0435\u0433\u043e\u0434\u043d\u044f",
+        empty: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0432\u0441\u0451 \u0437\u0430\u043d\u044f\u0442\u043e \ud83c\udf89",
+        allFit: "{duration} \u043c\u0438\u043d",
+        partialFit: "\u0434\u043e {duration} \u043c\u0438\u043d",
+      },
       stories: {
         brand: "МастерРядом",
         slotsTitle: "Свободные слоты · {date}",
@@ -566,6 +615,8 @@ export const UI_TEXT = {
         closed: "Закрыт",
         archived: "Архив",
       },
+      noCategoryWarning: "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u044c \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438 \u043a \u0441\u0432\u043e\u0438\u043c \u0443\u0441\u043b\u0443\u0433\u0430\u043c",
+      goToServices: "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0443\u0441\u043b\u0443\u0433\u0430\u043c \u2192",
       messages: {
         uncategorizedServicesWarning:
           "Сначала добавьте категорию к вашим услугам в разделе",
@@ -671,7 +722,7 @@ export const UI_TEXT = {
       },
       preview: {
         nameFallback: "Имя мастера",
-        taglineFallback: "Добавьте короткий слоган",
+        taglineFallback: "Добавьте хештег профиля",
         addressFallback: "Адрес пока не указан",
         bioFallback: "Добавьте описание, чтобы клиенты лучше узнали о вас.",
         addressLabel: "Адрес",
@@ -797,13 +848,14 @@ export const UI_TEXT = {
       },
       form: {
         nameLabel: "Имя",
-        namePlaceholder: "Имя",
-        taglineLabel: "Тэглайн",
-        taglinePlaceholder: "Например, свадебный макияж",
+        namePlaceholder: "Например: Анна Смирнова",
+        hashtagLabel: "Хештег профиля",
+        hashtagPlaceholder: "например: маникюр, Москва",
+        hashtagHint: "Показывается как бейдж на карточке в каталоге",
         addressLabel: "Адрес",
-        addressPlaceholder: "Адрес приёма",
+        addressPlaceholder: "Начни вводить адрес...",
         bioLabel: "Описание",
-        bioPlaceholder: "О себе",
+        bioPlaceholder: "Расскажи клиентам о себе — опыт, подход, специализация",
         selectAddressAria: "Выбрать адрес",
         replaceAvatarAction: "Заменить фото",
         removeAvatarAction: "Удалить фото",
@@ -817,7 +869,38 @@ export const UI_TEXT = {
     },
     reviews: {
       title: "Отзывы",
-      subtitle: "Оценки и комментарии клиентов, отсортированные прямо в кабинете.",
+      subtitle: "Что клиенты говорят о твоей работе",
+      rating: "Рейтинг",
+      statsTitle: "Рейтинг",
+      totalReviews: (n: number) => `${n} ${pluralize(n, "отзыв", "отзыва", "отзывов")}`,
+      canImprove: "Что можно улучшить",
+      noPrivateTags: "Пока нет приватных меток",
+      sortLabel: "Сортировать",
+      loading: "Загружаем отзывы...",
+      loadFailed: "Не удалось загрузить отзывы",
+      empty: "Отзывов пока нет — попроси первых клиентов поделиться впечатлениями",
+      emptyHint: "Клиенты оставляют отзыв после завершённой записи",
+      noText: "Без комментария",
+      privateTagsTitle: "Можно улучшить",
+      masterReply: "Ответ мастера",
+      reply: "Ответить",
+      replyPlaceholder: "Напиши ответ клиенту...",
+      replyPrompt: "Напиши ответ клиенту...",
+      replySave: "Отправить",
+      replyCancel: "Отмена",
+      replyFailed: "Не удалось отправить ответ",
+      report: "Пожаловаться",
+      reportPrompt: "Причина жалобы",
+      reportFailed: "Не удалось отправить жалобу",
+      reportedAt: "Жалоба отправлена",
+      verified: "Проверенный отзыв",
+      sortBy: {
+        label: "Сортировать",
+        newest: "Сначала новые",
+        oldest: "Сначала старые",
+        highest: "Высокий рейтинг",
+        lowest: "Низкий рейтинг",
+      },
     },
   },
   admin: {
@@ -953,8 +1036,10 @@ export const UI_TEXT = {
       firstNamePlaceholder: "Иван",
       middleName: "Отчество",
       middleNamePlaceholder: "Иванович",
-      displayName: "Отображаемое имя",
-      displayNamePlaceholder: "Как вас показывать в интерфейсе",
+      name: "\u0418\u043c\u044f",
+      namePlaceholder: "\u041a\u0430\u043a \u0442\u0435\u0431\u044f \u0437\u043e\u0432\u0443\u0442?",
+      displayName: "\u0418\u043c\u044f",
+      displayNamePlaceholder: "\u041a\u0430\u043a \u0442\u0435\u0431\u044f \u0437\u043e\u0432\u0443\u0442?",
       email: "Почта",
       birthDate: "Дата рождения",
       address: "Адрес",
@@ -2524,5 +2609,6 @@ export const UI_TEXT = {
     placeholder: "Напишите сообщение",
   },
 } as const;
+
 
 

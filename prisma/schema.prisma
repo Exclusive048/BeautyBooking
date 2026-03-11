@@ -154,6 +154,12 @@ enum ScheduleOverrideKind {
   TEMPLATE
 }
 
+enum ScheduleMode {
+  FLEXIBLE
+
+  FIXED
+}
+
 enum NotificationType {
   BOOKING_CREATED
   BOOKING_CANCELLED
@@ -630,6 +636,8 @@ model Provider {
   autoConfirmBookings       Boolean @default(false)
   cancellationDeadlineHours Int?
   remindersEnabled          Boolean @default(true)
+  scheduleMode              ScheduleMode @default(FLEXIBLE)
+  fixedSlotTimes            String[]     @default([])
 
   studioId String?
 
@@ -1737,6 +1745,7 @@ model GlobalCategory {
   context          String?
   reviewedAt       DateTime?
   isSystem         Boolean          @default(false)
+  visibleToAll     Boolean          @default(true)
   visualSearchSlug String?          @unique
 
   usageCount Int @default(0)
@@ -1762,6 +1771,7 @@ model GlobalCategory {
   @@index([status])
   @@index([parentId, orderIndex])
   @@index([isSystem])
+  @@index([visibleToAll])
   @@index([createdByUserId])
   @@index([createdByProviderId])
 }

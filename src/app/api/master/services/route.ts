@@ -130,6 +130,10 @@ export async function PUT(req: Request) {
   }
 }
 
+export async function PATCH(req: Request) {
+  return PUT(req);
+}
+
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();

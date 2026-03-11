@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type ScheduleBreak = {
@@ -42,6 +44,8 @@ type ScheduleOverride = {
 
 type StatusPayload = {
   mode: "solo" | "studio_member";
+  scheduleMode: "FLEXIBLE" | "FIXED";
+  fixedSlotTimes: string[];
   requestStatus?: "PENDING" | "REJECTED" | "APPROVED" | null;
   pendingRequestId?: string | null;
   rejectedComment?: string | null;
@@ -59,6 +63,8 @@ type SchedulePayload = {
   }>;
   weekly: { days: WeeklyDay[] };
   overrides: ScheduleOverride[];
+  scheduleMode?: "FLEXIBLE" | "FIXED";
+  fixedSlotTimes?: string[];
   removedOverrides?: string[];
 };
 
@@ -129,9 +135,33 @@ function normalizeBreaks(input: ScheduleBreak[]): ScheduleBreak[] {
     .filter((item) => item.startLocal && item.endLocal);
 }
 
+function normalizeFixedSlotTime(value: string): string | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
+    return null;
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeFixedSlotTimes(values: string[]): string[] {
+  const unique = new Set<string>();
+  for (const value of values) {
+    const normalized = normalizeFixedSlotTime(value);
+    if (normalized) unique.add(normalized);
+  }
+  return Array.from(unique).sort((left, right) => left.localeCompare(right));
+}
+
 export function ScheduleBuilder() {
   const viewerTimeZone = useViewerTimeZoneContext();
-  const [status, setStatus] = useState<StatusPayload>({ mode: "solo" });
+  const [status, setStatus] = useState<StatusPayload>({
+    mode: "solo",
+    scheduleMode: "FLEXIBLE",
+    fixedSlotTimes: [],
+  });
   const [tab, setTab] = useState<"templates" | "week" | "overrides">("templates");
   const [month, setMonth] = useState(currentMonthKey());
   const [selectedDate, setSelectedDate] = useState(`${currentMonthKey()}-01`);
@@ -147,6 +177,11 @@ export function ScheduleBuilder() {
   const [initialTemplates, setInitialTemplates] = useState<ScheduleTemplate[]>([]);
   const [initialWeeklyDays, setInitialWeeklyDays] = useState<WeeklyDay[]>([]);
   const [initialOverridesByMonth, setInitialOverridesByMonth] = useState<Record<string, ScheduleOverride[]>>({});
+  const [scheduleMode, setScheduleMode] = useState<"FLEXIBLE" | "FIXED">("FLEXIBLE");
+  const [initialScheduleMode, setInitialScheduleMode] = useState<"FLEXIBLE" | "FIXED">("FLEXIBLE");
+  const [fixedSlotTimes, setFixedSlotTimes] = useState<string[]>([]);
+  const [initialFixedSlotTimes, setInitialFixedSlotTimes] = useState<string[]>([]);
+  const [newFixedSlotTime, setNewFixedSlotTime] = useState("10:00");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -273,12 +308,18 @@ export function ScheduleBuilder() {
         breaks: item.breaks ?? [],
       }));
       const weeklyItems = weeklyJson.data.days;
+      const mode = statusJson.data.scheduleMode === "FIXED" ? "FIXED" : "FLEXIBLE";
+      const fixedTimes = normalizeFixedSlotTimes(statusJson.data.fixedSlotTimes ?? []);
 
       setStatus(statusJson.data);
       setTemplates(templateItems);
       setWeeklyDays(weeklyItems);
       setInitialTemplates(templateItems);
       setInitialWeeklyDays(weeklyItems);
+      setScheduleMode(mode);
+      setInitialScheduleMode(mode);
+      setFixedSlotTimes(fixedTimes);
+      setInitialFixedSlotTimes(fixedTimes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить график");
     } finally {
@@ -354,8 +395,12 @@ export function ScheduleBuilder() {
     setWeeklyDays((current) =>
       current.map((day) => {
         if (day.weekday !== weekday) return day;
+        const isTemplateUpdate = next.templateId !== undefined;
         const templateId = next.templateId !== undefined ? next.templateId : day.templateId;
-        const isActive = next.isActive !== undefined ? next.isActive : day.isActive;
+        let isActive = next.isActive !== undefined ? next.isActive : day.isActive;
+        if (isTemplateUpdate) {
+          isActive = Boolean(templateId);
+        }
         return {
           ...day,
           templateId,
@@ -380,6 +425,20 @@ export function ScheduleBuilder() {
       const list = current[month] ?? [];
       return { ...current, [month]: list.filter((item) => item.date !== dateKey) };
     });
+  };
+
+  const addFixedSlotTime = () => {
+    const normalized = normalizeFixedSlotTime(newFixedSlotTime);
+    if (!normalized) {
+      setError("\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f \u043e\u043a\u043d\u0430. \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u0444\u043e\u0440\u043c\u0430\u0442 HH:mm.");
+      return;
+    }
+    setError(null);
+    setFixedSlotTimes((current) => normalizeFixedSlotTimes([...current, normalized]));
+  };
+
+  const removeFixedSlotTime = (value: string) => {
+    setFixedSlotTimes((current) => current.filter((item) => item !== value));
   };
 
   const resetTemplateDraft = () => {
@@ -512,6 +571,8 @@ export function ScheduleBuilder() {
       })),
       weekly: { days: weeklyDays },
       overrides: Object.values(overridesByMonth).flatMap((items) => items),
+      scheduleMode,
+      fixedSlotTimes,
     };
   };
 
@@ -658,15 +719,37 @@ export function ScheduleBuilder() {
         }
       }
 
+      const settingsRes = await fetch("/api/provider/schedule/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleMode,
+          fixedSlotTimes,
+        }),
+      });
+      const settingsJson = (await settingsRes.json().catch(() => null)) as
+        | ApiResponse<{ scheduleMode: "FLEXIBLE" | "FIXED"; fixedSlotTimes: string[] }>
+        | null;
+      if (!settingsRes.ok || !settingsJson || !settingsJson.ok) {
+        throw new Error(settingsJson && !settingsJson.ok ? settingsJson.error.message : `API error: ${settingsRes.status}`);
+      }
+      const savedMode = settingsJson.data.scheduleMode;
+      const savedFixedSlots = normalizeFixedSlotTimes(settingsJson.data.fixedSlotTimes ?? []);
+
       const nextTemplates = templates.map((item) => {
         if (item.id) return item;
         const mappedId = templateIdMap.get(item.clientId);
         if (!mappedId) return item;
         return { ...item, id: mappedId };
       });
+      setStatus((current) => ({ ...current, scheduleMode: savedMode, fixedSlotTimes: savedFixedSlots }));
+      setScheduleMode(savedMode);
+      setFixedSlotTimes(savedFixedSlots);
       setTemplates(nextTemplates);
       setWeeklyDays(weeklyPayload);
       setOverridesByMonth(sanitizedOverridesByMonth);
+      setInitialScheduleMode(savedMode);
+      setInitialFixedSlotTimes(savedFixedSlots);
       setInitialTemplates(nextTemplates);
       setInitialWeeklyDays(weeklyPayload);
       setInitialOverridesByMonth(sanitizedOverridesByMonth);
@@ -706,6 +789,8 @@ export function ScheduleBuilder() {
     setTemplates(initialTemplates);
     setWeeklyDays(initialWeeklyDays);
     setOverridesByMonth(initialOverridesByMonth);
+    setScheduleMode(initialScheduleMode);
+    setFixedSlotTimes(initialFixedSlotTimes);
     setInfo("Изменения сброшены.");
   };
 
@@ -748,6 +833,76 @@ export function ScheduleBuilder() {
             <div className="text-xs text-text-sec">Шаблоны, неделя и исключения.</div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
+              <div className="text-sm font-semibold text-text-main">{UI_TEXT.schedule.mode.label}</div>
+              <div className="mt-2 space-y-2">
+                <label className="flex items-start gap-2 text-xs text-text-sec">
+                  <input
+                    type="radio"
+                    name="schedule-mode"
+                    checked={scheduleMode === "FLEXIBLE"}
+                    onChange={() => setScheduleMode("FLEXIBLE")}
+                    disabled={readOnly}
+                  />
+                  <span>{UI_TEXT.schedule.mode.flexible}</span>
+                </label>
+                <label className="flex items-start gap-2 text-xs text-text-sec">
+                  <input
+                    type="radio"
+                    name="schedule-mode"
+                    checked={scheduleMode === "FIXED"}
+                    onChange={() => setScheduleMode("FIXED")}
+                    disabled={readOnly}
+                  />
+                  <span>{UI_TEXT.schedule.mode.fixed}</span>
+                </label>
+              </div>
+            </div>
+
+            {scheduleMode === "FIXED" ? (
+              <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
+                <div className="text-sm font-semibold text-text-main">{UI_TEXT.schedule.fixedSlots.title}</div>
+                <p className="mt-1 text-xs text-text-sec">{UI_TEXT.schedule.fixedSlots.hint}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    type="time"
+                    value={newFixedSlotTime}
+                    onChange={(event) => setNewFixedSlotTime(event.target.value)}
+                    disabled={readOnly}
+                    className="max-w-[120px]"
+                  />
+                  <Button variant="secondary" size="sm" onClick={addFixedSlotTime} disabled={readOnly}>
+                    {UI_TEXT.schedule.fixedSlots.add}
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {fixedSlotTimes.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border-subtle px-3 py-2 text-xs text-text-sec">
+                      {UI_TEXT.schedule.fixedSlots.hint}
+                    </div>
+                  ) : (
+                    fixedSlotTimes.map((slotTime) => (
+                      <div
+                        key={slotTime}
+                        className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-card px-3 py-2"
+                      >
+                        <span className="text-sm font-medium text-text-main">{slotTime}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeFixedSlotTime(slotTime)}
+                          aria-label="Удалить окно"
+                          disabled={readOnly}
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             <Tabs
               items={[
                 { id: "templates", label: "Шаблоны", badge: templates.length },
@@ -894,9 +1049,10 @@ export function ScheduleBuilder() {
                               }))
                             }
                             disabled={readOnly}
-                            className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs text-red-600"
+                            aria-label="Удалить перерыв"
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                           >
-                            удалить
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
@@ -931,12 +1087,14 @@ export function ScheduleBuilder() {
                     templateId: null,
                     isActive: false,
                   };
+                  const selectedTemplate = day.templateId ? templatesById.get(day.templateId) ?? null : null;
                   return (
                     <div
                       key={label}
-                      className="grid items-center gap-2 rounded-2xl border border-border-subtle bg-bg-input/60 p-2 sm:grid-cols-[32px_minmax(0,1fr)_140px]"
+                      className="grid items-center gap-2 rounded-2xl border border-border-subtle bg-bg-input/60 p-2 sm:grid-cols-[32px_minmax(0,1fr)_auto]"
                     >
                       <div className="text-sm font-semibold text-text-main">{label}</div>
+                      <div className="space-y-1">
                       <Select
                         value={day.templateId ?? ""}
                         onChange={(event) => updateWeeklyDay(weekday, { templateId: event.target.value || null })}
@@ -950,14 +1108,17 @@ export function ScheduleBuilder() {
                           </option>
                         ))}
                       </Select>
-                      <label className="flex items-center gap-2 text-xs text-text-sec">
+                        {selectedTemplate ? (
+                          <span className="text-sm font-medium text-text-main">{selectedTemplate.name}</span>
+                        ) : null}
+                      </div>
+                      <label className="flex items-center justify-end">
                         <input
                           type="checkbox"
                           checked={day.isActive && Boolean(day.templateId)}
                           onChange={(event) => updateWeeklyDay(weekday, { isActive: event.target.checked })}
                           disabled={readOnly || !day.templateId}
                         />
-                        Рабочий день
                       </label>
                     </div>
                   );
@@ -987,9 +1148,15 @@ export function ScheduleBuilder() {
                               : "Шаблон по дате"}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => removeOverride(item.date)} disabled={readOnly}>
-                        Удалить
-                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => removeOverride(item.date)}
+                        aria-label="Удалить исключение"
+                        disabled={readOnly}
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   ))
                 )}
@@ -1189,9 +1356,10 @@ export function ScheduleBuilder() {
                       type="button"
                       onClick={() => setRangeBreaks((current) => current.filter((_, entryIndex) => entryIndex !== index))}
                       disabled={readOnly}
-                      className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs text-red-600"
+                      aria-label="Удалить перерыв"
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                     >
-                      удалить
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}

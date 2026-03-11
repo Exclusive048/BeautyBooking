@@ -307,21 +307,23 @@ export async function listPortfolioFeed(input: {
 export async function listHomePortfolioFeed(input: {
   limit: number;
   cursor?: string;
+  globalCategoryId?: string;
   categoryId?: string;
   tagId?: string;
   currentUserId?: string;
 }): Promise<{ items: PortfolioFeedItem[]; nextCursor: string | null }> {
   const pageSize = Math.max(1, Math.min(50, input.limit));
+  const globalCategoryId = input.globalCategoryId ?? input.categoryId;
 
   const loadRows = (cursor?: string) =>
     prisma.portfolioItem.findMany({
       where: {
         isPublic: true,
-        ...(input.categoryId
+        ...(globalCategoryId
           ? {
               services: {
                 some: {
-                  service: { globalCategoryId: input.categoryId },
+                  service: { globalCategoryId },
                 },
               },
             }

@@ -2,9 +2,9 @@
 
 import useSWR from "swr";
 import type { ApiResponse } from "@/lib/types/api";
-import type { MeProfile } from "@/lib/users/profile";
+import type { MeIdentity } from "@/lib/users/me";
 
-export type MeUser = MeProfile;
+export type MeUser = MeIdentity;
 
 const fetcher = async (url: string): Promise<{ user: MeUser | null } | null> => {
   const res = await fetch(url, { cache: "no-store", credentials: "include" });

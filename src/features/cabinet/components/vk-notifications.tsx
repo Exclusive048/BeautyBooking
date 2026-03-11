@@ -21,6 +21,7 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
 
 export function VkNotificationsSection({ embedded = false }: Props) {
   const t = UI_TEXT.clientCabinet;
+  const vkText = UI_TEXT.settings.notifications.vk;
   const [status, setStatus] = useState<VkStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,18 +53,20 @@ export function VkNotificationsSection({ embedded = false }: Props) {
     window.location.assign("/api/integrations/vk/start");
   };
 
-  const onDisable = async () => {
+  const onToggle = async (enabled: boolean) => {
     if (!status?.linked) return;
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/integrations/vk/disable", {
-        method: "POST",
+      const res = await fetch("/api/integrations/vk/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ enabled: boolean }> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, t.vk.settingsFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.vk.settingsFailed));
-      setStatus((prev) => (prev ? { ...prev, enabled: false } : prev));
+      setStatus((prev) => (prev ? { ...prev, enabled: json.data.enabled } : prev));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.vk.unknownError);
     } finally {
@@ -81,28 +84,36 @@ export function VkNotificationsSection({ embedded = false }: Props) {
 
   const linked = Boolean(status?.linked);
   const enabled = Boolean(status?.enabled);
-  const connected = linked && enabled;
 
   return (
     <div className={embedded ? "space-y-3" : "lux-card rounded-[24px] p-4 space-y-3"}>
       <ListRow
         icon="VK"
-        title={t.vk.title}
-        subtitle={connected ? t.vk.connected : t.vk.notConnected}
+        title={vkText.title}
+        subtitle={linked ? vkText.connected : t.vk.notConnected}
         right={
-          !connected ? (
+          !linked ? (
             <Button type="button" onClick={onConnect} disabled={saving} size="sm">
-              {saving ? UI_TEXT.common.loading : t.vk.connectButton}
+              {saving ? UI_TEXT.common.loading : vkText.connect}
             </Button>
           ) : (
-            <Button type="button" onClick={onDisable} disabled={saving} size="sm" variant="secondary">
-              {saving ? UI_TEXT.common.loading : t.vk.disconnectButton}
-            </Button>
+            <label className="inline-flex items-center gap-2 text-xs text-text-main">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(event) => void onToggle(event.target.checked)}
+                disabled={saving}
+                className="h-4 w-4 accent-primary"
+              />
+              {vkText.enable}
+            </label>
           )
         }
       />
 
-      {connected ? <div className="text-xs text-text-sec">{t.vk.hint}</div> : null}
+      {linked ? (
+        <div className="text-xs text-text-sec">{enabled ? t.vk.enabled : t.vk.disabled}</div>
+      ) : null}
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
     </div>
   );

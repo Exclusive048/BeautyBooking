@@ -120,7 +120,7 @@ export const upsertMasterServicesSchema = z.object({
         serviceId: z.string().trim().min(1),
         isEnabled: z.boolean(),
         onlinePaymentEnabled: z.boolean().optional(),
-        durationOverrideMin: z.number().int().min(1).max(24 * 60).nullable().optional(),
+        durationOverrideMin: z.number().int().min(15).max(12 * 60).nullable().optional(),
         priceOverride: z.number().int().min(0).nullable().optional(),
         globalCategoryId: z.string().trim().min(1).nullable().optional(),
       })
@@ -131,7 +131,7 @@ export const upsertMasterServicesSchema = z.object({
 export const createMasterServiceSchema = z.object({
   title: z.string().trim().min(1).max(240),
   price: z.number().int().min(0),
-  durationMin: z.number().int().min(1).max(24 * 60),
+  durationMin: z.number().int().min(15).max(12 * 60),
   globalCategoryId: z.string().trim().min(1).optional(),
 });
 

@@ -1,15 +1,7 @@
-import { redirect } from "next/navigation";
 import { MasterDashboardPage } from "@/features/master/components/master-dashboard-page";
-import { getSessionUser } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { UI_TEXT } from "@/lib/ui/text";
 
-export default async function MasterDashboardRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-
-  await getCurrentMasterProviderId(user.id);
-
+export default function MasterDashboardRoute() {
   return (
     <section className="space-y-4">
       <header>

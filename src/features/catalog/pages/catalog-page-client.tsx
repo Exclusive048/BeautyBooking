@@ -27,6 +27,7 @@ type CatalogSearchItem = {
   id: string;
   publicUsername: string | null;
   title: string;
+  tagline: string | null;
   avatarUrl: string | null;
   avatarFocalX: number | null;
   avatarFocalY: number | null;

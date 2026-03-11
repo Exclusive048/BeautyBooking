@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { addRoleToUser } from "@/lib/auth/roles";
 import { ensureUniqueUsername, generateDefaultUsername } from "@/lib/publicUsername";
 import { ensureFreeSubscription } from "@/lib/billing/ensure-free-subscription";
+import { logError, logInfo } from "@/lib/logging/logger";
 
 type MasterProfileCreateResult =
   | { status: "created"; masterProfileId: string; providerId: string }
@@ -15,23 +16,56 @@ type StudioProfileCreateResult =
 type CreateProfileInput = {
   userId: string;
   roles: AccountType[];
+  ensureFreeSubscriptionMode?: "sync" | "background";
 };
+
+function ensureFreeSubscriptionNonBlocking(userId: string, scope: SubscriptionScope, source: string): void {
+  const t0 = Date.now();
+  void ensureFreeSubscription(userId, scope)
+    .then(() => {
+      logInfo("ensureFreeSubscription completed", { userId, scope, source, ms: Date.now() - t0, mode: "background" });
+    })
+    .catch((error) => {
+      logError("ensureFreeSubscription failed", {
+        userId,
+        scope,
+        source,
+        mode: "background",
+        error: error instanceof Error ? error.stack : error,
+      });
+    });
+}
 
 export async function createMasterProfile(
   input: CreateProfileInput
 ): Promise<MasterProfileCreateResult> {
-  const userProfile = await prisma.userProfile.findUnique({
-    where: { id: input.userId },
-    select: { firstName: true, lastName: true },
-  });
-
-  const existingProfile = await prisma.masterProfile.findUnique({
-    where: { userId: input.userId },
-    select: { id: true, providerId: true },
-  });
+  const mode = input.ensureFreeSubscriptionMode ?? "sync";
+  const lookupStartedAt = Date.now();
+  const [userProfile, existingProfile] = await Promise.all([
+    prisma.userProfile.findUnique({
+      where: { id: input.userId },
+      select: { firstName: true, lastName: true },
+    }),
+    prisma.masterProfile.findUnique({
+      where: { userId: input.userId },
+      select: { id: true, providerId: true },
+    }),
+  ]);
+  logInfo("createMasterProfile: lookup", { userId: input.userId, ms: Date.now() - lookupStartedAt });
 
   if (existingProfile) {
-    await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
+    if (mode === "background") {
+      ensureFreeSubscriptionNonBlocking(input.userId, SubscriptionScope.MASTER, "createMasterProfile:existing");
+    } else {
+      const t0 = Date.now();
+      await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
+      logInfo("createMasterProfile: ensureFreeSubscription", {
+        userId: input.userId,
+        mode: "sync",
+        path: "existing",
+        ms: Date.now() - t0,
+      });
+    }
     return {
       status: "already-exists",
       masterProfileId: existingProfile.id,
@@ -39,14 +73,24 @@ export async function createMasterProfile(
     };
   }
 
-  await addRoleToUser(input.userId, input.roles, AccountType.MASTER);
+  const roleAndProviderStartedAt = Date.now();
+  const rolePromise = input.roles.includes(AccountType.MASTER)
+    ? Promise.resolve(input.roles)
+    : addRoleToUser(input.userId, input.roles, AccountType.MASTER);
 
-  let provider = await prisma.provider.findFirst({
-    where: { ownerUserId: input.userId, type: ProviderType.MASTER },
-    select: { id: true },
-  });
+  const [, existingProvider] = await Promise.all([
+    rolePromise,
+    prisma.provider.findFirst({
+      where: { ownerUserId: input.userId, type: ProviderType.MASTER },
+      select: { id: true },
+    }),
+  ]);
+  logInfo("createMasterProfile: role + provider lookup", { userId: input.userId, ms: Date.now() - roleAndProviderStartedAt });
+
+  let provider = existingProvider;
 
   if (!provider) {
+    const usernameStartedAt = Date.now();
     const baseUsername = generateDefaultUsername({
       providerType: ProviderType.MASTER,
       firstName: userProfile?.firstName ?? null,
@@ -54,6 +98,9 @@ export async function createMasterProfile(
       allowLastName: false,
     });
     const uniqueUsername = await ensureUniqueUsername(prisma, baseUsername);
+    logInfo("createMasterProfile: ensureUniqueUsername", { userId: input.userId, ms: Date.now() - usernameStartedAt });
+
+    const providerCreateStartedAt = Date.now();
     provider = await prisma.provider.create({
       data: {
         ownerUserId: input.userId,
@@ -72,14 +119,28 @@ export async function createMasterProfile(
       },
       select: { id: true },
     });
+    logInfo("createMasterProfile: provider.create", { userId: input.userId, ms: Date.now() - providerCreateStartedAt });
   }
 
+  const profileCreateStartedAt = Date.now();
   const createdProfile = await prisma.masterProfile.create({
     data: { userId: input.userId, providerId: provider.id },
     select: { id: true, providerId: true },
   });
+  logInfo("createMasterProfile: masterProfile.create", { userId: input.userId, ms: Date.now() - profileCreateStartedAt });
 
-  await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
+  if (mode === "background") {
+    ensureFreeSubscriptionNonBlocking(input.userId, SubscriptionScope.MASTER, "createMasterProfile:created");
+  } else {
+    const t0 = Date.now();
+    await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
+    logInfo("createMasterProfile: ensureFreeSubscription", {
+      userId: input.userId,
+      mode: "sync",
+      path: "created",
+      ms: Date.now() - t0,
+    });
+  }
 
   return {
     status: "created",
