@@ -99,17 +99,29 @@ export function PublicUsernameCard({ endpoint }: Props) {
         <input
           readOnly
           value={url}
-          className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-10 text-sm text-text-sec outline-none"
+          className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-20 text-sm text-text-sec outline-none"
         />
-        <button
-          type="button"
-          onClick={() => void handleCopy()}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-sec transition-colors hover:text-text-main"
-          title={settingsText.publicLink.copy}
-          aria-label={settingsText.publicLink.copy}
-        >
-          {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-        </button>
+        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-white/8 hover:text-text-main"
+            title={settingsText.publicLink.copy}
+            aria-label={settingsText.publicLink.copy}
+          >
+            {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+          </button>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-white/8 hover:text-text-main"
+            title={settingsText.publicLink.open}
+            aria-label={settingsText.publicLink.open}
+          >
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -156,15 +168,6 @@ export function PublicUsernameCard({ endpoint }: Props) {
               <Pencil className="h-3.5 w-3.5" />
               {settingsText.publicLink.editUsername}
             </button>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto inline-flex items-center gap-1 text-xs text-text-sec transition-colors hover:text-text-main"
-            >
-              {settingsText.publicLink.open}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
           </>
         )}
       </div>

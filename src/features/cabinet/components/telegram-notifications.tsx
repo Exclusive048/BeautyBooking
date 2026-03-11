@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import type { ApiResponse } from "@/lib/types/api";
@@ -18,13 +19,25 @@ type TelegramSettingsResponse = {
 
 type Props = {
   embedded?: boolean;
+  leadingIcon?: ReactNode;
+  title?: string;
+  hint?: string;
+  connectLabel?: string;
+  connectButtonClassName?: string;
 };
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
 
-export function TelegramNotificationsSection({ embedded = false }: Props) {
+export function TelegramNotificationsSection({
+  embedded = false,
+  leadingIcon,
+  title,
+  hint,
+  connectLabel,
+  connectButtonClassName,
+}: Props) {
   const t = UI_TEXT.settings.notifications.telegram;
   const { status, loading, error: statusError, reload } = useTelegramStatus();
   const [saving, setSaving] = useState(false);
@@ -79,12 +92,18 @@ export function TelegramNotificationsSection({ embedded = false }: Props) {
 
   const linked = Boolean(status?.linked);
   const enabled = Boolean(status?.enabled);
+  const titleText = title ?? t.title;
+  const hintText = hint ?? t.hint;
+  const connectText = connectLabel ?? t.connect;
+  const defaultConnectClass =
+    "shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-60";
 
   return (
     <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
       <div className="flex items-center justify-between gap-3">
+        {leadingIcon ? <div className="shrink-0">{leadingIcon}</div> : null}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{t.title}</p>
+          <p className="text-sm font-medium">{titleText}</p>
           <p className="mt-0.5 text-xs text-text-sec">{linked ? t.connected : t.notConnected}</p>
         </div>
         {linked ? (
@@ -99,14 +118,14 @@ export function TelegramNotificationsSection({ embedded = false }: Props) {
             type="button"
             onClick={() => void onConnect()}
             disabled={saving}
-            className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+            className={connectButtonClassName ?? defaultConnectClass}
           >
-            {t.connect}
+            {connectText}
           </button>
         )}
       </div>
 
-      {linked ? <p className="mt-2 text-xs text-text-sec">{t.hint}</p> : null}
+      <p className="mt-2 text-xs text-text-sec">{hintText}</p>
       {error ?? statusError ? <p className="mt-2 text-xs text-rose-400">{error ?? statusError}</p> : null}
     </div>
   );

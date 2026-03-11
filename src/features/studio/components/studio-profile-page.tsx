@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { MediaEntityType } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Send, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
@@ -9,7 +10,6 @@ import { PublicUsernameCard } from "@/features/cabinet/components/public-usernam
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
-import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
@@ -66,15 +66,16 @@ type StudioServicesResponse = {
   }>;
 };
 
-type StudioSettingsTab = "notifications" | "features" | "studioSettings";
+type StudioSettingsTab = "notifications" | "features" | "settings";
 
 export function StudioProfilePage({ providerId, studioId }: Props) {
-  const t = UI_TEXT.studioCabinet.profile;
+  const t = UI_TEXT.studio.profilePage;
+  const studioSettingsText = UI_TEXT.studio.settingsPanel;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteActiveCount, setDeleteActiveCount] = useState<number | null>(null);
@@ -127,15 +128,12 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
   const [bannerFocalY, setBannerFocalY] = useState<number | null>(null);
   const [pickingBannerFocal, setPickingBannerFocal] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const settingsTabs = useMemo<TabItem[]>(
-    () => [
-      { id: "notifications", label: "Уведомления" },
-      { id: "features", label: "Функции" },
-      { id: "studioSettings", label: "Настройки студии" },
-    ],
-    []
-  );
+  const savedTimeoutRef = useRef<number | null>(null);
+  const settingsTabs = [
+    { id: "notifications" as const, label: UI_TEXT.studio.tabs.notifications },
+    { id: "features" as const, label: UI_TEXT.studio.tabs.features },
+    { id: "settings" as const, label: UI_TEXT.studio.tabs.settings },
+  ];
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -217,20 +215,29 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
     void loadHotSlotServices();
   }, [loadHotSlotServices]);
 
-  const resizeDescription = useCallback(() => {
-    if (!descriptionRef.current) return;
-    descriptionRef.current.style.height = "auto";
-    descriptionRef.current.style.height = `${descriptionRef.current.scrollHeight}px`;
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current !== null) {
+        window.clearTimeout(savedTimeoutRef.current);
+      }
+    };
   }, []);
 
-  useEffect(() => {
-    resizeDescription();
-  }, [description, resizeDescription]);
+  const markSaved = useCallback(() => {
+    setSaved(true);
+    if (savedTimeoutRef.current !== null) {
+      window.clearTimeout(savedTimeoutRef.current);
+    }
+    savedTimeoutRef.current = window.setTimeout(() => {
+      setSaved(false);
+      savedTimeoutRef.current = null;
+    }, 2500);
+  }, []);
 
   const save = async (): Promise<void> => {
     setSaving(true);
     setError(null);
-    setInfo(null);
+    setSaved(false);
     try {
       const trimmedAddress = addressText.trim();
       const coordsReady =
@@ -256,7 +263,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       } else {
         const parsedDeadline = Number(trimmedDeadline);
         if (!Number.isFinite(parsedDeadline) || parsedDeadline < 0 || parsedDeadline > 168) {
-          throw new Error("Укажите значение от 0 до 168.");
+          throw new Error(t.deadlineValidation);
         }
         payload.cancellationDeadlineHours = Math.floor(parsedDeadline);
       }
@@ -290,7 +297,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
               : `${t.apiErrorPrefix}: ${res.status}`;
         throw new Error(message);
       }
-      setInfo(t.profileSaved);
+      markSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.saveFailed);
     } finally {
@@ -314,7 +321,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
           const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
           setDeleteActiveCount(typeof details?.count === "number" ? details.count : 0);
         } else {
-          setDeleteError(json && !json.ok ? json.error.message : `Ошибка: ${res.status}`);
+          setDeleteError(json && !json.ok ? json.error.message : `${t.deleteErrorPrefix}: ${res.status}`);
         }
         return;
       }
@@ -322,7 +329,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       router.push("/cabinet/roles");
       router.refresh();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Не удалось удалить кабинет студии.");
+      setDeleteError(err instanceof Error ? err.message : t.deleteFailed);
     } finally {
       setDeleteLoading(false);
     }
@@ -331,7 +338,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
   const uploadBanner = async (file: File): Promise<void> => {
     setSaving(true);
     setError(null);
-    setInfo(null);
+    setSaved(false);
     try {
       const formData = new FormData();
       formData.set("file", file);
@@ -367,7 +374,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       setBannerFocalX(saveJson.data.studio.bannerFocalX ?? null);
       setBannerFocalY(saveJson.data.studio.bannerFocalY ?? null);
       setPickingBannerFocal(true);
-      setInfo(t.bannerUploaded);
+      markSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.uploadBannerFailed);
     } finally {
@@ -380,11 +387,14 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
   }
 
   const avatarNode = (
-    <div className="group relative h-[96px] w-[96px] overflow-hidden rounded-[22px] border border-border-subtle bg-bg-input">
-      <AvatarEditor entityType={MediaEntityType.STUDIO} entityId={providerId} canEdit sizeClassName="h-[96px] w-[96px]" />
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-        Загрузить
-      </div>
+    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-bg-main bg-bg-elevated">
+      <AvatarEditor
+        entityType={MediaEntityType.STUDIO}
+        entityId={providerId}
+        canEdit
+        showAddButton={false}
+        sizeClassName="h-20 w-20"
+      />
     </div>
   );
 
@@ -392,24 +402,16 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
 
   return (
     <div className="space-y-6">
-      {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-      {info ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {info}
-        </div>
-      ) : null}
 
       <StudioProfileHero
         bannerUrl={bannerUrl}
         bannerFocalX={bannerFocalX}
         bannerFocalY={bannerFocalY}
         avatar={avatarNode}
-        title={name || "Студия"}
-        description={description}
+        studioName={name}
+        subtitle={UI_TEXT.studio.profile.subtitle}
+        isPublished={isPublished}
+        onTogglePublished={setIsPublished}
         onEditBanner={() => bannerInputRef.current?.click()}
         onEditFocal={bannerUrl ? () => setPickingBannerFocal(true) : undefined}
       />
@@ -432,7 +434,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
         <ModalSurface
           open={pickingBannerFocal}
           onClose={() => setPickingBannerFocal(false)}
-          title="Точка фокуса"
+          title={t.bannerFocusTitle}
         >
           <FocalPointPicker
             assetId={bannerAssetId!}
@@ -467,10 +469,6 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
         setAddressSuggestIndex={setAddressSuggestIndex}
         onNameChange={setName}
         onDescriptionChange={setDescription}
-        onDescriptionInput={() => {
-          resizeDescription();
-        }}
-        descriptionRef={descriptionRef}
         onAddressChange={handleAddressChange}
         onPhoneChange={setContactPhone}
         onEmailChange={setContactEmail}
@@ -479,40 +477,54 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
         onVkChange={setVk}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
-        <div className="rounded-2xl bg-bg-card/90 p-4">
-          <h3 className="text-sm font-semibold">Публикация профиля</h3>
-          <p className="mt-1 text-xs text-text-sec">
-            Без публикации профиль не отображается в поиске и витрине.
-          </p>
-          <label className="mt-3 inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isPublished}
-              onChange={(event) => setIsPublished(event.target.checked)}
-            />
-            Опубликовать профиль
-          </label>
-        </div>
-      </div>
+      <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
 
       <div className="space-y-4 rounded-2xl bg-bg-card/90 p-4">
-        <Tabs
-          items={settingsTabs}
-          value={settingsTab}
-          onChange={(value) => setSettingsTab(value as StudioSettingsTab)}
-          className="w-full"
-        />
+        <div className="flex rounded-xl bg-white/6 p-1">
+          {settingsTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSettingsTab(tab.id)}
+              className={[
+                "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+                settingsTab === tab.id
+                  ? "bg-white/12 text-text-main shadow-sm"
+                  : "text-text-sec hover:text-text-main",
+              ].join(" ")}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
         {settingsTab === "notifications" ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl bg-bg-card p-4">
-              <TelegramNotificationsSection embedded />
-            </div>
-            <div className="rounded-2xl bg-bg-card p-4">
-              <VkNotificationsSection embedded />
-            </div>
+          <div className="overflow-hidden rounded-2xl bg-white/4">
+            <TelegramNotificationsSection
+              embedded
+              title={UI_TEXT.settings.telegram.title}
+              hint={UI_TEXT.settings.telegram.hint}
+              connectLabel={UI_TEXT.settings.telegram.connect}
+              connectButtonClassName="shrink-0 rounded-xl border border-white/12 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/8"
+              leadingIcon={
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2AABEE]/15">
+                  <Send className="h-5 w-5 text-[#2AABEE]" />
+                </div>
+              }
+            />
+            <div className="h-px bg-white/6" />
+            <VkNotificationsSection
+              embedded
+              title={UI_TEXT.settings.vk.title}
+              hint={UI_TEXT.settings.vk.hint}
+              connectLabel={UI_TEXT.settings.vk.connect}
+              connectButtonClassName="shrink-0 rounded-xl border border-white/12 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/8"
+              leadingIcon={
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#4C75A3]/15">
+                  <Users className="h-5 w-5 text-[#4C75A3]" />
+                </div>
+              }
+            />
           </div>
         ) : null}
 
@@ -521,20 +533,18 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
             feature="hotSlots"
             requiredPlan="PREMIUM"
             scope="STUDIO"
-            title="Горящие слоты"
-            description="Автоскидки на свободные окна по правилам студии."
+            title={studioSettingsText.hotSlotsTitle}
+            description={studioSettingsText.hotSlotsDescription}
           >
             <HotSlotsSettingsSection services={hotSlotServices} scope="STUDIO" />
           </FeatureGate>
         ) : null}
 
-        {settingsTab === "studioSettings" ? (
+        {settingsTab === "settings" ? (
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-2xl bg-bg-card p-4">
-              <h3 className="text-sm font-semibold">Политика отмены</h3>
-              <p className="mt-1 text-xs text-text-sec">
-                Клиент может отменить запись не позднее указанного срока. Пустое значение - без ограничений, 0 - отмена запрещена.
-              </p>
+              <h3 className="text-sm font-semibold">{studioSettingsText.cancellationTitle}</h3>
+              <p className="mt-1 text-xs text-text-sec">{studioSettingsText.cancellationHint}</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <input
                   type="number"
@@ -543,52 +553,55 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
                   inputMode="numeric"
                   value={cancellationDeadlineInput}
                   onChange={(event) => setCancellationDeadlineInput(event.target.value)}
-                  placeholder="Например, 24"
+                  placeholder={studioSettingsText.cancellationPlaceholder}
                   className="h-10 w-[180px] rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <div className="text-xs text-text-sec">
-                  Текущее значение:{" "}
-                  {cancellationDeadlineHours === null ? "Без ограничений" : `${cancellationDeadlineHours} ч.`}
+                  {studioSettingsText.currentValueLabel}
+                  {cancellationDeadlineHours === null
+                    ? studioSettingsText.noLimit
+                    : studioSettingsText.hoursValue(cancellationDeadlineHours)}
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl bg-bg-card p-4">
-              <h3 className="text-sm font-semibold">Напоминания</h3>
-              <p className="mt-1 text-xs text-text-sec">
-                Напоминания о записи за 24 часа и 2 часа до начала.
-              </p>
+              <h3 className="text-sm font-semibold">{studioSettingsText.remindersTitle}</h3>
+              <p className="mt-1 text-xs text-text-sec">{studioSettingsText.remindersHint}</p>
               <label className="mt-3 inline-flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={remindersEnabled}
                   onChange={(event) => setRemindersEnabled(event.target.checked)}
                 />
-                {remindersEnabled ? "Включено" : "Выключено"}
+                {remindersEnabled ? studioSettingsText.remindersOn : studioSettingsText.remindersOff}
               </label>
             </div>
           </div>
         ) : null}
       </div>
-      <section className="mt-12 border-t border-red-200/40 pt-8">
-        <h2 className="text-sm font-semibold text-red-500">Удаление студии</h2>
-        <p className="mt-1 text-xs text-text-sec">
-          При удалении студии все мастера команды получат уведомление о расформировании. Удаление невозможно при наличии незавершённых записей.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            setDeleteError(null);
-            setDeleteActiveCount(null);
-            setDeleteModalOpen(true);
-          }}
-          className="mt-4 rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-500 hover:bg-red-50/10 transition-colors"
-        >
-          Удалить
-        </button>
-      </section>
+      <div className="rounded-2xl border border-red-500/20 bg-red-500/4 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-red-300">{UI_TEXT.studio.danger.title}</p>
+            <p className="mt-1 text-xs text-text-sec">{UI_TEXT.studio.danger.hint}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteActiveCount(null);
+                setDeleteModalOpen(true);
+              }}
+              className="mt-3 rounded-xl border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+            >
+              {UI_TEXT.studio.danger.cta}
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <StickySaveBar onSave={() => void save()} loading={saving} disabled={saving} />
+      <StickySaveBar onSave={() => void save()} isSaving={saving} saved={saved} error={error} disabled={saving} />
       <div id="reviews" />
       <DeleteCabinetModal
         open={deleteModalOpen}
@@ -602,3 +615,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
     </div>
   );
 }
+
+
+
+

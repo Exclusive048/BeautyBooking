@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type FormEvent, type Ref, type KeyboardEvent } from "react";
+import { MapPin } from "lucide-react";
+import { useCallback, useEffect, useRef, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
@@ -15,7 +16,7 @@ type Props = {
   telegram: string;
   instagram: string;
   vk: string;
-  addressInputRef: Ref<HTMLTextAreaElement>;
+  addressInputRef: Ref<HTMLInputElement>;
   addressStatus?: AddressStatus | null;
   addressSuggestions: AddressSuggestion[];
   isAddressSuggestOpen: boolean;
@@ -25,8 +26,6 @@ type Props = {
   setAddressSuggestIndex: (value: number) => void;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
-  onDescriptionInput: (event: FormEvent<HTMLTextAreaElement>) => void;
-  descriptionRef: Ref<HTMLTextAreaElement>;
   onAddressChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
   onEmailChange: (value: string) => void;
@@ -36,7 +35,7 @@ type Props = {
 };
 
 const inputClass =
-  "border-transparent bg-bg-input/70 focus-visible:border-border-focus focus-visible:ring-0";
+  "border border-white/10 bg-white/6 focus-visible:border-white/20 focus-visible:ring-0";
 
 export function StudioProfileForm({
   name,
@@ -57,8 +56,6 @@ export function StudioProfileForm({
   setAddressSuggestIndex,
   onNameChange,
   onDescriptionChange,
-  onDescriptionInput,
-  descriptionRef,
   onAddressChange,
   onPhoneChange,
   onEmailChange,
@@ -66,6 +63,7 @@ export function StudioProfileForm({
   onInstagramChange,
   onVkChange,
 }: Props) {
+  const studioFormText = UI_TEXT.studio.profileForm;
   const addressStatusTone =
     addressStatus?.tone === "success"
       ? "text-emerald-500"
@@ -95,7 +93,7 @@ export function StudioProfileForm({
   }, [isAddressSuggestOpen, setIsAddressSuggestOpen]);
 
   const handleAddressKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    (event: KeyboardEvent<HTMLInputElement>) => {
       if (addressSuggestions.length === 0) return;
 
       if (event.key === "ArrowDown") {
@@ -159,34 +157,37 @@ export function StudioProfileForm({
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.nameLabel}</div>
+            <div className="text-xs font-medium text-text-label">{studioFormText.nameLabel}</div>
             <Input
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
-              placeholder={UI_TEXT.studioCabinet.profile.namePlaceholder}
+              placeholder={studioFormText.namePlaceholder}
               className={inputClass}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">
-              {UI_TEXT.studioCabinet.profile.descriptionLabel}
-            </div>
-            <Textarea
-              ref={descriptionRef}
-              value={description}
-              onChange={(event) => onDescriptionChange(event.target.value)}
-              onInput={onDescriptionInput}
-              placeholder={UI_TEXT.studioCabinet.profile.descriptionPlaceholder}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.addressLabel}</div>
-            <div ref={addressSuggestRootRef} className="relative">
+            <div className="text-xs font-medium text-text-label">{studioFormText.descriptionLabel}</div>
+            <div className="relative">
               <Textarea
+                value={description}
+                onChange={(event) => onDescriptionChange(event.target.value.slice(0, 500))}
+                placeholder={studioFormText.descriptionPlaceholder}
+                maxLength={500}
+                rows={4}
+                className={`${inputClass} resize-none pb-7`}
+              />
+              <span className="absolute bottom-2 right-3 text-xs text-text-sec">{description.length}/500</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-text-label">{studioFormText.addressLabel}</div>
+            <div ref={addressSuggestRootRef} className="relative">
+              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec" />
+              <input
                 ref={addressInputRef}
+                type="text"
                 value={address}
                 onChange={(event) => onAddressChange(event.target.value)}
                 onKeyDown={handleAddressKeyDown}
@@ -198,9 +199,8 @@ export function StudioProfileForm({
                 onBlur={() => {
                   setIsAddressSuggestOpen(false);
                 }}
-                placeholder={UI_TEXT.studioCabinet.profile.addressPlaceholder}
-                className={inputClass}
-                rows={2}
+                placeholder={studioFormText.addressPlaceholder}
+                className={`lux-input h-11 w-full rounded-2xl px-4 text-sm text-text-main placeholder:text-text-placeholder outline-none ${inputClass} pl-9`}
               />
               {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
                 <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
@@ -214,10 +214,7 @@ export function StudioProfileForm({
                       className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
                         index === addressSuggestIndex ? "bg-bg-input" : ""
                       }`}
-                      aria-label={UI_TEXT.studioCabinet.profile.selectAddressAria.replace(
-                        "{address}",
-                        item.value
-                      )}
+                      aria-label={studioFormText.selectAddressAria.replace("{address}", item.value)}
                     >
                       <span className="whitespace-normal break-words">{item.value}</span>
                     </button>
@@ -231,59 +228,53 @@ export function StudioProfileForm({
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.phoneLabel}</div>
-            <Input
-              value={phone}
-              onChange={(event) => onPhoneChange(event.target.value)}
-              placeholder={UI_TEXT.studioCabinet.profile.phonePlaceholder}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.emailLabel}</div>
-            <Input
-              value={email}
-              onChange={(event) => onEmailChange(event.target.value)}
-              placeholder={UI_TEXT.studioCabinet.profile.emailPlaceholder}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">
-              {UI_TEXT.studioCabinet.profile.telegramLabel}
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-text-label">{studioFormText.phoneLabel}</div>
+              <Input
+                value={phone}
+                onChange={(event) => onPhoneChange(event.target.value)}
+                placeholder={studioFormText.phonePlaceholder}
+                className={inputClass}
+              />
             </div>
-            <Input
-              value={telegram}
-              onChange={(event) => onTelegramChange(event.target.value)}
-              placeholder={UI_TEXT.studioCabinet.profile.telegramPlaceholder}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">
-              {UI_TEXT.studioCabinet.profile.instagramLabel}
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-text-label">{studioFormText.emailLabel}</div>
+              <Input
+                value={email}
+                onChange={(event) => onEmailChange(event.target.value)}
+                placeholder={studioFormText.emailPlaceholder}
+                className={inputClass}
+              />
             </div>
-            <Input
-              value={instagram}
-              onChange={(event) => onInstagramChange(event.target.value)}
-              placeholder={UI_TEXT.studioCabinet.profile.instagramPlaceholder}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">{UI_TEXT.studioCabinet.profile.vkLabel}</div>
-            <Input
-              value={vk}
-              onChange={(event) => onVkChange(event.target.value)}
-              placeholder={UI_TEXT.studioCabinet.profile.vkPlaceholder}
-              className={inputClass}
-            />
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-text-label">{studioFormText.telegramLabel}</div>
+              <Input
+                value={telegram}
+                onChange={(event) => onTelegramChange(event.target.value)}
+                placeholder={studioFormText.telegramPlaceholder}
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-text-label">{studioFormText.vkLabel}</div>
+              <Input
+                value={vk}
+                onChange={(event) => onVkChange(event.target.value)}
+                placeholder={studioFormText.vkPlaceholder}
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <div className="text-xs font-medium text-text-label">{studioFormText.instagramLabel}</div>
+              <Input
+                value={instagram}
+                onChange={(event) => onInstagramChange(event.target.value)}
+                placeholder={studioFormText.instagramPlaceholder}
+                className={inputClass}
+              />
+            </div>
           </div>
         </div>
       </div>
