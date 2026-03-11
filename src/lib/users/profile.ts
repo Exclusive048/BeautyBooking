@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { logInfo } from "@/lib/logging/logger";
 import type { ProfileUpdateInput } from "@/lib/users/schemas";
 
 export type MeProfile = {
@@ -25,7 +26,8 @@ function serializeBirthDate(date: Date | null): string | null {
 }
 
 export async function getMeProfile(userId: string): Promise<MeProfile | null> {
-  const [profile, masterProfile, studioProvider] = await prisma.$transaction([
+  const t0 = Date.now();
+  const [profile, masterProfile, studioProvider] = await Promise.all([
     prisma.userProfile.findUnique({
       where: { id: userId },
       select: {
@@ -53,6 +55,7 @@ export async function getMeProfile(userId: string): Promise<MeProfile | null> {
       select: { studioProfile: { select: { id: true } } },
     }),
   ]);
+  logInfo("getMeProfile queries done", { userId, ms: Date.now() - t0 });
 
   if (!profile) return null;
 
@@ -107,7 +110,8 @@ export async function updateMeProfile(
     },
   });
 
-  const [masterProfile, studioProvider] = await prisma.$transaction([
+  const t0 = Date.now();
+  const [masterProfile, studioProvider] = await Promise.all([
     prisma.masterProfile.findUnique({
       where: { userId },
       select: { id: true },
@@ -117,6 +121,7 @@ export async function updateMeProfile(
       select: { studioProfile: { select: { id: true } } },
     }),
   ]);
+  logInfo("updateMeProfile relations resolved", { userId, ms: Date.now() - t0 });
 
   return {
     ...updated,

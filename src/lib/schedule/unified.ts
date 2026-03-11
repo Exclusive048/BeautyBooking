@@ -80,6 +80,8 @@ export type SchedulePayload = {
   templates: ScheduleTemplatePayload[];
   weekly: WeeklySchedulePayload;
   overrides: ScheduleOverridePayload[];
+  scheduleMode?: "FLEXIBLE" | "FIXED";
+  fixedSlotTimes?: string[];
   removedOverrides?: string[];
 };
 
@@ -517,6 +519,28 @@ export async function deleteScheduleOverride(providerId: string, dateKey: string
   await invalidateSlotsForMaster(providerId);
 }
 
+function normalizeFixedSlotTime(value: string): string | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
+    return null;
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeFixedSlotTimes(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  const unique = new Set<string>();
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const normalized = normalizeFixedSlotTime(value);
+    if (normalized) unique.add(normalized);
+  }
+  return Array.from(unique).sort((left, right) => left.localeCompare(right));
+}
+
 function validateSchedulePayload(input: SchedulePayload): SchedulePayload {
   if (!input || typeof input !== "object") {
     throw new AppError("Некорректное тело запроса.", 400, "INVALID_BODY");
@@ -562,8 +586,36 @@ export async function applySchedulePayload(providerId: string, payload: Schedule
   }
 
   const normalizedWeekly = normalizeWeeklyDays(validated.weekly.days);
+  const currentProvider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { id: true, scheduleMode: true, fixedSlotTimes: true },
+  });
+  if (!currentProvider) {
+    throw new AppError("Мастер не найден.", 404, "NOT_FOUND");
+  }
+  const shouldUpdateScheduleSettings = validated.scheduleMode !== undefined || validated.fixedSlotTimes !== undefined;
+  const nextScheduleMode =
+    validated.scheduleMode === "FIXED"
+      ? "FIXED"
+      : validated.scheduleMode === "FLEXIBLE"
+        ? "FLEXIBLE"
+        : currentProvider.scheduleMode;
+  const nextFixedSlotTimes =
+    validated.fixedSlotTimes !== undefined
+      ? normalizeFixedSlotTimes(validated.fixedSlotTimes)
+      : currentProvider.fixedSlotTimes;
 
   await prisma.$transaction(async (tx) => {
+    if (shouldUpdateScheduleSettings) {
+      await tx.provider.update({
+        where: { id: providerId },
+        data: {
+          scheduleMode: nextScheduleMode,
+          fixedSlotTimes: nextFixedSlotTimes,
+        },
+      });
+    }
+
     const existingTemplates = await tx.scheduleTemplate.findMany({
       where: { providerId },
       select: { id: true, name: true },

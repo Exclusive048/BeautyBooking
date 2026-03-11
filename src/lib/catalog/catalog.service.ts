@@ -19,6 +19,7 @@ export type CatalogProviderItem = {
   id: string;
   publicUsername: string | null;
   title: string;
+  tagline: string | null;
   avatarUrl: string | null;
   avatarFocalX: number | null;
   avatarFocalY: number | null;
@@ -462,6 +463,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       id: true,
       type: true,
       name: true,
+      tagline: true,
       publicUsername: true,
       avatarUrl: true,
       avatarFocalX: true,
@@ -560,6 +562,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       id: provider.id,
       publicUsername: provider.publicUsername ?? null,
       title: provider.name,
+      tagline: provider.tagline?.trim() || null,
       avatarUrl: provider.avatarUrl,
       avatarFocalX: provider.avatarFocalX ?? null,
       avatarFocalY: provider.avatarFocalY ?? null,

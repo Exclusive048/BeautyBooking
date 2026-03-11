@@ -16,6 +16,7 @@ type FeatureGateProps = {
   title?: string;
   description?: string;
   ctaLabel?: string;
+  fallback?: ReactNode;
   className?: string;
   children: ReactNode;
 };
@@ -27,6 +28,7 @@ export function FeatureGate({
   title,
   description,
   ctaLabel = UI_TEXT.billing.featureGate.ctaLabel,
+  fallback,
   className,
   children,
 }: FeatureGateProps) {
@@ -42,6 +44,10 @@ export function FeatureGate({
 
   if (plan.can(feature)) {
     return <>{children}</>;
+  }
+
+  if (fallback) {
+    return <>{fallback}</>;
   }
 
   const requiredLabel = requiredPlan ?? "PRO";

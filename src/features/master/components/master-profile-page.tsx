@@ -2,15 +2,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Lock } from "lucide-react";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalImage } from "@/components/ui/focal-image";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
-import { ConnectedAccountsSection } from "@/features/master/components/connected-accounts-section";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
+import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import {
   useAddressWithGeocode,
@@ -84,12 +87,15 @@ type MasterProfileData = {
 
 type GlobalCategoryOption = {
   id: string;
+  name?: string;
   title: string;
   slug: string;
   icon: string | null;
   parentId?: string | null;
   depth?: number;
   fullPath?: string;
+  status?: "PENDING" | "APPROVED" | "REJECTED";
+  isPersonal?: boolean;
 };
 
 type PendingPortfolioMeta = {
@@ -118,12 +124,20 @@ const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
   { id: "settings", label: UI_TEXT.master.profile.tabs.settings },
 ];
 
+const MIN_SERVICE_DURATION_MIN = 15;
+const MAX_SERVICE_DURATION_MIN = 12 * 60;
+const SERVICE_DURATION_STEP_MIN = 15;
 const SERVICE_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
 const SAVE_ADDRESS_ERROR_MESSAGE = UI_TEXT.master.profile.errors.saveAddress;
 
 function buildDurationOptions(value: number): number[] {
   if (!Number.isFinite(value) || value <= 0) return SERVICE_DURATION_OPTIONS;
   return SERVICE_DURATION_OPTIONS.includes(value) ? SERVICE_DURATION_OPTIONS : [value, ...SERVICE_DURATION_OPTIONS];
+}
+
+function formatCategoryOptionLabel(category: GlobalCategoryOption): string {
+  const base = category.fullPath || category.title || category.name || "";
+  return `${category.icon ? `${category.icon} ` : ""}${base}${category.isPersonal ? " (только у меня)" : ""}`;
 }
 
 function parseMediaAssetId(url: string): string | null {
@@ -203,7 +217,7 @@ function parseApiErrorMessage(value: unknown): string | null {
 async function readErrorMessage(
   res: Response,
   parsed?: unknown,
-  fallback = SAVE_ADDRESS_ERROR_MESSAGE
+  fallback: string = SAVE_ADDRESS_ERROR_MESSAGE
 ): Promise<string> {
   const parsedMessage = parseApiErrorMessage(parsed);
   if (parsedMessage) return parsedMessage;
@@ -255,7 +269,6 @@ export function MasterProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autosaveInfo, setAutosaveInfo] = useState<string | null>(null);
   const plan = usePlanFeatures("MASTER");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -273,7 +286,9 @@ export function MasterProfilePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("main");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [profileSaveStatus, setProfileSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [servicesSaveStatus, setServicesSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [profileFieldErrors, setProfileFieldErrors] = useState<{ displayName?: string }>({});
 
   const [displayName, setDisplayName] = useState("");
@@ -343,9 +358,6 @@ export function MasterProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
   const newPortfolioInputRef = useRef<HTMLInputElement | null>(null);
-  const serviceAutosaveTimer = useRef<number | null>(null);
-  const profileAutosaveTimer = useRef<number | null>(null);
-  const profileHydratedRef = useRef(false);
   const profileSavingRef = useRef(false);
   const profilePendingRef = useRef(false);
   const servicesSavingRef = useRef(false);
@@ -363,8 +375,53 @@ export function MasterProfilePage() {
   });
   const servicesSnapshotRef = useRef<MasterServiceItem[]>([]);
   const dataRef = useRef<MasterProfileData | null>(null);
-  const hydratedRef = useRef(false);
-  const isMountedRef = useRef(true);
+
+  const loadCategoryOptions = useCallback(async (): Promise<void> => {
+    try {
+      const [categoriesRes, proposalsRes] = await Promise.all([
+        fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
+        fetch("/api/categories/my-proposals", { cache: "no-store" }),
+      ]);
+
+      const categoriesJson = (await categoriesRes.json().catch(() => null)) as
+        | ApiResponse<{ categories: GlobalCategoryOption[] } | GlobalCategoryOption[]>
+        | null;
+      const proposalsJson = (await proposalsRes.json().catch(() => null)) as
+        | ApiResponse<GlobalCategoryOption[]>
+        | null;
+
+      const approved = categoriesRes.ok && categoriesJson && categoriesJson.ok
+        ? (Array.isArray(categoriesJson.data) ? categoriesJson.data : categoriesJson.data.categories)
+        : [];
+      const proposals = proposalsRes.ok && proposalsJson && proposalsJson.ok ? proposalsJson.data : [];
+
+      const mergedById = new Map<string, GlobalCategoryOption>();
+      for (const category of approved) {
+        mergedById.set(category.id, {
+          ...category,
+          title: category.title || category.name || "",
+          isPersonal: category.isPersonal ?? false,
+        });
+      }
+      for (const proposal of proposals) {
+        mergedById.set(proposal.id, {
+          ...proposal,
+          title: proposal.title || proposal.name || "",
+          isPersonal: true,
+        });
+      }
+
+      const merged = Array.from(mergedById.values())
+        .filter((category) => category.id && (category.title || category.name))
+        .sort((a, b) =>
+          (a.fullPath || a.title || a.name || "").localeCompare(b.fullPath || b.title || b.name || "", "ru")
+        );
+
+      setGlobalCategories(merged);
+    } catch {
+      setGlobalCategories([]);
+    }
+  }, []);
 
     const load = useCallback(async (): Promise<void> => {
       setLoading(true);
@@ -415,17 +472,7 @@ export function MasterProfilePage() {
       setProfileFieldErrors({});
       setServicesDraft(Object.fromEntries(profileData.services.map((item) => [item.serviceId, item])));
 
-      const categoriesRes = await fetch("/api/catalog/global-categories?status=APPROVED", {
-        cache: "no-store",
-      });
-      const categoriesJson = (await categoriesRes.json().catch(() => null)) as
-        | ApiResponse<{ categories: GlobalCategoryOption[] }>
-        | null;
-      if (categoriesRes.ok && categoriesJson && categoriesJson.ok) {
-        setGlobalCategories(categoriesJson.data.categories);
-      } else {
-        setGlobalCategories([]);
-      }
+      await loadCategoryOptions();
 
       const [avatarRes, portfolioRes] = await Promise.all([
         fetch(`/api/media?entityType=MASTER&entityId=${encodeURIComponent(profileData.master.id)}&kind=AVATAR`, { cache: "no-store" }),
@@ -453,26 +500,17 @@ export function MasterProfilePage() {
         setPortfolioAssetIdsByUrl(map);
       }
 
-      hydratedRef.current = false;
-      profileHydratedRef.current = false;
-      setAutosaveInfo(null);
+      setServicesSaveStatus("idle");
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadProfile);
     } finally {
       setLoading(false);
     }
-  }, [setAddressSnapshot]);
+  }, [loadCategoryOptions, setAddressSnapshot]);
 
     useEffect(() => {
       void load();
     }, [load]);
-
-    useEffect(() => {
-      isMountedRef.current = true;
-      return () => {
-        isMountedRef.current = false;
-      };
-    }, []);
 
     useEffect(() => {
       dataRef.current = data;
@@ -520,6 +558,19 @@ export function MasterProfilePage() {
       addressSource,
       geoStatus,
     ]);
+
+    useEffect(() => {
+      if (!data) return;
+      const hasChanges =
+        displayName.trim() !== data.master.displayName ||
+        tagline.trim() !== data.master.tagline ||
+        addressText.trim() !== data.master.address.trim() ||
+        bio.trim() !== (data.master.bio ?? "").trim() ||
+        (avatarUrl.trim() || null) !== ((data.master.avatarUrl ?? "").trim() || null);
+      if (hasChanges && profileSaveStatus !== "saving") {
+        setProfileSaveStatus("idle");
+      }
+    }, [addressText, avatarUrl, bio, data, displayName, profileSaveStatus, tagline]);
 
     useEffect(() => {
       servicesSnapshotRef.current = Object.values(servicesDraft);
@@ -678,6 +729,23 @@ export function MasterProfilePage() {
   };
 
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
+  const hasServiceDraftChanges = useMemo(() => {
+    if (!data) return false;
+    if (serviceList.length !== data.services.length) return true;
+    const baseById = new Map(data.services.map((service) => [service.serviceId, service]));
+    for (const service of serviceList) {
+      const base = baseById.get(service.serviceId);
+      if (!base) return true;
+      if (service.isEnabled !== base.isEnabled) return true;
+      if (service.globalCategoryId !== base.globalCategoryId) return true;
+      if (service.durationOverrideMin !== base.durationOverrideMin) return true;
+      if (service.effectiveDurationMin !== base.effectiveDurationMin) return true;
+      if (service.priceOverride !== base.priceOverride) return true;
+      if (service.effectivePrice !== base.effectivePrice) return true;
+      if (service.onlinePaymentEnabled !== base.onlinePaymentEnabled) return true;
+    }
+    return false;
+  }, [data, serviceList]);
   const disabledServices = useMemo(
     () => serviceList.filter((service) => !service.isEnabled),
     [serviceList]
@@ -742,7 +810,9 @@ export function MasterProfilePage() {
   }
 
   function normalizeDuration(value: number): number {
-    return Math.ceil(value / 5) * 5;
+    if (!Number.isFinite(value) || value <= 0) return MIN_SERVICE_DURATION_MIN;
+    const clamped = Math.min(MAX_SERVICE_DURATION_MIN, Math.max(MIN_SERVICE_DURATION_MIN, value));
+    return Math.round(clamped / SERVICE_DURATION_STEP_MIN) * SERVICE_DURATION_STEP_MIN;
   }
 
   const saveProfile = useCallback(
@@ -908,75 +978,58 @@ export function MasterProfilePage() {
       [load]
     );
 
-  useEffect(() => {
-    if (!data) return;
-    if (!profileHydratedRef.current) {
-      profileHydratedRef.current = true;
-      return;
-    }
+  const handleSaveProfile = useCallback(async (): Promise<void> => {
+    await saveProfile({ refresh: false });
+  }, [saveProfile]);
 
-    if (!displayName.trim()) {
-      setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
-      setProfileSaveStatus("error");
-      return;
-    }
+  const handlePublishToggle = useCallback(
+    async (nextValue: boolean): Promise<void> => {
+      if (isPublishing) return;
+      setIsPublishing(true);
+      setError(null);
+      setProfileSaveStatus("saving");
+      try {
+        const res = await fetch("/api/master/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublished: nextValue }),
+        });
+        const errorRes = res.clone();
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ id: string }>
+          | ApiErrorShape
+          | null;
+        if (!res.ok || !json || !json.ok) {
+          const message = await readErrorMessage(
+            errorRes,
+            json && !json.ok ? json : null,
+            UI_TEXT.master.profile.errors.saveFailed
+          );
+          throw new Error(message);
+        }
 
-    const nextAddress = addressText.trim();
-    const currentAddress = data.master.address.trim();
-    const addressChanged = nextAddress !== currentAddress;
-    const coordsReady =
-      !nextAddress ||
-      (addressCoords &&
-        Number.isFinite(addressCoords.lat) &&
-        Number.isFinite(addressCoords.lng));
-
-    const nextBio = bio.trim();
-    const currentBio = (data.master.bio ?? "").trim();
-    const nextAvatarUrl = avatarUrl.trim() || null;
-    const currentAvatarUrl = (data.master.avatarUrl ?? "").trim() || null;
-    const otherFieldsChanged =
-      displayName.trim() !== data.master.displayName ||
-      tagline.trim() !== data.master.tagline ||
-      nextBio !== currentBio ||
-      nextAvatarUrl !== currentAvatarUrl ||
-      isPublished !== data.master.isPublished;
-
-    if (addressChanged && !coordsReady && !otherFieldsChanged) {
-      return;
-    }
-
-    if (profileSavingRef.current) {
-      profilePendingRef.current = true;
-      return;
-    }
-
-    if (profileAutosaveTimer.current) {
-      window.clearTimeout(profileAutosaveTimer.current);
-    }
-
-    setProfileSaveStatus("saving");
-    profileAutosaveTimer.current = window.setTimeout(() => {
-      void saveProfile({ refresh: false });
-    }, 600);
-
-    return () => {
-      if (profileAutosaveTimer.current) {
-        window.clearTimeout(profileAutosaveTimer.current);
+        setIsPublished(nextValue);
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                master: {
+                  ...prev.master,
+                  isPublished: nextValue,
+                },
+              }
+            : prev
+        );
+        setProfileSaveStatus("saved");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.saveFailed);
+        setProfileSaveStatus("error");
+      } finally {
+        setIsPublishing(false);
       }
-    };
-  }, [
-    addressText,
-    avatarUrl,
-    bio,
-    data,
-    displayName,
-    addressCoords,
-    addressSource,
-    geoStatus,
-    isPublished,
-    saveProfile,
-    tagline,
-  ]);
+    },
+    [isPublishing]
+  );
 
   const updateAutoConfirm = async (nextValue: boolean): Promise<void> => {
     if (!data?.master.isSolo) return;
@@ -1115,6 +1168,8 @@ export function MasterProfilePage() {
 
       servicesSavingRef.current = true;
       servicesPendingRef.current = false;
+      setServicesSaveStatus("saving");
+      setError(null);
       const payloadItems = snapshot.map((item) => ({
         serviceId: item.serviceId,
         isEnabled: item.isEnabled,
@@ -1134,6 +1189,11 @@ export function MasterProfilePage() {
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
+        setServicesSaveStatus("saved");
+      } catch (err) {
+        setServicesSaveStatus("error");
+        setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.saveServices);
+        throw err;
       } finally {
         servicesSavingRef.current = false;
         if (servicesPendingRef.current) {
@@ -1143,49 +1203,30 @@ export function MasterProfilePage() {
       }
     }, []);
 
-  useEffect(() => {
-    const items = Object.values(servicesDraft);
-    if (items.length === 0) return;
-
-    if (!hydratedRef.current) {
-      hydratedRef.current = true;
-      return;
+  const handleSaveServices = useCallback(async (): Promise<void> => {
+    const snapshot = Object.values(servicesDraft);
+    if (snapshot.length === 0) return;
+    try {
+      await saveServices(snapshot);
+      const synced = snapshot.map((service) => ({ ...service }));
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              services: synced,
+            }
+          : prev
+      );
+    } catch {
+      // errors are handled in saveServices
     }
-
-    const hasInvalidEnabled = items.some(
-      (item) =>
-        item.isEnabled &&
-        (item.effectiveDurationMin <= 0 || (item.canEditPrice && item.effectivePrice <= 0))
-    );
-    if (hasInvalidEnabled) return;
-
-    if (serviceAutosaveTimer.current) {
-      window.clearTimeout(serviceAutosaveTimer.current);
-    }
-
-    setAutosaveInfo(UI_TEXT.master.profile.autosave.saving);
-    serviceAutosaveTimer.current = window.setTimeout(() => {
-      void saveServices(items)
-        .then(() => {
-          setAutosaveInfo(UI_TEXT.master.profile.autosave.savedAuto);
-        })
-        .catch((saveError) => {
-          setError(saveError instanceof Error ? saveError.message : UI_TEXT.master.profile.errors.saveServices);
-          setAutosaveInfo(null);
-        });
-    }, 700);
-
-    return () => {
-      if (servicesSavingRef.current) {
-        servicesPendingRef.current = true;
-        return;
-      }
-
-      if (serviceAutosaveTimer.current) {
-        window.clearTimeout(serviceAutosaveTimer.current);
-      }
-    };
   }, [saveServices, servicesDraft]);
+
+  useEffect(() => {
+    if (hasServiceDraftChanges && servicesSaveStatus !== "idle" && servicesSaveStatus !== "saving") {
+      setServicesSaveStatus("idle");
+    }
+  }, [hasServiceDraftChanges, servicesSaveStatus]);
 
   const createSoloService = async (): Promise<void> => {
     if (!data?.master.isSolo) return;
@@ -1195,7 +1236,11 @@ export function MasterProfilePage() {
     if (!Number.isFinite(newSoloServicePrice) || newSoloServicePrice <= 0) {
       errors.price = UI_TEXT.master.profile.errors.addServicePriceRequired;
     }
-    if (!Number.isFinite(newSoloServiceDuration) || newSoloServiceDuration <= 0) {
+    if (
+      !Number.isFinite(newSoloServiceDuration) ||
+      newSoloServiceDuration < MIN_SERVICE_DURATION_MIN ||
+      newSoloServiceDuration > MAX_SERVICE_DURATION_MIN
+    ) {
       errors.durationMin = UI_TEXT.master.profile.errors.addServiceDurationRequired;
     }
     if (Object.keys(errors).length > 0) {
@@ -1274,19 +1319,20 @@ export function MasterProfilePage() {
       const res = await fetch("/api/categories/propose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, context: "SERVICE" }),
+        body: JSON.stringify({ name: title, context: "SERVICE", isPersonalOnly: true }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
+      await loadCategoryOptions();
       setProposeCategoryTitle("");
       setProposeCategoryOpen(false);
       setProposeCategoryMessage(
-        "Категория отправлена на модерацию. Пока можете сохранить услугу без категории."
+        "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430. \u041e\u043d\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0442\u043e\u043b\u044c\u043a\u043e \u0432\u0430\u043c."
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить категорию на модерацию");
+      setError(err instanceof Error ? err.message : "Не удалось создать категорию");
     } finally {
       setProposeCategorySaving(false);
     }
@@ -1919,7 +1965,7 @@ export function MasterProfilePage() {
                         {UI_TEXT.master.profile.form.nameLabel}
                         <input
                           className={`${inputBaseClass} ${profileFieldErrors.displayName ? inputErrorClass : ""}`}
-                          value={displayName}
+                          value={displayName ?? ""}
                           onChange={(event) => {
                             setDisplayName(event.target.value);
                             if (event.target.value.trim()) {
@@ -1931,7 +1977,7 @@ export function MasterProfilePage() {
                               setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
                             }
                           }}
-                          placeholder="Например: Анна Смирнова"
+                          placeholder={UI_TEXT.master.profile.form.namePlaceholder}
                         />
                         {profileFieldErrors.displayName ? (
                           <div className="mt-1 text-xs text-rose-400">{profileFieldErrors.displayName}</div>
@@ -1939,13 +1985,14 @@ export function MasterProfilePage() {
                       </label>
 
                       <label className="text-xs text-text-sec">
-                        {UI_TEXT.master.profile.form.taglineLabel}
+                        {UI_TEXT.master.profile.form.hashtagLabel}
                         <input
                           className={inputBaseClass}
-                          value={tagline}
+                          value={tagline ?? ""}
                           onChange={(event) => setTagline(event.target.value)}
-                          placeholder={UI_TEXT.master.profile.form.taglinePlaceholder}
+                          placeholder={UI_TEXT.master.profile.form.hashtagPlaceholder}
                         />
+                        <div className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.form.hashtagHint}</div>
                       </label>
                     </div>
 
@@ -1955,7 +2002,7 @@ export function MasterProfilePage() {
                         <textarea
                           ref={addressInputRef}
                           className={inputBaseClass}
-                          value={addressText}
+                          value={addressText ?? ""}
                           rows={2}
                           onChange={(event) => {
                             handleAddressChange(event.target.value);
@@ -1970,7 +2017,7 @@ export function MasterProfilePage() {
                           onBlur={() => {
                             setIsAddressSuggestOpen(false);
                           }}
-                          placeholder="Начни вводить адрес..."
+                          placeholder={UI_TEXT.master.profile.form.addressPlaceholder}
                         />
                       </label>
                       {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
@@ -2001,10 +2048,10 @@ export function MasterProfilePage() {
                       {UI_TEXT.master.profile.form.bioLabel}
                       <textarea
                         className={inputBaseClass}
-                        value={bio}
+                        value={bio ?? ""}
                         rows={4}
                         onChange={(event) => setBio(event.target.value)}
-                        placeholder="Расскажи клиентам о себе — опыт, специализация, подход"
+                        placeholder={UI_TEXT.master.profile.form.bioPlaceholder}
                       />
                     </label>
                   </div>
@@ -2017,10 +2064,21 @@ export function MasterProfilePage() {
                     <input
                       type="checkbox"
                       checked={isPublished}
-                      onChange={(event) => setIsPublished(event.target.checked)}
+                      disabled={isPublishing}
+                      onChange={(event) => void handlePublishToggle(event.target.checked)}
                     />
-                    {UI_TEXT.master.profile.publication.publishAction}
+                    {isPublishing ? UI_TEXT.status.saving : UI_TEXT.master.profile.publication.publishAction}
                   </label>
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveProfile()}
+                      disabled={profileSaveStatus === "saving" || isPublishing}
+                      className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+                    >
+                      {profileSaveStatus === "saving" ? UI_TEXT.status.saving : UI_TEXT.actions.save}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2070,36 +2128,6 @@ export function MasterProfilePage() {
                   ) : null}
 
                 {data.master.isSolo ? (
-                <div className="rounded-2xl bg-bg-card/90 p-4">
-                  <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.reminders.title}</h4>
-                  <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.reminders.desc}</p>
-                  <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-medium">{UI_TEXT.master.profile.reminders.label}</div>
-                        <div className="mt-1 text-xs text-text-sec">
-                          {UI_TEXT.master.profile.reminders.hint}
-                        </div>
-                      </div>
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={remindersEnabled ?? false}
-                            disabled={autoConfirmLoading || remindersSaving}
-                            onChange={(event) => void updateRemindersEnabled(event.target.checked)}
-                          />
-                          {remindersSaving
-                            ? UI_TEXT.status.saving
-                            : remindersEnabled
-                            ? UI_TEXT.status.enabled
-                            : UI_TEXT.status.disabled}
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  ) : null}
-
-                {data.master.isSolo ? (
                   <div className="rounded-2xl bg-bg-card/90 p-4">
                     <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.cancellation.title}</h4>
                     <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.cancellation.desc}</p>
@@ -2136,7 +2164,64 @@ export function MasterProfilePage() {
                   </div>
                   ) : null}
 
-                  <ConnectedAccountsSection />
+                  <div className="lg:col-span-2">
+                    <FeatureGate
+                      feature="notifications"
+                      requiredPlan="PRO"
+                      scope="MASTER"
+                      fallback={
+                        <div className="rounded-2xl border border-white/8 bg-white/2 p-5">
+                          <div className="flex items-center gap-2 text-sm font-medium text-text-main">
+                            <Lock className="h-4 w-4 text-[#c6a97e]" />
+                            {UI_TEXT.billing.featureGate.notificationsTitle}
+                          </div>
+                          <p className="mt-1 text-xs text-text-sec">
+                            {UI_TEXT.billing.featureGate.notificationsHint}
+                          </p>
+                          <Link
+                            href="/cabinet/billing?scope=MASTER"
+                            className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-xs text-text-main transition hover:bg-bg-card"
+                          >
+                            {UI_TEXT.billing.featureGate.cta}
+                          </Link>
+                        </div>
+                      }
+                    >
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        {data.master.isSolo ? (
+                          <div className="rounded-2xl bg-bg-card/90 p-4">
+                            <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.reminders.title}</h4>
+                            <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.reminders.desc}</p>
+                            <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-medium">{UI_TEXT.master.profile.reminders.label}</div>
+                                  <div className="mt-1 text-xs text-text-sec">
+                                    {UI_TEXT.master.profile.reminders.hint}
+                                  </div>
+                                </div>
+                                <label className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={remindersEnabled ?? false}
+                                    disabled={autoConfirmLoading || remindersSaving}
+                                    onChange={(event) => void updateRemindersEnabled(event.target.checked)}
+                                  />
+                                  {remindersSaving
+                                    ? UI_TEXT.status.saving
+                                    : remindersEnabled
+                                      ? UI_TEXT.status.enabled
+                                      : UI_TEXT.status.disabled}
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                        <TelegramNotificationsSection />
+                        <VkNotificationsSection />
+                      </div>
+                    </FeatureGate>
+                  </div>
                   <FeatureGate
                     feature="hotSlots"
                     requiredPlan="PREMIUM"
@@ -2176,7 +2261,21 @@ export function MasterProfilePage() {
                     {UI_TEXT.master.profile.sections.servicesDesc}
                   </p>
                 </div>
-                {autosaveInfo ? <div className="text-xs text-text-sec">{autosaveInfo}</div> : null}
+                <div className="flex items-center gap-3">
+                  {servicesSaveStatus === "saved" ? (
+                    <div className="text-xs text-emerald-500">{UI_TEXT.common.saved}</div>
+                  ) : servicesSaveStatus === "error" ? (
+                    <div className="text-xs text-rose-400">{UI_TEXT.master.profile.errors.saveServices}</div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveServices()}
+                    disabled={servicesSaveStatus === "saving" || !hasServiceDraftChanges}
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+                  >
+                    {servicesSaveStatus === "saving" ? UI_TEXT.status.saving : UI_TEXT.actions.save}
+                  </button>
+                </div>
               </div>
 
         {showAddServicePanel ? (
@@ -2205,7 +2304,7 @@ export function MasterProfilePage() {
                         <option value="">{UI_TEXT.master.profile.services.selectCategory}</option>
                         {globalCategories.map((category) => (
                           <option key={category.id} value={category.id}>
-                            {category.icon ? `${category.icon} ` : ""}{category.fullPath || category.title}
+                            {formatCategoryOptionLabel(category)}
                           </option>
                         ))}
                       </select>
@@ -2220,7 +2319,7 @@ export function MasterProfilePage() {
                       onClick={() => setProposeCategoryOpen(true)}
                       className="text-xs font-medium text-primary underline"
                     >
-                      + Предложить свою категорию
+                      + Своя категория
                     </button>
                     {proposeCategoryMessage ? (
                       <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
@@ -2264,24 +2363,34 @@ export function MasterProfilePage() {
                       </div>
                     </label>
                     <label className="text-xs text-text-sec">
-                      {UI_TEXT.master.profile.services.durationLabel}
+                      {UI_TEXT.services.fields.duration}
                       <div className="mt-1 flex items-center gap-2">
-                        <select
-                          value={newSoloServiceDuration}
+                        <input
+                          type="number"
+                          min={MIN_SERVICE_DURATION_MIN}
+                          max={MAX_SERVICE_DURATION_MIN}
+                          step={SERVICE_DURATION_STEP_MIN}
+                          inputMode="numeric"
+                          value={newSoloServiceDuration === 0 ? "" : String(newSoloServiceDuration)}
+                          placeholder={UI_TEXT.services.fields.durationPlaceholder}
                           onChange={(event) => {
-                            setNewSoloServiceDuration(Number(event.target.value) || 0);
+                            const raw = event.target.value;
+                            setNewSoloServiceDuration(raw === "" ? 0 : Number(raw));
                             setNewSoloServiceFieldErrors((current) => ({ ...current, durationMin: undefined }));
                           }}
+                          onBlur={(event) => {
+                            const value = Number(event.target.value);
+                            if (!Number.isFinite(value) || value <= 0) {
+                              setNewSoloServiceDuration(MIN_SERVICE_DURATION_MIN);
+                              return;
+                            }
+                            setNewSoloServiceDuration(normalizeDuration(value));
+                          }}
                           className={`${selectBaseClass} ${newSoloServiceFieldErrors.durationMin ? inputErrorClass : ""}`}
-                        >
-                          {SERVICE_DURATION_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                        />
                         <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
                       </div>
+                      <p className="mt-1 text-xs text-text-sec">{UI_TEXT.services.fields.durationHint}</p>
                     </label>
                   </div>
                   {newSoloServiceFieldErrors.title ||
@@ -2375,11 +2484,10 @@ export function MasterProfilePage() {
                         >
                           <option value="">Нет категории</option>
                           {globalCategories.map((category) => (
-                            <option key={`service-category-${service.serviceId}-${category.id}`} value={category.id}>
-                              {category.icon ? `${category.icon} ` : ""}
-                              {category.fullPath || category.title}
-                            </option>
-                          ))}
+                          <option key={`service-category-${service.serviceId}-${category.id}`} value={category.id}>
+                              {formatCategoryOptionLabel(category)}
+                          </option>
+                        ))}
                         </select>
                         {!service.globalCategoryId ? (
                           <div className="text-xs text-amber-500">
@@ -2855,7 +2963,7 @@ export function MasterProfilePage() {
               maxLength={60}
             />
             <div className="text-xs text-text-sec">
-              Категория отправится на модерацию. Пока можете сохранить услугу без категории.
+              Категория будет сразу доступна только в вашем кабинете.
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -2903,8 +3011,7 @@ export function MasterProfilePage() {
               <option value="">Без категории</option>
               {globalCategories.map((category) => (
                 <option key={`portfolio-category-${category.id}`} value={category.id}>
-                  {category.icon ? `${category.icon} ` : ""}
-                  {category.fullPath || category.title}
+                  {formatCategoryOptionLabel(category)}
                 </option>
               ))}
             </select>

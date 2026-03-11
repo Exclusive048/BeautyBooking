@@ -131,15 +131,15 @@ export function HotSlotsSettingsSection({ services, scope = "MASTER" }: HotSlots
   }
 
   return (
-    <div className="rounded-2xl bg-bg-card/90 p-4">
+    <div className="w-full min-w-0 rounded-2xl bg-bg-card/90 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h4 className="text-sm font-semibold">Горящие окошки</h4>
           <p className="mt-1 text-xs text-text-sec">
             Автоскидки на свободные слоты в выбранный период.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex shrink-0 items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={rule.isEnabled}
@@ -281,21 +281,24 @@ export function HotSlotsSettingsSection({ services, scope = "MASTER" }: HotSlots
           ) : null}
 
           {rule.applyMode === "MANUAL" ? (
-            <div className="mt-2 rounded-xl border border-border-subtle bg-bg-input/70 p-3">
+            <div className="mt-2 w-full min-w-0 rounded-xl border border-border-subtle bg-bg-input/70 p-3">
               {enabledServices.length === 0 ? (
                 <div className="text-xs text-text-sec">Нет активных услуг.</div>
               ) : (
                 <div className="space-y-2">
                   {enabledServices.map((service) => (
-                    <label key={service.serviceId} className="flex items-center justify-between gap-3 text-xs">
-                      <span className="truncate text-text-main">{service.title}</span>
-                      <span className="text-text-sec">
-                        {moneyRUBPlain(service.effectivePrice)} ₽ / {service.effectiveDurationMin} мин
+                    <label key={service.serviceId} className="flex min-w-0 items-start gap-3 text-xs">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-text-main">{service.title}</span>
+                        <span className="block truncate text-text-sec">
+                          {moneyRUBPlain(service.effectivePrice)} ₽ / {service.effectiveDurationMin} мин
+                        </span>
                       </span>
                       <input
                         type="checkbox"
                         checked={rule.serviceIds.includes(service.serviceId)}
                         onChange={(event) => toggleService(service.serviceId, event.target.checked)}
+                        className="mt-0.5 shrink-0"
                       />
                     </label>
                   ))}

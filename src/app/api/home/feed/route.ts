@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const input = {
       limit: query.limit,
       cursor: query.cursor,
-      categoryId: query.categoryId,
+      globalCategoryId: query.globalCategoryId ?? query.categoryId,
       tagId: query.tagId,
       currentUserId: user?.id,
     };

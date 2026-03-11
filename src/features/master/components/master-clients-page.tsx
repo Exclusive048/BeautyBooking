@@ -64,12 +64,13 @@ export function MasterClientsPage() {
   const rawSort = searchParams.get("sort");
   const sort = rawSort === "visits" || rawSort === "alpha" || rawSort === "recent" ? rawSort : "recent";
   const plan = usePlanFeatures("MASTER");
-  const [data, setData] = useState<ClientsData>({ clients: [] });
+  const [data, setData] = useState<ClientsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedClient | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  const clients = data?.clients ?? [];
 
   const tagMap = useMemo(() => new Map(CLIENT_TAGS.map((tag) => [tag.id, tag])), []);
 
@@ -87,7 +88,7 @@ export function MasterClientsPage() {
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
-        setData(json.data);
+        setData(json.data ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Не удалось загрузить клиентов");
       } finally {
@@ -106,7 +107,7 @@ export function MasterClientsPage() {
     <section className="space-y-4">
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
-      {data.clients.length === 0 ? (
+      {clients.length === 0 ? (
         <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Пока нет клиентов. Список формируется из записей.</div>
       ) : (
         <div className="lux-card overflow-hidden rounded-[24px]">
@@ -123,7 +124,7 @@ export function MasterClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.clients.map((client, index) => {
+              {clients.map((client, index) => {
                 const tagIds = client.card?.tags ?? [];
                 const visibleTags = tagIds.slice(0, 3);
                 const extraTags = Math.max(0, tagIds.length - visibleTags.length);
@@ -201,3 +202,4 @@ export function MasterClientsPage() {
     </section>
   );
 }
+

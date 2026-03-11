@@ -7,6 +7,7 @@ type CategoryItem = {
   slug: string;
   icon: string | null;
   usageCount: number;
+  parentId: string | null;
 };
 
 type Props = {

@@ -123,6 +123,14 @@ export const FEATURE_CATALOG = {
     appliesTo: "BOTH",
     uiOrder: 80,
   },
+  notifications: {
+    kind: "boolean",
+    title: "Уведомления",
+    description: "Доступ к настройкам и каналам уведомлений.",
+    group: "Уведомления",
+    appliesTo: "BOTH",
+    uiOrder: 85,
+  },
   tgNotifications: {
     kind: "boolean",
     title: "Уведомления в Telegram",

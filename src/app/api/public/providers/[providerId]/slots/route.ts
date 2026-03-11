@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
+import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
@@ -18,6 +19,17 @@ function toDate(value: Date | string | null | undefined): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeFixedSlotTime(value: string): string | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
+    return null;
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 function mapSlotsError(code?: string): string {
@@ -66,7 +78,7 @@ export async function GET(
 
   const provider = await resolveProviderBySlugOrId({
     key: p.providerId,
-    select: { id: true, type: true, timezone: true },
+    select: { id: true, type: true, timezone: true, scheduleMode: true, fixedSlotTimes: true },
   });
   if (!provider || provider.type !== "MASTER") {
     return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
@@ -105,7 +117,24 @@ export async function GET(
     },
   });
 
-  const baseSlots = result.data.slots;
+  const fixedSlotSet =
+    provider.scheduleMode === "FIXED"
+      ? new Set(
+          (provider.fixedSlotTimes ?? [])
+            .map((value) => normalizeFixedSlotTime(value))
+            .filter((value): value is string => Boolean(value))
+        )
+      : null;
+  const baseSlots =
+    fixedSlotSet !== null
+      ? result.data.slots.filter((slot) => {
+          const startsAt = toDate(slot.startAtUtc);
+          if (!startsAt) return false;
+          const { hour, minute } = getLocalTimeParts(startsAt, provider.timezone);
+          const localTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+          return fixedSlotSet.has(localTime);
+        })
+      : result.data.slots;
   type SlotLike = (typeof baseSlots)[number] & {
     hotSlotId?: string | null;
     isHot?: boolean;

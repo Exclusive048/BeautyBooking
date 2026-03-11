@@ -12,13 +12,15 @@ import { otpVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { linkGuestBookingsToUserByPhone } from "@/lib/bookings/link-guest-bookings";
-import { logError } from "@/lib/logging/logger";
+import { invalidateMeIdentityCache } from "@/lib/users/me";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 
 const CONSENT_DOCUMENT_VERSION = "1.0";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
+    const routeStartedAt = Date.now();
     const body = await req.json().catch(() => null);
     const parsed = otpVerifySchema.safeParse(body);
     if (!parsed.success) {
@@ -58,14 +60,17 @@ export async function POST(req: Request) {
       return fail("Code not found", 401, "CODE_NOT_FOUND");
     }
 
-    await clearOtpVerifyFailures(phone);
+    const verifyDbStartedAt = Date.now();
+    const [, , existingProfile] = await Promise.all([
+      clearOtpVerifyFailures(phone),
+      prisma.otpCode.update({
+        where: { id: otp.id },
+        data: { usedAt: now },
+      }),
+      prisma.userProfile.findUnique({ where: { phone } }),
+    ]);
 
-    await prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { usedAt: now },
-    });
-
-    let profile = await prisma.userProfile.findUnique({ where: { phone } });
+    let profile = existingProfile;
 
     if (!profile) {
       profile = await prisma.userProfile.create({
@@ -80,37 +85,26 @@ export async function POST(req: Request) {
         profile = { ...profile, roles: nextRoles };
       }
     }
-
-    try {
-      await ensureFreeSubscriptionsForRoles(profile.id, profile.roles);
-    } catch (error) {
-      logError("ensureFreeSubscriptionsForRoles failed after otp verify", {
-        userProfileId: profile.id,
-        error: error instanceof Error ? error.stack : error,
-      });
-      sendTelegramAlert(
-        `User ${profile.id} logged in without free subscription`,
-        `auth:free-subscription:otp:${profile.id}`
-      );
-    }
-
-    if (profile.phone) {
-      try {
-        await linkGuestBookingsToUserByPhone({ userProfileId: profile.id, phoneRaw: profile.phone });
-      } catch (error) {
-        logError("linkGuestBookingsToUserByPhone failed after otp verify", {
-          userProfileId: profile.id,
-          error: error instanceof Error ? error.stack : error,
-        });
-      }
-    }
+    logInfo("OTP verify primary DB queries done", {
+      userProfileId: profile.id,
+      ms: Date.now() - verifyDbStartedAt,
+    });
 
     const forwardedFor = req.headers.get("x-forwarded-for");
     const ipAddress = forwardedFor?.split(",")[0]?.trim() ?? null;
     const userAgent = req.headers.get("user-agent");
 
-    try {
-      await prisma.userConsent.createMany({
+    const sideEffectsStartedAt = Date.now();
+    const linkBookingsPromise = profile.phone
+      ? linkGuestBookingsToUserByPhone({ userProfileId: profile.id, phoneRaw: profile.phone }).catch((error) => {
+          logError("linkGuestBookingsToUserByPhone failed after otp verify", {
+            userProfileId: profile.id,
+            error: error instanceof Error ? error.stack : error,
+          });
+        })
+      : Promise.resolve();
+    const consentPromise = prisma.userConsent
+      .createMany({
         data: [
           {
             userId: profile.id,
@@ -128,17 +122,37 @@ export async function POST(req: Request) {
           },
         ],
         skipDuplicates: true,
+      })
+      .catch((error) => {
+        logError("Failed to save user consents", {
+          userId: profile.id,
+          error: error instanceof Error ? error.stack : String(error),
+        });
       });
-    } catch (error) {
-      logError("Failed to save user consents", {
-        userId: profile.id,
-        error: error instanceof Error ? error.stack : String(error),
-      });
-    }
 
     const redirectDecision = await resolveCabinetRedirect(profile.id);
+    await Promise.all([linkBookingsPromise, consentPromise]);
+    logInfo("OTP verify side effects done", {
+      userProfileId: profile.id,
+      ms: Date.now() - sideEffectsStartedAt,
+    });
+
     const response = ok({ redirect: redirectDecision.target });
     setSessionCookies(response, { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles });
+
+    void ensureFreeSubscriptionsForRoles(profile.id, profile.roles).catch((error) => {
+      logError("ensureFreeSubscriptionsForRoles failed after otp verify", {
+        userProfileId: profile.id,
+        error: error instanceof Error ? error.stack : error,
+      });
+      sendTelegramAlert(
+        `User ${profile.id} logged in without free subscription`,
+        `auth:free-subscription:otp:${profile.id}`
+      );
+    });
+    void invalidateMeIdentityCache(profile.id);
+    logInfo("OTP verify completed", { userProfileId: profile.id, totalMs: Date.now() - routeStartedAt });
+
     return response;
   });
 }
