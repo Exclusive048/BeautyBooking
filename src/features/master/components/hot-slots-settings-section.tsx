@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { moneyRUBPlain } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type RuleState = {
   isEnabled: boolean;
@@ -26,19 +27,18 @@ type ServiceItem = {
 type HotSlotsSettingsSectionProps = {
   services: ServiceItem[];
   scope?: "MASTER" | "STUDIO";
+  embedded?: boolean;
 };
 
-const TRIGGER_OPTIONS = [
-  { value: 48, label: "За 48 ч" },
-  { value: 24, label: "За 24 ч" },
-  { value: 12, label: "За 12 ч" },
-  { value: 0, label: "В день записи" },
-];
+const TRIGGER_OPTIONS = [48, 24, 12, 0] as const;
+const PERCENT_OPTIONS = [10, 20, 30] as const;
 
-const PERCENT_OPTIONS = [10, 20, 30];
-
-
-export function HotSlotsSettingsSection({ services, scope = "MASTER" }: HotSlotsSettingsSectionProps) {
+export function HotSlotsSettingsSection({
+  services,
+  scope = "MASTER",
+  embedded = false,
+}: HotSlotsSettingsSectionProps) {
+  const text = UI_TEXT.settings.hotSlots;
   const [rule, setRule] = useState<RuleState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,19 +52,22 @@ export function HotSlotsSettingsSection({ services, scope = "MASTER" }: HotSlots
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, { cache: "no-store" });
+      const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, {
+        cache: "no-store",
+        credentials: "include",
+      });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ rule: RuleState }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить правила.");
+        throw new Error(json && !json.ok ? json.error.message : text.loadFailed);
       }
       setRule(json.data.rule);
       setStatus(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить правила.");
+      setError(err instanceof Error ? err.message : text.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [scopeQuery]);
+  }, [scopeQuery, text.loadFailed]);
 
   useEffect(() => {
     void loadRule();
@@ -90,232 +93,238 @@ export function HotSlotsSettingsSection({ services, scope = "MASTER" }: HotSlots
     setStatus(null);
     try {
       if (rule.applyMode === "MANUAL" && rule.serviceIds.length === 0) {
-        throw new Error("Выберите хотя бы одну услугу.");
+        throw new Error(text.manualRequired);
       }
       if (rule.applyMode === "PRICE_FROM" && (!rule.minPriceFrom || rule.minPriceFrom <= 0)) {
-        throw new Error("Укажите минимальную цену для правила.");
+        throw new Error(text.minPriceRequired);
       }
       const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rule),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ rule: RuleState }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось сохранить правило.");
+        throw new Error(json && !json.ok ? json.error.message : text.saveFailed);
       }
       setRule(json.data.rule);
-      setStatus("Сохранено");
+      setStatus(UI_TEXT.common.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить правило.");
+      setError(err instanceof Error ? err.message : text.saveFailed);
     } finally {
       setSaving(false);
     }
-  }, [rule, scopeQuery]);
+  }, [rule, scopeQuery, text.manualRequired, text.minPriceRequired, text.saveFailed]);
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-bg-card/90 p-4">
-        <div className="text-sm text-text-sec">Загрузка настроек...</div>
+      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/4 p-4 text-sm text-text-sec"}>
+        {UI_TEXT.common.loading}
       </div>
     );
   }
 
   if (!rule) {
     return (
-      <div className="rounded-2xl bg-bg-card/90 p-4">
-        <div className="text-sm text-text-sec">Правило пока недоступно.</div>
-        {error ? <div className="mt-2 text-xs text-rose-400">{error}</div> : null}
+      <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
+        <p className="text-sm text-text-sec">{text.unavailable}</p>
+        {error ? <p className="mt-2 text-xs text-rose-400">{error}</p> : null}
       </div>
     );
   }
 
+  const triggerLabel = (value: (typeof TRIGGER_OPTIONS)[number]) => {
+    if (value === 48) return text.trigger48;
+    if (value === 24) return text.trigger24;
+    if (value === 12) return text.trigger12;
+    return text.triggerDay;
+  };
+
   return (
-    <div className="w-full min-w-0 rounded-2xl bg-bg-card/90 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold">Горящие окошки</h4>
-          <p className="mt-1 text-xs text-text-sec">
-            Автоскидки на свободные слоты в выбранный период.
-          </p>
+    <div className={embedded ? "space-y-4 p-4" : "space-y-4 rounded-2xl bg-white/4 p-4"}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{text.title}</p>
+          <p className="mt-0.5 text-xs text-text-sec">{text.description}</p>
         </div>
-        <label className="flex shrink-0 items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={rule.isEnabled}
-            onChange={(event) => updateRule({ isEnabled: event.target.checked })}
-          />
-          {rule.isEnabled ? "Включено" : "Выключено"}
-        </label>
+        <Switch
+          checked={rule.isEnabled}
+          onCheckedChange={(checked) => updateRule({ isEnabled: checked })}
+          className="shrink-0"
+        />
       </div>
 
-      <div className="mt-4 space-y-4">
-        <div>
-          <div className="text-xs font-semibold text-text-main">Когда включать скидку</div>
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{text.whenToApply}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {TRIGGER_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => updateRule({ triggerHours: option })}
+              className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+                rule.triggerHours === option
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-white/8 text-text-main hover:bg-white/12"
+              }`}
+            >
+              {triggerLabel(option)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{text.discountType}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => updateRule({ discountType: "PERCENT", discountValue: 10 })}
+            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+              rule.discountType === "PERCENT"
+                ? "bg-primary text-primary-foreground"
+                : "bg-white/8 text-text-main hover:bg-white/12"
+            }`}
+          >
+            {text.percent}
+          </button>
+          <button
+            type="button"
+            onClick={() => updateRule({ discountType: "FIXED", discountValue: 500 })}
+            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+              rule.discountType === "FIXED"
+                ? "bg-primary text-primary-foreground"
+                : "bg-white/8 text-text-main hover:bg-white/12"
+            }`}
+          >
+            {text.fixedAmount}
+          </button>
+        </div>
+
+        {rule.discountType === "PERCENT" ? (
           <div className="mt-2 flex flex-wrap gap-2">
-            {TRIGGER_OPTIONS.map((option) => (
+            {PERCENT_OPTIONS.map((value) => (
               <button
-                key={option.value}
+                key={value}
                 type="button"
-                onClick={() => updateRule({ triggerHours: option.value })}
-                className={`rounded-full border px-3 py-1 text-xs transition ${
-                  rule.triggerHours === option.value
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
+                onClick={() => updateRule({ discountValue: value })}
+                className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+                  rule.discountValue === value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-white/8 text-text-main hover:bg-white/12"
                 }`}
               >
-                {option.label}
+                {value}%
               </button>
             ))}
           </div>
-        </div>
-
-        <div>
-          <div className="text-xs font-semibold text-text-main">Размер скидки</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => updateRule({ discountType: "PERCENT", discountValue: 10 })}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                rule.discountType === "PERCENT"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
-              }`}
-            >
-              Процент
-            </button>
-            <button
-              type="button"
-              onClick={() => updateRule({ discountType: "FIXED", discountValue: 500 })}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                rule.discountType === "FIXED"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
-              }`}
-            >
-              Фиксированная сумма
-            </button>
+        ) : (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min={100}
+              max={5000}
+              value={Number.isFinite(rule.discountValue) ? rule.discountValue : 0}
+              onChange={(event) => updateRule({ discountValue: Number(event.target.value) || 0 })}
+              className="h-10 w-32 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
           </div>
-
-          {rule.discountType === "PERCENT" ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PERCENT_OPTIONS.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => updateRule({ discountValue: value })}
-                  className={`rounded-full border px-3 py-1 text-xs transition ${
-                    rule.discountValue === value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
-                  }`}
-                >
-                  {value}%
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="number"
-                min={100}
-                max={5000}
-                value={Number.isFinite(rule.discountValue) ? rule.discountValue : 0}
-                onChange={(event) => updateRule({ discountValue: Number(event.target.value) || 0 })}
-                className="h-9 w-32 rounded-lg border border-border-subtle bg-bg-input px-3 text-sm"
-              />
-              <span className="text-xs text-text-sec">₽</span>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="text-xs font-semibold text-text-main">Применение скидки</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => updateRule({ applyMode: "ALL_SERVICES" })}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                rule.applyMode === "ALL_SERVICES"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
-              }`}
-            >
-              На все услуги
-            </button>
-            <button
-              type="button"
-              onClick={() => updateRule({ applyMode: "PRICE_FROM" })}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                rule.applyMode === "PRICE_FROM"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
-              }`}
-            >
-              Только дороже…
-            </button>
-            <button
-              type="button"
-              onClick={() => updateRule({ applyMode: "MANUAL" })}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                rule.applyMode === "MANUAL"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"
-              }`}
-            >
-              Выбрать услуги
-            </button>
-          </div>
-
-          {rule.applyMode === "PRICE_FROM" ? (
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="number"
-                min={0}
-                value={rule.minPriceFrom ?? 0}
-                onChange={(event) => updateRule({ minPriceFrom: Number(event.target.value) || 0 })}
-                className="h-9 w-32 rounded-lg border border-border-subtle bg-bg-input px-3 text-sm"
-              />
-              <span className="text-xs text-text-sec">₽</span>
-            </div>
-          ) : null}
-
-          {rule.applyMode === "MANUAL" ? (
-            <div className="mt-2 w-full min-w-0 rounded-xl border border-border-subtle bg-bg-input/70 p-3">
-              {enabledServices.length === 0 ? (
-                <div className="text-xs text-text-sec">Нет активных услуг.</div>
-              ) : (
-                <div className="space-y-2">
-                  {enabledServices.map((service) => (
-                    <label key={service.serviceId} className="flex min-w-0 items-start gap-3 text-xs">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-text-main">{service.title}</span>
-                        <span className="block truncate text-text-sec">
-                          {moneyRUBPlain(service.effectivePrice)} ₽ / {service.effectiveDurationMin} мин
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={rule.serviceIds.includes(service.serviceId)}
-                        onChange={(event) => toggleService(service.serviceId, event.target.checked)}
-                        className="mt-0.5 shrink-0"
-                      />
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
+        )}
       </div>
 
-      {error ? <div className="mt-3 text-xs text-rose-400">{error}</div> : null}
-      {status ? <div className="mt-3 text-xs text-emerald-500">{status}</div> : null}
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{text.applyMode}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => updateRule({ applyMode: "ALL_SERVICES" })}
+            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+              rule.applyMode === "ALL_SERVICES"
+                ? "bg-primary text-primary-foreground"
+                : "bg-white/8 text-text-main hover:bg-white/12"
+            }`}
+          >
+            {text.applyAll}
+          </button>
+          <button
+            type="button"
+            onClick={() => updateRule({ applyMode: "PRICE_FROM" })}
+            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+              rule.applyMode === "PRICE_FROM"
+                ? "bg-primary text-primary-foreground"
+                : "bg-white/8 text-text-main hover:bg-white/12"
+            }`}
+          >
+            {text.applyFrom}
+          </button>
+          <button
+            type="button"
+            onClick={() => updateRule({ applyMode: "MANUAL" })}
+            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
+              rule.applyMode === "MANUAL"
+                ? "bg-primary text-primary-foreground"
+                : "bg-white/8 text-text-main hover:bg-white/12"
+            }`}
+          >
+            {text.applyManual}
+          </button>
+        </div>
 
-      <div className="mt-4 flex justify-end">
-        <Button onClick={() => void saveRule()} disabled={saving}>
-          {saving ? "Сохраняем..." : "Сохранить"}
-        </Button>
+        {rule.applyMode === "PRICE_FROM" ? (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              value={rule.minPriceFrom ?? 0}
+              onChange={(event) => updateRule({ minPriceFrom: Number(event.target.value) || 0 })}
+              className="h-10 w-32 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
+          </div>
+        ) : null}
+
+        {rule.applyMode === "MANUAL" ? (
+          <div className="mt-2 w-full min-w-0 rounded-xl bg-white/6 p-3">
+            {enabledServices.length === 0 ? (
+              <p className="text-xs text-text-sec">{text.noServices}</p>
+            ) : (
+              <div className="space-y-2">
+                {enabledServices.map((service) => (
+                  <div key={service.serviceId} className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs text-text-main">{service.title}</p>
+                      <p className="truncate text-xs text-text-sec">
+                        {moneyRUBPlain(service.effectivePrice)} {UI_TEXT.common.currencyRub} / {service.effectiveDurationMin} {UI_TEXT.common.minutesShort}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={rule.serviceIds.includes(service.serviceId)}
+                      onCheckedChange={(checked) => toggleService(service.serviceId, checked)}
+                      size="sm"
+                      className="shrink-0"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+      {status ? <p className="text-xs text-text-sec">{status}</p> : null}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => void saveRule()}
+          disabled={saving}
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+        >
+          {saving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
+        </button>
       </div>
     </div>
   );

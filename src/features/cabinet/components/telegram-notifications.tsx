@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { ListRow } from "@/components/ui/list-row";
+import { Switch } from "@/components/ui/switch";
 import type { ApiResponse } from "@/lib/types/api";
 import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -26,7 +25,7 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
 }
 
 export function TelegramNotificationsSection({ embedded = false }: Props) {
-  const t = UI_TEXT.clientCabinet;
+  const t = UI_TEXT.settings.notifications.telegram;
   const { status, loading, error: statusError, reload } = useTelegramStatus();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +34,14 @@ export function TelegramNotificationsSection({ embedded = false }: Props) {
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/telegram/link", { cache: "no-store" });
+      const res = await fetch("/api/telegram/link", { cache: "no-store", credentials: "include" });
       const json = (await res.json().catch(() => null)) as ApiResponse<TelegramLinkResponse> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, t.telegram.linkFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.telegram.linkFailed));
+      if (!res.ok) throw new Error(getErrorMessage(json, t.connectFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.connectFailed));
       window.open(json.data.url, "_blank", "noopener,noreferrer");
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.telegram.unknownError);
+      setError(e instanceof Error ? e.message : t.connectFailed);
     } finally {
       setSaving(false);
     }
@@ -55,15 +54,16 @@ export function TelegramNotificationsSection({ embedded = false }: Props) {
     try {
       const res = await fetch("/api/telegram/settings", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<TelegramSettingsResponse> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, t.telegram.settingsFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.telegram.settingsFailed));
+      if (!res.ok) throw new Error(getErrorMessage(json, t.updateFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.updateFailed));
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.telegram.unknownError);
+      setError(e instanceof Error ? e.message : t.updateFailed);
     } finally {
       setSaving(false);
     }
@@ -71,7 +71,7 @@ export function TelegramNotificationsSection({ embedded = false }: Props) {
 
   if (loading) {
     return (
-      <div className={embedded ? "text-sm text-text-sec" : "lux-card rounded-[24px] p-4 text-sm text-text-sec"}>
+      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/4 p-4 text-sm text-text-sec"}>
         {UI_TEXT.common.loading}
       </div>
     );
@@ -81,33 +81,33 @@ export function TelegramNotificationsSection({ embedded = false }: Props) {
   const enabled = Boolean(status?.enabled);
 
   return (
-    <div className={embedded ? "space-y-3" : "lux-card rounded-[24px] p-4 space-y-3"}>
-      <ListRow
-        icon="TG"
-        title={t.telegram.title}
-        subtitle={linked ? t.telegram.connected : t.telegram.notConnected}
-        right={
-          !linked ? (
-            <Button type="button" onClick={onConnect} disabled={saving} size="sm">
-              {saving ? UI_TEXT.common.loading : t.telegram.connectButton}
-            </Button>
-          ) : (
-            <label className="inline-flex items-center gap-2 text-xs text-text-main">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => onToggle(e.target.checked)}
-                disabled={!linked || saving}
-                className="h-4 w-4 accent-primary"
-              />
-              {enabled ? t.telegram.enabled : t.telegram.disabled}
-            </label>
-          )
-        }
-      />
+    <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{t.title}</p>
+          <p className="mt-0.5 text-xs text-text-sec">{linked ? t.connected : t.notConnected}</p>
+        </div>
+        {linked ? (
+          <Switch
+            checked={enabled}
+            onCheckedChange={(next) => void onToggle(next)}
+            disabled={saving}
+            className="shrink-0"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => void onConnect()}
+            disabled={saving}
+            className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+          >
+            {t.connect}
+          </button>
+        )}
+      </div>
 
-      {linked ? <div className="text-xs text-text-sec">{t.telegram.hint}</div> : null}
-      {error ?? statusError ? <div className="text-xs text-red-600">{error ?? statusError}</div> : null}
+      {linked ? <p className="mt-2 text-xs text-text-sec">{t.hint}</p> : null}
+      {error ?? statusError ? <p className="mt-2 text-xs text-rose-400">{error ?? statusError}</p> : null}
     </div>
   );
 }

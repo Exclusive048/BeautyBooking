@@ -1,12 +1,21 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
-import { FeatureGate } from "@/components/billing/FeatureGate";
+import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalImage } from "@/components/ui/focal-image";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
@@ -17,9 +26,6 @@ import { VkNotificationsSection } from "@/features/cabinet/components/vk-notific
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import {
   useAddressWithGeocode,
-  type AddressCoords,
-  type AddressSource,
-  type GeoStatus,
 } from "@/lib/maps/use-address-with-geocode";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
@@ -266,6 +272,88 @@ async function uploadMasterMedia(input: {
   return json.data.asset;
 }
 
+function SettingsSection({
+  title,
+  children,
+  pro = false,
+}: {
+  title: string;
+  children: ReactNode;
+  pro?: boolean;
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-text-sec">{title}</h2>
+        {pro ? (
+          <span className="rounded-full bg-[#c6a97e]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c6a97e]">
+            PRO
+          </span>
+        ) : null}
+      </div>
+      <div className="rounded-2xl bg-white/4">{children}</div>
+    </section>
+  );
+}
+
+function SectionDivider() {
+  return <div className="h-px bg-white/6" />;
+}
+
+function LockedFeatureRow({
+  title,
+  hint,
+  children,
+  hasAccess,
+  showUpgradeTip,
+  onUpgradeClick,
+}: {
+  title: string;
+  hint: string;
+  children: ReactNode;
+  hasAccess: boolean;
+  showUpgradeTip: boolean;
+  onUpgradeClick: () => void;
+}) {
+  return (
+    <div
+      className={[
+        "relative flex items-center justify-between gap-3 p-4 transition-colors",
+        hasAccess ? "" : "opacity-60",
+      ].join(" ")}
+    >
+      <div className="min-w-0 flex-1 pr-4">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">{title}</p>
+          {!hasAccess ? (
+            <span className="rounded-full bg-[#c6a97e]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c6a97e]">
+              PRO
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-0.5 text-xs text-text-sec">{hint}</p>
+      </div>
+
+      <div onClick={!hasAccess ? onUpgradeClick : undefined} className={!hasAccess ? "cursor-pointer" : ""}>
+        {hasAccess ? children : <div className="pointer-events-none">{children}</div>}
+      </div>
+
+      {!hasAccess && showUpgradeTip ? (
+        <div className="absolute right-4 top-full z-10 mt-1 w-56 rounded-xl bg-bg-elevated p-3 shadow-xl">
+          <p className="text-xs font-medium">{UI_TEXT.settings.billing.featureGate.title}</p>
+          <p className="mt-1 text-xs text-text-sec">{UI_TEXT.settings.billing.featureGate.hint}</p>
+          <Link
+            href="/cabinet/billing?scope=MASTER"
+            className="mt-2 block rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-semibold text-white"
+          >
+            {UI_TEXT.settings.billing.featureGate.cta}
+          </Link>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function MasterProfilePage() {
   const router = useRouter();
   const [data, setData] = useState<MasterProfileData | null>(null);
@@ -281,11 +369,10 @@ export function MasterProfilePage() {
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
   const [autoConfirmSaving, setAutoConfirmSaving] = useState(false);
-  const [remindersEnabled, setRemindersEnabled] = useState<boolean | null>(null);
-  const [remindersSaving, setRemindersSaving] = useState(false);
   const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
   const [cancellationDeadlineInput, setCancellationDeadlineInput] = useState("");
   const [cancellationDeadlineSaving, setCancellationDeadlineSaving] = useState(false);
+  const [cancellationSaved, setCancellationSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>("main");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
@@ -293,6 +380,7 @@ export function MasterProfilePage() {
   const [profileSaveStatus, setProfileSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [servicesSaveStatus, setServicesSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [profileFieldErrors, setProfileFieldErrors] = useState<{ displayName?: string }>({});
+  const [upgradeTipKey, setUpgradeTipKey] = useState<"telegram" | "vk" | "hotSlots" | null>(null);
 
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -300,8 +388,6 @@ export function MasterProfilePage() {
     inputRef: addressInputRef,
     addressText,
     addressCoords,
-    addressSource,
-    geoStatus,
     addressStatus,
     suggestions: addressSuggestions,
     isSuggestOpen: isAddressSuggestOpen,
@@ -361,23 +447,11 @@ export function MasterProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
   const newPortfolioInputRef = useRef<HTMLInputElement | null>(null);
-  const profileSavingRef = useRef(false);
-  const profilePendingRef = useRef(false);
   const servicesSavingRef = useRef(false);
   const servicesPendingRef = useRef(false);
-  const profileSnapshotRef = useRef({
-    displayName: "",
-    tagline: "",
-    addressText: "",
-    bio: "",
-    avatarUrl: "",
-    isPublished: false,
-    addressCoords: null as AddressCoords | null,
-    addressSource: "manual" as AddressSource,
-    geoStatus: "idle" as GeoStatus,
-  });
   const servicesSnapshotRef = useRef<MasterServiceItem[]>([]);
-  const dataRef = useRef<MasterProfileData | null>(null);
+  const cancellationSavedTimeoutRef = useRef<number | null>(null);
+  const upgradeTipTimeoutRef = useRef<number | null>(null);
 
   const loadCategoryOptions = useCallback(async (): Promise<void> => {
     try {
@@ -426,49 +500,32 @@ export function MasterProfilePage() {
     }
   }, []);
 
-    const load = useCallback(async (): Promise<void> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetchWithAuth("/api/master/profile", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<MasterProfileData> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
-        }
+  const load = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchWithAuth("/api/master/profile", { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as ApiResponse<MasterProfileData> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      }
 
-        const profileData = json.data;
-        dataRef.current = profileData;
-        const hasCoords =
-          typeof profileData.master.geoLat === "number" &&
-          Number.isFinite(profileData.master.geoLat) &&
-          typeof profileData.master.geoLng === "number" &&
-          Number.isFinite(profileData.master.geoLng);
-        const coords = hasCoords
-          ? { lat: profileData.master.geoLat!, lng: profileData.master.geoLng! }
-          : null;
-        const nextGeoStatus: GeoStatus = "idle";
+      const profileData = json.data;
+      const hasCoords =
+        typeof profileData.master.geoLat === "number" &&
+        Number.isFinite(profileData.master.geoLat) &&
+        typeof profileData.master.geoLng === "number" &&
+        Number.isFinite(profileData.master.geoLng);
+      const coords = hasCoords ? { lat: profileData.master.geoLat!, lng: profileData.master.geoLng! } : null;
 
-        profileSnapshotRef.current = {
-          displayName: profileData.master.displayName,
-          tagline: profileData.master.tagline,
-          addressText: profileData.master.address,
-          bio: profileData.master.bio ?? "",
-          avatarUrl: profileData.master.avatarUrl ?? "",
-          isPublished: profileData.master.isPublished,
-          addressCoords: coords,
-          addressSource: "manual",
-          geoStatus: nextGeoStatus,
-        };
-        servicesSnapshotRef.current = profileData.services;
-        profileSavingRef.current = false;
-        profilePendingRef.current = false;
-        servicesSavingRef.current = false;
-        servicesPendingRef.current = false;
-        setData(profileData);
-        setDisplayName(profileData.master.displayName);
-        setTagline(profileData.master.tagline);
-        setAddressSnapshot({ text: profileData.master.address, coords });
-        setBio(profileData.master.bio ?? "");
+      servicesSnapshotRef.current = profileData.services;
+      servicesSavingRef.current = false;
+      servicesPendingRef.current = false;
+      setData(profileData);
+      setDisplayName(profileData.master.displayName);
+      setTagline(profileData.master.tagline);
+      setAddressSnapshot({ text: profileData.master.address, coords });
+      setBio(profileData.master.bio ?? "");
       setAvatarUrl(profileData.master.avatarUrl ?? "");
       setIsPublished(profileData.master.isPublished);
       setProfileSaveStatus("idle");
@@ -511,73 +568,56 @@ export function MasterProfilePage() {
     }
   }, [loadCategoryOptions, setAddressSnapshot]);
 
-    useEffect(() => {
-      void load();
-    }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-    useEffect(() => {
-      dataRef.current = data;
-    }, [data]);
-
-    useEffect(() => {
-      if (!isAddressSuggestOpen) return;
-      const handleDocumentClick = (event: MouseEvent | TouchEvent) => {
-        const target = event.target;
-        if (!(target instanceof Node)) return;
-        if (!addressSuggestRootRef.current) return;
-        if (!addressSuggestRootRef.current.contains(target)) {
-          setIsAddressSuggestOpen(false);
-        }
-      };
-
-      document.addEventListener("mousedown", handleDocumentClick);
-      document.addEventListener("touchstart", handleDocumentClick);
-      return () => {
-        document.removeEventListener("mousedown", handleDocumentClick);
-        document.removeEventListener("touchstart", handleDocumentClick);
-      };
-    }, [isAddressSuggestOpen, setIsAddressSuggestOpen]);
-
-    useEffect(() => {
-      profileSnapshotRef.current = {
-        displayName,
-        tagline,
-        addressText,
-        bio,
-        avatarUrl,
-        isPublished,
-        addressCoords,
-        addressSource,
-        geoStatus,
-      };
-    }, [
-      displayName,
-      tagline,
-      addressText,
-      avatarUrl,
-      bio,
-      isPublished,
-      addressCoords,
-      addressSource,
-      geoStatus,
-    ]);
-
-    useEffect(() => {
-      if (!data) return;
-      const hasChanges =
-        displayName.trim() !== data.master.displayName ||
-        tagline.trim() !== data.master.tagline ||
-        addressText.trim() !== data.master.address.trim() ||
-        bio.trim() !== (data.master.bio ?? "").trim() ||
-        (avatarUrl.trim() || null) !== ((data.master.avatarUrl ?? "").trim() || null);
-      if (hasChanges && profileSaveStatus !== "saving") {
-        setProfileSaveStatus("idle");
+  useEffect(() => {
+    if (!isAddressSuggestOpen) return;
+    const handleDocumentClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!addressSuggestRootRef.current) return;
+      if (!addressSuggestRootRef.current.contains(target)) {
+        setIsAddressSuggestOpen(false);
       }
-    }, [addressText, avatarUrl, bio, data, displayName, profileSaveStatus, tagline]);
+    };
 
-    useEffect(() => {
-      servicesSnapshotRef.current = Object.values(servicesDraft);
-    }, [servicesDraft]);
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("touchstart", handleDocumentClick);
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("touchstart", handleDocumentClick);
+    };
+  }, [isAddressSuggestOpen, setIsAddressSuggestOpen]);
+
+  useEffect(() => {
+    if (!data) return;
+    const hasChanges =
+      displayName.trim() !== data.master.displayName ||
+      tagline.trim() !== data.master.tagline ||
+      addressText.trim() !== data.master.address.trim() ||
+      bio.trim() !== (data.master.bio ?? "").trim() ||
+      (avatarUrl.trim() || null) !== ((data.master.avatarUrl ?? "").trim() || null);
+    if (hasChanges && profileSaveStatus !== "saving") {
+      setProfileSaveStatus("idle");
+    }
+  }, [addressText, avatarUrl, bio, data, displayName, profileSaveStatus, tagline]);
+
+  useEffect(() => {
+    servicesSnapshotRef.current = Object.values(servicesDraft);
+  }, [servicesDraft]);
+
+  useEffect(() => {
+    return () => {
+      if (cancellationSavedTimeoutRef.current !== null) {
+        window.clearTimeout(cancellationSavedTimeoutRef.current);
+      }
+      if (upgradeTipTimeoutRef.current !== null) {
+        window.clearTimeout(upgradeTipTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!bookingConfigServiceId) {
@@ -637,7 +677,6 @@ export function MasterProfilePage() {
   useEffect(() => {
     if (!data?.master.isSolo) {
       setAutoConfirmBookings(null);
-      setRemindersEnabled(null);
       setCancellationDeadlineHours(null);
       setCancellationDeadlineInput("");
       return;
@@ -655,21 +694,18 @@ export function MasterProfilePage() {
           | ApiResponse<{
               autoConfirmBookings: boolean;
               cancellationDeadlineHours: number | null;
-              remindersEnabled: boolean;
             }>
           | null;
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
         }
         setAutoConfirmBookings(json.data.autoConfirmBookings);
-        setRemindersEnabled(json.data.remindersEnabled);
         const deadlineValue = json.data.cancellationDeadlineHours ?? null;
         setCancellationDeadlineHours(deadlineValue);
         setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setAutoConfirmBookings(null);
-        setRemindersEnabled(null);
         setCancellationDeadlineHours(null);
         setCancellationDeadlineInput("");
       } finally {
@@ -802,11 +838,25 @@ export function MasterProfilePage() {
   const onlinePaymentsSystemEnabled = plan.system?.onlinePaymentsEnabled ?? false;
   const canOnlinePayments = onlinePaymentsAllowed && onlinePaymentsSystemEnabled;
   const showOnlinePaymentsToggle = data?.master.isSolo ?? false;
+  const hasTelegramAccess = plan.can("notifications") && plan.can("tgNotifications");
+  const hasVkAccess = plan.can("notifications") && plan.can("vkNotifications");
+  const hasHotSlotsAccess = plan.can("hotSlots");
   const onlinePaymentsLockedMessage = !onlinePaymentsAllowed
     ? UI_TEXT.master.profile.onlinePayments.proRequired
     : !onlinePaymentsSystemEnabled
       ? UI_TEXT.master.profile.onlinePayments.disabledByAdmin
       : null;
+
+  const handleUpgradeClick = useCallback((key: "telegram" | "vk" | "hotSlots") => {
+    setUpgradeTipKey(key);
+    if (upgradeTipTimeoutRef.current !== null) {
+      window.clearTimeout(upgradeTipTimeoutRef.current);
+    }
+    upgradeTipTimeoutRef.current = window.setTimeout(() => {
+      setUpgradeTipKey((current) => (current === key ? null : current));
+      upgradeTipTimeoutRef.current = null;
+    }, 3000);
+  }, []);
 
   function normalizePrice(value: number): number {
     return Math.ceil(value / 100) * 100;
@@ -818,171 +868,146 @@ export function MasterProfilePage() {
     return Math.round(clamped / SERVICE_DURATION_STEP_MIN) * SERVICE_DURATION_STEP_MIN;
   }
 
-  const saveProfile = useCallback(
-      async (options?: { refresh?: boolean }): Promise<boolean> => {
-        const currentData = dataRef.current;
-        if (!currentData) return false;
+  const saveProfile = useCallback(async (): Promise<boolean> => {
+    if (!data) return false;
 
-        if (profileSavingRef.current) {
-          profilePendingRef.current = true;
-          return false;
-        }
+    setProfileFieldErrors({});
+    setError(null);
 
-        const snapshot = profileSnapshotRef.current;
-        const currentMaster = currentData.master;
-        const payload: {
-          displayName?: string;
-          tagline?: string;
-          address?: string;
-          bio?: string | null;
-          avatarUrl?: string | null;
-          isPublished?: boolean;
-          geoLat?: number | null;
-          geoLng?: number | null;
-        } = {};
+    const currentMaster = data.master;
+    const payload: {
+      displayName?: string;
+      tagline?: string;
+      address?: string;
+      bio?: string | null;
+      avatarUrl?: string | null;
+      isPublished?: boolean;
+      geoLat?: number | null;
+      geoLng?: number | null;
+    } = {};
 
-        const nextDisplayName = snapshot.displayName.trim();
-        if (!nextDisplayName) {
-          setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
-          setProfileSaveStatus("error");
-          return false;
-        }
+    const nextDisplayName = displayName.trim();
+    if (!nextDisplayName) {
+      setProfileFieldErrors({ displayName: UI_TEXT.master.profile.errors.displayNameRequired });
+      setProfileSaveStatus("error");
+      return false;
+    }
+    if (nextDisplayName !== currentMaster.displayName) {
+      payload.displayName = nextDisplayName;
+    }
 
-        if (nextDisplayName !== currentMaster.displayName) {
-          payload.displayName = nextDisplayName;
-        }
+    const nextTagline = tagline.trim();
+    if (nextTagline !== currentMaster.tagline) {
+      payload.tagline = nextTagline;
+    }
 
-        const nextTagline = snapshot.tagline.trim();
-        if (nextTagline !== currentMaster.tagline) {
-          payload.tagline = nextTagline;
-        }
+    const nextAddress = addressText.trim();
+    const currentAddress = currentMaster.address.trim();
+    const addressChanged = nextAddress !== currentAddress;
 
-        const nextAddress = snapshot.addressText.trim();
-        const currentAddress = currentMaster.address.trim();
-        const addressChanged = nextAddress !== currentAddress;
+    const nextBio = bio.trim();
+    const currentBio = (currentMaster.bio ?? "").trim();
+    if (nextBio !== currentBio) {
+      payload.bio = nextBio;
+    }
 
-        const nextBio = snapshot.bio.trim();
-        const currentBio = (currentMaster.bio ?? "").trim();
-        if (nextBio !== currentBio) {
-          payload.bio = nextBio;
-        }
+    const nextAvatarUrl = avatarUrl.trim() || null;
+    const currentAvatarUrl = (currentMaster.avatarUrl ?? "").trim() || null;
+    if (nextAvatarUrl !== currentAvatarUrl) {
+      payload.avatarUrl = nextAvatarUrl;
+    }
 
-        const nextAvatarUrl = snapshot.avatarUrl.trim() || null;
-        const currentAvatarUrl = (currentMaster.avatarUrl ?? "").trim() || null;
-        if (nextAvatarUrl !== currentAvatarUrl) {
-          payload.avatarUrl = nextAvatarUrl;
-        }
+    if (isPublished !== currentMaster.isPublished) {
+      payload.isPublished = isPublished;
+    }
 
-        if (snapshot.isPublished !== currentMaster.isPublished) {
-          payload.isPublished = snapshot.isPublished;
-        }
+    const nextCoords =
+      addressCoords && Number.isFinite(addressCoords.lat) && Number.isFinite(addressCoords.lng)
+        ? addressCoords
+        : null;
+    const currentCoords =
+      typeof currentMaster.geoLat === "number" &&
+      Number.isFinite(currentMaster.geoLat) &&
+      typeof currentMaster.geoLng === "number" &&
+      Number.isFinite(currentMaster.geoLng)
+        ? { lat: currentMaster.geoLat, lng: currentMaster.geoLng }
+        : null;
 
-        const nextCoords =
-          snapshot.addressCoords &&
-          Number.isFinite(snapshot.addressCoords.lat) &&
-          Number.isFinite(snapshot.addressCoords.lng)
-            ? snapshot.addressCoords
-            : null;
-        const currentCoords =
-          typeof currentMaster.geoLat === "number" &&
-          Number.isFinite(currentMaster.geoLat) &&
-          typeof currentMaster.geoLng === "number" &&
-          Number.isFinite(currentMaster.geoLng)
-            ? { lat: currentMaster.geoLat, lng: currentMaster.geoLng }
-            : null;
+    const coordsChanged =
+      (nextCoords?.lat ?? null) !== (currentCoords?.lat ?? null) ||
+      (nextCoords?.lng ?? null) !== (currentCoords?.lng ?? null);
 
-        const coordsChanged =
-          (nextCoords?.lat ?? null) !== (currentCoords?.lat ?? null) ||
-          (nextCoords?.lng ?? null) !== (currentCoords?.lng ?? null);
+    if (addressChanged) {
+      if (!nextAddress) {
+        payload.address = "";
+        payload.geoLat = null;
+        payload.geoLng = null;
+      } else if (nextCoords) {
+        payload.address = nextAddress;
+        payload.geoLat = nextCoords.lat;
+        payload.geoLng = nextCoords.lng;
+      } else {
+        setError(SAVE_ADDRESS_ERROR_MESSAGE);
+        setProfileSaveStatus("error");
+        return false;
+      }
+    } else if (coordsChanged && nextCoords) {
+      payload.geoLat = nextCoords.lat;
+      payload.geoLng = nextCoords.lng;
+    }
 
-        const coordsReady = !nextAddress || Boolean(nextCoords);
+    if (Object.keys(payload).length === 0) {
+      setProfileSaveStatus("saved");
+      return true;
+    }
 
-        if (addressChanged) {
-          if (!nextAddress) {
-            payload.address = "";
-            payload.geoLat = null;
-            payload.geoLng = null;
-          } else if (coordsReady && nextCoords) {
-            payload.address = nextAddress;
-            payload.geoLat = nextCoords.lat;
-            payload.geoLng = nextCoords.lng;
-          }
-        } else if (coordsChanged && coordsReady && nextCoords) {
-          payload.geoLat = nextCoords.lat;
-          payload.geoLng = nextCoords.lng;
-        }
+    setProfileSaveStatus("saving");
+    try {
+      const res = await fetchWithAuth("/api/master/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const errorRes = res.clone();
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | ApiErrorShape | null;
+      if (!res.ok || !json || !json.ok) {
+        const message = await readErrorMessage(
+          errorRes,
+          json && !json.ok ? json : null,
+          SAVE_ADDRESS_ERROR_MESSAGE
+        );
+        throw new Error(message);
+      }
 
-        if (Object.keys(payload).length === 0) {
-          setProfileSaveStatus("saved");
-          return true;
-        }
-
-        profileSavingRef.current = true;
-        profilePendingRef.current = false;
-        setProfileSaveStatus("saving");
-        setError(null);
-        try {
-          const res = await fetchWithAuth("/api/master/profile", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const errorRes = res.clone();
-          const json = (await res.json().catch(() => null)) as
-            | ApiResponse<{ id: string }>
-            | ApiErrorShape
-            | null;
-          if (!res.ok || !json || !json.ok) {
-            const message = await readErrorMessage(
-              errorRes,
-              json && !json.ok ? json : null,
-              SAVE_ADDRESS_ERROR_MESSAGE
-            );
-            throw new Error(message);
-          }
-
-          if (options?.refresh) {
-            await load();
-          } else {
-            setData((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    master: {
-                      ...prev.master,
-                      displayName: payload.displayName ?? prev.master.displayName,
-                      tagline: payload.tagline ?? prev.master.tagline,
-                      address: payload.address ?? prev.master.address,
-                      geoLat: payload.geoLat !== undefined ? payload.geoLat : prev.master.geoLat,
-                      geoLng: payload.geoLng !== undefined ? payload.geoLng : prev.master.geoLng,
-                      bio: payload.bio ?? prev.master.bio,
-                      avatarUrl: payload.avatarUrl ?? prev.master.avatarUrl,
-                      isPublished: payload.isPublished ?? prev.master.isPublished,
-                    },
-                  }
-                : prev
-            );
-          }
-
-          setProfileSaveStatus("saved");
-          return true;
-        } catch (err) {
-          setError(err instanceof Error ? err.message : SAVE_ADDRESS_ERROR_MESSAGE);
-          setProfileSaveStatus("error");
-          return false;
-        } finally {
-          profileSavingRef.current = false;
-          if (profilePendingRef.current) {
-            profilePendingRef.current = false;
-            void saveProfile({ refresh: false });
-          }
-        }
-      },
-      [load]
-    );
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              master: {
+                ...prev.master,
+                displayName: payload.displayName ?? prev.master.displayName,
+                tagline: payload.tagline ?? prev.master.tagline,
+                address: payload.address ?? prev.master.address,
+                geoLat: payload.geoLat !== undefined ? payload.geoLat : prev.master.geoLat,
+                geoLng: payload.geoLng !== undefined ? payload.geoLng : prev.master.geoLng,
+                bio: payload.bio ?? prev.master.bio,
+                avatarUrl: payload.avatarUrl ?? prev.master.avatarUrl,
+                isPublished: payload.isPublished ?? prev.master.isPublished,
+              },
+            }
+          : prev
+      );
+      setProfileSaveStatus("saved");
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : SAVE_ADDRESS_ERROR_MESSAGE);
+      setProfileSaveStatus("error");
+      return false;
+    }
+  }, [addressCoords, addressText, avatarUrl, bio, data, displayName, isPublished, tagline]);
 
   const handleSaveProfile = useCallback(async (): Promise<void> => {
-    await saveProfile({ refresh: false });
+    await saveProfile();
   }, [saveProfile]);
 
   const handlePublishToggle = useCallback(
@@ -1036,6 +1061,8 @@ export function MasterProfilePage() {
 
   const updateAutoConfirm = async (nextValue: boolean): Promise<void> => {
     if (!data?.master.isSolo) return;
+    const prevValue = autoConfirmBookings;
+    setAutoConfirmBookings(nextValue);
     setAutoConfirmSaving(true);
     setError(null);
     try {
@@ -1048,7 +1075,6 @@ export function MasterProfilePage() {
         | ApiResponse<{
             autoConfirmBookings: boolean;
             cancellationDeadlineHours: number | null;
-            remindersEnabled: boolean;
           }>
         | ApiErrorShape
         | null;
@@ -1061,58 +1087,21 @@ export function MasterProfilePage() {
         );
       }
       setAutoConfirmBookings(json.data.autoConfirmBookings);
-      setRemindersEnabled(json.data.remindersEnabled);
       const deadlineValue = json.data.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
     } catch (err) {
+      setAutoConfirmBookings(prevValue);
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateSettings);
     } finally {
       setAutoConfirmSaving(false);
     }
   };
 
-  const updateRemindersEnabled = async (nextValue: boolean): Promise<void> => {
-    if (!data?.master.isSolo) return;
-    setRemindersSaving(true);
-    setError(null);
-    try {
-      const res = await fetchWithAuth("/api/providers/me/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ remindersEnabled: nextValue }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{
-            autoConfirmBookings: boolean;
-            cancellationDeadlineHours: number | null;
-            remindersEnabled: boolean;
-          }>
-        | ApiErrorShape
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(
-          extractApiErrorMessage(
-            json && !json.ok ? json : null,
-            `API error: ${res.status}`
-          )
-        );
-      }
-      setAutoConfirmBookings(json.data.autoConfirmBookings);
-      setRemindersEnabled(json.data.remindersEnabled);
-      const deadlineValue = json.data.cancellationDeadlineHours ?? null;
-      setCancellationDeadlineHours(deadlineValue);
-      setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateReminders);
-    } finally {
-      setRemindersSaving(false);
-    }
-  };
-
   const saveCancellationDeadline = async (): Promise<void> => {
     if (!data?.master.isSolo) return;
     setCancellationDeadlineSaving(true);
+    setCancellationSaved(false);
     setError(null);
     try {
       const trimmed = cancellationDeadlineInput.trim();
@@ -1136,7 +1125,6 @@ export function MasterProfilePage() {
         | ApiResponse<{
             autoConfirmBookings: boolean;
             cancellationDeadlineHours: number | null;
-            remindersEnabled: boolean;
           }>
         | ApiErrorShape
         | null;
@@ -1149,10 +1137,16 @@ export function MasterProfilePage() {
         );
       }
       setAutoConfirmBookings(json.data.autoConfirmBookings);
-      setRemindersEnabled(json.data.remindersEnabled);
       const deadlineValue = json.data.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
+      setCancellationSaved(true);
+      if (cancellationSavedTimeoutRef.current !== null) {
+        window.clearTimeout(cancellationSavedTimeoutRef.current);
+      }
+      cancellationSavedTimeoutRef.current = window.setTimeout(() => {
+        setCancellationSaved(false);
+      }, 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateCancellationDeadline);
     } finally {
@@ -2063,15 +2057,16 @@ export function MasterProfilePage() {
                 <div className="rounded-2xl bg-bg-card/90 p-4">
                   <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.publication.title}</h3>
                   <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.publication.desc}</p>
-                  <label className="mt-3 inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-sm">
+                      {isPublishing ? UI_TEXT.status.saving : UI_TEXT.master.profile.publication.publishAction}
+                    </span>
+                    <Switch
                       checked={isPublished}
                       disabled={isPublishing}
-                      onChange={(event) => void handlePublishToggle(event.target.checked)}
+                      onCheckedChange={(nextValue) => void handlePublishToggle(nextValue)}
                     />
-                    {isPublishing ? UI_TEXT.status.saving : UI_TEXT.master.profile.publication.publishAction}
-                  </label>
+                  </div>
                   <div className="mt-3">
                     <button
                       type="button"
@@ -2093,50 +2088,36 @@ export function MasterProfilePage() {
           ) : null}
 
           {activeTab === "settings" ? (
-            <div className="space-y-6">
+            <div className="space-y-8 p-1">
               <div>
-                <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.settingsTitle}</h3>
-                <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.sections.settingsDesc}</p>
+                <h3 className="text-xl font-semibold">{UI_TEXT.settings.title}</h3>
+                <p className="mt-1 text-sm text-text-sec">{UI_TEXT.settings.subtitle}</p>
               </div>
-              <PublicUsernameCard endpoint="/api/cabinet/master/public-username" />
-              <div className="grid gap-4 lg:grid-cols-2">
-                {data.master.isSolo ? (
-                  <div className="rounded-2xl bg-bg-card/90 p-4">
-                    <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.automation.title}</h4>
-                    <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.automation.desc}</p>
-                    <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium">{UI_TEXT.master.profile.automation.autoConfirmTitle}</div>
-                          <div className="mt-1 text-xs text-text-sec">
-                            {UI_TEXT.master.profile.automation.autoConfirmDesc}
-                          </div>
-                        </div>
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={autoConfirmBookings ?? false}
-                            disabled={autoConfirmLoading || autoConfirmSaving}
-                            onChange={(event) => void updateAutoConfirm(event.target.checked)}
-                          />
-                          {autoConfirmLoading
-                            ? UI_TEXT.status.loading
-                            : autoConfirmBookings
-                              ? UI_TEXT.status.enabled
-                              : UI_TEXT.status.disabled}
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  ) : null}
 
-                {data.master.isSolo ? (
-                  <div className="rounded-2xl bg-bg-card/90 p-4">
-                    <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.cancellation.title}</h4>
-                    <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.cancellation.desc}</p>
-                    <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
-                      <label className="block text-xs text-text-sec">{UI_TEXT.master.profile.cancellation.label}</label>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
+              <SettingsSection title={UI_TEXT.settings.sections.publicPage}>
+                <PublicUsernameCard endpoint="/api/cabinet/master/public-username" />
+              </SettingsSection>
+
+              {data.master.isSolo ? (
+                <SettingsSection title={UI_TEXT.settings.sections.bookingRules}>
+                  <div className="flex items-center justify-between gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{UI_TEXT.settings.autoConfirm.title}</p>
+                      <p className="mt-0.5 text-xs text-text-sec">{UI_TEXT.settings.autoConfirm.hint}</p>
+                    </div>
+                    <Switch
+                      checked={autoConfirmBookings ?? false}
+                      onCheckedChange={(nextValue) => void updateAutoConfirm(nextValue)}
+                      disabled={autoConfirmLoading || autoConfirmSaving}
+                      className="shrink-0"
+                    />
+                  </div>
+                  <SectionDivider />
+                  <div className="p-4">
+                    <p className="text-sm font-medium">{UI_TEXT.settings.cancellation.title}</p>
+                    <p className="mt-0.5 text-xs text-text-sec">{UI_TEXT.settings.cancellation.hint}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="relative w-32">
                         <input
                           type="number"
                           min={0}
@@ -2144,115 +2125,108 @@ export function MasterProfilePage() {
                           inputMode="numeric"
                           value={cancellationDeadlineInput}
                           onChange={(event) => setCancellationDeadlineInput(event.target.value)}
+                          onBlur={() => void saveCancellationDeadline()}
                           disabled={autoConfirmLoading || cancellationDeadlineSaving}
-                          placeholder={UI_TEXT.master.profile.cancellation.placeholder}
-                          className="h-10 w-[160px] rounded-xl border border-border-subtle bg-bg-card px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+                          className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-8 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+                          placeholder="24"
                         />
-                        <button
-                          type="button"
-                          onClick={() => void saveCancellationDeadline()}
-                          disabled={autoConfirmLoading || cancellationDeadlineSaving}
-                          className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
-                        >
-                          {cancellationDeadlineSaving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
-                        </button>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-sec">
+                          {UI_TEXT.common.hoursShortLetter}
+                        </span>
                       </div>
-                      <div className="mt-2 text-xs text-text-sec">
-                        {UI_TEXT.master.profile.cancellation.currentValue}{" "}
-                        {cancellationDeadlineHours === null
-                          ? UI_TEXT.common.noLimit
-                          : `${cancellationDeadlineHours} ${UI_TEXT.master.profile.cancellation.hoursShort}`}
-                      </div>
+                      {cancellationSaved ? (
+                        <span className="text-xs text-text-sec">{UI_TEXT.common.saved}</span>
+                      ) : null}
                     </div>
+                    <p className="mt-2 text-xs text-text-sec">
+                      {cancellationDeadlineHours === null
+                        ? UI_TEXT.common.noLimit
+                        : `${cancellationDeadlineHours} ${UI_TEXT.common.hoursShortLetter}`}
+                    </p>
                   </div>
-                  ) : null}
+                </SettingsSection>
+              ) : null}
 
-                  <div className="lg:col-span-2">
-                    <FeatureGate
-                      feature="notifications"
-                      requiredPlan="PRO"
-                      scope="MASTER"
-                      fallback={
-                        <div className="rounded-2xl border border-white/8 bg-white/2 p-5">
-                          <div className="flex items-center gap-2 text-sm font-medium text-text-main">
-                            <Lock className="h-4 w-4 text-[#c6a97e]" />
-                            {UI_TEXT.billing.featureGate.notificationsTitle}
-                          </div>
-                          <p className="mt-1 text-xs text-text-sec">
-                            {UI_TEXT.billing.featureGate.notificationsHint}
-                          </p>
-                          <Link
-                            href="/cabinet/billing?scope=MASTER"
-                            className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-xs text-text-main transition hover:bg-bg-card"
-                          >
-                            {UI_TEXT.billing.featureGate.cta}
-                          </Link>
-                        </div>
-                      }
-                    >
-                      <div className="grid gap-4 lg:grid-cols-2">
-                        {data.master.isSolo ? (
-                          <div className="rounded-2xl bg-bg-card/90 p-4">
-                            <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.reminders.title}</h4>
-                            <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.reminders.desc}</p>
-                            <div className="mt-3 rounded-xl bg-bg-input/70 p-3">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                  <div className="text-sm font-medium">{UI_TEXT.master.profile.reminders.label}</div>
-                                  <div className="mt-1 text-xs text-text-sec">
-                                    {UI_TEXT.master.profile.reminders.hint}
-                                  </div>
-                                </div>
-                                <label className="flex items-center gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
-                                    checked={remindersEnabled ?? false}
-                                    disabled={autoConfirmLoading || remindersSaving}
-                                    onChange={(event) => void updateRemindersEnabled(event.target.checked)}
-                                  />
-                                  {remindersSaving
-                                    ? UI_TEXT.status.saving
-                                    : remindersEnabled
-                                      ? UI_TEXT.status.enabled
-                                      : UI_TEXT.status.disabled}
-                                </label>
-                              </div>
-                            </div>
-                          </div>
-                        ) : null}
-                        <TelegramNotificationsSection />
-                        <VkNotificationsSection />
-                      </div>
-                    </FeatureGate>
-                  </div>
-                  <FeatureGate
-                    feature="hotSlots"
-                    requiredPlan="PREMIUM"
-                    scope="MASTER"
-                    title={UI_TEXT.master.profile.hotSlots.title}
-                    description={UI_TEXT.master.profile.hotSlots.desc}
+              <SettingsSection title={UI_TEXT.settings.sections.proFeatures} pro>
+                {hasTelegramAccess ? (
+                  <TelegramNotificationsSection embedded />
+                ) : (
+                  <LockedFeatureRow
+                    title={UI_TEXT.settings.telegram.title}
+                    hint={UI_TEXT.settings.telegram.hint}
+                    hasAccess={false}
+                    showUpgradeTip={upgradeTipKey === "telegram"}
+                    onUpgradeClick={() => handleUpgradeClick("telegram")}
                   >
-                    <HotSlotsSettingsSection services={serviceList} />
-                  </FeatureGate>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
+                    >
+                      {UI_TEXT.settings.telegram.connect}
+                    </button>
+                  </LockedFeatureRow>
+                )}
+                <SectionDivider />
+                {hasVkAccess ? (
+                  <VkNotificationsSection embedded />
+                ) : (
+                  <LockedFeatureRow
+                    title={UI_TEXT.settings.notifications.vk.title}
+                    hint={UI_TEXT.settings.notifications.vk.enable}
+                    hasAccess={false}
+                    showUpgradeTip={upgradeTipKey === "vk"}
+                    onUpgradeClick={() => handleUpgradeClick("vk")}
+                  >
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
+                    >
+                      {UI_TEXT.settings.notifications.vk.connect}
+                    </button>
+                  </LockedFeatureRow>
+                )}
+                <SectionDivider />
+                {hasHotSlotsAccess ? (
+                  <HotSlotsSettingsSection services={serviceList} embedded />
+                ) : (
+                  <LockedFeatureRow
+                    title={UI_TEXT.settings.hotSlots.title}
+                    hint={UI_TEXT.settings.hotSlots.hint}
+                    hasAccess={false}
+                    showUpgradeTip={upgradeTipKey === "hotSlots"}
+                    onUpgradeClick={() => handleUpgradeClick("hotSlots")}
+                  >
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
+                    >
+                      {UI_TEXT.settings.hotSlots.configure}
+                    </button>
+                  </LockedFeatureRow>
+                )}
+              </SettingsSection>
+
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/4 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-red-300">{UI_TEXT.settings.danger.title}</p>
+                    <p className="mt-1 text-xs text-text-sec">{UI_TEXT.settings.danger.hint}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteActiveCount(null);
+                        setDeleteModalOpen(true);
+                      }}
+                      className="mt-3 rounded-xl border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                    >
+                      {UI_TEXT.settings.danger.cta}
+                    </button>
+                  </div>
                 </div>
-              <section className="mt-12 border-t border-red-200/40 pt-8">
-                <h2 className="text-sm font-semibold text-red-500">{UI_TEXT.master.profile.deleteCabinet.title}</h2>
-                <p className="mt-1 text-xs text-text-sec">
-                  {UI_TEXT.master.profile.deleteCabinet.descMain} {UI_TEXT.master.profile.deleteCabinet.descLegal}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeleteError(null);
-                    setDeleteActiveCount(null);
-                    setDeleteModalOpen(true);
-                  }}
-                  className="mt-4 rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-500 hover:bg-red-50/10 transition-colors"
-                >
-                  {UI_TEXT.master.profile.deleteCabinet.action}
-                </button>
-              </section>
               </div>
+            </div>
             ) : null}
 
           {activeTab === "services" ? (

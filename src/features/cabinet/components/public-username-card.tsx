@@ -1,8 +1,9 @@
 "use client";
 
+import { Check, Copy, ExternalLink, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type PublicUsernamePayload = {
   username: string;
@@ -13,34 +14,31 @@ type Props = {
   endpoint: string;
 };
 
-const RULES_TEXT = "a-z, 0-9, дефис, 3–32";
-
 export function PublicUsernameCard({ endpoint }: Props) {
+  const settingsText = UI_TEXT.settings;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [username, setUsername] = useState("");
   const [url, setUrl] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState("");
-
-  const canAct = Boolean(url && username);
-  const usernamePlaceholder = endpoint.includes("/studio/") ? "my-studio" : "anna-manicure";
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(endpoint, { cache: "no-store" });
+      const res = await fetch(endpoint, { cache: "no-store", credentials: "include" });
       const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
       setUsername(json.data.username);
       setUrl(json.data.url);
+      setDraft(json.data.username);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить публичную ссылку.");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateSettings);
     } finally {
       setLoading(false);
     }
@@ -50,40 +48,20 @@ export function PublicUsernameCard({ endpoint }: Props) {
     void load();
   }, [load]);
 
-  const openModal = useCallback(() => {
-    setDraft(username);
-    setError(null);
-    setModalOpen(true);
-  }, [username]);
-
-  const closeModal = useCallback(() => {
-    if (saving) return;
-    setModalOpen(false);
-  }, [saving]);
-
-  const showNotice = useCallback((message: string) => {
-    setNotice(message);
-    window.setTimeout(() => setNotice(null), 2500);
-  }, []);
-
   const handleCopy = useCallback(async () => {
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      showNotice("Ссылка скопирована.");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      showNotice("Не удалось скопировать ссылку.");
+      setError(UI_TEXT.master.profile.errors.saveFailed);
     }
-  }, [showNotice, url]);
-
-  const handleOpen = useCallback(() => {
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
   }, [url]);
 
   const submitDisabled = useMemo(() => saving || !draft.trim(), [draft, saving]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (): Promise<void> => {
     const next = draft.trim();
     if (!next) return;
     setSaving(true);
@@ -91,119 +69,108 @@ export function PublicUsernameCard({ endpoint }: Props) {
     try {
       const res = await fetch(endpoint, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: next }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
-      if (res.status === 409) {
-        setError("Этот username уже занят. Попробуйте другой.");
-        return;
-      }
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
       setUsername(json.data.username);
       setUrl(json.data.url);
-      setModalOpen(false);
-      showNotice("Публичная ссылка обновлена.");
+      setIsEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось изменить username.");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.saveFailed);
     } finally {
       setSaving(false);
     }
-  }, [draft, endpoint, showNotice]);
+  }, [draft, endpoint]);
+
+  const publicPath = username ? `/u/${username}` : "/u/";
 
   if (loading) {
-    return (
-      <div className="rounded-2xl bg-bg-card/90 p-4 text-sm text-text-sec">
-        Загрузка публичной ссылки...
-      </div>
-    );
+    return <div className="p-4 text-sm text-text-sec">{UI_TEXT.common.loading}</div>;
   }
 
   return (
-    <section className="rounded-2xl bg-bg-card/90 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">Публичная ссылка</h3>
-          <p className="mt-1 text-xs text-text-sec">
-            Используйте эту ссылку для клиента и продвижения.
-          </p>
-        </div>
-        {notice ? <div className="text-xs text-emerald-400">{notice}</div> : null}
-      </div>
-
-      {error ? <div className="mt-3 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-200">{error}</div> : null}
-
-      <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-sm text-text-main">
-        <div className="text-xs text-text-sec">Username</div>
-        <div className="mt-1 font-semibold">{username || "—"}</div>
-        <div className="mt-3 text-xs text-text-sec">Полная ссылка</div>
-        <div className="mt-1 truncate text-sm">{url || "—"}</div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
+    <div className="space-y-3 p-4">
+      <div className="relative">
+        <input
+          readOnly
+          value={url}
+          className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-10 text-sm text-text-sec outline-none"
+        />
         <button
           type="button"
-          onClick={handleCopy}
-          disabled={!canAct}
-          className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
+          onClick={() => void handleCopy()}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-sec transition-colors hover:text-text-main"
+          title={settingsText.publicLink.copy}
+          aria-label={settingsText.publicLink.copy}
         >
-          Скопировать ссылку
-        </button>
-        <button
-          type="button"
-          onClick={handleOpen}
-          disabled={!canAct}
-          className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
-        >
-          Открыть
-        </button>
-        <button
-          type="button"
-          onClick={openModal}
-          disabled={!canAct}
-          className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
-        >
-          Изменить username
+          {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
 
-      <ModalSurface open={modalOpen} onClose={closeModal} title="Изменить username">
-        <div className="space-y-3">
-          <label className="text-xs text-text-sec">
-            Новый username
+      <div className="flex flex-wrap items-center gap-2">
+        {isEditing ? (
+          <>
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-transparent bg-bg-input px-3 py-2 text-sm text-text-main outline-none transition focus:border-border-subtle"
-              placeholder={usernamePlaceholder}
+              className="h-10 min-w-0 flex-1 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder="anna-manicure"
+              autoFocus
             />
-          </label>
-          <div className="text-xs text-text-sec">Правила: {RULES_TEXT}</div>
-          <div className="rounded-xl bg-bg-input/70 p-3 text-xs text-text-sec">
-            После изменения старая ссылка будет перенаправлять на новую.
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={closeModal}
-              disabled={saving}
-              className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
-            >
-              Отмена
-            </button>
             <button
               type="button"
               onClick={() => void handleSubmit()}
               disabled={submitDisabled}
-              className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+              className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
             >
-              Подтвердить
+              {UI_TEXT.actions.save}
             </button>
-          </div>
-        </div>
-      </ModalSurface>
-    </section>
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(username);
+                setIsEditing(false);
+              }}
+              disabled={saving}
+              className="shrink-0 rounded-xl bg-white/8 px-3 py-2 text-xs text-text-sec transition-colors hover:bg-white/12"
+            >
+              {UI_TEXT.actions.cancel}
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-sm text-text-sec">{publicPath}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(username);
+                setIsEditing(true);
+              }}
+              className="inline-flex items-center gap-1 text-xs text-text-sec transition-colors hover:text-text-main"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {settingsText.publicLink.editUsername}
+            </button>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto inline-flex items-center gap-1 text-xs text-text-sec transition-colors hover:text-text-main"
+            >
+              {settingsText.publicLink.open}
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </>
+        )}
+      </div>
+
+      {error ? <div className="text-xs text-rose-400">{error}</div> : null}
+      {copied ? <div className="text-xs text-text-sec">{settingsText.publicLink.copied}</div> : null}
+    </div>
   );
 }

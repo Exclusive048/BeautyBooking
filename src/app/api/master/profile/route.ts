@@ -68,14 +68,14 @@ export async function PATCH(req: Request) {
       }
     }
     const data = await updateMasterProfile(masterId, {
-      displayName: body.displayName,
-      tagline: body.tagline,
-      address: body.address,
-      geoLat: body.geoLat,
-      geoLng: body.geoLng,
-      bio: body.bio,
-      avatarUrl: body.avatarUrl,
-      isPublished: body.isPublished,
+      ...(body.isPublished !== undefined ? { isPublished: body.isPublished } : {}),
+      ...(body.displayName !== undefined ? { displayName: body.displayName } : {}),
+      ...(body.tagline !== undefined ? { tagline: body.tagline } : {}),
+      ...(body.address !== undefined ? { address: body.address } : {}),
+      ...(body.geoLat !== undefined ? { geoLat: body.geoLat } : {}),
+      ...(body.geoLng !== undefined ? { geoLng: body.geoLng } : {}),
+      ...(body.bio !== undefined ? { bio: body.bio } : {}),
+      ...(body.avatarUrl !== undefined ? { avatarUrl: body.avatarUrl } : {}),
     });
     return jsonProfileOk(data);
   } catch (error) {
