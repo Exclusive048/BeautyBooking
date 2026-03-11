@@ -98,47 +98,45 @@ export async function POST(req: Request) {
       return jsonFail(409, "Этот username уже занят. Попробуйте другой.", "CONFLICT");
     }
 
-    await prisma.$transaction(async (tx) => {
-      const current = await tx.provider.findUnique({
-        where: { id: provider.id },
-        select: { publicUsername: true },
-      });
-      if (!current) {
-        throw new AppError("Профиль студии не найден.", 404, "PROVIDER_NOT_FOUND");
-      }
+    const current = await prisma.provider.findUnique({
+      where: { id: provider.id },
+      select: { publicUsername: true },
+    });
+    if (!current) {
+      throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    }
 
-      if (current.publicUsername && current.publicUsername !== normalized) {
-        const exists = await tx.publicUsernameAlias.findUnique({
-          where: { username: current.publicUsername },
+    if (current.publicUsername && current.publicUsername !== normalized) {
+      const exists = await prisma.publicUsernameAlias.findUnique({
+        where: { username: current.publicUsername },
+        select: { id: true },
+      });
+      if (!exists) {
+        await prisma.publicUsernameAlias.create({
+          data: { username: current.publicUsername, providerId: provider.id },
           select: { id: true },
         });
-        if (!exists) {
-          await tx.publicUsernameAlias.create({
-            data: { username: current.publicUsername, providerId: provider.id },
-            select: { id: true },
-          });
-        }
       }
+    }
 
-      await tx.provider.update({
-        where: { id: provider.id },
-        data: { publicUsername: normalized, publicUsernameUpdatedAt: new Date() },
-        select: { id: true },
-      });
-
-      const aliases = await tx.publicUsernameAlias.findMany({
-        where: { providerId: provider.id },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-
-      if (aliases.length > 10) {
-        const keepIds = new Set(aliases.slice(0, 10).map((alias) => alias.id));
-        await tx.publicUsernameAlias.deleteMany({
-          where: { providerId: provider.id, id: { notIn: Array.from(keepIds) } },
-        });
-      }
+    await prisma.provider.update({
+      where: { id: provider.id },
+      data: { publicUsername: normalized, publicUsernameUpdatedAt: new Date() },
+      select: { id: true },
     });
+
+    const aliases = await prisma.publicUsernameAlias.findMany({
+      where: { providerId: provider.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (aliases.length > 10) {
+      const keepIds = new Set(aliases.slice(0, 10).map((alias) => alias.id));
+      await prisma.publicUsernameAlias.deleteMany({
+        where: { providerId: provider.id, id: { notIn: Array.from(keepIds) } },
+      });
+    }
 
     return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, provider.id, normalized) });
   } catch (error) {

@@ -66,20 +66,18 @@ export async function POST(
     return fail("Forbidden", 403, "FORBIDDEN");
   }
 
-  await prisma.$transaction([
-    prisma.studioMembership.update({
-      where: { id: membership.id },
-      data: { status: MembershipStatus.LEFT },
-    }),
-    prisma.provider.updateMany({
-      where: {
-        ownerUserId: auth.user.id,
-        type: ProviderType.MASTER,
-        studioId: studio.providerId,
-      },
-      data: { studioId: null },
-    }),
-  ]);
+  await prisma.studioMembership.update({
+    where: { id: membership.id },
+    data: { status: MembershipStatus.LEFT },
+  });
+  await prisma.provider.updateMany({
+    where: {
+      ownerUserId: auth.user.id,
+      type: ProviderType.MASTER,
+      studioId: studio.providerId,
+    },
+    data: { studioId: null },
+  });
 
   try {
     const ownerUserId = studio.ownerUserId ?? studio.provider.ownerUserId ?? null;

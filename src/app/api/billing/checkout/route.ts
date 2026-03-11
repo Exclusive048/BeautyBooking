@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { createInitialPayment } from "@/lib/payments/yookassa/client";
-import { BILLING_PERIODS } from "@/lib/billing/constants";
+import { BILLING_PERIODS, BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { formatTimeBucketUtc, sha256 } from "@/lib/billing/utils";
 
@@ -38,9 +38,11 @@ export async function POST(req: Request) {
       scope: true,
       isActive: true,
       prices: {
-        where: { periodMonths, isActive: true },
-        select: { priceKopeks: true },
-        take: 1,
+        where: {
+          isActive: true,
+          periodMonths: { in: periodMonths === 12 ? [1, 12] : [periodMonths] },
+        },
+        select: { periodMonths: true, priceKopeks: true },
       },
     },
   });
@@ -52,7 +54,14 @@ export async function POST(req: Request) {
     return fail("Тариф не относится к выбранному разделу.", 400, "VALIDATION_ERROR");
   }
 
-  const priceKopeks = plan.prices[0]?.priceKopeks ?? null;
+  const monthlyPriceKopeks = plan.prices.find((entry) => entry.periodMonths === 1)?.priceKopeks ?? null;
+  const selectedPeriodPriceKopeks =
+    plan.prices.find((entry) => entry.periodMonths === periodMonths)?.priceKopeks ?? null;
+  const priceKopeks =
+    periodMonths === 12 && monthlyPriceKopeks !== null
+      ? Math.floor(monthlyPriceKopeks * 12 * (1 - BILLING_YEARLY_DISCOUNT))
+      : selectedPeriodPriceKopeks ??
+        (monthlyPriceKopeks !== null ? monthlyPriceKopeks * periodMonths : null);
   if (priceKopeks === null) {
     return fail("Цена для выбранного срока не найдена.", 404, "NOT_FOUND");
   }

@@ -69,6 +69,9 @@ type Props = {
   studioId: string;
 };
 
+const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
+  fetch(input, { ...init, credentials: "include" });
+
 
 export function StudioServicesPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.services;
@@ -123,7 +126,7 @@ export function StudioServicesPage({ studioId }: Props) {
     setError(null);
     try {
       const servicesParams = new URLSearchParams({ studioId });
-      const servicesRes = await fetch(`/api/studio/services?${servicesParams.toString()}`, {
+      const servicesRes = await fetchWithAuth(`/api/studio/services?${servicesParams.toString()}`, {
         cache: "no-store",
       });
       const servicesJson = (await servicesRes.json().catch(() => null)) as ApiResponse<ServicesData> | null;
@@ -147,8 +150,8 @@ export function StudioServicesPage({ studioId }: Props) {
       }
 
       const [mastersRes, categoriesRes] = await Promise.all([
-        fetch(`/api/studio/masters?${servicesParams.toString()}`, { cache: "no-store" }),
-        fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
+        fetchWithAuth(`/api/studio/masters?${servicesParams.toString()}`, { cache: "no-store" }),
+        fetchWithAuth("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
       ]);
       const mastersJson = (await mastersRes.json().catch(() => null)) as ApiResponse<MastersData> | null;
       if (mastersRes.ok && mastersJson && mastersJson.ok) {
@@ -157,10 +160,12 @@ export function StudioServicesPage({ studioId }: Props) {
         setMasters([]);
       }
       const categoriesJson = (await categoriesRes.json().catch(() => null)) as
-        | ApiResponse<{ categories: GlobalCategoryOption[] }>
+        | ApiResponse<{ categories: GlobalCategoryOption[] } | GlobalCategoryOption[]>
         | null;
       if (categoriesRes.ok && categoriesJson && categoriesJson.ok) {
-        setGlobalCategories(categoriesJson.data.categories);
+        setGlobalCategories(
+          Array.isArray(categoriesJson.data) ? categoriesJson.data : categoriesJson.data.categories
+        );
       } else {
         setGlobalCategories([]);
       }
@@ -327,10 +332,10 @@ export function StudioServicesPage({ studioId }: Props) {
     setError(null);
     setProposeCategoryMessage(null);
     try {
-      const res = await fetch("/api/categories/propose", {
+      const res = await fetchWithAuth("/api/categories/propose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, context: "SERVICE" }),
+        body: JSON.stringify({ name: title, context: "SERVICE", isPersonalOnly: true }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {

@@ -10,6 +10,7 @@ import { dateFromKey, parseTime } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
+import { prismaDirect } from "@/lib/prisma-direct";
 
 type RouteContext = {
   params: Promise<{ applicationId: string }>;
@@ -42,17 +43,18 @@ function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
 
 async function resolveBufferMinutes(
   providerId: string,
-  masterProviderId: string | null
+  masterProviderId: string | null,
+  providerQuery: Pick<typeof prisma.provider, "findUnique"> = prisma.provider
 ): Promise<number> {
   if (masterProviderId) {
-    const master = await prisma.provider.findUnique({
+    const master = await providerQuery.findUnique({
       where: { id: masterProviderId },
       select: { bufferBetweenBookingsMin: true },
     });
     return normalizeBufferMinutes(master?.bufferBetweenBookingsMin);
   }
 
-  const provider = await prisma.provider.findUnique({
+  const provider = await providerQuery.findUnique({
     where: { id: providerId },
     select: { bufferBetweenBookingsMin: true },
   });
@@ -183,7 +185,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const priceValue = application.offer.price ? Number(application.offer.price) : 0;
     const safePrice = Number.isFinite(priceValue) && priceValue > 0 ? priceValue : 0;
 
-    const bookingId = await prisma.$transaction(
+    const bookingId = await prismaDirect.$transaction(
       async (tx) => {
         const [offerRow, appRow] = await Promise.all([
           tx.modelOffer.findUnique({
@@ -211,7 +213,8 @@ export async function POST(req: Request, ctx: RouteContext) {
 
         const bufferMin = await resolveBufferMinutes(
           application.offer.masterService.service.providerId,
-          application.offer.masterId
+          application.offer.masterId,
+          tx.provider
         );
         const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
         const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;

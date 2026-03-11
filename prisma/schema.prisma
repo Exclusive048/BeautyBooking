@@ -1235,6 +1235,9 @@ model ScheduleOverride {
   kind ScheduleOverrideKind @default(TIME_RANGE)
 
   isDayOff Boolean @default(false)
+  isWorkday Boolean?
+  scheduleMode ScheduleMode?
+  fixedSlotTimes String[] @default([])
 
   startLocal String?
 
@@ -1383,6 +1386,8 @@ model WeeklyScheduleDay {
   template ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   isActive Boolean @default(false)
+  scheduleMode ScheduleMode @default(FLEXIBLE)
+  fixedSlotTimes String[] @default([])
 
   @@unique([configId, weekday])
   @@index([templateId])

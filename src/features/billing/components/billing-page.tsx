@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
 import { cn } from "@/lib/cn";
 import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
@@ -62,12 +63,46 @@ type BillingPageProps = {
 };
 
 const PERIODS: PeriodMonths[] = [1, 12];
-const PERIOD_BUTTON_BASE = "rounded-xl px-4 py-2 text-sm font-semibold transition-colors";
-const PERIOD_BUTTON_SELECTED = `${PERIOD_BUTTON_BASE} bg-primary text-white`;
-const PERIOD_BUTTON_UNSELECTED = `${PERIOD_BUTTON_BASE} bg-white/8 text-text-main hover:bg-white/12`;
+const PERIOD_BUTTON_SELECTED =
+  "rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card";
+const PERIOD_BUTTON_UNSELECTED =
+  "rounded-xl bg-white/8 px-4 py-2 text-sm font-medium text-text-main transition-colors hover:bg-white/12";
 
 function getPrice(plan: BillingPlan, periodMonths: PeriodMonths): PlanPrice | null {
   return plan.prices.find((price) => price.periodMonths === periodMonths) ?? null;
+}
+
+function getBaseMonthlyPriceKopeks(plan: BillingPlan): number | null {
+  return getPrice(plan, 1)?.priceKopeks ?? null;
+}
+
+function getDisplayMonthlyPriceKopeks(plan: BillingPlan, periodMonths: PeriodMonths): number | null {
+  const monthly = getBaseMonthlyPriceKopeks(plan);
+  if (monthly === null) return null;
+  if (periodMonths === 12) {
+    return Math.floor(monthly * (1 - BILLING_YEARLY_DISCOUNT));
+  }
+  return monthly;
+}
+
+function getCheckoutAmountKopeks(plan: BillingPlan, periodMonths: PeriodMonths): number | null {
+  const monthly = getBaseMonthlyPriceKopeks(plan);
+  if (monthly === null) {
+    return getPrice(plan, periodMonths)?.priceKopeks ?? null;
+  }
+  if (periodMonths === 12) {
+    return Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT));
+  }
+  if (periodMonths === 1) return monthly;
+  return getPrice(plan, periodMonths)?.priceKopeks ?? monthly * periodMonths;
+}
+
+function getYearlySavingsKopeks(plan: BillingPlan): number {
+  const monthly = getBaseMonthlyPriceKopeks(plan);
+  if (monthly === null) return 0;
+  const fullYear = monthly * 12;
+  const discountedYear = Math.floor(fullYear * (1 - BILLING_YEARLY_DISCOUNT));
+  return Math.max(0, fullYear - discountedYear);
 }
 
 function formatPeriodLabel(periodMonths: PeriodMonths) {
@@ -124,6 +159,12 @@ export function BillingPage({ scope }: BillingPageProps) {
 
   const handleCheckout = async (selectedScope: SubscriptionScope, plan: BillingPlan) => {
     const periodMonths = selectedPeriod[selectedScope];
+    const totalAmountKopeks = getCheckoutAmountKopeks(plan, periodMonths);
+    if (totalAmountKopeks === null) {
+      setError("Не удалось определить стоимость тарифа.");
+      return;
+    }
+
     setBusyScope(selectedScope);
     setError(null);
     try {
@@ -134,6 +175,7 @@ export function BillingPage({ scope }: BillingPageProps) {
           scope: selectedScope,
           planId: plan.id,
           periodMonths,
+          totalAmountKopeks,
           returnUrl: `${window.location.origin}/cabinet/billing?scope=${selectedScope}`,
         }),
       });
@@ -275,24 +317,45 @@ export function BillingPage({ scope }: BillingPageProps) {
               }
               className={selectedPeriod[scope] === periodMonths ? PERIOD_BUTTON_SELECTED : PERIOD_BUTTON_UNSELECTED}
             >
-              <span>{formatPeriodLabel(periodMonths)}</span>
               {periodMonths === 12 ? (
-                <span className="ml-2 text-xs opacity-80">{UI_TEXT.billing.period.yearDiscount}</span>
-              ) : null}
+                <span className="flex items-center gap-1.5">
+                  <span>{formatPeriodLabel(periodMonths)}</span>
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      selectedPeriod[scope] === periodMonths
+                        ? "bg-white/20 text-white"
+                        : "bg-primary/20 text-primary"
+                    )}
+                  >
+                    {UI_TEXT.billing.period.yearDiscount}
+                  </span>
+                </span>
+              ) : (
+                <span>{formatPeriodLabel(periodMonths)}</span>
+              )}
             </button>
           ))}
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           {scopePlans.map((plan) => {
-            const price = getPrice(plan, selectedPeriod[scope]);
+            const displayMonthlyPriceKopeks = getDisplayMonthlyPriceKopeks(plan, selectedPeriod[scope]);
+            const checkoutAmountKopeks = getCheckoutAmountKopeks(plan, selectedPeriod[scope]);
+            const baseMonthlyPriceKopeks = getBaseMonthlyPriceKopeks(plan);
+            const yearlySavingsKopeks = selectedPeriod[scope] === 12 ? getYearlySavingsKopeks(plan) : 0;
             const isCurrent =
               subscription?.plan.id === plan.id &&
               (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE");
-            let priceLabel = "Нет цены";
-            if (price) {
-              priceLabel = price.priceKopeks > 0 ? moneyRUBFromKopeks(price.priceKopeks) : "Бесплатно";
+
+            let displayPriceLabel = "Нет цены";
+            if (displayMonthlyPriceKopeks !== null) {
+              displayPriceLabel =
+                displayMonthlyPriceKopeks > 0
+                  ? moneyRUBFromKopeks(displayMonthlyPriceKopeks)
+                  : "Бесплатно";
             }
+
             return (
               <Card key={plan.id} className={cn("flex h-full flex-col", isCurrent ? "ring-1 ring-text-main" : "")}>
                 <CardHeader>
@@ -301,12 +364,30 @@ export function BillingPage({ scope }: BillingPageProps) {
                       <div className="text-base font-semibold text-text-main">{plan.name}</div>
                       <div className="mt-1 text-xs text-text-sec">{plan.code}</div>
                     </div>
-                    <div className="text-sm font-semibold text-text-main">{priceLabel}</div>
+                    <div className="text-right">
+                      <div className="flex items-baseline justify-end gap-1">
+                        <span className="text-2xl font-bold text-text-main">{displayPriceLabel}</span>
+                        <span className="text-sm text-text-sec">/мес</span>
+                      </div>
+                      {selectedPeriod[scope] === 12 && baseMonthlyPriceKopeks !== null ? (
+                        <div className="mt-1 flex items-center justify-end gap-2">
+                          <span className="text-sm text-text-sec line-through">
+                            {moneyRUBFromKopeks(baseMonthlyPriceKopeks)}
+                          </span>
+                          <span className="text-xs text-emerald-500">
+                            {UI_TEXT.billing.period.yearSavings(Math.floor(yearlySavingsKopeks / 100))}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between gap-4">
                   <div className="text-xs text-text-sec">Период: {formatPeriodLabel(selectedPeriod[scope])}</div>
-                  <Button disabled={isBusy || isCurrent || !price} onClick={() => void handleCheckout(scope, plan)}>
+                  <Button
+                    disabled={isBusy || isCurrent || checkoutAmountKopeks === null}
+                    onClick={() => void handleCheckout(scope, plan)}
+                  >
                     {isCurrent ? "Текущий тариф" : "Оформить"}
                   </Button>
                 </CardContent>
