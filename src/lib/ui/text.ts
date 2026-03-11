@@ -1327,7 +1327,7 @@ export const UI_TEXT = {
       clients: "Клиенты",
       analytics: "Аналитика",
       finance: "Финансы",
-      billing: "Подписка",
+      billing: "Тарифы",
       settingsAria: "Настройки",
     },
     dashboard: {
