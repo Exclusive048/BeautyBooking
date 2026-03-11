@@ -79,28 +79,25 @@ export async function POST(req: Request, ctx: RouteContext) {
       return jsonFail(409, "Media asset already in use", "CONFLICT");
     }
 
-    const created = await prisma.$transaction(async (tx) => {
-      const application = await tx.modelApplication.create({
-        data: {
-          offerId: offer.id,
-          clientUserId: user.id,
-          status: "PENDING",
-          consentToShoot: true,
-          clientNote: body.note?.trim() || null,
-        },
-        select: { id: true, status: true, createdAt: true },
-      });
-
-      const updateResult = await tx.mediaAsset.updateMany({
-        where: { id: { in: body.mediaIds } },
-        data: { entityType: "MODEL_APPLICATION", entityId: application.id },
-      });
-      if (updateResult.count !== body.mediaIds.length) {
-        throw new Error("Media attach failed");
-      }
-
-      return application;
+    const created = await prisma.modelApplication.create({
+      data: {
+        offerId: offer.id,
+        clientUserId: user.id,
+        status: "PENDING",
+        consentToShoot: true,
+        clientNote: body.note?.trim() || null,
+      },
+      select: { id: true, status: true, createdAt: true },
     });
+
+    const updateResult = await prisma.mediaAsset.updateMany({
+      where: { id: { in: body.mediaIds } },
+      data: { entityType: "MODEL_APPLICATION", entityId: created.id },
+    });
+    if (updateResult.count !== body.mediaIds.length) {
+      await prisma.modelApplication.delete({ where: { id: created.id } }).catch(() => undefined);
+      throw new Error("Media attach failed");
+    }
 
     const application = await loadApplicationWithRelations(created.id);
     if (application) {

@@ -326,23 +326,21 @@ export async function PATCH(req: Request) {
     if (prices && prices.length > 0) {
       const normalized = normalizePrices(prices);
       if (normalized.length > 0) {
-        await prisma.$transaction(
-          normalized.map((entry) =>
-            prisma.billingPlanPrice.upsert({
-              where: { planId_periodMonths: { planId: id, periodMonths: entry.periodMonths } },
-              create: {
-                planId: id,
-                periodMonths: entry.periodMonths,
-                priceKopeks: entry.priceKopeks,
-                isActive: entry.isActive ?? true,
-              },
-              update: {
-                priceKopeks: entry.priceKopeks,
-                ...(typeof entry.isActive === "boolean" ? { isActive: entry.isActive } : {}),
-              },
-            })
-          )
-        );
+        for (const entry of normalized) {
+          await prisma.billingPlanPrice.upsert({
+            where: { planId_periodMonths: { planId: id, periodMonths: entry.periodMonths } },
+            create: {
+              planId: id,
+              periodMonths: entry.periodMonths,
+              priceKopeks: entry.priceKopeks,
+              isActive: entry.isActive ?? true,
+            },
+            update: {
+              priceKopeks: entry.priceKopeks,
+              ...(typeof entry.isActive === "boolean" ? { isActive: entry.isActive } : {}),
+            },
+          });
+        }
       }
     }
 

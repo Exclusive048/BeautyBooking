@@ -2,8 +2,8 @@ import { ok, fail } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { isDateKey } from "@/lib/schedule/dateKey";
-import { getLocalTimeParts } from "@/lib/schedule/timezone";
+import { dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
@@ -32,29 +32,49 @@ function normalizeFixedSlotTime(value: string): string | null {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+function normalizeFixedSlotTimes(values: string[]): string[] {
+  const unique = new Set<string>();
+  for (const value of values) {
+    const normalized = normalizeFixedSlotTime(value);
+    if (normalized) unique.add(normalized);
+  }
+  return Array.from(unique).sort((left, right) => left.localeCompare(right));
+}
+
 function mapSlotsError(code?: string): string {
   switch (code) {
     case "SERVICE_REQUIRED":
-      return "Не указана услуга.";
+      return "РќРµ СѓРєР°Р·Р°РЅР° СѓСЃР»СѓРіР°.";
     case "DURATION_INVALID":
-      return "Некорректная длительность услуги.";
+      return "РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ СѓСЃР»СѓРіРё.";
     case "DATE_INVALID":
-      return "Некорректная дата.";
+      return "РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°.";
     case "RANGE_INVALID":
-      return "Некорректный диапазон.";
+      return "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РґРёР°РїР°Р·РѕРЅ.";
     case "PROVIDER_NOT_FOUND":
     case "MASTER_NOT_FOUND":
-      return "Мастер не найден.";
+      return "РњР°СЃС‚РµСЂ РЅРµ РЅР°Р№РґРµРЅ.";
     case "SERVICE_NOT_FOUND":
-      return "Услуга не найдена.";
+      return "РЈСЃР»СѓРіР° РЅРµ РЅР°Р№РґРµРЅР°.";
     case "SERVICE_INVALID":
-      return "Услуга недоступна для мастера.";
+      return "РЈСЃР»СѓРіР° РЅРµРґРѕСЃС‚СѓРїРЅР° РґР»СЏ РјР°СЃС‚РµСЂР°.";
     case "SERVICE_DISABLED":
-      return "Услуга недоступна.";
+      return "РЈСЃР»СѓРіР° РЅРµРґРѕСЃС‚СѓРїРЅР°.";
     default:
-      return "Не удалось загрузить слоты.";
+      return "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃР»РѕС‚С‹.";
   }
 }
+
+function dayIndexFromDateKey(dateKey: string): number {
+  const day = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+type EffectiveSchedule = {
+  isWorkday: boolean;
+  scheduleMode: "FLEXIBLE" | "FIXED";
+  fixedSlotSet: Set<string>;
+};
 
 export async function GET(
   req: Request,
@@ -67,13 +87,13 @@ export async function GET(
   const toKey = url.searchParams.get("to") ?? "";
   const limitRaw = url.searchParams.get("limit");
 
-  if (!serviceId) return fail("Не указана услуга.", 400, "SERVICE_REQUIRED");
-  if (!isDateKey(fromKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
-  if (toKey && !isDateKey(toKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
+  if (!serviceId) return fail("РќРµ СѓРєР°Р·Р°РЅР° СѓСЃР»СѓРіР°.", 400, "SERVICE_REQUIRED");
+  if (!isDateKey(fromKey)) return fail("РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°.", 400, "DATE_INVALID");
+  if (toKey && !isDateKey(toKey)) return fail("РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°.", 400, "DATE_INVALID");
 
   const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
   if (limitRaw && !Number.isFinite(limit)) {
-    return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
+    return fail("РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р»РёРјРёС‚.", 400, "LIMIT_INVALID");
   }
 
   const provider = await resolveProviderBySlugOrId({
@@ -81,7 +101,7 @@ export async function GET(
     select: { id: true, type: true, timezone: true, scheduleMode: true, fixedSlotTimes: true },
   });
   if (!provider || provider.type !== "MASTER") {
-    return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
+    return fail("РњР°СЃС‚РµСЂ РЅРµ РЅР°Р№РґРµРЅ.", 404, "MASTER_NOT_FOUND");
   }
 
   const duration = await resolveServiceDuration(provider.id, serviceId);
@@ -93,7 +113,7 @@ export async function GET(
     where: { id: serviceId },
     select: { id: true, price: true },
   });
-  if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
+  if (!service) return fail("РЈСЃР»СѓРіР° РЅРµ РЅР°Р№РґРµРЅР°.", 404, "SERVICE_NOT_FOUND");
 
   const result = await listAvailabilitySlotsPaginated(provider.id, serviceId, duration.data, {
     fromKey,
@@ -104,37 +124,112 @@ export async function GET(
     return fail(mapSlotsError(result.code), result.status, result.code);
   }
 
-  const rule = await prisma.discountRule.findUnique({
-    where: { providerId: provider.id },
-    select: {
-      isEnabled: true,
-      triggerHours: true,
-      discountType: true,
-      discountValue: true,
-      applyMode: true,
-      minPriceFrom: true,
-      serviceIds: true,
-    },
+  const rangeFromUtc = dateFromLocalDateKey(result.data.meta.fromDate, provider.timezone, 0, 0);
+  const rangeToExclusiveUtc = dateFromLocalDateKey(result.data.meta.toDateExclusive, provider.timezone, 0, 0);
+
+  const [rule, weeklyConfig, overrides] = await Promise.all([
+    prisma.discountRule.findUnique({
+      where: { providerId: provider.id },
+      select: {
+        isEnabled: true,
+        triggerHours: true,
+        discountType: true,
+        discountValue: true,
+        applyMode: true,
+        minPriceFrom: true,
+        serviceIds: true,
+      },
+    }),
+    prisma.weeklyScheduleConfig.findUnique({
+      where: { providerId: provider.id },
+      select: {
+        days: {
+          select: {
+            weekday: true,
+            isActive: true,
+            scheduleMode: true,
+            fixedSlotTimes: true,
+            templateId: true,
+          },
+        },
+      },
+    }),
+    prisma.scheduleOverride.findMany({
+      where: { providerId: provider.id, date: { gte: rangeFromUtc, lt: rangeToExclusiveUtc } },
+      select: {
+        date: true,
+        isDayOff: true,
+        isWorkday: true,
+        scheduleMode: true,
+        fixedSlotTimes: true,
+      },
+      orderBy: { date: "asc" },
+    }),
+  ]);
+
+  const weekByDay = new Map<number, EffectiveSchedule>();
+  for (const day of weeklyConfig?.days ?? []) {
+    weekByDay.set(day.weekday, {
+      isWorkday: Boolean(day.isActive && day.templateId),
+      scheduleMode: day.scheduleMode ?? "FLEXIBLE",
+      fixedSlotSet: new Set(normalizeFixedSlotTimes(day.fixedSlotTimes ?? [])),
+    });
+  }
+
+  const exceptionsByDate = new Map<string, EffectiveSchedule>();
+  for (const row of overrides) {
+    const dateKey = toLocalDateKey(row.date, provider.timezone);
+    const fixedTimes = normalizeFixedSlotTimes(row.fixedSlotTimes ?? []);
+    exceptionsByDate.set(dateKey, {
+      isWorkday: row.isWorkday ?? !row.isDayOff,
+      scheduleMode: row.scheduleMode ?? (fixedTimes.length > 0 ? "FIXED" : "FLEXIBLE"),
+      fixedSlotSet: new Set(fixedTimes),
+    });
+  }
+
+  const fallbackFixedSet = new Set(normalizeFixedSlotTimes(provider.fixedSlotTimes ?? []));
+  const effectiveCache = new Map<string, EffectiveSchedule>();
+  const getEffective = (dateKey: string): EffectiveSchedule => {
+    const cached = effectiveCache.get(dateKey);
+    if (cached) return cached;
+
+    const fromException = exceptionsByDate.get(dateKey);
+    if (fromException) {
+      effectiveCache.set(dateKey, fromException);
+      return fromException;
+    }
+
+    const weekday = dayIndexFromDateKey(dateKey) + 1;
+    const fromWeek = weekByDay.get(weekday);
+    if (fromWeek) {
+      effectiveCache.set(dateKey, fromWeek);
+      return fromWeek;
+    }
+
+    const fallback: EffectiveSchedule = {
+      isWorkday: true,
+      scheduleMode: provider.scheduleMode === "FIXED" ? "FIXED" : "FLEXIBLE",
+      fixedSlotSet: fallbackFixedSet,
+    };
+    effectiveCache.set(dateKey, fallback);
+    return fallback;
+  };
+
+  const baseSlots = result.data.slots.filter((slot) => {
+    const startsAt = toDate(slot.startAtUtc);
+    if (!startsAt) return false;
+    const dateKey = toLocalDateKey(startsAt, provider.timezone);
+    const effective = getEffective(dateKey);
+
+    if (!effective.isWorkday) return false;
+    if (effective.scheduleMode !== "FIXED") return true;
+    if (effective.fixedSlotSet.size === 0) return false;
+
+    const { hour, minute } = getLocalTimeParts(startsAt, provider.timezone);
+    const localTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    return effective.fixedSlotSet.has(localTime);
   });
 
-  const fixedSlotSet =
-    provider.scheduleMode === "FIXED"
-      ? new Set(
-          (provider.fixedSlotTimes ?? [])
-            .map((value) => normalizeFixedSlotTime(value))
-            .filter((value): value is string => Boolean(value))
-        )
-      : null;
-  const baseSlots =
-    fixedSlotSet !== null
-      ? result.data.slots.filter((slot) => {
-          const startsAt = toDate(slot.startAtUtc);
-          if (!startsAt) return false;
-          const { hour, minute } = getLocalTimeParts(startsAt, provider.timezone);
-          const localTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-          return fixedSlotSet.has(localTime);
-        })
-      : result.data.slots;
   type SlotLike = (typeof baseSlots)[number] & {
     hotSlotId?: string | null;
     isHot?: boolean;
@@ -144,6 +239,7 @@ export async function GET(
     discountedPrice?: number | null;
     discountPercent?: number | null;
   };
+
   const now = new Date();
   const decoratedSlots: SlotLike[] = baseSlots.map((slot) => {
     const startAtUtc = toDate(slot.startAtUtc);

@@ -242,6 +242,9 @@ function firstFieldError(value: string | string[] | undefined): string | null {
   return null;
 }
 
+const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
+  fetch(input, { ...init, credentials: "include" });
+
 async function uploadMasterMedia(input: {
   file: File;
   masterId: string;
@@ -379,8 +382,8 @@ export function MasterProfilePage() {
   const loadCategoryOptions = useCallback(async (): Promise<void> => {
     try {
       const [categoriesRes, proposalsRes] = await Promise.all([
-        fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
-        fetch("/api/categories/my-proposals", { cache: "no-store" }),
+        fetchWithAuth("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
+        fetchWithAuth("/api/categories/my-proposals", { cache: "no-store" }),
       ]);
 
       const categoriesJson = (await categoriesRes.json().catch(() => null)) as
@@ -427,7 +430,7 @@ export function MasterProfilePage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/master/profile", { cache: "no-store" });
+        const res = await fetchWithAuth("/api/master/profile", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<MasterProfileData> | null;
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
@@ -644,7 +647,7 @@ export function MasterProfilePage() {
     setAutoConfirmLoading(true);
     void (async () => {
       try {
-        const res = await fetch("/api/providers/me/settings", {
+        const res = await fetchWithAuth("/api/providers/me/settings", {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -919,7 +922,7 @@ export function MasterProfilePage() {
         setProfileSaveStatus("saving");
         setError(null);
         try {
-          const res = await fetch("/api/master/profile", {
+          const res = await fetchWithAuth("/api/master/profile", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -989,7 +992,7 @@ export function MasterProfilePage() {
       setError(null);
       setProfileSaveStatus("saving");
       try {
-        const res = await fetch("/api/master/profile", {
+        const res = await fetchWithAuth("/api/master/profile", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isPublished: nextValue }),
@@ -1036,7 +1039,7 @@ export function MasterProfilePage() {
     setAutoConfirmSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/providers/me/settings", {
+      const res = await fetchWithAuth("/api/providers/me/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ autoConfirmBookings: nextValue }),
@@ -1074,7 +1077,7 @@ export function MasterProfilePage() {
     setRemindersSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/providers/me/settings", {
+      const res = await fetchWithAuth("/api/providers/me/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ remindersEnabled: nextValue }),
@@ -1124,7 +1127,7 @@ export function MasterProfilePage() {
         value = Math.floor(parsed);
       }
 
-      const res = await fetch("/api/providers/me/settings", {
+      const res = await fetchWithAuth("/api/providers/me/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cancellationDeadlineHours: value }),
@@ -1316,7 +1319,7 @@ export function MasterProfilePage() {
     setError(null);
     setProposeCategoryMessage(null);
     try {
-      const res = await fetch("/api/categories/propose", {
+      const res = await fetchWithAuth("/api/categories/propose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: title, context: "SERVICE", isPersonalOnly: true }),

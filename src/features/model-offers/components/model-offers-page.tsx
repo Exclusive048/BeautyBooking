@@ -51,6 +51,12 @@ type ServiceOption = {
   isEnabled?: boolean;
 };
 
+type GlobalCategoryOption = {
+  id: string;
+  name: string;
+  title?: string;
+};
+
 type OffersResponse = {
   offers: ModelOfferItem[];
   services: ServiceOption[];
@@ -153,9 +159,13 @@ function extractServices(data: unknown): ServiceOption[] {
   });
 }
 
+const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
+  fetch(input, { ...init, credentials: "include" });
+
 export function ModelOffersPage() {
   const [offers, setOffers] = useState<ModelOfferItem[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
+  const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -217,12 +227,23 @@ export function ModelOffersPage() {
     [serviceOptions]
   );
 
+  const globalCategoryNameById = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const category of globalCategories) {
+      if (!category.id) continue;
+      const label = (category.name || category.title || "").trim();
+      if (!label) continue;
+      byId.set(category.id, label);
+    }
+    return byId;
+  }, [globalCategories]);
+
   const categoryOptions = useMemo(() => {
     const byId = new Map<string, { id: string; name: string }>();
     for (const service of servicesWithCategory) {
       const categoryId = service.globalCategoryId?.trim();
       if (!categoryId) continue;
-      const categoryName = service.categoryTitle?.trim();
+      const categoryName = service.categoryTitle?.trim() || globalCategoryNameById.get(categoryId);
       byId.set(categoryId, {
         id: categoryId,
         name:
@@ -232,7 +253,7 @@ export function ModelOffersPage() {
       });
     }
     return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "ru"));
-  }, [servicesWithCategory]);
+  }, [globalCategoryNameById, servicesWithCategory]);
 
   const filteredServices = useMemo(
     () =>
@@ -272,17 +293,33 @@ export function ModelOffersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [res, servicesRes] = await Promise.all([
-        fetch("/api/master/model-offers", { cache: "no-store" }),
-        fetch("/api/master/services", { cache: "no-store" }),
+      const [res, servicesRes, categoriesRes] = await Promise.all([
+        fetchWithAuth("/api/master/model-offers", { cache: "no-store" }),
+        fetchWithAuth("/api/master/services", { cache: "no-store" }),
+        fetchWithAuth("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
       ]);
       const json = (await res.json().catch(() => null)) as ApiResponse<OffersResponse> | null;
       const servicesJson = (await servicesRes.json().catch(() => null)) as
         | ApiResponse<{ services: unknown[] }>
         | null;
+      const categoriesJson = (await categoriesRes.json().catch(() => null)) as
+        | ApiResponse<{ categories: GlobalCategoryOption[] } | GlobalCategoryOption[]>
+        | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(extractApiError(json, UI_TEXT.master.modelOffers.errors.loadOffers));
       }
+      const approvedCategories =
+        categoriesRes.ok && categoriesJson && categoriesJson.ok
+          ? Array.isArray(categoriesJson.data)
+            ? categoriesJson.data
+            : categoriesJson.data.categories
+          : [];
+      setGlobalCategories(
+        approvedCategories.filter(
+          (category): category is GlobalCategoryOption =>
+            Boolean(category && typeof category.id === "string" && typeof category.name === "string")
+        )
+      );
       setOffers(Array.isArray(json.data.offers) ? json.data.offers : []);
       const offerServices = Array.isArray(json.data.services)
         ? extractServices({ services: json.data.services })
@@ -312,6 +349,7 @@ export function ModelOffersPage() {
       );
       setOffers([]);
       setServices([]);
+      setGlobalCategories([]);
     } finally {
       setLoading(false);
     }
@@ -475,7 +513,7 @@ export function ModelOffersPage() {
 
       setSaving(true);
       try {
-        const res = await fetch("/api/master/model-offers", {
+        const res = await fetchWithAuth("/api/master/model-offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

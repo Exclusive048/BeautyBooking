@@ -19,14 +19,15 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const sessionUser = await getSessionUser();
     const status = parseStatus(url.searchParams.get("status")) ?? CategoryStatus.APPROVED;
-    const where: Prisma.GlobalCategoryWhereInput = {
-      status,
-    };
-    if (status === CategoryStatus.APPROVED) {
-      where.OR = sessionUser
-        ? [{ visibleToAll: true }, { createdByUserId: sessionUser.id }, { proposedBy: sessionUser.id }]
-        : [{ visibleToAll: true }];
-    }
+    const where: Prisma.GlobalCategoryWhereInput = sessionUser
+      ? {
+          status,
+          OR: [{ visibleToAll: true }, { proposedBy: sessionUser.id }],
+        }
+      : {
+          status,
+          visibleToAll: true,
+        };
 
     const categories = await prisma.globalCategory.findMany({
       where,
