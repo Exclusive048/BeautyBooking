@@ -550,6 +550,8 @@ model StudioMembership {
 
   status MembershipStatus @default(PENDING)
 
+  leftAt DateTime?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt

@@ -36,6 +36,9 @@ export function StudioTeamPage({ studioId }: Props) {
   const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<StudioTeamMaster | null>(null);
+  const [removeTransferServices, setRemoveTransferServices] = useState(true);
+  const [removeSubmitting, setRemoveSubmitting] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [title, setTitle] = useState("");
@@ -110,6 +113,42 @@ export function StudioTeamPage({ studioId }: Props) {
     }
   };
 
+  const openRemoveModal = (master: StudioTeamMaster): void => {
+    setRemoveTarget(master);
+    setRemoveTransferServices(true);
+    setError(null);
+  };
+
+  const removeMaster = async (): Promise<void> => {
+    if (!removeTarget) return;
+
+    setRemoveSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cabinet/studio/members/${removeTarget.id}/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transferServices: removeTransferServices }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ masterId: string; transferredServices: number }>
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+
+      if (selectedMasterId === removeTarget.id) {
+        setSelectedMasterId(null);
+      }
+      setRemoveTarget(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось удалить мастера из студии");
+    } finally {
+      setRemoveSubmitting(false);
+    }
+  };
+
   if (loading) {
     return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
   }
@@ -160,32 +199,37 @@ export function StudioTeamPage({ studioId }: Props) {
 
       <div className="grid gap-3">
         {masters.map((master) => (
-          <button
+          <div
             key={master.id}
-            type="button"
-            onClick={() => setSelectedMasterId(master.id)}
-            className="lux-card rounded-[24px] p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-hover"
+            className="lux-card rounded-[24px] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-hover"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-medium text-text-main">{master.name}</div>
-              <span
-                className={
-                  master.status === "PENDING"
-                    ? "rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
-                    : "rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
-                }
-              >
+            <button type="button" onClick={() => setSelectedMasterId(master.id)} className="w-full text-left">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium text-text-main">{master.name}</div>
+                <span
+                  className={
+                    master.status === "PENDING"
+                      ? "rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                      : "rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                  }
+                >
+                  {master.status === "PENDING" ? t.pending : t.active}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-text-sec">
                 {master.status === "PENDING" ? t.pending : t.active}
-              </span>
+                {master.title ? ` • ${master.title}` : ""}
+              </div>
+              {master.status === "PENDING" && master.phone ? (
+                <div className="mt-1 text-xs text-text-sec">{master.phone}</div>
+              ) : null}
+            </button>
+            <div className="mt-3 flex justify-end">
+              <Button type="button" variant="danger" size="sm" onClick={() => openRemoveModal(master)}>
+                Удалить из студии
+              </Button>
             </div>
-            <div className="mt-1 text-xs text-text-sec">
-              {master.status === "PENDING" ? t.pending : t.active}
-              {master.title ? ` • ${master.title}` : ""}
-            </div>
-            {master.status === "PENDING" && master.phone ? (
-              <div className="mt-1 text-xs text-text-sec">{master.phone}</div>
-            ) : null}
-          </button>
+          </div>
         ))}
       </div>
 
@@ -221,6 +265,45 @@ export function StudioTeamPage({ studioId }: Props) {
             </Button>
             <Button type="button" onClick={() => void createMaster()} disabled={submitting}>
               {submitting ? t.creating : t.save}
+            </Button>
+          </div>
+        </div>
+      </ModalSurface>
+
+      <ModalSurface
+        open={Boolean(removeTarget)}
+        onClose={() => {
+          if (!removeSubmitting) setRemoveTarget(null);
+        }}
+        title={removeTarget ? `Удалить ${removeTarget.name} из студии?` : "Удалить из студии?"}
+      >
+        <div className="space-y-4">
+          <label className="flex items-start gap-2 text-sm text-text-main">
+            <input
+              type="checkbox"
+              checked={removeTransferServices}
+              onChange={(event) => setRemoveTransferServices(event.target.checked)}
+              disabled={removeSubmitting}
+              className="mt-0.5"
+            />
+            <span>
+              Сохранить мастеру его услуги
+              <span className="mt-1 block text-xs text-text-sec">
+                Услуги будут перенесены в личный кабинет мастера
+              </span>
+            </span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setRemoveTarget(null)}
+              disabled={removeSubmitting}
+            >
+              Отмена
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void removeMaster()} disabled={removeSubmitting}>
+              {removeSubmitting ? "Удаляем..." : "Удалить из студии"}
             </Button>
           </div>
         </div>

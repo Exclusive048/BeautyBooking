@@ -68,7 +68,7 @@ export async function POST(
 
   await prisma.studioMembership.update({
     where: { id: membership.id },
-    data: { status: MembershipStatus.LEFT },
+    data: { status: MembershipStatus.LEFT, leftAt: new Date() },
   });
   await prisma.provider.updateMany({
     where: {

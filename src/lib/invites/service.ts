@@ -132,7 +132,7 @@ export async function acceptStudioInvite(
     const savedMembership = membership
       ? await tx.studioMembership.update({
           where: { id: membership.id },
-          data: { status: MembershipStatus.ACTIVE, roles: nextRoles },
+          data: { status: MembershipStatus.ACTIVE, roles: nextRoles, leftAt: null },
           select: { id: true },
         })
       : await tx.studioMembership.create({
@@ -141,6 +141,7 @@ export async function acceptStudioInvite(
             studioId: invite.studioId,
             status: MembershipStatus.ACTIVE,
             roles: nextRoles,
+            leftAt: null,
           },
           select: { id: true },
         });

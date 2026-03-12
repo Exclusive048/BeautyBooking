@@ -363,6 +363,10 @@ export function MasterProfilePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteActiveCount, setDeleteActiveCount] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [leaveStudioModalOpen, setLeaveStudioModalOpen] = useState(false);
+  const [leaveStudioTransferServices, setLeaveStudioTransferServices] = useState(true);
+  const [leaveStudioLoading, setLeaveStudioLoading] = useState(false);
+  const [leaveStudioError, setLeaveStudioError] = useState<string | null>(null);
   const [pendingInvites, setPendingInvites] = useState<NotificationCenterInviteItem[]>([]);
   const [autoConfirmBookings, setAutoConfirmBookings] = useState<boolean | null>(null);
   const [autoConfirmLoading, setAutoConfirmLoading] = useState(false);
@@ -762,6 +766,36 @@ export function MasterProfilePage() {
       setDeleteError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.deleteCabinet);
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleLeaveStudio = async (): Promise<void> => {
+    setLeaveStudioLoading(true);
+    setLeaveStudioError(null);
+    try {
+      const res = await fetchWithAuth("/api/cabinet/master/leave-studio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transferServices: leaveStudioTransferServices }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ transferredServices: number }>
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        setLeaveStudioError(
+          json && !json.ok ? json.error.message : `${UI_TEXT.master.profile.errors.apiErrorPrefix} ${res.status}`
+        );
+        return;
+      }
+
+      setLeaveStudioModalOpen(false);
+      router.push("/cabinet/master/profile");
+      router.refresh();
+      await load();
+    } catch (err) {
+      setLeaveStudioError(err instanceof Error ? err.message : "Не удалось покинуть студию");
+    } finally {
+      setLeaveStudioLoading(false);
     }
   };
 
@@ -2210,6 +2244,19 @@ export function MasterProfilePage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-red-300">{UI_TEXT.settings.danger.title}</p>
                     <p className="mt-1 text-xs text-text-sec">{UI_TEXT.settings.danger.hint}</p>
+                    {!data?.master.isSolo ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeaveStudioError(null);
+                          setLeaveStudioTransferServices(true);
+                          setLeaveStudioModalOpen(true);
+                        }}
+                        className="mt-3 mr-2 rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
+                      >
+                        Покинуть студию
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => {
@@ -3102,6 +3149,57 @@ export function MasterProfilePage() {
           </div>
         </div>
       ) : null}
+      <ModalSurface
+        open={leaveStudioModalOpen}
+        onClose={() => {
+          if (!leaveStudioLoading) setLeaveStudioModalOpen(false);
+        }}
+        title="Покинуть студию?"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-main">
+            После выхода вы станете независимым мастером. Ваши будущие записи сохранятся.
+          </p>
+          <label className="flex items-start gap-2 text-sm text-text-main">
+            <input
+              type="checkbox"
+              checked={leaveStudioTransferServices}
+              onChange={(event) => setLeaveStudioTransferServices(event.target.checked)}
+              disabled={leaveStudioLoading}
+              className="mt-0.5"
+            />
+            <span>
+              Перенести услуги студии в мой прайс
+              <span className="mt-1 block text-xs text-text-sec">
+                Цены и длительность будут скопированы с вашими настройками
+              </span>
+            </span>
+          </label>
+          {leaveStudioError ? (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+              {leaveStudioError}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setLeaveStudioModalOpen(false)}
+              disabled={leaveStudioLoading}
+              className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleLeaveStudio()}
+              disabled={leaveStudioLoading}
+              className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-60"
+            >
+              {leaveStudioLoading ? "Выходим..." : "Покинуть студию"}
+            </button>
+          </div>
+        </div>
+      </ModalSurface>
     <DeleteCabinetModal
       open={deleteModalOpen}
       type="master"
