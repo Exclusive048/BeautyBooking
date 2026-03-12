@@ -69,8 +69,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
               <div className="text-sm text-text-sec">{UI_TEXT.pages.modelOffer.masterLabel}</div>
               <div className="text-lg font-semibold text-text-main">{offer.master.name}</div>
               <div className="text-xs text-text-sec">
-                {offer.master.city ?? UI_TEXT.pages.models.cityFallback} • ⭐{" "}
-                {offer.master.ratingAvg.toFixed(1)}
+                {offer.master.city ?? UI_TEXT.pages.models.cityFallback} • {offer.master.ratingAvg.toFixed(1)}
               </div>
             </div>
           </div>
@@ -89,9 +88,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
               {offer.service.category?.title ?? UI_TEXT.pages.models.categoryFallback}
             </div>
             <h1 className="mt-2 text-2xl font-semibold text-text-main">{offer.service.title}</h1>
-            {offer.service.description ? (
-              <p className="mt-3 text-sm text-text-sec">{offer.service.description}</p>
-            ) : null}
+            {offer.service.description ? <p className="mt-3 text-sm text-text-sec">{offer.service.description}</p> : null}
 
             <div className="mt-6 grid gap-3 rounded-2xl bg-bg-input/60 p-4 text-sm text-text-main">
               <div className="flex items-center justify-between">
@@ -108,9 +105,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
               </div>
               <div className="flex items-center justify-between">
                 <span>{UI_TEXT.pages.modelOffer.priceLabel}</span>
-                <span>
-                  {offer.price !== null ? `${offer.price} ₽` : UI_TEXT.pages.models.priceFree}
-                </span>
+                <span>{offer.price !== null ? `${offer.price} ${UI_TEXT.common.currencyRub}` : UI_TEXT.pages.models.priceFree}</span>
               </div>
             </div>
 
@@ -131,9 +126,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
 
         <aside className="rounded-3xl border border-border-subtle/80 bg-bg-card/80 p-6">
           <div className="text-sm font-semibold text-text-main">{UI_TEXT.pages.modelOffer.applyTitle}</div>
-          <p className="mt-2 text-sm text-text-sec">
-            {UI_TEXT.pages.modelOffer.applySubtitle}
-          </p>
+          <p className="mt-2 text-sm text-text-sec">{UI_TEXT.pages.modelOffer.applySubtitle}</p>
           <div className="mt-5">
             <ModelOfferApplyForm offerId={offer.id} userId={user?.id ?? null} loginHref={loginHref} />
           </div>
@@ -142,4 +135,3 @@ export default async function ModelOfferPage({ params }: PageProps) {
     </section>
   );
 }
-

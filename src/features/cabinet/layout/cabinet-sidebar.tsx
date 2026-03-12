@@ -3,12 +3,18 @@
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { LogoutButton } from "@/features/auth/components/logout-button";
+import { UI_TEXT } from "@/lib/ui/text";
+
+const modelApplicationsLabel =
+  (UI_TEXT as unknown as { client?: { nav?: { modelApplications?: string } } }).client?.nav
+    ?.modelApplications ?? "Заявки на модель";
 
 const NAV_ITEMS = [
-  { label: "Профиль", href: "/cabinet/profile" },
-  { label: "Мои записи", href: "/cabinet/bookings" },
-  { label: "Профессиональные роли", href: "/cabinet/roles" },
-  { label: "Настройки", href: "/cabinet/settings" },
+  { label: UI_TEXT.nav.profile, href: "/cabinet/profile" },
+  { label: UI_TEXT.nav.myBookings, href: "/cabinet/bookings" },
+  { label: modelApplicationsLabel, href: "/cabinet/model-applications" },
+  { label: UI_TEXT.nav.professionalRoles, href: "/cabinet/roles" },
+  { label: UI_TEXT.nav.settings, href: "/cabinet/settings" },
 ];
 
 type Props = {
@@ -22,7 +28,7 @@ function isActivePath(pathname: string, href: string) {
 
 export function CabinetSidebar({ userLabel }: Props) {
   const pathname = usePathname();
-  const label = userLabel?.trim() || "МастерРядом";
+  const label = userLabel?.trim() || UI_TEXT.brand.name;
 
   return (
     <aside className="w-full lg:w-[280px] lg:shrink-0">
@@ -36,9 +42,7 @@ export function CabinetSidebar({ userLabel }: Props) {
           <nav className="space-y-2">
             {NAV_ITEMS.map((item) => {
               const active = isActivePath(pathname, item.href);
-              return (
-                <SidebarItem key={item.href} href={item.href} label={item.label} active={active} />
-              );
+              return <SidebarItem key={item.href} href={item.href} label={item.label} active={active} />;
             })}
           </nav>
 
@@ -50,4 +54,3 @@ export function CabinetSidebar({ userLabel }: Props) {
     </aside>
   );
 }
-

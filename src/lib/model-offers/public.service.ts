@@ -50,6 +50,11 @@ export type PublicModelOffersResult = {
   nextPage: number | null;
 };
 
+export type PublicModelOfferFilters = {
+  categories: PublicModelOfferFilterCategory[];
+  citySuggestions: string[];
+};
+
 function resolveOfferDuration(input: {
   durationOverrideMin: number | null;
   baseDurationMin: number | null;
@@ -64,8 +69,28 @@ function toPriceNumber(value: Prisma.Decimal | null): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-function todayLocal(): string {
-  return new Date().toISOString().slice(0, 10);
+function todayDateString(): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.toISOString().slice(0, 10);
+}
+
+function normalizeAddressPart(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function cityFromAddress(address: string): string | null {
+  const parts = address
+    .split(",")
+    .map((part) => normalizeAddressPart(part))
+    .filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const token = parts[i];
+    if (token.length < 2) continue;
+    if (!/[A-Za-zА-Яа-яЁё]/.test(token)) continue;
+    return token;
+  }
+  return null;
 }
 
 function resolveOfferService(input: {
@@ -135,6 +160,7 @@ function toPublicItem(input: {
     publicUsername: string | null;
     ratingAvg: number;
     ratingCount: number;
+    address: string;
     district: string;
   };
   masterService: {
@@ -199,21 +225,25 @@ function toPublicItem(input: {
       avatarFocalY: input.master.avatarFocalY ?? null,
       ratingAvg: input.master.ratingAvg,
       ratingCount: input.master.ratingCount,
-      city: input.master.district ?? null,
+      city: cityFromAddress(input.master.address) ?? cityFromAddress(input.master.district) ?? null,
     },
   };
 }
 
 export async function listPublicModelOffers(input: PublicModelOffersQuery): Promise<PublicModelOffersResult> {
+  const masterWhere: Prisma.ProviderWhereInput = {
+    isPublished: true,
+    type: ProviderType.MASTER,
+  };
+  if (input.city) {
+    masterWhere.address = { contains: input.city, mode: "insensitive" };
+  }
+
   const and: Prisma.ModelOfferWhereInput[] = [
     { status: "ACTIVE" },
-    { dateLocal: { gte: todayLocal() } },
-    { master: { isPublished: true, type: ProviderType.MASTER } },
+    { dateLocal: { gte: todayDateString() } },
+    { master: masterWhere },
   ];
-
-  if (input.city) {
-    and.push({ master: { district: { contains: input.city, mode: "insensitive" } } });
-  }
 
   if (input.categoryId) {
     and.push({
@@ -244,6 +274,7 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
         select: {
           id: true,
           name: true,
+          address: true,
           avatarUrl: true,
           avatarFocalX: true,
           avatarFocalY: true,
@@ -301,7 +332,7 @@ export async function getPublicModelOffer(offerId: string): Promise<PublicModelO
     where: {
       id: offerId,
       status: "ACTIVE",
-      dateLocal: { gte: todayLocal() },
+      dateLocal: { gte: todayDateString() },
       master: { isPublished: true, type: ProviderType.MASTER },
     },
     select: {
@@ -315,6 +346,7 @@ export async function getPublicModelOffer(offerId: string): Promise<PublicModelO
         select: {
           id: true,
           name: true,
+          address: true,
           avatarUrl: true,
           avatarFocalX: true,
           avatarFocalY: true,
@@ -363,14 +395,79 @@ export type PublicModelOfferFilterCategory = {
   name: string;
 };
 
-export async function listModelOfferFilterCategories(): Promise<PublicModelOfferFilterCategory[]> {
+async function listModelOfferCategoriesWithOffers(todayStr: string): Promise<PublicModelOfferFilterCategory[]> {
   return prisma.globalCategory.findMany({
     where: {
       status: "APPROVED",
+      visibleToAll: true,
+      isSystem: false,
+      NOT: [{ visualSearchSlug: "hot" }],
+      services: {
+        some: {
+          OR: [
+            { modelOffers: { some: { status: "ACTIVE", dateLocal: { gte: todayStr } } } },
+            {
+              masterServices: {
+                some: {
+                  modelOffers: { some: { status: "ACTIVE", dateLocal: { gte: todayStr } } },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function listModelOfferFilterCategories(): Promise<PublicModelOfferFilterCategory[]> {
+  const todayStr = todayDateString();
+  const categories = await listModelOfferCategoriesWithOffers(todayStr);
+  if (categories.length > 0) return categories;
+
+  return prisma.globalCategory.findMany({
+    where: {
+      status: "APPROVED",
+      visibleToAll: true,
       isSystem: false,
       NOT: [{ visualSearchSlug: "hot" }],
     },
     select: { id: true, name: true },
-    orderBy: [{ usageCount: "desc" }, { name: "asc" }],
+    orderBy: { name: "asc" },
   });
+}
+
+export async function listModelOfferCitySuggestions(): Promise<string[]> {
+  const addresses = await prisma.provider.findMany({
+    where: {
+      type: ProviderType.MASTER,
+      isPublished: true,
+      address: { not: "" },
+    },
+    select: { address: true },
+    distinct: ["address"],
+    take: 50,
+    orderBy: { address: "asc" },
+  });
+
+  const cityMap = new Map<string, string>();
+  for (const item of addresses) {
+    const city = cityFromAddress(item.address);
+    if (!city) continue;
+    const key = city.toLowerCase();
+    if (!cityMap.has(key)) cityMap.set(key, city);
+  }
+
+  return Array.from(cityMap.values()).sort((a, b) => a.localeCompare(b, "ru"));
+}
+
+export async function listModelOfferFilters(): Promise<PublicModelOfferFilters> {
+  const [categories, citySuggestions] = await Promise.all([
+    listModelOfferFilterCategories(),
+    listModelOfferCitySuggestions(),
+  ]);
+
+  return { categories, citySuggestions };
 }

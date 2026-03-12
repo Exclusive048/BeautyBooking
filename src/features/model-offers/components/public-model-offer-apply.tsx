@@ -42,6 +42,7 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
       </Button>
     );
   }
+  const currentUserId = userId;
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const list = Array.from(event.target.files ?? []).slice(0, MAX_FILES);
@@ -52,11 +53,6 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
 
   async function uploadAssets(): Promise<string[]> {
     const mediaIds: string[] = [];
-    const currentUserId = userId;
-    if (!currentUserId) {
-      throw new Error("USER_REQUIRED");
-    }
-
     for (const file of files) {
       const formData = new FormData();
       formData.set("file", file);
@@ -76,6 +72,13 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
   }
 
   async function submit() {
+    if (!userId) {
+      if (typeof window !== "undefined") {
+        window.location.href = loginHref;
+      }
+      return;
+    }
+
     setErrorText(null);
     setSuccess(false);
 
@@ -85,7 +88,7 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
     }
 
     if (files.length === 0) {
-      setErrorText("Добавьте 1–3 фото для заявки.");
+      setErrorText("Добавьте 1-3 фото для заявки.");
       return;
     }
 
@@ -96,7 +99,7 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          consentToShoot: true,
+          consentToShoot: consent,
           note: note.trim() || undefined,
           mediaIds,
         }),
@@ -127,7 +130,10 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
       ) : null}
       {success ? (
         <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700">
-          Заявка отправлена. Мастер свяжется с вами.
+          <p>Заявка отправлена! Мастер рассмотрит её и предложит время.</p>
+          <Link href="/cabinet/model-applications" className="mt-1 inline-block underline">
+            Перейти в «Мои заявки на модель»
+          </Link>
         </div>
       ) : null}
 

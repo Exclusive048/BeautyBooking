@@ -585,7 +585,8 @@ export async function updateMediaFocalPoint(
 
 export async function getMediaFile(
   user: UserProfile | null,
-  assetId: string
+  assetId: string,
+  options?: { skipReadAccessCheck?: boolean }
 ): Promise<MediaFileResult> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },
@@ -597,7 +598,12 @@ export async function getMediaFile(
     throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
   }
 
-  await ensureCanReadMedia(user, asset.entityType, asset.entityId);
+  const skipReadAccessCheck =
+    options?.skipReadAccessCheck === true && asset.kind === MediaKind.MODEL_APPLICATION_PHOTO;
+
+  if (!skipReadAccessCheck) {
+    await ensureCanReadMedia(user, asset.entityType, asset.entityId);
+  }
 
   const storage = getStorageProvider();
   const file = await storage.getObject(asset.storageKey, asset.mimeType);

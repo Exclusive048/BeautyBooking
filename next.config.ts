@@ -68,6 +68,15 @@ const nextConfig = {
   // This does NOT happen in production builds.
   reactStrictMode: true,
   serverExternalPackages: ["redis", "@redis/client"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "storage.yandexcloud.net",
+        pathname: "/**",
+      },
+    ],
+  },
   turbopack: {
     root: path.resolve(__dirname),
   },

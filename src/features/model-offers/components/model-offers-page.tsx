@@ -9,6 +9,7 @@ import { Chip } from "@/components/ui/chip";
 import { HeaderBlock } from "@/components/ui/header-block";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ModelOfferApplicationsSection } from "@/features/model-offers/components/model-offer-applications-section";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -28,6 +29,7 @@ type ModelOfferItem = {
   price: number | null;
   requirements: string[];
   extraBusyMin: number;
+  applicationsCount?: number;
   status: ModelOfferStatus;
   createdAt: string;
   updatedAt: string;
@@ -912,6 +914,11 @@ export function ModelOffersPage() {
                       </span>
                     )}
                   </div>
+
+                  <ModelOfferApplicationsSection
+                    offerId={offer.id}
+                    applicationsCount={Number(offer.applicationsCount ?? 0)}
+                  />
                 </CardContent>
               </Card>
             );

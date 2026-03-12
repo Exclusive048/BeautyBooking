@@ -13,11 +13,16 @@ type RouteContext = {
 };
 
 export const runtime = "nodejs";
-const PUBLIC_MEDIA_KINDS = new Set<MediaKind>([MediaKind.PORTFOLIO, MediaKind.AVATAR]);
+const PUBLIC_MEDIA_KINDS = new Set<MediaKind>([
+  MediaKind.PORTFOLIO,
+  MediaKind.AVATAR,
+  MediaKind.MODEL_APPLICATION_PHOTO,
+]);
 const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
   MediaEntityType.MASTER,
   MediaEntityType.STUDIO,
   MediaEntityType.SITE,
+  MediaEntityType.MODEL_APPLICATION,
 ]);
 
 function isStorageMissingErrorDetails(details: unknown): boolean {
@@ -42,6 +47,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       where: { id: assetId },
       select: {
         id: true,
+        entityId: true,
         storageKey: true,
         status: true,
         kind: true,
@@ -54,6 +60,23 @@ export async function GET(req: Request, ctx: RouteContext) {
         { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
         { status: 404 }
       );
+    }
+
+    if (
+      asset.kind === MediaKind.MODEL_APPLICATION_PHOTO ||
+      asset.entityType === MediaEntityType.MODEL_APPLICATION
+    ) {
+      const storage = getStorageProvider();
+      const publicUrl = storage.getPublicUrl?.(asset.storageKey);
+      if (publicUrl) {
+        return new NextResponse(null, {
+          status: 302,
+          headers: {
+            Location: publicUrl,
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
     }
 
     if (PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType)) {
