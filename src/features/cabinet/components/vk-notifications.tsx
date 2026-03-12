@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -43,7 +44,7 @@ export function VkNotificationsSection({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/integrations/vk/status", { cache: "no-store", credentials: "include" });
+      const res = await fetchWithAuth("/api/integrations/vk/status", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<VkStatus> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, legacyVkText.loadFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, legacyVkText.loadFailed));
@@ -70,9 +71,8 @@ export function VkNotificationsSection({
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/integrations/vk/settings", {
+      const res = await fetchWithAuth("/api/integrations/vk/settings", {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });

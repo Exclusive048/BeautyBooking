@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { TooltipHint } from "@/components/ui/tooltip-hint";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import {
   normalizeStudioServiceDurationMin,
   normalizeStudioServicePrice,
@@ -68,10 +69,6 @@ type MastersData = {
 type Props = {
   studioId: string;
 };
-
-const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
-  fetch(input, { ...init, credentials: "include" });
-
 
 export function StudioServicesPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.services;
@@ -186,7 +183,7 @@ export function StudioServicesPage({ studioId }: Props) {
     if (!masterId) return;
     setAssigningServiceId(serviceId);
     try {
-      const res = await fetch(`/api/studio/services/${serviceId}/assign-master`, {
+      const res = await fetchWithAuth(`/api/studio/services/${serviceId}/assign-master`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studioId, masterId }),
@@ -211,7 +208,7 @@ export function StudioServicesPage({ studioId }: Props) {
     setTogglingServiceId(service.id);
     setError(null);
     try {
-      const res = await fetch(`/api/studio/services/${service.id}`, {
+      const res = await fetchWithAuth(`/api/studio/services/${service.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -235,7 +232,7 @@ export function StudioServicesPage({ studioId }: Props) {
     setSubmittingCategory(true);
     setError(null);
     try {
-      const res = await fetch("/api/studio/categories", {
+      const res = await fetchWithAuth("/api/studio/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -271,7 +268,7 @@ export function StudioServicesPage({ studioId }: Props) {
     setSubmittingService(true);
     setError(null);
     try {
-      const res = await fetch("/api/studio/services", {
+      const res = await fetchWithAuth("/api/studio/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -305,7 +302,7 @@ export function StudioServicesPage({ studioId }: Props) {
     setSavingServiceCategoryId(service.id);
     setError(null);
     try {
-      const res = await fetch(`/api/studio/services/${service.id}`, {
+      const res = await fetchWithAuth(`/api/studio/services/${service.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

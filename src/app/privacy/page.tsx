@@ -7,13 +7,13 @@ const INN = UI_TEXT.pages.privacy.innPlaceholder;
 const OGRN = UI_TEXT.pages.privacy.ogrnPlaceholder;
 const LEGAL_ADDRESS = UI_TEXT.pages.privacy.legalAddressPlaceholder;
 const CONTACT_EMAILS = {
-  privacy: "privacy@МастерРядом.ru",
-  legal: "legal@МастерРядом.ru",
-  support: "support@МастерРядом.ru",
+  privacy: "support@мастеррядом.online",
+  legal: "legal@мастеррядом.online",
+  support: "support@мастеррядом.online",
 };
 
-const DOCUMENT_VERSION = "1.0";
-const UPDATED_AT = "17.02.2026";
+const DOCUMENT_VERSION = "1.1";
+const UPDATED_AT = "12.03.2026";
 
 export const metadata: Metadata = {
   title: UI_TEXT.pages.privacy.title,

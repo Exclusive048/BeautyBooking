@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -47,7 +48,7 @@ export function TelegramNotificationsSection({
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/telegram/link", { cache: "no-store", credentials: "include" });
+      const res = await fetchWithAuth("/api/telegram/link", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<TelegramLinkResponse> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, t.connectFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.connectFailed));
@@ -65,9 +66,8 @@ export function TelegramNotificationsSection({
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/telegram/settings", {
+      const res = await fetchWithAuth("/api/telegram/settings", {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });

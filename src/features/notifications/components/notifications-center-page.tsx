@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
 import type { NotificationEvent } from "@/lib/notifications/types";
@@ -229,7 +230,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
         )
       );
       try {
-        await fetch("/api/notifications/read-all", { method: "POST", credentials: "include" });
+        await fetchWithAuth("/api/notifications/read-all", { method: "POST" });
         emitBellRefresh();
       } catch {
         // Ignore errors on mark-all.
@@ -250,7 +251,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
       )
     );
     try {
-      await fetch(`/api/notifications/${noteId}/read`, { method: "POST", credentials: "include" });
+      await fetchWithAuth(`/api/notifications/${noteId}/read`, { method: "POST" });
       emitBellRefresh(noteId);
     } catch {
       // Ignore errors on mark read.
@@ -259,7 +260,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   };
 
   const reloadCenterData = useCallback(async () => {
-    const res = await fetch("/api/notifications/center", { cache: "no-store", credentials: "include" });
+    const res = await fetchWithAuth("/api/notifications/center", { cache: "no-store" });
     const json = (await res.json().catch(() => null)) as ApiResponse<NotificationCenterData> | null;
     if (!res.ok || !json || !json.ok) {
       throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
@@ -277,9 +278,8 @@ export function NotificationsCenterPage({ initialData }: Props) {
     }
     setActionPendingId(noteId);
     try {
-      const res = await fetch(`/api/bookings/${booking.bookingId}/confirm`, {
+      const res = await fetchWithAuth(`/api/bookings/${booking.bookingId}/confirm`, {
         method: "POST",
-        credentials: "include",
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
@@ -324,9 +324,8 @@ export function NotificationsCenterPage({ initialData }: Props) {
     }
     setActionPendingId(noteId);
     try {
-      const res = await fetch(`/api/bookings/${booking.bookingId}/cancel`, {
+      const res = await fetchWithAuth(`/api/bookings/${booking.bookingId}/cancel`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: UI_TEXT.notifications.declineReason }),
       });

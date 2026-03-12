@@ -125,6 +125,19 @@ export async function POST(req: Request, ctx: RouteContext) {
                 },
               },
             },
+            service: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+                durationMin: true,
+                baseDurationMin: true,
+                price: true,
+                basePrice: true,
+                providerId: true,
+                studioId: true,
+              },
+            },
           },
         },
       },
@@ -151,6 +164,11 @@ export async function POST(req: Request, ctx: RouteContext) {
       return jsonFail(409, "Proposed time is missing", "CONFLICT");
     }
 
+    const offerService = application.offer.masterService?.service ?? application.offer.service;
+    if (!offerService) {
+      return jsonFail(409, "Offer service is missing", "CONFLICT");
+    }
+
     const inRange = isTimeWithinRange({
       value: application.proposedTimeLocal,
       start: application.offer.timeRangeStartLocal,
@@ -175,9 +193,9 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     const durationMin =
       resolveServiceDuration({
-        durationOverrideMin: application.offer.masterService.durationOverrideMin ?? null,
-        baseDurationMin: application.offer.masterService.service.baseDurationMin ?? null,
-        durationMin: application.offer.masterService.service.durationMin,
+        durationOverrideMin: application.offer.masterService?.durationOverrideMin ?? null,
+        baseDurationMin: offerService.baseDurationMin ?? null,
+        durationMin: offerService.durationMin,
       }) + Math.max(0, application.offer.extraBusyMin ?? 0);
 
     const endAtUtc = new Date(startAtUtc.getTime() + durationMin * 60 * 1000);
@@ -212,7 +230,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         }
 
         const bufferMin = await resolveBufferMinutes(
-          application.offer.masterService.service.providerId,
+          offerService.providerId,
           application.offer.masterId,
           tx.provider
         );
@@ -220,8 +238,8 @@ export async function POST(req: Request, ctx: RouteContext) {
         const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
 
         const conflictWhere = application.offer.masterId
-          ? { providerId: application.offer.masterService.service.providerId, masterProviderId: application.offer.masterId }
-          : { providerId: application.offer.masterService.service.providerId };
+          ? { providerId: offerService.providerId, masterProviderId: application.offer.masterId }
+          : { providerId: offerService.providerId };
 
         const conflicts = await tx.booking.findMany({
           where: {
@@ -246,8 +264,8 @@ export async function POST(req: Request, ctx: RouteContext) {
 
         const booking = await tx.booking.create({
           data: {
-            providerId: application.offer.masterService.service.providerId,
-            serviceId: application.offer.masterService.service.id,
+            providerId: offerService.providerId,
+            serviceId: offerService.id,
             masterProviderId: application.offer.masterId,
             masterId: application.offer.masterId,
             startAtUtc,
@@ -270,11 +288,11 @@ export async function POST(req: Request, ctx: RouteContext) {
         await tx.bookingServiceItem.create({
           data: {
             bookingId: booking.id,
-            studioId: application.offer.masterService.service.studioId ?? null,
-            serviceId: application.offer.masterService.service.id,
+            studioId: offerService.studioId ?? null,
+            serviceId: offerService.id,
             titleSnapshot:
-              application.offer.masterService.service.title?.trim() ||
-              application.offer.masterService.service.name,
+              offerService.title?.trim() ||
+              offerService.name,
             priceSnapshot: safePrice,
             durationSnapshotMin: durationMin,
           },
@@ -305,7 +323,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     await invalidateSlotsForBookingRange({
-      providerId: application.offer.masterService.service.providerId,
+      providerId: offerService.providerId,
       masterProviderId: application.offer.masterId,
       startAtUtc,
       endAtUtc,

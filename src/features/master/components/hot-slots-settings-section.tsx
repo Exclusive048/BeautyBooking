@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { moneyRUBPlain } from "@/lib/format";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -52,9 +53,8 @@ export function HotSlotsSettingsSection({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, {
+      const res = await fetchWithAuth(`/api/provider/hot-slots/rule${scopeQuery}`, {
         cache: "no-store",
-        credentials: "include",
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ rule: RuleState }> | null;
       if (!res.ok || !json || !json.ok) {
@@ -98,9 +98,8 @@ export function HotSlotsSettingsSection({
       if (rule.applyMode === "PRICE_FROM" && (!rule.minPriceFrom || rule.minPriceFrom <= 0)) {
         throw new Error(text.minPriceRequired);
       }
-      const res = await fetch(`/api/provider/hot-slots/rule${scopeQuery}`, {
+      const res = await fetchWithAuth(`/api/provider/hot-slots/rule${scopeQuery}`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rule),
       });

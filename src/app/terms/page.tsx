@@ -7,9 +7,9 @@ const INN = UI_TEXT.pages.terms.innPlaceholder;
 const OGRN = UI_TEXT.pages.terms.ogrnPlaceholder;
 const LEGAL_ADDRESS = UI_TEXT.pages.terms.legalAddressPlaceholder;
 const CONTACT_EMAILS = {
-  privacy: "privacy@МастерРядом.ru",
-  legal: "legal@МастерРядом.ru",
-  support: "support@МастерРядом.ru",
+  privacy: "support@мастеррядом.online",
+  legal: "legal@мастеррядом.online",
+  support: "support@мастеррядом.online",
 };
 
 const LISTED_PRICE_RUB = UI_TEXT.pages.terms.pricingPlaceholders.listedPrice;
@@ -17,8 +17,8 @@ const PROMOTED_PRICE_RUB = UI_TEXT.pages.terms.pricingPlaceholders.promotedPrice
 const COMMISSION_PCT = UI_TEXT.pages.terms.pricingPlaceholders.commission;
 const MIN_PAYOUT_RUB = UI_TEXT.pages.terms.pricingPlaceholders.minPayout;
 
-const DOCUMENT_VERSION = "1.0";
-const UPDATED_AT = "17.02.2026";
+const DOCUMENT_VERSION = "1.1";
+const UPDATED_AT = "12.03.2026";
 
 export const metadata: Metadata = {
   title: UI_TEXT.pages.terms.title,

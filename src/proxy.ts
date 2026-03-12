@@ -15,8 +15,8 @@ type RateLimitTier =
   | "publicApi";
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
-const PROTECTED_ROUTE_PREFIXES = ["/cabinet", "/admin", "/notifications"];
 const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
+const PUBLIC_PATHS = ["/login", "/register", "/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
 
 function resolveRequestId(request: NextRequest): string {
   const header = request.headers.get("x-request-id");
@@ -73,10 +73,6 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
   return "publicApi";
 }
 
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-}
-
 function isAccessTokenValid(token: string | undefined): boolean {
   if (!token) return false;
   try {
@@ -93,15 +89,29 @@ export async function proxy(request: NextRequest) {
 
   const method = request.method.toUpperCase();
   const pathname = normalizePathname(request.nextUrl.pathname);
+  const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  let refreshedSetCookie: string | null = null;
 
-  if (isProtectedRoute(pathname) && pathname !== REFRESH_ENDPOINT_PATH) {
+  if (!isPublicPath) {
     const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
     const accessToken = request.cookies.get(accessCookieName)?.value;
-    if (!isAccessTokenValid(accessToken)) {
-      const refreshUrl = new URL(REFRESH_ENDPOINT_PATH, request.url);
-      const nextPath = `${pathname}${request.nextUrl.search}`;
-      refreshUrl.searchParams.set("next", nextPath);
-      return withRequestId(NextResponse.redirect(refreshUrl), requestId);
+    const accessValid = isAccessTokenValid(accessToken);
+
+    if (!accessValid) {
+      const refreshToken = request.cookies.get("bh_refresh")?.value;
+      if (refreshToken) {
+        const refreshUrl = new URL(REFRESH_ENDPOINT_PATH, request.url);
+        const refreshRes = await fetch(refreshUrl.toString(), {
+          method: "POST",
+          headers: {
+            cookie: request.headers.get("cookie") ?? "",
+          },
+        });
+
+        if (refreshRes.ok) {
+          refreshedSetCookie = refreshRes.headers.get("set-cookie");
+        }
+      }
     }
   }
 
@@ -158,6 +168,9 @@ export async function proxy(request: NextRequest) {
 
   if (!isDev) {
     response.headers.set("content-security-policy", csp);
+  }
+  if (refreshedSetCookie) {
+    response.headers.set("set-cookie", refreshedSetCookie);
   }
 
   return withRequestId(response, requestId);

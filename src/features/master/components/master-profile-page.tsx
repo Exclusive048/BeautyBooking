@@ -24,6 +24,7 @@ import { PublicUsernameCard } from "@/features/cabinet/components/public-usernam
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import {
   useAddressWithGeocode,
 } from "@/lib/maps/use-address-with-geocode";
@@ -248,9 +249,6 @@ function firstFieldError(value: string | string[] | undefined): string | null {
   return null;
 }
 
-const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
-  fetch(input, { ...init, credentials: "include" });
-
 async function uploadMasterMedia(input: {
   file: File;
   masterId: string;
@@ -264,7 +262,7 @@ async function uploadMasterMedia(input: {
   formData.set("kind", input.kind);
   if (input.replaceAssetId) formData.set("replaceAssetId", input.replaceAssetId);
 
-  const res = await fetch("/api/media", { method: "POST", body: formData });
+  const res = await fetchWithAuth("/api/media", { method: "POST", body: formData });
   const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
   if (!res.ok || !json || !json.ok) {
     throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
@@ -535,8 +533,8 @@ export function MasterProfilePage() {
       await loadCategoryOptions();
 
       const [avatarRes, portfolioRes] = await Promise.all([
-        fetch(`/api/media?entityType=MASTER&entityId=${encodeURIComponent(profileData.master.id)}&kind=AVATAR`, { cache: "no-store" }),
-        fetch(`/api/media?entityType=MASTER&entityId=${encodeURIComponent(profileData.master.id)}&kind=PORTFOLIO`, { cache: "no-store" }),
+        fetchWithAuth(`/api/media?entityType=MASTER&entityId=${encodeURIComponent(profileData.master.id)}&kind=AVATAR`, { cache: "no-store" }),
+        fetchWithAuth(`/api/media?entityType=MASTER&entityId=${encodeURIComponent(profileData.master.id)}&kind=PORTFOLIO`, { cache: "no-store" }),
       ]);
 
       const avatarJson = (await avatarRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
@@ -632,7 +630,7 @@ export function MasterProfilePage() {
 
     void (async () => {
       try {
-        const res = await fetch(`/api/master/services/${bookingConfigServiceId}/booking-config`, { cache: "no-store" });
+        const res = await fetchWithAuth(`/api/master/services/${bookingConfigServiceId}/booking-config`, { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<{
           requiresReferencePhoto: boolean;
           questions: Array<{ id: string; text: string; required: boolean; order: number }>;
@@ -721,7 +719,7 @@ export function MasterProfilePage() {
   useEffect(() => {
     const loadInvites = async () => {
       try {
-        const res = await fetch("/api/notifications/center", { cache: "no-store" });
+        const res = await fetchWithAuth("/api/notifications/center", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
           | ApiResponse<{ invites: NotificationCenterInviteItem[] }>
           | null;
@@ -740,7 +738,7 @@ export function MasterProfilePage() {
     setDeleteError(null);
     setDeleteActiveCount(null);
     try {
-      const res = await fetch("/api/cabinet/master/delete", { method: "DELETE" });
+      const res = await fetchWithAuth("/api/cabinet/master/delete", { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as
         | ApiResponse<{ deleted: boolean }>
         | { ok: false; error: { message: string; code?: string; details?: unknown } }
@@ -1177,7 +1175,7 @@ export function MasterProfilePage() {
       }));
 
       try {
-        const res = await fetch("/api/master/services", {
+        const res = await fetchWithAuth("/api/master/services", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ items: payloadItems }),
@@ -1254,7 +1252,7 @@ export function MasterProfilePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/master/services", {
+      const res = await fetchWithAuth("/api/master/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1381,7 +1379,7 @@ export function MasterProfilePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/media/${avatarAssetId}`, { method: "DELETE" });
+      const res = await fetchWithAuth(`/api/media/${avatarAssetId}`, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
@@ -1452,7 +1450,7 @@ export function MasterProfilePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/master/portfolio", {
+      const res = await fetchWithAuth("/api/master/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1489,7 +1487,7 @@ export function MasterProfilePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/master/portfolio/${item.id}`, { method: "DELETE" });
+      const res = await fetchWithAuth(`/api/master/portfolio/${item.id}`, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
@@ -1497,7 +1495,7 @@ export function MasterProfilePage() {
 
       const assetId = portfolioAssetIdsByUrl[item.mediaUrl] ?? parseMediaAssetId(item.mediaUrl);
       if (assetId) {
-        await fetch(`/api/media/${assetId}`, { method: "DELETE" });
+        await fetchWithAuth(`/api/media/${assetId}`, { method: "DELETE" });
       }
 
       await load();
@@ -1519,7 +1517,7 @@ export function MasterProfilePage() {
         kind: "PORTFOLIO",
       });
 
-      const createRes = await fetch("/api/master/portfolio", {
+      const createRes = await fetchWithAuth("/api/master/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1560,7 +1558,7 @@ export function MasterProfilePage() {
     setPortfolioCategorySaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/master/portfolio/${portfolioCategoryTarget.id}/category`, {
+      const res = await fetchWithAuth(`/api/master/portfolio/${portfolioCategoryTarget.id}/category`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1801,7 +1799,7 @@ export function MasterProfilePage() {
           order: index,
         })),
       };
-      const res = await fetch(`/api/master/services/${bookingConfigServiceId}/booking-config`, {
+      const res = await fetchWithAuth(`/api/master/services/${bookingConfigServiceId}/booking-config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -2367,7 +2365,7 @@ export function MasterProfilePage() {
                         />
                         <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
                       </div>
-                      <p className="mt-1 text-xs text-text-sec">{UI_TEXT.services.fields.durationHint}</p>
+                      
                     </label>
                   </div>
                   {newSoloServiceFieldErrors.title ||

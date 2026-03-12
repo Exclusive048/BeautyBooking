@@ -2,6 +2,7 @@
 
 import { Check, Copy, ExternalLink, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -29,7 +30,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(endpoint, { cache: "no-store", credentials: "include" });
+      const res = await fetchWithAuth(endpoint, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
@@ -67,9 +68,8 @@ export function PublicUsernameCard({ endpoint }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetchWithAuth(endpoint, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: next }),
       });

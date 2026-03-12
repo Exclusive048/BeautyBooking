@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
 
-type MasterContext = {
+export type MasterContext = {
   id: string;
   ownerUserId: string | null;
   studioProviderId: string | null;
@@ -24,7 +24,7 @@ type MasterContext = {
   ratingCount: number;
 };
 
-async function getMasterContext(masterId: string): Promise<MasterContext> {
+export async function getMasterContext(masterId: string): Promise<MasterContext> {
   const master = await prisma.provider.findUnique({
     where: { id: masterId },
     select: {
@@ -428,16 +428,10 @@ export async function upsertMasterServices(
         .filter((value): value is string => Boolean(value))
     );
     if (requestedGlobalCategoryIds.length > 0) {
-      const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [{ status: CategoryStatus.APPROVED, visibleToAll: true }];
-      if (context.ownerUserId) {
-        visibilityConditions.push({ createdByUserId: context.ownerUserId });
-        visibilityConditions.push({ proposedBy: context.ownerUserId });
-      }
       const categories = await prisma.globalCategory.findMany({
         where: {
           id: { in: requestedGlobalCategoryIds },
-          visualSearchSlug: { not: "hot" },
-          OR: visibilityConditions,
+          status: CategoryStatus.APPROVED,
         },
         select: { id: true },
       });
@@ -554,22 +548,15 @@ export async function createSoloMasterService(
 
   const globalCategoryId = input.globalCategoryId?.trim() || null;
   if (globalCategoryId) {
-    const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [
-      { status: CategoryStatus.APPROVED, visibleToAll: true },
-    ];
-    if (context.ownerUserId) {
-      visibilityConditions.push({ createdByUserId: context.ownerUserId });
-      visibilityConditions.push({ proposedBy: context.ownerUserId });
-    }
     const globalCategory = await prisma.globalCategory.findFirst({
       where: {
         id: globalCategoryId,
-        OR: visibilityConditions,
+        status: CategoryStatus.APPROVED,
       },
-      select: { id: true, status: true, visualSearchSlug: true },
+      select: { id: true },
     });
-    if (!globalCategory || globalCategory.visualSearchSlug === "hot") {
-      throw new AppError("Global category not found", 404, "NOT_FOUND");
+    if (!globalCategory) {
+      throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
     }
   }
 

@@ -68,6 +68,57 @@ function todayLocal(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function resolveOfferService(input: {
+  masterService: {
+    durationOverrideMin: number | null;
+    service: {
+      id: string;
+      name: string;
+      title: string | null;
+      description: string | null;
+      durationMin: number;
+      baseDurationMin: number | null;
+      globalCategory: { id: string; name: string; slug: string | null } | null;
+    };
+  } | null;
+  service: {
+    id: string;
+    name: string;
+    title: string | null;
+    description: string | null;
+    durationMin: number;
+    baseDurationMin: number | null;
+    globalCategory: { id: string; name: string; slug: string | null } | null;
+  } | null;
+}):
+  | {
+      durationOverrideMin: number | null;
+      service: {
+        id: string;
+        name: string;
+        title: string | null;
+        description: string | null;
+        durationMin: number;
+        baseDurationMin: number | null;
+        globalCategory: { id: string; name: string; slug: string | null } | null;
+      };
+    }
+  | null {
+  if (input.masterService) {
+    return {
+      durationOverrideMin: input.masterService.durationOverrideMin ?? null,
+      service: input.masterService.service,
+    };
+  }
+  if (input.service) {
+    return {
+      durationOverrideMin: null,
+      service: input.service,
+    };
+  }
+  return null;
+}
+
 function toPublicItem(input: {
   id: string;
   dateLocal: string;
@@ -97,9 +148,24 @@ function toPublicItem(input: {
       baseDurationMin: number | null;
       globalCategory: { id: string; name: string; slug: string | null } | null;
     };
-  };
-}): PublicModelOfferItem {
-  const service = input.masterService.service;
+  } | null;
+  service: {
+    id: string;
+    name: string;
+    title: string | null;
+    description: string | null;
+    durationMin: number;
+    baseDurationMin: number | null;
+    globalCategory: { id: string; name: string; slug: string | null } | null;
+  } | null;
+}): PublicModelOfferItem | null {
+  const offerService = resolveOfferService({
+    masterService: input.masterService,
+    service: input.service,
+  });
+  if (!offerService) return null;
+
+  const service = offerService.service;
   return {
     id: input.id,
     dateLocal: input.dateLocal,
@@ -112,7 +178,7 @@ function toPublicItem(input: {
       title: service.title?.trim() || service.name,
       description: service.description ?? null,
       durationMin: resolveOfferDuration({
-        durationOverrideMin: input.masterService.durationOverrideMin ?? null,
+        durationOverrideMin: offerService.durationOverrideMin ?? null,
         baseDurationMin: service.baseDurationMin ?? null,
         durationMin: service.durationMin,
       }),
@@ -150,7 +216,12 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
   }
 
   if (input.categoryId) {
-    and.push({ masterService: { service: { globalCategoryId: input.categoryId } } });
+    and.push({
+      OR: [
+        { masterService: { is: { service: { globalCategoryId: input.categoryId } } } },
+        { service: { is: { globalCategoryId: input.categoryId } } },
+      ],
+    });
   }
 
   const where: Prisma.ModelOfferWhereInput = and.length > 0 ? { AND: and } : {};
@@ -198,6 +269,17 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
           },
         },
       },
+      service: {
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          description: true,
+          durationMin: true,
+          baseDurationMin: true,
+          globalCategory: { select: { id: true, name: true, slug: true } },
+        },
+      },
     },
   });
 
@@ -205,7 +287,9 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
   const rows = hasMore ? offers.slice(0, -1) : offers;
 
   return {
-    items: rows.map(toPublicItem),
+    items: rows
+      .map(toPublicItem)
+      .filter((item): item is PublicModelOfferItem => Boolean(item)),
     nextPage: hasMore ? input.page + 1 : null,
   };
 }
@@ -256,10 +340,22 @@ export async function getPublicModelOffer(offerId: string): Promise<PublicModelO
           },
         },
       },
+      service: {
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          description: true,
+          durationMin: true,
+          baseDurationMin: true,
+          globalCategory: { select: { id: true, name: true, slug: true } },
+        },
+      },
     },
   });
 
-  return offer ? toPublicItem(offer) : null;
+  if (!offer) return null;
+  return toPublicItem(offer);
 }
 
 export type PublicModelOfferFilterCategory = {

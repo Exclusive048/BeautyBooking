@@ -846,6 +846,8 @@ model Service {
 
   masterServices MasterService[]
 
+  modelOffers ModelOffer[]
+
   portfolioItems PortfolioItemService[]
 
   bookingItems BookingServiceItem[]
@@ -1516,9 +1518,13 @@ model ModelOffer {
 
   master Provider @relation(fields: [masterId], references: [id], onDelete: Cascade)
 
-  masterServiceId String
+  masterServiceId String?
 
-  masterService MasterService @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
+  masterService MasterService? @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
+
+  serviceId String?
+
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   serviceIds String[] @default([])
 
@@ -1546,6 +1552,7 @@ model ModelOffer {
   @@index([status])
   @@index([dateLocal])
   @@index([masterServiceId])
+  @@index([serviceId])
 }
 
 model ModelApplication {

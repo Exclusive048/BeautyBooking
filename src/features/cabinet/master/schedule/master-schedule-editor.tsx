@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -122,9 +123,6 @@ function normalizeSlots(values: string[]): string[] {
   }
   return Array.from(unique).sort((left, right) => left.localeCompare(right));
 }
-
-const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
-  fetch(input, { ...init, credentials: "include" });
 
 export function MasterScheduleEditor() {
   const [timezone, setTimezone] = useState("Europe/Moscow");

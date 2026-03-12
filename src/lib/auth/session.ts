@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { signAccessToken, signRefreshToken, verifyToken, type SessionPayload } from "./jwt";
 import type { NextResponse } from "next/server";
 
-const ACCESS_COOKIE_MAX_AGE_SECONDS = 15 * 60;
+const ACCESS_COOKIE_MAX_AGE_SECONDS = 2 * 60 * 60;
 const REFRESH_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const REFRESH_COOKIE_NAME = "bh_refresh";
 const REFRESH_COOKIE_PATH = "/api/auth/refresh";

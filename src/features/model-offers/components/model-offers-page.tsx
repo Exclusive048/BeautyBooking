@@ -9,6 +9,7 @@ import { Chip } from "@/components/ui/chip";
 import { HeaderBlock } from "@/components/ui/header-block";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -98,25 +99,49 @@ function extractServices(data: unknown): ServiceOption[] {
   return listCandidate.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
-    const hasExplicitServiceId = typeof record.serviceId === "string" && record.serviceId.trim().length > 0;
-    const masterServiceId = hasExplicitServiceId
-      ? (typeof record.id === "string" && record.id.trim()) ||
-        (typeof record.masterServiceId === "string" && record.masterServiceId.trim()) ||
-        null
-      : null;
-    const serviceId = hasExplicitServiceId
-      ? (record.serviceId as string).trim()
-      : (typeof record.id === "string" && record.id.trim()) || null;
+    const nestedService =
+      record.service && typeof record.service === "object"
+        ? (record.service as Record<string, unknown>)
+        : null;
+    const explicitServiceId =
+      typeof record.serviceId === "string" && record.serviceId.trim().length > 0
+        ? record.serviceId.trim()
+        : null;
+    const nestedServiceId =
+      typeof nestedService?.id === "string" && nestedService.id.trim().length > 0
+        ? nestedService.id.trim()
+        : null;
+    const fallbackServiceId =
+      typeof record.id === "string" && record.id.trim().length > 0 ? record.id.trim() : null;
+    const serviceId = explicitServiceId ?? nestedServiceId ?? fallbackServiceId;
+    const explicitMasterServiceId =
+      typeof record.masterServiceId === "string" && record.masterServiceId.trim().length > 0
+        ? record.masterServiceId.trim()
+        : null;
+    const inferredMasterServiceId =
+      typeof record.id === "string" &&
+      record.id.trim().length > 0 
+        ? record.id.trim()
+        : null;
+    const masterServiceId = explicitMasterServiceId ?? inferredMasterServiceId;
     const title =
       (typeof record.title === "string" && record.title.trim()) ||
       (typeof record.serviceTitle === "string" && record.serviceTitle.trim()) ||
       (typeof record.name === "string" && record.name.trim()) ||
+      (typeof nestedService?.title === "string" && nestedService.title.trim()) ||
+      (typeof nestedService?.name === "string" && nestedService.name.trim()) ||
       null;
     const duration =
       typeof record.durationMin === "number"
         ? record.durationMin
         : typeof record.duration === "number"
           ? record.duration
+          : typeof record.effectiveDurationMin === "number"
+            ? record.effectiveDurationMin
+            : typeof nestedService?.durationMin === "number"
+              ? nestedService.durationMin
+              : typeof nestedService?.baseDurationMin === "number"
+                ? nestedService.baseDurationMin
           : null;
     const price =
       typeof record.price === "number"
@@ -125,25 +150,42 @@ function extractServices(data: unknown): ServiceOption[] {
           ? record.effectivePrice
           : typeof record.basePrice === "number"
             ? record.basePrice
+            : typeof nestedService?.price === "number"
+              ? nestedService.price
+              : typeof nestedService?.basePrice === "number"
+                ? nestedService.basePrice
             : null;
     if (!serviceId || !title || duration === null) return [];
     const globalCategoryRecord =
       record.globalCategory && typeof record.globalCategory === "object"
         ? (record.globalCategory as Record<string, unknown>)
         : null;
+    const nestedGlobalCategoryRecord =
+      nestedService?.globalCategory && typeof nestedService.globalCategory === "object"
+        ? (nestedService.globalCategory as Record<string, unknown>)
+        : null;
     const categoryTitle =
       typeof record.categoryTitle === "string"
         ? record.categoryTitle
         : typeof globalCategoryRecord?.name === "string"
           ? globalCategoryRecord.name
+          : typeof nestedGlobalCategoryRecord?.name === "string"
+            ? nestedGlobalCategoryRecord.name
           : null;
     const globalCategoryId =
       typeof record.globalCategoryId === "string" && record.globalCategoryId.trim().length > 0
         ? record.globalCategoryId
         : typeof globalCategoryRecord?.id === "string" && globalCategoryRecord.id.trim().length > 0
           ? globalCategoryRecord.id
+          : typeof nestedGlobalCategoryRecord?.id === "string" && nestedGlobalCategoryRecord.id.trim().length > 0
+            ? nestedGlobalCategoryRecord.id
           : null;
-    const isEnabled = typeof record.isEnabled === "boolean" ? record.isEnabled : undefined;
+    const isEnabled =
+      typeof record.isEnabled === "boolean"
+        ? record.isEnabled
+        : typeof nestedService?.isEnabled === "boolean"
+          ? nestedService.isEnabled
+          : undefined;
     return [
       {
         id: masterServiceId,
@@ -158,9 +200,6 @@ function extractServices(data: unknown): ServiceOption[] {
     ];
   });
 }
-
-const fetchWithAuth = (input: RequestInfo | URL, init?: RequestInit) =>
-  fetch(input, { ...init, credentials: "include" });
 
 export function ModelOffersPage() {
   const [offers, setOffers] = useState<ModelOfferItem[]>([]);
@@ -454,9 +493,12 @@ export function ModelOffersPage() {
       const normalizedEnd = calculatedEndTime?.trim() ?? "";
       const normalizedCategory = selectedCategoryId.trim();
       const primaryService = selectedService;
+      const normalizedMasterServiceId = masterServiceId.trim();
 
       if (!normalizedCategory) nextErrors.categoryId = UI_TEXT.master.modelOffers.validation.categoryRequired;
-      if (!masterServiceId) nextErrors.masterServiceId = UI_TEXT.master.modelOffers.validation.serviceRequired;
+      if (!normalizedMasterServiceId || !primaryService?.id || primaryService.id !== normalizedMasterServiceId) {
+        nextErrors.masterServiceId = UI_TEXT.master.modelOffers.validation.serviceRequired;
+      }
       if (!normalizedDate) nextErrors.dateLocal = UI_TEXT.master.modelOffers.validation.dateRequired;
       if (!normalizedStart || !normalizedEnd) {
         nextErrors.timeRange = UI_TEXT.master.modelOffers.validation.timeRangeRequired;
@@ -499,7 +541,7 @@ export function ModelOffersPage() {
       }
 
       const payload: Record<string, unknown> = {
-        masterServiceId,
+        masterServiceId: normalizedMasterServiceId,
         serviceIds: primaryService ? [primaryService.serviceId] : [],
         dateLocal: normalizedDate,
         timeRangeStartLocal: normalizedStart,

@@ -69,51 +69,64 @@ export async function GET(req: Request) {
                 },
               },
             },
+            service: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+                durationMin: true,
+                baseDurationMin: true,
+                category: { select: { title: true } },
+              },
+            },
           },
         },
       },
     });
 
-    const items = applications.map((item) => {
-      const service = item.offer.masterService.service;
-      const durationMin = resolveServiceDuration({
-        durationOverrideMin: item.offer.masterService.durationOverrideMin ?? null,
-        baseDurationMin: service.baseDurationMin ?? null,
-        durationMin: service.durationMin,
-      });
+    const items = applications
+      .map((item) => {
+        const service = item.offer.masterService?.service ?? item.offer.service;
+        if (!service) return null;
+        const durationMin = resolveServiceDuration({
+          durationOverrideMin: item.offer.masterService?.durationOverrideMin ?? null,
+          baseDurationMin: service.baseDurationMin ?? null,
+          durationMin: service.durationMin,
+        });
 
-      return {
-        id: item.id,
-        status: item.status,
-        clientNote: item.clientNote,
-        proposedTimeLocal: item.proposedTimeLocal,
-        confirmedStartAt: item.confirmedStartAt ? item.confirmedStartAt.toISOString() : null,
-        bookingId: item.bookingId,
-        createdAt: item.createdAt.toISOString(),
-        offer: {
-          id: item.offer.id,
-          status: item.offer.status,
-          dateLocal: item.offer.dateLocal,
-          timeRangeStartLocal: item.offer.timeRangeStartLocal,
-          timeRangeEndLocal: item.offer.timeRangeEndLocal,
-          price: toPriceNumber(item.offer.price),
-          requirements: item.offer.requirements,
-          extraBusyMin: item.offer.extraBusyMin,
-          master: {
-            id: item.offer.master.id,
-            name: item.offer.master.name,
-            avatarUrl: item.offer.master.avatarUrl ?? null,
-            publicUsername: item.offer.master.publicUsername ?? null,
+        return {
+          id: item.id,
+          status: item.status,
+          clientNote: item.clientNote,
+          proposedTimeLocal: item.proposedTimeLocal,
+          confirmedStartAt: item.confirmedStartAt ? item.confirmedStartAt.toISOString() : null,
+          bookingId: item.bookingId,
+          createdAt: item.createdAt.toISOString(),
+          offer: {
+            id: item.offer.id,
+            status: item.offer.status,
+            dateLocal: item.offer.dateLocal,
+            timeRangeStartLocal: item.offer.timeRangeStartLocal,
+            timeRangeEndLocal: item.offer.timeRangeEndLocal,
+            price: toPriceNumber(item.offer.price),
+            requirements: item.offer.requirements,
+            extraBusyMin: item.offer.extraBusyMin,
+            master: {
+              id: item.offer.master.id,
+              name: item.offer.master.name,
+              avatarUrl: item.offer.master.avatarUrl ?? null,
+              publicUsername: item.offer.master.publicUsername ?? null,
+            },
+            service: {
+              id: service.id,
+              title: service.title?.trim() || service.name,
+              categoryTitle: service.category?.title ?? null,
+              durationMin,
+            },
           },
-          service: {
-            id: service.id,
-            title: service.title?.trim() || service.name,
-            categoryTitle: service.category?.title ?? null,
-            durationMin,
-          },
-        },
-      };
-    });
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
     return jsonOk({ applications: items });
   } catch (error) {

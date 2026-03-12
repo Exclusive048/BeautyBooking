@@ -25,7 +25,7 @@ export type SessionPayload = {
   exp: number;
 };
 
-const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+const ACCESS_TOKEN_TTL_SECONDS = 2 * 60 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 type AccessTokenPayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti">;

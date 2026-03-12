@@ -605,6 +605,54 @@ function toPriceNumber(value: Prisma.Decimal | null): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+function resolveModelOfferService(input: {
+  masterService: {
+    durationOverrideMin: number | null;
+    service: {
+      id: string;
+      name: string;
+      title: string | null;
+      durationMin: number;
+      baseDurationMin: number | null;
+      category: { title: string } | null;
+    };
+  } | null;
+  service: {
+    id: string;
+    name: string;
+    title: string | null;
+    durationMin: number;
+    baseDurationMin: number | null;
+    category: { title: string } | null;
+  } | null;
+}):
+  | {
+      service: {
+        id: string;
+        name: string;
+        title: string | null;
+        durationMin: number;
+        baseDurationMin: number | null;
+        category: { title: string } | null;
+      };
+      durationOverrideMin: number | null;
+    }
+  | null {
+  if (input.masterService) {
+    return {
+      service: input.masterService.service,
+      durationOverrideMin: input.masterService.durationOverrideMin ?? null,
+    };
+  }
+  if (input.service) {
+    return {
+      service: input.service,
+      durationOverrideMin: null,
+    };
+  }
+  return null;
+}
+
 async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSearchResult> {
   const and: Prisma.ModelOfferWhereInput[] = [{ status: "ACTIVE" }];
   const categoryIds = await resolveCategoryFilterIds(
@@ -617,26 +665,56 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
 
   if (categoryIds.length > 0) {
     and.push({
-      masterService: {
-        service: {
-          globalCategoryId: { in: categoryIds },
+      OR: [
+        {
+          masterService: {
+            is: {
+              service: {
+                globalCategoryId: { in: categoryIds },
+              },
+            },
+          },
         },
-      },
+        {
+          service: {
+            is: {
+              globalCategoryId: { in: categoryIds },
+            },
+          },
+        },
+      ],
     });
   }
 
   const serviceQuery = input.serviceQuery?.trim();
   if (serviceQuery) {
     and.push({
-      masterService: {
-        service: {
-          OR: [
-            { name: { contains: serviceQuery, mode: "insensitive" } },
-            { title: { contains: serviceQuery, mode: "insensitive" } },
-            { category: { is: { title: { contains: serviceQuery, mode: "insensitive" } } } },
-          ],
+      OR: [
+        {
+          masterService: {
+            is: {
+              service: {
+                OR: [
+                  { name: { contains: serviceQuery, mode: "insensitive" } },
+                  { title: { contains: serviceQuery, mode: "insensitive" } },
+                  { category: { is: { title: { contains: serviceQuery, mode: "insensitive" } } } },
+                ],
+              },
+            },
+          },
         },
-      },
+        {
+          service: {
+            is: {
+              OR: [
+                { name: { contains: serviceQuery, mode: "insensitive" } },
+                { title: { contains: serviceQuery, mode: "insensitive" } },
+                { category: { is: { title: { contains: serviceQuery, mode: "insensitive" } } } },
+              ],
+            },
+          },
+        },
+      ],
     });
   }
 
@@ -717,35 +795,52 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
           },
         },
       },
+      service: {
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          durationMin: true,
+          baseDurationMin: true,
+          category: { select: { title: true } },
+        },
+      },
     },
   });
 
   const hasMore = offers.length > take;
   const rows = hasMore ? offers.slice(0, -1) : offers;
 
-  const items: CatalogModelOfferItem[] = rows.map((offer) => {
-    const service = offer.masterService.service;
-    return {
-      type: "modelOffer",
-      id: offer.id,
-      masterId: offer.masterId,
-      masterName: offer.master?.name ?? "Master",
-      masterAvatarUrl: offer.master?.avatarUrl ?? null,
-      masterPublicUsername: offer.master?.publicUsername ?? null,
-      serviceTitle: service.title?.trim() || service.name,
-      categoryTitle: service.category?.title ?? null,
-      durationMin: resolveOfferDuration({
-        durationOverrideMin: offer.masterService.durationOverrideMin ?? null,
-        baseDurationMin: service.baseDurationMin ?? null,
-        durationMin: service.durationMin,
-      }),
-      dateLocal: offer.dateLocal,
-      timeRangeStartLocal: offer.timeRangeStartLocal,
-      timeRangeEndLocal: offer.timeRangeEndLocal,
-      price: toPriceNumber(offer.price),
-      requirements: offer.requirements,
-    };
-  });
+  const items: CatalogModelOfferItem[] = rows
+    .map((offer) => {
+      const offerService = resolveModelOfferService({
+        masterService: offer.masterService,
+        service: offer.service,
+      });
+      if (!offerService) return null;
+      const service = offerService.service;
+      return {
+        type: "modelOffer",
+        id: offer.id,
+        masterId: offer.masterId,
+        masterName: offer.master?.name ?? "Master",
+        masterAvatarUrl: offer.master?.avatarUrl ?? null,
+        masterPublicUsername: offer.master?.publicUsername ?? null,
+        serviceTitle: service.title?.trim() || service.name,
+        categoryTitle: service.category?.title ?? null,
+        durationMin: resolveOfferDuration({
+          durationOverrideMin: offerService.durationOverrideMin ?? null,
+          baseDurationMin: service.baseDurationMin ?? null,
+          durationMin: service.durationMin,
+        }),
+        dateLocal: offer.dateLocal,
+        timeRangeStartLocal: offer.timeRangeStartLocal,
+        timeRangeEndLocal: offer.timeRangeEndLocal,
+        price: toPriceNumber(offer.price),
+        requirements: offer.requirements,
+      };
+    })
+    .filter((item): item is CatalogModelOfferItem => Boolean(item));
 
   return {
     items,
