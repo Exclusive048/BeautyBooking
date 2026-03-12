@@ -1,32 +1,39 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Tabs } from "@/components/ui/tabs";
-import type { ApiResponse } from "@/lib/types/api";
-import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { slugifyCategory } from "@/lib/slug";
+import type { ApiResponse } from "@/lib/types/api";
+
+type CategoryStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 type CreatorInfo = {
   id: string;
+  name: string | null;
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  profileHref: string;
 };
 
 type CategoryItem = {
   id: string;
+  name: string;
   title: string;
   slug: string;
   icon: string | null;
   parentId: string | null;
   depth: number;
   fullPath: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: CategoryStatus;
   usageCount: number;
+  visibleToAll: boolean;
   createdAt: string;
   createdBy: CreatorInfo | null;
 };
@@ -35,29 +42,39 @@ type CategoriesResponse = {
   categories: CategoryItem[];
 };
 
-const TABS = [
-  { id: "categories", label: "Категории" },
-  { id: "moderation", label: "Модерация" },
+const TAB_ITEMS = [
+  { id: "all", label: "Все" },
+  { id: "pending", label: "На модерации" },
+  { id: "approved", label: "Одобренные" },
+  { id: "rejected", label: "Отклонённые" },
 ];
+
+const TAB_STATUS: Record<string, CategoryStatus | null> = {
+  all: null,
+  pending: "PENDING",
+  approved: "APPROVED",
+  rejected: "REJECTED",
+};
 
 function formatDate(value: string, timeZone: string) {
   return UI_FMT.dateTimeLong(value, { timeZone });
 }
 
-function creatorLabel(creator: CreatorInfo | null) {
-  if (!creator) return "-";
-  return creator.displayName || creator.phone || creator.email || "-";
+function statusLabel(status: CategoryStatus): string {
+  if (status === "PENDING") return "На модерации";
+  if (status === "APPROVED") return "Одобрена";
+  return "Отклонена";
 }
 
-function statusLabel(status: CategoryItem["status"]) {
-  if (status === "APPROVED") return "Активна";
-  if (status === "PENDING") return "На модерации";
-  return "Отклонена";
+function creatorName(creator: CreatorInfo | null): string {
+  if (!creator) return "Неизвестно";
+  return creator.name || creator.displayName || creator.phone || creator.email || "Неизвестно";
 }
 
 export function AdminCatalog() {
   const viewerTimeZone = useViewerTimeZoneContext();
-  const [tab, setTab] = useState("categories");
+
+  const [tab, setTab] = useState<string>("all");
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,11 +95,17 @@ export function AdminCatalog() {
     setSlugTouched(false);
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (nextTab: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/catalog/categories", { cache: "no-store" });
+      const params = new URLSearchParams();
+      const status = TAB_STATUS[nextTab] ?? null;
+      if (status) params.set("status", status);
+      const query = params.toString();
+      const res = await fetch(`/api/admin/catalog/global-categories${query ? `?${query}` : ""}`, {
+        cache: "no-store",
+      });
       const json = (await res.json().catch(() => null)) as ApiResponse<CategoriesResponse> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить каталог");
@@ -96,8 +119,8 @@ export function AdminCatalog() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(tab);
+  }, [load, tab]);
 
   useEffect(() => {
     if (!toast) return;
@@ -111,18 +134,41 @@ export function AdminCatalog() {
     }
   }, [newTitle, slugTouched]);
 
-  const handleStatus = async (id: string, action: "approve" | "reject") => {
+  const handleApprove = async (id: string) => {
     setBusyId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/catalog/categories/${id}/${action}`, { method: "POST" });
+      const res = await fetch(`/api/admin/catalog/global-categories/${id}/approve`, {
+        method: "POST",
+      });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось обновить категорию");
+        throw new Error(json && !json.ok ? json.error.message : "Не удалось одобрить категорию");
       }
-      await load();
+      setToast("Категория одобрена");
+      await load(tab);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить категорию");
+      setError(err instanceof Error ? err.message : "Не удалось одобрить категорию");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/catalog/global-categories/${id}/reject`, {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : "Не удалось отклонить категорию");
+      }
+      setToast("Категория отклонена и удалена");
+      await load(tab);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось отклонить категорию");
     } finally {
       setBusyId(null);
     }
@@ -154,7 +200,7 @@ export function AdminCatalog() {
       setShowCreateModal(false);
       resetCreateForm();
       setToast("Категория добавлена");
-      await load();
+      await load(tab);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось создать категорию");
     } finally {
@@ -174,8 +220,8 @@ export function AdminCatalog() {
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-text-main">Каталог и модерация</h1>
-        <p className="mt-1 text-sm text-text-sec">Проверяйте категории и управляйте статусом публикации.</p>
+        <h1 className="text-2xl font-semibold text-text-main">Каталог категорий</h1>
+        <p className="mt-1 text-sm text-text-sec">Модерация пользовательских категорий и управление каталогом.</p>
       </header>
 
       {toast ? (
@@ -188,138 +234,110 @@ export function AdminCatalog() {
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <Tabs items={TABS} value={tab} onChange={setTab} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs items={TAB_ITEMS} value={tab} onChange={setTab} />
+        <Button type="button" size="sm" onClick={() => setShowCreateModal(true)}>
+          Добавить категорию
+        </Button>
+      </div>
 
-      {tab === "categories" ? (
+      {tab === "pending" ? (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-text-sec">Всего категорий: {categories.length}</div>
-            <Button type="button" size="sm" onClick={() => setShowCreateModal(true)}>
-              Добавить категорию
-            </Button>
-          </div>
-
-          <div className="lux-card overflow-hidden rounded-[24px]">
-            <table className="w-full border-separate border-spacing-0">
-              <thead>
-                <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
-                  <th className="px-4 py-3 text-left">Категория</th>
-                  <th className="px-4 py-3 text-left">Slug</th>
-                  <th className="px-4 py-3 text-left">Статус</th>
-                  <th className="px-4 py-3 text-left">Использований</th>
-                  <th className="px-4 py-3 text-right">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.length ? (
-                  categories.map((category, index) => (
-                    <tr key={category.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
-                      <td className="px-4 py-3 text-sm text-text-main">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{category.icon ?? "•"}</span>
-                          <span>{category.fullPath || category.title}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-text-sec">{category.slug}</td>
-                      <td className="px-4 py-3 text-sm text-text-sec">{statusLabel(category.status)}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-text-main">{category.usageCount}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex gap-2">
-                          {category.status === "APPROVED" ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={busyId === category.id}
-                              onClick={() => handleStatus(category.id, "reject")}
-                            >
-                              Отклонить
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={busyId === category.id}
-                              onClick={() => handleStatus(category.id, "approve")}
-                            >
-                              Подтвердить
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-text-sec">
-                      Категории не найдены.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {pendingCategories.length > 0 ? (
+            pendingCategories.map((category) => (
+              <div
+                key={category.id}
+                className="flex items-center justify-between rounded-2xl border border-white/8 bg-bg-card p-4"
+              >
+                <div>
+                  <p className="font-medium">{category.fullPath || category.title}</p>
+                  <p className="text-xs text-text-sec">
+                    Предложил:{" "}
+                    {category.createdBy ? (
+                      <Link href={category.createdBy.profileHref} className="underline hover:text-text-main">
+                        {creatorName(category.createdBy)}
+                      </Link>
+                    ) : (
+                      "Неизвестно"
+                    )}{" "}
+                    · {formatDate(category.createdAt, viewerTimeZone)}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleApprove(category.id)}
+                    disabled={busyId === category.id}
+                    className="rounded-xl bg-green-500/15 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-60"
+                  >
+                    Одобрить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReject(category.id)}
+                    disabled={busyId === category.id}
+                    className="rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-60"
+                  >
+                    Отклонить
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Категорий на модерации нет.</div>
+          )}
         </div>
-      ) : null}
-
-      {tab === "moderation" ? (
-        <div className="space-y-4">
-          <div className="lux-card overflow-hidden rounded-[24px]">
-            <table className="w-full border-separate border-spacing-0">
-              <thead>
-                <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
-                  <th className="px-4 py-3 text-left">Название</th>
-                  <th className="px-4 py-3 text-left">Кто создал</th>
-                  <th className="px-4 py-3 text-left">Дата</th>
-                  <th className="px-4 py-3 text-right">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingCategories.length ? (
-                  pendingCategories.map((category, index) => (
-                    <tr key={category.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
-                      <td className="px-4 py-3 text-sm text-text-main">{category.fullPath || category.title}</td>
-                      <td className="px-4 py-3 text-sm text-text-sec">{creatorLabel(category.createdBy)}</td>
-                      <td className="px-4 py-3 text-sm text-text-sec">
-                        {formatDate(category.createdAt, viewerTimeZone)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busyId === category.id}
-                            onClick={() => handleStatus(category.id, "reject")}
-                          >
-                            Отклонить
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busyId === category.id}
-                            onClick={() => handleStatus(category.id, "approve")}
-                          >
-                            Подтвердить
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-text-sec">
-                      Очередь категорий пуста.
+      ) : (
+        <div className="lux-card overflow-hidden rounded-[24px]">
+          <table className="w-full border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
+                <th className="px-4 py-3 text-left">Категория</th>
+                <th className="px-4 py-3 text-left">Slug</th>
+                <th className="px-4 py-3 text-left">Статус</th>
+                <th className="px-4 py-3 text-left">Видимость</th>
+                <th className="px-4 py-3 text-left">Автор</th>
+                <th className="px-4 py-3 text-left">Дата</th>
+                <th className="px-4 py-3 text-right">Использований</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.length > 0 ? (
+                categories.map((category, index) => (
+                  <tr key={category.id} className={index % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
+                    <td className="px-4 py-3 text-sm text-text-main">
+                      <span className="mr-2 text-base">{category.icon ?? "•"}</span>
+                      {category.fullPath || category.title}
                     </td>
+                    <td className="px-4 py-3 text-sm text-text-sec">{category.slug}</td>
+                    <td className="px-4 py-3 text-sm text-text-sec">{statusLabel(category.status)}</td>
+                    <td className="px-4 py-3 text-sm text-text-sec">
+                      {category.visibleToAll ? "Для всех" : "Только автор"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-text-sec">
+                      {category.createdBy ? (
+                        <Link href={category.createdBy.profileHref} className="underline hover:text-text-main">
+                          {creatorName(category.createdBy)}
+                        </Link>
+                      ) : (
+                        "Неизвестно"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-text-sec">{formatDate(category.createdAt, viewerTimeZone)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-text-main">{category.usageCount}</td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="lux-card rounded-[24px] p-4 text-sm text-text-sec">
-            Новых тегов нет. Если теги будут добавлены в продукт, они появятся в этой очереди.
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-text-sec">
+                    Категории не найдены.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      ) : null}
+      )}
 
       <ModalSurface
         open={showCreateModal}
@@ -368,3 +386,4 @@ export function AdminCatalog() {
     </section>
   );
 }
+

@@ -428,10 +428,16 @@ export async function upsertMasterServices(
         .filter((value): value is string => Boolean(value))
     );
     if (requestedGlobalCategoryIds.length > 0) {
+      const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [
+        { status: CategoryStatus.APPROVED, visibleToAll: true },
+      ];
+      if (context.ownerUserId) {
+        visibilityConditions.push({ createdByUserId: context.ownerUserId });
+      }
       const categories = await prisma.globalCategory.findMany({
         where: {
           id: { in: requestedGlobalCategoryIds },
-          status: CategoryStatus.APPROVED,
+          OR: visibilityConditions,
         },
         select: { id: true },
       });
@@ -548,10 +554,16 @@ export async function createSoloMasterService(
 
   const globalCategoryId = input.globalCategoryId?.trim() || null;
   if (globalCategoryId) {
+    const visibilityConditions: Prisma.GlobalCategoryWhereInput[] = [
+      { status: CategoryStatus.APPROVED, visibleToAll: true },
+    ];
+    if (context.ownerUserId) {
+      visibilityConditions.push({ createdByUserId: context.ownerUserId });
+    }
     const globalCategory = await prisma.globalCategory.findFirst({
       where: {
         id: globalCategoryId,
-        status: CategoryStatus.APPROVED,
+        OR: visibilityConditions,
       },
       select: { id: true },
     });

@@ -144,7 +144,9 @@ function buildDurationOptions(value: number): number[] {
 
 function formatCategoryOptionLabel(category: GlobalCategoryOption): string {
   const base = category.fullPath || category.title || category.name || "";
-  return `${category.icon ? `${category.icon} ` : ""}${base}${category.isPersonal ? " (только у меня)" : ""}`;
+  const pendingSuffix = category.status === "PENDING" ? " (на модерации)" : "";
+  const personalSuffix = category.isPersonal ? " (только у меня)" : "";
+  return `${category.icon ? `${category.icon} ` : ""}${base}${pendingSuffix}${personalSuffix}`;
 }
 
 function parseMediaAssetId(url: string): string | null {
@@ -457,40 +459,21 @@ export function MasterProfilePage() {
 
   const loadCategoryOptions = useCallback(async (): Promise<void> => {
     try {
-      const [categoriesRes, proposalsRes] = await Promise.all([
-        fetchWithAuth("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
-        fetchWithAuth("/api/categories/my-proposals", { cache: "no-store" }),
-      ]);
-
+      const categoriesRes = await fetchWithAuth("/api/catalog/global-categories", { cache: "no-store" });
       const categoriesJson = (await categoriesRes.json().catch(() => null)) as
         | ApiResponse<{ categories: GlobalCategoryOption[] } | GlobalCategoryOption[]>
         | null;
-      const proposalsJson = (await proposalsRes.json().catch(() => null)) as
-        | ApiResponse<GlobalCategoryOption[]>
-        | null;
 
-      const approved = categoriesRes.ok && categoriesJson && categoriesJson.ok
+      const items = categoriesRes.ok && categoriesJson && categoriesJson.ok
         ? (Array.isArray(categoriesJson.data) ? categoriesJson.data : categoriesJson.data.categories)
         : [];
-      const proposals = proposalsRes.ok && proposalsJson && proposalsJson.ok ? proposalsJson.data : [];
 
-      const mergedById = new Map<string, GlobalCategoryOption>();
-      for (const category of approved) {
-        mergedById.set(category.id, {
+      const merged = items
+        .map((category) => ({
           ...category,
           title: category.title || category.name || "",
           isPersonal: category.isPersonal ?? false,
-        });
-      }
-      for (const proposal of proposals) {
-        mergedById.set(proposal.id, {
-          ...proposal,
-          title: proposal.title || proposal.name || "",
-          isPersonal: true,
-        });
-      }
-
-      const merged = Array.from(mergedById.values())
+        }))
         .filter((category) => category.id && (category.title || category.name))
         .sort((a, b) =>
           (a.fullPath || a.title || a.name || "").localeCompare(b.fullPath || b.title || b.name || "", "ru")
@@ -821,6 +804,25 @@ export function MasterProfilePage() {
     () => serviceList.filter((service) => !service.isEnabled),
     [serviceList]
   );
+  const pendingCategoryTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const category of globalCategories) {
+      if (category.status !== "PENDING") continue;
+      const title = (category.fullPath || category.title || category.name || "").trim();
+      if (!title) continue;
+      map.set(category.id, title);
+    }
+    return map;
+  }, [globalCategories]);
+  const pendingServiceCategoryNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const service of serviceList) {
+      if (!service.globalCategoryId) continue;
+      const title = pendingCategoryTitleById.get(service.globalCategoryId);
+      if (title) names.add(title);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "ru"));
+  }, [pendingCategoryTitleById, serviceList]);
   const serviceTitleById = useMemo(
     () => new Map(serviceList.map((service) => [service.serviceId, service.title])),
     [serviceList]
@@ -1348,7 +1350,7 @@ export function MasterProfilePage() {
       const res = await fetchWithAuth("/api/categories/propose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: title, context: "SERVICE", isPersonalOnly: true }),
+        body: JSON.stringify({ name: title, context: "SERVICE" }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
@@ -1358,7 +1360,7 @@ export function MasterProfilePage() {
       setProposeCategoryTitle("");
       setProposeCategoryOpen(false);
       setProposeCategoryMessage(
-        "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430. \u041e\u043d\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0442\u043e\u043b\u044c\u043a\u043e \u0432\u0430\u043c."
+        "Категория отправлена на модерацию. Пока она доступна только вам."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось создать категорию");
@@ -2299,6 +2301,13 @@ export function MasterProfilePage() {
                   </button>
                 </div>
               </div>
+
+              {pendingServiceCategoryNames.length > 0 ? (
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+                  Категория «{pendingServiceCategoryNames.join("», «")}» ожидает проверки администратором. После
+                  одобрения она появится в общем каталоге.
+                </div>
+              ) : null}
 
         {showAddServicePanel ? (
           <div className="rounded-2xl bg-bg-card/90 p-4">

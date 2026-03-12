@@ -65,8 +65,6 @@ export async function POST(req: Request) {
     }
     const parentId = parsed.data.parentId?.trim() || null;
     const context = parsed.data.context?.trim() || null;
-    const isPersonalOnly = parsed.data.isPersonalOnly === true;
-
     if (parentId) {
       const parent = await prisma.globalCategory.findUnique({
         where: { id: parentId },
@@ -84,13 +82,13 @@ export async function POST(req: Request) {
         name: title,
         slug: uniqueSlug,
         parentId,
-        status: isPersonalOnly ? CategoryStatus.APPROVED : CategoryStatus.PENDING,
+        status: CategoryStatus.PENDING,
         proposedBy: auth.user.id,
         proposedAt: new Date(),
         context,
-        reviewedAt: isPersonalOnly ? new Date() : null,
+        reviewedAt: null,
         isSystem: false,
-        visibleToAll: !isPersonalOnly,
+        visibleToAll: false,
         createdByUserId: auth.user.id,
       },
       select: { id: true, name: true, status: true },

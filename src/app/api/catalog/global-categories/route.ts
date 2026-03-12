@@ -21,8 +21,10 @@ export async function GET(req: Request) {
     const status = parseStatus(url.searchParams.get("status")) ?? CategoryStatus.APPROVED;
     const where: Prisma.GlobalCategoryWhereInput = sessionUser
       ? {
-          status,
-          OR: [{ visibleToAll: true }, { proposedBy: sessionUser.id }],
+          OR: [
+            { status: CategoryStatus.APPROVED, visibleToAll: true },
+            { createdByUserId: sessionUser.id },
+          ],
         }
       : {
           status,
@@ -67,8 +69,10 @@ export async function GET(req: Request) {
         depth: category.depth,
         fullPath: category.fullPath,
         usageCount: category.usageCount,
+        status: category.status,
         isPersonal: !category.visibleToAll,
         visibleToAll: category.visibleToAll,
+        createdByUserId: category.createdByUserId,
       })),
     });
   } catch (error) {
