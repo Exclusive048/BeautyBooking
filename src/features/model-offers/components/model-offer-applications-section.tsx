@@ -170,7 +170,7 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
               alt=""
               width={40}
               height={40}
-              unoptimized
+              sizes="40px"
               className="h-10 w-10 rounded-full object-cover"
             />
           ) : (

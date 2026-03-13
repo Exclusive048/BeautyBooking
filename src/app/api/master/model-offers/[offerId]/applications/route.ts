@@ -1,6 +1,10 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import {
+  buildPrivateMediaDeliveryUrl,
+  createPrivateMediaDeliveryToken,
+} from "@/lib/media/private-delivery";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
@@ -69,7 +73,8 @@ export async function GET(req: Request, ctx: RouteContext) {
     const mediaByApplication = new Map<string, { id: string; url: string }[]>();
     for (const asset of mediaAssets) {
       const list = mediaByApplication.get(asset.entityId) ?? [];
-      list.push({ id: asset.id, url: `/api/media/file/${asset.id}` });
+      const token = createPrivateMediaDeliveryToken({ assetId: asset.id });
+      list.push({ id: asset.id, url: buildPrivateMediaDeliveryUrl(asset.id, token) });
       mediaByApplication.set(asset.entityId, list);
     }
 
