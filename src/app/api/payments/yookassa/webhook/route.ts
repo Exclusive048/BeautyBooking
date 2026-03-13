@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
-import { isYookassaIpAllowed } from "@/lib/payments/yookassa/allowlist";
+import { checkYookassaIpAllowlist } from "@/lib/payments/yookassa/allowlist";
 import { createYookassaWebhookJob, type YookassaWebhookPayload } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
 import { alertCritical } from "@/lib/monitoring";
@@ -63,9 +63,14 @@ export async function POST(req: Request) {
       return fail("Invalid signature", 401, "UNAUTHORIZED");
     }
 
-    const ip = extractClientIp(req);
-    if (!ip || !isYookassaIpAllowed(ip)) {
-      logError("YooKassa webhook rejected: IP not allowed", { ip });
+    const allowlistCheck = checkYookassaIpAllowlist(extractClientIp(req));
+    if (!allowlistCheck.allowed) {
+      logError("YooKassa webhook rejected: IP allowlist deny", {
+        ip: allowlistCheck.ip,
+        reason: allowlistCheck.reason,
+        ipVersion: allowlistCheck.ipVersion,
+        allowlistLastReviewedAt: allowlistCheck.metadata.lastReviewedAt,
+      });
       void recordSurfaceEvent({
         surface: "webhook",
         outcome: "denied",
@@ -78,7 +83,9 @@ export async function POST(req: Request) {
     const token = getWebhookToken(req);
     const expectedToken = process.env.YOOKASSA_WEBHOOK_TOKEN?.trim();
     if (expectedToken && token !== expectedToken) {
-      logError("YooKassa webhook rejected: invalid token", { ip });
+      logError("YooKassa webhook rejected: invalid token", {
+        ip: allowlistCheck.ip,
+      });
       void recordSurfaceEvent({
         surface: "webhook",
         outcome: "denied",

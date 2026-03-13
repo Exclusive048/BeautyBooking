@@ -1,7 +1,14 @@
 import { isIP } from "net";
 
+export const YOOKASSA_ALLOWLIST_METADATA = {
+  source: "YooKassa official webhook IP ranges",
+  lastReviewedAt: "2026-03-14",
+  reviewCadenceDays: 30,
+  changeProcess:
+    "When YooKassa updates webhook IP ranges, update YOOKASSA_ALLOWED_IP_RANGES and lastReviewedAt together.",
+} as const;
+
 export const YOOKASSA_ALLOWED_IP_RANGES = [
-  // TODO: Update allowlist periodically from official YooKassa docs.
   "185.71.76.0/27",
   "185.71.77.0/27",
   "77.75.153.0/25",
@@ -12,8 +19,29 @@ export const YOOKASSA_ALLOWED_IP_RANGES = [
 ];
 
 type CidrRange =
-  | { version: 4; network: number; mask: number }
-  | { version: 6; network: number[]; mask: number[] };
+  | { cidr: string; version: 4; network: number; mask: number }
+  | { cidr: string; version: 6; network: number[]; mask: number[] };
+
+type IpVersion = 4 | 6;
+type AllowlistDenyReason = "MISSING_IP" | "INVALID_IP" | "NOT_IN_ALLOWLIST";
+
+export type YookassaIpAllowlistResult =
+  | {
+      allowed: true;
+      ip: string;
+      ipVersion: IpVersion;
+      matchedRange: string;
+      reason: "ALLOWLIST_MATCHED";
+      metadata: typeof YOOKASSA_ALLOWLIST_METADATA;
+    }
+  | {
+      allowed: false;
+      ip: string | null;
+      ipVersion: IpVersion | null;
+      matchedRange: null;
+      reason: AllowlistDenyReason;
+      metadata: typeof YOOKASSA_ALLOWLIST_METADATA;
+    };
 
 function parseIpv4(input: string): number | null {
   const parts = input.split(".");
@@ -101,14 +129,14 @@ function parseCidr(cidr: string): CidrRange | null {
     const network = parseIpv4(ip);
     if (network === null) return null;
     const maskValue = mask === 0 ? 0 : (~0 >>> (32 - mask)) << (32 - mask);
-    return { version: 4, network, mask: maskValue >>> 0 };
+    return { cidr, version: 4, network, mask: maskValue >>> 0 };
   }
 
   if (version === 6) {
     if (mask < 0 || mask > 128) return null;
     const network = parseIpv6(ip);
     if (network === null) return null;
-    return { version: 6, network, mask: buildIpv6Mask(mask) };
+    return { cidr, version: 6, network, mask: buildIpv6Mask(mask) };
   }
 
   return null;
@@ -121,27 +149,70 @@ function matchesIpv6(value: number[], network: number[], mask: number[]): boolea
   return true;
 }
 
-const PARSED_RANGES = YOOKASSA_ALLOWED_IP_RANGES.map(parseCidr).filter(
-  (value): value is CidrRange => Boolean(value)
-);
+const PARSED_RANGES: CidrRange[] = YOOKASSA_ALLOWED_IP_RANGES.map((cidr) => {
+  const parsed = parseCidr(cidr);
+  if (!parsed) {
+    throw new Error(`YooKassa allowlist contains invalid CIDR range: ${cidr}`);
+  }
+  return parsed;
+});
 
-export function isYookassaIpAllowed(ip: string): boolean {
-  const version = isIP(ip);
-  if (version === 0) return false;
+function denyAllowlist(
+  reason: AllowlistDenyReason,
+  ip: string | null,
+  ipVersion: IpVersion | null
+): YookassaIpAllowlistResult {
+  return {
+    allowed: false,
+    reason,
+    ip,
+    ipVersion,
+    matchedRange: null,
+    metadata: YOOKASSA_ALLOWLIST_METADATA,
+  };
+}
+
+function allowAllowlist(ip: string, ipVersion: IpVersion, matchedRange: string): YookassaIpAllowlistResult {
+  return {
+    allowed: true,
+    reason: "ALLOWLIST_MATCHED",
+    ip,
+    ipVersion,
+    matchedRange,
+    metadata: YOOKASSA_ALLOWLIST_METADATA,
+  };
+}
+
+export function checkYookassaIpAllowlist(ip: string | null | undefined): YookassaIpAllowlistResult {
+  const normalizedIp = ip?.trim() ?? "";
+  if (!normalizedIp) return denyAllowlist("MISSING_IP", null, null);
+
+  const version = isIP(normalizedIp);
+  if (version !== 4 && version !== 6) {
+    return denyAllowlist("INVALID_IP", normalizedIp, null);
+  }
 
   if (version === 4) {
-    const value = parseIpv4(ip);
-    if (value === null) return false;
-    return PARSED_RANGES.some(
+    const value = parseIpv4(normalizedIp);
+    if (value === null) return denyAllowlist("INVALID_IP", normalizedIp, 4);
+    const matched = PARSED_RANGES.find(
       (range) =>
         range.version === 4 &&
         (value & range.mask) === (range.network & range.mask)
     );
+    if (!matched) return denyAllowlist("NOT_IN_ALLOWLIST", normalizedIp, 4);
+    return allowAllowlist(normalizedIp, 4, matched.cidr);
   }
 
-  const value6 = parseIpv6(ip);
-  if (value6 === null) return false;
-  return PARSED_RANGES.some(
+  const value6 = parseIpv6(normalizedIp);
+  if (value6 === null) return denyAllowlist("INVALID_IP", normalizedIp, 6);
+  const matched = PARSED_RANGES.find(
     (range) => range.version === 6 && matchesIpv6(value6, range.network, range.mask)
   );
+  if (!matched) return denyAllowlist("NOT_IN_ALLOWLIST", normalizedIp, 6);
+  return allowAllowlist(normalizedIp, 6, matched.cidr);
+}
+
+export function isYookassaIpAllowed(ip: string): boolean {
+  return checkYookassaIpAllowlist(ip).allowed;
 }

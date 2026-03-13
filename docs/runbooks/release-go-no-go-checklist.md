@@ -247,6 +247,22 @@ NO-GO condition:
 - Valid test event fails (401/403/503) due to misconfiguration.
 
 Check:
+- YooKassa IP allowlist metadata is up to date before release.
+
+How to verify:
+- Open `src/lib/payments/yookassa/allowlist.ts` and verify `YOOKASSA_ALLOWLIST_METADATA.lastReviewedAt` and `reviewCadenceDays` are still valid.
+- Confirm current CIDR ranges in `YOOKASSA_ALLOWED_IP_RANGES` match the latest official YooKassa webhook IP ranges.
+
+Where to verify:
+- [src/lib/payments/yookassa/allowlist.ts](/d:/BeautyBooking/beautyhub/src/lib/payments/yookassa/allowlist.ts), [docs/runbooks/yookassa-allowlist-maintenance.md](/d:/BeautyBooking/beautyhub/docs/runbooks/yookassa-allowlist-maintenance.md).
+
+GO condition:
+- `lastReviewedAt` is within the review cadence and ranges were checked against YooKassa docs.
+
+NO-GO condition:
+- Allowlist review window expired or CIDR ranges are not verified for current YooKassa docs.
+
+Check:
 - Worker processes webhook jobs.
 
 How to verify:
