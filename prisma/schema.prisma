@@ -762,6 +762,10 @@ model Provider {
 
   @@index([ownerUserId])
   @@index([studioId])
+  @@index([isPublished, rating(sort: Desc), reviews(sort: Desc)])
+  @@index([isPublished, ratingAvg(sort: Desc), reviews(sort: Desc), createdAt(sort: Desc)])
+  @@index([studioId, type, isPublished, createdAt])
+  @@index([type, isPublished, address])
 }
 
 model PublicUsernameAlias {
@@ -893,6 +897,8 @@ model Service {
   updatedAt DateTime @updatedAt
 
   @@index([providerId])
+  @@index([providerId, isEnabled, isActive])
+  @@index([globalCategoryId, isEnabled, isActive])
 }
 
 model ServiceBookingQuestion {
@@ -941,6 +947,8 @@ model MasterService {
   @@unique([masterProviderId, serviceId])
   @@index([masterProviderId])
   @@index([serviceId])
+  @@index([masterProviderId, isEnabled])
+  @@index([serviceId, isEnabled])
 }
 
 model DiscountRule {
@@ -967,6 +975,8 @@ model DiscountRule {
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+
+  @@index([isEnabled])
 }
 
 model HotSlot {
@@ -1587,6 +1597,7 @@ model ModelOffer {
   @@index([dateLocal])
   @@index([masterServiceId])
   @@index([serviceId])
+  @@index([status, dateLocal, timeRangeStartLocal, createdAt(sort: Desc), id])
 }
 
 model ModelApplication {
@@ -1820,6 +1831,7 @@ model GlobalCategory {
   @@index([visibleToAll])
   @@index([createdByUserId])
   @@index([createdByProviderId])
+  @@index([status, visibleToAll, isSystem, name])
 }
 
 model Tag {
