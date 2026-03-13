@@ -44,24 +44,24 @@ function normalizeFixedSlotTimes(values: string[]): string[] {
 function mapSlotsError(code?: string): string {
   switch (code) {
     case "SERVICE_REQUIRED":
-      return "РќРµ СѓРєР°Р·Р°РЅР° СѓСЃР»СѓРіР°.";
+      return "Не указана услуга.";
     case "DURATION_INVALID":
-      return "РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ СѓСЃР»СѓРіРё.";
+      return "Некорректная длительность услуги.";
     case "DATE_INVALID":
-      return "РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°.";
+      return "Некорректная дата.";
     case "RANGE_INVALID":
-      return "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РґРёР°РїР°Р·РѕРЅ.";
+      return "Некорректный диапазон.";
     case "PROVIDER_NOT_FOUND":
     case "MASTER_NOT_FOUND":
-      return "РњР°СЃС‚РµСЂ РЅРµ РЅР°Р№РґРµРЅ.";
+      return "Мастер не найден.";
     case "SERVICE_NOT_FOUND":
-      return "РЈСЃР»СѓРіР° РЅРµ РЅР°Р№РґРµРЅР°.";
+      return "Услуга не найдена.";
     case "SERVICE_INVALID":
-      return "РЈСЃР»СѓРіР° РЅРµРґРѕСЃС‚СѓРїРЅР° РґР»СЏ РјР°СЃС‚РµСЂР°.";
+      return "Услуга недоступна для мастера.";
     case "SERVICE_DISABLED":
-      return "РЈСЃР»СѓРіР° РЅРµРґРѕСЃС‚СѓРїРЅР°.";
+      return "Услуга недоступна.";
     default:
-      return "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃР»РѕС‚С‹.";
+      return "Не удалось загрузить слоты.";
   }
 }
 
@@ -87,13 +87,13 @@ export async function GET(
   const toKey = url.searchParams.get("to") ?? "";
   const limitRaw = url.searchParams.get("limit");
 
-  if (!serviceId) return fail("РќРµ СѓРєР°Р·Р°РЅР° СѓСЃР»СѓРіР°.", 400, "SERVICE_REQUIRED");
-  if (!isDateKey(fromKey)) return fail("РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°.", 400, "DATE_INVALID");
-  if (toKey && !isDateKey(toKey)) return fail("РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РґР°С‚Р°.", 400, "DATE_INVALID");
+  if (!serviceId) return fail("Не указана услуга.", 400, "SERVICE_REQUIRED");
+  if (!isDateKey(fromKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
+  if (toKey && !isDateKey(toKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
 
   const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
   if (limitRaw && !Number.isFinite(limit)) {
-    return fail("РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р»РёРјРёС‚.", 400, "LIMIT_INVALID");
+    return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
   }
 
   const provider = await resolveProviderBySlugOrId({
@@ -101,7 +101,7 @@ export async function GET(
     select: { id: true, type: true, timezone: true, scheduleMode: true, fixedSlotTimes: true },
   });
   if (!provider || provider.type !== "MASTER") {
-    return fail("РњР°СЃС‚РµСЂ РЅРµ РЅР°Р№РґРµРЅ.", 404, "MASTER_NOT_FOUND");
+    return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const duration = await resolveServiceDuration(provider.id, serviceId);
@@ -113,7 +113,7 @@ export async function GET(
     where: { id: serviceId },
     select: { id: true, price: true },
   });
-  if (!service) return fail("РЈСЃР»СѓРіР° РЅРµ РЅР°Р№РґРµРЅР°.", 404, "SERVICE_NOT_FOUND");
+  if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
 
   const result = await listAvailabilitySlotsPaginated(provider.id, serviceId, duration.data, {
     fromKey,

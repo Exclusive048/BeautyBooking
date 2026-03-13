@@ -170,8 +170,8 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
       await createBillingNotification({
         userId: billingPayment.subscription.userId,
         type: NotificationType.BILLING_PAYMENT_SUCCEEDED,
-        title: "РћРїР»Р°С‚Р° РїСЂРѕС€Р»Р°",
-        body: "РћРїР»Р°С‚Р° РїРѕРґРїРёСЃРєРё СѓСЃРїРµС€РЅРѕ Р·Р°РІРµСЂС€РµРЅР°.",
+        title: "Оплата прошла",
+        body: "Оплата подписки успешно завершена.",
         payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
       });
     }
@@ -208,8 +208,8 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
     await createBillingNotification({
       userId: billingPayment.subscription.userId,
       type: NotificationType.BILLING_PAYMENT_FAILED,
-      title: "РџР»Р°С‚С‘Р¶ РЅРµ РїСЂРѕС€С‘Р»",
-      body: "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РІРµСЂС€РёС‚СЊ РѕРїР»Р°С‚Сѓ РїРѕРґРїРёСЃРєРё.",
+      title: "Платёж не прошёл",
+      body: "Не удалось завершить оплату подписки.",
       payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
     });
   }

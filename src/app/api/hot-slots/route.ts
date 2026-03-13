@@ -68,10 +68,10 @@ export async function GET(req: Request) {
     const to = query.to ? new Date(query.to) : new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-      return jsonFail(400, "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РґРёР°РїР°Р·РѕРЅ РґР°С‚.", "DATE_INVALID");
+      return jsonFail(400, "Некорректный диапазон дат.", "DATE_INVALID");
     }
     if (from > to) {
-      return jsonFail(400, "Р”Р°С‚Р° РЅР°С‡Р°Р»Р° РїРѕР·Р¶Рµ РґР°С‚С‹ РѕРєРѕРЅС‡Р°РЅРёСЏ.", "RANGE_INVALID");
+      return jsonFail(400, "Дата начала позже даты окончания.", "RANGE_INVALID");
     }
 
     const rules = await prisma.discountRule.findMany({
@@ -213,7 +213,7 @@ export async function GET(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    const message = appError.code === "VALIDATION_ERROR" ? "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё." : appError.message;
+    const message = appError.code === "VALIDATION_ERROR" ? "Ошибка валидации." : appError.message;
     return jsonFail(appError.status, message, appError.code, appError.details);
   }
 }
