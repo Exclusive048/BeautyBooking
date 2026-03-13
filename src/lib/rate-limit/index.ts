@@ -17,6 +17,8 @@ type MemoryBucket = {
 };
 
 const memoryBuckets = new Map<string, MemoryBucket>();
+const isProduction = process.env.NODE_ENV === "production";
+const MEMORY_FALLBACK_MAX_BUCKETS = 20_000;
 const SENSITIVE_ROUTE_PREFIXES = [
   "/api/auth",
   "/api/bookings",
@@ -60,26 +62,78 @@ function isSensitiveRouteKey(key: string): boolean {
 }
 
 function checkMemoryLimit(key: string, limit: number, windowSeconds: number): boolean {
+  const result = checkMemoryLimitDetailed(key, limit, windowSeconds);
+  return result.allowed;
+}
+
+function pruneMemoryBuckets(now: number): void {
+  if (memoryBuckets.size < MEMORY_FALLBACK_MAX_BUCKETS) return;
+
+  for (const [bucketKey, bucket] of memoryBuckets) {
+    if (bucket.resetAt <= now) {
+      memoryBuckets.delete(bucketKey);
+    }
+  }
+
+  if (memoryBuckets.size < MEMORY_FALLBACK_MAX_BUCKETS) return;
+
+  const overflow = memoryBuckets.size - MEMORY_FALLBACK_MAX_BUCKETS + 1;
+  let removed = 0;
+  for (const bucketKey of memoryBuckets.keys()) {
+    memoryBuckets.delete(bucketKey);
+    removed += 1;
+    if (removed >= overflow) break;
+  }
+}
+
+function checkMemoryLimitDetailed(
+  key: string,
+  limit: number,
+  windowSeconds: number
+): { allowed: boolean; retryAfterSeconds: number } {
   const now = nowMs();
   const windowMs = windowSeconds * 1000;
+  pruneMemoryBuckets(now);
+
   const existing = memoryBuckets.get(key);
   if (!existing || existing.resetAt <= now) {
     memoryBuckets.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
+    return { allowed: true, retryAfterSeconds: windowSeconds };
   }
-  if (existing.count >= limit) return false;
+  if (existing.count >= limit) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((existing.resetAt - now) / 1000)
+    );
+    return { allowed: false, retryAfterSeconds };
+  }
   existing.count += 1;
-  return true;
+  return { allowed: true, retryAfterSeconds: windowSeconds };
 }
 
-function maybeAlertRedisRateLimitFailOpen(): void {
+function maybeAlertRedisRateLimitDegraded(): void {
   const count = trackError("redis:rate-limit");
   if (count === 3) {
     sendTelegramAlert(
-      "\u26A0\uFE0F Redis \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 rate limit \u043E\u0442\u043A\u043B\u044E\u0447\u0451\u043D (3 \u043E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430 \u043C\u0438\u043D\u0443\u0442\u0443)",
+      "\u26A0\uFE0F Redis \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 rate limit \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0432 degraded-\u0440\u0435\u0436\u0438\u043C\u0435 (3 \u043E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430 \u043C\u0438\u043D\u0443\u0442\u0443)",
       "redis:rate-limit:unavailable"
     );
   }
+}
+
+function buildMemoryFallbackResult(
+  key: string,
+  config: RateLimitConfig
+): RateLimitResult {
+  const fallback = checkMemoryLimitDetailed(
+    key,
+    config.maxRequests,
+    config.windowSeconds
+  );
+  if (fallback.allowed) {
+    return { limited: false };
+  }
+  return { limited: true, retryAfterSeconds: fallback.retryAfterSeconds };
 }
 
 async function checkRateLimitConfig(
@@ -92,8 +146,21 @@ async function checkRateLimitConfig(
       if (isSensitiveRouteKey(key)) {
         return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
       }
-      logError("Rate limit Redis unavailable, fail-open", { key, mode: "config", __skipAlert: true });
-      maybeAlertRedisRateLimitFailOpen();
+      if (isProduction) {
+        logError("Rate limit Redis unavailable, using bounded memory fallback", {
+          key,
+          mode: "config",
+          __skipAlert: true,
+        });
+        maybeAlertRedisRateLimitDegraded();
+        return buildMemoryFallbackResult(key, config);
+      }
+      logError("Rate limit Redis unavailable, fail-open", {
+        key,
+        mode: "config",
+        __skipAlert: true,
+      });
+      maybeAlertRedisRateLimitDegraded();
       return { limited: false };
     }
 
@@ -115,7 +182,10 @@ async function checkRateLimitConfig(
     if (isSensitiveRouteKey(key)) {
       return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
     }
-    maybeAlertRedisRateLimitFailOpen();
+    maybeAlertRedisRateLimitDegraded();
+    if (isProduction) {
+      return buildMemoryFallbackResult(key, config);
+    }
     return { limited: false };
   }
 }
@@ -131,8 +201,12 @@ async function checkRateLimitLegacy(
       if (isSensitiveRouteKey(key)) {
         return false;
       }
-      logError("Rate limit Redis unavailable, fail-open", { key, mode: "legacy", __skipAlert: true });
-      maybeAlertRedisRateLimitFailOpen();
+      logError("Rate limit Redis unavailable, using memory fallback", {
+        key,
+        mode: "legacy",
+        __skipAlert: true,
+      });
+      maybeAlertRedisRateLimitDegraded();
       return checkMemoryLimit(key, limit, windowSeconds);
     }
 
@@ -149,7 +223,10 @@ async function checkRateLimitLegacy(
     if (isSensitiveRouteKey(key)) {
       return false;
     }
-    maybeAlertRedisRateLimitFailOpen();
+    maybeAlertRedisRateLimitDegraded();
+    if (isProduction) {
+      return checkMemoryLimit(key, limit, windowSeconds);
+    }
     return true;
   }
 }
