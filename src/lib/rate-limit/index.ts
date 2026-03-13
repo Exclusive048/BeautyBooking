@@ -114,7 +114,7 @@ function checkMemoryLimitDetailed(
 function maybeAlertRedisRateLimitDegraded(): void {
   const count = trackError("redis:rate-limit");
   if (count === 3) {
-    sendTelegramAlert(
+    void sendTelegramAlert(
       "\u26A0\uFE0F Redis \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 rate limit \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0432 degraded-\u0440\u0435\u0436\u0438\u043C\u0435 (3 \u043E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430 \u043C\u0438\u043D\u0443\u0442\u0443)",
       "redis:rate-limit:unavailable"
     );

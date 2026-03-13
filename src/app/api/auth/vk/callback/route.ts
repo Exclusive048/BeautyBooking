@@ -165,7 +165,7 @@ export async function GET(req: Request) {
             userProfileId: sessionUser.id,
             error: error instanceof Error ? error.stack : error,
           });
-          sendTelegramAlert(
+          void sendTelegramAlert(
             `User ${sessionUser.id} logged in without free subscription`,
             `auth:free-subscription:vk-link:${sessionUser.id}`
           );
@@ -242,7 +242,7 @@ export async function GET(req: Request) {
           userProfileId: user.id,
           error: error instanceof Error ? error.stack : error,
         });
-        sendTelegramAlert(
+        void sendTelegramAlert(
           `User ${user.id} logged in without free subscription`,
           `auth:free-subscription:vk-auth:${user.id}`
         );

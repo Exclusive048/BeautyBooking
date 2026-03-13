@@ -58,7 +58,7 @@ function logOpenAiFailure(scope: string, error: unknown): void {
   if (status === 429) {
     const count = trackError("openai:rate-limit");
     if (count === 5) {
-      sendTelegramAlert(
+      void sendTelegramAlert(
         "\u26A0\uFE0F OpenAI rate limit \u2014 visual search \u0437\u0430\u043C\u0435\u0434\u043B\u0435\u043D",
         "openai:rate-limit"
       );
@@ -67,7 +67,7 @@ function logOpenAiFailure(scope: string, error: unknown): void {
     return;
   }
   if (status === 402) {
-    sendTelegramAlert(
+    void sendTelegramAlert(
       "\uD83D\uDEA8 OpenAI \u0431\u0430\u043B\u0430\u043D\u0441 \u0438\u0441\u0447\u0435\u0440\u043F\u0430\u043D \u2014 visual search \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442",
       "openai:balance-exhausted"
     );

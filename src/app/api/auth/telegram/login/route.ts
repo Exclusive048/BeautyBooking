@@ -34,7 +34,7 @@ export async function POST(req: Request) {
         userProfileId: result.user.id,
         error: error instanceof Error ? error.stack : error,
       });
-      sendTelegramAlert(
+      void sendTelegramAlert(
         `User ${result.user.id} logged in without free subscription`,
         `auth:free-subscription:telegram:${result.user.id}`
       );

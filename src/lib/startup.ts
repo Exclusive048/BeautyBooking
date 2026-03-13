@@ -17,7 +17,7 @@ async function runStartupChecks(): Promise<void> {
     logError("CRITICAL: Failed to ensure billing plans on startup", {
       error: error instanceof Error ? error.stack : error,
     });
-    sendTelegramAlert(
+    void sendTelegramAlert(
       "🚨 Старт сервера: не удалось создать billing plans. Регистрация может работать некорректно.",
       "startup:billing-plans"
     );
