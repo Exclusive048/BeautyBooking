@@ -1,7 +1,7 @@
 import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifySessionToken } from "@/lib/auth/jwt";
 import { AppError } from "@/lib/api/errors";
+import { hasAnyRole, requireAuthFromRequest } from "@/lib/auth/guards";
 
 export type SessionUser = {
   userId: string;
@@ -25,20 +25,6 @@ function pickRole(roles: AccountType[]): AccountType {
     if (roles.includes(role)) return role;
   }
   return AccountType.CLIENT;
-}
-
-function parseCookies(header: string | null): Record<string, string> {
-  if (!header) return {};
-  const entries = header
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const idx = part.indexOf("=");
-      if (idx < 0) return [part, ""] as const;
-      return [part.slice(0, idx).trim(), part.slice(idx + 1).trim()] as const;
-    });
-  return Object.fromEntries(entries);
 }
 
 async function resolveStudioIdForUser(userId: string): Promise<string | null> {
@@ -85,26 +71,11 @@ async function resolveProviderIds(
 }
 
 export async function getSessionUser(req: Request): Promise<SessionUser> {
-  const header = req.headers.get("cookie");
-  const cookies = parseCookies(header);
-  const name = process.env.AUTH_COOKIE_NAME ?? "bh_session";
-  const token = cookies[name];
-  if (!token) {
+  const auth = await requireAuthFromRequest(req);
+  if (!auth.ok) {
     throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
   }
-
-  const payload = verifySessionToken(token);
-  if (!payload) {
-    throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
-  }
-
-  const user = await prisma.userProfile.findUnique({
-    where: { id: payload.sub },
-    select: { id: true, roles: true },
-  });
-  if (!user) {
-    throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
-  }
+  const user = auth.user;
 
   const role = pickRole(user.roles);
   const { providerId, studioId } = await resolveProviderIds(user.id, role);
@@ -119,7 +90,7 @@ export async function getSessionUser(req: Request): Promise<SessionUser> {
 }
 
 export function requireRole(user: SessionUser, roles: AccountType[]): AppError | null {
-  if (!roles.some((role) => user.roles.includes(role))) {
+  if (!hasAnyRole(user, roles)) {
     return new AppError("Forbidden", 403, "FORBIDDEN");
   }
   return null;

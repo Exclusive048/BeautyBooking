@@ -15,7 +15,7 @@ const REFRESH_COOKIE_MAX_AGE_SECONDS = REFRESH_TOKEN_TTL_SECONDS;
 const REFRESH_COOKIE_NAME = "bh_refresh";
 const REFRESH_COOKIE_PATH = "/api/auth/refresh";
 
-function getAccessCookieName(): string {
+export function getAccessCookieName(): string {
   return process.env.AUTH_COOKIE_NAME ?? "bh_session";
 }
 
@@ -40,11 +40,48 @@ export type RefreshSessionRevokeResult =
   | "REVOKED"
   | "ALREADY_INACTIVE";
 
+function parseCookieHeader(header: string | null): Record<string, string> {
+  if (!header) return {};
+  const entries = header
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.indexOf("=");
+      if (idx < 0) return [part, ""] as const;
+      return [part.slice(0, idx).trim(), part.slice(idx + 1).trim()] as const;
+    });
+  return Object.fromEntries(entries);
+}
+
+function parseAccessTokenPayload(token: string | null | undefined): SessionPayload | null {
+  if (!token) return null;
+  return verifyToken(token, "access");
+}
+
+async function loadActiveSessionUser(userId: string) {
+  return prisma.userProfile.findFirst({
+    where: { id: userId, isDeleted: false },
+  });
+}
+
 async function getAccessSessionPayload(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(getAccessCookieName())?.value;
-  if (!token) return null;
-  return verifyToken(token, "access");
+  return parseAccessTokenPayload(token);
+}
+
+export function getAccessTokenFromRequest(req: Request): string | null {
+  const header = req.headers.get("cookie");
+  const allCookies = parseCookieHeader(header);
+  const token = allCookies[getAccessCookieName()];
+  return token || null;
+}
+
+export async function getSessionUserFromRequest(req: Request) {
+  const payload = parseAccessTokenPayload(getAccessTokenFromRequest(req));
+  if (!payload?.sub) return null;
+  return loadActiveSessionUser(payload.sub);
 }
 
 function buildRefreshExpiresAt(): Date {
@@ -260,11 +297,6 @@ export async function getSessionUserId(): Promise<string | null> {
 
 export async function getSessionUser() {
   const payload = await getAccessSessionPayload();
-  if (!payload) return null;
-
-  const user = await prisma.userProfile.findFirst({
-    where: { id: payload.sub, isDeleted: false },
-  });
-
-  return user;
+  if (!payload?.sub) return null;
+  return loadActiveSessionUser(payload.sub);
 }
