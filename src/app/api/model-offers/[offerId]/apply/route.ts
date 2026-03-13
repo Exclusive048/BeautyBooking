@@ -42,9 +42,9 @@ export async function POST(req: Request, ctx: RouteContext) {
         },
       },
     });
-    if (!offer) return jsonFail(404, "Offer not found", "NOT_FOUND");
+    if (!offer) return jsonFail(404, "Предложение не найдено", "NOT_FOUND");
     if (offer.status !== "ACTIVE") {
-      return jsonFail(409, "Offer is not active", "CONFLICT");
+      return jsonFail(409, "Предложение не активно", "CONFLICT");
     }
 
     const existing = await prisma.modelApplication.findUnique({
@@ -57,7 +57,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       select: { id: true },
     });
     if (existing) {
-      return jsonFail(409, "Application already exists", "ALREADY_EXISTS");
+      return jsonFail(409, "Вы уже откликались на это предложение", "ALREADY_EXISTS");
     }
 
     const mediaAssets = await prisma.mediaAsset.findMany({

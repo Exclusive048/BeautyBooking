@@ -62,23 +62,42 @@ export async function GET(req: Request, ctx: RouteContext) {
       );
     }
 
+    // MODEL_APPLICATION_PHOTO — proxy bytes from S3, never expose S3 URL to client
     if (
       asset.kind === MediaKind.MODEL_APPLICATION_PHOTO ||
       asset.entityType === MediaEntityType.MODEL_APPLICATION
     ) {
       const storage = getStorageProvider();
       const publicUrl = storage.getPublicUrl?.(asset.storageKey);
-      if (publicUrl) {
-        return new NextResponse(null, {
-          status: 302,
-          headers: {
-            Location: publicUrl,
-            "Cache-Control": "public, max-age=3600",
-          },
-        });
+      if (!publicUrl) {
+        return NextResponse.json(
+          { ok: false, error: { message: "Storage error", code: "STORAGE_ERROR" } },
+          { status: 500 }
+        );
       }
+
+      const s3Res = await fetch(publicUrl);
+      if (!s3Res.ok) {
+        return NextResponse.json(
+          { ok: false, error: { message: "Media not found", code: "MEDIA_ASSET_NOT_FOUND" } },
+          { status: 404 }
+        );
+      }
+
+      const contentType = s3Res.headers.get("content-type") ?? "image/webp";
+      const contentLength = s3Res.headers.get("content-length");
+
+      return new NextResponse(s3Res.body, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          ...(contentLength ? { "Content-Length": contentLength } : {}),
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
     }
 
+    // PORTFOLIO, AVATAR — public, redirect to S3
     if (PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType)) {
       const storage = getStorageProvider();
       const publicUrl = storage.getPublicUrl?.(asset.storageKey);
@@ -94,6 +113,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       }
     }
 
+    // Private files — auth required
     const user = await getSessionUser();
     const file = await getMediaFile(user, assetId);
     return new NextResponse(file.stream, {
