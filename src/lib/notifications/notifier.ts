@@ -7,6 +7,18 @@ import type { NotificationEvent } from "@/lib/notifications/types";
 
 const allowMemoryNotifierFallback = process.env.NODE_ENV !== "production";
 
+export type NotifierRuntimeStatus = {
+  mode: "redis" | "memory" | "unavailable";
+  ready: boolean;
+  reason: string | null;
+};
+
+let notifierRuntimeStatus: NotifierRuntimeStatus = {
+  mode: "unavailable",
+  ready: false,
+  reason: "not-initialized",
+};
+
 export type NotificationSubscriber = (event: NotificationEvent) => void;
 
 export type NotificationNotifier = {
@@ -89,11 +101,30 @@ async function createNotifier(): Promise<NotificationNotifier> {
   const subscriberClient = await getRedisSubscriberConnection();
   if (!publisherClient || !subscriberClient) {
     if (!allowMemoryNotifierFallback) {
+      notifierRuntimeStatus = {
+        mode: "unavailable",
+        ready: false,
+        reason: "redis-required",
+      };
       throw new Error("Redis is required for notifications notifier in production");
     }
+    notifierRuntimeStatus = {
+      mode: "memory",
+      ready: true,
+      reason: "redis-unavailable-fallback",
+    };
     return new MemoryNotificationNotifier();
   }
+  notifierRuntimeStatus = {
+    mode: "redis",
+    ready: true,
+    reason: null,
+  };
   return new RedisNotificationNotifier(publisherClient, subscriberClient);
 }
 
 export const notificationsNotifier = createNotifier();
+
+export function getNotificationsNotifierRuntimeStatus(): NotifierRuntimeStatus {
+  return notifierRuntimeStatus;
+}

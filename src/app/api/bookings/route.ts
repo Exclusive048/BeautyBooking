@@ -13,6 +13,7 @@ import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { listProviderBookingsForOwner } from "@/lib/bookings/list";
 import { loadBookingWithRelations, notifyBookingConfirmed, notifyBookingCreated } from "@/lib/notifications/booking-notifications";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 export async function GET(req: Request) {
   try {
@@ -115,6 +116,11 @@ export async function POST(req: Request) {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+      void recordSurfaceEvent({
+        surface: "bookings",
+        outcome: "success",
+        operation: "create-booking",
+      });
       return jsonOk({ booking: created }, { status: 201 });
     }
 
@@ -146,6 +152,11 @@ export async function POST(req: Request) {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+    void recordSurfaceEvent({
+      surface: "bookings",
+      outcome: "success",
+      operation: "create-booking",
+    });
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);
@@ -158,6 +169,12 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
+    void recordSurfaceEvent({
+      surface: "bookings",
+      outcome: appError.status === 401 || appError.status === 403 ? "denied" : "failure",
+      operation: "create-booking",
+      code: appError.code,
+    });
     return jsonFail(appError.status, appError.message, appError.code);
   }
 }

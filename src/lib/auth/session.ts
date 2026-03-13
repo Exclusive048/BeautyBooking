@@ -9,6 +9,7 @@ import {
   verifyToken,
   type SessionPayload,
 } from "./jwt";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 const ACCESS_COOKIE_MAX_AGE_SECONDS = 2 * 60 * 60;
 const REFRESH_COOKIE_MAX_AGE_SECONDS = REFRESH_TOKEN_TTL_SECONDS;
@@ -136,6 +137,11 @@ export async function setSessionCookies(response: NextResponse, payload: Session
 
   setAccessCookie(response, accessToken);
   setRefreshCookie(response, refreshToken);
+  void recordSurfaceEvent({
+    surface: "auth",
+    outcome: "success",
+    operation: "session-issue",
+  });
 }
 
 export function setAccessSessionCookie(response: NextResponse, payload: SessionCookiePayload): void {
@@ -210,6 +216,11 @@ export async function rotateSessionCookies(
 
   setAccessCookie(response, accessToken);
   setRefreshCookie(response, nextRefreshToken);
+  void recordSurfaceEvent({
+    surface: "auth",
+    outcome: "success",
+    operation: "refresh-rotate",
+  });
   return payload;
 }
 

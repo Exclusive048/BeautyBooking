@@ -2,6 +2,7 @@ import { jsonFail } from "@/lib/api/contracts";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { getSessionUser } from "@/lib/auth/session";
 import { logError } from "@/lib/logging/logger";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { notificationsNotifier } from "@/lib/notifications/notifier";
 import type { NotificationEvent } from "@/lib/notifications/types";
 import { prisma } from "@/lib/prisma";
@@ -71,7 +72,15 @@ async function loadMissedEvents(userId: string, lastEventId: string): Promise<No
 export async function GET(req: Request) {
   return withRequestContext(req, async () => {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) {
+      void recordSurfaceEvent({
+        surface: "notifications",
+        outcome: "denied",
+        operation: "stream-connect",
+        code: "UNAUTHORIZED",
+      });
+      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    }
 
     const lastEventId = req.headers.get("last-event-id")?.trim() ?? "";
     const stream = new TransformStream();
@@ -103,6 +112,12 @@ export async function GET(req: Request) {
     try {
       notifier = await notificationsNotifier;
     } catch {
+      void recordSurfaceEvent({
+        surface: "notifications",
+        outcome: "failure",
+        operation: "stream-connect",
+        code: "NOTIFIER_UNAVAILABLE",
+      });
       return jsonFail(503, "Service unavailable", "INTERNAL_ERROR");
     }
     const unsubscribe = notifier.subscribe(user.id, (event) => {
@@ -123,6 +138,11 @@ export async function GET(req: Request) {
     };
 
     req.signal.addEventListener("abort", close);
+    void recordSurfaceEvent({
+      surface: "notifications",
+      outcome: "success",
+      operation: "stream-connect",
+    });
 
     return new Response(stream.readable, {
       headers: {

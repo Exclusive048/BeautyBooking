@@ -15,6 +15,7 @@ import { linkGuestBookingsToUserByPhone } from "@/lib/bookings/link-guest-bookin
 import { invalidateMeIdentityCache } from "@/lib/users/me";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 const CONSENT_DOCUMENT_VERSION = "1.0";
 
@@ -52,11 +53,23 @@ export async function POST(req: Request) {
     if (!otp) {
       const failResult = await registerOtpVerifyFailure(phone);
       if (!failResult.ok) {
+        void recordSurfaceEvent({
+          surface: "auth",
+          outcome: "failure",
+          operation: "otp-verify",
+          code: failResult.error ?? "OTP_VERIFY_LOCKED",
+        });
         return NextResponse.json(
           { error: failResult.error, retryAfterSec: failResult.retryAfterSec },
           { status: failResult.status, headers: { "Retry-After": String(failResult.retryAfterSec) } }
         );
       }
+      void recordSurfaceEvent({
+        surface: "auth",
+        outcome: "failure",
+        operation: "otp-verify",
+        code: "CODE_NOT_FOUND",
+      });
       return fail("Code not found", 401, "CODE_NOT_FOUND");
     }
 

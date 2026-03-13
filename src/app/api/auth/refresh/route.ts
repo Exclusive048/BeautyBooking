@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { clearSessionCookies, getRefreshCookieName, rotateSessionCookies } from "@/lib/auth/session";
 import { nextRedirect, normalizeInternalPath } from "@/lib/http/origin";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 const REFRESH_COOKIE_NAME = getRefreshCookieName();
 
@@ -21,12 +22,24 @@ export async function POST(req: Request) {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get(REFRESH_COOKIE_NAME)?.value;
     if (!refreshToken) {
+      void recordSurfaceEvent({
+        surface: "auth",
+        outcome: "failure",
+        operation: "refresh-post",
+        code: "NO_REFRESH_TOKEN",
+      });
       return fail("No refresh token", 401, "UNAUTHORIZED");
     }
 
     const response = ok({ ok: true });
     const session = await rotateSessionCookies(response, refreshToken);
     if (!session) {
+      void recordSurfaceEvent({
+        surface: "auth",
+        outcome: "failure",
+        operation: "refresh-post",
+        code: "INVALID_REFRESH_TOKEN",
+      });
       const unauthorized = fail("Invalid refresh token", 401, "UNAUTHORIZED");
       clearSessionCookies(unauthorized);
       unauthorized.headers.set("Cache-Control", "no-store");

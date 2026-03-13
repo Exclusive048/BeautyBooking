@@ -6,6 +6,7 @@ import { createYookassaWebhookJob, type YookassaWebhookPayload } from "@/lib/que
 import { enqueue } from "@/lib/queue/queue";
 import { alertCritical } from "@/lib/monitoring";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 export const runtime = "nodejs";
 
@@ -53,12 +54,24 @@ export async function POST(req: Request) {
         signaturePresent: Boolean(signature),
         secretPresent: Boolean(secret),
       });
+      void recordSurfaceEvent({
+        surface: "webhook",
+        outcome: "denied",
+        operation: "yookassa-ingress",
+        code: "INVALID_SIGNATURE",
+      });
       return fail("Invalid signature", 401, "UNAUTHORIZED");
     }
 
     const ip = extractClientIp(req);
     if (!ip || !isYookassaIpAllowed(ip)) {
       logError("YooKassa webhook rejected: IP not allowed", { ip });
+      void recordSurfaceEvent({
+        surface: "webhook",
+        outcome: "denied",
+        operation: "yookassa-ingress",
+        code: "IP_NOT_ALLOWED",
+      });
       return fail("Forbidden", 403, "FORBIDDEN");
     }
 
@@ -66,11 +79,23 @@ export async function POST(req: Request) {
     const expectedToken = process.env.YOOKASSA_WEBHOOK_TOKEN?.trim();
     if (expectedToken && token !== expectedToken) {
       logError("YooKassa webhook rejected: invalid token", { ip });
+      void recordSurfaceEvent({
+        surface: "webhook",
+        outcome: "denied",
+        operation: "yookassa-ingress",
+        code: "INVALID_WEBHOOK_TOKEN",
+      });
       return fail("Unauthorized", 401, "UNAUTHORIZED");
     }
 
     const payload = parsePayload(rawBody);
     if (!payload) {
+      void recordSurfaceEvent({
+        surface: "webhook",
+        outcome: "failure",
+        operation: "yookassa-ingress",
+        code: "BAD_PAYLOAD",
+      });
       return fail("Bad request", 400, "BAD_REQUEST");
     }
 
@@ -83,10 +108,21 @@ export async function POST(req: Request) {
       await alertCritical("Failed to enqueue YooKassa webhook job", {
         error: error instanceof Error ? error.message : String(error),
       });
+      void recordSurfaceEvent({
+        surface: "webhook",
+        outcome: "failure",
+        operation: "yookassa-ingress",
+        code: "QUEUE_ENQUEUE_FAILED",
+      });
       return fail("Service unavailable", 503, "SERVICE_UNAVAILABLE");
     }
 
     logInfo("YooKassa webhook accepted and queued");
+    void recordSurfaceEvent({
+      surface: "webhook",
+      outcome: "success",
+      operation: "yookassa-ingress",
+    });
     return ok({ ok: true });
   });
 }

@@ -12,6 +12,7 @@ import { sendTelegramMessage } from "@/lib/telegram/client";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
@@ -364,7 +365,22 @@ async function processYookassaWebhookJob(
     return;
   }
 
-  await processYookassaWebhookPayload(job.payload);
+  try {
+    await processYookassaWebhookPayload(job.payload);
+    void recordSurfaceEvent({
+      surface: "webhook",
+      outcome: "success",
+      operation: "yookassa-worker-processor",
+    });
+  } catch (error) {
+    void recordSurfaceEvent({
+      surface: "webhook",
+      outcome: "failure",
+      operation: "yookassa-worker-processor",
+      code: error instanceof Error ? error.name || "PROCESS_FAILED" : "PROCESS_FAILED",
+    });
+    throw error;
+  }
 }
 
 async function processMediaCleanupJob(

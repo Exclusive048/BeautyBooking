@@ -8,6 +8,7 @@ import {
   PRIVATE_MEDIA_TOKEN_QUERY_PARAM,
   verifyPrivateMediaDeliveryToken,
 } from "@/lib/media/private-delivery";
+import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { getMediaFile } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
@@ -71,6 +72,11 @@ export async function GET(req: Request, ctx: RouteContext) {
       const storage = getStorageProvider();
       const publicUrl = storage.getPublicUrl?.(asset.storageKey);
       if (publicUrl) {
+        void recordSurfaceEvent({
+          surface: "media",
+          outcome: "success",
+          operation: "public-redirect",
+        });
         const location = new URL(publicUrl, req.url).toString();
         return new NextResponse(null, {
           status: 302,
@@ -86,6 +92,12 @@ export async function GET(req: Request, ctx: RouteContext) {
     if (mediaToken) {
       const isValidToken = verifyPrivateMediaDeliveryToken(mediaToken, asset.id);
       if (!isValidToken) {
+        void recordSurfaceEvent({
+          surface: "media",
+          outcome: "denied",
+          operation: "private-token",
+          code: "INVALID_PRIVATE_MEDIA_TOKEN",
+        });
         return NextResponse.json(
           { ok: false, error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
           { status: 401 }
@@ -108,6 +120,11 @@ export async function GET(req: Request, ctx: RouteContext) {
         );
       }
 
+      void recordSurfaceEvent({
+        surface: "media",
+        outcome: "success",
+        operation: "private-token",
+      });
       return new NextResponse(Readable.toWeb(tokenFile.stream) as ReadableStream, {
         status: 200,
         headers: {
@@ -120,6 +137,11 @@ export async function GET(req: Request, ctx: RouteContext) {
 
     const user = await getSessionUser();
     const file = await getMediaFile(user, assetId);
+    void recordSurfaceEvent({
+      surface: "media",
+      outcome: "success",
+      operation: "private-session",
+    });
     return new NextResponse(file.stream, {
       status: 200,
       headers: {
@@ -150,6 +172,22 @@ export async function GET(req: Request, ctx: RouteContext) {
         requestId,
         route: "GET /api/media/file/{id}",
         stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+
+    if (appError.status === 401 || appError.status === 403) {
+      void recordSurfaceEvent({
+        surface: "media",
+        outcome: "denied",
+        operation: "media-read",
+        code: appError.code,
+      });
+    } else if (appError.status >= 500) {
+      void recordSurfaceEvent({
+        surface: "media",
+        outcome: "failure",
+        operation: "media-read",
+        code: appError.code,
       });
     }
 
