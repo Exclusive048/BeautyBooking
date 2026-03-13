@@ -11,6 +11,9 @@ export const RATE_LIMITS = {
   // General mutation (cabinet POST/PATCH/DELETE)
   cabinetMutation: { windowSeconds: 60, maxRequests: 60 },
 
+  // Destructive account/cabinet deletion
+  destructiveDelete: { windowSeconds: 60 * 60, maxRequests: 1 },
+
   // General public API
   publicApi: { windowSeconds: 60, maxRequests: 120 },
 } satisfies Record<string, RateLimitConfig>;

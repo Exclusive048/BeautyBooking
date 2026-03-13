@@ -3,12 +3,10 @@ import { requireAuth } from "@/lib/auth/guards";
 import { fail, ok } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { deleteUserAccount } from "@/lib/deletion/delete-account";
 
 export const runtime = "nodejs";
-
-const RATE_LIMIT = 1;
-const RATE_WINDOW_SECONDS = 60 * 60;
 
 function getFirstIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -26,15 +24,15 @@ export async function DELETE(req: Request) {
   if (!auth.ok) return auth.response;
 
   const ip = getFirstIp(req);
-  const ipKey = `delete-account:ip:${hashKey(ip ?? "unknown")}`;
-  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-  if (!ipAllowed) {
+  const ipKey = `rl:/api/me/delete/ip:${hashKey(ip ?? "unknown")}`;
+  const ipRateLimit = await checkRateLimit(ipKey, RATE_LIMITS.destructiveDelete);
+  if (ipRateLimit.limited) {
     return fail("Слишком часто. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
-  const userKey = `delete-account:user:${hashKey(auth.user.id)}`;
-  const userAllowed = await checkRateLimit(userKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-  if (!userAllowed) {
+  const userKey = `rl:/api/me/delete/user:${hashKey(auth.user.id)}`;
+  const userRateLimit = await checkRateLimit(userKey, RATE_LIMITS.destructiveDelete);
+  if (userRateLimit.limited) {
     return fail("Слишком часто. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
