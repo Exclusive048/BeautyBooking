@@ -74,7 +74,7 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     await Promise.all([
       tx.pushSubscription.deleteMany({ where: { userId } }),
       tx.notification.deleteMany({
-        where: { userId, createdAt: { gte: cutoffDate } },
+        where: { userId, createdAt: { lt: cutoffDate } },
       }),
       tx.telegramLinkToken.deleteMany({ where: { userId } }),
       tx.telegramLink.deleteMany({ where: { userId } }),
