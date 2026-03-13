@@ -40,6 +40,12 @@ const STATUS_KEY_PREFIX = "mon:status:surface:";
 const STATUS_TTL_SECONDS = 7 * 24 * 60 * 60;
 const allowMemoryFallback = process.env.NODE_ENV !== "production";
 const memoryStore = new Map<CriticalObservabilitySurface, SurfaceStatusSnapshot>();
+const PRODUCTION_DEGRADED_MARKER_TTL_MS = 10 * 60 * 1000;
+const PRODUCTION_DEGRADED_MARKER_MIN_INTERVAL_MS = 60_000;
+const productionDegradedStore = new Map<
+  CriticalObservabilitySurface,
+  { snapshot: SurfaceStatusSnapshot; markedAtMs: number; expiresAtMs: number }
+>();
 let lastStoreErrorLogAt = 0;
 
 function nowIso(): string {
@@ -168,6 +174,57 @@ function applyMemoryEvent(input: SurfaceEventInput, eventAt: string): void {
   memoryStore.set(input.surface, applyEvent(current, input, eventAt));
 }
 
+function markProductionDegradedSurface(
+  surface: CriticalObservabilitySurface,
+  code: string,
+  operation: string
+): void {
+  const now = Date.now();
+  const existing = productionDegradedStore.get(surface);
+  if (existing && now - existing.markedAtMs < PRODUCTION_DEGRADED_MARKER_MIN_INTERVAL_MS) {
+    productionDegradedStore.set(surface, {
+      ...existing,
+      expiresAtMs: now + PRODUCTION_DEGRADED_MARKER_TTL_MS,
+    });
+    return;
+  }
+
+  const eventAt = new Date(now).toISOString();
+  const next = applyEvent(
+    existing?.snapshot ?? createDefaultSnapshot(surface, "none"),
+    {
+      surface,
+      outcome: "degraded",
+      code,
+      operation,
+    },
+    eventAt
+  );
+
+  productionDegradedStore.set(surface, {
+    snapshot: {
+      ...next,
+      store: "none",
+    },
+    markedAtMs: now,
+    expiresAtMs: now + PRODUCTION_DEGRADED_MARKER_TTL_MS,
+  });
+}
+
+function takeProductionDegradedSnapshot(surface: CriticalObservabilitySurface): SurfaceStatusSnapshot | null {
+  const item = productionDegradedStore.get(surface);
+  if (!item) return null;
+  if (item.expiresAtMs <= Date.now()) {
+    productionDegradedStore.delete(surface);
+    return null;
+  }
+  return item.snapshot;
+}
+
+function clearProductionDegradedSnapshot(surface: CriticalObservabilitySurface): void {
+  productionDegradedStore.delete(surface);
+}
+
 async function writeRedisEvent(input: SurfaceEventInput, eventAt: string): Promise<boolean> {
   const redis = await getRedisConnection();
   if (!redis) return false;
@@ -202,12 +259,21 @@ export async function recordSurfaceEvent(input: SurfaceEventInput): Promise<void
   const eventAt = nowIso();
   try {
     const storedInRedis = await writeRedisEvent(input, eventAt);
-    if (storedInRedis) return;
+    if (storedInRedis) {
+      clearProductionDegradedSnapshot(input.surface);
+      return;
+    }
 
     if (allowMemoryFallback) {
       applyMemoryEvent(input, eventAt);
       return;
     }
+
+    markProductionDegradedSurface(
+      input.surface,
+      "REDIS_UNAVAILABLE",
+      "status-store-write"
+    );
 
     maybeLogStoreIssue("Observability surface event dropped: Redis unavailable", {
       surface: input.surface,
@@ -219,6 +285,11 @@ export async function recordSurfaceEvent(input: SurfaceEventInput): Promise<void
       applyMemoryEvent(input, eventAt);
       return;
     }
+    markProductionDegradedSurface(
+      input.surface,
+      "REDIS_WRITE_FAILED",
+      "status-store-write"
+    );
     maybeLogStoreIssue("Observability surface event dropped: storage write failed", {
       surface: input.surface,
       outcome: input.outcome,
@@ -237,9 +308,15 @@ export async function getSurfaceStatus(
         "monitoring:status:read",
         redis.hGetAll(toRedisKey(surface))
       );
+      clearProductionDegradedSnapshot(surface);
       return hydrateFromRedis(surface, hash);
+    } else if (!allowMemoryFallback) {
+      markProductionDegradedSurface(surface, "REDIS_UNAVAILABLE", "status-store-read");
     }
   } catch (error) {
+    if (!allowMemoryFallback) {
+      markProductionDegradedSurface(surface, "REDIS_READ_FAILED", "status-store-read");
+    }
     maybeLogStoreIssue("Observability surface read failed", {
       surface,
       error: error instanceof Error ? error.message : String(error),
@@ -249,6 +326,9 @@ export async function getSurfaceStatus(
   if (allowMemoryFallback) {
     return memoryStore.get(surface) ?? createDefaultSnapshot(surface, "memory");
   }
+
+  const degradedSnapshot = takeProductionDegradedSnapshot(surface);
+  if (degradedSnapshot) return degradedSnapshot;
 
   return createDefaultSnapshot(surface, "none");
 }

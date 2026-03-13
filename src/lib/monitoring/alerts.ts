@@ -7,9 +7,11 @@ const ERROR_WINDOW_MS = 60_000;
 const ALERT_COOLDOWN_MS = 5 * 60_000;
 const ALERT_COOLDOWN_KEY_PREFIX = "mon:alert:cooldown:";
 const isProduction = process.env.NODE_ENV === "production";
+const COOLDOWN_DEGRADED_LOG_INTERVAL_MS = 60_000;
 
 const errorCounts = new Map<string, number[]>();
 const lastAlertAt = new Map<string, number>();
+let lastCooldownDegradedLogAt = 0;
 
 export function trackError(key: string): number {
   const now = Date.now();
@@ -53,6 +55,13 @@ function acquireMemoryCooldown(alertKey: string): boolean {
   return true;
 }
 
+function maybeLogCooldownDegraded(message: string, details: Record<string, unknown>): void {
+  const now = Date.now();
+  if (now - lastCooldownDegradedLogAt < COOLDOWN_DEGRADED_LOG_INTERVAL_MS) return;
+  lastCooldownDegradedLogAt = now;
+  logError(message, { ...details, __skipAlert: true });
+}
+
 export async function sendTelegramAlert(message: string, alertKey?: string): Promise<boolean> {
   const normalizedAlertKey = alertKey?.trim() || message;
   try {
@@ -63,22 +72,29 @@ export async function sendTelegramAlert(message: string, alertKey?: string): Pro
 
     if (sharedCooldown === "degraded") {
       if (isProduction) {
-        logError("Alert cooldown shared store unavailable; sending alert without cooldown", {
+        maybeLogCooldownDegraded("Alert cooldown shared store unavailable; using local protective cooldown", {
           alertKey: normalizedAlertKey,
-          __skipAlert: true,
         });
-      } else if (!acquireMemoryCooldown(normalizedAlertKey)) {
+      }
+      if (!acquireMemoryCooldown(normalizedAlertKey)) {
         return false;
       }
     }
   } catch (error) {
-    logError("Alert cooldown check failed; fallback policy applied", {
-      alertKey: normalizedAlertKey,
-      error: error instanceof Error ? error.message : String(error),
-      __skipAlert: true,
-    });
+    if (isProduction) {
+      maybeLogCooldownDegraded("Alert cooldown check failed; using local protective cooldown", {
+        alertKey: normalizedAlertKey,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } else {
+      logError("Alert cooldown check failed; fallback policy applied", {
+        alertKey: normalizedAlertKey,
+        error: error instanceof Error ? error.message : String(error),
+        __skipAlert: true,
+      });
+    }
 
-    if (!isProduction && !acquireMemoryCooldown(normalizedAlertKey)) {
+    if (!acquireMemoryCooldown(normalizedAlertKey)) {
       return false;
     }
   }
