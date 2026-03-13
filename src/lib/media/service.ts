@@ -254,7 +254,7 @@ export async function listMediaAssets(
   input: { entityType: MediaEntityType; entityId: string; kind?: MediaKind }
 ): Promise<MediaAssetDto[]> {
   const entityId = normalizeEntityId(input.entityId);
-  await ensureCanReadMedia(user, input.entityType, entityId);
+  await ensureCanReadMedia(user, input.entityType, entityId, input.kind);
 
   const assets = await prisma.mediaAsset.findMany({
     where: {
@@ -597,7 +597,7 @@ export async function getMediaFile(
     throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
   }
 
-  await ensureCanReadMedia(user, asset.entityType, asset.entityId);
+  await ensureCanReadMedia(user, asset.entityType, asset.entityId, asset.kind);
 
   const storage = getStorageProvider();
   const file = await storage.getObject(asset.storageKey, asset.mimeType);

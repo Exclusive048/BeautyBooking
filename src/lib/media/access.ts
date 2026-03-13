@@ -159,51 +159,100 @@ export async function ensureCanManageMedia(
 export async function ensureCanReadMedia(
   user: UserProfile | null,
   entityType: MediaEntityType,
-  entityId: string
+  entityId: string,
+  kind?: MediaKind
 ): Promise<void> {
-  if (entityType === MediaEntityType.USER) {
-    if (!user || (user.id !== entityId && !isSiteAdmin(user))) {
+  const kindAllowedForEntity = (() => {
+    if (!kind) return true;
+    switch (entityType) {
+      case MediaEntityType.USER:
+        return kind === MediaKind.AVATAR || kind === MediaKind.MODEL_APPLICATION_PHOTO;
+      case MediaEntityType.MASTER:
+      case MediaEntityType.STUDIO:
+      case MediaEntityType.SITE:
+        return kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO;
+      case MediaEntityType.MODEL_APPLICATION:
+        return kind === MediaKind.MODEL_APPLICATION_PHOTO;
+      case MediaEntityType.CLIENT_CARD:
+        return kind === MediaKind.CLIENT_CARD_PHOTO;
+      case MediaEntityType.BOOKING:
+        return kind === MediaKind.BOOKING_REFERENCE;
+      default:
+        return false;
+    }
+  })();
+
+  if (!kindAllowedForEntity) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+
+  switch (entityType) {
+    case MediaEntityType.USER: {
+      if (!user || (user.id !== entityId && !isSiteAdmin(user))) {
+        throw new AppError("Forbidden", 403, "FORBIDDEN");
+      }
+      return;
+    }
+    case MediaEntityType.SITE: {
+      if (entityId !== "site") {
+        throw new AppError("Not found", 404, "NOT_FOUND");
+      }
+      if (kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO) {
+        return;
+      }
+      if (!user || !isSiteAdmin(user)) {
+        throw new AppError("Forbidden", 403, "FORBIDDEN");
+      }
+      return;
+    }
+    case MediaEntityType.MASTER:
+    case MediaEntityType.STUDIO: {
+      if (kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO) {
+        return;
+      }
+      if (!user) {
+        throw new AppError("Forbidden", 403, "FORBIDDEN");
+      }
+      const canManage = await canManageProvider(entityId, user.id);
+      if (!canManage) {
+        throw new AppError("Forbidden", 403, "FORBIDDEN");
+      }
+      return;
+    }
+    case MediaEntityType.MODEL_APPLICATION: {
+      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      const application = await prisma.modelApplication.findUnique({
+        where: { id: entityId },
+        select: { id: true, clientUserId: true, offer: { select: { masterId: true } } },
+      });
+      if (!application) {
+        throw new AppError("Not found", 404, "NOT_FOUND");
+      }
+      if (application.clientUserId === user.id) return;
+      await resolveMasterAccess(application.offer.masterId, user.id);
+      return;
+    }
+    case MediaEntityType.CLIENT_CARD: {
+      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      const card = await prisma.clientCard.findUnique({
+        where: { id: entityId },
+        select: { id: true, providerId: true },
+      });
+      if (!card) {
+        throw new AppError("Client card not found", 404, "CLIENT_CARD_NOT_FOUND");
+      }
+      const canManage = await canManageProvider(card.providerId, user.id);
+      if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      return;
+    }
+    case MediaEntityType.BOOKING: {
+      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      const allowed = await canReadBookingMedia(user, entityId);
+      if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      return;
+    }
+    default:
       throw new AppError("Forbidden", 403, "FORBIDDEN");
-    }
-    return;
   }
 
-  if (entityType === MediaEntityType.SITE && entityId !== "site") {
-    throw new AppError("Not found", 404, "NOT_FOUND");
-  }
-
-  if (entityType === MediaEntityType.MODEL_APPLICATION) {
-    if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
-    const application = await prisma.modelApplication.findUnique({
-      where: { id: entityId },
-      select: { id: true, clientUserId: true, offer: { select: { masterId: true } } },
-    });
-    if (!application) {
-      throw new AppError("Not found", 404, "NOT_FOUND");
-    }
-    if (application.clientUserId === user.id) return;
-    await resolveMasterAccess(application.offer.masterId, user.id);
-    return;
-  }
-
-  if (entityType === MediaEntityType.CLIENT_CARD) {
-    if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
-    const card = await prisma.clientCard.findUnique({
-      where: { id: entityId },
-      select: { id: true, providerId: true },
-    });
-    if (!card) {
-      throw new AppError("Client card not found", 404, "CLIENT_CARD_NOT_FOUND");
-    }
-    const canManage = await canManageProvider(card.providerId, user.id);
-    if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
-    return;
-  }
-
-  if (entityType === MediaEntityType.BOOKING) {
-    if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
-    const allowed = await canReadBookingMedia(user, entityId);
-    if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
-    return;
-  }
 }
