@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import type { Job } from "@/lib/queue/types";
 import { isJob, normalizeJobMeta } from "@/lib/queue/types";
@@ -34,6 +34,10 @@ async function getQueueRedisConnection(operation: string): Promise<QueueRedisCli
   if (client) return client;
   if (allowMemoryQueueFallback) return null;
   throw createQueueRedisRequiredError(operation);
+}
+
+function runQueueRedisCommand<T>(operation: string, promise: Promise<T>): Promise<T> {
+  return withRedisCommandTimeout(`queue:${operation}`, promise);
 }
 
 export type QueueStats = {
@@ -116,10 +120,16 @@ async function removeProcessingById(jobId: string): Promise<boolean> {
     return true;
   }
 
-  const items = await client.lRange(PROCESSING_KEY, 0, -1);
+  const items = await runQueueRedisCommand(
+    "removeProcessingById:lRange",
+    client.lRange(PROCESSING_KEY, 0, -1)
+  );
   const matchedRaw = items.find((raw) => parseJob(raw)?.id === jobId);
   if (!matchedRaw) return false;
-  const removed = await client.lRem(PROCESSING_KEY, 1, matchedRaw);
+  const removed = await runQueueRedisCommand(
+    "removeProcessingById:lRem",
+    client.lRem(PROCESSING_KEY, 1, matchedRaw)
+  );
   return removed > 0;
 }
 
@@ -129,11 +139,11 @@ async function removeListItemByIndex(key: string, index: number): Promise<boolea
 
   const marker = `__queue_marker__:${randomUUID()}`;
   try {
-    await client.lSet(key, index, marker);
+    await runQueueRedisCommand("removeListItemByIndex:lSet", client.lSet(key, index, marker));
   } catch {
     return false;
   }
-  const removed = await client.lRem(key, 1, marker);
+  const removed = await runQueueRedisCommand("removeListItemByIndex:lRem", client.lRem(key, 1, marker));
   return removed > 0;
 }
 
@@ -145,7 +155,7 @@ export async function enqueue(job: Job, options?: EnqueueOptions): Promise<void>
       memoryQueue.push(queuedJob);
       return;
     }
-    await client.rPush(QUEUE_KEY, JSON.stringify(queuedJob));
+    await runQueueRedisCommand("enqueue:rPush", client.rPush(QUEUE_KEY, JSON.stringify(queuedJob)));
   } catch (error) {
     logError("Queue enqueue failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -174,12 +184,15 @@ export async function dequeue(): Promise<Job | null> {
       return processingJob;
     }
 
-    const raw = await client.lMove(QUEUE_KEY, PROCESSING_KEY, "LEFT", "RIGHT");
+    const raw = await runQueueRedisCommand(
+      "dequeue:lMove",
+      client.lMove(QUEUE_KEY, PROCESSING_KEY, "LEFT", "RIGHT")
+    );
     if (!raw) return null;
 
     const job = parseJob(raw);
     if (!job) {
-      await client.lRem(PROCESSING_KEY, 1, raw);
+      await runQueueRedisCommand("dequeue:cleanupInvalid", client.lRem(PROCESSING_KEY, 1, raw));
       logError("Queue job parse failed", { raw });
       return null;
     }
@@ -187,12 +200,18 @@ export async function dequeue(): Promise<Job | null> {
     const processingJob = withProcessingTimestamp(job);
     const processingRaw = JSON.stringify(processingJob);
 
-    await client.lRem(PROCESSING_KEY, 1, raw);
-    await client.rPush(PROCESSING_KEY, processingRaw);
+    await runQueueRedisCommand("dequeue:lRemRaw", client.lRem(PROCESSING_KEY, 1, raw));
+    await runQueueRedisCommand("dequeue:rPushProcessing", client.rPush(PROCESSING_KEY, processingRaw));
 
     if (isScheduledForFuture(processingJob)) {
-      await client.lRem(PROCESSING_KEY, 1, processingRaw);
-      await client.rPush(QUEUE_KEY, JSON.stringify(withoutProcessingTimestamp(processingJob)));
+      await runQueueRedisCommand(
+        "dequeue:lRemScheduledProcessing",
+        client.lRem(PROCESSING_KEY, 1, processingRaw)
+      );
+      await runQueueRedisCommand(
+        "dequeue:rPushScheduledBack",
+        client.rPush(QUEUE_KEY, JSON.stringify(withoutProcessingTimestamp(processingJob)))
+      );
       return null;
     }
 
@@ -222,7 +241,10 @@ export async function acknowledge(job: Job): Promise<void> {
     }
 
     const serialized = JSON.stringify(job);
-    const removed = await client.lRem(PROCESSING_KEY, 1, serialized);
+    const removed = await runQueueRedisCommand(
+      "acknowledge:lRem",
+      client.lRem(PROCESSING_KEY, 1, serialized)
+    );
     if (removed === 0) {
       const fallbackRemoved = await removeProcessingById(job.id);
       if (!fallbackRemoved) {
@@ -252,7 +274,7 @@ export async function enqueueDeadJob(job: Job): Promise<void> {
       memoryDead.push(deadJob);
       return;
     }
-    await client.rPush(DEAD_KEY, JSON.stringify(deadJob));
+    await runQueueRedisCommand("enqueueDeadJob:rPush", client.rPush(DEAD_KEY, JSON.stringify(deadJob)));
   } catch (error) {
     logError("Queue dead-letter enqueue failed", {
       jobId: deadJob.id,
@@ -312,11 +334,14 @@ export async function recoverStuckJobs(): Promise<number> {
       return recovered;
     }
 
-    const items = await client.lRange(PROCESSING_KEY, 0, -1);
+    const items = await runQueueRedisCommand(
+      "recoverStuckJobs:lRange",
+      client.lRange(PROCESSING_KEY, 0, -1)
+    );
     for (const raw of items) {
       const job = parseJob(raw);
       if (!job) {
-        await client.lRem(PROCESSING_KEY, 1, raw);
+        await runQueueRedisCommand("recoverStuckJobs:dropInvalid", client.lRem(PROCESSING_KEY, 1, raw));
         continue;
       }
 
@@ -324,7 +349,7 @@ export async function recoverStuckJobs(): Promise<number> {
       const isStuck = Date.now() - startedAt > PROCESSING_TIMEOUT_MS;
       if (!isStuck) continue;
 
-      await client.lRem(PROCESSING_KEY, 1, raw);
+      await runQueueRedisCommand("recoverStuckJobs:lRem", client.lRem(PROCESSING_KEY, 1, raw));
 
       const attempts = (job.attempts ?? 0) + 1;
       if (attempts <= MAX_RECOVERY_ATTEMPTS) {
@@ -333,7 +358,7 @@ export async function recoverStuckJobs(): Promise<number> {
           attempts,
           _recoveredAt: Date.now(),
         });
-        await client.lPush(QUEUE_KEY, JSON.stringify(recoveredJob));
+        await runQueueRedisCommand("recoverStuckJobs:lPush", client.lPush(QUEUE_KEY, JSON.stringify(recoveredJob)));
         recovered += 1;
         logError("Recovered stuck job", { jobId: job.id, attempts, __skipAlert: true });
       } else {
@@ -342,7 +367,7 @@ export async function recoverStuckJobs(): Promise<number> {
           attempts,
           failedAt: Date.now(),
         });
-        await client.rPush(DEAD_KEY, JSON.stringify(deadJob));
+        await runQueueRedisCommand("recoverStuckJobs:rPushDead", client.rPush(DEAD_KEY, JSON.stringify(deadJob)));
         logError("Job permanently failed — too many attempts", {
           jobId: job.id,
           attempts,
@@ -369,7 +394,7 @@ export async function getQueueLength(): Promise<number> {
     if (!client) {
       return memoryQueue.length;
     }
-    return await client.lLen(QUEUE_KEY);
+    return await runQueueRedisCommand("getQueueLength:lLen", client.lLen(QUEUE_KEY));
   } catch (error) {
     logError("Queue length check failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -391,9 +416,9 @@ export async function getQueueStats(): Promise<QueueStats> {
     }
 
     const [pending, processing, dead] = await Promise.all([
-      client.lLen(QUEUE_KEY),
-      client.lLen(PROCESSING_KEY),
-      client.lLen(DEAD_KEY),
+      runQueueRedisCommand("getQueueStats:lLenPending", client.lLen(QUEUE_KEY)),
+      runQueueRedisCommand("getQueueStats:lLenProcessing", client.lLen(PROCESSING_KEY)),
+      runQueueRedisCommand("getQueueStats:lLenDead", client.lLen(DEAD_KEY)),
     ]);
     return { pending, processing, dead };
   } catch {
@@ -414,11 +439,11 @@ export async function listDeadJobs(limit = 50): Promise<DeadQueueJobItem[]> {
       }));
     }
 
-    const total = await client.lLen(DEAD_KEY);
+    const total = await runQueueRedisCommand("listDeadJobs:lLen", client.lLen(DEAD_KEY));
     if (total === 0) return [];
 
     const start = Math.max(total - safeLimit, 0);
-    const raws = await client.lRange(DEAD_KEY, start, -1);
+    const raws = await runQueueRedisCommand("listDeadJobs:lRange", client.lRange(DEAD_KEY, start, -1));
     const items: DeadQueueJobItem[] = [];
 
     raws.forEach((raw, index) => {
@@ -456,20 +481,23 @@ export async function retryDeadJobByIndex(index: number): Promise<boolean> {
       return true;
     }
 
-    const raw = await client.lIndex(DEAD_KEY, queueIndex);
+    const raw = await runQueueRedisCommand("retryDeadJobByIndex:lIndex", client.lIndex(DEAD_KEY, queueIndex));
     if (!raw) return false;
 
     const job = parseJob(raw);
     const removed = await removeListItemByIndex(DEAD_KEY, queueIndex);
     if (!removed || !job) return false;
 
-    await client.lPush(
-      QUEUE_KEY,
-      JSON.stringify(
-        normalizeJobMeta({
-          ...withoutProcessingTimestamp(job),
-          attempts: 0,
-        })
+    await runQueueRedisCommand(
+      "retryDeadJobByIndex:lPush",
+      client.lPush(
+        QUEUE_KEY,
+        JSON.stringify(
+          normalizeJobMeta({
+            ...withoutProcessingTimestamp(job),
+            attempts: 0,
+          })
+        )
       )
     );
 

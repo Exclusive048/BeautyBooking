@@ -1,4 +1,4 @@
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 
@@ -170,9 +170,15 @@ async function checkRateLimitConfig(
       return { limited: false };
     }
 
-    const count = await client.incr(key);
+    const count = await withRedisCommandTimeout(
+      "rate-limit:config:incr",
+      client.incr(key)
+    );
     if (count === 1) {
-      await client.expire(key, config.windowSeconds);
+      await withRedisCommandTimeout(
+        "rate-limit:config:expire",
+        client.expire(key, config.windowSeconds)
+      );
     }
 
     if (count > config.maxRequests) {
@@ -216,9 +222,15 @@ async function checkRateLimitLegacy(
       return checkMemoryLimit(key, limit, windowSeconds);
     }
 
-    const count = await client.incr(key);
+    const count = await withRedisCommandTimeout(
+      "rate-limit:legacy:incr",
+      client.incr(key)
+    );
     if (count === 1) {
-      await client.expire(key, windowSeconds);
+      await withRedisCommandTimeout(
+        "rate-limit:legacy:expire",
+        client.expire(key, windowSeconds)
+      );
     }
     return count <= limit;
   } catch (error) {

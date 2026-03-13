@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { alertWarning } from "@/lib/monitoring";
 import { logError } from "@/lib/logging/logger";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 
 const ERROR_WINDOW_MS = 60_000;
 const ALERT_COOLDOWN_MS = 5 * 60_000;
@@ -30,10 +30,13 @@ async function acquireSharedCooldown(alertKey: string): Promise<"sent" | "cooldo
     return "degraded";
   }
 
-  const result = await client.set(buildCooldownStoreKey(alertKey), String(Date.now()), {
-    NX: true,
-    PX: ALERT_COOLDOWN_MS,
-  });
+  const result = await withRedisCommandTimeout(
+    "monitoring:alerts:cooldown-set",
+    client.set(buildCooldownStoreKey(alertKey), String(Date.now()), {
+      NX: true,
+      PX: ALERT_COOLDOWN_MS,
+    })
+  );
   if (result === "OK") {
     return "sent";
   }

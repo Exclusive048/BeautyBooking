@@ -1,5 +1,5 @@
 import { logError } from "@/lib/logging/logger";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 
 export const CRITICAL_OBSERVABILITY_SURFACES = [
   "auth",
@@ -193,7 +193,7 @@ async function writeRedisEvent(input: SurfaceEventInput, eventAt: string): Promi
   if (input.outcome === "denied") multi.hIncrBy(key, "deniedCount", 1);
   if (input.outcome === "degraded") multi.hIncrBy(key, "degradedCount", 1);
   multi.expire(key, STATUS_TTL_SECONDS);
-  await multi.exec();
+  await withRedisCommandTimeout("monitoring:status:write", multi.exec());
 
   return true;
 }
@@ -233,7 +233,10 @@ export async function getSurfaceStatus(
   try {
     const redis = await getRedisConnection();
     if (redis) {
-      const hash = await redis.hGetAll(toRedisKey(surface));
+      const hash = await withRedisCommandTimeout(
+        "monitoring:status:read",
+        redis.hGetAll(toRedisKey(surface))
+      );
       return hydrateFromRedis(surface, hash);
     }
   } catch (error) {
