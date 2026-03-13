@@ -21,15 +21,16 @@ export type SessionPayload = {
   roles?: string[];
   tokenType?: "access" | "refresh";
   jti?: string;
+  sid?: string;
   iat: number;
   exp: number;
 };
 
-const ACCESS_TOKEN_TTL_SECONDS = 2 * 60 * 60;
-const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
+export const ACCESS_TOKEN_TTL_SECONDS = 2 * 60 * 60;
+export const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-type AccessTokenPayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti">;
-type RefreshTokenPayload = Pick<SessionPayload, "sub">;
+type AccessTokenPayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti" | "sid">;
+type RefreshTokenPayload = Pick<SessionPayload, "sub" | "sid" | "jti">;
 
 function createToken(
   payload: Record<string, unknown>,
@@ -73,7 +74,7 @@ export function signAccessToken(payload: AccessTokenPayload): string {
 
 export function signRefreshToken(payload: RefreshTokenPayload): string {
   return createToken(payload, REFRESH_TOKEN_TTL_SECONDS, "refresh", {
-    jti: crypto.randomUUID(),
+    jti: payload.jti,
   });
 }
 

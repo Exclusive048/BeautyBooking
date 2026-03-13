@@ -138,7 +138,7 @@ export async function POST(req: Request) {
     });
 
     const response = ok({ redirect: redirectDecision.target });
-    setSessionCookies(response, { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles });
+    await setSessionCookies(response, { sub: profile.id, phone: profile.phone ?? null, roles: profile.roles });
 
     void ensureFreeSubscriptionsForRoles(profile.id, profile.roles).catch((error) => {
       logError("ensureFreeSubscriptionsForRoles failed after otp verify", {

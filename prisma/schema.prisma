@@ -416,6 +416,7 @@ model UserProfile {
 
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  refreshSessions   RefreshSession[]
 
   consents UserConsent[]
 
@@ -602,6 +603,37 @@ model OtpCode {
 
   @@index([phone])
   @@index([expiresAt])
+}
+
+model RefreshSession {
+  id String @id @default(cuid())
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  jti String @unique
+
+  expiresAt DateTime
+
+  usedAt DateTime?
+
+  revokedAt DateTime?
+
+  rotatedToSessionId String? @unique
+
+  rotatedToSession   RefreshSession?  @relation("RefreshSessionRotation", fields: [rotatedToSessionId], references: [id], onDelete: SetNull)
+
+  rotatedFromSession RefreshSession[] @relation("RefreshSessionRotation")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([usedAt])
 }
 
 model Provider {

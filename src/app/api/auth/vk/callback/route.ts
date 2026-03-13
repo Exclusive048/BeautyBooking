@@ -173,7 +173,7 @@ export async function GET(req: Request) {
 
         const redirectDecision = await resolveCabinetRedirect(sessionUser.id);
         const response = nextRedirect(req, redirectDecision.target);
-        setSessionCookies(response, {
+        await setSessionCookies(response, {
           sub: sessionUser.id,
           phone: sessionUser.phone ?? null,
           roles: sessionUser.roles,
@@ -258,7 +258,7 @@ export async function GET(req: Request) {
 
       const redirectDecision = await resolveCabinetRedirect(user.id);
       const response = nextRedirect(req, redirectDecision.target);
-      setSessionCookies(response, { sub: user.id, phone: user.phone ?? null, roles: user.roles });
+      await setSessionCookies(response, { sub: user.id, phone: user.phone ?? null, roles: user.roles });
       return response;
     } catch (error) {
       const appError = error instanceof AppError ? error : toAppError(error);

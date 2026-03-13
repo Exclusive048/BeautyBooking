@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
     const redirectDecision = await resolveCabinetRedirect(result.user.id);
     const response = ok({ redirect: redirectDecision.target });
-    setSessionCookies(response, {
+    await setSessionCookies(response, {
       sub: result.user.id,
       phone: result.user.phone ?? null,
       roles: result.user.roles,
