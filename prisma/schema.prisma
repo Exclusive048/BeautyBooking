@@ -1564,11 +1564,11 @@ model ModelOffer {
 
   masterServiceId String?
 
-  masterService MasterService? @relation(fields: [masterServiceId], references: [id], onDelete: Cascade)
+  masterService MasterService? @relation(fields: [masterServiceId], references: [id], onDelete: SetNull)
 
   serviceId String?
 
-  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   serviceIds String[] @default([])
 

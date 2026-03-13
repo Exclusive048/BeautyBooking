@@ -125,7 +125,24 @@ export async function deleteProviderService(
   });
   if (!existing) return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
 
-  await prisma.service.delete({ where: { id: serviceId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.modelOffer.updateMany({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { serviceId },
+          {
+            masterService: {
+              is: { serviceId },
+            },
+          },
+        ],
+      },
+      data: { status: "ARCHIVED" },
+    });
+
+    await tx.service.delete({ where: { id: serviceId } });
+  });
 
   return { ok: true, data: { id: serviceId } };
 }

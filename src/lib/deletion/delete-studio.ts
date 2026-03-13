@@ -99,6 +99,16 @@ export async function deleteStudioCabinet(userId: string): Promise<void> {
     for (const item of members) memberUserIds.add(item.userId);
     if (studio.ownerUserId) memberUserIds.add(studio.ownerUserId);
 
+    await tx.modelOffer.updateMany({
+      where: {
+        status: "ACTIVE",
+        masterService: {
+          is: { studioId: studio.id },
+        },
+      },
+      data: { status: "ARCHIVED" },
+    });
+
     await Promise.all([
       tx.studioMembership.deleteMany({ where: { studioId: studio.id } }),
       tx.studioMember.deleteMany({ where: { studioId: studio.id } }),
