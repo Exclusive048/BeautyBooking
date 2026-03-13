@@ -5,6 +5,8 @@ import { getRedisConnection, getRedisSubscriberConnection } from "@/lib/redis/co
 import { logError } from "@/lib/logging/logger";
 import type { NotificationEvent } from "@/lib/notifications/types";
 
+const allowMemoryNotifierFallback = process.env.NODE_ENV !== "production";
+
 export type NotificationSubscriber = (event: NotificationEvent) => void;
 
 export type NotificationNotifier = {
@@ -86,6 +88,9 @@ async function createNotifier(): Promise<NotificationNotifier> {
   const publisherClient = await getRedisConnection();
   const subscriberClient = await getRedisSubscriberConnection();
   if (!publisherClient || !subscriberClient) {
+    if (!allowMemoryNotifierFallback) {
+      throw new Error("Redis is required for notifications notifier in production");
+    }
     return new MemoryNotificationNotifier();
   }
   return new RedisNotificationNotifier(publisherClient, subscriberClient);

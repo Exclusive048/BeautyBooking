@@ -4,13 +4,24 @@ import { memoryClient } from "@/lib/cache/memoryClient";
 import { logInfo } from "@/lib/logging/logger";
 
 const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim().length > 0);
+const isProduction = process.env.NODE_ENV === "production";
 
 let client: CacheClient | null = null;
 
 function resolveClient(): CacheClient {
   if (!client) {
-    client = hasRedisUrl ? redisClient : memoryClient;
-    logInfo("Cache client selected", { driver: hasRedisUrl ? "redis" : "memory" });
+    if (hasRedisUrl) {
+      client = redisClient;
+      logInfo("Cache client selected", { driver: "redis" });
+      return client;
+    }
+
+    if (isProduction) {
+      throw new Error("Redis is required for cache in production");
+    }
+
+    client = memoryClient;
+    logInfo("Cache client selected", { driver: "memory" });
   }
   return client;
 }

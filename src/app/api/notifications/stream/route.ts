@@ -99,7 +99,12 @@ export async function GET(req: Request) {
       }
     }
 
-    const notifier = await notificationsNotifier;
+    let notifier: Awaited<typeof notificationsNotifier>;
+    try {
+      notifier = await notificationsNotifier;
+    } catch {
+      return jsonFail(503, "Service unavailable", "INTERNAL_ERROR");
+    }
     const unsubscribe = notifier.subscribe(user.id, (event) => {
       send(event, event.id);
     });

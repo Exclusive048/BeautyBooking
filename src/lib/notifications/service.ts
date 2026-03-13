@@ -6,6 +6,7 @@ import {
   StudioRole,
 } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { notificationsNotifier } from "@/lib/notifications/notifier";
 import type { NotificationEvent } from "@/lib/notifications/types";
@@ -124,8 +125,15 @@ async function createNotifications(
 
 export function publishRealtime(userId: string, event: NotificationEvent) {
   void (async () => {
-    const notifier = await notificationsNotifier;
-    notifier.publish(userId, event);
+    try {
+      const notifier = await notificationsNotifier;
+      notifier.publish(userId, event);
+    } catch (error) {
+      logError("Realtime notifications publish failed", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   })();
 }
 

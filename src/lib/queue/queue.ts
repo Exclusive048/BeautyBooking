@@ -9,10 +9,32 @@ const PROCESSING_KEY = "queue:processing";
 const DEAD_KEY = "queue:dead";
 const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RECOVERY_ATTEMPTS = 3;
+const allowMemoryQueueFallback = process.env.NODE_ENV !== "production";
 
 const memoryQueue: Job[] = [];
 const memoryProcessing: Job[] = [];
 const memoryDead: Job[] = [];
+
+type QueueRedisClient = NonNullable<Awaited<ReturnType<typeof getRedisConnection>>>;
+type QueueRedisRequiredError = Error & { code: "REDIS_REQUIRED_FOR_QUEUE" };
+
+function createQueueRedisRequiredError(operation: string): QueueRedisRequiredError {
+  const error = new Error(`Redis is required for queue operation: ${operation}`) as QueueRedisRequiredError;
+  error.code = "REDIS_REQUIRED_FOR_QUEUE";
+  return error;
+}
+
+function isQueueRedisRequiredError(error: unknown): error is QueueRedisRequiredError {
+  if (!error || typeof error !== "object") return false;
+  return (error as { code?: string }).code === "REDIS_REQUIRED_FOR_QUEUE";
+}
+
+async function getQueueRedisConnection(operation: string): Promise<QueueRedisClient | null> {
+  const client = await getRedisConnection();
+  if (client) return client;
+  if (allowMemoryQueueFallback) return null;
+  throw createQueueRedisRequiredError(operation);
+}
 
 export type QueueStats = {
   pending: number;
@@ -86,7 +108,7 @@ function withoutProcessingTimestamp(job: Job): Job {
 }
 
 async function removeProcessingById(jobId: string): Promise<boolean> {
-  const client = await getRedisConnection();
+  const client = await getQueueRedisConnection("removeProcessingById");
   if (!client) {
     const index = memoryProcessing.findIndex((item) => item.id === jobId);
     if (index === -1) return false;
@@ -102,7 +124,7 @@ async function removeProcessingById(jobId: string): Promise<boolean> {
 }
 
 async function removeListItemByIndex(key: string, index: number): Promise<boolean> {
-  const client = await getRedisConnection();
+  const client = await getQueueRedisConnection("removeListItemByIndex");
   if (!client) return false;
 
   const marker = `__queue_marker__:${randomUUID()}`;
@@ -118,7 +140,7 @@ async function removeListItemByIndex(key: string, index: number): Promise<boolea
 export async function enqueue(job: Job, options?: EnqueueOptions): Promise<void> {
   const queuedJob = applyEnqueueDelay(job, options);
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("enqueue");
     if (!client) {
       memoryQueue.push(queuedJob);
       return;
@@ -134,7 +156,7 @@ export async function enqueue(job: Job, options?: EnqueueOptions): Promise<void>
 
 export async function dequeue(): Promise<Job | null> {
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("dequeue");
 
     if (!client) {
       const nextJob = memoryQueue.shift() ?? null;
@@ -179,6 +201,9 @@ export async function dequeue(): Promise<Job | null> {
     logError("Queue dequeue error", {
       error: error instanceof Error ? error.message : String(error),
     });
+    if (isQueueRedisRequiredError(error)) {
+      throw error;
+    }
     // TODO: add queue-degradation metric/alert when dequeue errors are frequent.
     return null;
   }
@@ -186,7 +211,7 @@ export async function dequeue(): Promise<Job | null> {
 
 export async function acknowledge(job: Job): Promise<void> {
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("acknowledge");
 
     if (!client) {
       const removed = await removeProcessingById(job.id);
@@ -209,6 +234,9 @@ export async function acknowledge(job: Job): Promise<void> {
       jobId: job.id,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (isQueueRedisRequiredError(error)) {
+      throw error;
+    }
   }
 }
 
@@ -219,7 +247,7 @@ export async function enqueueDeadJob(job: Job): Promise<void> {
   });
 
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("enqueueDeadJob");
     if (!client) {
       memoryDead.push(deadJob);
       return;
@@ -230,12 +258,15 @@ export async function enqueueDeadJob(job: Job): Promise<void> {
       jobId: deadJob.id,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (isQueueRedisRequiredError(error)) {
+      throw error;
+    }
   }
 }
 
 export async function recoverStuckJobs(): Promise<number> {
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("recoverStuckJobs");
     let recovered = 0;
 
     if (!client) {
@@ -327,13 +358,16 @@ export async function recoverStuckJobs(): Promise<number> {
     logError("recoverStuckJobs error", {
       error: error instanceof Error ? error.message : String(error),
     });
+    if (isQueueRedisRequiredError(error)) {
+      throw error;
+    }
     return 0;
   }
 }
 
 export async function getQueueLength(): Promise<number> {
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("getQueueLength");
     if (!client) {
       return memoryQueue.length;
     }
@@ -349,7 +383,7 @@ export async function getQueueLength(): Promise<number> {
 
 export async function getQueueStats(): Promise<QueueStats> {
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("getQueueStats");
     if (!client) {
       return {
         pending: memoryQueue.length,
@@ -373,7 +407,7 @@ export async function listDeadJobs(limit = 50): Promise<DeadQueueJobItem[]> {
   const safeLimit = Math.max(1, Math.min(limit, 500));
 
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("listDeadJobs");
     if (!client) {
       const start = Math.max(memoryDead.length - safeLimit, 0);
       return memoryDead.slice(start).map((job, index) => ({
@@ -410,7 +444,7 @@ export async function retryDeadJobByIndex(index: number): Promise<boolean> {
   if (!Number.isFinite(queueIndex) || queueIndex < 0) return false;
 
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("retryDeadJobByIndex");
     if (!client) {
       const job = memoryDead[queueIndex];
       if (!job) return false;
@@ -456,7 +490,7 @@ export async function deleteDeadJobByIndex(index: number): Promise<boolean> {
   if (!Number.isFinite(queueIndex) || queueIndex < 0) return false;
 
   try {
-    const client = await getRedisConnection();
+    const client = await getQueueRedisConnection("deleteDeadJobByIndex");
     if (!client) {
       if (!memoryDead[queueIndex]) return false;
       memoryDead.splice(queueIndex, 1);

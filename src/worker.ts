@@ -7,6 +7,7 @@ import {
   getQueueStats,
   recoverStuckJobs,
 } from "@/lib/queue/queue";
+import { getRedisConnection } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
@@ -132,6 +133,17 @@ function resolveHealthcheckUrl(): string {
 function resolveWorkerSecret(): string | null {
   const secret = process.env.WORKER_SECRET?.trim();
   return secret && secret.length > 0 ? secret : null;
+}
+
+async function ensureWorkerRedisReady(): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const redis = await getRedisConnection();
+  if (!redis) {
+    throw new Error("Redis is required for worker in production");
+  }
+
+  await redis.ping();
 }
 
 async function pingHealthcheck(): Promise<void> {
@@ -462,6 +474,8 @@ async function runLoop() {
 }
 
 async function startWorker() {
+  await ensureWorkerRedisReady();
+
   logInfo("Worker starting — recovering stuck jobs...");
   const recovered = await recoverStuckJobs();
   if (recovered > 0) {
@@ -480,4 +494,5 @@ async function startWorker() {
 startWorker().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   logError("Worker stopped", { error: message });
+  process.exit(1);
 });

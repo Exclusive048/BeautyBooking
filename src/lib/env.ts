@@ -83,6 +83,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().trim().optional(),
   YANDEX_GEOCODER_API_KEY: z.string().trim().optional(),
   YANDEX_SUGGEST_API_KEY: z.string().trim().optional(),
+  REDIS_URL: z.string().trim().optional(),
 });
 
 export type ValidatedEnv = z.infer<typeof envSchema>;
@@ -118,6 +119,7 @@ export function validateEnv(): ValidatedEnv {
   requireVar("YANDEX_SUGGEST_API_KEY");
 
   if (parsed.NODE_ENV === "production") {
+    requireVar("REDIS_URL");
     requireVar("WORKER_SECRET");
     requireVar("YOOKASSA_SECRET_KEY");
     requireVar("YOOKASSA_SHOP_ID");
