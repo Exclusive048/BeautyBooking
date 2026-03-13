@@ -3,6 +3,7 @@ import { mapProviderCard } from "@/lib/providers/mappers";
 
 export async function listProviderCards() {
   const providers = await prisma.provider.findMany({
+    where: { isPublished: true },
     orderBy: [{ rating: "desc" }, { reviews: "desc" }],
     select: {
       id: true,

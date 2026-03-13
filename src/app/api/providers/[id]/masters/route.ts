@@ -21,10 +21,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
     const provider = await resolveProviderBySlugOrId({
       key: id,
-      select: { id: true, type: true, name: true, publicUsername: true },
+      select: { id: true, type: true, name: true, publicUsername: true, isPublished: true },
     });
 
-    if (!provider) {
+    if (!provider || !provider.isPublished) {
       return fail("Provider not found", 404, "PROVIDER_NOT_FOUND");
     }
 
@@ -33,7 +33,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     }
 
     const masters = await prisma.provider.findMany({
-      where: { studioId: provider.id, type: ProviderType.MASTER },
+      where: { studioId: provider.id, type: ProviderType.MASTER, isPublished: true },
       select: { id: true, name: true, publicUsername: true },
       orderBy: { createdAt: "asc" },
     });
