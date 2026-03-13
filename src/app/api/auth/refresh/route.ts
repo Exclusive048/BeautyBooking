@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
-import { clearSessionCookies, rotateSessionCookies } from "@/lib/auth/session";
+import { clearSessionCookies, getRefreshCookieName, rotateSessionCookies } from "@/lib/auth/session";
 import { nextRedirect, normalizeInternalPath } from "@/lib/http/origin";
 
-const REFRESH_COOKIE_NAME = "bh_refresh";
+const REFRESH_COOKIE_NAME = getRefreshCookieName();
 
 function resolveNextPath(req: Request): string {
   const url = new URL(req.url);

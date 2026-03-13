@@ -34,6 +34,12 @@ type RefreshTokenClaims = {
   jti: string;
 };
 
+export type RefreshSessionRevokeResult =
+  | "NO_TOKEN"
+  | "INVALID_TOKEN"
+  | "REVOKED"
+  | "ALREADY_INACTIVE";
+
 async function getAccessSessionPayload(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(getAccessCookieName())?.value;
@@ -170,22 +176,63 @@ export async function rotateSessionCookies(
   return payload;
 }
 
-export async function revokeRefreshSessionByToken(refreshToken: string | null | undefined): Promise<void> {
-  if (!refreshToken) return;
+export async function revokeRefreshSessionByToken(
+  refreshToken: string | null | undefined
+): Promise<RefreshSessionRevokeResult> {
+  if (!refreshToken) return "NO_TOKEN";
   const claims = parseRefreshTokenClaims(refreshToken);
-  if (!claims) return;
+  if (!claims) return "INVALID_TOKEN";
 
-  await prisma.refreshSession.updateMany({
-    where: {
-      id: claims.sid,
-      userId: claims.sub,
-      jti: claims.jti,
-      revokedAt: null,
-    },
-    data: {
-      revokedAt: new Date(),
-    },
+  const result = await prisma.$transaction(async (tx) => {
+    const session = await tx.refreshSession.findFirst({
+      where: {
+        id: claims.sid,
+        userId: claims.sub,
+        jti: claims.jti,
+      },
+      select: {
+        id: true,
+        rotatedToSessionId: true,
+      },
+    });
+    if (!session) {
+      return "ALREADY_INACTIVE" as const;
+    }
+
+    const chainIds: string[] = [];
+    const seenIds = new Set<string>();
+    let cursorId: string | null = session.id;
+    while (cursorId && !seenIds.has(cursorId)) {
+      seenIds.add(cursorId);
+      chainIds.push(cursorId);
+      const nextSession: { rotatedToSessionId: string | null } | null = await tx.refreshSession.findUnique({
+        where: { id: cursorId },
+        select: { rotatedToSessionId: true },
+      });
+      cursorId = nextSession?.rotatedToSessionId ?? null;
+    }
+
+    const revoked = await tx.refreshSession.updateMany({
+      where: {
+        id: { in: chainIds },
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+    return revoked.count > 0 ? ("REVOKED" as const) : ("ALREADY_INACTIVE" as const);
   });
+  return result;
+}
+
+export async function revokeAndClearSessionCookies(
+  response: NextResponse,
+  refreshToken: string | null | undefined
+): Promise<RefreshSessionRevokeResult> {
+  const result = await revokeRefreshSessionByToken(refreshToken);
+  clearSessionCookies(response);
+  return result;
 }
 
 export function clearSessionCookies(response: NextResponse): void {
