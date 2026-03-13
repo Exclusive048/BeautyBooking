@@ -99,6 +99,7 @@ export async function GET(
   const provider = await resolveProviderBySlugOrId({
     key: p.providerId,
     select: { id: true, type: true, timezone: true, scheduleMode: true, fixedSlotTimes: true },
+    requirePublished: true,
   });
   if (!provider || provider.type !== "MASTER") {
     return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");

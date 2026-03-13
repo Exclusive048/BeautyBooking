@@ -33,16 +33,23 @@ export async function resolveProviderBySlugOrId<TSelect extends Prisma.ProviderS
   key: string | null | undefined;
   select?: TSelect;
   client?: typeof prisma;
+  requirePublished?: boolean;
 }): Promise<ProviderResult<TSelect> | null> {
   const normalized = normalizeProviderKey(args.key);
   if (!normalized) return null;
 
   const where = looksLikeProviderId(normalized) ? { id: normalized } : { publicUsername: normalized };
   const client = args.client ?? prisma;
-  const provider = await client.provider.findUnique({
-    where,
-    select: (args.select ?? DEFAULT_PROVIDER_SELECT) as Prisma.ProviderSelect,
-  });
+  const select = (args.select ?? DEFAULT_PROVIDER_SELECT) as Prisma.ProviderSelect;
+  const provider = args.requirePublished
+    ? await client.provider.findFirst({
+        where: { ...where, isPublished: true },
+        select,
+      })
+    : await client.provider.findUnique({
+        where,
+        select,
+      });
 
   return provider as ProviderResult<TSelect> | null;
 }
