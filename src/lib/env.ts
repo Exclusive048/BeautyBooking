@@ -69,6 +69,7 @@ const envSchema = z.object({
   AUTH_COOKIE_NAME: z.string().trim().min(1).default("bh_session"),
   WORKER_SECRET: z.string().trim().optional(),
   STORAGE_PROVIDER: z.enum(STORAGE_PROVIDERS).default("local"),
+  MEDIA_DELIVERY_SECRET: z.string().trim().optional(),
   VISUAL_SEARCH_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
   YOOKASSA_SECRET_KEY: z.string().trim().optional(),
   YOOKASSA_SHOP_ID: z.string().trim().optional(),
@@ -121,6 +122,7 @@ export function validateEnv(): ValidatedEnv {
   if (parsed.NODE_ENV === "production") {
     requireVar("REDIS_URL");
     requireVar("WORKER_SECRET");
+    requireVar("MEDIA_DELIVERY_SECRET");
     requireVar("YOOKASSA_SECRET_KEY");
     requireVar("YOOKASSA_SHOP_ID");
   }
