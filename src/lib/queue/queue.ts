@@ -258,9 +258,7 @@ export async function enqueueDeadJob(job: Job): Promise<void> {
       jobId: deadJob.id,
       error: error instanceof Error ? error.message : String(error),
     });
-    if (isQueueRedisRequiredError(error)) {
-      throw error;
-    }
+    throw error;
   }
 }
 

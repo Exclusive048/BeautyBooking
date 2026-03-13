@@ -399,35 +399,22 @@ async function processJob(job: Job): Promise<void> {
   try {
     if (job.type === TELEGRAM_SEND_JOB_TYPE) {
       await processTelegramSend(job);
-      return;
-    }
-
-    if (job.type === BOOKING_REMINDER_JOB_TYPE) {
+    } else if (job.type === BOOKING_REMINDER_JOB_TYPE) {
       await processBookingReminderJob(job);
-      return;
-    }
-
-    if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
+    } else if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
       await processVisualSearchIndexJob(job);
-      return;
-    }
-
-    if (job.type === YOOKASSA_WEBHOOK_JOB_TYPE) {
+    } else if (job.type === YOOKASSA_WEBHOOK_JOB_TYPE) {
       await processYookassaWebhookJob(job);
-      return;
-    }
-
-    if (job.type === MEDIA_CLEANUP_JOB_TYPE) {
+    } else if (job.type === MEDIA_CLEANUP_JOB_TYPE) {
       await processMediaCleanupJob(job);
-      return;
+    } else {
+      const unknownJob = job as unknown as { id?: string; type?: string };
+      logError("Worker received unknown job type", {
+        jobId: unknownJob.id ?? "unknown",
+        type: unknownJob.type ?? "unknown",
+        __skipAlert: true,
+      });
     }
-
-    const unknownJob = job as unknown as { id?: string; type?: string };
-    logError("Worker received unknown job type", {
-      jobId: unknownJob.id ?? "unknown",
-      type: unknownJob.type ?? "unknown",
-      __skipAlert: true,
-    });
   } catch (error) {
     logError("Worker job processing failed", {
       jobId: job.id,
@@ -450,9 +437,9 @@ async function processJob(job: Job): Promise<void> {
     } else {
       await moveToDeadQueue({ ...job, attempts });
     }
-  } finally {
-    await acknowledge(job);
   }
+
+  await acknowledge(job);
 }
 
 async function runLoop() {
