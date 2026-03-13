@@ -82,6 +82,31 @@ function isAccessTokenValid(token: string | undefined): boolean {
   }
 }
 
+function splitCombinedSetCookieHeader(headerValue: string): string[] {
+  return headerValue
+    .split(/,(?=\s*[^;,=\s]+=[^;,]*)/g)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function readSetCookieHeaders(headers: Headers): string[] {
+  const headersWithGetSetCookie = headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+
+  if (typeof headersWithGetSetCookie.getSetCookie === "function") {
+    const values = headersWithGetSetCookie
+      .getSetCookie()
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+    if (values.length > 0) return values;
+  }
+
+  const combined = headers.get("set-cookie");
+  if (!combined) return [];
+  return splitCombinedSetCookieHeader(combined);
+}
+
 export async function proxy(request: NextRequest) {
   const requestId = resolveRequestId(request);
   const requestHeaders = new Headers(request.headers);
@@ -90,7 +115,7 @@ export async function proxy(request: NextRequest) {
   const method = request.method.toUpperCase();
   const pathname = normalizePathname(request.nextUrl.pathname);
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
-  let refreshedSetCookie: string | null = null;
+  let refreshedSetCookies: string[] = [];
 
   if (!isPublicPath) {
     const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
@@ -109,7 +134,7 @@ export async function proxy(request: NextRequest) {
         });
 
         if (refreshRes.ok) {
-          refreshedSetCookie = refreshRes.headers.get("set-cookie");
+          refreshedSetCookies = readSetCookieHeaders(refreshRes.headers);
         }
       }
     }
@@ -169,8 +194,8 @@ export async function proxy(request: NextRequest) {
   if (!isDev) {
     response.headers.set("content-security-policy", csp);
   }
-  if (refreshedSetCookie) {
-    response.headers.set("set-cookie", refreshedSetCookie);
+  for (const setCookie of refreshedSetCookies) {
+    response.headers.append("set-cookie", setCookie);
   }
 
   return withRequestId(response, requestId);
