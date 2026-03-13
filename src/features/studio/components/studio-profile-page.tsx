@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { MediaEntityType } from "@prisma/client";
 import { AlertTriangle, Send, Users } from "lucide-react";
