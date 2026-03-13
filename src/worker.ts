@@ -39,6 +39,7 @@ ensureVisualSearchStartupConfig();
 let isShuttingDown = false;
 let lastHealthcheckAt = 0;
 let jobsProcessed = 0;
+let workerSecretMissingLogged = false;
 
 const HEALTHCHECK_INTERVAL_MS = 30_000;
 const STUCK_RECOVERY_INTERVAL_MS = 2 * 60 * 1000;
@@ -128,14 +129,28 @@ function resolveHealthcheckUrl(): string {
   return `${appUrl.replace(/\/+$/, "")}/api/health/worker`;
 }
 
+function resolveWorkerSecret(): string | null {
+  const secret = process.env.WORKER_SECRET?.trim();
+  return secret && secret.length > 0 ? secret : null;
+}
+
 async function pingHealthcheck(): Promise<void> {
+  const workerSecret = resolveWorkerSecret();
+  if (!workerSecret) {
+    if (!workerSecretMissingLogged) {
+      logInfo("Worker healthcheck ping skipped: WORKER_SECRET is not configured");
+      workerSecretMissingLogged = true;
+    }
+    return;
+  }
+
   const healthcheckUrl = resolveHealthcheckUrl();
 
   try {
     await fetch(healthcheckUrl, {
       method: "POST",
       headers: {
-        "x-worker-secret": (process.env.WORKER_SECRET ?? "dev-worker-secret").trim(),
+        "x-worker-secret": workerSecret,
       },
     });
   } catch (error) {

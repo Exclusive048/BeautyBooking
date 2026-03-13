@@ -67,7 +67,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_VK_ENABLED: z.string().trim().optional(),
   DEFAULT_TIMEZONE: z.string().trim().optional().default("Europe/Moscow"),
   AUTH_COOKIE_NAME: z.string().trim().min(1).default("bh_session"),
-  WORKER_SECRET: z.string().trim().default("dev-worker-secret"),
+  WORKER_SECRET: z.string().trim().optional(),
   STORAGE_PROVIDER: z.enum(STORAGE_PROVIDERS).default("local"),
   VISUAL_SEARCH_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
   YOOKASSA_SECRET_KEY: z.string().trim().optional(),
@@ -118,6 +118,7 @@ export function validateEnv(): ValidatedEnv {
   requireVar("YANDEX_SUGGEST_API_KEY");
 
   if (parsed.NODE_ENV === "production") {
+    requireVar("WORKER_SECRET");
     requireVar("YOOKASSA_SECRET_KEY");
     requireVar("YOOKASSA_SHOP_ID");
   }

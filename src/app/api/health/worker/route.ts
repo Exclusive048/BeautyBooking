@@ -7,8 +7,9 @@ const WORKER_LAST_PING_KEY = "worker:last-ping";
 const WORKER_PING_TTL_SECONDS = 300;
 const WORKER_ALIVE_THRESHOLD_MS = 120_000;
 
-function resolveWorkerSecret(): string {
-  return (process.env.WORKER_SECRET ?? "dev-worker-secret").trim();
+function resolveWorkerSecret(): string | null {
+  const secret = process.env.WORKER_SECRET?.trim();
+  return secret && secret.length > 0 ? secret : null;
 }
 
 function formatAgeSeconds(ageMs: number): string {
@@ -17,8 +18,13 @@ function formatAgeSeconds(ageMs: number): string {
 }
 
 export async function POST(request: Request) {
+  const expectedSecret = resolveWorkerSecret();
+  if (!expectedSecret) {
+    return Response.json({ error: "Service unavailable" }, { status: 503 });
+  }
+
   const providedSecret = request.headers.get("x-worker-secret")?.trim() ?? "";
-  if (!providedSecret || providedSecret !== resolveWorkerSecret()) {
+  if (!providedSecret || providedSecret !== expectedSecret) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
