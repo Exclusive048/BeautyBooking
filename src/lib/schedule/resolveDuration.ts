@@ -16,10 +16,19 @@ export async function resolveServiceDuration(masterId: string, serviceId: string
 
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
-    select: { id: true, providerId: true, durationMin: true },
+    select: {
+      id: true,
+      providerId: true,
+      durationMin: true,
+      isEnabled: true,
+      isActive: true,
+    },
   });
   if (!service) {
     return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+  }
+  if (!service.isEnabled || !service.isActive) {
+    return { ok: false, status: 409, message: "Service unavailable", code: "SERVICE_DISABLED" };
   }
 
   if (master.studioId) {
@@ -37,8 +46,8 @@ export async function resolveServiceDuration(masterId: string, serviceId: string
       select: { durationOverrideMin: true, isEnabled: true },
     });
 
-    if (override && override.isEnabled === false) {
-      return { ok: false, status: 409, message: "Service disabled for master", code: "SERVICE_DISABLED" };
+    if (!override || override.isEnabled === false) {
+      return { ok: false, status: 409, message: "Service not assigned to master", code: "SERVICE_INVALID" };
     }
 
     return { ok: true, data: override?.durationOverrideMin ?? service.durationMin };
