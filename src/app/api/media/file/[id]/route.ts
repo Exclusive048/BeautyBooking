@@ -16,13 +16,11 @@ export const runtime = "nodejs";
 const PUBLIC_MEDIA_KINDS = new Set<MediaKind>([
   MediaKind.PORTFOLIO,
   MediaKind.AVATAR,
-  MediaKind.MODEL_APPLICATION_PHOTO,
 ]);
 const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
   MediaEntityType.MASTER,
   MediaEntityType.STUDIO,
   MediaEntityType.SITE,
-  MediaEntityType.MODEL_APPLICATION,
 ]);
 
 function isStorageMissingErrorDetails(details: unknown): boolean {
@@ -60,41 +58,6 @@ export async function GET(req: Request, ctx: RouteContext) {
         { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
         { status: 404 }
       );
-    }
-
-    // MODEL_APPLICATION_PHOTO — proxy bytes from S3, never expose S3 URL to client
-    if (
-      asset.kind === MediaKind.MODEL_APPLICATION_PHOTO ||
-      asset.entityType === MediaEntityType.MODEL_APPLICATION
-    ) {
-      const storage = getStorageProvider();
-      const publicUrl = storage.getPublicUrl?.(asset.storageKey);
-      if (!publicUrl) {
-        return NextResponse.json(
-          { ok: false, error: { message: "Storage error", code: "STORAGE_ERROR" } },
-          { status: 500 }
-        );
-      }
-
-      const s3Res = await fetch(publicUrl);
-      if (!s3Res.ok) {
-        return NextResponse.json(
-          { ok: false, error: { message: "Media not found", code: "MEDIA_ASSET_NOT_FOUND" } },
-          { status: 404 }
-        );
-      }
-
-      const contentType = s3Res.headers.get("content-type") ?? "image/webp";
-      const contentLength = s3Res.headers.get("content-length");
-
-      return new NextResponse(s3Res.body, {
-        status: 200,
-        headers: {
-          "Content-Type": contentType,
-          ...(contentLength ? { "Content-Length": contentLength } : {}),
-          "Cache-Control": "private, max-age=3600",
-        },
-      });
     }
 
     // PORTFOLIO, AVATAR — public, redirect to S3

@@ -165,7 +165,14 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {photo ? (
-            <Image src={photo} alt="" width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
+            <Image
+              src={photo}
+              alt=""
+              width={40}
+              height={40}
+              unoptimized
+              className="h-10 w-10 rounded-full object-cover"
+            />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-input text-sm font-semibold text-text-sec">
               {application.client.displayName.slice(0, 1).toUpperCase()}
