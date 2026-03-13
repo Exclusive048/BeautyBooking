@@ -478,9 +478,10 @@ export const openApiSpec = {
       },
       ProviderListData: {
         type: "object",
-        required: ["providers"],
+        required: ["providers", "nextCursor"],
         properties: {
           providers: { type: "array", items: { $ref: "#/components/schemas/ProviderCard" } },
+          nextCursor: { type: "string", nullable: true },
         },
       },
       ProviderProfileData: {
@@ -1965,6 +1966,10 @@ export const openApiSpec = {
       get: {
         summary: "List providers",
         tags: ["providers"],
+        parameters: [
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
+        ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/ProviderListData" }),
           "500": errorResponse("Internal error"),

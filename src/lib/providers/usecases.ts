@@ -9,8 +9,15 @@ import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 
 // AUDIT (section 5):
 // - Superpower badges are computed server-side from public review tags.
-export async function listProviders(): Promise<ProviderCardDto[]> {
-  return listProviderCards();
+export async function listProviders(input?: {
+  cursor?: string | null;
+  limit?: number;
+}): Promise<{ providers: ProviderCardDto[]; nextCursor: string | null }> {
+  const result = await listProviderCards(input);
+  return {
+    providers: result.items,
+    nextCursor: result.nextCursor,
+  };
 }
 
 export async function getProviderProfile(providerKey: string): Promise<ProviderProfileDto> {
