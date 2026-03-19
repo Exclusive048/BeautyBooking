@@ -7,7 +7,6 @@ import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { applySchedulePayload, type SchedulePayload } from "@/lib/schedule/unified";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestApproved } from "@/lib/notifications/studio-notifications";
-import { archiveScheduleChangeRequestById } from "@/lib/schedule/request-archive";
 
 export const runtime = "nodejs";
 
@@ -41,12 +40,9 @@ export async function POST(
 
     await applySchedulePayload(request.providerId, request.payloadJson as unknown as SchedulePayload);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.scheduleChangeRequest.update({
-        where: { id: request.id },
-        data: { status: "APPROVED" },
-      });
-      await archiveScheduleChangeRequestById(request.id, tx);
+    await prisma.scheduleChangeRequest.update({
+      where: { id: request.id },
+      data: { status: "APPROVED" },
     });
 
     try {
