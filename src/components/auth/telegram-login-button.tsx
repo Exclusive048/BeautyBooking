@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -14,13 +15,18 @@ type TelegramAuthUser = {
   hash: string;
 };
 
+type TelegramLoginButtonProps = {
+  iconOnly?: boolean;
+  className?: string;
+  showConfigError?: boolean;
+};
+
 declare global {
   interface Window {
     onTelegramAuth?: (user: TelegramAuthUser) => void;
   }
 }
 
-// Фирменная иконка Telegram
 function TelegramIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -29,13 +35,18 @@ function TelegramIcon({ className }: { className?: string }) {
   );
 }
 
-export default function TelegramLoginButton() {
+export default function TelegramLoginButton({
+  iconOnly = false,
+  className,
+  showConfigError = true,
+}: TelegramLoginButtonProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didInitRef = useRef(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const label = UI_TEXT.auth.telegram.loginButton;
 
   useEffect(() => {
     if (window.onTelegramAuth) return;
@@ -80,50 +91,77 @@ export default function TelegramLoginButton() {
     containerRef.current.appendChild(script);
   }, [botUsername]);
 
-  // Кликаем по скрытой telegram-кнопке
   function handleClick() {
-    const iframe = containerRef.current?.querySelector("iframe");
-    if (iframe) {
-      // Telegram widget рендерится как iframe — кликаем внутрь
+    const iframe = containerRef.current?.querySelector("iframe") as HTMLIFrameElement | null;
+    if (!iframe) return;
+
+    try {
       iframe.contentWindow?.document.querySelector("button")?.click();
-      // Fallback: прямой клик по iframe
-      iframe.click();
+    } catch {
+      // Ignore cross-origin access errors.
     }
+
+    iframe.click();
   }
 
+  const iconOnlyButton = (
+    <button
+      type="button"
+      onClick={botUsername ? handleClick : undefined}
+      disabled={!botUsername || loading}
+      aria-label={label}
+      title={botUsername ? label : UI_TEXT.auth.telegram.botNotConfigured}
+      className={cn(className, !botUsername && "opacity-50")}
+    >
+      <TelegramIcon className="h-5 w-5 text-[#2AABEE]" />
+      <span className="sr-only">{loading ? UI_TEXT.common.loading : label}</span>
+    </button>
+  );
+
   if (!botUsername) {
+    if (iconOnly) return iconOnlyButton;
+
     return (
       <div className="space-y-2">
         <button
           type="button"
           className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-border-subtle/80 bg-bg-input px-4 text-sm font-medium text-text-main opacity-50"
+          aria-label={label}
           disabled
         >
-          <TelegramIcon className="h-4 w-4" />
-          {UI_TEXT.auth.telegram.loginButton}
+          <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
+          {label}
         </button>
-        <div className="text-xs text-red-500">{UI_TEXT.auth.telegram.botNotConfigured}</div>
+        {showConfigError ? <div className="text-xs text-red-500">{UI_TEXT.auth.telegram.botNotConfigured}</div> : null}
       </div>
+    );
+  }
+
+  if (iconOnly) {
+    return (
+      <>
+        <div ref={containerRef} className="pointer-events-none absolute opacity-0" aria-hidden="true" />
+        {iconOnlyButton}
+      </>
     );
   }
 
   return (
     <div className="space-y-2">
-      {/* Скрытый виджет Telegram — нужен для обработки авторизации */}
       <div ref={containerRef} className="pointer-events-none absolute opacity-0" aria-hidden="true" />
-
-      {/* Кастомная кнопка в стиле проекта */}
       <button
         type="button"
         onClick={handleClick}
         disabled={loading}
+        aria-label={label}
         className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border-subtle/80 bg-bg-input px-4 text-sm font-medium text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/45 disabled:pointer-events-none disabled:opacity-50"
       >
         <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
-        {loading ? UI_TEXT.common.loading : UI_TEXT.auth.telegram.loginButton}
+        {loading ? UI_TEXT.common.loading : label}
       </button>
 
       {errorText ? <div className="text-center text-xs text-red-500">{errorText}</div> : null}
     </div>
   );
 }
+

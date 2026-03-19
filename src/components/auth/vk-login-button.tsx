@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
-// Фирменная иконка VK
+type VkLoginButtonProps = {
+  iconOnly?: boolean;
+  className?: string;
+};
+
 function VkIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -13,16 +18,28 @@ function VkIcon({ className }: { className?: string }) {
   );
 }
 
-export default function VkLoginButton() {
+export default function VkLoginButton({ iconOnly = false, className }: VkLoginButtonProps) {
   const vkEnabled = process.env.NEXT_PUBLIC_VK_ENABLED === "true";
   if (!vkEnabled) return null;
 
+  const label = UI_TEXT.auth.vk.loginButton;
+
+  if (iconOnly) {
+    return (
+      <Link href="/api/auth/vk/start" aria-label={label} title={label} className={cn(className)}>
+        <VkIcon className="h-5 w-5 text-[#0077FF]" />
+        <span className="sr-only">{label}</span>
+      </Link>
+    );
+  }
+
   return (
     <Button asChild variant="secondary" size="lg" className="w-full gap-2">
-      <Link href="/api/auth/vk/start">
+      <Link href="/api/auth/vk/start" aria-label={label}>
         <VkIcon className="h-4 w-4 text-[#0077FF]" />
-        {UI_TEXT.auth.vk.loginButton}
+        {label}
       </Link>
     </Button>
   );
 }
+
