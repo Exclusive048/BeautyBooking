@@ -2,13 +2,22 @@
 
 import { useRef, useState } from "react";
 import { UI_TEXT } from "@/lib/ui/text";
+import { SUPPORT_CONTACT_MAX_LENGTH, normalizeSupportContact } from "@/lib/support/contact";
 
 type TicketType = "bug" | "suggestion";
 
-export default function SupportPageClient() {
+type SupportPageClientProps = {
+  initialContact: string | null;
+};
+
+const CONTACT_LABEL = "\u041a\u0430\u043a \u0441 \u0432\u0430\u043c\u0438 \u0441\u0432\u044f\u0437\u0430\u0442\u044c\u0441\u044f";
+const CONTACT_PLACEHOLDER = "\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: email, Telegram, VK \u0438\u043b\u0438 \u0443\u0434\u043e\u0431\u043d\u044b\u0439 \u043a\u043e\u043d\u0442\u0430\u043a\u0442";
+
+export default function SupportPageClient({ initialContact }: SupportPageClientProps) {
   const [type, setType] = useState<TicketType>("bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [contact, setContact] = useState(initialContact ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -37,6 +46,7 @@ export default function SupportPageClient() {
     setSending(true);
 
     const pageUrl = typeof window === "undefined" ? null : window.location.href;
+    const normalizedContact = normalizeSupportContact(contact);
 
     try {
       const res = await fetch("/api/support/tickets", {
@@ -46,6 +56,7 @@ export default function SupportPageClient() {
           type,
           title: title.trim(),
           description: description.trim(),
+          contact: normalizedContact,
           fileName,
           pageUrl,
         }),
@@ -93,6 +104,7 @@ export default function SupportPageClient() {
             setSent(false);
             setTitle("");
             setDescription("");
+            setContact(initialContact ?? "");
             setFile(null);
             setType("bug");
             setError(null);
@@ -184,6 +196,25 @@ export default function SupportPageClient() {
           className="w-full resize-none rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
         />
         <p className="text-xs text-text-sec text-right">{description.length} / 2000</p>
+      </div>
+
+      {/* Contact */}
+      <div className="space-y-2">
+        <label htmlFor="contact" className="block text-sm font-medium text-text-main">
+          {CONTACT_LABEL}
+        </label>
+        <input
+          id="contact"
+          type="text"
+          value={contact}
+          onChange={(e) => setContact(e.target.value)}
+          placeholder={CONTACT_PLACEHOLDER}
+          maxLength={SUPPORT_CONTACT_MAX_LENGTH}
+          className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+        />
+        <p className="text-xs text-text-sec text-right">
+          {contact.length} / {SUPPORT_CONTACT_MAX_LENGTH}
+        </p>
       </div>
 
       {/* Attachment */}

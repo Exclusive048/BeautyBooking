@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import SupportPageClient from "./support-client";
+import { getSessionUser } from "@/lib/auth/session";
+import { logError } from "@/lib/logging/logger";
+import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -8,7 +11,29 @@ export const metadata: Metadata = {
   description: UI_TEXT.pages.support.description,
 };
 
-export default function SupportPage() {
+export default async function SupportPage() {
+  let initialContact: string | null = null;
+
+  try {
+    const user = await getSessionUser();
+    const resolved = await resolveSupportContactFromUser(
+      user
+        ? {
+            id: user.id,
+            email: user.email ?? null,
+            phone: user.phone ?? null,
+            telegramId: user.telegramId ?? null,
+          }
+        : null
+    );
+    initialContact = resolved.contact;
+  } catch (error) {
+    logError("Support page contact prefill failed", {
+      route: "GET /support",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return (
     <main className="mx-auto max-w-[680px] px-4 py-12 md:py-20 space-y-10">
 
@@ -54,7 +79,7 @@ export default function SupportPage() {
       {/* Form */}
       <div className="lux-card rounded-[24px] bg-bg-card p-7">
         <h2 className="text-lg font-semibold text-text-main mb-6">{UI_TEXT.pages.support.formTitle}</h2>
-        <SupportPageClient />
+        <SupportPageClient initialContact={initialContact} />
       </div>
     </main>
   );
