@@ -50,8 +50,8 @@ function buildFooterLinks() {
     { label: UI_TEXT.footer.links.faq, href: "/faq" },
     hasSupportPage
       ? { label: UI_TEXT.footer.links.contact, href: "/support" }
-      : { label: UI_TEXT.footer.links.contact, href: "mailto:support@МастерРядом.ru", external: true },
-    { label: UI_TEXT.footer.links.telegramSupport, href: "https://t.me/МастерРядом_support", external: true },
+      : { label: UI_TEXT.footer.links.contact, href: "mailto:support@мастеррядом.online", external: true },
+    { label: UI_TEXT.footer.links.telegramSupport, href: "https://t.me/masterryadom_support_bot", external: true },
     { label: UI_TEXT.footer.links.terms, href: "/terms" },
     { label: UI_TEXT.footer.links.privacy, href: "/privacy" },
   ];

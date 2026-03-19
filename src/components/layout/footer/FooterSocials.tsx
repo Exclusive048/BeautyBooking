@@ -22,7 +22,7 @@ const socials: SocialLink[] = [
   },
   {
     label: UI_TEXT.footer.socials.telegram,
-    href: "https://t.me/beautyhub_news",
+    href: "https://t.me/masterryadom_news",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
         <path

@@ -8,6 +8,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { normalizeSupportContact, resolveSupportContactFromUser } from "@/lib/support/contact";
 import { extractSmtpErrorDetails, maskSmtpIdentity, normalizeSmtpAddressList } from "@/lib/support/smtp";
+import {
+  getSupportAttachmentValidationMessage,
+  validateSupportAttachmentMeta,
+} from "@/lib/support/attachment";
 
 export const runtime = "nodejs";
 
@@ -21,7 +25,6 @@ const supportTicketSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().min(20).max(2000),
   contact: z.string().trim().max(200).nullable().optional(),
-  fileName: z.string().trim().max(200).nullable().optional(),
   pageUrl: z.string().trim().max(500).nullable().optional(),
 });
 
@@ -45,6 +48,12 @@ function normalizeOptional(value?: string | null): string | null {
   if (value === undefined || value === null) return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readFormText(formData: FormData, key: string): string | null {
+  const value = formData.get(key);
+  if (typeof value !== "string") return null;
+  return value;
 }
 
 function safePageForLog(pageUrl: string | null): string | null {
@@ -92,22 +101,72 @@ export async function POST(req: Request) {
   const requestId = getRequestId(req);
   const route = "POST /api/support/tickets";
 
-  let payload: unknown;
+  let formData: FormData;
   try {
-    payload = await req.json();
+    formData = await req.formData();
   } catch {
     return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
   }
 
-  const parsed = supportTicketSchema.safeParse(payload);
+  const parsed = supportTicketSchema.safeParse({
+    type: readFormText(formData, "type") ?? "",
+    title: readFormText(formData, "title") ?? "",
+    description: readFormText(formData, "description") ?? "",
+    contact: readFormText(formData, "contact"),
+    pageUrl: readFormText(formData, "pageUrl"),
+  });
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
   }
 
   const data = parsed.data;
+  const fileEntry = formData.get("file");
+  if (fileEntry !== null && !(fileEntry instanceof File)) {
+    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+  }
+
+  let attachment:
+    | {
+        file: File;
+        fileName: string;
+        mimeType: string;
+        size: number;
+      }
+    | null = null;
+
+  if (fileEntry instanceof File) {
+    const validation = validateSupportAttachmentMeta({
+      fileName: fileEntry.name,
+      mimeType: fileEntry.type,
+      size: fileEntry.size,
+    });
+    if (!validation.ok) {
+      logInfo("Support ticket attachment rejected", {
+        requestId,
+        route,
+        errorKind: "attachment_validation_failed",
+        attachmentValidationCode: validation.code,
+        attachmentSize: fileEntry.size,
+        attachmentMime: normalizeOptional(fileEntry.type),
+        attachmentNameLength: fileEntry.name.length,
+      });
+      return NextResponse.json(
+        { ok: false, error: getSupportAttachmentValidationMessage(validation.code) },
+        { status: 400 }
+      );
+    }
+
+    attachment = {
+      file: fileEntry,
+      fileName: validation.normalizedFileName,
+      mimeType: validation.normalizedMimeType,
+      size: validation.size,
+    };
+  }
+
   const ip = getFirstIp(req);
   const userAgent = normalizeOptional(req.headers.get("user-agent"));
-  const fileName = normalizeOptional(data.fileName);
+  const fileName = attachment?.fileName ?? null;
   const pageUrl = normalizeOptional(data.pageUrl);
   const user = await getSessionUser();
   const userId = user?.id ?? null;
@@ -138,6 +197,12 @@ export async function POST(req: Request) {
       });
     }
   }
+  const attachmentDiagnostics = {
+    hasAttachment: Boolean(attachment),
+    attachmentNameLength: attachment?.fileName.length ?? 0,
+    attachmentSize: attachment?.size ?? 0,
+    attachmentMime: attachment?.mimeType ?? null,
+  };
 
   const redis = await getRedisConnection();
   if (!redis) {
@@ -187,6 +252,7 @@ export async function POST(req: Request) {
       supportTo: maskSmtpIdentity(supportToRaw),
       hasPass: Boolean(smtpPass),
       passLength: smtpPass?.length ?? 0,
+      ...attachmentDiagnostics,
     });
     return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
   }
@@ -208,6 +274,7 @@ export async function POST(req: Request) {
       supportTo: maskSmtpIdentity(supportToRaw),
       hasPass: Boolean(smtpPass),
       passLength: smtpPass.length,
+      ...attachmentDiagnostics,
     });
     return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
   }
@@ -289,8 +356,7 @@ export async function POST(req: Request) {
       type: data.type,
       titleLength: data.title.length,
       descriptionLength: data.description.length,
-      hasAttachment: Boolean(fileName),
-      attachmentNameLength: fileName?.length ?? 0,
+      ...attachmentDiagnostics,
       pageUrl: safePageForLog(pageUrl),
       userId,
       ip,
@@ -302,11 +368,22 @@ export async function POST(req: Request) {
   }
 
   try {
+    const attachments = attachment
+      ? [
+          {
+            filename: attachment.fileName,
+            content: Buffer.from(await attachment.file.arrayBuffer()),
+            contentType: attachment.mimeType,
+          },
+        ]
+      : undefined;
+
     await transporter.sendMail({
       from: normalizedSmtpFrom.value,
       to: normalizedSupportTo.value,
       subject: `Support [${data.type}] ${safeTitle}`,
       text,
+      attachments,
     });
   } catch (error) {
     const smtpError = extractSmtpErrorDetails(error);
@@ -325,8 +402,7 @@ export async function POST(req: Request) {
       type: data.type,
       titleLength: data.title.length,
       descriptionLength: data.description.length,
-      hasAttachment: Boolean(fileName),
-      attachmentNameLength: fileName?.length ?? 0,
+      ...attachmentDiagnostics,
       pageUrl: safePageForLog(pageUrl),
       userId,
       ip,
@@ -343,8 +419,7 @@ export async function POST(req: Request) {
     type: data.type,
     titleLength: data.title.length,
     descriptionLength: data.description.length,
-    hasAttachment: Boolean(fileName),
-    attachmentNameLength: fileName?.length ?? 0,
+    ...attachmentDiagnostics,
     pageUrl: safePageForLog(pageUrl),
     userId,
     ip,

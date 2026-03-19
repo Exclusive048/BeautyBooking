@@ -3,6 +3,10 @@
 import { useRef, useState } from "react";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SUPPORT_CONTACT_MAX_LENGTH, normalizeSupportContact } from "@/lib/support/contact";
+import {
+  getSupportAttachmentValidationMessage,
+  validateSupportAttachmentMeta,
+} from "@/lib/support/attachment";
 
 type TicketType = "bug" | "suggestion";
 
@@ -27,6 +31,26 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextFile = e.target.files?.[0] ?? null;
+    if (!nextFile) {
+      setFile(null);
+      return;
+    }
+
+    const validation = validateSupportAttachmentMeta({
+      fileName: nextFile.name,
+      mimeType: nextFile.type,
+      size: nextFile.size,
+    });
+    if (!validation.ok) {
+      setError(getSupportAttachmentValidationMessage(validation.code));
+      setFile(null);
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
+      return;
+    }
+
+    setError(null);
     setFile(nextFile);
   };
 
@@ -47,19 +71,31 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
 
     const pageUrl = typeof window === "undefined" ? null : window.location.href;
     const normalizedContact = normalizeSupportContact(contact);
+    const formData = new FormData();
+    formData.append("type", type);
+    formData.append("title", title.trim());
+    formData.append("description", description.trim());
+    formData.append("contact", normalizedContact ?? "");
+    formData.append("pageUrl", pageUrl ?? "");
+
+    if (file) {
+      const validation = validateSupportAttachmentMeta({
+        fileName: file.name,
+        mimeType: file.type,
+        size: file.size,
+      });
+      if (!validation.ok) {
+        setError(getSupportAttachmentValidationMessage(validation.code));
+        setSending(false);
+        return;
+      }
+      formData.append("file", file, validation.normalizedFileName);
+    }
 
     try {
       const res = await fetch("/api/support/tickets", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          title: title.trim(),
-          description: description.trim(),
-          contact: normalizedContact,
-          fileName,
-          pageUrl,
-        }),
+        body: formData,
       });
 
       let payload: { ok?: boolean; error?: string } | null = null;

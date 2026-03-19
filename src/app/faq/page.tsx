@@ -60,7 +60,7 @@ export default function FaqPage() {
             {UI_TEXT.pages.faq.contactPrimary}
           </Link>
           <a
-            href="https://t.me/МастерРядом_support"
+            href="https://t.me/masterryadom_support_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
