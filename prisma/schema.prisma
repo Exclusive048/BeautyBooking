@@ -2183,6 +2183,36 @@ model ScheduleChangeRequest {
   @@index([studioId, status, createdAt])
 }
 
+model ScheduleChangeRequestArchive {
+  id String @id @default(cuid())
+
+  sourceRequestId String @unique
+
+  studioId String?
+
+  providerId String
+
+  createdAt DateTime
+
+  finalizedAt DateTime
+
+  finalStatus ScheduleChangeRequestStatus
+
+  statusHistoryJson Json
+
+  payloadJson Json
+
+  comment String?
+
+  sourceSnapshotJson Json?
+
+  archivedAt DateTime @default(now())
+
+  @@index([studioId, finalizedAt])
+  @@index([studioId, finalStatus, finalizedAt])
+  @@index([archivedAt])
+}
+
 model PortfolioItem {
   id String @id @default(cuid())
 

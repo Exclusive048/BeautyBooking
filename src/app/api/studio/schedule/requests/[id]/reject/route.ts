@@ -6,6 +6,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestRejected } from "@/lib/notifications/studio-notifications";
+import { archiveScheduleChangeRequestById } from "@/lib/schedule/request-archive";
 
 export const runtime = "nodejs";
 
@@ -43,9 +44,12 @@ export async function POST(
       return jsonFail(400, "Запрос уже обработан.", "VALIDATION_ERROR");
     }
 
-    await prisma.scheduleChangeRequest.update({
-      where: { id: request.id },
-      data: { status: "REJECTED", comment },
+    await prisma.$transaction(async (tx) => {
+      await tx.scheduleChangeRequest.update({
+        where: { id: request.id },
+        data: { status: "REJECTED", comment },
+      });
+      await archiveScheduleChangeRequestById(request.id, tx);
     });
 
     try {
