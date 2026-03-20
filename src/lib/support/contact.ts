@@ -1,12 +1,12 @@
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
+import {
+  normalizeSupportContact,
+  type SupportContactOption,
+  type SupportContactOptionKind,
+} from "@/lib/support/contact-shared";
 
-const CONTACT_BY_PROVIDER = {
-  telegram: "Telegram",
-  vk: "VK",
-  sms: "SMS",
-} as const;
-
-export type SupportContactSource = "email" | "telegram" | "vk" | "sms" | "none";
+export type SupportContactSource = SupportContactOptionKind | "none";
 
 type SupportContactUser = {
   id: string;
@@ -15,43 +15,65 @@ type SupportContactUser = {
   telegramId: string | null;
 };
 
-export const SUPPORT_CONTACT_MAX_LENGTH = 200;
-
-export function normalizeSupportContact(value?: string | null): string | null {
-  if (value === undefined || value === null) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, SUPPORT_CONTACT_MAX_LENGTH);
+function buildLabel(kind: SupportContactOptionKind, value: string): string {
+  if (kind === "phone") return `\u0422\u0435\u043b\u0435\u0444\u043e\u043d: ${value}`;
+  if (kind === "telegram") return `Telegram: ${value}`;
+  if (kind === "vk") return `VK: ${value}`;
+  return `Email: ${value}`;
 }
 
-export async function resolveSupportContactFromUser(
+function buildOption(kind: SupportContactOptionKind, value: string | null): SupportContactOption | null {
+  const normalized = normalizeSupportContact(value);
+  if (!normalized) return null;
+  const label = buildLabel(kind, normalized);
+  return {
+    kind,
+    value: label,
+    label,
+  };
+}
+
+function normalizePhoneForContact(input: string | null): string | null {
+  const normalized = normalizeSupportContact(input);
+  if (!normalized) return null;
+  return normalizeRussianPhone(normalized) ?? normalized;
+}
+
+export async function buildSupportContactOptionsFromUser(
   user: SupportContactUser | null | undefined
-): Promise<{ contact: string | null; source: SupportContactSource }> {
-  if (!user) {
-    return { contact: null, source: "none" };
-  }
+): Promise<SupportContactOption[]> {
+  if (!user) return [];
 
-  const email = normalizeSupportContact(user.email);
-  if (email) {
-    return { contact: email, source: "email" };
-  }
+  const options: SupportContactOption[] = [];
+  const seen = new Set<string>();
+  const pushUnique = (option: SupportContactOption | null) => {
+    if (!option || seen.has(option.value)) return;
+    seen.add(option.value);
+    options.push(option);
+  };
 
-  if (normalizeSupportContact(user.telegramId)) {
-    return { contact: CONTACT_BY_PROVIDER.telegram, source: "telegram" };
-  }
+  pushUnique(buildOption("phone", normalizePhoneForContact(user.phone)));
+  pushUnique(buildOption("telegram", user.telegramId));
 
   const vkLink = await prisma.vkLink.findUnique({
     where: { userId: user.id },
     select: { vkUserId: true },
   });
-  if (normalizeSupportContact(vkLink?.vkUserId ?? null)) {
-    return { contact: CONTACT_BY_PROVIDER.vk, source: "vk" };
-  }
+  pushUnique(buildOption("vk", vkLink?.vkUserId ?? null));
+  pushUnique(buildOption("email", user.email));
 
-  if (normalizeSupportContact(user.phone)) {
-    return { contact: CONTACT_BY_PROVIDER.sms, source: "sms" };
-  }
+  return options;
+}
 
-  return { contact: null, source: "none" };
+export async function resolveSupportContactFromUser(
+  user: SupportContactUser | null | undefined
+): Promise<{ contact: string | null; source: SupportContactSource; options: SupportContactOption[] }> {
+  const options = await buildSupportContactOptionsFromUser(user);
+  const first = options[0] ?? null;
+  return {
+    contact: first?.value ?? null,
+    source: first?.kind ?? "none",
+    options,
+  };
 }
 

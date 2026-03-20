@@ -4,6 +4,7 @@ import SupportPageClient from "./support-client";
 import { getSessionUser } from "@/lib/auth/session";
 import { logError } from "@/lib/logging/logger";
 import { resolveSupportContactFromUser } from "@/lib/support/contact";
+import type { SupportContactOption } from "@/lib/support/contact-shared";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function SupportPage() {
-  let initialContact: string | null = null;
+  let contactOptions: SupportContactOption[] = [];
 
   try {
     const user = await getSessionUser();
@@ -26,7 +27,7 @@ export default async function SupportPage() {
           }
         : null
     );
-    initialContact = resolved.contact;
+    contactOptions = resolved.options;
   } catch (error) {
     logError("Support page contact prefill failed", {
       route: "GET /support",
@@ -79,7 +80,7 @@ export default async function SupportPage() {
       {/* Form */}
       <div className="lux-card rounded-[24px] bg-bg-card p-7">
         <h2 className="text-lg font-semibold text-text-main mb-6">{UI_TEXT.pages.support.formTitle}</h2>
-        <SupportPageClient initialContact={initialContact} />
+        <SupportPageClient contactOptions={contactOptions} />
       </div>
     </main>
   );

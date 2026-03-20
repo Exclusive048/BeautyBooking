@@ -6,7 +6,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRedisConnection } from "@/lib/redis/connection";
-import { normalizeSupportContact, resolveSupportContactFromUser } from "@/lib/support/contact";
+import { resolveSupportContactFromUser } from "@/lib/support/contact";
+import { normalizeSupportContact } from "@/lib/support/contact-shared";
 import { extractSmtpErrorDetails, maskSmtpIdentity, normalizeSmtpAddressList } from "@/lib/support/smtp";
 import {
   getSupportAttachmentValidationMessage,
@@ -25,13 +26,14 @@ const supportTicketSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().min(20).max(2000),
   contact: z.string().trim().max(200).nullable().optional(),
+  contactSource: z.enum(["profile_option", "manual_input"]).optional(),
   pageUrl: z.string().trim().max(500).nullable().optional(),
 });
 
 const RATE_LIMIT = 5;
 const RATE_WINDOW_SECONDS = 10 * 60;
 
-type ContactSource = "client_input" | "email" | "telegram" | "vk" | "sms" | "none";
+type ContactSource = "profile_option" | "manual_input" | "none";
 
 function getFirstIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -113,6 +115,7 @@ export async function POST(req: Request) {
     title: readFormText(formData, "title") ?? "",
     description: readFormText(formData, "description") ?? "",
     contact: readFormText(formData, "contact"),
+    contactSource: readFormText(formData, "contactSource") ?? undefined,
     pageUrl: readFormText(formData, "pageUrl"),
   });
   if (!parsed.success) {
@@ -170,33 +173,51 @@ export async function POST(req: Request) {
   const pageUrl = normalizeOptional(data.pageUrl);
   const user = await getSessionUser();
   const userId = user?.id ?? null;
-
-  let contact = normalizeSupportContact(data.contact);
-  let contactSource: ContactSource = contact ? "client_input" : "none";
-
-  if (!contact) {
-    try {
-      const resolved = await resolveSupportContactFromUser(
-        user
-          ? {
-              id: user.id,
-              email: user.email ?? null,
-              phone: user.phone ?? null,
-              telegramId: user.telegramId ?? null,
-            }
-          : null
-      );
-      contact = normalizeSupportContact(resolved.contact);
-      contactSource = resolved.source;
-    } catch (error) {
-      logError("Support ticket contact fallback resolve failed", {
-        requestId,
-        route,
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+  let profileContactValues: string[] = [];
+  let fallbackProfileContact: string | null = null;
+  try {
+    const resolved = await resolveSupportContactFromUser(
+      user
+        ? {
+            id: user.id,
+            email: user.email ?? null,
+            phone: user.phone ?? null,
+            telegramId: user.telegramId ?? null,
+          }
+        : null
+    );
+    profileContactValues = resolved.options.map((option) => option.value);
+    fallbackProfileContact = normalizeSupportContact(resolved.contact);
+  } catch (error) {
+    logError("Support ticket contact fallback resolve failed", {
+      requestId,
+      route,
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
+
+  const profileContactSet = new Set(profileContactValues);
+  const incomingContact = normalizeSupportContact(data.contact);
+  let contact = incomingContact;
+  let contactSource: ContactSource = "none";
+
+  if (incomingContact) {
+    if (data.contactSource === "profile_option") {
+      if (!profileContactSet.has(incomingContact)) {
+        return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+      }
+      contactSource = "profile_option";
+    } else if (data.contactSource === "manual_input") {
+      contactSource = "manual_input";
+    } else {
+      contactSource = profileContactSet.has(incomingContact) ? "profile_option" : "manual_input";
+    }
+  } else if (fallbackProfileContact) {
+    contact = fallbackProfileContact;
+    contactSource = "profile_option";
+  }
+
   const attachmentDiagnostics = {
     hasAttachment: Boolean(attachment),
     attachmentNameLength: attachment?.fileName.length ?? 0,

@@ -1,31 +1,49 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { UI_TEXT } from "@/lib/ui/text";
-import { SUPPORT_CONTACT_MAX_LENGTH, normalizeSupportContact } from "@/lib/support/contact";
+import {
+  SUPPORT_CONTACT_MAX_LENGTH,
+  normalizeSupportContact,
+  type SupportContactInputSource,
+  type SupportContactOption,
+} from "@/lib/support/contact-shared";
 import {
   getSupportAttachmentValidationMessage,
   validateSupportAttachmentMeta,
 } from "@/lib/support/attachment";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type TicketType = "bug" | "suggestion";
 
 type SupportPageClientProps = {
-  initialContact: string | null;
+  contactOptions: SupportContactOption[];
 };
 
 const CONTACT_LABEL = "\u041a\u0430\u043a \u0441 \u0432\u0430\u043c\u0438 \u0441\u0432\u044f\u0437\u0430\u0442\u044c\u0441\u044f";
-const CONTACT_PLACEHOLDER = "\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: email, Telegram, VK \u0438\u043b\u0438 \u0443\u0434\u043e\u0431\u043d\u044b\u0439 \u043a\u043e\u043d\u0442\u0430\u043a\u0442";
+const CONTACT_PLACEHOLDER =
+  "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 / \u043f\u043e\u0447\u0442\u0430 / Telegram ID";
+const CONTACT_CUSTOM_ACTION =
+  "\u0423\u043a\u0430\u0437\u0430\u0442\u044c \u0434\u0440\u0443\u0433\u043e\u0439 \u0441\u043f\u043e\u0441\u043e\u0431 \u0441\u0432\u044f\u0437\u0438";
+const CONTACT_ADD_ACTION =
+  "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0441\u043f\u043e\u0441\u043e\u0431 \u0441\u0432\u044f\u0437\u0438";
+const CONTACT_SELECT_ID = "contact-select";
+const CONTACT_MANUAL_ID = "contact-manual";
 
-export default function SupportPageClient({ initialContact }: SupportPageClientProps) {
+export default function SupportPageClient({ contactOptions }: SupportPageClientProps) {
+  const hasProfileOptions = contactOptions.length > 0;
+  const firstProfileContact = contactOptions[0]?.value ?? "";
+
   const [type, setType] = useState<TicketType>("bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [contact, setContact] = useState(initialContact ?? "");
+  const [selectedProfileContact, setSelectedProfileContact] = useState(firstProfileContact);
+  const [manualContact, setManualContact] = useState("");
+  const [showManualContact, setShowManualContact] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const fileName = file?.name ?? null;
 
@@ -44,9 +62,7 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
     if (!validation.ok) {
       setError(getSupportAttachmentValidationMessage(validation.code));
       setFile(null);
-      if (fileRef.current) {
-        fileRef.current.value = "";
-      }
+      if (fileRef.current) fileRef.current.value = "";
       return;
     }
 
@@ -58,24 +74,48 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
     e.preventDefault();
     setError(null);
 
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
+    if (!trimmedTitle) {
       setError(UI_TEXT.pages.support.form.errorTitleRequired);
       return;
     }
-    if (!description.trim() || description.trim().length < 20) {
+    if (!trimmedDescription || trimmedDescription.length < 20) {
       setError(UI_TEXT.pages.support.form.errorDescriptionRequired);
       return;
     }
 
-    setSending(true);
+    const normalizedManualContact = normalizeSupportContact(manualContact);
+    const normalizedProfileContact = normalizeSupportContact(selectedProfileContact);
 
+    let normalizedContact: string | null = null;
+    let contactSource: SupportContactInputSource | null = null;
+
+    if (showManualContact && normalizedManualContact) {
+      normalizedContact = normalizedManualContact;
+      contactSource = "manual_input";
+    } else if (hasProfileOptions && normalizedProfileContact) {
+      normalizedContact = normalizedProfileContact;
+      contactSource = "profile_option";
+    }
+
+    if (
+      contactSource === "profile_option" &&
+      !contactOptions.some((option) => option.value === normalizedContact)
+    ) {
+      setError(UI_TEXT.pages.support.form.errorSendFailed);
+      return;
+    }
+
+    setSending(true);
     const pageUrl = typeof window === "undefined" ? null : window.location.href;
-    const normalizedContact = normalizeSupportContact(contact);
+
     const formData = new FormData();
     formData.append("type", type);
-    formData.append("title", title.trim());
-    formData.append("description", description.trim());
+    formData.append("title", trimmedTitle);
+    formData.append("description", trimmedDescription);
     formData.append("contact", normalizedContact ?? "");
+    if (contactSource) formData.append("contactSource", contactSource);
     formData.append("pageUrl", pageUrl ?? "");
 
     if (file) {
@@ -127,28 +167,26 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-24 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl">
-          ✅
+          {"\u2714\uFE0F"}
         </div>
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.support.form.successTitle}</h2>
-          <p className="text-sm text-text-sec max-w-[360px]">
-            {UI_TEXT.pages.support.form.successDescription}
-          </p>
+          <p className="max-w-[360px] text-sm text-text-sec">{UI_TEXT.pages.support.form.successDescription}</p>
         </div>
         <button
           onClick={() => {
             setSent(false);
             setTitle("");
             setDescription("");
-            setContact(initialContact ?? "");
+            setSelectedProfileContact(firstProfileContact);
+            setManualContact("");
+            setShowManualContact(false);
             setFile(null);
             setType("bug");
             setError(null);
-            if (fileRef.current) {
-              fileRef.current.value = "";
-            }
+            if (fileRef.current) fileRef.current.value = "";
           }}
-          className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
+          className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main transition-colors hover:bg-bg-card"
         >
           {UI_TEXT.pages.support.form.successAction}
         </button>
@@ -158,8 +196,6 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-
-      {/* Type selector */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-text-main">{UI_TEXT.pages.support.form.typeLabel}</label>
         <div className="grid grid-cols-2 gap-3">
@@ -183,18 +219,17 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
               onClick={() => setType(opt.value)}
               className={`lux-card rounded-[16px] p-4 text-left transition-all ${
                 type === opt.value
-                  ? "ring-2 ring-primary/50 bg-bg-card"
+                  ? "bg-bg-card ring-2 ring-primary/50"
                   : "bg-bg-card opacity-70 hover:opacity-100"
               }`}
             >
               <p className="text-sm font-medium text-text-main">{opt.label}</p>
-              <p className="text-xs text-text-sec mt-0.5">{opt.desc}</p>
+              <p className="mt-0.5 text-xs text-text-sec">{opt.desc}</p>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Title */}
       <div className="space-y-2">
         <label htmlFor="title" className="block text-sm font-medium text-text-main">
           {UI_TEXT.pages.support.form.titleLabel} <span className="text-red-500">*</span>
@@ -210,11 +245,10 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
               : UI_TEXT.pages.support.form.titlePlaceholderSuggestion
           }
           maxLength={120}
-          className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
-      {/* Description */}
       <div className="space-y-2">
         <label htmlFor="description" className="block text-sm font-medium text-text-main">
           {UI_TEXT.pages.support.form.descriptionLabel} <span className="text-red-500">*</span>
@@ -229,38 +263,79 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
               ? UI_TEXT.pages.support.form.descriptionPlaceholderBug
               : UI_TEXT.pages.support.form.descriptionPlaceholderSuggestion
           }
-          className="w-full resize-none rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          className="w-full resize-none rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
-        <p className="text-xs text-text-sec text-right">{description.length} / 2000</p>
+        <p className="text-right text-xs text-text-sec">{description.length} / 2000</p>
       </div>
 
-      {/* Contact */}
       <div className="space-y-2">
-        <label htmlFor="contact" className="block text-sm font-medium text-text-main">
+        <label
+          htmlFor={hasProfileOptions ? CONTACT_SELECT_ID : showManualContact ? CONTACT_MANUAL_ID : undefined}
+          className="block text-sm font-medium text-text-main"
+        >
           {CONTACT_LABEL}
         </label>
-        <input
-          id="contact"
-          type="text"
-          value={contact}
-          onChange={(e) => setContact(e.target.value)}
-          placeholder={CONTACT_PLACEHOLDER}
-          maxLength={SUPPORT_CONTACT_MAX_LENGTH}
-          className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-        />
-        <p className="text-xs text-text-sec text-right">
-          {contact.length} / {SUPPORT_CONTACT_MAX_LENGTH}
-        </p>
+
+        {hasProfileOptions ? (
+          <div className="space-y-2">
+            <select
+              id={CONTACT_SELECT_ID}
+              value={selectedProfileContact}
+              onChange={(e) => setSelectedProfileContact(e.target.value)}
+              className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              {contactOptions.map((option) => (
+                <option key={`${option.kind}-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            {!showManualContact ? (
+              <button
+                type="button"
+                onClick={() => setShowManualContact(true)}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                {CONTACT_CUSTOM_ACTION}
+              </button>
+            ) : null}
+          </div>
+        ) : !showManualContact ? (
+          <button
+            type="button"
+            onClick={() => setShowManualContact(true)}
+            className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-4 text-sm font-medium text-text-main transition-colors hover:bg-bg-card"
+          >
+            {CONTACT_ADD_ACTION}
+          </button>
+        ) : null}
+
+        {showManualContact ? (
+          <div className="space-y-2">
+            <input
+              id={CONTACT_MANUAL_ID}
+              type="text"
+              value={manualContact}
+              onChange={(e) => setManualContact(e.target.value)}
+              placeholder={CONTACT_PLACEHOLDER}
+              maxLength={SUPPORT_CONTACT_MAX_LENGTH}
+              className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <p className="text-right text-xs text-text-sec">
+              {manualContact.length} / {SUPPORT_CONTACT_MAX_LENGTH}
+            </p>
+          </div>
+        ) : null}
       </div>
 
-      {/* Attachment */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-text-main">
           {UI_TEXT.pages.support.form.attachmentLabel}{" "}
-          <span className="text-text-sec font-normal">{UI_TEXT.pages.support.form.attachmentOptional}</span>
+          <span className="font-normal text-text-sec">{UI_TEXT.pages.support.form.attachmentOptional}</span>
         </label>
         <div
-          className="lux-card rounded-[16px] bg-bg-card border-2 border-dashed border-border-subtle p-6 text-center cursor-pointer hover:border-primary/40 transition-colors"
+          className="lux-card cursor-pointer rounded-[16px] border-2 border-dashed border-border-subtle bg-bg-card p-6 text-center transition-colors hover:border-primary/40"
           onClick={() => fileRef.current?.click()}
         >
           {fileName ? (
@@ -284,29 +359,22 @@ export default function SupportPageClient({ initialContact }: SupportPageClientP
           className="hidden"
           onChange={handleFileChange}
         />
-        <p className="text-xs text-text-sec">
-          {UI_TEXT.pages.support.form.attachmentNote}
-        </p>
+        <p className="text-xs text-text-sec">{UI_TEXT.pages.support.form.attachmentNote}</p>
       </div>
 
-      {/* Privacy note */}
-      <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-xs text-text-sec leading-relaxed">
+      <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-xs leading-relaxed text-text-sec">
         {UI_TEXT.pages.support.form.privacyNote}
       </div>
       <div className="text-xs text-text-sec">{UI_TEXT.pages.support.form.responseNote}</div>
 
-      {/* Error */}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      ) : null}
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={sending}
-        className="w-full inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-sm font-semibold text-white shadow-card hover:brightness-105 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-sm font-semibold text-white shadow-card transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {sending ? UI_TEXT.pages.support.form.submitSending : UI_TEXT.pages.support.form.submit}
       </button>
