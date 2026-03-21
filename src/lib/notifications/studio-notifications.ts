@@ -63,10 +63,42 @@ function resolveUserLabel(input: {
   return input.fallback;
 }
 
+function buildPhoneCandidates(phone: string): string[] {
+  const candidates = new Set<string>();
+  const raw = phone.trim();
+  if (raw) {
+    candidates.add(raw);
+  }
+
+  const normalized = normalizeRussianPhone(phone);
+  if (!normalized) {
+    return Array.from(candidates);
+  }
+
+  const localNumber = normalized.slice(2);
+  candidates.add(normalized);
+  candidates.add(`+8${localNumber}`);
+  candidates.add(`8${localNumber}`);
+  candidates.add(`7${localNumber}`);
+  candidates.add(`+7${localNumber}`);
+
+  return Array.from(candidates);
+}
+
+async function resolveInviteRecipientUserId(phone: string): Promise<string | null> {
+  const phoneCandidates = buildPhoneCandidates(phone);
+  if (phoneCandidates.length === 0) return null;
+  const invitedUser = await prisma.userProfile.findFirst({
+    where: { phone: { in: phoneCandidates } },
+    select: { id: true },
+  });
+  return invitedUser?.id ?? null;
+}
+
 async function resolveInviteUserLabel(invite: InviteWithRelations): Promise<string> {
-  const normalizedPhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
-  const profile = await prisma.userProfile.findUnique({
-    where: { phone: normalizedPhone },
+  const phoneCandidates = buildPhoneCandidates(invite.phone);
+  const profile = await prisma.userProfile.findFirst({
+    where: { phone: { in: phoneCandidates } },
     select: { displayName: true, firstName: true, lastName: true, phone: true },
   });
   return resolveUserLabel({
@@ -103,12 +135,8 @@ export async function loadScheduleRequestWithRelations(
 }
 
 export async function notifyStudioInviteReceived(invite: InviteWithRelations): Promise<void> {
-  const normalizedPhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
-  const invitedUser = await prisma.userProfile.findUnique({
-    where: { phone: normalizedPhone },
-    select: { id: true },
-  });
-  if (!invitedUser) return;
+  const invitedUserId = await resolveInviteRecipientUserId(invite.phone);
+  if (!invitedUserId) return;
 
   const studioName = invite.studio.provider.name || "Студия";
   const inviterLabel = resolveUserLabel({
@@ -123,7 +151,7 @@ export async function notifyStudioInviteReceived(invite: InviteWithRelations): P
   const body = `Вас пригласили в студию ${studioName}. Пригласил(а): ${inviterLabel}.`;
 
   await deliverNotification({
-    userId: invitedUser.id,
+    userId: invitedUserId,
     type: NotificationType.STUDIO_INVITE_RECEIVED,
     title,
     body,
