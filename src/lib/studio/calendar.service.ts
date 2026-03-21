@@ -7,6 +7,7 @@ export type StudioCalendarMaster = {
   id: string;
   name: string;
   isActive: boolean;
+  avatarUrl: string | null;
 };
 
 export type StudioCalendarBooking = {
@@ -87,7 +88,7 @@ export async function getStudioCalendar(input: {
       studioId: studio.providerId,
       ...(masterFilter ? { id: { in: masterFilter } } : {}),
     },
-    select: { id: true, name: true, isPublished: true },
+    select: { id: true, name: true, isPublished: true, avatarUrl: true },
     orderBy: { name: "asc" },
   });
 
@@ -139,6 +140,7 @@ export async function getStudioCalendar(input: {
       id: master.id,
       name: master.name,
       isActive: master.isPublished,
+      avatarUrl: master.avatarUrl ?? null,
     })),
     bookings: bookings.map((booking) => ({
       id: booking.id,

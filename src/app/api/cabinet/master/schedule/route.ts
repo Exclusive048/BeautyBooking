@@ -1,4 +1,4 @@
-import { ScheduleMode } from "@prisma/client";
+import { ScheduleMode, StudioRole } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { ensureStudioRole } from "@/lib/studio/access";
 
 export const runtime = "nodejs";
 
@@ -67,6 +68,48 @@ const WEEK_TEMPLATE_OPTIONS: WeekTemplateDto[] = [
   { id: "standard", label: "\u0421\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u0430\u044f \u043f\u044f\u0442\u0438\u0434\u043d\u0435\u0432\u043a\u0430" },
   { id: "2x2", label: "2 \u0447\u0435\u0440\u0435\u0437 2" },
 ];
+
+async function resolveTargetProviderId(req: Request, userId: string): Promise<string> {
+  const url = new URL(req.url);
+  const studioId = url.searchParams.get("studioId")?.trim() ?? "";
+  const masterId = url.searchParams.get("masterId")?.trim() ?? "";
+
+  if (!studioId && !masterId) {
+    return getCurrentMasterProviderId(userId);
+  }
+
+  if (!studioId || !masterId) {
+    throw new AppError("Validation error", 400, "VALIDATION_ERROR");
+  }
+
+  await ensureStudioRole({
+    studioId,
+    userId,
+    allowed: [StudioRole.OWNER, StudioRole.ADMIN],
+  });
+
+  const studio = await prisma.studio.findUnique({
+    where: { id: studioId },
+    select: { providerId: true },
+  });
+  if (!studio) {
+    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+  }
+
+  const master = await prisma.provider.findFirst({
+    where: {
+      id: masterId,
+      type: "MASTER",
+      studioId: studio.providerId,
+    },
+    select: { id: true },
+  });
+  if (!master) {
+    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+  }
+
+  return master.id;
+}
 
 function normalizeTime(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -506,7 +549,7 @@ export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
-    const providerId = await getCurrentMasterProviderId(user.id);
+    const providerId = await resolveTargetProviderId(req, user.id);
     const data = await buildScheduleResponse(providerId);
     return jsonOk(data);
   } catch (error) {
@@ -526,7 +569,7 @@ export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
-    const providerId = await getCurrentMasterProviderId(user.id);
+    const providerId = await resolveTargetProviderId(req, user.id);
 
     const body = (await req.json().catch(() => null)) as PatchBody | null;
     if (!body || typeof body !== "object") {

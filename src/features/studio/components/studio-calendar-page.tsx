@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ScheduleBuilder } from "@/features/schedule/components/schedule-builder";
+import { MasterScheduleEditor } from "@/features/cabinet/master/schedule/master-schedule-editor";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -18,6 +18,8 @@ type CalendarView = "day" | "week" | "month";
 type CalendarMaster = {
   id: string;
   name: string;
+  isActive: boolean;
+  avatarUrl: string | null;
 };
 
 type CalendarBooking = {
@@ -116,6 +118,18 @@ function dayLabel(dateKey: string, timeZone: string): string {
   });
 }
 
+function masterInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "M";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
+}
+
+function buildMasterScheduleApiPath(studioId: string, masterId: string): string {
+  const params = new URLSearchParams({ studioId, masterId });
+  return `/api/cabinet/master/schedule?${params.toString()}`;
+}
+
 function CalendarBookingChat({ bookingId }: { bookingId: string }) {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -156,6 +170,8 @@ export function StudioCalendarPage({ studioId }: Props) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const [monthDetailsDay, setMonthDetailsDay] = useState<string | null>(null);
+  const [activeScheduleMasterId, setActiveScheduleMasterId] = useState<string | null>(null);
+  const [visitedScheduleMasterIds, setVisitedScheduleMasterIds] = useState<string[]>([]);
 
   const load = async (): Promise<void> => {
     setLoading(true);
@@ -236,6 +252,31 @@ export function StudioCalendarPage({ studioId }: Props) {
     }
   }, [serviceFilter, serviceOptions]);
 
+  useEffect(() => {
+    if (data.masters.length === 0) {
+      setActiveScheduleMasterId(null);
+      setVisitedScheduleMasterIds([]);
+      return;
+    }
+    setActiveScheduleMasterId((current) => {
+      if (current && data.masters.some((master) => master.id === current)) {
+        return current;
+      }
+      return data.masters[0].id;
+    });
+    setVisitedScheduleMasterIds((current) => {
+      const available = new Set(data.masters.map((master) => master.id));
+      return current.filter((id) => available.has(id));
+    });
+  }, [data.masters]);
+
+  useEffect(() => {
+    if (!activeScheduleMasterId) return;
+    setVisitedScheduleMasterIds((current) =>
+      current.includes(activeScheduleMasterId) ? current : [...current, activeScheduleMasterId]
+    );
+  }, [activeScheduleMasterId]);
+
   const filteredBookings = useMemo(() => {
     const q = query.trim().toLowerCase();
     return data.bookings.filter((booking) => {
@@ -312,6 +353,9 @@ export function StudioCalendarPage({ studioId }: Props) {
     return { bookings, blocks };
   }, [blocksByDay, bookingsByDay, monthDetailsDay]);
 
+  const mastersById = useMemo(() => new Map(data.masters.map((master) => [master.id, master])), [data.masters]);
+  const activeScheduleMaster = activeScheduleMasterId ? mastersById.get(activeScheduleMasterId) ?? null : null;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -326,7 +370,98 @@ export function StudioCalendarPage({ studioId }: Props) {
       </div>
 
       {panel === "schedule" ? (
-        <ScheduleBuilder />
+        <>
+          {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{t.loading}</div> : null}
+          {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+
+          {!loading && data.masters.length === 0 ? (
+            <div className="lux-card rounded-[24px] p-5">
+              <h3 className="text-base font-semibold">{t.noMasters}</h3>
+              <p className="mt-1 text-sm text-text-sec">Выберите мастера и настройте его личный график.</p>
+              <Link
+                href="/cabinet/studio/team"
+                className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm hover:bg-bg-card"
+              >
+                {t.goToTeam}
+              </Link>
+            </div>
+          ) : null}
+
+          {!loading && data.masters.length > 0 ? (
+            <div className="space-y-4">
+              <section className="lux-card rounded-[24px] p-4">
+                <header className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-text-main">График мастеров студии</h3>
+                    <p className="mt-1 text-sm text-text-sec">Выберите мастера и настройте его личный график.</p>
+                  </div>
+                  {activeScheduleMaster ? (
+                    <div className="text-xs text-text-sec">
+                      Редактируете: <span className="font-medium text-text-main">{activeScheduleMaster.name}</span>
+                    </div>
+                  ) : null}
+                </header>
+
+                <div className="mt-3 overflow-x-auto pb-1">
+                  <div className="flex min-w-max gap-2 pr-1">
+                    {data.masters.map((master) => {
+                      const isActive = master.id === activeScheduleMasterId;
+                      return (
+                        <button
+                          key={master.id}
+                          type="button"
+                          onClick={() => setActiveScheduleMasterId(master.id)}
+                          aria-pressed={isActive}
+                          className={`w-[116px] shrink-0 rounded-2xl border px-3 py-3 text-center transition-all ${
+                            isActive
+                              ? "border-primary/45 bg-primary/10 shadow-card"
+                              : "border-border-subtle bg-bg-input/50 hover:bg-bg-card"
+                          }`}
+                        >
+                          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-bg-card text-sm font-semibold text-text-main">
+                            {master.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={master.avatarUrl} alt={master.name} className="h-full w-full object-cover" />
+                            ) : (
+                              <span>{masterInitials(master.name)}</span>
+                            )}
+                          </div>
+                          <div className="truncate text-sm font-medium text-text-main">{master.name}</div>
+                          <div className={`mt-1 text-[11px] ${master.isActive ? "Профиль опубликован" : "Профиль скрыт"}`}>
+                            {master.isActive ? "Профиль опубликован" : "Профиль скрыт"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <p className="mt-3 text-xs text-text-sec">
+                  Черновик изменений хранится отдельно для каждого мастера, пока вы не нажмёте сохранение в его графике.
+                </p>
+              </section>
+
+              <section className="space-y-3">
+                {visitedScheduleMasterIds.map((masterId) => {
+                  const master = mastersById.get(masterId);
+                  if (!master) return null;
+                  const isActive = master.id === activeScheduleMasterId;
+
+                  return (
+                    <div key={master.id} className={isActive ? "block" : "hidden"}>
+                      <div className="rounded-2xl border border-border-subtle bg-bg-input/50 px-3 py-2 text-sm text-text-sec">
+                        Расписание мастера: <span className="font-medium text-text-main">{master.name}</span>
+                      </div>
+                      <div className="mt-3">
+                        <MasterScheduleEditor apiPath={buildMasterScheduleApiPath(studioId, master.id)} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            </div>
+          ) : null}
+        </>
       ) : (
         <>
           <div className="lux-card rounded-[24px] p-4">

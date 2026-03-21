@@ -124,7 +124,7 @@ function normalizeSlots(values: string[]): string[] {
   return Array.from(unique).sort((left, right) => left.localeCompare(right));
 }
 
-export function MasterScheduleEditor() {
+export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" }: { apiPath?: string }) {
   const [timezone, setTimezone] = useState("Europe/Moscow");
   const [week, setWeek] = useState<DaySchedule[]>([]);
   const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
@@ -190,7 +190,7 @@ export function MasterScheduleEditor() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchWithAuth("/api/cabinet/master/schedule", { cache: "no-store" });
+      const response = await fetchWithAuth(apiPath, { cache: "no-store" });
       const json = (await response.json().catch(() => null)) as ApiResponse<SchedulePayload> | null;
       if (!response.ok || !json || !json.ok) throw new Error(json && !json.ok ? json.error.message : T.errors.load);
       applyPayload(json.data);
@@ -199,14 +199,14 @@ export function MasterScheduleEditor() {
     } finally {
       setLoading(false);
     }
-  }, [applyPayload]);
+  }, [apiPath, applyPayload]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const patch = useCallback(async (body: unknown) => {
-    const response = await fetchWithAuth("/api/cabinet/master/schedule", {
+    const response = await fetchWithAuth(apiPath, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -216,7 +216,7 @@ export function MasterScheduleEditor() {
     applyPayload(json.data);
     setInfo(T.saved);
     window.setTimeout(() => setInfo(null), 2500);
-  }, [applyPayload]);
+  }, [apiPath, applyPayload]);
 
   const updateDay = (dayIndex: number, patchDay: Partial<DaySchedule>) => {
     setWeek((current) => current.map((item) => (item.dayOfWeek === dayIndex ? { ...item, ...patchDay } : item)));
