@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { MasterSchedulePage } from "@/features/master/components/master-schedule-page";
 import { getSessionUser } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderContext } from "@/lib/master/access";
 
 export default async function MasterScheduleRoute() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  await getCurrentMasterProviderId(user.id);
+  const provider = await getCurrentMasterProviderContext(user.id);
 
-  return <MasterSchedulePage />;
+  return <MasterSchedulePage isStudioManaged={Boolean(provider.studioId)} />;
 }
