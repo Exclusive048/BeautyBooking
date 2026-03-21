@@ -587,13 +587,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
           ) : null}
 
           {activeTab === "services" ? (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-bg-card/90 p-4">
-                <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.servicesTitle}</h3>
-                <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.sections.servicesDesc}</p>
-              </div>
-              <StudioServicesPage studioId={studioId} />
-            </div>
+            <StudioServicesPage studioId={studioId} />
           ) : null}
 
           {activeTab === "portfolio" ? (

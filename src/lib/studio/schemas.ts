@@ -102,6 +102,7 @@ export const reorderStudioServicesSchema = z.object({
 export const assignMasterToServiceSchema = z.object({
   studioId: z.string().trim().min(1),
   masterId: z.string().trim().min(1),
+  isEnabled: z.boolean().optional(),
 });
 
 export const studioMasterQuerySchema = z.object({

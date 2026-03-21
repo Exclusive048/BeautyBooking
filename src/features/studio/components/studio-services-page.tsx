@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, Settings2, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { moneyRUBPlain } from "@/lib/format";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
-import { TooltipHint } from "@/components/ui/tooltip-hint";
+import { Switch } from "@/components/ui/switch";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
-import { usePlanFeatures } from "@/lib/billing/use-plan-features";
+import { moneyRUBPlain } from "@/lib/format";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import {
   normalizeStudioServiceDurationMin,
@@ -18,114 +18,150 @@ import {
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
-type StudioServiceAssignedMaster = {
-  masterId: string;
-  masterName: string;
-};
+type StudioServiceAssignedMaster = { masterId: string; masterName: string };
 
 type StudioServiceView = {
   id: string;
+  categoryId: string | null;
   globalCategoryId: string | null;
   globalCategory: { id: string; name: string } | null;
   title: string;
   basePrice: number;
   baseDurationMin: number;
   isActive: boolean;
-  onlinePaymentEnabled: boolean;
   masters: StudioServiceAssignedMaster[];
 };
 
-type StudioCategoryView = {
-  id: string;
-  title: string;
-  services: StudioServiceView[];
-};
+type StudioCategoryView = { id: string; title: string; services: StudioServiceView[] };
 
 type GlobalCategoryOption = {
   id: string;
   title: string;
-  slug: string;
+  name?: string;
   icon: string | null;
-  parentId?: string | null;
-  depth?: number;
   fullPath?: string;
 };
 
-type ServicesData = {
-  categories: StudioCategoryView[];
-};
+type StudioMaster = { id: string; name: string; isActive: boolean; title: string; status?: "PENDING" | "ACTIVE" };
 
-type StudioMaster = {
-  id: string;
-  name: string;
-  isActive: boolean;
-  title: string;
-};
+type ServicesData = { categories: StudioCategoryView[] };
+type MastersData = { masters: StudioMaster[] };
 
-type MastersData = {
-  masters: StudioMaster[];
-};
+type BookingQuestionDraft = { id?: string; tempId: string; text: string; required: boolean; order: number };
+type BookingConfigDraft = { requiresReferencePhoto: boolean; questions: BookingQuestionDraft[] };
 
-type Props = {
-  studioId: string;
-};
+type Props = { studioId: string };
+
+const UNCATEGORIZED_ID = "__uncategorized__";
+
+function buildTempId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function categoryLabel(category: GlobalCategoryOption): string {
+  const title = category.fullPath || category.title || category.name || "";
+  return `${category.icon ? `${category.icon} ` : ""}${title}`;
+}
 
 export function StudioServicesPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.services;
-  const plan = usePlanFeatures("STUDIO");
+  const bookingText = UI_TEXT.master.profile.bookingConfig;
+  const statusText = UI_TEXT.status;
+
   const [data, setData] = useState<ServicesData>({ categories: [] });
   const [masters, setMasters] = useState<StudioMaster[]>([]);
+  const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
+  const [serviceGlobalCategoryById, setServiceGlobalCategoryById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [assigningServiceId, setAssigningServiceId] = useState<string | null>(null);
-  const [selectedMasterByService, setSelectedMasterByService] = useState<Record<string, string>>({});
-  const [drawerMasterId, setDrawerMasterId] = useState<string | null>(null);
+
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showProposeCategoryModal, setShowProposeCategoryModal] = useState(false);
   const [submittingCategory, setSubmittingCategory] = useState(false);
   const [submittingService, setSubmittingService] = useState(false);
-  const [togglingServiceId, setTogglingServiceId] = useState<string | null>(null);
+  const [proposingCategory, setProposingCategory] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [newServiceTitle, setNewServiceTitle] = useState("");
   const [newServiceCategoryId, setNewServiceCategoryId] = useState("");
   const [newServiceGlobalCategoryId, setNewServiceGlobalCategoryId] = useState("");
-  const [serviceGlobalCategoryById, setServiceGlobalCategoryById] = useState<Record<string, string>>({});
-  const [savingServiceCategoryId, setSavingServiceCategoryId] = useState<string | null>(null);
-  const [showProposeCategoryModal, setShowProposeCategoryModal] = useState(false);
-  const [proposedCategoryTitle, setProposedCategoryTitle] = useState("");
-  const [proposingCategory, setProposingCategory] = useState(false);
-  const [proposeCategoryMessage, setProposeCategoryMessage] = useState<string | null>(null);
   const [newServicePrice, setNewServicePrice] = useState("");
   const [newServiceDuration, setNewServiceDuration] = useState("");
-  const [globalCategories, setGlobalCategories] = useState<GlobalCategoryOption[]>([]);
+  const [newServiceMasterIds, setNewServiceMasterIds] = useState<string[]>([]);
+  const [proposedCategoryTitle, setProposedCategoryTitle] = useState("");
+  const [proposeCategoryMessage, setProposeCategoryMessage] = useState<string | null>(null);
 
-  const totalServices = useMemo(
-    () => data.categories.reduce((sum, category) => sum + category.services.length, 0),
+  const [expandedAssignmentsServiceId, setExpandedAssignmentsServiceId] = useState<string | null>(null);
+  const [assigningKey, setAssigningKey] = useState<string | null>(null);
+  const [togglingServiceId, setTogglingServiceId] = useState<string | null>(null);
+  const [savingServiceCategoryId, setSavingServiceCategoryId] = useState<string | null>(null);
+  const [drawerMasterId, setDrawerMasterId] = useState<string | null>(null);
+
+  const [bookingConfigService, setBookingConfigService] = useState<{ id: string; title: string } | null>(null);
+  const [bookingConfigDraft, setBookingConfigDraft] = useState<BookingConfigDraft | null>(null);
+  const [bookingConfigLoading, setBookingConfigLoading] = useState(false);
+  const [bookingConfigSaving, setBookingConfigSaving] = useState(false);
+  const [bookingConfigError, setBookingConfigError] = useState<string | null>(null);
+
+  const editableCategories = useMemo(
+    () => data.categories.filter((category) => category.id !== UNCATEGORIZED_ID),
     [data.categories]
   );
+  const services = useMemo(() => data.categories.flatMap((category) => category.services), [data.categories]);
+  const totalServices = services.length;
+  const totalAssignments = useMemo(
+    () => services.reduce((sum, service) => sum + service.masters.length, 0),
+    [services]
+  );
+  const servicesWithoutMasters = useMemo(
+    () => services.filter((service) => service.masters.length === 0).length,
+    [services]
+  );
+  const mastersMap = useMemo(() => new Map(masters.map((master) => [master.id, master])), [masters]);
 
   const summaryText = useMemo(() => {
     return t.summary
-      .replace("{categories}", String(data.categories.length))
+      .replace("{categories}", String(editableCategories.length))
       .replace("{services}", String(totalServices));
-  }, [data.categories.length, t.summary, totalServices]);
-  const onlinePaymentsAllowed = plan.can("onlinePayments");
-  const onlinePaymentsSystemEnabled = plan.system?.onlinePaymentsEnabled ?? false;
-  const canOnlinePayments = onlinePaymentsAllowed && onlinePaymentsSystemEnabled;
-  const onlinePaymentsLockedMessage = !onlinePaymentsAllowed
-    ? "Онлайн-оплата доступна на PRO и выше."
-    : !onlinePaymentsSystemEnabled
-      ? "Функция временно отключена администрацией"
-      : null;
+  }, [editableCategories.length, t.summary, totalServices]);
 
-  async function load(): Promise<void> {
+  const patchService = useCallback(
+    (serviceId: string, updater: (service: StudioServiceView) => StudioServiceView) => {
+      setData((current) => ({
+        categories: current.categories.map((category) => ({
+          ...category,
+          services: category.services.map((service) => (service.id === serviceId ? updater(service) : service)),
+        })),
+      }));
+    },
+    []
+  );
+
+  const assignMaster = useCallback(
+    async (serviceId: string, masterId: string, isEnabled: boolean): Promise<void> => {
+      const res = await fetchWithAuth(`/api/studio/services/${serviceId}/assign-master`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studioId, masterId, isEnabled }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ serviceId: string; masterId: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+    },
+    [studioId, t.apiErrorPrefix]
+  );
+
+  const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const servicesParams = new URLSearchParams({ studioId });
-      const servicesRes = await fetchWithAuth(`/api/studio/services?${servicesParams.toString()}`, {
-        cache: "no-store",
-      });
+      const params = new URLSearchParams({ studioId });
+      const [servicesRes, mastersRes, categoriesRes] = await Promise.all([
+        fetchWithAuth(`/api/studio/services?${params.toString()}`, { cache: "no-store" }),
+        fetchWithAuth(`/api/studio/masters?${params.toString()}`, { cache: "no-store" }),
+        fetchWithAuth("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
+      ]);
       const servicesJson = (await servicesRes.json().catch(() => null)) as ApiResponse<ServicesData> | null;
       if (!servicesRes.ok || !servicesJson || !servicesJson.ok) {
         throw new Error(
@@ -135,34 +171,30 @@ export function StudioServicesPage({ studioId }: Props) {
         );
       }
       setData(servicesJson.data);
-      const nextServiceCategories: Record<string, string> = {};
+      const nextServiceCategoryById: Record<string, string> = {};
       for (const category of servicesJson.data.categories) {
         for (const service of category.services) {
-          nextServiceCategories[service.id] = service.globalCategoryId ?? "";
+          nextServiceCategoryById[service.id] = service.globalCategoryId ?? "";
         }
       }
-      setServiceGlobalCategoryById(nextServiceCategories);
-      if (!newServiceCategoryId && servicesJson.data.categories.length > 0) {
-        setNewServiceCategoryId(servicesJson.data.categories[0].id);
-      }
+      setServiceGlobalCategoryById(nextServiceCategoryById);
 
-      const [mastersRes, categoriesRes] = await Promise.all([
-        fetchWithAuth(`/api/studio/masters?${servicesParams.toString()}`, { cache: "no-store" }),
-        fetchWithAuth("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" }),
-      ]);
+      const categories = servicesJson.data.categories.filter((category) => category.id !== UNCATEGORIZED_ID);
+      setNewServiceCategoryId((current) => {
+        if (categories.length === 0) return "";
+        if (categories.some((item) => item.id === current)) return current;
+        return categories[0].id;
+      });
+
       const mastersJson = (await mastersRes.json().catch(() => null)) as ApiResponse<MastersData> | null;
-      if (mastersRes.ok && mastersJson && mastersJson.ok) {
-        setMasters(mastersJson.data.masters);
-      } else {
-        setMasters([]);
-      }
+      setMasters(mastersRes.ok && mastersJson && mastersJson.ok ? mastersJson.data.masters : []);
+
       const categoriesJson = (await categoriesRes.json().catch(() => null)) as
         | ApiResponse<{ categories: GlobalCategoryOption[] } | GlobalCategoryOption[]>
         | null;
       if (categoriesRes.ok && categoriesJson && categoriesJson.ok) {
-        setGlobalCategories(
-          Array.isArray(categoriesJson.data) ? categoriesJson.data : categoriesJson.data.categories
-        );
+        const items = Array.isArray(categoriesJson.data) ? categoriesJson.data : categoriesJson.data.categories;
+        setGlobalCategories(items.map((item) => ({ ...item, title: item.title || item.name || "" })));
       } else {
         setGlobalCategories([]);
       }
@@ -171,59 +203,138 @@ export function StudioServicesPage({ studioId }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [studioId, t.apiErrorPrefix, t.loadFailed]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studioId, t.apiErrorPrefix, t.loadFailed]);
+  }, [load]);
 
-  const assignMaster = async (serviceId: string): Promise<void> => {
-    const masterId = selectedMasterByService[serviceId];
-    if (!masterId) return;
-    setAssigningServiceId(serviceId);
-    try {
-      const res = await fetchWithAuth(`/api/studio/services/${serviceId}/assign-master`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studioId, masterId }),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ serviceId: string; masterId: string }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
-      }
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.assignFailed);
-    } finally {
-      setAssigningServiceId(null);
-    }
-  };
-
-  const toggleOnlinePayment = async (service: StudioServiceView, nextValue: boolean): Promise<void> => {
-    if (nextValue && !canOnlinePayments) {
-      setError(onlinePaymentsLockedMessage ?? "Онлайн-оплата недоступна.");
+  useEffect(() => {
+    if (!bookingConfigService) {
+      setBookingConfigDraft(null);
+      setBookingConfigError(null);
       return;
     }
+    let cancelled = false;
+    setBookingConfigLoading(true);
+    setBookingConfigError(null);
+    const params = new URLSearchParams({ studioId });
+    void (async () => {
+      try {
+        const res = await fetchWithAuth(
+          `/api/studio/services/${bookingConfigService.id}/booking-config?${params.toString()}`,
+          { cache: "no-store" }
+        );
+        const json = (await res.json().catch(() => null)) as ApiResponse<{
+          requiresReferencePhoto: boolean;
+          questions: Array<{ id: string; text: string; required: boolean; order: number }>;
+        }> | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+        }
+        if (!cancelled) {
+          setBookingConfigDraft({
+            requiresReferencePhoto: json.data.requiresReferencePhoto,
+            questions: (json.data.questions ?? []).map((question, index) => ({
+              id: question.id,
+              tempId: question.id || buildTempId("question"),
+              text: question.text,
+              required: question.required,
+              order: Number.isFinite(question.order) ? question.order : index,
+            })),
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setBookingConfigDraft(null);
+          setBookingConfigError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadBookingConfig);
+        }
+      } finally {
+        if (!cancelled) setBookingConfigLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingConfigService, studioId, t.apiErrorPrefix]);
+
+  const toggleServiceActive = async (service: StudioServiceView, nextValue: boolean): Promise<void> => {
     setTogglingServiceId(service.id);
     setError(null);
     try {
       const res = await fetchWithAuth(`/api/studio/services/${service.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studioId,
-        }),
+        body: JSON.stringify({ studioId, isActive: nextValue }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
       }
-      await load();
+      patchService(service.id, (current) => ({ ...current, isActive: nextValue }));
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
       setTogglingServiceId(null);
+    }
+  };
+
+  const saveServiceGlobalCategory = async (service: StudioServiceView): Promise<void> => {
+    const nextGlobalCategoryId = (serviceGlobalCategoryById[service.id] ?? "").trim();
+    setSavingServiceCategoryId(service.id);
+    setError(null);
+    try {
+      const res = await fetchWithAuth(`/api/studio/services/${service.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studioId, globalCategoryId: nextGlobalCategoryId || null }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+      const globalCategory = nextGlobalCategoryId
+        ? globalCategories.find((item) => item.id === nextGlobalCategoryId)
+        : null;
+      patchService(service.id, (current) => ({
+        ...current,
+        globalCategoryId: nextGlobalCategoryId || null,
+        globalCategory: globalCategory
+          ? { id: globalCategory.id, name: globalCategory.title || globalCategory.name || "" }
+          : null,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update service category");
+    } finally {
+      setSavingServiceCategoryId(null);
+    }
+  };
+
+  const toggleMasterAssignment = async (
+    service: StudioServiceView,
+    masterId: string,
+    nextEnabled: boolean
+  ): Promise<void> => {
+    const key = `${service.id}:${masterId}`;
+    setAssigningKey(key);
+    setError(null);
+    try {
+      await assignMaster(service.id, masterId, nextEnabled);
+      patchService(service.id, (current) => {
+        const exists = current.masters.some((item) => item.masterId === masterId);
+        if (nextEnabled && !exists) {
+          const masterName = mastersMap.get(masterId)?.name || "Master";
+          return { ...current, masters: [...current.masters, { masterId, masterName }] };
+        }
+        if (!nextEnabled && exists) {
+          return { ...current, masters: current.masters.filter((item) => item.masterId !== masterId) };
+        }
+        return current;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.assignFailed);
+    } finally {
+      setAssigningKey(null);
     }
   };
 
@@ -235,10 +346,7 @@ export function StudioServicesPage({ studioId }: Props) {
       const res = await fetchWithAuth("/api/studio/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studioId,
-          title: newCategoryTitle.trim(),
-        }),
+        body: JSON.stringify({ studioId, title: newCategoryTitle.trim() }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
@@ -256,15 +364,11 @@ export function StudioServicesPage({ studioId }: Props) {
 
   const submitService = async (): Promise<void> => {
     if (!newServiceTitle.trim() || !newServiceCategoryId) return;
-    const normalizedPrice = normalizeStudioServicePrice(
-      Number(newServicePrice.trim() === "" ? "0" : newServicePrice)
-    );
+    const normalizedPrice = normalizeStudioServicePrice(Number(newServicePrice.trim() === "" ? "0" : newServicePrice));
     const normalizedDuration = normalizeStudioServiceDurationMin(
       Number(newServiceDuration.trim() === "" ? "60" : newServiceDuration)
     );
-    setNewServicePrice(String(normalizedPrice));
-    setNewServiceDuration(String(normalizedDuration));
-
+    const selectedMasterIds = [...newServiceMasterIds];
     setSubmittingService(true);
     setError(null);
     try {
@@ -284,41 +388,28 @@ export function StudioServicesPage({ studioId }: Props) {
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
       }
+      if (selectedMasterIds.length > 0) {
+        const results = await Promise.allSettled(
+          selectedMasterIds.map((masterId) => assignMaster(json.data.id, masterId, true))
+        );
+        const failed = results.filter((item) => item.status === "rejected").length;
+        if (failed > 0) {
+          setError(
+            `Service created, but assignments were only partially saved (${failed}/${selectedMasterIds.length}).`
+          );
+        }
+      }
       setShowServiceModal(false);
       setNewServiceTitle("");
       setNewServiceGlobalCategoryId("");
       setNewServicePrice("");
       setNewServiceDuration("");
+      setNewServiceMasterIds([]);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.createServiceFailed);
     } finally {
       setSubmittingService(false);
-    }
-  };
-
-  const saveServiceGlobalCategory = async (service: StudioServiceView): Promise<void> => {
-    const nextGlobalCategoryId = (serviceGlobalCategoryById[service.id] ?? "").trim();
-    setSavingServiceCategoryId(service.id);
-    setError(null);
-    try {
-      const res = await fetchWithAuth(`/api/studio/services/${service.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studioId,
-          globalCategoryId: nextGlobalCategoryId || null,
-        }),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
-      }
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить категорию услуги");
-    } finally {
-      setSavingServiceCategoryId(null);
     }
   };
 
@@ -340,45 +431,120 @@ export function StudioServicesPage({ studioId }: Props) {
       }
       setShowProposeCategoryModal(false);
       setProposedCategoryTitle("");
-      setProposeCategoryMessage(
-        "Категория отправлена на модерацию. Пока можете сохранить услугу без категории."
-      );
+      setProposeCategoryMessage("Category submitted for moderation. You can save the service without a category.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить категорию на модерацию");
+      setError(err instanceof Error ? err.message : "Failed to submit category for moderation");
     } finally {
       setProposingCategory(false);
     }
   };
 
-  if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
-  }
+  const addBookingQuestion = () => {
+    setBookingConfigDraft((current) => {
+      if (!current || current.questions.length >= 5) return current;
+      return {
+        ...current,
+        questions: [...current.questions, { tempId: buildTempId("question"), text: "", required: false, order: current.questions.length }],
+      };
+    });
+  };
+
+  const updateBookingQuestion = (tempId: string, patch: Partial<BookingQuestionDraft>) => {
+    setBookingConfigDraft((current) =>
+      current
+        ? {
+            ...current,
+            questions: current.questions.map((question) => (question.tempId === tempId ? { ...question, ...patch } : question)),
+          }
+        : current
+    );
+  };
+
+  const removeBookingQuestion = (tempId: string) => {
+    setBookingConfigDraft((current) =>
+      current ? { ...current, questions: current.questions.filter((question) => question.tempId !== tempId) } : current
+    );
+  };
+
+  const moveBookingQuestion = (index: number, direction: -1 | 1) => {
+    setBookingConfigDraft((current) => {
+      if (!current) return current;
+      const next = [...current.questions];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...current, questions: next.map((question, idx) => ({ ...question, order: idx })) };
+    });
+  };
+
+  const closeBookingConfig = () => {
+    setBookingConfigService(null);
+    setBookingConfigDraft(null);
+    setBookingConfigError(null);
+  };
+
+  const saveBookingConfig = async (): Promise<void> => {
+    if (!bookingConfigService || !bookingConfigDraft) return;
+    setBookingConfigSaving(true);
+    setBookingConfigError(null);
+    try {
+      const params = new URLSearchParams({ studioId });
+      const res = await fetchWithAuth(
+        `/api/studio/services/${bookingConfigService.id}/booking-config?${params.toString()}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requiresReferencePhoto: bookingConfigDraft.requiresReferencePhoto,
+            questions: bookingConfigDraft.questions.map((question, order) => ({
+              id: question.id,
+              text: question.text,
+              required: question.required,
+              order,
+            })),
+          }),
+        }
+      );
+      const json = (await res.json().catch(() => null)) as ApiResponse<{
+        requiresReferencePhoto: boolean;
+        questions: Array<{ id: string; text: string; required: boolean; order: number }>;
+      }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
+      }
+      closeBookingConfig();
+    } catch (err) {
+      setBookingConfigError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadBookingConfig);
+    } finally {
+      setBookingConfigSaving(false);
+    }
+  };
+
+  if (loading) return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
 
   return (
     <div className="space-y-4">
-      <div className="lux-card rounded-[24px] p-4 text-sm text-text-sec">{summaryText}</div>
+      <section className="lux-card rounded-[24px] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-text-main">{UI_TEXT.master.profile.sections.servicesTitle}</h3>
+            <p className="mt-1 text-sm text-text-sec">{summaryText}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => setShowServiceModal(true)} variant="secondary" size="sm" disabled={editableCategories.length === 0}>+ {t.addService}</Button>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Assignments</div><div className="mt-1 font-semibold text-text-main">{totalAssignments}</div></div>
+          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Unassigned services</div><div className="mt-1 font-semibold text-text-main">{servicesWithoutMasters}</div></div>
+          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Studio masters</div><div className="mt-1 font-semibold text-text-main">{masters.length}</div></div>
+        </div>
+      </section>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => setShowCategoryModal(true)} variant="secondary" size="sm">
-          + {t.createCategory}
-        </Button>
-        <Button
-          type="button"
-          onClick={() => setShowServiceModal(true)}
-          variant="secondary"
-          size="sm"
-          disabled={data.categories.length === 0}
-        >
-          + {t.addService}
-        </Button>
-      </div>
-
-      {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      ) : null}
+      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       {totalServices === 0 ? (
-        <section className="lux-card rounded-[24px] p-5">
+        <section className="lux-card rounded-[24px] p-6 text-center">
           <h3 className="text-base font-semibold text-text-main">{t.noServicesTitle}</h3>
           <p className="mt-1 text-sm text-text-sec">{t.noServicesDescription}</p>
         </section>
@@ -386,132 +552,192 @@ export function StudioServicesPage({ studioId }: Props) {
 
       {data.categories.map((category) => (
         <section key={category.id} className="lux-card overflow-hidden rounded-[24px]">
-          <header className="border-b border-border-subtle/80 px-5 py-4">
+          <header className="flex items-center justify-between border-b border-border-subtle/80 px-5 py-4">
             <h2 className="text-sm font-semibold text-text-main">{category.title}</h2>
+            <span className="text-xs text-text-sec">{category.services.length}</span>
           </header>
-          <div className="space-y-2 p-3">
-            {category.services.map((service) => (
-              <div key={service.id} className="rounded-2xl border border-border-subtle bg-bg-input/50 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="font-medium text-text-main">{service.title}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-text-sec">
-                      <span>{service.baseDurationMin} {t.durationMin}</span>
-                      <span>•</span>
-                      <span>{`${moneyRUBPlain(service.basePrice)} ${t.currency}`}</span>
-                    </div>
-                    <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
-                      <input
-                        type="checkbox"
-                        checked={service.isActive}
-                        readOnly
-                        className="h-4 w-4 rounded border-border-subtle accent-primary"
-                      />
-                      <span>{t.visibleInSearch}</span>
-                      <TooltipHint text={t.visibleInSearchHint} />
-                    </label>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {service.globalCategory ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                          {service.globalCategory.name}
+          <div className="space-y-3 p-3">
+            {category.services.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-input/40 p-4 text-sm text-text-sec">
+                No services in this category yet.
+              </div>
+            ) : null}
+
+            {category.services.map((service) => {
+              const assignedMasters = [...service.masters].sort((a, b) =>
+                a.masterName.localeCompare(b.masterName, "ru")
+              );
+              const expanded = expandedAssignmentsServiceId === service.id;
+              const assignmentSummary =
+                assignedMasters.length === 0
+                  ? "Not assigned to any master"
+                  : assignedMasters.length === 1
+                    ? "Assigned to 1 master"
+                    : `Assigned to ${assignedMasters.length} masters`;
+
+              return (
+                <article key={service.id} className="rounded-2xl border border-border-subtle bg-bg-input/50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-base font-semibold text-text-main">{service.title}</h3>
+                        {service.globalCategory ? (
+                          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+                            {service.globalCategory.name}
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
+                            No category
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-sec">
+                        <span className="rounded-full bg-bg-elevated px-2 py-1 text-text-main">
+                          {service.baseDurationMin} {t.durationMin}
                         </span>
-                      ) : (
-                        <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">
-                          Нет категории
+                        <span className="rounded-full bg-bg-elevated px-2 py-1 text-text-main">
+                          {moneyRUBPlain(service.basePrice)} {t.currency}
                         </span>
-                      )}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-text-main">
+                        <Users className="h-4 w-4 text-text-sec" />
+                        {assignmentSummary}
+                      </div>
+
+                      {assignedMasters.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {assignedMasters.map((master) => (
+                            <Chip
+                              key={`${service.id}-${master.masterId}`}
+                              type="button"
+                              onClick={() => setDrawerMasterId(master.masterId)}
+                            >
+                              {master.masterName}
+                            </Chip>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Select
+                          className="min-w-[220px] rounded-xl px-2 py-1 text-sm"
+                          value={serviceGlobalCategoryById[service.id] ?? service.globalCategoryId ?? ""}
+                          onChange={(event) =>
+                            setServiceGlobalCategoryById((current) => ({
+                              ...current,
+                              [service.id]: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">No category</option>
+                          {globalCategories.map((item) => (
+                            <option key={`service-global-category-${service.id}-${item.id}`} value={item.id}>
+                              {categoryLabel(item)}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void saveServiceGlobalCategory(service)}
+                          disabled={savingServiceCategoryId === service.id}
+                        >
+                          {savingServiceCategoryId === service.id ? "Saving..." : "Save category"}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Select
-                        className="min-w-[220px] rounded-xl px-2 py-1 text-sm"
-                        value={serviceGlobalCategoryById[service.id] ?? service.globalCategoryId ?? ""}
-                        onChange={(event) =>
-                          setServiceGlobalCategoryById((current) => ({
-                            ...current,
-                            [service.id]: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Без категории</option>
-                        {globalCategories.map((category) => (
-                          <option key={`service-global-category-${service.id}-${category.id}`} value={category.id}>
-                            {category.icon ? `${category.icon} ` : ""}
-                            {category.fullPath || category.title}
-                          </option>
-                        ))}
-                      </Select>
+
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <label className="inline-flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-card px-3 py-2 text-xs text-text-sec">
+                        <span>{service.isActive ? "On" : "Off"}</span>
+                        <Switch
+                          checked={service.isActive}
+                          onCheckedChange={(next) => void toggleServiceActive(service, next)}
+                          disabled={togglingServiceId === service.id}
+                          size="sm"
+                        />
+                      </label>
+
                       <Button
                         type="button"
-                        size="sm"
                         variant="secondary"
-                        onClick={() => void saveServiceGlobalCategory(service)}
-                        disabled={savingServiceCategoryId === service.id}
+                        size="sm"
+                        onClick={() => setBookingConfigService({ id: service.id, title: service.title })}
+                        className="gap-1"
                       >
-                        {savingServiceCategoryId === service.id ? "Сохраняем..." : "Сохранить категорию"}
+                        <Settings2 className="h-4 w-4" />
+                        {bookingText.open}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setExpandedAssignmentsServiceId((current) => (current === service.id ? null : service.id))
+                        }
+                        className="gap-1"
+                      >
+                        {expanded ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Hide assignments
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Assign masters
+                          </>
+                        )}
                       </Button>
                     </div>
-                    {false && (
-                      <>
-                        {/* TODO: Online payments for services - not yet implemented */}
-                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
-                          <input
-                            type="checkbox"
-                            checked={service.onlinePaymentEnabled}
-                            disabled={!canOnlinePayments || togglingServiceId === service.id}
-                            onChange={(event) => void toggleOnlinePayment(service, event.target.checked)}
-                            className="h-4 w-4 rounded border-border-subtle accent-primary disabled:opacity-60"
-                          />
-                          <span>Онлайн-оплата</span>
-                          {onlinePaymentsLockedMessage ? (
-                            <TooltipHint text={onlinePaymentsLockedMessage ?? ""} />
-                          ) : null}
-                        </label>
-                      </>
-                    )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Select
-                      className="min-w-[180px] rounded-xl px-2 py-1 text-sm"
-                      value={selectedMasterByService[service.id] ?? ""}
-                      onChange={(event) =>
-                        setSelectedMasterByService((current) => ({
-                          ...current,
-                          [service.id]: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">{t.selectMaster}</option>
-                      {masters.map((master) => (
-                        <option key={master.id} value={master.id}>
-                          {master.name}
-                        </option>
-                      ))}
-                    </Select>
-                    <Button
-                      type="button"
-                      onClick={() => void assignMaster(service.id)}
-                      disabled={assigningServiceId === service.id}
-                      variant="secondary"
-                      size="sm"
-                      title={t.assignMaster}
-                    >
-                      {t.assignMaster}
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {service.masters.map((master) => (
-                    <Chip
-                      key={`${service.id}-${master.masterId}`}
-                      type="button"
-                      onClick={() => setDrawerMasterId(master.masterId)}
-                    >
-                      {master.masterName}
-                    </Chip>
-                  ))}
-                </div>
-              </div>
-            ))}
+
+                  {expanded ? (
+                    <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-card/70 p-3">
+                      <div className="mb-3 text-xs text-text-sec">
+                        Enable masters who can provide this service.
+                      </div>
+                      {masters.length === 0 ? (
+                        <div className="rounded-xl bg-bg-input p-3 text-sm text-text-sec">
+                          No masters in studio yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {masters.map((master) => {
+                            const checked = service.masters.some((item) => item.masterId === master.id);
+                            const key = `${service.id}:${master.id}`;
+                            return (
+                              <label
+                                key={`${service.id}-${master.id}`}
+                                className="flex items-center justify-between gap-3 rounded-xl border border-border-subtle bg-bg-input/70 px-3 py-2"
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm text-text-main">
+                                    {master.name}
+                                    {master.status === "PENDING" ? " (invited)" : ""}
+                                  </div>
+                                  <div className="text-xs text-text-sec">{master.title}</div>
+                                </div>
+                                <Switch
+                                  size="sm"
+                                  checked={checked}
+                                  disabled={assigningKey === key}
+                                  onCheckedChange={(next) => void toggleMasterAssignment(service, master.id, next)}
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
       ))}
@@ -540,12 +766,9 @@ export function StudioServicesPage({ studioId }: Props) {
         <div className="space-y-4">
           <h3 className="text-base font-semibold text-text-main">{t.createServiceTitle}</h3>
           <div className="space-y-2">
-            <Select
-              value={newServiceCategoryId}
-              onChange={(event) => setNewServiceCategoryId(event.target.value)}
-            >
+            <Select value={newServiceCategoryId} onChange={(event) => setNewServiceCategoryId(event.target.value)}>
               <option value="">{t.selectCategory}</option>
-              {data.categories.map((category) => (
+              {editableCategories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.title}
                 </option>
@@ -555,28 +778,21 @@ export function StudioServicesPage({ studioId }: Props) {
               value={newServiceGlobalCategoryId}
               onChange={(event) => setNewServiceGlobalCategoryId(event.target.value)}
             >
-              <option value="">Глобальная категория</option>
-              {globalCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.icon ? `${category.icon} ` : ""}{category.fullPath || category.title}
+              <option value="">Global category</option>
+              {globalCategories.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {categoryLabel(item)}
                 </option>
               ))}
             </Select>
-            {!newServiceGlobalCategoryId ? (
-              <div className="text-xs text-text-sec">
-                Выберите категорию, чтобы услуга отображалась на сайте.
-              </div>
-            ) : null}
             <button
               type="button"
               onClick={() => setShowProposeCategoryModal(true)}
               className="w-fit text-xs font-medium text-primary underline"
             >
-              + Предложить свою категорию
+              + Suggest your category
             </button>
-            {proposeCategoryMessage ? (
-              <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
-            ) : null}
+            {proposeCategoryMessage ? <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div> : null}
             <Input
               type="text"
               value={newServiceTitle}
@@ -589,11 +805,6 @@ export function StudioServicesPage({ studioId }: Props) {
               step={100}
               value={newServicePrice}
               onChange={(event) => setNewServicePrice(event.target.value)}
-              onBlur={() => {
-                setNewServicePrice((current) =>
-                  current.trim() === "" ? "" : String(normalizeStudioServicePrice(Number(current)))
-                );
-              }}
               placeholder={t.pricePlaceholder}
             />
             <Input
@@ -602,14 +813,61 @@ export function StudioServicesPage({ studioId }: Props) {
               step={5}
               value={newServiceDuration}
               onChange={(event) => setNewServiceDuration(event.target.value)}
-              onBlur={() => {
-                setNewServiceDuration((current) =>
-                  current.trim() === "" ? "" : String(normalizeStudioServiceDurationMin(Number(current)))
-                );
-              }}
               placeholder={t.durationPlaceholder}
             />
           </div>
+
+          <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium text-text-main">Assign masters right away</div>
+              <div className="text-xs text-text-sec">{newServiceMasterIds.length}</div>
+            </div>
+            {masters.length === 0 ? (
+              <p className="mt-2 text-xs text-text-sec">Add studio masters first.</p>
+            ) : (
+              <>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setNewServiceMasterIds(masters.map((master) => master.id))}
+                  >
+                    Select all
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setNewServiceMasterIds([])}>
+                    Clear
+                  </Button>
+                </div>
+                <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {masters.map((master) => {
+                    const checked = newServiceMasterIds.includes(master.id);
+                    return (
+                      <label
+                        key={`new-service-master-${master.id}`}
+                        className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-card px-3 py-2"
+                      >
+                        <span className="text-sm text-text-main">{master.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) =>
+                            setNewServiceMasterIds((current) =>
+                              event.target.checked
+                                ? [...current, master.id]
+                                : current.filter((id) => id !== master.id)
+                            )
+                          }
+                          className="h-4 w-4 rounded border-border-subtle accent-primary"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2">
             <Button type="button" onClick={() => setShowServiceModal(false)} variant="secondary">
               {t.cancel}
@@ -631,7 +889,7 @@ export function StudioServicesPage({ studioId }: Props) {
         }}
       >
         <div className="space-y-4">
-          <h3 className="text-base font-semibold text-text-main">Предложить категорию</h3>
+          <h3 className="text-base font-semibold text-text-main">Suggest category</h3>
           <Input
             type="text"
             value={proposedCategoryTitle}
@@ -640,7 +898,7 @@ export function StudioServicesPage({ studioId }: Props) {
             maxLength={60}
           />
           <div className="text-xs text-text-sec">
-            Категория отправится на модерацию. Пока можете сохранить услугу без категории.
+            Category will be sent to moderation. You can save the service without a category.
           </div>
           <div className="flex justify-end gap-2">
             <Button
@@ -659,11 +917,124 @@ export function StudioServicesPage({ studioId }: Props) {
               onClick={() => void submitCategoryProposal()}
               disabled={proposingCategory || !proposedCategoryTitle.trim()}
             >
-              {proposingCategory ? t.creating : "Отправить"}
+              {proposingCategory ? t.creating : "Send"}
             </Button>
           </div>
         </div>
       </ModalSurface>
+
+      {bookingConfigService ? (
+        <ModalSurface open onClose={closeBookingConfig} title={`${bookingText.title}: ${bookingConfigService.title}`}>
+          <div className="space-y-4">
+            {bookingConfigLoading ? <div className="text-sm text-text-sec">{bookingText.loading}</div> : null}
+            {bookingConfigError ? <div className="text-sm text-rose-400">{bookingConfigError}</div> : null}
+            {bookingConfigDraft ? (
+              <>
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-border-subtle bg-bg-input/60 p-3">
+                  <span className="text-sm text-text-main">{bookingText.referencePhotoRequiredLabel}</span>
+                  <Switch
+                    checked={bookingConfigDraft.requiresReferencePhoto}
+                    onCheckedChange={(next) =>
+                      setBookingConfigDraft((current) =>
+                        current ? { ...current, requiresReferencePhoto: next } : current
+                      )
+                    }
+                    size="sm"
+                  />
+                </label>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-text-main">{bookingText.questionsTitle}</div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={addBookingQuestion}
+                      disabled={bookingConfigDraft.questions.length >= 5}
+                    >
+                      + {bookingText.addQuestion}
+                    </Button>
+                  </div>
+
+                  {bookingConfigDraft.questions.length === 0 ? (
+                    <div className="text-xs text-text-sec">{bookingText.empty}</div>
+                  ) : null}
+
+                  {bookingConfigDraft.questions.map((question, index) => (
+                    <div key={question.tempId} className="rounded-xl border border-border-subtle bg-bg-input/70 p-3">
+                      <div className="text-xs font-medium text-text-sec">
+                        {bookingText.questionLabel} {index + 1}
+                      </div>
+                      <Input
+                        type="text"
+                        value={question.text}
+                        onChange={(event) => updateBookingQuestion(question.tempId, { text: event.target.value })}
+                        placeholder={bookingText.questionPlaceholder}
+                        className="mt-2"
+                      />
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={index === 0}
+                            onClick={() => moveBookingQuestion(index, -1)}
+                          >
+                            {bookingText.moveUp}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={index === bookingConfigDraft.questions.length - 1}
+                            onClick={() => moveBookingQuestion(index, 1)}
+                          >
+                            {bookingText.moveDown}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeBookingQuestion(question.tempId)}
+                          >
+                            {bookingText.remove}
+                          </Button>
+                        </div>
+                        <label className="inline-flex items-center gap-2 text-xs text-text-sec">
+                          <input
+                            type="checkbox"
+                            checked={question.required}
+                            onChange={(event) =>
+                              updateBookingQuestion(question.tempId, { required: event.target.checked })
+                            }
+                            className="h-4 w-4 rounded border-border-subtle accent-primary"
+                          />
+                          {bookingText.required}
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={closeBookingConfig}>
+                {t.cancel}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void saveBookingConfig()}
+                disabled={bookingConfigSaving || bookingConfigLoading || !bookingConfigDraft}
+              >
+                {bookingConfigSaving ? statusText.saving : statusText.saved}
+              </Button>
+            </div>
+          </div>
+        </ModalSurface>
+      ) : null}
 
       {drawerMasterId ? (
         <MasterCardDrawer

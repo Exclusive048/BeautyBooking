@@ -33,6 +33,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       studioId: body.studioId,
       serviceId: id,
       masterId: body.masterId,
+      isEnabled: body.isEnabled,
     });
     return jsonOk(result);
   } catch (error) {

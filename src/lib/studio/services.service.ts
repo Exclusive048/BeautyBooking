@@ -398,6 +398,7 @@ export async function assignMasterToService(input: {
   studioId: string;
   serviceId: string;
   masterId: string;
+  isEnabled?: boolean;
 }): Promise<{ serviceId: string; masterId: string }> {
   const service = await prisma.service.findUnique({
     where: { id: input.serviceId },
@@ -426,12 +427,12 @@ export async function assignMasterToService(input: {
       masterProviderId: input.masterId,
       masterId: input.masterId,
       serviceId: input.serviceId,
-      isEnabled: true,
+      isEnabled: input.isEnabled ?? true,
     },
     update: {
       studioId: input.studioId,
       masterId: input.masterId,
-      isEnabled: true,
+      isEnabled: input.isEnabled ?? true,
     },
   });
 
