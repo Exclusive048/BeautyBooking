@@ -6,6 +6,7 @@ import { createInitialPayment } from "@/lib/payments/yookassa/client";
 import { BILLING_PERIODS, BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { formatTimeBucketUtc, sha256 } from "@/lib/billing/utils";
+import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,13 @@ export async function POST(req: Request) {
   }
 
   const { scope, planId, periodMonths, returnUrl } = parsed.data;
+
+  if (scope === "MASTER") {
+    const managedByStudio = await isCurrentMasterManagedByStudio(user.id);
+    if (managedByStudio) {
+      return fail("Тарифом мастера в студии управляет студия.", 403, "FORBIDDEN");
+    }
+  }
 
   const plan = await prisma.billingPlan.findUnique({
     where: { id: planId },

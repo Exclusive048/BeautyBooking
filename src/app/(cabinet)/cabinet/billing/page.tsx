@@ -6,7 +6,7 @@ import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar
 import { hasMasterProfile } from "@/lib/auth/roles";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderContext } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
@@ -50,9 +50,9 @@ export default async function Page({ searchParams }: PageProps) {
       redirect("/403");
     }
 
-    const masterId = await getCurrentMasterProviderId(user.id);
+    const masterContext = await getCurrentMasterProviderContext(user.id);
     const master = await prisma.provider.findUnique({
-      where: { id: masterId },
+      where: { id: masterContext.id },
       select: { ratingAvg: true, rating: true, studioId: true },
     });
     if (!master) {
@@ -72,9 +72,39 @@ export default async function Page({ searchParams }: PageProps) {
 
     return (
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
-        <MasterCabinetTopbar ratingLabel={ratingLabel} studioName={studioName} />
+        <MasterCabinetTopbar
+          ratingLabel={ratingLabel}
+          studioName={studioName}
+          isStudioMember={Boolean(master.studioId)}
+        />
         <main className="min-w-0">
-          <BillingPage scope="MASTER" />
+          {master.studioId ? (
+            <section className="space-y-4">
+              <div className="lux-card rounded-[24px] p-6">
+                <h1 className="text-2xl font-semibold text-text-main">Тариф управляется студией</h1>
+                <p className="mt-2 text-sm text-text-sec">
+                  Вы работаете в составе студии, поэтому управление тарифом выполняет студия.
+                  Обратитесь к администратору студии, если нужно изменить тариф.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <a
+                    href="/cabinet/master/dashboard"
+                    className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                  >
+                    Вернуться в кабинет
+                  </a>
+                  <a
+                    href="/cabinet/master/profile"
+                    className="inline-flex items-center rounded-xl border border-border-subtle px-4 py-2 text-sm font-medium text-text-main transition-colors hover:bg-bg-input"
+                  >
+                    Открыть профиль
+                  </a>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <BillingPage scope="MASTER" />
+          )}
         </main>
       </section>
     );

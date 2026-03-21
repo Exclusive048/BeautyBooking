@@ -7,6 +7,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 type Props = {
   ratingLabel: string;
   studioName?: string | null;
+  isStudioMember?: boolean;
 };
 
 const NAV_ITEMS: Array<{ href: string; label: string }> = [
@@ -14,18 +15,20 @@ const NAV_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/cabinet/master/schedule", label: UI_TEXT.master.topbar.nav.schedule },
   { href: "/cabinet/master/clients", label: UI_TEXT.master.topbar.nav.clients },
   { href: "/cabinet/master/analytics", label: UI_TEXT.master.topbar.nav.analytics },
-  { href: "/cabinet/billing?scope=MASTER", label: UI_TEXT.master.topbar.nav.billing },
   { href: "/cabinet/master/model-offers", label: UI_TEXT.master.topbar.nav.models },
   { href: "/cabinet/master/profile", label: UI_TEXT.master.topbar.nav.profile },
 ];
+
+const BILLING_NAV_ITEM = { href: "/cabinet/billing?scope=MASTER", label: UI_TEXT.master.topbar.nav.billing };
 
 function isActive(pathname: string, href: string): boolean {
   const path = href.split("?")[0] ?? href;
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
-export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
+export function MasterCabinetTopbar({ ratingLabel, studioName, isStudioMember = false }: Props) {
   const pathname = usePathname();
+  const navItems = isStudioMember ? NAV_ITEMS : [...NAV_ITEMS.slice(0, 4), BILLING_NAV_ITEM, ...NAV_ITEMS.slice(4)];
 
   return (
     <header className="lux-card rounded-[22px] p-3">
@@ -35,7 +38,7 @@ export function MasterCabinetTopbar({ ratingLabel, studioName }: Props) {
             {UI_TEXT.master.topbar.brand}
           </Link>
           <nav className="flex flex-wrap items-center gap-2">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = isActive(pathname, item.href);
               return (
                 <Link

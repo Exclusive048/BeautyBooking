@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { NotificationType } from "@prisma/client";
+import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,13 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
     return fail("Неверные данные.", 400, "VALIDATION_ERROR");
+  }
+
+  if (parsed.data.scope === "MASTER") {
+    const managedByStudio = await isCurrentMasterManagedByStudio(user.id);
+    if (managedByStudio) {
+      return fail("Тарифом мастера в студии управляет студия.", 403, "FORBIDDEN");
+    }
   }
 
   const subscription = await prisma.userSubscription.findUnique({

@@ -17,6 +17,7 @@ export default async function MasterCabinetLayout({
     select: {
       ratingAvg: true,
       rating: true,
+      studioId: true,
       masterProfile: { select: { id: true } },
       studio: { select: { name: true } },
     },
@@ -29,7 +30,11 @@ export default async function MasterCabinetLayout({
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
-      <MasterCabinetTopbar ratingLabel={ratingLabel} studioName={studioName} />
+      <MasterCabinetTopbar
+        ratingLabel={ratingLabel}
+        studioName={studioName}
+        isStudioMember={Boolean(master.studioId)}
+      />
       <main className="min-w-0">{children}</main>
     </section>
   );
