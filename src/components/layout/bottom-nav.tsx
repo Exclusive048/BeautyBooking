@@ -105,7 +105,7 @@ const NAV_ITEMS_STUDIO: NavItem[] = [
   { label: UI_TEXT.nav.home, href: "/", icon: IconHome },
   { label: UI_TEXT.nav.clients, href: "/cabinet/studio/clients", icon: IconUser },
   { label: UI_TEXT.nav.calendar, href: "/cabinet/studio/calendar", icon: IconCalendar },
-  { label: UI_TEXT.nav.services, href: "/cabinet/studio/services", icon: IconGrid },
+  { label: UI_TEXT.nav.services, href: "/cabinet/studio/settings?tab=services", icon: IconGrid },
 ];
 
 const NAV_ITEMS_ADMIN: NavItem[] = [
@@ -139,7 +139,8 @@ export function BottomNav() {
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-bg-card/95 pb-safe pt-2 shadow-card backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-4xl items-center justify-around px-3">
           {items.map((item) => {
-            const isActive = pathname === "/" ? item.href === "/" : pathname.startsWith(item.href);
+            const itemPath = item.href.split("?")[0] ?? item.href;
+            const isActive = pathname === "/" ? itemPath === "/" : pathname.startsWith(itemPath);
             const Icon = item.icon;
             return (
               <Link

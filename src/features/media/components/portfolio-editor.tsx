@@ -1,12 +1,13 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   entityType: MediaEntityType;
@@ -31,7 +32,9 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dropActive, setDropActive] = useState(false);
   const plan = usePlanFeatures(entityType === "STUDIO" ? "STUDIO" : "MASTER");
+  const portfolioText = UI_TEXT.master.profile.portfolio;
   const portfolioLimit =
     entityType === "STUDIO"
       ? plan.features
@@ -113,6 +116,33 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
     [load]
   );
 
+  const handleDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!canEdit || busy || limitReached) return;
+      event.preventDefault();
+      setDropActive(true);
+    },
+    [busy, canEdit, limitReached]
+  );
+
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDropActive(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!canEdit || busy || limitReached) return;
+      event.preventDefault();
+      setDropActive(false);
+      const file = event.dataTransfer.files?.[0];
+      if (file) {
+        void upload(file);
+      }
+    },
+    [busy, canEdit, limitReached, upload]
+  );
+
   return (
     <div className="space-y-3">
       {canEdit ? (
@@ -127,6 +157,35 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
           </button>
           <div className={`text-xs ${limitWarning ? "text-amber-600" : "text-text-sec"}`}>
             {limitLabel}
+          </div>
+        </div>
+      ) : null}
+
+      {canEdit ? (
+        <div
+          role="button"
+          tabIndex={0}
+          className={`flex min-h-[140px] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 text-center text-sm transition ${
+            dropActive ? "border-primary bg-primary/10" : "border-border-subtle bg-bg-card/80"
+          } ${busy || limitReached ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+          onClick={() => {
+            if (!busy && !limitReached) {
+              addInputRef.current?.click();
+            }
+          }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onKeyDown={(event) => {
+            if ((event.key === "Enter" || event.key === " ") && !busy && !limitReached) {
+              event.preventDefault();
+              addInputRef.current?.click();
+            }
+          }}
+        >
+          <div className="text-sm font-medium text-text-main">{portfolioText.dropTitle}</div>
+          <div className="mt-1 text-xs text-text-sec">
+            {portfolioText.dropSubtitle} {busy ? portfolioText.uploadingSuffix : ""}
           </div>
         </div>
       ) : null}
