@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { NotificationEvent } from "@/lib/notifications/types";
+import { getNotificationPresentation, isBookingActionNotification } from "@/lib/notifications/presentation";
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -60,18 +61,21 @@ export function NotificationsBell({ ariaLabel }: Props) {
   const seenToastIdsRef = useRef<Map<string, number>>(new Map());
 
   const handleToast = useCallback((payload: NotificationEvent) => {
+    const presentation = getNotificationPresentation(payload.type);
+    if (!presentation.showToast) return;
+
     const timers = timersRef.current;
     const seen = seenToastIdsRef.current;
     if (seen.has(payload.id)) return;
     const seenTimeout = window.setTimeout(() => {
       seen.delete(payload.id);
-    }, 5 * 60 * 1000);
+    }, presentation.dedupeWindowMs);
     seen.set(payload.id, seenTimeout);
 
     setToasts((current) => {
       const filtered = current.filter((item) => item.id !== payload.id);
       const next = [payload, ...filtered];
-      return next.slice(0, 3);
+      return next.slice(0, presentation.maxVisibleToasts);
     });
     const existing = timers.get(payload.id);
     if (existing) {
@@ -81,7 +85,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
     const timeoutId = window.setTimeout(() => {
       setToasts((current) => current.filter((item) => item.id !== payload.id));
       timers.delete(payload.id);
-    }, 6000);
+    }, presentation.toastDurationMs);
     timers.set(payload.id, timeoutId);
   }, []);
 
@@ -171,7 +175,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
             const chatPayload =
               toast.type === "CHAT_MESSAGE_RECEIVED" ? parseChatPayload(toast.payloadJson) : null;
             const canAct =
-              (toast.type === "BOOKING_CREATED" || toast.type === "BOOKING_REQUEST") &&
+              isBookingActionNotification(toast.type) &&
               booking?.bookingId &&
               (!booking.bookingStatus || booking.bookingStatus === "PENDING");
 

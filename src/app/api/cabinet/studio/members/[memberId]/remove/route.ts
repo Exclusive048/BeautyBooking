@@ -3,6 +3,8 @@ import { MembershipStatus, StudioRole } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { requireAuth } from "@/lib/auth/guards";
+import { getRequestId, logError } from "@/lib/logging/logger";
+import { loadInviteWithRelations, notifyStudioInviteRevoked } from "@/lib/notifications/studio-notifications";
 import { prisma } from "@/lib/prisma";
 import { transferMasterOutOfStudio } from "@/lib/studio/transfer-master";
 import { parseBody } from "@/lib/validation";
@@ -63,13 +65,30 @@ export async function POST(req: Request, ctx: RouteContext) {
       body.transferServices
     );
 
+    if (result.revokedInviteIds.length > 0) {
+      for (const inviteId of result.revokedInviteIds) {
+        try {
+          const invite = await loadInviteWithRelations(inviteId);
+          if (invite) {
+            await notifyStudioInviteRevoked(invite);
+          }
+        } catch (error) {
+          logError("POST /api/cabinet/studio/members/[memberId]/remove invite-revoke notify failed", {
+            requestId: getRequestId(req),
+            route: "POST /api/cabinet/studio/members/{memberId}/remove",
+            stack: error instanceof Error ? error.stack : undefined,
+          });
+        }
+      }
+    }
+
     return jsonOk({
       masterId: params.memberId.trim(),
       transferredServices: result.transferredServices,
+      revokedInvites: result.revokedInviteIds.length,
     });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
   }
 }
-

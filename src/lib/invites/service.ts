@@ -48,6 +48,14 @@ export async function acceptStudioInvite(
     return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
   }
 
+  if (invite.status === MembershipStatus.LEFT) {
+    return { ok: false, status: 409, message: "Invite revoked", code: "INVITE_REVOKED" };
+  }
+
+  if (invite.status === MembershipStatus.ACTIVE) {
+    return { ok: false, status: 409, message: "Invite already accepted", code: "INVITE_ALREADY_ACCEPTED" };
+  }
+
   if (invite.status === MembershipStatus.REJECTED) {
     return { ok: false, status: 409, message: "Invite already rejected", code: "INVITE_ALREADY_REJECTED" };
   }
@@ -189,6 +197,10 @@ export async function rejectStudioInvite(
 
   if (invite.status === MembershipStatus.ACTIVE) {
     return { ok: false, status: 409, message: "Invite already accepted", code: "INVITE_ALREADY_ACCEPTED" };
+  }
+
+  if (invite.status === MembershipStatus.LEFT) {
+    return { ok: false, status: 409, message: "Invite revoked", code: "INVITE_REVOKED" };
   }
 
   if (invite.status === MembershipStatus.REJECTED) {

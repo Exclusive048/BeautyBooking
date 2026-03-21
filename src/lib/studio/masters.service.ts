@@ -95,7 +95,7 @@ export async function createStudioMaster(input: {
   phone: string;
   title: string;
   invitedByUserId: string;
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; inviteId: string; shouldNotifyInvite: boolean }> {
   const studio = await getStudioContext(input.studioId);
   const created = await prisma.$transaction(async (tx) => {
     const existing = await tx.provider.findFirst({
@@ -141,7 +141,17 @@ export async function createStudioMaster(input: {
           select: { id: true },
         });
 
-    await tx.studioInvite.upsert({
+    const existingInvite = await tx.studioInvite.findUnique({
+      where: {
+        studioId_phone: {
+          studioId: studio.id,
+          phone: input.phone,
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const invite = await tx.studioInvite.upsert({
       where: {
         studioId_phone: {
           studioId: studio.id,
@@ -161,10 +171,14 @@ export async function createStudioMaster(input: {
       select: { id: true },
     });
 
-    return master;
+    return {
+      master,
+      inviteId: invite.id,
+      shouldNotifyInvite: !existingInvite || existingInvite.status !== MembershipStatus.PENDING,
+    };
   });
 
-  return { id: created.id };
+  return { id: created.master.id, inviteId: created.inviteId, shouldNotifyInvite: created.shouldNotifyInvite };
 }
 
 export async function getStudioMasterDetails(input: {

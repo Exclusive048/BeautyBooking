@@ -9,6 +9,7 @@ import { StudioInviteCards } from "@/features/notifications/components/studio-in
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
+import { isBookingActionNotification, shouldRefreshInvitesForEvent } from "@/lib/notifications/presentation";
 import type { NotificationEvent } from "@/lib/notifications/types";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -30,8 +31,6 @@ type BookingPayload = {
   bookingId?: unknown;
   bookingStatus?: unknown;
 };
-
-const BOOKING_ACTION_NOTIFICATION_TYPES = new Set(["BOOKING_CREATED", "BOOKING_REQUEST"]);
 
 function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {
   if (!payload) return null;
@@ -180,6 +179,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const t = UI_TEXT.notificationsCenter;
   const viewerTimeZone = useViewerTimeZoneContext();
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [invites, setInvites] = useState(initialData.invites);
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
   const [notifications, setNotifications] = useState(initialData.notifications);
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
@@ -196,6 +196,11 @@ export function NotificationsCenterPage({ initialData }: Props) {
   useEffect(() => {
     setNotifications(initialData.notifications);
   }, [initialData.notifications]);
+
+  useEffect(() => {
+    setInvites(initialData.invites);
+    setInvitesCount(initialData.invites.length);
+  }, [initialData.invites]);
 
   useEffect(() => {
     return () => {
@@ -265,6 +270,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
     if (!res.ok || !json || !json.ok) {
       throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
     }
+    setInvites(json.data.invites);
     setNotifications(json.data.notifications);
     setInvitesCount(json.data.invites.length);
     emitBellRefresh();
@@ -367,6 +373,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
   useEffect(() => {
     return subscribeNotificationEvent((event) => {
       if (event.kind === "incoming" && event.notification) {
+        if (shouldRefreshInvitesForEvent(event.notification.type)) {
+          void reloadCenterData();
+        }
         const incoming = toCenterItem(event.notification);
         setNotifications((current) => {
           const existingIndex = current.findIndex((note) => note.id === incoming.id);
@@ -395,7 +404,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
         );
       }
     });
-  }, []);
+  }, [reloadCenterData]);
 
   const filteredNotifications = useMemo(() => {
     if (filter === "all" || filter === "invites") return notifications;
@@ -452,8 +461,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
               </div>
             ) : (
               <StudioInviteCards
-                invites={initialData.invites}
+                invites={invites}
                 onChanged={(items) => {
+                  setInvites(items);
                   setInvitesCount(items.length);
                 }}
               />
@@ -472,11 +482,11 @@ export function NotificationsCenterPage({ initialData }: Props) {
               const bookingPayload = parseBookingPayload(note.payloadJson);
               const bookingStatus = bookingPayload?.bookingStatus?.toUpperCase();
               const canAct =
-                BOOKING_ACTION_NOTIFICATION_TYPES.has(note.type) &&
+                isBookingActionNotification(note.type) &&
                 bookingPayload?.bookingId &&
                 (!bookingStatus || bookingStatus === "PENDING" || bookingStatus === "NEW");
               const statusMeta =
-                BOOKING_ACTION_NOTIFICATION_TYPES.has(note.type) && bookingPayload?.bookingId
+                isBookingActionNotification(note.type) && bookingPayload?.bookingId
                   ? resolveBookingStatusMeta(bookingStatus)
                   : null;
               const isUnread = !note.isRead;

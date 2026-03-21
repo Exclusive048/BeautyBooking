@@ -2,6 +2,8 @@ import { Prisma, NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { publishRealtime } from "@/lib/notifications/service";
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 const inviteInclude = {
   studio: {
@@ -213,6 +215,30 @@ export async function notifyStudioInviteRejected(invite: InviteWithRelations): P
     pushUrl: "/notifications",
     telegramText: buildTelegramText(title, body),
   });
+}
+
+export async function notifyStudioInviteRevoked(invite: InviteWithRelations): Promise<void> {
+  const invitedUserId = await resolveInviteRecipientUserId(invite.phone);
+  if (!invitedUserId) return;
+
+  const studioName = invite.studio.provider.name || "Студия";
+  const title = "Приглашение отозвано";
+  const body = `Студия ${studioName} отозвала приглашение.`;
+
+  const event: NotificationEvent = {
+    id: `studio-invite-revoked:${invite.id}:${Date.now()}`,
+    type: "STUDIO_INVITE_REVOKED",
+    title,
+    body,
+    payloadJson: {
+      inviteId: invite.id,
+      studioId: invite.studio.id,
+      studioName,
+    },
+    createdAt: new Date().toISOString(),
+  };
+
+  publishRealtime(invitedUserId, event);
 }
 
 export async function notifyStudioMemberLeft(input: {

@@ -1,5 +1,6 @@
 import { MembershipStatus, Prisma, ProviderType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prismaDirect } from "@/lib/prisma-direct";
 
 function uniqueStringIds(input: string[]): string[] {
@@ -14,11 +15,29 @@ function uniqueStringIds(input: string[]): string[] {
   return result;
 }
 
+function buildPhoneCandidates(phone: string): string[] {
+  const candidates = new Set<string>();
+  const raw = phone.trim();
+  if (raw) candidates.add(raw);
+
+  const normalized = normalizeRussianPhone(raw);
+  if (!normalized) return Array.from(candidates);
+
+  const local = normalized.slice(2);
+  candidates.add(normalized);
+  candidates.add(`+7${local}`);
+  candidates.add(`7${local}`);
+  candidates.add(`8${local}`);
+  candidates.add(`+8${local}`);
+
+  return Array.from(candidates);
+}
+
 export async function transferMasterOutOfStudio(
   masterId: string,
   studioProviderId: string,
   transferServices: boolean
-): Promise<{ transferredServices: number }> {
+): Promise<{ transferredServices: number; revokedInviteIds: string[] }> {
   return prismaDirect.$transaction(
     async (tx) => {
       const master = await tx.provider.findUnique({
@@ -28,6 +47,7 @@ export async function transferMasterOutOfStudio(
           type: true,
           studioId: true,
           ownerUserId: true,
+          contactPhone: true,
         },
       });
       if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioProviderId) {
@@ -189,9 +209,29 @@ export async function transferMasterOutOfStudio(
         data: { studioId: null },
       });
 
-      return { transferredServices };
+      const contactPhone = master.contactPhone?.trim() ?? "";
+      let revokedInviteIds: string[] = [];
+      if (contactPhone) {
+        const phoneCandidates = buildPhoneCandidates(contactPhone);
+        const pendingInvites = await tx.studioInvite.findMany({
+          where: {
+            studioId: studio.id,
+            status: MembershipStatus.PENDING,
+            phone: { in: phoneCandidates },
+          },
+          select: { id: true },
+        });
+        revokedInviteIds = pendingInvites.map((item) => item.id);
+        if (revokedInviteIds.length > 0) {
+          await tx.studioInvite.updateMany({
+            where: { id: { in: revokedInviteIds } },
+            data: { status: MembershipStatus.LEFT },
+          });
+        }
+      }
+
+      return { transferredServices, revokedInviteIds };
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   );
 }
-

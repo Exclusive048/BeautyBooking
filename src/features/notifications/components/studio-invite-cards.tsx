@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
@@ -22,6 +22,18 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setItems(invites);
+  }, [invites]);
+
+  const removeInviteLocally = (inviteId: string) => {
+    setItems((current) => {
+      const nextItems = current.filter((invite) => invite.id !== inviteId);
+      onChanged?.(nextItems);
+      return nextItems;
+    });
+  };
+
   const postInviteAction = async (inviteId: string, action: "accept" | "reject") => {
     setSavingId(inviteId);
     setError(null);
@@ -33,13 +45,22 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
       });
       const json = (await response.json().catch(() => null)) as ApiResponse<{ inviteId: string }> | null;
       if (!response.ok || !json || !json.ok) {
+        const code = json && !json.ok ? String(json.error.code ?? "") : "";
+        if (
+          code === "INVITE_REVOKED" ||
+          code === "INVITE_NOT_FOUND" ||
+          code === "INVITE_ALREADY_ACCEPTED" ||
+          code === "INVITE_ALREADY_REJECTED"
+        ) {
+          removeInviteLocally(inviteId);
+          setError("Приглашение больше не активно.");
+          return;
+        }
         setError(json && !json.ok ? json.error.message : t.actionFailed);
         return;
       }
 
-      const nextItems = items.filter((invite) => invite.id !== inviteId);
-      setItems(nextItems);
-      onChanged?.(nextItems);
+      removeInviteLocally(inviteId);
     } catch {
       setError(t.networkError);
     } finally {
