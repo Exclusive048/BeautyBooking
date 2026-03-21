@@ -1,5 +1,6 @@
 import { MembershipStatus, NotificationType, ProviderType, StudioRole } from "@prisma/client";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { resolveNotificationOpenHref } from "@/lib/notifications/presentation";
 import { prisma } from "@/lib/prisma";
 
 export type NotificationChannel = "MASTER" | "STUDIO" | "SYSTEM";
@@ -322,7 +323,10 @@ export async function getNotificationCenterData(input: {
         readAt: item.readAt ? item.readAt.toISOString() : null,
         createdAt: item.createdAt.toISOString(),
         payloadJson,
-        openHref: resolveModelOpenHref(item.type, payloadJson) ?? resolveChatOpenHref(item.type, payloadJson),
+        openHref:
+          resolveModelOpenHref(item.type, payloadJson) ??
+          resolveChatOpenHref(item.type, payloadJson) ??
+          resolveNotificationOpenHref(item.type, payloadJson),
       };
     }),
     ...scheduleRequestNotifications,

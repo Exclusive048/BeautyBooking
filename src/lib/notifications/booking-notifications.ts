@@ -1,4 +1,4 @@
-import { NotificationType, Prisma } from "@prisma/client";
+import { MembershipStatus, NotificationType, Prisma, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
 
@@ -8,6 +8,7 @@ const bookingInclude = {
     select: {
       id: true,
       type: true,
+      studioId: true,
       name: true,
       timezone: true,
       ownerUserId: true,
@@ -59,6 +60,51 @@ function resolveMasterUserId(booking: BookingWithRelations): string | null {
   );
 }
 
+async function resolveStudioIdForBooking(booking: BookingWithRelations): Promise<string | null> {
+  if (booking.studioId) return booking.studioId;
+
+  if (booking.provider.type === ProviderType.STUDIO) {
+    const studio = await prisma.studio.findUnique({
+      where: { providerId: booking.provider.id },
+      select: { id: true },
+    });
+    return studio?.id ?? null;
+  }
+
+  if (!booking.provider.studioId) return null;
+  const studio = await prisma.studio.findUnique({
+    where: { providerId: booking.provider.studioId },
+    select: { id: true },
+  });
+  return studio?.id ?? null;
+}
+
+async function resolveProviderRecipientUserIds(booking: BookingWithRelations): Promise<string[]> {
+  const recipients = new Set<string>();
+
+  const masterUserId = resolveMasterUserId(booking);
+  if (masterUserId) recipients.add(masterUserId);
+
+  if (booking.provider.ownerUserId) {
+    recipients.add(booking.provider.ownerUserId);
+  }
+
+  const studioId = await resolveStudioIdForBooking(booking);
+  if (studioId) {
+    const admins = await prisma.studioMembership.findMany({
+      where: {
+        studioId,
+        status: MembershipStatus.ACTIVE,
+        roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
+      },
+      select: { userId: true },
+    });
+    admins.forEach((item) => recipients.add(item.userId));
+  }
+
+  return Array.from(recipients);
+}
+
 function buildBookingPayload(booking: BookingWithRelations): Prisma.InputJsonValue {
   return {
     bookingId: booking.id,
@@ -82,6 +128,22 @@ function bookingPushUrl(bookingId: string, audience: "CLIENT" | "MASTER"): strin
     return `/cabinet/master/dashboard?bookingId=${bookingId}`;
   }
   return `/cabinet/bookings?bookingId=${bookingId}`;
+}
+
+function providerNotificationPushUrl(booking: BookingWithRelations, recipientUserId: string): string {
+  const assignedMasterUserId =
+    booking.masterProvider?.ownerUserId ?? booking.masterProvider?.masterProfile?.userId ?? null;
+  if (assignedMasterUserId && recipientUserId === assignedMasterUserId) {
+    return bookingPushUrl(booking.id, "MASTER");
+  }
+  if (booking.provider.type === ProviderType.STUDIO || booking.studioId) {
+    return "/cabinet/studio/calendar";
+  }
+  const masterUserId = resolveMasterUserId(booking);
+  if (masterUserId && recipientUserId === masterUserId) {
+    return bookingPushUrl(booking.id, "MASTER");
+  }
+  return "/notifications";
 }
 
 function bookingWhenLabel(booking: BookingWithRelations): string | null {
@@ -199,8 +261,8 @@ export async function notifyCancelledByMaster(booking: BookingWithRelations): Pr
 }
 
 export async function notifyCancelledByClient(booking: BookingWithRelations): Promise<void> {
-  const masterUserId = resolveMasterUserId(booking);
-  if (!masterUserId) return;
+  const recipientIds = await resolveProviderRecipientUserIds(booking);
+  if (recipientIds.length === 0) return;
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
@@ -209,16 +271,21 @@ export async function notifyCancelledByClient(booking: BookingWithRelations): Pr
     ? `${booking.clientName} отменил запись на ${serviceName} ${whenLabel}.`
     : `${booking.clientName} отменил запись на ${serviceName}.`;
 
-  await deliverNotification({
-    userId: masterUserId,
-    type: NotificationType.BOOKING_CANCELLED_BY_CLIENT,
-    title,
-    body,
-    payloadJson: buildBookingPayload(booking),
-    bookingId: booking.id,
-    pushUrl: bookingPushUrl(booking.id, "MASTER"),
-    telegramText: buildTelegramText(title, body),
-  });
+  const payload = buildBookingPayload(booking);
+  await Promise.all(
+    recipientIds.map((userId) =>
+      deliverNotification({
+        userId,
+        type: NotificationType.BOOKING_CANCELLED_BY_CLIENT,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: providerNotificationPushUrl(booking, userId),
+        telegramText: buildTelegramText(title, body),
+      })
+    )
+  );
 }
 
 export async function notifyBookingRescheduled(booking: BookingWithRelations): Promise<void> {
@@ -245,8 +312,8 @@ export async function notifyBookingRescheduled(booking: BookingWithRelations): P
 }
 
 export async function notifyRescheduleRequested(booking: BookingWithRelations): Promise<void> {
-  const masterUserId = resolveMasterUserId(booking);
-  if (!masterUserId) return;
+  const recipientIds = await resolveProviderRecipientUserIds(booking);
+  if (recipientIds.length === 0) return;
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingRequestedLabel(booking) ?? bookingWhenLabel(booking);
@@ -255,16 +322,21 @@ export async function notifyRescheduleRequested(booking: BookingWithRelations): 
     ? `Клиент ${booking.clientName} просит перенести запись на ${serviceName} ${whenLabel}.`
     : `Клиент ${booking.clientName} просит перенести запись на ${serviceName}.`;
 
-  await deliverNotification({
-    userId: masterUserId,
-    type: NotificationType.BOOKING_RESCHEDULE_REQUESTED,
-    title,
-    body,
-    payloadJson: buildBookingPayload(booking),
-    bookingId: booking.id,
-    pushUrl: bookingPushUrl(booking.id, "MASTER"),
-    telegramText: buildTelegramText(title, body),
-  });
+  const payload = buildBookingPayload(booking);
+  await Promise.all(
+    recipientIds.map((userId) =>
+      deliverNotification({
+        userId,
+        type: NotificationType.BOOKING_RESCHEDULE_REQUESTED,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: providerNotificationPushUrl(booking, userId),
+        telegramText: buildTelegramText(title, body),
+      })
+    )
+  );
 }
 
 export async function notifyBookingReminder24h(booking: BookingWithRelations): Promise<void> {

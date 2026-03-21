@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { NotificationEvent } from "@/lib/notifications/types";
-import { getNotificationPresentation, isBookingActionNotification } from "@/lib/notifications/presentation";
+import {
+  getNotificationPresentation,
+  isBookingActionNotification,
+  resolveNotificationOpenHref,
+} from "@/lib/notifications/presentation";
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -122,8 +126,8 @@ export function NotificationsBell({ ariaLabel }: Props) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
       await markRead(notificationId);
-    } catch (error) {
-      console.error("Failed to confirm booking from toast", error);
+    } catch {
+      // ignore
     }
   };
 
@@ -141,8 +145,8 @@ export function NotificationsBell({ ariaLabel }: Props) {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
       await markRead(notificationId);
-    } catch (error) {
-      console.error("Failed to decline booking from toast", error);
+    } catch {
+      // ignore
     }
   };
 
@@ -174,6 +178,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
             const booking = parseBookingPayload(toast.payloadJson);
             const chatPayload =
               toast.type === "CHAT_MESSAGE_RECEIVED" ? parseChatPayload(toast.payloadJson) : null;
+            const openHref = resolveNotificationOpenHref(toast.type, toast.payloadJson);
             const canAct =
               isBookingActionNotification(toast.type) &&
               booking?.bookingId &&
@@ -208,6 +213,13 @@ export function NotificationsBell({ ariaLabel }: Props) {
                       onClick={() => void handleOpenChat(toast.id, toast.payloadJson)}
                     >
                       {UI_TEXT.actions.openChat}
+                    </Button>
+                  </div>
+                ) : null}
+                {toast.type !== "CHAT_MESSAGE_RECEIVED" && openHref ? (
+                  <div className="mt-3">
+                    <Button asChild size="sm" variant="secondary">
+                      <Link href={openHref}>{UI_TEXT.notificationsCenter.openAction}</Link>
                     </Button>
                   </div>
                 ) : null}

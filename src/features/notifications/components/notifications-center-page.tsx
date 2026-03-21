@@ -9,7 +9,11 @@ import { StudioInviteCards } from "@/features/notifications/components/studio-in
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
-import { isBookingActionNotification, shouldRefreshInvitesForEvent } from "@/lib/notifications/presentation";
+import {
+  isBookingActionNotification,
+  resolveNotificationOpenHref,
+  shouldRefreshInvitesForEvent,
+} from "@/lib/notifications/presentation";
 import type { NotificationEvent } from "@/lib/notifications/types";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -151,7 +155,7 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
     if (typeof payload.offerId === "string") {
       return `/cabinet/master/model-offers?offerId=${payload.offerId}`;
     }
-    return undefined;
+    return resolveNotificationOpenHref(event.type, payload);
   };
 
   return {
@@ -310,12 +314,11 @@ export function NotificationsCenterPage({ initialData }: Props) {
       await markNotificationRead(noteId);
       try {
         await reloadCenterData();
-      } catch (reloadError) {
-        console.error("Failed to refresh notification center after confirm", reloadError);
+      } catch {
+        // ignore refresh errors
       }
       showActionNotice("success", "Запись подтверждена");
-    } catch (error) {
-      console.error("Failed to confirm booking from notification", error);
+    } catch {
       showActionNotice("error", "Не удалось подтвердить запись — попробуйте ещё раз");
     } finally {
       setActionPendingId(null);
@@ -358,12 +361,11 @@ export function NotificationsCenterPage({ initialData }: Props) {
       await markNotificationRead(noteId);
       try {
         await reloadCenterData();
-      } catch (reloadError) {
-        console.error("Failed to refresh notification center after decline", reloadError);
+      } catch {
+        // ignore refresh errors
       }
       showActionNotice("success", "Запись отклонена");
-    } catch (error) {
-      console.error("Failed to decline booking from notification", error);
+    } catch {
       showActionNotice("error", "Не удалось отклонить запись — попробуйте ещё раз");
     } finally {
       setActionPendingId(null);
