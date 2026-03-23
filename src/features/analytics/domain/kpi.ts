@@ -173,29 +173,31 @@ function buildSnapshot(input: {
 }
 
 async function loadWeeklyCapacityMinutes(context: AnalyticsContext): Promise<number[]> {
-  if (context.scope === "MASTER") {
-    const rows = await prisma.weeklySchedule.findMany({
-      where: { providerId: context.providerId },
-      select: { dayOfWeek: true, startLocal: true, endLocal: true },
-    });
-    const totals = Array.from({ length: 7 }, () => 0);
-    for (const row of rows) {
-      const weekday = row.dayOfWeek === 7 ? 0 : row.dayOfWeek;
-      totals[weekday] += diffMinutes(row.startLocal, row.endLocal);
-    }
-    return totals;
-  }
-
-  const rows = await prisma.weeklySchedule.findMany({
-    where: context.masterFilterId
-      ? { providerId: context.masterFilterId }
-      : { provider: { studioId: context.providerId, type: ProviderType.MASTER } },
-    select: { dayOfWeek: true, startLocal: true, endLocal: true },
+  const rows = await prisma.weeklyScheduleDay.findMany({
+    where: context.scope === "MASTER"
+      ? {
+          config: { providerId: context.providerId },
+          isActive: true,
+          templateId: { not: null },
+        }
+      : {
+          config: context.masterFilterId
+            ? { providerId: context.masterFilterId }
+            : { provider: { studioId: context.providerId, type: ProviderType.MASTER } },
+          isActive: true,
+          templateId: { not: null },
+        },
+    select: {
+      weekday: true,
+      template: { select: { startLocal: true, endLocal: true } },
+    },
   });
+
   const totals = Array.from({ length: 7 }, () => 0);
   for (const row of rows) {
-    const weekday = row.dayOfWeek === 7 ? 0 : row.dayOfWeek;
-    totals[weekday] += diffMinutes(row.startLocal, row.endLocal);
+    if (!row.template) continue;
+    const weekday = row.weekday === 7 ? 0 : row.weekday;
+    totals[weekday] += diffMinutes(row.template.startLocal, row.template.endLocal);
   }
   return totals;
 }

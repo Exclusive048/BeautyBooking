@@ -140,12 +140,6 @@ enum ScheduleBreakKind {
   OVERRIDE
 }
 
-enum ScheduleRuleKind {
-  WEEKLY
-
-  CYCLE
-}
-
 enum ScheduleOverrideKind {
   OFF
 
@@ -296,12 +290,6 @@ enum TimeBlockType {
   BREAK
 
   BLOCK
-}
-
-enum WorkExceptionType {
-  OFF
-
-  SHIFT
 }
 
 enum ScheduleChangeRequestStatus {
@@ -492,12 +480,6 @@ model Studio {
   serviceCategories ServiceCategory[]
 
   masterServices MasterService[]
-
-  workShiftTemplates WorkShiftTemplate[]
-
-  workDayRules WorkDayRule[]
-
-  workExceptions WorkException[]
 
   timeBlocks TimeBlock[]
 
@@ -717,13 +699,7 @@ model Provider {
 
   masterBookings Booking[] @relation("BookingMaster")
 
-  weeklySchedule WeeklySchedule[]
-
-  scheduleRules ScheduleRule[]
-
   scheduleOverrides ScheduleOverride[]
-
-  scheduleBlocks ScheduleBlock[]
 
   scheduleBreaks ScheduleBreak[]
 
@@ -1223,52 +1199,6 @@ model PushSubscription {
   @@index([userId])
 }
 
-model WeeklySchedule {
-  id String @id @default(cuid())
-
-  providerId String
-
-  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  dayOfWeek Int
-
-  startLocal String
-
-  endLocal String
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@index([providerId, dayOfWeek])
-}
-
-model ScheduleRule {
-  id String @id @default(cuid())
-
-  providerId String
-
-  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  kind ScheduleRuleKind
-
-  timezone String
-
-  anchorDate DateTime?
-
-  payloadJson Json
-
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId, isActive])
-  @@index([providerId, updatedAt])
-}
-
 model ScheduleOverride {
   id String @id @default(cuid())
 
@@ -1296,29 +1226,6 @@ model ScheduleOverride {
   isActive Boolean?
 
   note String?
-
-  reason String?
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  @@index([providerId])
-  @@index([providerId, date])
-}
-
-model ScheduleBlock {
-  id String @id @default(cuid())
-
-  providerId String
-
-  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  date DateTime
-
-  startLocal String
-
-  endLocal String
 
   reason String?
 
@@ -2057,81 +1964,6 @@ model BookingServiceItem {
   @@index([bookingId])
   @@index([studioId])
   @@index([serviceId])
-}
-
-model WorkShiftTemplate {
-  id String @id @default(cuid())
-
-  studioId String
-
-  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
-
-  masterId String?
-
-  title String
-
-  startTime String
-
-  endTime String
-
-  breakRulesJson String?
-
-  dayRules WorkDayRule[]
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  @@index([studioId, masterId])
-}
-
-model WorkDayRule {
-  id String @id @default(cuid())
-
-  studioId String
-
-  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
-
-  masterId String
-
-  weekday Int
-
-  templateId String
-
-  template WorkShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  isWorking Boolean @default(true)
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  @@unique([studioId, masterId, weekday])
-  @@index([templateId])
-}
-
-model WorkException {
-  id String @id @default(cuid())
-
-  studioId String?
-
-  studio Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
-
-  masterId String
-
-  date DateTime
-
-  type WorkExceptionType
-
-  startTime String?
-
-  endTime String?
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  @@index([studioId, masterId, date])
 }
 
 model TimeBlock {

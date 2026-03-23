@@ -1,4 +1,4 @@
-import type { Prisma, ScheduleBreakKind, ScheduleOverrideKind, ScheduleRuleKind } from "@prisma/client";
+import type { Prisma, ScheduleBreakKind, ScheduleOverrideKind } from "@prisma/client";
 import type { DayOfWeek, ScheduleBreakInterval } from "@/lib/domain/schedule";
 import type {
   ScheduleOverrideConfig,
@@ -9,7 +9,7 @@ import { parseScheduleRulePayload } from "@/lib/schedule/rule-engine";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 type ActiveRuleRecord = {
-  kind: ScheduleRuleKind;
+  kind: "WEEKLY" | "CYCLE";
   timezone: string;
   anchorDate: Date | null;
   payloadJson: Prisma.JsonValue;

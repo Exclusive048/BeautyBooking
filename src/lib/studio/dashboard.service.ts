@@ -53,7 +53,9 @@ export async function getStudioDashboardStats(studioId: string): Promise<StudioD
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const last7Days = addUtcDays(todayStart, -6);
 
-  const [bookingsToday, mastersTotal, scheduleCount, workingRules, recentBookings, reviewsCount] =
+  const activeWeekday = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+
+  const [bookingsToday, mastersTotal, scheduleCount, workingMasters, recentBookings, reviewsCount] =
     await Promise.all([
       prisma.booking.findMany({
         where: {
@@ -71,15 +73,21 @@ export async function getStudioDashboardStats(studioId: string): Promise<StudioD
       prisma.provider.count({
         where: { type: ProviderType.MASTER, studioId: studio.providerId },
       }),
-      prisma.workDayRule.count({ where: { studioId: studio.id } }),
-      prisma.workDayRule.findMany({
+      prisma.weeklyScheduleConfig.count({
         where: {
-          studioId: studio.id,
-          weekday: now.getUTCDay(),
-          isWorking: true,
+          provider: { type: ProviderType.MASTER, studioId: studio.providerId },
         },
-        select: { masterId: true },
-        distinct: ["masterId"],
+      }),
+      prisma.weeklyScheduleDay.findMany({
+        where: {
+          weekday: activeWeekday,
+          isActive: true,
+          config: {
+            provider: { type: ProviderType.MASTER, studioId: studio.providerId },
+          },
+        },
+        select: { configId: true },
+        distinct: ["configId"],
       }),
       prisma.booking.findMany({
         where: {
@@ -130,7 +138,7 @@ export async function getStudioDashboardStats(studioId: string): Promise<StudioD
     bookingsTodayCount,
     bookingsTodayAmount,
     mastersTotal,
-    mastersWorking: scheduleCount > 0 ? workingRules.length : null,
+    mastersWorking: scheduleCount > 0 ? workingMasters.length : null,
     newClientsCount: clientKeys.size,
     reviewsCount,
   };

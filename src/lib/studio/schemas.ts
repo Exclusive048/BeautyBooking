@@ -130,49 +130,6 @@ export const createStudioMasterSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(240),
 });
 
-const hhmmSchema = z.string().regex(/^\d{2}:\d{2}$/);
-
-export const createWorkShiftTemplateSchema = z.object({
-  studioId: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120),
-  startTime: hhmmSchema,
-  endTime: hhmmSchema,
-  breaks: z
-    .array(
-      z.object({
-        startTime: hhmmSchema,
-        endTime: hhmmSchema,
-      })
-    )
-    .max(3)
-    .default([]),
-});
-
-export const upsertDayRulesSchema = z.object({
-  studioId: z.string().trim().min(1),
-  items: z
-    .array(
-      z.object({
-        weekday: z.number().int().min(0).max(6),
-        templateId: z.string().trim().min(1),
-        isWorking: z.boolean(),
-      })
-    )
-    .max(7),
-});
-
-export const createWorkExceptionSchema = z.object({
-  studioId: z.string().trim().min(1),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  type: z.enum(["OFF", "SHIFT"]),
-  startTime: hhmmSchema.optional(),
-  endTime: hhmmSchema.optional(),
-});
-
-export const deleteWorkExceptionSchema = z.object({
-  studioId: z.string().trim().min(1),
-});
-
 export const bulkMasterServicesSchema = z.object({
   studioId: z.string().trim().min(1),
   items: z

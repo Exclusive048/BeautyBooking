@@ -3,11 +3,8 @@ import type { Prisma } from "@prisma/client";
 import type { Result } from "@/lib/domain/result";
 import type {
   AvailabilitySlot,
-  DayOfWeek,
-  ScheduleBlock,
   ScheduleBreakInterval,
   ScheduleOverride,
-  WeeklyScheduleItem,
 } from "@/lib/domain/schedule";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
@@ -47,33 +44,6 @@ function clampPageSize(value: number | null | undefined): number {
   return safe;
 }
 
-type ScheduleRuleDay = {
-  isWorkday: boolean;
-  startLocal?: string | null;
-  endLocal?: string | null;
-  breaks?: ScheduleBreakInterval[];
-};
-
-type WeeklyScheduleRuleDay = ScheduleRuleDay & {
-  dayOfWeek: DayOfWeek;
-};
-
-export type SaveScheduleRuleInput = {
-  kind: "WEEKLY" | "CYCLE";
-  timezone?: string;
-  anchorDate?: Date | null;
-  payload:
-    | {
-        weekly: WeeklyScheduleRuleDay[];
-      }
-    | {
-        cycle: {
-          days: ScheduleRuleDay[];
-        };
-      };
-  bufferBetweenBookingsMin?: number;
-};
-
 function validateBufferMinutes(value: number): Result<number> {
   if (!Number.isInteger(value)) {
     return { ok: false, status: 400, message: "Invalid buffer", code: "BUFFER_INVALID" };
@@ -96,23 +66,6 @@ function normalizeBufferMinutes(value: number | null | undefined): number {
 
 function normalizeDate(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
-function validateWeeklyItem(item: WeeklyScheduleItem): Result<WeeklyScheduleItem> {
-  if (item.dayOfWeek < 0 || item.dayOfWeek > 6) {
-    return { ok: false, status: 400, message: "Invalid day of week", code: "DAY_INVALID" };
-  }
-
-  const start = timeToMinutes(item.startLocal);
-  const end = timeToMinutes(item.endLocal);
-  if (start === null || end === null || start >= end) {
-    return { ok: false, status: 400, message: "Invalid time range", code: "TIME_RANGE_INVALID" };
-  }
-
-  const breaksResult = validateBreaks(item.breaks, start, end);
-  if (!breaksResult.ok) return breaksResult;
-
-  return { ok: true, data: { ...item, breaks: breaksResult.data } };
 }
 
 function validateBreaks(
@@ -182,168 +135,6 @@ function validateOverride(input: ScheduleOverride): Result<ScheduleOverride> {
   if (!breaksResult.ok) return breaksResult;
 
   return { ok: true, data: { ...input, date, breaks: breaksResult.data } };
-}
-
-function validateBlock(input: ScheduleBlock): Result<ScheduleBlock> {
-  const date = normalizeDate(input.date);
-  const start = timeToMinutes(input.startLocal);
-  const end = timeToMinutes(input.endLocal);
-  if (start === null || end === null || start >= end) {
-    return { ok: false, status: 400, message: "Invalid time range", code: "TIME_RANGE_INVALID" };
-  }
-  return { ok: true, data: { ...input, date } };
-}
-
-function normalizeTimezone(input: string | undefined, fallback: string): string {
-  const value = input?.trim();
-  if (!value) return fallback;
-  return value;
-}
-
-function validateRuleDayTemplate(input: ScheduleRuleDay): Result<{
-  isWorkday: boolean;
-  startLocal: string | null;
-  endLocal: string | null;
-  breaks: ScheduleBreakInterval[];
-}> {
-  if (!input.isWorkday) {
-    return {
-      ok: true,
-      data: {
-        isWorkday: false,
-        startLocal: null,
-        endLocal: null,
-        breaks: [],
-      },
-    };
-  }
-
-  const startLocal = input.startLocal ?? null;
-  const endLocal = input.endLocal ?? null;
-  const start = startLocal ? timeToMinutes(startLocal) : null;
-  const end = endLocal ? timeToMinutes(endLocal) : null;
-  if (start === null || end === null || start >= end) {
-    return { ok: false, status: 400, message: "Invalid time range", code: "TIME_RANGE_INVALID" };
-  }
-
-  const breaksResult = validateBreaks(input.breaks ?? [], start, end);
-  if (!breaksResult.ok) return breaksResult;
-
-  return {
-    ok: true,
-    data: {
-      isWorkday: true,
-      startLocal,
-      endLocal,
-      breaks: breaksResult.data ?? [],
-    },
-  };
-}
-
-function validateAndNormalizeRulePayload(input: SaveScheduleRuleInput["payload"]): Result<Prisma.JsonObject> {
-  if ("weekly" in input) {
-    const normalized: Prisma.JsonObject[] = [];
-    const seenDays = new Set<number>();
-    for (const day of input.weekly) {
-      if (seenDays.has(day.dayOfWeek)) {
-        return { ok: false, status: 400, message: "Duplicate day in weekly rule", code: "VALIDATION_ERROR" };
-      }
-      seenDays.add(day.dayOfWeek);
-      const validated = validateRuleDayTemplate(day);
-      if (!validated.ok) return validated;
-      normalized.push({
-        dayOfWeek: day.dayOfWeek,
-        isWorkday: validated.data.isWorkday,
-        startLocal: validated.data.startLocal,
-        endLocal: validated.data.endLocal,
-        breaks: validated.data.breaks as unknown as Prisma.JsonArray,
-      });
-    }
-    return { ok: true, data: { weekly: normalized } };
-  }
-
-  if (input.cycle.days.length === 0) {
-    return { ok: false, status: 400, message: "Cycle days required", code: "VALIDATION_ERROR" };
-  }
-
-  const days: Prisma.JsonObject[] = [];
-  for (const day of input.cycle.days) {
-    const validated = validateRuleDayTemplate(day);
-    if (!validated.ok) return validated;
-    days.push({
-      isWorkday: validated.data.isWorkday,
-      startLocal: validated.data.startLocal,
-      endLocal: validated.data.endLocal,
-      breaks: validated.data.breaks as unknown as Prisma.JsonArray,
-    });
-  }
-
-  return {
-    ok: true,
-    data: {
-      cycle: {
-        days: days as unknown as Prisma.JsonArray,
-      },
-    },
-  };
-}
-
-export async function setWeeklySchedule(
-  providerId: string,
-  items: WeeklyScheduleItem[]
-): Promise<Result<{ count: number }>> {
-  const normalized: WeeklyScheduleItem[] = [];
-  for (const item of items) {
-    const validated = validateWeeklyItem(item);
-    if (!validated.ok) return validated;
-    normalized.push(validated.data);
-  }
-
-  const ops: Prisma.PrismaPromise<unknown>[] = [
-    prisma.scheduleRule.updateMany({
-      where: { providerId, isActive: true },
-      data: { isActive: false },
-    }),
-    prisma.weeklySchedule.deleteMany({ where: { providerId } }),
-    prisma.weeklySchedule.createMany({
-      data: normalized.map((item) => ({
-        providerId,
-        dayOfWeek: item.dayOfWeek,
-        startLocal: item.startLocal,
-        endLocal: item.endLocal,
-      })),
-    }),
-  ];
-
-  const hasBreaksPayload = normalized.some((item) => item.breaks !== undefined);
-  if (hasBreaksPayload) {
-    for (const item of normalized) {
-      if (item.breaks === undefined) continue;
-      ops.push(
-        prisma.scheduleBreak.deleteMany({
-          where: { providerId, kind: "WEEKLY", dayOfWeek: item.dayOfWeek },
-        })
-      );
-      if (item.breaks.length > 0) {
-        ops.push(
-          prisma.scheduleBreak.createMany({
-            data: item.breaks.map((b) => ({
-              providerId,
-              kind: "WEEKLY",
-              dayOfWeek: item.dayOfWeek,
-              startLocal: b.startLocal,
-              endLocal: b.endLocal,
-            })),
-          })
-        );
-      }
-    }
-  }
-
-  await prisma.$transaction(ops);
-  await invalidateSlotsForMaster(providerId);
-
-  return { ok: true, data: { count: normalized.length } };
 }
 
 export async function setScheduleOverride(
@@ -435,103 +226,6 @@ export async function removeScheduleOverride(
   ]);
   await invalidateSlotsForMaster(providerId);
   return { ok: true, data: { date: normalized } };
-}
-
-export async function addScheduleBlock(
-  providerId: string,
-  input: ScheduleBlock
-): Promise<Result<{ id: string }>> {
-  const validated = validateBlock(input);
-  if (!validated.ok) return validated;
-
-  const created = await prisma.scheduleBlock.create({
-    data: {
-      providerId,
-      date: validated.data.date,
-      startLocal: validated.data.startLocal,
-      endLocal: validated.data.endLocal,
-      reason: validated.data.reason ?? null,
-    },
-  });
-  await invalidateSlotsForMaster(providerId);
-
-  return { ok: true, data: { id: created.id } };
-}
-
-export async function removeScheduleBlock(
-  providerId: string,
-  blockId: string
-): Promise<Result<{ id: string }>> {
-  const existing = await prisma.scheduleBlock.findFirst({
-    where: { id: blockId, providerId },
-    select: { id: true },
-  });
-  if (!existing) return { ok: false, status: 404, message: "Block not found", code: "BLOCK_NOT_FOUND" };
-
-  await prisma.scheduleBlock.delete({ where: { id: existing.id } });
-  await invalidateSlotsForMaster(providerId);
-  return { ok: true, data: { id: existing.id } };
-}
-
-export async function saveScheduleRule(
-  providerId: string,
-  input: SaveScheduleRuleInput
-): Promise<Result<{ id: string }>> {
-  const provider = await prisma.provider.findUnique({
-    where: { id: providerId },
-    select: { id: true, timezone: true },
-  });
-  if (!provider) {
-    return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
-  }
-
-  if (input.kind === "CYCLE" && !input.anchorDate) {
-    return { ok: false, status: 400, message: "Anchor date is required", code: "DATE_INVALID" };
-  }
-
-  const payloadResult = validateAndNormalizeRulePayload(input.payload);
-  if (!payloadResult.ok) return payloadResult;
-
-  let normalizedBuffer: number | null = null;
-  if (typeof input.bufferBetweenBookingsMin === "number") {
-    const validatedBuffer = validateBufferMinutes(input.bufferBetweenBookingsMin);
-    if (!validatedBuffer.ok) return validatedBuffer;
-    normalizedBuffer = validatedBuffer.data;
-  }
-
-  const timezone = normalizeTimezone(input.timezone, provider.timezone);
-  const anchorDate = input.anchorDate ? normalizeDate(input.anchorDate) : null;
-
-  const created = await prisma.$transaction(async (tx) => {
-    await tx.scheduleRule.updateMany({
-      where: { providerId, isActive: true },
-      data: { isActive: false },
-    });
-
-    const createdRule = await tx.scheduleRule.create({
-      data: {
-        providerId,
-        kind: input.kind,
-        timezone,
-        anchorDate: input.kind === "CYCLE" ? anchorDate : null,
-        payloadJson: payloadResult.data,
-        isActive: true,
-      },
-      select: { id: true },
-    });
-
-    if (normalizedBuffer !== null) {
-      await tx.provider.update({
-        where: { id: providerId },
-        data: { bufferBetweenBookingsMin: normalizedBuffer },
-      });
-    }
-
-    return createdRule;
-  });
-
-  await invalidateSlotsForMaster(providerId);
-  return { ok: true, data: { id: created.id } };
 }
 
 export type AvailabilitySlotsPageMeta = {
