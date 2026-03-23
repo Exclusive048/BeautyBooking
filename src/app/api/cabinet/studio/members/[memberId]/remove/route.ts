@@ -86,9 +86,25 @@ export async function POST(req: Request, ctx: RouteContext) {
       masterId: params.memberId.trim(),
       transferredServices: result.transferredServices,
       revokedInvites: result.revokedInviteIds.length,
+      alreadyLeft: false,
     });
   } catch (error) {
     const appError = toAppError(error);
+    if (
+      appError.code === "CONFLICT" &&
+      typeof appError.details === "object" &&
+      appError.details !== null &&
+      (appError.details as { reason?: string }).reason === "ALREADY_LEFT_STUDIO"
+    ) {
+      const params = await ctx.params;
+      return jsonOk({
+        masterId: params.memberId.trim(),
+        transferredServices: 0,
+        revokedInvites: 0,
+        alreadyLeft: true,
+      });
+    }
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
   }
 }
+

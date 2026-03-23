@@ -50,8 +50,14 @@ export async function transferMasterOutOfStudio(
           contactPhone: true,
         },
       });
-      if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioProviderId) {
+      if (!master || master.type !== ProviderType.MASTER) {
         throw new AppError("Master not found in studio", 404, "NOT_FOUND");
+      }
+      if (!master.studioId) {
+        throw new AppError("Master already left studio", 409, "CONFLICT", { reason: "ALREADY_LEFT_STUDIO" });
+      }
+      if (master.studioId !== studioProviderId) {
+        throw new AppError("Master belongs to another studio", 409, "CONFLICT", { reason: "STUDIO_MISMATCH" });
       }
 
       const studio = await tx.studio.findUnique({
@@ -235,3 +241,4 @@ export async function transferMasterOutOfStudio(
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   );
 }
+

@@ -782,6 +782,12 @@ export function MasterProfilePage() {
     }
   };
 
+  const openLeaveStudioModal = useCallback(() => {
+    setLeaveStudioError(null);
+    setLeaveStudioTransferServices(true);
+    setLeaveStudioModalOpen(true);
+  }, []);
+
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
   const hasServiceDraftChanges = useMemo(() => {
     if (!data) return false;
@@ -1877,6 +1883,28 @@ export function MasterProfilePage() {
           <p className="mt-1 text-xs text-amber-200/80">{UI_TEXT.master.profile.invite.description}</p>
           <div className="mt-3">
             <StudioInviteCards invites={pendingInvites} onChanged={setPendingInvites} />
+          </div>
+        </div>
+      ) : null}
+
+
+      {!data.master.isSolo ? (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-200">Вы работаете в составе студии</p>
+              <p className="mt-1 text-xs text-text-sec">
+                Если нужно прекратить членство, вы можете самостоятельно выйти из студии. После выхода доступ к студийным
+                разделам и настройкам студии будет отключен.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openLeaveStudioModal}
+              className="rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
+            >
+              Выйти из студии
+            </button>
           </div>
         </div>
       ) : null}
