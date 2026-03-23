@@ -6,6 +6,11 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { applySchedulePayload, type SchedulePayload } from "@/lib/schedule/unified";
+import {
+  applyScheduleSnapshot,
+  isScheduleEditorRequestPayload,
+  normalizeScheduleEditorRequestPayload,
+} from "@/lib/schedule/editor";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestApproved } from "@/lib/notifications/studio-notifications";
 
 export const runtime = "nodejs";
@@ -38,7 +43,12 @@ export async function POST(
       return jsonFail(400, "Запрос уже обработан.", "VALIDATION_ERROR");
     }
 
-    await applySchedulePayload(request.providerId, request.payloadJson as unknown as SchedulePayload);
+    if (isScheduleEditorRequestPayload(request.payloadJson)) {
+      const normalized = normalizeScheduleEditorRequestPayload(request.payloadJson);
+      await applyScheduleSnapshot(request.providerId, normalized);
+    } else {
+      await applySchedulePayload(request.providerId, request.payloadJson as unknown as SchedulePayload);
+    }
 
     await prisma.scheduleChangeRequest.update({
       where: { id: request.id },

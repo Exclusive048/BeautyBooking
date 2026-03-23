@@ -1,7 +1,6 @@
-import type { Prisma, ScheduleBreakKind, ScheduleOverrideKind, ScheduleRuleKind } from "@prisma/client";
+import type { ScheduleOverrideKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { buildScheduleRuleConfig } from "@/lib/schedule/rule-adapters";
 import { resolvePublishedUntilLocal } from "@/lib/schedule/publish-horizon";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
@@ -10,21 +9,6 @@ import type { DayOfWeek, ScheduleBreakInterval } from "@/lib/domain/schedule";
 type ScheduleVersion = {
   value: string;
   updatedAt: Date | null;
-};
-
-type ActiveRuleRecord = {
-  kind: ScheduleRuleKind;
-  timezone: string;
-  anchorDate: Date | null;
-  payloadJson: Prisma.JsonValue;
-  isActive: boolean;
-  updatedAt: Date;
-};
-
-type WeeklyRow = {
-  dayOfWeek: number;
-  startLocal: string;
-  endLocal: string;
 };
 
 export type OverrideRow = {
@@ -40,14 +24,6 @@ export type OverrideRow = {
 };
 
 export type BreakRow = {
-  kind: ScheduleBreakKind;
-  dayOfWeek: number | null;
-  date: Date | null;
-  startLocal: string;
-  endLocal: string;
-};
-
-export type BlockRow = {
   date: Date;
   startLocal: string;
   endLocal: string;
@@ -63,10 +39,21 @@ export type ScheduleContext = {
   providerId: string;
   timezone: string;
   scheduleWindow: ScheduleWindow;
-  rule: ReturnType<typeof buildScheduleRuleConfig>;
+  rule: {
+    kind: "WEEKLY";
+    timezone: string;
+    anchorDate: null;
+    payload: {
+      weekly: Array<{
+        dayOfWeek: DayOfWeek;
+        isWorkday: boolean;
+        startLocal: string | null;
+        endLocal: string | null;
+        breaks: ScheduleBreakInterval[];
+      }>;
+    };
+  } | null;
   overridesByDateKey: Map<string, OverrideRow[]>;
-  blocksByDateKey: Map<string, BlockRow[]>;
-  breaksWeekly: BreakRow[];
   breaksOverrideByDateKey: Map<string, BreakRow[]>;
   templatesById: Map<string, { startLocal: string; endLocal: string; breaks: ScheduleBreakInterval[] }>;
 };
@@ -91,7 +78,7 @@ function buildRuleFromWeeklyConfig(input: {
   timezone: string;
   days: Array<{ weekday: number; templateId: string | null; isActive: boolean }>;
   templatesById: Map<string, { startLocal: string; endLocal: string; breaks: ScheduleBreakInterval[] }>;
-}): ReturnType<typeof buildScheduleRuleConfig> {
+}): ScheduleContext["rule"] {
   if (input.days.length === 0) return null;
   const dayByWeekday = new Map<number, { templateId: string | null; isActive: boolean }>();
   for (const day of input.days) {
@@ -134,31 +121,18 @@ function dateKeyToUtcStart(dateKey: string): Date {
 }
 
 async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion> {
-  const [provider, rule, weeklyMax, overrideMax, breakMax, blockMax, templateMax, weeklyConfigMax] =
+  const [provider, overrideMax, overrideBreakMax, templateMax, weeklyConfigMax] =
     await prisma.$transaction([
     prisma.provider.findUnique({
       where: { id: masterId },
       select: { updatedAt: true },
-    }),
-    prisma.scheduleRule.findFirst({
-      where: { providerId: masterId, isActive: true },
-      orderBy: { updatedAt: "desc" },
-      select: { updatedAt: true },
-    }),
-    prisma.weeklySchedule.aggregate({
-      where: { providerId: masterId },
-      _max: { updatedAt: true },
     }),
     prisma.scheduleOverride.aggregate({
       where: { providerId: masterId },
       _max: { updatedAt: true },
     }),
     prisma.scheduleBreak.aggregate({
-      where: { providerId: masterId },
-      _max: { updatedAt: true },
-    }),
-    prisma.scheduleBlock.aggregate({
-      where: { providerId: masterId },
+      where: { providerId: masterId, kind: "OVERRIDE" },
       _max: { updatedAt: true },
     }),
     prisma.scheduleTemplate.aggregate({
@@ -173,11 +147,8 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
 
   const latest = maxDate([
     provider?.updatedAt ?? null,
-    rule?.updatedAt ?? null,
-    weeklyMax._max.updatedAt ?? null,
     overrideMax._max.updatedAt ?? null,
-    breakMax._max.updatedAt ?? null,
-    blockMax._max.updatedAt ?? null,
+    overrideBreakMax._max.updatedAt ?? null,
     templateMax._max.updatedAt ?? null,
     weeklyConfigMax._max.updatedAt ?? null,
   ]);
@@ -216,29 +187,7 @@ export async function createScheduleContext(input: {
   const timezone = normalizeTimezone(input.timezoneHint, provider.timezone);
   const scheduleWindow = await getScheduleWindow(provider.id, timezone);
 
-  const [rule, weeklyRows, weeklyBreaks, weeklyConfig, templates] = await prisma.$transaction([
-    prisma.scheduleRule.findFirst({
-      where: { providerId: provider.id, isActive: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-      select: {
-        kind: true,
-        timezone: true,
-        anchorDate: true,
-        payloadJson: true,
-        isActive: true,
-        updatedAt: true,
-      },
-    }),
-    prisma.weeklySchedule.findMany({
-      where: { providerId: provider.id },
-      select: { dayOfWeek: true, startLocal: true, endLocal: true },
-      orderBy: [{ dayOfWeek: "asc" }, { startLocal: "asc" }],
-    }),
-    prisma.scheduleBreak.findMany({
-      where: { providerId: provider.id, kind: "WEEKLY" },
-      select: { kind: true, dayOfWeek: true, date: true, startLocal: true, endLocal: true },
-    }),
+  const [weeklyConfig, templates] = await prisma.$transaction([
     prisma.weeklyScheduleConfig.findUnique({
       where: { providerId: provider.id },
       select: {
@@ -282,22 +231,16 @@ export async function createScheduleContext(input: {
       })
     : null;
 
-  const ruleConfig = unifiedRuleConfig ?? buildScheduleRuleConfig({
-    providerTimezone: timezone,
-    activeRule: (rule as ActiveRuleRecord | null) ?? null,
-    weeklyRows: weeklyRows as WeeklyRow[],
-    breakRows: weeklyBreaks as BreakRow[],
-  });
+  const ruleConfig = unifiedRuleConfig;
 
   let overrides: OverrideRow[] = [];
-  let blocks: BlockRow[] = [];
   let overrideBreaks: BreakRow[] = [];
 
   if (input.range) {
     const fromUtc = dateKeyToUtcStart(input.range.fromKey);
     const toUtcExclusive = dateKeyToUtcStart(input.range.toKeyExclusive);
 
-    const [overrideRows, blockRows, breakRows] = await prisma.$transaction([
+    const [overrideRows, breakRows] = await prisma.$transaction([
       prisma.scheduleOverride.findMany({
         where: { providerId: provider.id, date: { gte: fromUtc, lt: toUtcExclusive } },
         select: {
@@ -312,22 +255,17 @@ export async function createScheduleContext(input: {
           reason: true,
         },
       }),
-      prisma.scheduleBlock.findMany({
-        where: { providerId: provider.id, date: { gte: fromUtc, lt: toUtcExclusive } },
-        select: { date: true, startLocal: true, endLocal: true },
-      }),
       prisma.scheduleBreak.findMany({
         where: {
           providerId: provider.id,
           kind: "OVERRIDE",
           date: { gte: fromUtc, lt: toUtcExclusive },
         },
-        select: { kind: true, dayOfWeek: true, date: true, startLocal: true, endLocal: true },
+        select: { date: true, startLocal: true, endLocal: true },
       }),
     ]);
 
     overrides = overrideRows as OverrideRow[];
-    blocks = blockRows as BlockRow[];
     overrideBreaks = breakRows as BreakRow[];
   }
 
@@ -339,17 +277,8 @@ export async function createScheduleContext(input: {
     overridesByDateKey.set(key, list);
   }
 
-  const blocksByDateKey = new Map<string, BlockRow[]>();
-  for (const row of blocks) {
-    const key = toLocalDateKey(row.date, timezone);
-    const list = blocksByDateKey.get(key) ?? [];
-    list.push(row);
-    blocksByDateKey.set(key, list);
-  }
-
   const breaksOverrideByDateKey = new Map<string, BreakRow[]>();
   for (const row of overrideBreaks) {
-    if (!row.date) continue;
     const key = toLocalDateKey(row.date, timezone);
     const list = breaksOverrideByDateKey.get(key) ?? [];
     list.push(row);
@@ -362,8 +291,6 @@ export async function createScheduleContext(input: {
     scheduleWindow,
     rule: ruleConfig,
     overridesByDateKey,
-    blocksByDateKey,
-    breaksWeekly: weeklyBreaks as BreakRow[],
     breaksOverrideByDateKey,
     templatesById,
   };

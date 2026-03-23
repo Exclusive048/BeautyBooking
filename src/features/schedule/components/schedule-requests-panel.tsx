@@ -44,6 +44,31 @@ type SchedulePayload = {
   overrides: ScheduleOverride[];
 };
 
+type EditorBreak = { start: string; end: string };
+type EditorDaySchedule = {
+  dayOfWeek: number;
+  isWorkday: boolean;
+  scheduleMode: "FLEXIBLE" | "FIXED";
+  startTime: string;
+  endTime: string;
+  breaks: EditorBreak[];
+  fixedSlotTimes: string[];
+};
+type EditorException = {
+  date: string;
+  isWorkday: boolean;
+  scheduleMode: "FLEXIBLE" | "FIXED";
+  startTime: string | null;
+  endTime: string | null;
+  breaks: EditorBreak[];
+  fixedSlotTimes: string[];
+};
+type EditorRequestPayload = {
+  format: "EDITOR_V1";
+  weekSchedule: EditorDaySchedule[];
+  exceptions: EditorException[];
+};
+
 type RequestDetails = {
   request: {
     id: string;
@@ -51,7 +76,7 @@ type RequestDetails = {
     comment: string | null;
     createdAt: string;
     provider: { id: string; name: string };
-    payload: SchedulePayload;
+    payload: SchedulePayload | EditorRequestPayload;
   };
   current: {
     templates: Array<{
@@ -64,6 +89,10 @@ type RequestDetails = {
     weekly: { days: WeeklyDay[] };
     overrides: ScheduleOverride[];
     month: string;
+    editorSnapshot: {
+      weekSchedule: EditorDaySchedule[];
+      exceptions: Array<EditorException & { id: string }>;
+    };
   };
 };
 
@@ -145,6 +174,66 @@ function resolveDay(input: {
   };
 }
 
+function isEditorRequestPayload(value: SchedulePayload | EditorRequestPayload): value is EditorRequestPayload {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    "format" in value &&
+    value.format === "EDITOR_V1" &&
+    Array.isArray(value.weekSchedule) &&
+    Array.isArray(value.exceptions)
+  );
+}
+
+function resolveEditorDay(input: {
+  weekSchedule: EditorDaySchedule[];
+  exceptions: EditorException[];
+  dateKey: string;
+}): {
+  isWorkday: boolean;
+  scheduleMode: "FLEXIBLE" | "FIXED";
+  startTime: string | null;
+  endTime: string | null;
+  breaks: EditorBreak[];
+  fixedSlotTimes: string[];
+} {
+  const day = new Date(`${input.dateKey}T00:00:00.000Z`).getUTCDay();
+  const dayOfWeek = day === 0 ? 6 : day - 1;
+  const base = input.weekSchedule.find((item) => item.dayOfWeek === dayOfWeek) ?? null;
+  const exception = input.exceptions.find((item) => item.date === input.dateKey) ?? null;
+
+  if (exception) {
+    return {
+      isWorkday: exception.isWorkday,
+      scheduleMode: exception.scheduleMode,
+      startTime: exception.startTime,
+      endTime: exception.endTime,
+      breaks: exception.breaks ?? [],
+      fixedSlotTimes: exception.fixedSlotTimes ?? [],
+    };
+  }
+
+  if (!base) {
+    return {
+      isWorkday: false,
+      scheduleMode: "FLEXIBLE",
+      startTime: null,
+      endTime: null,
+      breaks: [],
+      fixedSlotTimes: [],
+    };
+  }
+
+  return {
+    isWorkday: base.isWorkday,
+    scheduleMode: base.scheduleMode,
+    startTime: base.startTime,
+    endTime: base.endTime,
+    breaks: base.breaks ?? [],
+    fixedSlotTimes: base.fixedSlotTimes ?? [],
+  };
+}
+
 export function ScheduleRequestsPanel() {
   const viewerTimeZone = useViewerTimeZoneContext();
   const [requests, setRequests] = useState<RequestItem[]>([]);
@@ -221,6 +310,42 @@ export function ScheduleRequestsPanel() {
     if (!details) return new Set<string>();
     const changed = new Set<string>();
     const payload = details.request.payload;
+    if (isEditorRequestPayload(payload)) {
+      const currentSnapshot = details.current.editorSnapshot;
+      for (const { dateKey } of calendar) {
+        const planned = resolveEditorDay({
+          weekSchedule: currentSnapshot.weekSchedule,
+          exceptions: currentSnapshot.exceptions,
+          dateKey,
+        });
+        const draft = resolveEditorDay({
+          weekSchedule: payload.weekSchedule,
+          exceptions: payload.exceptions,
+          dateKey,
+        });
+        const plannedKey = JSON.stringify({
+          isWorkday: planned.isWorkday,
+          scheduleMode: planned.scheduleMode,
+          startTime: planned.startTime,
+          endTime: planned.endTime,
+          breaks: planned.breaks,
+          fixedSlotTimes: [...planned.fixedSlotTimes].sort(),
+        });
+        const draftKey = JSON.stringify({
+          isWorkday: draft.isWorkday,
+          scheduleMode: draft.scheduleMode,
+          startTime: draft.startTime,
+          endTime: draft.endTime,
+          breaks: draft.breaks,
+          fixedSlotTimes: [...draft.fixedSlotTimes].sort(),
+        });
+        if (plannedKey !== draftKey) {
+          changed.add(dateKey);
+        }
+      }
+      return changed;
+    }
+
     const current = details.current;
     for (const { dateKey } of calendar) {
       const planned = resolveDay({

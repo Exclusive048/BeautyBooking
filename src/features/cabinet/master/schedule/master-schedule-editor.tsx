@@ -33,11 +33,19 @@ type ScheduleException = {
   fixedSlotTimes: string[];
 };
 type WeekTemplate = { id: "standard" | "2x2"; label: string };
+type ApprovalInfo = {
+  mode: "SOLO_MASTER" | "STUDIO_ADMIN" | "STUDIO_MASTER";
+  requestStatus: "PENDING" | "REJECTED" | null;
+  pendingRequestId: string | null;
+  rejectedComment: string | null;
+  lastAction?: "APPLIED" | "REQUEST_CREATED" | "REQUEST_UPDATED" | "NO_CHANGES";
+};
 type SchedulePayload = {
   timezone: string;
   weekSchedule: DaySchedule[];
   exceptions: ScheduleException[];
   templates: WeekTemplate[];
+  approval?: ApprovalInfo;
 };
 
 const T = UI_TEXT.cabinet.master.schedule;
@@ -47,6 +55,15 @@ const DEFAULT_START = "09:00";
 const DEFAULT_END = "20:00";
 const FIXED_START = "00:00";
 const FIXED_END = "23:55";
+
+function defaultApproval(): ApprovalInfo {
+  return {
+    mode: "SOLO_MASTER",
+    requestStatus: null,
+    pendingRequestId: null,
+    rejectedComment: null,
+  };
+}
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -143,6 +160,7 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
   const [savingException, setSavingException] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [approval, setApproval] = useState<ApprovalInfo>(defaultApproval());
 
   const exceptionByDate = useMemo(() => new Map(exceptions.map((item) => [item.date, item])), [exceptions]);
   const selectedKey = selectedDate ? toDateKey(selectedDate, timezone) : null;
@@ -184,6 +202,7 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
     setWeek(payload.weekSchedule);
     setTemplates(payload.templates);
     setExceptions(payload.exceptions.slice().sort((left, right) => left.date.localeCompare(right.date)));
+    setApproval(payload.approval ?? defaultApproval());
   }, []);
 
   const load = useCallback(async () => {
@@ -214,7 +233,14 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
     const json = (await response.json().catch(() => null)) as ApiResponse<SchedulePayload> | null;
     if (!response.ok || !json || !json.ok) throw new Error(json && !json.ok ? json.error.message : T.errors.saveWeek);
     applyPayload(json.data);
-    setInfo(T.saved);
+    const action = json.data.approval?.lastAction;
+    if (action === "REQUEST_CREATED" || action === "REQUEST_UPDATED") {
+      setInfo("Изменения отправлены на согласование.");
+    } else if (action === "NO_CHANGES") {
+      setInfo("Изменений нет.");
+    } else {
+      setInfo(T.saved);
+    }
     window.setTimeout(() => setInfo(null), 2500);
   }, [apiPath, applyPayload]);
 
@@ -259,11 +285,26 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
     }
   };
 
+  const isStudioMaster = approval.mode === "STUDIO_MASTER";
+  const hasPendingRequest = approval.requestStatus === "PENDING";
+
   if (loading) return <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 text-sm text-text-sec">{T.loading}</div>;
 
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
+      {isStudioMaster ? (
+        <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <p>
+            {hasPendingRequest
+              ? "Изменения по графику ожидают согласования студии."
+              : "Изменения по графику отправляются на согласование студии и не применяются сразу."}
+          </p>
+          {approval.rejectedComment ? (
+            <p className="mt-1 text-xs text-amber-200/90">Последний комментарий студии: {approval.rejectedComment}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[320px_1fr_300px]">
         <Card>
           <CardHeader className="pb-3">
@@ -598,4 +639,3 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
     </section>
   );
 }
-

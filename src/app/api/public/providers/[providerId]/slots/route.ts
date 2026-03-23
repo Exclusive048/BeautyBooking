@@ -98,7 +98,7 @@ export async function GET(
 
   const provider = await resolveProviderBySlugOrId({
     key: p.providerId,
-    select: { id: true, type: true, timezone: true, scheduleMode: true, fixedSlotTimes: true },
+    select: { id: true, type: true, timezone: true },
     requirePublished: true,
   });
   if (!provider || provider.type !== "MASTER") {
@@ -188,7 +188,6 @@ export async function GET(
     });
   }
 
-  const fallbackFixedSet = new Set(normalizeFixedSlotTimes(provider.fixedSlotTimes ?? []));
   const effectiveCache = new Map<string, EffectiveSchedule>();
   const getEffective = (dateKey: string): EffectiveSchedule => {
     const cached = effectiveCache.get(dateKey);
@@ -209,8 +208,8 @@ export async function GET(
 
     const fallback: EffectiveSchedule = {
       isWorkday: true,
-      scheduleMode: provider.scheduleMode === "FIXED" ? "FIXED" : "FLEXIBLE",
-      fixedSlotSet: fallbackFixedSet,
+      scheduleMode: "FLEXIBLE",
+      fixedSlotSet: new Set<string>(),
     };
     effectiveCache.set(dateKey, fallback);
     return fallback;

@@ -35,17 +35,12 @@ export const ScheduleEngine = {
       breaksByDateKey,
     });
     const dateBreaks = breaksByDateKey.get(dateKey) ?? [];
-    const blockBreaks = (ctx.blocksByDateKey.get(dateKey) ?? []).map((row) => ({
-      start: row.startLocal,
-      end: row.endLocal,
-    }));
 
     const plan = resolveDayPlanFromRule({
       dateKey,
       rule: ctx.rule,
       overrides: overrideConfigs,
       dateBreaks,
-      blockBreaks,
       providerTimezone: ctx.timezone,
     });
     const gated = applyPublishHorizon({

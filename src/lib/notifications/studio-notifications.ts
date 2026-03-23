@@ -319,6 +319,53 @@ export async function notifyScheduleRequestApproved(
   });
 }
 
+export async function notifyMasterScheduleUpdatedByStudio(input: {
+  providerId: string;
+  studioProviderId: string;
+}): Promise<void> {
+  const [provider, studio] = await Promise.all([
+    prisma.provider.findUnique({
+      where: { id: input.providerId },
+      select: {
+        id: true,
+        ownerUserId: true,
+        masterProfile: { select: { userId: true } },
+      },
+    }),
+    prisma.studio.findUnique({
+      where: { providerId: input.studioProviderId },
+      select: {
+        id: true,
+        provider: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  if (!provider || !studio) return;
+
+  const masterUserId = provider.ownerUserId ?? provider.masterProfile?.userId ?? null;
+  if (!masterUserId) return;
+
+  const studioName = studio.provider.name ?? "РЎС‚СѓРґРёСЏ";
+  const title = "Р“СЂР°С„РёРє РѕР±РЅРѕРІР»РµРЅ СЃС‚СѓРґРёРµР№";
+  const body = `РЎС‚СѓРґРёСЏ ${studioName} РѕР±РЅРѕРІРёР»Р° РІР°С€ СЂР°Р±РѕС‡РёР№ РіСЂР°С„РёРє.`;
+
+  await deliverNotification({
+    userId: masterUserId,
+    type: NotificationType.STUDIO_SCHEDULE_APPROVED,
+    title,
+    body,
+    payloadJson: {
+      studioId: studio.id,
+      studioProviderId: input.studioProviderId,
+      providerId: input.providerId,
+      source: "STUDIO_DIRECT_APPLY",
+    },
+    pushUrl: "/notifications",
+    telegramText: buildTelegramText(title, body),
+  });
+}
+
 export async function notifyScheduleRequestRejected(
   request: ScheduleRequestWithRelations
 ): Promise<void> {

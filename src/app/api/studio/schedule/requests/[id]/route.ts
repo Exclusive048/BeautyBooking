@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
+import { buildScheduleSnapshot } from "@/lib/schedule/editor";
 import { getWeeklyScheduleConfig, listScheduleOverrides, listScheduleTemplates } from "@/lib/schedule/unified";
 
 export const runtime = "nodejs";
@@ -48,10 +49,11 @@ export async function GET(
 
     if (!request) return jsonFail(404, "Запрос не найден.", "NOT_FOUND");
 
-    const [templates, weekly, overrides] = await Promise.all([
+    const [templates, weekly, overrides, editorSnapshot] = await Promise.all([
       listScheduleTemplates(request.provider.id),
       getWeeklyScheduleConfig(request.provider.id),
       listScheduleOverrides(request.provider.id, month),
+      buildScheduleSnapshot(request.provider.id),
     ]);
 
     return jsonOk({
@@ -63,7 +65,7 @@ export async function GET(
         provider: request.provider,
         payload: request.payloadJson,
       },
-      current: { templates, weekly, overrides, month },
+      current: { templates, weekly, overrides, month, editorSnapshot },
     });
   } catch (error) {
     const appError = toAppError(error);
