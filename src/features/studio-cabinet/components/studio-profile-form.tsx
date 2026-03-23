@@ -184,43 +184,47 @@ export function StudioProfileForm({
           <div className="space-y-2">
             <div className="text-xs font-medium text-text-label">{studioFormText.addressLabel}</div>
             <div ref={addressSuggestRootRef} className="relative">
-              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec" />
-              <input
-                ref={addressInputRef}
-                type="text"
-                value={address}
-                onChange={(event) => onAddressChange(event.target.value)}
-                onKeyDown={handleAddressKeyDown}
-                onFocus={() => {
-                  if (addressSuggestions.length > 0) {
-                    setIsAddressSuggestOpen(true);
-                  }
-                }}
-                onBlur={() => {
-                  setIsAddressSuggestOpen(false);
-                }}
-                placeholder={studioFormText.addressPlaceholder}
-                className={`lux-input h-11 w-full rounded-2xl px-4 text-sm text-text-main placeholder:text-text-placeholder outline-none ${inputClass} pl-9`}
-              />
-              {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
-                <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
-                  {addressSuggestions.map((item, index) => (
-                    <button
-                      type="button"
-                      key={`${item.value}-${index}`}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setAddressSuggestIndex(index)}
-                      onClick={() => selectAddressSuggestion(item)}
-                      className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
-                        index === addressSuggestIndex ? "bg-bg-input" : ""
-                      }`}
-                      aria-label={studioFormText.selectAddressAria.replace("{address}", item.value)}
-                    >
-                      <span className="whitespace-normal break-words">{item.value}</span>
-                    </button>
-                  ))}
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center">
+                  <MapPin className="h-4 w-4 text-text-sec" />
                 </div>
-              ) : null}
+                <input
+                  ref={addressInputRef}
+                  type="text"
+                  value={address}
+                  onChange={(event) => onAddressChange(event.target.value)}
+                  onKeyDown={handleAddressKeyDown}
+                  onFocus={() => {
+                    if (addressSuggestions.length > 0) {
+                      setIsAddressSuggestOpen(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setIsAddressSuggestOpen(false);
+                  }}
+                  placeholder={studioFormText.addressPlaceholder}
+                  className={`lux-input h-11 w-full rounded-2xl px-4 text-sm text-text-main placeholder:text-text-placeholder outline-none ${inputClass} pl-11`}
+                />
+                {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
+                  <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
+                    {addressSuggestions.map((item, index) => (
+                      <button
+                        type="button"
+                        key={`${item.value}-${index}`}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setAddressSuggestIndex(index)}
+                        onClick={() => selectAddressSuggestion(item)}
+                        className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
+                          index === addressSuggestIndex ? "bg-bg-input" : ""
+                        }`}
+                        aria-label={studioFormText.selectAddressAria.replace("{address}", item.value)}
+                      >
+                        <span className="whitespace-normal break-words">{item.value}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               {addressStatus ? (
                 <div className={`mt-1 text-xs ${addressStatusTone}`}>{addressStatus.text}</div>
               ) : null}

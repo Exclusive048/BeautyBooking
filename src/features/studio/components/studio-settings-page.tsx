@@ -487,6 +487,38 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
     }
   };
 
+  const removeBanner = async (): Promise<void> => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const saveRes = await fetchWithAuth(`/api/studios/${providerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bannerAssetId: null }),
+      });
+      const saveJson = (await saveRes.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
+      if (!saveRes.ok || !saveJson || !saveJson.ok) {
+        throw new Error(
+          saveJson && !saveJson.ok
+            ? saveJson.error.message
+            : `${t.apiErrorPrefix}: ${saveRes.status}`
+        );
+      }
+      setBannerUrl(saveJson.data.studio.bannerUrl);
+      setBannerAssetId(saveJson.data.studio.bannerAssetId ?? null);
+      setBannerFocalX(saveJson.data.studio.bannerFocalX ?? null);
+      setBannerFocalY(saveJson.data.studio.bannerFocalY ?? null);
+      setPickingBannerFocal(false);
+      markSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.uploadBannerFailed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const publicationStateLabel = isPublished ? "Опубликован" : "Не опубликован";
   const publicationStatusClass = isPublished ? "text-emerald-300" : "text-amber-300";
   const canPickBannerFocal = Boolean(bannerAssetId && bannerUrl);
   const showSaveBar = activeTab === "main" || activeTab === "settings";
@@ -546,17 +578,10 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                 isPublished={isPublished}
                 onTogglePublished={setIsPublished}
                 onEditBanner={() => bannerInputRef.current?.click()}
+                onRemoveBanner={bannerUrl ? () => void removeBanner() : undefined}
                 onEditFocal={bannerUrl ? () => setPickingBannerFocal(true) : undefined}
+                isBusy={saving}
               />
-
-              <div className="rounded-2xl bg-bg-card/90 p-4">
-                <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.publication.title}</h3>
-                <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.publication.desc}</p>
-                <p className={`mt-3 text-sm font-medium ${publicationStatusClass}`}>
-                  {isPublished ? UI_TEXT.studio.profile.published : UI_TEXT.studio.profile.hidden}
-                </p>
-              </div>
-
               <StudioProfileForm
                 name={name}
                 description={description}

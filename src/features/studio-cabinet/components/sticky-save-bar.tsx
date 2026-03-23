@@ -1,6 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -19,24 +20,21 @@ export function StickySaveBar({
   disabled = false,
 }: Props) {
   return (
-    <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-white/8 bg-bg-main/95 px-4 py-3 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
-      <div className="flex items-center gap-2">
-        {saved ? (
-          <span className="flex items-center gap-1.5 text-sm text-text-sec">
-            <Check className="h-4 w-4 text-green-400" />
-            {UI_TEXT.common.saved}
-          </span>
-        ) : null}
-        {error ? <span className="text-sm text-red-400">{error}</span> : null}
-      </div>
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={disabled || isSaving}
-        className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-      >
-        {isSaving ? UI_TEXT.common.saving : UI_TEXT.common.saveChanges}
-      </button>
+    <div className="sticky bottom-3 z-10">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border-subtle/80 bg-bg-card/95 px-4 py-3 shadow-card backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 flex items-center gap-2">
+          {saved ? (
+            <span className="flex items-center gap-1.5 text-sm text-text-sec">
+              <Check className="h-4 w-4 text-green-400" />
+              {UI_TEXT.common.saved}
+            </span>
+          ) : null}
+          {error ? <span className="truncate text-sm text-red-400">{error}</span> : null}
         </div>
+        <Button onClick={onSave} size="md" disabled={disabled || isSaving} className="w-full md:w-auto">
+          {isSaving ? UI_TEXT.common.saving : UI_TEXT.common.saveChanges}
+        </Button>
+      </div>
+    </div>
   );
 }
