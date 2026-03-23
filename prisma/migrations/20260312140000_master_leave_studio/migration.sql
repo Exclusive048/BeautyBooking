@@ -1,1 +1,0 @@
-ALTER TABLE "StudioMembership" ADD COLUMN IF NOT EXISTS "leftAt" TIMESTAMP(3);
