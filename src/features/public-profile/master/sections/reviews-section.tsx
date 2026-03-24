@@ -5,6 +5,7 @@ import { ReviewsSectionClient } from "@/features/public-profile/master/sections/
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ClientBooking } from "@/lib/bookings/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -77,7 +78,7 @@ export async function ReviewsSection({ providerId }: Props) {
   if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить блок.
+        {UI_TEXT.publicProfile.page.blockLoadFailed}
       </div>
     );
   }
@@ -85,7 +86,7 @@ export async function ReviewsSection({ providerId }: Props) {
   if (!provider) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить отзывы.
+        {UI_TEXT.publicProfile.page.reviewsLoadFailed}
       </div>
     );
   }

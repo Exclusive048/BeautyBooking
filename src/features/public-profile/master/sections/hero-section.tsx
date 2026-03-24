@@ -2,6 +2,7 @@ import { HeroBlock } from "@/features/public-profile/master/hero-block";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
 import { serverApiFetch } from "@/lib/api/server-fetch";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type PortfolioItemPreview = {
   id: string;
@@ -45,7 +46,7 @@ export async function HeroSection({ providerId }: Props) {
   if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить блок.
+        {UI_TEXT.publicProfile.page.blockLoadFailed}
       </div>
     );
   }
@@ -53,7 +54,7 @@ export async function HeroSection({ providerId }: Props) {
   if (!provider) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить профиль.
+        {UI_TEXT.publicProfile.page.profileLoadFailed}
       </div>
     );
   }

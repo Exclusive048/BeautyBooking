@@ -9,6 +9,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type ModelApplicationStatus =
   | "PENDING"
@@ -63,28 +64,30 @@ function extractApiError<T>(json: ApiResponse<T> | null, fallback: string): stri
   return fallback;
 }
 
+const APP_TEXT = UI_TEXT.master.modelOffers.applications;
+
 function statusMeta(status: ModelApplicationStatus): { label: string; className: string } {
   if (status === "PENDING") {
     return {
-      label: "На рассмотрении",
+      label: APP_TEXT.status.pending,
       className: "border-amber-200 bg-amber-50 text-amber-700",
     };
   }
   if (status === "APPROVED_WAITING_CLIENT" || status === "ACCEPTED") {
     return {
-      label: "Принята",
+      label: APP_TEXT.status.accepted,
       className: "border-emerald-200 bg-emerald-50 text-emerald-700",
     };
   }
   if (status === "REJECTED") {
     return {
-      label: "Отклонена",
+      label: APP_TEXT.status.rejected,
       className: "border-slate-200 bg-slate-50 text-slate-600",
     };
   }
   if (status === "CONFIRMED") {
     return {
-      label: "Подтверждена",
+      label: APP_TEXT.status.confirmed,
       className: "border-blue-200 bg-blue-50 text-blue-700",
     };
   }
@@ -99,14 +102,14 @@ function ProposeTimeModal({ open, onClose, onSubmit, submitting, initialValue, t
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <ModalSurface open={open} onClose={onClose} title="Предложить время" className="max-w-md">
+    <ModalSurface open={open} onClose={onClose} title={APP_TEXT.modal.title} className="max-w-md">
       <form
         className="space-y-4"
         onSubmit={async (event) => {
           event.preventDefault();
           const normalized = value.trim();
           if (!normalized) {
-            setError("Укажите время");
+            setError(APP_TEXT.modal.timeRequired);
             return;
           }
           setError(null);
@@ -114,7 +117,7 @@ function ProposeTimeModal({ open, onClose, onSubmit, submitting, initialValue, t
         }}
       >
         <div>
-          <label className="text-sm text-text-sec">Время встречи</label>
+          <label className="text-sm text-text-sec">{APP_TEXT.modal.timeLabel}</label>
           <Input
             type="time"
             step={900}
@@ -125,7 +128,7 @@ function ProposeTimeModal({ open, onClose, onSubmit, submitting, initialValue, t
           />
           {timeRange ? (
             <p className="mt-2 text-xs text-text-sec">
-              Доступный диапазон: {timeRange.start}-{timeRange.end}
+              {APP_TEXT.modal.range.replace("{start}", timeRange.start).replace("{end}", timeRange.end)}
             </p>
           ) : null}
           {error ? <p className="mt-2 text-xs text-rose-500">{error}</p> : null}
@@ -133,10 +136,10 @@ function ProposeTimeModal({ open, onClose, onSubmit, submitting, initialValue, t
 
         <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
-            Отмена
+            {APP_TEXT.modal.cancel}
           </Button>
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Сохраняем..." : "Предложить"}
+            {submitting ? APP_TEXT.modal.submitting : APP_TEXT.modal.submit}
           </Button>
         </div>
       </form>
@@ -180,7 +183,9 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-text-main">{application.client.displayName}</p>
-            <p className="text-xs text-text-sec">Отклик: {UI_FMT.dateTimeShort(application.createdAt)}</p>
+            <p className="text-xs text-text-sec">
+              {APP_TEXT.card.responseAt.replace("{datetime}", UI_FMT.dateTimeShort(application.createdAt))}
+            </p>
           </div>
         </div>
         <Badge className={status.className}>{status.label}</Badge>
@@ -188,29 +193,29 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Badge className={consentClass}>
-          {application.consentToShoot ? "Согласие на съемку" : "Без согласия на съемку"}
+          {application.consentToShoot ? APP_TEXT.card.consentYes : APP_TEXT.card.consentNo}
         </Badge>
         {application.proposedTimeLocal ? (
           <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-            Предложено: {application.proposedTimeLocal}
+            {APP_TEXT.card.proposed.replace("{time}", application.proposedTimeLocal)}
           </Badge>
         ) : null}
         {application.confirmedStartAt ? (
           <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-            Подтверждено: {UI_FMT.dateTimeShort(application.confirmedStartAt)}
+            {APP_TEXT.card.confirmed.replace("{datetime}", UI_FMT.dateTimeShort(application.confirmedStartAt))}
           </Badge>
         ) : null}
       </div>
 
       <div className="mt-3 rounded-xl bg-bg-input/60 p-3">
-        <p className="text-xs text-text-sec">Пожелания модели</p>
-        <p className="mt-1 text-sm text-text-main">{application.clientNote?.trim() || "Без комментария"}</p>
+        <p className="text-xs text-text-sec">{APP_TEXT.card.noteTitle}</p>
+        <p className="mt-1 text-sm text-text-main">{application.clientNote?.trim() || APP_TEXT.card.noteEmpty}</p>
       </div>
 
       {isPending ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => onPropose(application)} disabled={proposing || rejecting}>
-            Предложить время
+            {APP_TEXT.card.proposeButton}
           </Button>
           <Button
             size="sm"
@@ -219,7 +224,7 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
             disabled={proposing || rejecting}
             className="text-rose-500 hover:bg-rose-50 hover:text-rose-600"
           >
-            {rejecting ? "Отклоняем..." : "Отклонить"}
+            {rejecting ? APP_TEXT.card.rejectingButton : APP_TEXT.card.rejectButton}
           </Button>
         </div>
       ) : null}
@@ -249,7 +254,7 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<OfferApplicationsData> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(extractApiError(json, "Не удалось загрузить отклики"));
+        throw new Error(extractApiError(json, APP_TEXT.errors.load));
       }
       setApplications(Array.isArray(json.data.applications) ? json.data.applications : []);
       setTimeRange({
@@ -258,7 +263,7 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
       });
       setLoaded(true);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить отклики");
+      setError(loadError instanceof Error ? loadError.message : APP_TEXT.errors.load);
     } finally {
       setLoading(false);
     }
@@ -271,7 +276,7 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
 
   const handleReject = useCallback(
     async (application: ModelOfferApplication) => {
-      if (!window.confirm("Отклонить отклик?")) return;
+      if (!window.confirm(APP_TEXT.rejectConfirm)) return;
       setRejectingId(application.id);
       setError(null);
       try {
@@ -282,11 +287,11 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
         });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ application: { id: string; status: string } }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(extractApiError(json, "Не удалось отклонить отклик"));
+          throw new Error(extractApiError(json, APP_TEXT.errors.reject));
         }
         await loadApplications();
       } catch (rejectError) {
-        setError(rejectError instanceof Error ? rejectError.message : "Не удалось отклонить отклик");
+        setError(rejectError instanceof Error ? rejectError.message : APP_TEXT.errors.reject);
       } finally {
         setRejectingId(null);
       }
@@ -307,12 +312,12 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
         });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ application: { id: string; status: string } }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(extractApiError(json, "Не удалось предложить время"));
+          throw new Error(extractApiError(json, APP_TEXT.errors.propose));
         }
         setSelected(null);
         await loadApplications();
       } catch (proposeError) {
-        setError(proposeError instanceof Error ? proposeError.message : "Не удалось предложить время");
+        setError(proposeError instanceof Error ? proposeError.message : APP_TEXT.errors.propose);
       } finally {
         setProposing(false);
       }
@@ -333,29 +338,31 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
         className="flex w-full items-center justify-between gap-3 text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-text-main">Отклики ({visibleCount})</span>
+          <span className="text-sm font-semibold text-text-main">
+            {APP_TEXT.title} ({visibleCount})
+          </span>
           {loaded && pendingCount > 0 ? (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-              Новые: {pendingCount}
+              {APP_TEXT.pendingShort.replace("{count}", String(pendingCount))}
             </span>
           ) : null}
         </div>
-        <span className="text-xs text-text-sec">{open ? "Свернуть" : "Развернуть"}</span>
+        <span className="text-xs text-text-sec">{open ? APP_TEXT.collapse : APP_TEXT.expand}</span>
       </button>
 
       {open ? (
         <div className="mt-3 space-y-3">
-          {loading ? <p className="text-sm text-text-sec">Загружаем отклики...</p> : null}
+          {loading ? <p className="text-sm text-text-sec">{APP_TEXT.loading}</p> : null}
           {error ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
               <p className="text-sm text-rose-700">{error}</p>
               <Button size="sm" variant="secondary" className="mt-2" onClick={() => void loadApplications()} disabled={loading}>
-                Повторить
+                {APP_TEXT.retry}
               </Button>
             </div>
           ) : null}
           {!loading && !error && applications.length === 0 ? (
-            <p className="text-sm text-text-sec">Пока нет откликов</p>
+            <p className="text-sm text-text-sec">{APP_TEXT.empty}</p>
           ) : null}
           {!loading && !error
             ? applications.map((application) => (

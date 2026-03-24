@@ -16,16 +16,6 @@ type Props = {
 };
 
 const NEW_REVIEW_WINDOW_DAYS = 7;
-const UI = {
-  loadFailed: "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043e\u0442\u0437\u044b\u0432\u044b.",
-  total: "\u0412\u0441\u0435\u0433\u043e",
-  new: "\u041d\u043e\u0432\u044b\u0435",
-  unanswered: "\u041d\u0435\u043e\u0442\u0432\u0435\u0447\u0435\u043d\u043d\u044b\u0435",
-  all: "\u0412\u0441\u0435",
-  loading: "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043e\u0442\u0437\u044b\u0432\u043e\u0432...",
-  emptyFilter: "\u041f\u043e \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u043c\u0443 \u0444\u0438\u043b\u044c\u0442\u0440\u0443 \u043e\u0442\u0437\u044b\u0432\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
-  noText: "\u0411\u0435\u0437 \u0442\u0435\u043a\u0441\u0442\u0430",
-};
 
 function normalizeFilter(value: string | null | undefined): ReviewFilter {
   if (value === "new" || value === "unanswered" || value === "all") {
@@ -51,6 +41,7 @@ function buildStars(rating: number): string {
 }
 
 export function StudioReviewsPage({ providerId, initialFilter }: Props) {
+  const t = UI_TEXT.studioCabinet.reviews;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,18 +72,18 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`);
       }
       setReviews(json.data.reviews);
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-      setError(loadError instanceof Error ? loadError.message : UI.loadFailed);
+      setError(loadError instanceof Error ? loadError.message : t.loadFailed);
     } finally {
       if (!signal || !signal.aborted) {
         setLoading(false);
       }
     }
-  }, [providerId]);
+  }, [providerId, t.apiErrorPrefix, t.loadFailed]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -133,7 +124,7 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  const summaryText = `${UI.total}: ${reviews.length} \u2022 ${UI.new}: ${newCount} \u2022 ${UI.unanswered}: ${unansweredCount}`;
+  const summaryText = `${t.total}: ${reviews.length} • ${t.new}: ${newCount} • ${t.unanswered}: ${unansweredCount}`;
 
   return (
     <div className="space-y-4">
@@ -148,7 +139,7 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
                 filter === "new" ? "bg-bg-input text-text-main" : "text-text-sec hover:text-text-main"
               }`}
             >
-              {UI.new}
+              {t.new}
             </button>
             <button
               type="button"
@@ -157,7 +148,7 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
                 filter === "unanswered" ? "bg-bg-input text-text-main" : "text-text-sec hover:text-text-main"
               }`}
             >
-              {UI.unanswered}
+              {t.unanswered}
             </button>
             <button
               type="button"
@@ -166,13 +157,13 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
                 filter === "all" ? "bg-bg-input text-text-main" : "text-text-sec hover:text-text-main"
               }`}
             >
-              {UI.all}
+              {t.all}
             </button>
           </div>
         </div>
       </section>
 
-      {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{UI.loading}</div> : null}
+      {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div> : null}
       {error ? <div className="rounded-2xl border border-rose-300/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
 
       {!loading && !error ? (
@@ -180,7 +171,7 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
           <h3 className="mb-3 text-sm font-semibold">{UI_TEXT.studioCabinet.dashboard.cards.reviews}</h3>
           {filteredReviews.length === 0 ? (
             <div className="rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-sm text-text-sec">
-              {UI.emptyFilter}
+              {t.emptyFilter}
             </div>
           ) : (
             <div className="space-y-2">
@@ -192,7 +183,7 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
                       {buildStars(review.rating)} {formatReviewDate(review.createdAt, viewerTimeZone)}
                     </div>
                   </div>
-                  <div className="mt-2 text-sm text-text-sec">{review.text?.trim() ? review.text : UI.noText}</div>
+                  <div className="mt-2 text-sm text-text-sec">{review.text?.trim() ? review.text : t.noText}</div>
                   {review.publicTags.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {review.publicTags.map((tag) => (

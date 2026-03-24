@@ -19,13 +19,6 @@ type SupportPageClientProps = {
   contactOptions: SupportContactOption[];
 };
 
-const CONTACT_LABEL = "\u041a\u0430\u043a \u0441 \u0432\u0430\u043c\u0438 \u0441\u0432\u044f\u0437\u0430\u0442\u044c\u0441\u044f";
-const CONTACT_PLACEHOLDER =
-  "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 / \u043f\u043e\u0447\u0442\u0430 / Telegram ID";
-const CONTACT_CUSTOM_ACTION =
-  "\u0423\u043a\u0430\u0437\u0430\u0442\u044c \u0434\u0440\u0443\u0433\u043e\u0439 \u0441\u043f\u043e\u0441\u043e\u0431 \u0441\u0432\u044f\u0437\u0438";
-const CONTACT_ADD_ACTION =
-  "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0441\u043f\u043e\u0441\u043e\u0431 \u0441\u0432\u044f\u0437\u0438";
 const CONTACT_SELECT_ID = "contact-select";
 const CONTACT_MANUAL_ID = "contact-manual";
 
@@ -273,7 +266,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
           htmlFor={hasProfileOptions ? CONTACT_SELECT_ID : showManualContact ? CONTACT_MANUAL_ID : undefined}
           className="block text-sm font-medium text-text-main"
         >
-          {CONTACT_LABEL}
+          {UI_TEXT.pages.support.form.contactLabel}
         </label>
 
         {hasProfileOptions ? (
@@ -297,7 +290,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
                 onClick={() => setShowManualContact(true)}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                {CONTACT_CUSTOM_ACTION}
+                {UI_TEXT.pages.support.form.contactCustomAction}
               </button>
             ) : null}
           </div>
@@ -307,7 +300,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
             onClick={() => setShowManualContact(true)}
             className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-4 text-sm font-medium text-text-main transition-colors hover:bg-bg-card"
           >
-            {CONTACT_ADD_ACTION}
+            {UI_TEXT.pages.support.form.contactAddAction}
           </button>
         ) : null}
 
@@ -318,7 +311,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
               type="text"
               value={manualContact}
               onChange={(e) => setManualContact(e.target.value)}
-              placeholder={CONTACT_PLACEHOLDER}
+              placeholder={UI_TEXT.pages.support.form.contactPlaceholder}
               maxLength={SUPPORT_CONTACT_MAX_LENGTH}
               className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
             />

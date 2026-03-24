@@ -15,8 +15,6 @@ type LoginClientProps = {
   heroImageFocalY: number | null;
 };
 
-const OR_LABEL = "\u0438\u043b\u0438";
-const SOCIAL_LOGIN_LABEL = "\u0412\u043e\u0439\u0442\u0438 \u0441 \u043f\u043e\u043c\u043e\u0449\u044c\u044e";
 const SOCIAL_ICON_BUTTON_CLASS =
   "inline-flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle/80 bg-bg-input text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-border-subtle hover:bg-bg-card hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/55 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45";
 
@@ -263,13 +261,15 @@ export default function LoginClient({
             <div className="my-6 flex items-center gap-3">
               <div className="h-px flex-1 bg-border" />
               <span className="text-xs font-semibold tracking-wider text-muted-foreground">
-                {OR_LABEL}
+                {UI_TEXT.auth.loginPage.or}
               </span>
               <div className="h-px flex-1 bg-border" />
             </div>
 
             <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
-              <p className="text-center text-sm font-medium text-muted-foreground">{SOCIAL_LOGIN_LABEL}</p>
+              <p className="text-center text-sm font-medium text-muted-foreground">
+                {UI_TEXT.auth.loginPage.socialLoginLabel}
+              </p>
               <div className="flex items-center justify-center gap-3">
                 <TelegramLoginButton iconOnly className={SOCIAL_ICON_BUTTON_CLASS} showConfigError={false} />
                 <VkLoginButton iconOnly className={SOCIAL_ICON_BUTTON_CLASS} />

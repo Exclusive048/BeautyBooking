@@ -783,7 +783,7 @@ export function PublicBookingWidget({
                 {slotNotice ? <div className="mb-2 text-xs text-amber-600">{slotNotice}</div> : null}
                 {selectedSlot?.isHot ? (
                   <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-2 py-1 text-[11px] font-semibold text-orange-400">
-                    <span>HOT</span>
+                    <span>{UI_TEXT.publicProfile.slots.hotBadge}</span>
                     <span>
                       -{selectedSlotDiscountPercent ?? selectedSlot.discountValue ?? 0}%
                     </span>
@@ -850,7 +850,7 @@ export function PublicBookingWidget({
               <input
                 value={guestPhone}
                 onChange={(event) => setGuestPhone(event.target.value)}
-                placeholder="+7 900 000 00 00"
+                placeholder={UI_TEXT.publicProfile.booking.phonePlaceholder}
                 className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
               />
               <a
@@ -921,7 +921,7 @@ export function PublicBookingWidget({
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder="Пожелания мастеру — необязательно"
+              placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
               className="lux-input min-h-[84px] w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
             />
           </div>

@@ -87,18 +87,18 @@ export function ConnectedAccountsSection() {
   const linked = Boolean(status?.linked);
   const enabled = Boolean(status?.enabled);
 
-  const statusLabel = linked ? "Подключено" : "Не подключено";
+  const statusLabel = linked ? t.connected : t.notConnected;
   const statusDotClass = linked ? "bg-emerald-500" : "bg-rose-500";
 
   return (
     <div className="rounded-2xl bg-bg-card/90 p-4">
-      <h3 className="text-sm font-semibold">Подключенные аккаунты</h3>
-      <p className="mt-1 text-xs text-text-sec">Управляйте внешними каналами уведомлений.</p>
+      <h3 className="text-sm font-semibold">{t.sectionTitle}</h3>
+      <p className="mt-1 text-xs text-text-sec">{t.sectionSubtitle}</p>
 
       <div className="mt-3 space-y-3">
         <ListRow
           icon="TG"
-          title="Уведомления в Telegram"
+          title={t.title}
           subtitle={
             <span className="inline-flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${statusDotClass}`} aria-hidden />
@@ -110,7 +110,7 @@ export function ConnectedAccountsSection() {
               <div className="text-xs text-text-sec">{UI_TEXT.common.loading}</div>
             ) : !linked ? (
               <Button type="button" size="sm" onClick={onConnect} disabled={saving}>
-                {saving ? UI_TEXT.common.loading : "Подключить"}
+                {saving ? UI_TEXT.common.loading : t.connectButton}
               </Button>
             ) : (
               <label className="inline-flex items-center gap-2 text-xs text-text-main">
@@ -121,7 +121,7 @@ export function ConnectedAccountsSection() {
                   disabled={saving}
                   className="h-4 w-4 accent-primary"
                 />
-                {enabled ? "Включено" : "Выключено"}
+                {enabled ? t.enabled : t.disabled}
               </label>
             )
           }
@@ -130,11 +130,13 @@ export function ConnectedAccountsSection() {
       </div>
 
       {showConnectModal ? (
-        <ModalSurface open onClose={() => setShowConnectModal(false)} title="Подключение Telegram">
+        <ModalSurface open onClose={() => setShowConnectModal(false)} title={t.connectModalTitle}>
           <div className="space-y-3 text-sm text-text-sec">
-            <p>Нажмите «Открыть Telegram», затем нажмите Start у бота, чтобы связать уведомления.</p>
+            <p>{t.connectModalDescription}</p>
             {connectExpiresAt ? (
-              <p className="text-xs text-text-sec">Ссылка действует до {formatExpiresAt(connectExpiresAt, viewerTimeZone)}.</p>
+              <p className="text-xs text-text-sec">
+                {t.connectModalExpiresAt.replace("{datetime}", formatExpiresAt(connectExpiresAt, viewerTimeZone))}
+              </p>
             ) : null}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -147,13 +149,13 @@ export function ConnectedAccountsSection() {
               }}
               disabled={!connectUrl}
             >
-              Открыть Telegram
+              {t.connectModalOpen}
             </Button>
             <Button type="button" variant="secondary" onClick={() => void refreshAfterConnect()}>
-              Проверить статус
+              {t.connectModalCheck}
             </Button>
             <Button type="button" variant="secondary" onClick={() => setShowConnectModal(false)}>
-              Закрыть
+              {t.connectModalClose}
             </Button>
           </div>
         </ModalSurface>

@@ -2,6 +2,7 @@ import { getProvider } from "@/features/public-profile/master/server/provider-qu
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { BookingSectionClient } from "@/features/public-profile/master/sections/booking-section-client";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -30,7 +31,7 @@ export async function BookingSection({ providerId, initialSlotStartAt }: Props) 
   if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить блок.
+        {UI_TEXT.publicProfile.page.blockLoadFailed}
       </div>
     );
   }
@@ -38,7 +39,7 @@ export async function BookingSection({ providerId, initialSlotStartAt }: Props) 
   if (!provider) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить запись.
+        {UI_TEXT.publicProfile.page.bookingLoadFailed}
       </div>
     );
   }

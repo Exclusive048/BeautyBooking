@@ -10,6 +10,7 @@ import { FeatureGate } from "@/components/billing/FeatureGate";
 import { cn } from "@/lib/cn";
 import { moneyRUBFromKopeks, moneyRUBPlainFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Scope = "MASTER" | "STUDIO";
 
@@ -596,7 +597,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="lux-card rounded-[22px] p-4">
-                  <SectionHeader title="LTV" />
+                  <SectionHeader title={UI_TEXT.analytics.labels.ltv} />
                   {clients.ltv ? (
                     <div className="mt-3 text-sm text-text-sec">
                       Средняя выручка:{" "}
@@ -680,7 +681,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
               </div>
 
               <div className="lux-card rounded-[22px] p-4">
-                <SectionHeader title="Lead-time" />
+                <SectionHeader title={UI_TEXT.analytics.labels.leadTime} />
                 {leadTime ? (
                   <div className="mt-4 space-y-2">
                     {leadTime.buckets.map((bucket) => (

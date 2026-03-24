@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMe } from "@/lib/hooks/use-me";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type SubscriptionItem = {
   providerId: string;
@@ -72,7 +73,7 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
     }
   };
 
-  const label = subscribed ? "🔕 Отписаться" : "🔔 Уведомить о горячих слотах";
+  const label = subscribed ? UI_TEXT.publicProfile.slots.unsubscribeHot : UI_TEXT.publicProfile.slots.subscribeHot;
 
   return (
     <button
@@ -81,7 +82,7 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
       disabled={loading}
       className={`frost-panel rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55 disabled:opacity-60 ${className ?? ""}`}
     >
-      {loading && initialized ? "Загрузка..." : label}
+      {loading && initialized ? UI_TEXT.publicProfile.slots.subscribeLoading : label}
     </button>
   );
 }

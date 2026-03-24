@@ -1,6 +1,7 @@
 import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { serverApiFetch } from "@/lib/api/server-fetch";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type PortfolioItemPreview = {
   id: string;
@@ -38,7 +39,7 @@ export async function PortfolioSection({ providerId }: Props) {
   if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить блок.
+        {UI_TEXT.publicProfile.page.blockLoadFailed}
       </div>
     );
   }

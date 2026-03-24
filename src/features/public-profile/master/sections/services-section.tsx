@@ -1,6 +1,7 @@
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { ServicesSectionClient } from "@/features/public-profile/master/sections/services-section-client";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -21,7 +22,7 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
   if (hasError) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить блок.
+        {UI_TEXT.publicProfile.page.blockLoadFailed}
       </div>
     );
   }
@@ -29,7 +30,7 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
   if (!provider) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/90 p-5 text-sm text-text-sec">
-        Не удалось загрузить услуги.
+        {UI_TEXT.publicProfile.page.servicesLoadFailed}
       </div>
     );
   }

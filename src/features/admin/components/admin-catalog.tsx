@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Tabs } from "@/components/ui/tabs";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 import { slugifyCategory } from "@/lib/slug";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -293,7 +294,7 @@ export function AdminCatalog() {
             <thead>
               <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
                 <th className="px-4 py-3 text-left">Категория</th>
-                <th className="px-4 py-3 text-left">Slug</th>
+                <th className="px-4 py-3 text-left">{UI_TEXT.admin.catalog.slugColumn}</th>
                 <th className="px-4 py-3 text-left">Статус</th>
                 <th className="px-4 py-3 text-left">Видимость</th>
                 <th className="px-4 py-3 text-left">Автор</th>
@@ -359,7 +360,7 @@ export function AdminCatalog() {
               setNewSlug(event.target.value);
               setSlugTouched(true);
             }}
-            placeholder="slug (необязательно)"
+            placeholder={UI_TEXT.admin.catalog.slugPlaceholder}
           />
           <Input
             value={newIcon}
@@ -386,4 +387,3 @@ export function AdminCatalog() {
     </section>
   );
 }
-

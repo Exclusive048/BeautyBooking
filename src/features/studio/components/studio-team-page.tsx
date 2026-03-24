@@ -49,7 +49,7 @@ export function StudioTeamPage({ studioId }: Props) {
   const limitReached = teamLimit !== null && masters.length >= teamLimit;
   const limitSoftWarning = teamLimit !== null && masters.length >= Math.max(teamLimit - 1, 1);
   const limitLabel =
-    teamLimit === null ? "Unlimited" : `${masters.length} / ${teamLimit}`;
+    teamLimit === null ? t.noLimit : `${masters.length} / ${teamLimit}`;
 
   const load = async (): Promise<void> => {
     setLoading(true);
@@ -143,7 +143,7 @@ export function StudioTeamPage({ studioId }: Props) {
       setRemoveTarget(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить мастера из студии");
+      setError(err instanceof Error ? err.message : t.removeFailed);
     } finally {
       setRemoveSubmitting(false);
     }
@@ -178,9 +178,9 @@ export function StudioTeamPage({ studioId }: Props) {
 
       {limitReached ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-          Team limit reached. Upgrade your plan to add more мастеров.{" "}
+          {t.limitReachedMessage}{" "}
           <a href="/cabinet/billing?scope=STUDIO" className="underline">
-            View plans
+            {t.viewPlans}
           </a>
           .
         </div>
@@ -218,7 +218,7 @@ export function StudioTeamPage({ studioId }: Props) {
               </div>
               <div className="mt-1 text-xs text-text-sec">
                 {master.status === "PENDING" ? t.pending : t.active}
-                {master.title ? ` • ${master.title}` : ""}
+                {master.title ? `${t.roleSeparator}${master.title}` : ""}
               </div>
               {master.status === "PENDING" && master.phone ? (
                 <div className="mt-1 text-xs text-text-sec">{master.phone}</div>
@@ -226,7 +226,7 @@ export function StudioTeamPage({ studioId }: Props) {
             </button>
             <div className="mt-3 flex justify-end">
               <Button type="button" variant="danger" size="sm" onClick={() => openRemoveModal(master)}>
-                Удалить из студии
+                {t.removeAction}
               </Button>
             </div>
           </div>
@@ -275,7 +275,11 @@ export function StudioTeamPage({ studioId }: Props) {
         onClose={() => {
           if (!removeSubmitting) setRemoveTarget(null);
         }}
-        title={removeTarget ? `Удалить ${removeTarget.name} из студии?` : "Удалить из студии?"}
+        title={
+          removeTarget
+            ? t.removeTitle.replace("{name}", removeTarget.name)
+            : t.removeTitleFallback
+        }
       >
         <div className="space-y-4">
           <label className="flex items-start gap-2 text-sm text-text-main">
@@ -287,9 +291,9 @@ export function StudioTeamPage({ studioId }: Props) {
               className="mt-0.5"
             />
             <span>
-              Сохранить мастеру его услуги
+              {t.transferServicesLabel}
               <span className="mt-1 block text-xs text-text-sec">
-                Услуги будут перенесены в личный кабинет мастера
+                {t.transferServicesHint}
               </span>
             </span>
           </label>
@@ -300,10 +304,10 @@ export function StudioTeamPage({ studioId }: Props) {
               onClick={() => setRemoveTarget(null)}
               disabled={removeSubmitting}
             >
-              Отмена
+              {t.cancel}
             </Button>
             <Button type="button" variant="danger" onClick={() => void removeMaster()} disabled={removeSubmitting}>
-              {removeSubmitting ? "Удаляем..." : "Удалить из студии"}
+              {removeSubmitting ? t.removing : t.removeAction}
             </Button>
           </div>
         </div>

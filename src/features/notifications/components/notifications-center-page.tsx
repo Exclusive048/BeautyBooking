@@ -59,27 +59,28 @@ function parseBookingPayload(payload: unknown): { bookingId: string; bookingStat
 }
 
 function resolveBookingStatusMeta(status: string | undefined): { label: string; className: string } | null {
+  const t = UI_TEXT.notificationsCenter.bookingStatus;
   if (!status) return null;
   const normalized = status.toUpperCase();
   switch (normalized) {
     case "CONFIRMED":
       return {
-        label: "Подтверждено",
+        label: t.confirmed,
         className: "border border-emerald-500/35 bg-emerald-500/10 text-emerald-300",
       };
     case "REJECTED":
       return {
-        label: "Отклонено",
+        label: t.rejected,
         className: "border border-rose-500/35 bg-rose-500/10 text-rose-300",
       };
     case "CANCELLED":
       return {
-        label: "Отменено",
+        label: t.cancelled,
         className: "border border-border-subtle bg-bg-input/65 text-text-sec",
       };
     case "NO_SHOW":
       return {
-        label: "Неявка",
+        label: t.noShow,
         className: "border border-border-subtle bg-bg-input/65 text-text-sec",
       };
     default:
@@ -189,6 +190,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const actionNoticeTimerRef = useRef<number | null>(null);
+  const bookingActionText = t.bookingActions;
 
   const emitBellRefresh = (notificationId?: string) => {
     emitNotificationEvent({
@@ -283,7 +285,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const handleBookingConfirm = async (noteId: string, payload: unknown) => {
     const booking = parseBookingPayload(payload);
     if (!booking) {
-      showActionNotice("error", "Не удалось определить запись для подтверждения");
+      showActionNotice("error", bookingActionText.resolveForConfirmFailed);
       return;
     }
     setActionPendingId(noteId);
@@ -317,9 +319,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
       } catch {
         // ignore refresh errors
       }
-      showActionNotice("success", "Запись подтверждена");
+      showActionNotice("success", bookingActionText.confirmSuccess);
     } catch {
-      showActionNotice("error", "Не удалось подтвердить запись — попробуйте ещё раз");
+      showActionNotice("error", bookingActionText.confirmFailed);
     } finally {
       setActionPendingId(null);
     }
@@ -328,7 +330,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const handleBookingDecline = async (noteId: string, payload: unknown) => {
     const booking = parseBookingPayload(payload);
     if (!booking) {
-      showActionNotice("error", "Не удалось определить запись для отклонения");
+      showActionNotice("error", bookingActionText.resolveForDeclineFailed);
       return;
     }
     setActionPendingId(noteId);
@@ -364,9 +366,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
       } catch {
         // ignore refresh errors
       }
-      showActionNotice("success", "Запись отклонена");
+      showActionNotice("success", bookingActionText.declineSuccess);
     } catch {
-      showActionNotice("error", "Не удалось отклонить запись — попробуйте ещё раз");
+      showActionNotice("error", bookingActionText.declineFailed);
     } finally {
       setActionPendingId(null);
     }
