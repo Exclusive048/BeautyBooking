@@ -404,25 +404,25 @@ export function MasterDashboardPage() {
   const requestReschedule = async (booking: DayBooking): Promise<void> => {
     if (!canMasterRequestMove(booking)) return;
     if (!booking.durationMin || booking.durationMin <= 0) {
-      setError("Не удалось определить длительность записи");
+      setError(UI_TEXT.master.dashboard.errors.bookingDurationUnknown);
       return;
     }
 
     const defaultStart = booking.startAtUtc
       ? new Date(booking.startAtUtc).toISOString().slice(0, 16)
       : "";
-    const startInput = window.prompt("Новая дата и время начала (YYYY-MM-DDTHH:mm)", defaultStart)?.trim();
+    const startInput = window.prompt(UI_TEXT.master.dashboard.prompts.rescheduleStart, defaultStart)?.trim();
     if (!startInput) return;
 
     const startAt = new Date(startInput);
     if (Number.isNaN(startAt.getTime())) {
-      setError("Некорректная дата или время начала");
+      setError(UI_TEXT.master.dashboard.errors.invalidStartDateTime);
       return;
     }
 
-    const comment = window.prompt("Комментарий для клиента", booking.changeComment ?? "")?.trim();
+    const comment = window.prompt(UI_TEXT.master.dashboard.prompts.clientComment, booking.changeComment ?? "")?.trim();
     if (!comment) {
-      setError("Комментарий обязателен");
+      setError(UI_TEXT.master.dashboard.errors.commentRequired);
       return;
     }
 
@@ -450,7 +450,7 @@ export function MasterDashboardPage() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить запрос на перенос");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.dashboard.errors.sendRescheduleRequest);
     } finally {
       setActionId(null);
     }
@@ -485,11 +485,11 @@ export function MasterDashboardPage() {
   };
 
   const getStatusLabel = (status: string): string => {
-    if (status === "PENDING" || status === "NEW") return "Ожидает подтверждения";
+    if (status === "PENDING" || status === "NEW") return UI_TEXT.master.dashboard.status.pending;
   if (status === "CONFIRMED") return UI_TEXT.master.dashboard.status.confirmed;
-    if (status === "CHANGE_REQUESTED") return "Ожидает решения второй стороны";
-    if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
-    if (status === "FINISHED") return "Завершено";
+    if (status === "CHANGE_REQUESTED") return UI_TEXT.master.dashboard.status.changeRequested;
+    if (status === "IN_PROGRESS" || status === "STARTED") return UI_TEXT.master.dashboard.status.inProgress;
+    if (status === "FINISHED") return UI_TEXT.master.dashboard.status.finished;
   if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") {
     return UI_TEXT.master.dashboard.status.rejected;
   }
@@ -895,7 +895,7 @@ export function MasterDashboardPage() {
                   className="text-sm"
                   aria-label={UI_TEXT.master.dashboard.labels.balanceToggleAria}
                 >
-                  {balanceVisible ? "Скрыть" : "Показать"}
+                  {balanceVisible ? UI_TEXT.master.dashboard.labels.hideBalance : UI_TEXT.master.dashboard.labels.showBalance}
                 </button>
               </div>
               <div className={`text-2xl font-semibold ${balanceVisible ? "" : "blur-sm select-none"}`}>

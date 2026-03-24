@@ -334,12 +334,12 @@ export function MasterScheduleEditor({
         });
         const json = (await response.json().catch(() => null)) as ApiResponse<MasterDayData> | null;
         if (!response.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить записи дня");
+          throw new Error(json && !json.ok ? json.error.message : T.errors.loadDayBookings);
         }
         setDayData(json.data);
       } catch (dayLoadError) {
         if (dayLoadError instanceof DOMException && dayLoadError.name === "AbortError") return;
-        setDayError(dayLoadError instanceof Error ? dayLoadError.message : "Не удалось загрузить записи дня");
+        setDayError(dayLoadError instanceof Error ? dayLoadError.message : T.errors.loadDayBookings);
         setDayData(null);
       } finally {
         if (!controller.signal.aborted) {
@@ -370,9 +370,9 @@ export function MasterScheduleEditor({
     applyPayload(json.data);
     const action = json.data.approval?.lastAction;
     if (action === "REQUEST_CREATED" || action === "REQUEST_UPDATED") {
-      setInfo("Изменения отправлены на согласование.");
+      setInfo(T.info.requestSubmitted);
     } else if (action === "NO_CHANGES") {
-      setInfo("Изменений нет.");
+      setInfo(T.info.noChanges);
     } else {
       setInfo(T.saved);
     }
@@ -488,11 +488,13 @@ export function MasterScheduleEditor({
         <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           <p>
             {hasPendingRequest
-              ? "Изменения по графику ожидают согласования студии."
-              : "Изменения по графику отправляются на согласование студии и не применяются сразу."}
+              ? T.studioMaster.pendingRequest
+              : T.studioMaster.submitForApproval}
           </p>
           {approval.rejectedComment ? (
-            <p className="mt-1 text-xs text-amber-200/90">Последний комментарий студии: {approval.rejectedComment}</p>
+            <p className="mt-1 text-xs text-amber-200/90">
+              {T.studioMaster.lastCommentPrefix} {approval.rejectedComment}
+            </p>
           ) : null}
         </div>
       ) : null}

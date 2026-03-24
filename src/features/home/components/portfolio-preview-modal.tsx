@@ -87,7 +87,7 @@ export function PortfolioPreviewModal({ itemId, open, onClose }: Props) {
           </div>
           <div className="space-y-4">
             <div>
-              <div className="text-xs uppercase text-text-sec">Мастер</div>
+              <div className="text-xs uppercase text-text-sec">{UI_TEXT.home.preview.masterLabel}</div>
               <div className="text-lg font-semibold text-text-main">{detail.masterName}</div>
               {detail.studioName ? (
                 <div className="text-sm text-text-sec">{detail.studioName}</div>
@@ -95,7 +95,7 @@ export function PortfolioPreviewModal({ itemId, open, onClose }: Props) {
             </div>
 
             <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-4 text-sm text-text-main">
-              <div className="text-xs uppercase text-text-sec">На фото</div>
+              <div className="text-xs uppercase text-text-sec">{UI_TEXT.home.preview.onPhotoLabel}</div>
               <div className="mt-1 font-medium">
                 {detail.primaryServiceTitle ?? detail.caption ?? detail.masterName}
               </div>
