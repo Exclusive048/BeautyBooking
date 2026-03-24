@@ -1344,7 +1344,7 @@ export function MasterProfilePage() {
       setNewSoloServiceFieldErrors({});
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add service");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.saveServices);
     } finally {
       setSaving(false);
     }

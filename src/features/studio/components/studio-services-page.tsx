@@ -304,7 +304,7 @@ export function StudioServicesPage({ studioId }: Props) {
           : null,
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update service category");
+      setError(err instanceof Error ? err.message : "Не удалось обновить категорию услуги");
     } finally {
       setSavingServiceCategoryId(null);
     }
@@ -323,7 +323,7 @@ export function StudioServicesPage({ studioId }: Props) {
       patchService(service.id, (current) => {
         const exists = current.masters.some((item) => item.masterId === masterId);
         if (nextEnabled && !exists) {
-          const masterName = mastersMap.get(masterId)?.name || "Master";
+          const masterName = mastersMap.get(masterId)?.name || "Мастер";
           return { ...current, masters: [...current.masters, { masterId, masterName }] };
         }
         if (!nextEnabled && exists) {
@@ -395,7 +395,7 @@ export function StudioServicesPage({ studioId }: Props) {
         const failed = results.filter((item) => item.status === "rejected").length;
         if (failed > 0) {
           setError(
-            `Service created, but assignments were only partially saved (${failed}/${selectedMasterIds.length}).`
+            `Услуга создана, но назначения мастеров сохранились частично (${failed}/${selectedMasterIds.length}).`
           );
         }
       }
@@ -431,9 +431,9 @@ export function StudioServicesPage({ studioId }: Props) {
       }
       setShowProposeCategoryModal(false);
       setProposedCategoryTitle("");
-      setProposeCategoryMessage("Category submitted for moderation. You can save the service without a category.");
+      setProposeCategoryMessage("Категория отправлена на модерацию. Услугу можно сохранить и без категории.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit category for moderation");
+      setError(err instanceof Error ? err.message : "Не удалось отправить категорию на модерацию");
     } finally {
       setProposingCategory(false);
     }
@@ -535,9 +535,9 @@ export function StudioServicesPage({ studioId }: Props) {
           </div>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Assignments</div><div className="mt-1 font-semibold text-text-main">{totalAssignments}</div></div>
-          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Unassigned services</div><div className="mt-1 font-semibold text-text-main">{servicesWithoutMasters}</div></div>
-          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Studio masters</div><div className="mt-1 font-semibold text-text-main">{masters.length}</div></div>
+          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Назначения</div><div className="mt-1 font-semibold text-text-main">{totalAssignments}</div></div>
+          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Услуги без мастера</div><div className="mt-1 font-semibold text-text-main">{servicesWithoutMasters}</div></div>
+          <div className="rounded-2xl bg-bg-input/70 p-3 text-sm"><div className="text-text-sec">Мастера студии</div><div className="mt-1 font-semibold text-text-main">{masters.length}</div></div>
         </div>
       </section>
 
@@ -559,7 +559,7 @@ export function StudioServicesPage({ studioId }: Props) {
           <div className="space-y-3 p-3">
             {category.services.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-input/40 p-4 text-sm text-text-sec">
-                No services in this category yet.
+                В этой категории пока нет услуг.
               </div>
             ) : null}
 
@@ -570,10 +570,10 @@ export function StudioServicesPage({ studioId }: Props) {
               const expanded = expandedAssignmentsServiceId === service.id;
               const assignmentSummary =
                 assignedMasters.length === 0
-                  ? "Not assigned to any master"
+                  ? "Не назначено ни одному мастеру"
                   : assignedMasters.length === 1
-                    ? "Assigned to 1 master"
-                    : `Assigned to ${assignedMasters.length} masters`;
+                    ? "Назначено 1 мастеру"
+                    : `Назначено ${assignedMasters.length} мастерам`;
 
               return (
                 <article key={service.id} className="rounded-2xl border border-border-subtle bg-bg-input/50 p-4">
@@ -587,7 +587,7 @@ export function StudioServicesPage({ studioId }: Props) {
                           </span>
                         ) : (
                           <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
-                            No category
+                            Без категории
                           </span>
                         )}
                       </div>
@@ -631,7 +631,7 @@ export function StudioServicesPage({ studioId }: Props) {
                             }))
                           }
                         >
-                          <option value="">No category</option>
+                          <option value="">Без категории</option>
                           {globalCategories.map((item) => (
                             <option key={`service-global-category-${service.id}-${item.id}`} value={item.id}>
                               {categoryLabel(item)}
@@ -645,14 +645,14 @@ export function StudioServicesPage({ studioId }: Props) {
                           onClick={() => void saveServiceGlobalCategory(service)}
                           disabled={savingServiceCategoryId === service.id}
                         >
-                          {savingServiceCategoryId === service.id ? "Saving..." : "Save category"}
+                          {savingServiceCategoryId === service.id ? "Сохраняем..." : "Сохранить категорию"}
                         </Button>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-2">
                       <label className="inline-flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-card px-3 py-2 text-xs text-text-sec">
-                        <span>{service.isActive ? "On" : "Off"}</span>
+                        <span>{service.isActive ? "Вкл" : "Выкл"}</span>
                         <Switch
                           checked={service.isActive}
                           onCheckedChange={(next) => void toggleServiceActive(service, next)}
@@ -684,12 +684,12 @@ export function StudioServicesPage({ studioId }: Props) {
                         {expanded ? (
                           <>
                             <ChevronUp className="h-4 w-4" />
-                            Hide assignments
+                            Скрыть назначения
                           </>
                         ) : (
                           <>
                             <ChevronDown className="h-4 w-4" />
-                            Assign masters
+                            Назначить мастеров
                           </>
                         )}
                       </Button>
@@ -699,11 +699,11 @@ export function StudioServicesPage({ studioId }: Props) {
                   {expanded ? (
                     <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-card/70 p-3">
                       <div className="mb-3 text-xs text-text-sec">
-                        Enable masters who can provide this service.
+                        Выберите мастеров, которые могут выполнять эту услугу.
                       </div>
                       {masters.length === 0 ? (
                         <div className="rounded-xl bg-bg-input p-3 text-sm text-text-sec">
-                          No masters in studio yet.
+                          В студии пока нет мастеров.
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -718,7 +718,7 @@ export function StudioServicesPage({ studioId }: Props) {
                                 <div className="min-w-0">
                                   <div className="truncate text-sm text-text-main">
                                     {master.name}
-                                    {master.status === "PENDING" ? " (invited)" : ""}
+                                    {master.status === "PENDING" ? " (приглашён)" : ""}
                                   </div>
                                   <div className="text-xs text-text-sec">{master.title}</div>
                                 </div>
@@ -778,7 +778,7 @@ export function StudioServicesPage({ studioId }: Props) {
               value={newServiceGlobalCategoryId}
               onChange={(event) => setNewServiceGlobalCategoryId(event.target.value)}
             >
-              <option value="">Global category</option>
+              <option value="">Глобальная категория</option>
               {globalCategories.map((item) => (
                 <option key={item.id} value={item.id}>
                   {categoryLabel(item)}
@@ -790,7 +790,7 @@ export function StudioServicesPage({ studioId }: Props) {
               onClick={() => setShowProposeCategoryModal(true)}
               className="w-fit text-xs font-medium text-primary underline"
             >
-              + Suggest your category
+              + Предложить свою категорию
             </button>
             {proposeCategoryMessage ? <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div> : null}
             <Input
@@ -819,11 +819,11 @@ export function StudioServicesPage({ studioId }: Props) {
 
           <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-medium text-text-main">Assign masters right away</div>
+              <div className="text-sm font-medium text-text-main">Назначить мастеров сразу</div>
               <div className="text-xs text-text-sec">{newServiceMasterIds.length}</div>
             </div>
             {masters.length === 0 ? (
-              <p className="mt-2 text-xs text-text-sec">Add studio masters first.</p>
+              <p className="mt-2 text-xs text-text-sec">Сначала добавьте мастеров студии.</p>
             ) : (
               <>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -833,10 +833,10 @@ export function StudioServicesPage({ studioId }: Props) {
                     variant="ghost"
                     onClick={() => setNewServiceMasterIds(masters.map((master) => master.id))}
                   >
-                    Select all
+                    Выбрать всех
                   </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setNewServiceMasterIds([])}>
-                    Clear
+                    Очистить
                   </Button>
                 </div>
                 <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
@@ -848,17 +848,14 @@ export function StudioServicesPage({ studioId }: Props) {
                         className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-card px-3 py-2"
                       >
                         <span className="text-sm text-text-main">{master.name}</span>
-                        <input
-                          type="checkbox"
+                        <Switch
+                          size="sm"
                           checked={checked}
-                          onChange={(event) =>
+                          onCheckedChange={(next) =>
                             setNewServiceMasterIds((current) =>
-                              event.target.checked
-                                ? [...current, master.id]
-                                : current.filter((id) => id !== master.id)
+                              next ? [...current, master.id] : current.filter((id) => id !== master.id)
                             )
                           }
-                          className="h-4 w-4 rounded border-border-subtle accent-primary"
                         />
                       </label>
                     );
@@ -889,7 +886,7 @@ export function StudioServicesPage({ studioId }: Props) {
         }}
       >
         <div className="space-y-4">
-          <h3 className="text-base font-semibold text-text-main">Suggest category</h3>
+          <h3 className="text-base font-semibold text-text-main">Предложить категорию</h3>
           <Input
             type="text"
             value={proposedCategoryTitle}
@@ -898,7 +895,7 @@ export function StudioServicesPage({ studioId }: Props) {
             maxLength={60}
           />
           <div className="text-xs text-text-sec">
-            Category will be sent to moderation. You can save the service without a category.
+            Категория будет отправлена на модерацию. Услугу можно сохранить и без категории.
           </div>
           <div className="flex justify-end gap-2">
             <Button
@@ -917,7 +914,7 @@ export function StudioServicesPage({ studioId }: Props) {
               onClick={() => void submitCategoryProposal()}
               disabled={proposingCategory || !proposedCategoryTitle.trim()}
             >
-              {proposingCategory ? t.creating : "Send"}
+              {proposingCategory ? t.creating : "Отправить"}
             </Button>
           </div>
         </div>
@@ -1003,13 +1000,10 @@ export function StudioServicesPage({ studioId }: Props) {
                           </Button>
                         </div>
                         <label className="inline-flex items-center gap-2 text-xs text-text-sec">
-                          <input
-                            type="checkbox"
+                          <Switch
+                            size="sm"
                             checked={question.required}
-                            onChange={(event) =>
-                              updateBookingQuestion(question.tempId, { required: event.target.checked })
-                            }
-                            className="h-4 w-4 rounded border-border-subtle accent-primary"
+                            onCheckedChange={(next) => updateBookingQuestion(question.tempId, { required: next })}
                           />
                           {bookingText.required}
                         </label>

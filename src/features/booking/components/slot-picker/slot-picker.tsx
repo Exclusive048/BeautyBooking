@@ -82,15 +82,6 @@ export const SlotPickerOptimized = memo(function SlotPickerOptimized({
   onChange,
   disabled,
 }: SlotPickerProps) {
-  const renderCount = useRef(0);
-  const isDev = process.env.NODE_ENV !== "production";
-
-  useEffect(() => {
-    if (!isDev) return;
-    renderCount.current += 1;
-    console.debug(`[render] SlotPickerOptimized #${renderCount.current}`);
-  }, [isDev]);
-
   const defaultOpen = useMemo(() => {
     const next: Record<string, boolean> = {};
     for (const group of groups) {
@@ -189,11 +180,11 @@ const SlotGroupRow = memo(function SlotGroupRow({
       <button
         type="button"
         onClick={() => onToggle(group.id)}
-        className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left"
+        className="flex w-full items-center justify-between rounded-xl border border-border-subtle bg-bg-input/70 px-3 py-2 text-left transition hover:bg-bg-input"
         aria-expanded={isOpen}
       >
-        <span className="text-xs font-semibold text-neutral-600">{group.label}</span>
-        <span className="text-xs text-neutral-400">{group.items.length}</span>
+        <span className="text-xs font-semibold text-text-main">{group.label}</span>
+        <span className="text-xs text-text-sec">{group.items.length}</span>
       </button>
       {content}
     </div>
@@ -227,8 +218,8 @@ const SlotButton = memo(function SlotButton({
   const hotLabel =
     isHot && typeof discountValue === "number"
       ? discountType === "FIXED"
-        ? `HOT -${discountValue} RUB`
-        : `HOT -${discountValue}%`
+        ? `${UI_TEXT.catalog.chips.hot} -${discountValue} ${UI_TEXT.common.currencyRub}`
+        : `${UI_TEXT.catalog.chips.hot} -${discountValue}%`
       : null;
 
   return (
@@ -239,10 +230,10 @@ const SlotButton = memo(function SlotButton({
       className={cn(
         "rounded-2xl border px-3 py-2 text-sm transition",
         active
-          ? "border-neutral-900 bg-neutral-900 text-white"
+          ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
           : isHot
-            ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
-            : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50",
+            ? "border-amber-300/60 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+            : "border-border-subtle bg-bg-input text-text-main hover:bg-bg-elevated",
         disabled && "cursor-not-allowed opacity-60",
         className
       )}
@@ -250,7 +241,7 @@ const SlotButton = memo(function SlotButton({
       <span className="inline-flex items-center gap-2">
         {timeText}
         {hotLabel ? (
-          <span className="rounded-full bg-amber-200/60 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
             {hotLabel}
           </span>
         ) : null}

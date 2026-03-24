@@ -1299,7 +1299,20 @@ export const UI_TEXT = {
       cancelBooking: "Отменить запись",
       leaveReview: "Оставить отзыв",
     },
-    profile: {
+    reviewForm: {
+      title: "Оставить отзыв",
+      publicTagsTitle: "Что понравилось больше всего (до 3 пунктов)",
+      privateTagsTitle: "Что можно улучшить (до 3 пунктов)",
+      privateTagsHint: "Эти отметки видит только мастер",
+      tagsLoading: "Загружаем теги...",
+      tagsLimit: "Можно выбрать до {count}",
+      textPlaceholder: "Расскажите, как прошла запись — это поможет другим клиентам",
+      submit: "Отправить",
+      sending: "Отправляем...",
+      cancel: "Отмена",
+      loadTagsFailed: "Не удалось загрузить теги",
+      submitFailed: "Не удалось отправить отзыв",
+    },    profile: {
       subtitle: "Личные данные и контактная информация",
       saveFailed: "Не удалось сохранить",
       networkError: "Сеть недоступна или сервер не отвечает",

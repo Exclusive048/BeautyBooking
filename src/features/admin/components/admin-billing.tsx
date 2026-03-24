@@ -252,17 +252,6 @@ export function AdminBilling() {
     return () => document.removeEventListener("keydown", handler);
   }, [modalMode, closeModal]);
 
-  useEffect(() => {
-    if (process.env.NODE_ENV === "production" || !modalMode) return;
-    const keysCount = Object.keys(FEATURE_CATALOG).length;
-    const entriesCount = Object.entries(FEATURE_CATALOG).length;
-    if (keysCount !== entriesCount) {
-      console.warn("[admin-billing] feature catalog mismatch", { keysCount, entriesCount });
-    } else {
-      console.debug("[admin-billing] feature catalog size", keysCount);
-    }
-  }, [modalMode]);
-
   const plansById = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
 
   const groupedPlans = useMemo(() => {

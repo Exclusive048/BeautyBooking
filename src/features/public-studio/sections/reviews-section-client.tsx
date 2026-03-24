@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { fetchStudioProfile } from "@/features/booking/lib/studio-booking";
 import type { ReviewDto } from "@/lib/reviews/types";
@@ -34,13 +35,14 @@ export function StudioReviewsSectionClient({
           {UI_FMT.starsLabel(rating)} / {reviewsCount} {UI_TEXT.publicStudio.reviewsCountLabel}
         </div>
         {canReviewBookingId && !showReviewForm ? (
-          <button
+          <Button
             type="button"
             onClick={() => setShowReviewForm(true)}
-            className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
+            variant="secondary"
+            size="sm"
           >
             {UI_TEXT.publicStudio.reviewLeave}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -78,7 +80,7 @@ export function StudioReviewsSectionClient({
                   {review.publicTags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="rounded-full border border-border bg-white/70 px-2 py-1 text-[11px] text-text-muted"
+                      className="rounded-full border border-border-subtle bg-bg-input/80 px-2 py-1 text-[11px] text-text-sec"
                     >
                       {tag.icon ? `${tag.icon} ` : ""}
                       {tag.label}

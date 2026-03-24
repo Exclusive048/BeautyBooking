@@ -51,7 +51,7 @@ export function PublicStudioProfilePage({ studioId, bookingParams }: Props) {
 
       <a
         href="#studio-booking-entry"
-        className="fixed bottom-5 right-5 z-20 inline-flex items-center justify-center rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-neutral-800"
+        className="fixed bottom-5 right-5 z-20 inline-flex items-center justify-center rounded-full border border-border-subtle bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-5 py-3 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-hover transition hover:brightness-105"
       >
         {UI_TEXT.publicStudio.heroBook}
       </a>

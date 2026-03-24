@@ -419,7 +419,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-6">
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-6">
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-3">
             <div className="h-4 w-40 animate-pulse rounded bg-muted" />
@@ -441,12 +441,16 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     );
   }
   if (error || !studio) {
-    return <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">{error ?? UI_TEXT.publicStudio.bookingError}</div>;
+    return (
+      <div className="rounded-2xl border border-red-300/60 bg-red-950/30 p-6 text-sm text-red-200">
+        {error ?? UI_TEXT.publicStudio.bookingError}
+      </div>
+    );
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-6 rounded-2xl border border-border bg-surface p-5 md:p-6">
+      <div className="space-y-6 rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
         <section>
           <h3 className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.chooseService}</h3>
           <div className="mt-3 space-y-2">
@@ -457,8 +461,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                 onClick={() => setServiceId(service.id)}
                 className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                   serviceId === service.id
-                    ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                    : "border-border bg-muted/20 hover:border-neutral-400"
+                    ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
+                    : "border-border-subtle bg-bg-input/70 hover:bg-bg-elevated"
                 }`}
               >
                 <div className="text-sm font-semibold">{service.name}</div>
@@ -489,8 +493,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                 onClick={() => setMasterId(ANY_MASTER_ID)}
                 className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                   masterId === ANY_MASTER_ID
-                    ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                    : "border-border bg-muted/20 hover:border-neutral-400"
+                    ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
+                    : "border-border-subtle bg-bg-input/70 hover:bg-bg-elevated"
                 }`}
               >
                 {UI_TEXT.publicStudio.anyMaster}
@@ -500,10 +504,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                   key={master.id}
                   type="button"
                   onClick={() => setMasterId(master.id)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                    masterId === master.id
-                      ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                      : "border-border bg-muted/20 hover:border-neutral-400"
+                    className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                      masterId === master.id
+                      ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
+                      : "border-border-subtle bg-bg-input/70 hover:bg-bg-elevated"
                   }`}
                 >
                   {master.name}
@@ -515,7 +519,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         </section>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-border bg-surface p-5 md:p-6">
+      <div className="space-y-6 rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
         <section className={serviceId ? "" : "opacity-50"}>
           <h3 className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.chooseDate}</h3>
           <div className="mt-3">
@@ -541,7 +545,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           )}
         </section>
 
-        <section className="rounded-xl border border-border bg-muted/20 p-4">
+        <section className="rounded-xl border border-border-subtle bg-bg-input/60 p-4">
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-text-muted">{UI_TEXT.publicStudio.chooseService}</span>
@@ -572,7 +576,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           </div>
 
           <label
-            className="mt-3 block cursor-pointer rounded-xl border border-border bg-surface p-3"
+            className="mt-3 block cursor-pointer rounded-xl border border-border-subtle bg-bg-card p-3"
             aria-label={UI_TEXT.publicProfile.booking.silentModeAria}
           >
             <div className="flex items-start justify-between gap-3">
@@ -608,7 +612,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
-            className="mt-1 min-h-[84px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none"
+            className="mt-1 min-h-[84px] w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main outline-none"
           />
 
           
@@ -618,7 +622,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           {bookingConfigError ? <div className="mt-3 text-xs text-red-600">{bookingConfigError}</div> : null}
 
           {bookingConfig && (bookingConfig.requiresReferencePhoto || bookingConfig.questions.length > 0) ? (
-            <div className="mt-3 rounded-xl border border-border bg-surface p-3 text-sm">
+            <div className="mt-3 rounded-xl border border-border-subtle bg-bg-card p-3 text-sm">
               <div className="text-sm font-semibold text-text">
                 {UI_TEXT.publicProfile.booking.bookingConfigTitle}
               </div>
@@ -674,7 +678,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                         onChange={(event) =>
                           setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                         }
-                        className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none"
+                        className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main outline-none"
                         placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
                       />
                     </label>
@@ -691,7 +695,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
             type="button"
             onClick={() => void onSubmit()}
             disabled={submitLoading || referenceUploading || !selectedService || !resolvedMasterId || !slotLabel}
-            className="mt-4 w-full rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-neutral-900"
+            className="mt-4 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {UI_TEXT.publicStudio.book}
           </button>
@@ -702,14 +706,21 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         <div className="fixed inset-0 z-50">
           <button type="button" className="absolute inset-0 bg-black/45" onClick={() => setShowAuthModal(false)} aria-label={UI_TEXT.common.cancel} />
           <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl">
+            <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-xl">
               <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.authRequiredTitle}</div>
               <div className="mt-2 text-sm text-text-muted">{UI_TEXT.publicStudio.authRequiredText}</div>
               <div className="mt-4 flex gap-2">
-                <Link href={buildLoginUrl(nextPath)} className="flex-1 rounded-xl bg-neutral-900 py-2 text-center text-sm font-semibold text-white dark:bg-white dark:text-neutral-900">
+                <Link
+                  href={buildLoginUrl(nextPath)}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta py-2 text-center text-sm font-semibold text-[rgb(var(--accent-foreground))]"
+                >
                   {UI_TEXT.publicStudio.login}
                 </Link>
-                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 rounded-xl border border-border py-2 text-sm font-semibold text-text">
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(false)}
+                  className="flex-1 rounded-xl border border-border-subtle bg-bg-input py-2 text-sm font-semibold text-text-main"
+                >
                   {UI_TEXT.common.cancel}
                 </button>
               </div>

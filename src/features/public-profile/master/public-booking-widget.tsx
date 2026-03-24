@@ -69,12 +69,6 @@ export function PublicBookingWidget({
   const totalPrice = selectedServices.reduce((sum, service) => sum + Math.max(0, service.price), 0);
   const totalDuration = selectedServices.reduce((sum, service) => sum + Math.max(0, service.durationMin), 0);
   const isDev = process.env.NODE_ENV !== "production";
-  const renderCount = useRef(0);
-  useEffect(() => {
-    if (!isDev) return;
-    renderCount.current += 1;
-    console.debug(`[render] PublicBookingWidget #${renderCount.current}`);
-  }, [isDev]);
 
   const [step, setStep] = useState<"summary" | "slots" | "checkout">("summary");
   const [anchorKey, setAnchorKey] = useState<string>(() => toLocalDateKey(new Date(), providerTimeZone));

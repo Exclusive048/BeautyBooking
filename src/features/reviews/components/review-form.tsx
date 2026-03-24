@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { UI_TEXT } from "@/lib/ui/text";
 import type { ReviewDto, ReviewTagDto } from "@/lib/reviews/types";
+import type { ApiResponse } from "@/lib/types/api";
 
-// AUDIT (section 3):
-// - UI now supports PUBLIC and PRIVATE tag selection with max-3 per group.
 type Props = {
   bookingId: string;
   onSubmitted: (review: ReviewDto) => void;
@@ -31,21 +32,24 @@ function ChipButton(props: {
 }) {
   const { tag, selected, disabled, onClick } = props;
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full border px-3 py-1.5 text-xs transition disabled:opacity-60 ${
-        selected ? "border-black bg-black text-white" : "border-neutral-300 bg-white text-neutral-700"
+      size="sm"
+      variant={selected ? "primary" : "secondary"}
+      className={`rounded-full px-3 text-xs ${
+        selected ? "" : "border-border-subtle bg-bg-input text-text-main hover:bg-bg-elevated"
       }`}
     >
       {tag.icon ? `${tag.icon} ` : ""}
       {tag.label}
-    </button>
+    </Button>
   );
 }
 
 export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
+  const t = UI_TEXT.clientCabinet.reviewForm;
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
   const [publicTags, setPublicTags] = useState<ReviewTagDto[]>([]);
@@ -60,7 +64,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         setTagsLoading(true);
         setTagsError(null);
@@ -74,7 +78,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         setPrivateTags(json.data.privateTags);
       } catch (loadError) {
         if (cancelled) return;
-        setTagsError(loadError instanceof Error ? loadError.message : "Failed to load tags");
+        setTagsError(loadError instanceof Error ? loadError.message : t.loadTagsFailed);
       } finally {
         if (!cancelled) {
           setTagsLoading(false);
@@ -84,7 +88,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t.loadTagsFailed]);
 
   const canSubmit = useMemo(() => !loading && rating >= 1 && rating <= 5, [loading, rating]);
 
@@ -141,35 +145,36 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
       setSelectedPublicTagIds([]);
       setSelectedPrivateTagIds([]);
       setHint(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit review");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t.submitFailed);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="rounded-2xl border p-4">
-      <div className="text-sm font-semibold">Leave review</div>
+    <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
+      <div className="text-sm font-semibold text-text-main">{t.title}</div>
+
       <div className="mt-3 flex flex-wrap gap-2">
         {[1, 2, 3, 4, 5].map((value) => (
-          <button
+          <Button
             key={value}
             type="button"
             onClick={() => setRating(value)}
-            className={`rounded-lg border px-3 py-1 text-sm ${
-              rating === value ? "bg-black text-white border-black" : "border-neutral-300"
-            }`}
+            size="sm"
+            variant={rating === value ? "primary" : "secondary"}
+            className="h-8 rounded-lg px-3 text-sm"
             disabled={loading}
           >
             {starsLabel(value)}
-          </button>
+          </Button>
         ))}
       </div>
 
       <div className="mt-4">
-        <div className="text-xs font-medium text-neutral-700">What did you like most? (up to 3)</div>
-        {tagsLoading ? <div className="mt-2 text-xs text-neutral-500">Loading tags...</div> : null}
+        <div className="text-xs font-medium text-text-main">{t.publicTagsTitle}</div>
+        {tagsLoading ? <div className="mt-2 text-xs text-text-sec">{t.tagsLoading}</div> : null}
         {tagsError ? <div className="mt-2 text-xs text-red-600">{tagsError}</div> : null}
         {!tagsLoading && !tagsError ? (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -184,7 +189,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
                     tag.id,
                     selectedPublicTagIds,
                     setSelectedPublicTagIds,
-                    `You can select up to ${MAX_TAGS_PER_GROUP}`
+                    t.tagsLimit.replace("{count}", String(MAX_TAGS_PER_GROUP))
                   )
                 }
               />
@@ -193,19 +198,19 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         ) : null}
       </div>
 
-      <textarea
-        className="mt-3 w-full rounded-xl border px-3 py-2 text-sm min-h-[100px]"
-        placeholder="Расскажи как прошло — это поможет другим клиентам"
+      <Textarea
+        className="mt-3 min-h-[100px]"
+        placeholder={t.textPlaceholder}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(event) => setText(event.target.value)}
         maxLength={1000}
         disabled={loading}
       />
 
       <div className="mt-4">
-        <div className="text-xs font-medium text-neutral-700">What can be improved? (up to 3)</div>
-        <div className="mt-1 text-[11px] text-neutral-500">These marks are visible only to the master</div>
-        {tagsLoading ? <div className="mt-2 text-xs text-neutral-500">Loading tags...</div> : null}
+        <div className="text-xs font-medium text-text-main">{t.privateTagsTitle}</div>
+        <div className="mt-1 text-[11px] text-text-sec">{t.privateTagsHint}</div>
+        {tagsLoading ? <div className="mt-2 text-xs text-text-sec">{t.tagsLoading}</div> : null}
         {!tagsLoading && !tagsError ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {privateTags.map((tag) => (
@@ -219,7 +224,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
                     tag.id,
                     selectedPrivateTagIds,
                     setSelectedPrivateTagIds,
-                    `You can select up to ${MAX_TAGS_PER_GROUP}`
+                    t.tagsLimit.replace("{count}", String(MAX_TAGS_PER_GROUP))
                   )
                 }
               />
@@ -228,27 +233,17 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         ) : null}
       </div>
 
-      {hint ? <div className="mt-2 text-xs text-amber-700">{hint}</div> : null}
+      {hint ? <div className="mt-2 text-xs text-amber-300">{hint}</div> : null}
       {error ? <div className="mt-2 text-sm text-red-600">{error}</div> : null}
 
       <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!canSubmit}
-          className="rounded-lg bg-black text-white px-3 py-2 text-sm disabled:opacity-60"
-        >
-          {loading ? "Sending..." : "Submit"}
-        </button>
+        <Button type="button" onClick={submit} disabled={!canSubmit}>
+          {loading ? t.sending : t.submit}
+        </Button>
         {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={loading}
-            className="rounded-lg border px-3 py-2 text-sm"
-          >
-            Cancel
-          </button>
+          <Button type="button" onClick={onCancel} disabled={loading} variant="secondary">
+            {t.cancel}
+          </Button>
         ) : null}
       </div>
     </div>

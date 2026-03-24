@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -57,50 +58,53 @@ export function StudioServicesList({ studio, categories, services }: Props) {
   const activeServices = groups.find((group) => group.title === activeGroup)?.services ?? [];
 
   if (services.length === 0) {
-    return <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-text-muted">{UI_TEXT.publicStudio.noServices}</div>;
+    return (
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 text-sm text-text-sec">
+        {UI_TEXT.publicStudio.noServices}
+      </div>
+    );
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 md:p-6">
+    <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
       <div className="flex flex-wrap gap-2">
         {groups.map((group) => {
           const active = group.title === activeGroup;
           return (
-            <button
+            <Button
               key={group.title}
               type="button"
               onClick={() => setActiveGroup(group.title)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                active
-                  ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                  : "border-border bg-muted text-text hover:border-neutral-400"
-              }`}
+              size="sm"
+              variant={active ? "primary" : "secondary"}
+              className="rounded-full px-3 text-xs"
             >
               {group.title}
-            </button>
+            </Button>
           );
         })}
       </div>
 
       <div className="mt-4 space-y-3">
         {activeServices.map((service) => (
-          <article key={service.id} className="rounded-xl border border-border bg-muted/30 p-4">
+          <article key={service.id} className="rounded-xl border border-border-subtle bg-bg-input/60 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-text">{service.name}</div>
-                <div className="mt-1 text-xs text-text-muted">
+                <div className="text-sm font-semibold text-text-main">{service.name}</div>
+                <div className="mt-1 text-xs text-text-sec">
                   {service.price > 0
                     ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
                     : UI_TEXT.publicStudio.servicePriceOnRequest}
                 </div>
               </div>
-              <Link
-                href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services")}
-                className="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-                aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
-              >
-                {UI_TEXT.publicStudio.addService}
-              </Link>
+              <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
+                <Link
+                  href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services")}
+                  aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
+                >
+                  {UI_TEXT.publicStudio.addService}
+                </Link>
+              </Button>
             </div>
           </article>
         ))}

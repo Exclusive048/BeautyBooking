@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { providerPublicUrl } from "@/lib/public-urls";
 import type { CatalogMapPoint } from "@/features/catalog/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type MapSearchPayload = {
   bbox: string;
@@ -152,7 +153,7 @@ function getYmapsUrl(): string {
 
 function loadYmaps(): Promise<YMapsApi> {
   if (typeof window === "undefined") {
-    return Promise.reject(new Error("Yandex Maps is not available on the server"));
+    return Promise.reject(new Error(UI_TEXT.catalog.loadFailed));
   }
   const ymapsWindow = window as YMapsWindow;
   if (ymapsWindow.ymaps) {
@@ -169,7 +170,7 @@ function loadYmaps(): Promise<YMapsApi> {
       });
       existing.addEventListener("error", () => {
         ymapsLoader = null;
-        reject(new Error("Failed to load Yandex Maps"));
+        reject(new Error(UI_TEXT.catalog.loadFailed));
       });
       return;
     }
@@ -182,14 +183,14 @@ function loadYmaps(): Promise<YMapsApi> {
       const loadedWindow = window as YMapsWindow;
       if (!loadedWindow.ymaps) {
         ymapsLoader = null;
-        reject(new Error("Yandex Maps API is not available"));
+        reject(new Error(UI_TEXT.catalog.loadFailed));
         return;
       }
       loadedWindow.ymaps.ready(() => resolve(loadedWindow.ymaps!));
     };
     script.onerror = () => {
       ymapsLoader = null;
-      reject(new Error("Failed to load Yandex Maps"));
+      reject(new Error(UI_TEXT.catalog.loadFailed));
     };
     document.head.appendChild(script);
   });

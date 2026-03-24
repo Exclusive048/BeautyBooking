@@ -404,25 +404,25 @@ export function MasterDashboardPage() {
   const requestReschedule = async (booking: DayBooking): Promise<void> => {
     if (!canMasterRequestMove(booking)) return;
     if (!booking.durationMin || booking.durationMin <= 0) {
-      setError("Booking duration is missing");
+      setError("Не удалось определить длительность записи");
       return;
     }
 
     const defaultStart = booking.startAtUtc
       ? new Date(booking.startAtUtc).toISOString().slice(0, 16)
       : "";
-    const startInput = window.prompt("New start (YYYY-MM-DDTHH:mm)", defaultStart)?.trim();
+    const startInput = window.prompt("Новая дата и время начала (YYYY-MM-DDTHH:mm)", defaultStart)?.trim();
     if (!startInput) return;
 
     const startAt = new Date(startInput);
     if (Number.isNaN(startAt.getTime())) {
-      setError("Invalid start time");
+      setError("Некорректная дата или время начала");
       return;
     }
 
-    const comment = window.prompt("Comment for client", booking.changeComment ?? "")?.trim();
+    const comment = window.prompt("Комментарий для клиента", booking.changeComment ?? "")?.trim();
     if (!comment) {
-      setError("Comment is required");
+      setError("Комментарий обязателен");
       return;
     }
 
@@ -450,7 +450,7 @@ export function MasterDashboardPage() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to request reschedule");
+      setError(err instanceof Error ? err.message : "Не удалось отправить запрос на перенос");
     } finally {
       setActionId(null);
     }
@@ -485,11 +485,11 @@ export function MasterDashboardPage() {
   };
 
   const getStatusLabel = (status: string): string => {
-    if (status === "PENDING" || status === "NEW") return "Awaiting confirmation";
+    if (status === "PENDING" || status === "NEW") return "Ожидает подтверждения";
   if (status === "CONFIRMED") return UI_TEXT.master.dashboard.status.confirmed;
-    if (status === "CHANGE_REQUESTED") return "Awaiting other side";
-    if (status === "IN_PROGRESS" || status === "STARTED") return "In progress";
-    if (status === "FINISHED") return "Finished";
+    if (status === "CHANGE_REQUESTED") return "Ожидает решения второй стороны";
+    if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
+    if (status === "FINISHED") return "Завершено";
   if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") {
     return UI_TEXT.master.dashboard.status.rejected;
   }
@@ -664,7 +664,7 @@ export function MasterDashboardPage() {
             className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-2 text-sm"
             aria-label={UI_TEXT.master.dashboard.labels.refresh}
           >
-            ↻
+            {UI_TEXT.master.dashboard.labels.refresh}
           </button>
         </div>
       </div>
@@ -800,10 +800,6 @@ export function MasterDashboardPage() {
                   </div>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {/* AUDIT (кнопки мастера):
-                      - реализовано: PENDING + actionRequiredBy=MASTER => Confirm/Reject.
-                      - реализовано: CHANGE_REQUESTED от CLIENT => Confirm move/Reject move.
-                      - реализовано частично: в карточке нет ссылки на профиль клиента (только имя/телефон). */}
                   {booking.status === "PENDING" && booking.actionRequiredBy === "MASTER" ? (
                     <>
                       <button
@@ -899,7 +895,7 @@ export function MasterDashboardPage() {
                   className="text-sm"
                   aria-label={UI_TEXT.master.dashboard.labels.balanceToggleAria}
                 >
-                  {balanceVisible ? "🙈" : "👁️"}
+                  {balanceVisible ? "Скрыть" : "Показать"}
                 </button>
               </div>
               <div className={`text-2xl font-semibold ${balanceVisible ? "" : "blur-sm select-none"}`}>
@@ -920,7 +916,7 @@ export function MasterDashboardPage() {
                     className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
                     aria-label={UI_TEXT.master.dashboard.labels.refreshSlotsAria}
                   >
-                    ↻
+                    {UI_TEXT.master.dashboard.labels.refresh}
                   </button>
                   <button type="button" onClick={() => setStoryOpen(true)} className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs">
                     {UI_TEXT.master.dashboard.labels.publishStories}
@@ -980,7 +976,7 @@ export function MasterDashboardPage() {
                       className="w-full rounded-xl border border-border-subtle bg-bg-input/70 p-2 text-left text-sm transition hover:bg-bg-input"
                     >
                       <div className="font-medium">
-                        {review.authorName} · ⭐{review.rating}
+                        {review.authorName} • ★{review.rating}
                       </div>
                       {review.text ? <div className="text-text-sec">{review.text}</div> : null}
                     </button>
@@ -1087,7 +1083,7 @@ export function MasterDashboardPage() {
                 <option value="">{UI_TEXT.master.dashboard.manualBooking.chooseService}</option>
                 {data.services.map((service) => (
                   <option key={service.id} value={service.id}>
-                    {service.title} · {service.durationMin} {UI_TEXT.common.minutesShort} · {formatMoney(service.price)}
+                    {service.title} • {service.durationMin} {UI_TEXT.common.minutesShort} • {formatMoney(service.price)}
                   </option>
                 ))}
               </select>
