@@ -86,7 +86,7 @@ export default async function StudioCabinetIndexPage() {
             String(stats.reviewsCount)
           ),
           subtitle: UI_TEXT.studioCabinet.dashboard.reviewsWindow,
-          href: "/cabinet/studio/settings?tab=settings#reviews",
+          href: "/cabinet/studio/reviews?filter=new",
         },
       ]
     : [
@@ -115,7 +115,7 @@ export default async function StudioCabinetIndexPage() {
           title: UI_TEXT.studioCabinet.dashboard.cards.reviews,
           value: "—",
           subtitle: UI_TEXT.studioCabinet.dashboard.emptyHint,
-          href: "/cabinet/studio/settings?tab=settings#reviews",
+          href: "/cabinet/studio/reviews?filter=new",
           muted: true,
         },
       ];
