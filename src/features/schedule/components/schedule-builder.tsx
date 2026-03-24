@@ -68,7 +68,8 @@ type SchedulePayload = {
   removedOverrides?: string[];
 };
 
-const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
+const SCHEDULE_TEXT = UI_TEXT.cabinet.master.schedule;
+const WEEKDAYS = SCHEDULE_TEXT.dayShortNames;
 
 const EMPTY_OVERRIDES: ScheduleOverride[] = [];
 
@@ -115,14 +116,14 @@ function formatPlanLabel(input: {
   templateName?: string | null;
   kind?: "weekly" | "override";
 }): string {
-  if (!input.isWorking) return "Выходной";
+  if (!input.isWorking) return SCHEDULE_TEXT.dayOff;
   if (input.templateName) {
     return `${input.templateName} (${input.startLocal ?? "—"}–${input.endLocal ?? "—"})`;
   }
   if (input.startLocal && input.endLocal) {
-    return `Смена ${input.startLocal}–${input.endLocal}`;
+    return `${SCHEDULE_TEXT.shiftPrefix} ${input.startLocal}–${input.endLocal}`;
   }
-  return "Рабочий день";
+  return SCHEDULE_TEXT.workday;
 }
 
 function createClientId(): string {
@@ -157,6 +158,8 @@ function normalizeFixedSlotTimes(values: string[]): string[] {
 
 export function ScheduleBuilder() {
   const viewerTimeZone = useViewerTimeZoneContext();
+  const t = UI_TEXT.cabinet.master.schedule;
+  const b = t.builder;
   const [status, setStatus] = useState<StatusPayload>({
     mode: "solo",
     scheduleMode: "FLEXIBLE",
@@ -253,7 +256,7 @@ export function ScheduleBuilder() {
         isWorking: true,
         startLocal: override.startLocal ?? null,
         endLocal: override.endLocal ?? null,
-        templateName: "Кастом",
+        templateName: t.customLabel,
         kind: "override" as const,
       };
     }
@@ -266,12 +269,12 @@ export function ScheduleBuilder() {
         isWorking: Boolean(template),
         startLocal: template?.startLocal ?? null,
         endLocal: template?.endLocal ?? null,
-        templateName: template?.name ?? "Шаблон",
+        templateName: template?.name ?? t.templateLabelShort,
         kind: "override" as const,
       };
     }
     return { ...selectedBasePlan, kind: "weekly" as const };
-  }, [selectedBasePlan, selectedOverride, templatesById]);
+  }, [selectedBasePlan, selectedOverride, templatesById, t.customLabel, t.templateLabelShort]);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -321,11 +324,11 @@ export function ScheduleBuilder() {
       setFixedSlotTimes(fixedTimes);
       setInitialFixedSlotTimes(fixedTimes);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить график");
+      setError(err instanceof Error ? err.message : t.errors.load);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t.errors.load]);
 
   const loadOverrides = useCallback(
     async (monthKey: string): Promise<void> => {
@@ -340,10 +343,10 @@ export function ScheduleBuilder() {
         setOverridesByMonth((current) => ({ ...current, [monthKey]: json.data.overrides }));
         setInitialOverridesByMonth((current) => ({ ...current, [monthKey]: json.data.overrides }));
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось загрузить исключения");
+        setError(err instanceof Error ? err.message : t.errors.loadOverrides);
       }
     },
-    [overridesByMonth]
+    [overridesByMonth, t.errors.loadOverrides]
   );
 
   const setRangeFromTemplate = useCallback(
@@ -430,7 +433,7 @@ export function ScheduleBuilder() {
   const addFixedSlotTime = () => {
     const normalized = normalizeFixedSlotTime(newFixedSlotTime);
     if (!normalized) {
-      setError("\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f \u043e\u043a\u043d\u0430. \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u0444\u043e\u0440\u043c\u0430\u0442 HH:mm.");
+      setError(t.errors.invalidSlotTime);
       return;
     }
     setError(null);
@@ -461,11 +464,11 @@ export function ScheduleBuilder() {
   const upsertTemplateDraft = () => {
     const name = templateDraft.name.trim();
     if (!name) {
-      setError("Название шаблона обязательно.");
+      setError(t.errors.templateNameRequired);
       return;
     }
     if (!templateDraft.startLocal || !templateDraft.endLocal) {
-      setError("Укажите время начала и окончания.");
+      setError(t.errors.timeRangeRequired);
       return;
     }
     setTemplates((current) => {
@@ -528,7 +531,7 @@ export function ScheduleBuilder() {
       return;
     }
     if (!rangeStart || !rangeEnd) {
-      setError("Укажите время начала и окончания.");
+      setError(t.errors.timeRangeRequired);
       return;
     }
     updateOverride(selectedDate, {
@@ -542,7 +545,7 @@ export function ScheduleBuilder() {
 
   const applyTimeRange = () => {
     if (!rangeStart || !rangeEnd) {
-      setError("Укажите время начала и окончания.");
+      setError(t.errors.timeRangeRequired);
       return;
     }
     updateOverride(selectedDate, {
@@ -753,9 +756,9 @@ export function ScheduleBuilder() {
       setInitialTemplates(nextTemplates);
       setInitialWeeklyDays(weeklyPayload);
       setInitialOverridesByMonth(sanitizedOverridesByMonth);
-      setInfo("График сохранен.");
+      setInfo(t.info.savedWeek);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить график");
+      setError(err instanceof Error ? err.message : t.errors.saveWeek);
     } finally {
       setSaving(false);
     }
@@ -777,9 +780,9 @@ export function ScheduleBuilder() {
         throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
       }
       await load();
-      setInfo("Запрос отправлен на согласование.");
+      setInfo(t.info.requestSubmitted);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить запрос");
+      setError(err instanceof Error ? err.message : t.errors.submitRequest);
     } finally {
       setSaving(false);
     }
@@ -791,13 +794,13 @@ export function ScheduleBuilder() {
     setOverridesByMonth(initialOverridesByMonth);
     setScheduleMode(initialScheduleMode);
     setFixedSlotTimes(initialFixedSlotTimes);
-    setInfo("Изменения сброшены.");
+    setInfo(t.info.resetDone);
   };
 
   const calendarDays = useMemo(() => buildMonthGrid(month), [month]);
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загружаем график...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{b.loading}</div>;
   }
 
   return (
@@ -805,18 +808,18 @@ export function ScheduleBuilder() {
       {status.mode === "studio_member" ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-4 text-sm">
           {status.requestStatus === "PENDING" ? (
-            <div className="text-text-main">
-              Ваш новый график на проверке у администратора. Редактирование временно недоступно.
-            </div>
+            <div className="text-text-main">{b.pendingReadonly}</div>
           ) : status.requestStatus === "REJECTED" ? (
             <div className="text-text-main">
-              Запрос отклонен.
+              {b.requestRejected}
               {status.rejectedComment ? (
-                <div className="mt-1 text-xs text-text-sec">Комментарий: {status.rejectedComment}</div>
+                <div className="mt-1 text-xs text-text-sec">
+                  {b.commentLabel}: {status.rejectedComment}
+                </div>
               ) : null}
             </div>
           ) : (
-            <div className="text-text-sec">Изменения по графику отправляются на согласование.</div>
+            <div className="text-text-sec">{b.submitHintStudio}</div>
           )}
         </div>
       ) : null}
@@ -829,8 +832,8 @@ export function ScheduleBuilder() {
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
         <Card className="h-full">
           <CardHeader className="pb-2">
-            <div className="text-base font-semibold">Настройки</div>
-            <div className="text-xs text-text-sec">Шаблоны, неделя и исключения.</div>
+            <div className="text-base font-semibold">{b.settingsTitle}</div>
+            <div className="text-xs text-text-sec">{b.settingsSubtitle}</div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
@@ -890,7 +893,7 @@ export function ScheduleBuilder() {
                         <button
                           type="button"
                           onClick={() => removeFixedSlotTime(slotTime)}
-                          aria-label="Удалить окно"
+                          aria-label={b.deleteWindowAria}
                           disabled={readOnly}
                           className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                         >
@@ -905,9 +908,9 @@ export function ScheduleBuilder() {
 
             <Tabs
               items={[
-                { id: "templates", label: "Шаблоны", badge: templates.length },
-                { id: "week", label: "Неделя" },
-                { id: "overrides", label: "Исключения" },
+                { id: "templates", label: b.tabs.templates, badge: templates.length },
+                { id: "week", label: b.tabs.week },
+                { id: "overrides", label: b.tabs.overrides },
               ]}
               value={tab}
               onChange={(value) => setTab(value as "templates" | "week" | "overrides")}
@@ -929,7 +932,7 @@ export function ScheduleBuilder() {
                           </div>
                           {template.breaks.length > 0 ? (
                             <div className="mt-1 text-[11px] text-text-sec">
-                              Перерывы:{" "}
+                              {b.breaksPrefix}:{" "}
                               {template.breaks.map((item) => `${item.startLocal}–${item.endLocal}`).join(", ")}
                             </div>
                           ) : null}
@@ -941,7 +944,7 @@ export function ScheduleBuilder() {
                             onClick={() => startEditTemplate(template)}
                             disabled={readOnly}
                           >
-                            Редактировать
+                            {b.editTemplate}
                           </Button>
                           <Button
                             variant="ghost"
@@ -950,7 +953,7 @@ export function ScheduleBuilder() {
                             onClick={() => deleteTemplateDraft(template.clientId)}
                             disabled={readOnly}
                           >
-                            Удалить
+                            {UI_TEXT.actions.delete}
                           </Button>
                         </div>
                       </div>
@@ -960,13 +963,13 @@ export function ScheduleBuilder() {
 
                 <div className="rounded-2xl border border-border-subtle bg-bg-card p-3">
                   <div className="mb-2 text-sm font-semibold">
-                    {editingTemplateId ? "Редактирование шаблона" : "Новый шаблон"}
+                    {editingTemplateId ? b.editTemplateTitle : b.createTemplateTitle}
                   </div>
                   <div className="space-y-2">
                     <Input
                       value={templateDraft.name}
                       onChange={(event) => setTemplateDraft((current) => ({ ...current, name: event.target.value }))}
-                      placeholder="Название шаблона"
+                      placeholder={b.templateNamePlaceholder}
                       disabled={readOnly}
                     />
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -991,7 +994,7 @@ export function ScheduleBuilder() {
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs text-text-sec">
-                        <span>Перерывы (до 3)</span>
+                        <span>{b.breaksLimit}</span>
                         <button
                           type="button"
                           onClick={() =>
@@ -1007,7 +1010,7 @@ export function ScheduleBuilder() {
                           disabled={readOnly}
                           className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs text-text-main"
                         >
-                          + Перерыв
+                          {b.addBreak}
                         </button>
                       </div>
                       {templateDraft.breaks.map((item, index) => (
@@ -1049,7 +1052,7 @@ export function ScheduleBuilder() {
                               }))
                             }
                             disabled={readOnly}
-                            aria-label="Удалить перерыв"
+                            aria-label={b.deleteBreakAria}
                             className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -1064,14 +1067,14 @@ export function ScheduleBuilder() {
                         onClick={upsertTemplateDraft}
                         disabled={readOnly || templates.length >= 7}
                       >
-                        {editingTemplateId ? "Сохранить" : "Добавить шаблон"}
+                        {editingTemplateId ? UI_TEXT.actions.save : b.addTemplate}
                       </Button>
                       {editingTemplateId ? (
                         <Button variant="secondary" size="sm" onClick={resetTemplateDraft} disabled={readOnly}>
-                          Отмена
+                          {UI_TEXT.actions.cancel}
                         </Button>
                       ) : null}
-                      {templates.length >= 7 ? <div className="text-xs text-text-sec">Достигнут лимит 7 шаблонов.</div> : null}
+                      {templates.length >= 7 ? <div className="text-xs text-text-sec">{b.templateLimitReached}</div> : null}
                     </div>
                   </div>
                 </div>
@@ -1101,7 +1104,7 @@ export function ScheduleBuilder() {
                         disabled={readOnly}
                         className="rounded-xl px-2 py-1 text-sm"
                       >
-                        <option value="">Нет шаблона</option>
+                        <option value="">{b.noTemplateOption}</option>
                         {templates.map((template) => (
                           <option key={template.clientId} value={template.clientId}>
                             {template.name}
@@ -1130,7 +1133,7 @@ export function ScheduleBuilder() {
               <div className="space-y-2">
                 {overrides.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border-subtle p-3 text-sm text-text-sec">
-                    Исключений пока нет.
+                    {b.noOverrides}
                   </div>
                 ) : (
                   overrides.map((item) => (
@@ -1142,16 +1145,16 @@ export function ScheduleBuilder() {
                         <div className="font-medium text-text-main">{item.date}</div>
                         <div className="text-xs text-text-sec">
                           {item.type === "OFF"
-                            ? "Выходной"
+                            ? t.dayOff
                             : item.type === "TIME_RANGE"
-                              ? `Кастом ${item.startLocal ?? ""}–${item.endLocal ?? ""}`
-                              : "Шаблон по дате"}
+                              ? `${t.customLabel} ${item.startLocal ?? ""}–${item.endLocal ?? ""}`
+                              : t.byDateTemplateLabel}
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => removeOverride(item.date)}
-                        aria-label="Удалить исключение"
+                        aria-label={b.deleteOverrideAria}
                         disabled={readOnly}
                         className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                       >
@@ -1169,8 +1172,8 @@ export function ScheduleBuilder() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="text-base font-semibold">Календарь</div>
-                <div className="text-xs text-text-sec">План по неделе и исключения.</div>
+                <div className="text-base font-semibold">{b.calendarTitle}</div>
+                <div className="text-xs text-text-sec">{b.calendarSubtitle}</div>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <button
@@ -1210,27 +1213,27 @@ export function ScheduleBuilder() {
                   const template = weekly?.templateId ? templatesById.get(weekly.templateId) : null;
                   const plannedWorking = Boolean(weekly?.isActive && template);
                   const plannedLabel = plannedWorking
-                    ? `${template?.name ?? "Смена"} ${template?.startLocal ?? ""}–${template?.endLocal ?? ""}`
-                    : "Выходной";
+                    ? `${template?.name ?? t.shiftPrefix} ${template?.startLocal ?? ""}–${template?.endLocal ?? ""}`
+                    : t.dayOff;
 
                   let actualLabel = plannedLabel;
                   let actualWorking = plannedWorking;
                   if (override?.type === "OFF") {
                     actualWorking = false;
-                    actualLabel = "Выходной";
+                    actualLabel = t.dayOff;
                   } else if (override?.type === "TIME_RANGE") {
                     actualWorking = true;
-                    actualLabel = `Кастом ${override.startLocal ?? ""}–${override.endLocal ?? ""}`;
+                    actualLabel = `${t.customLabel} ${override.startLocal ?? ""}–${override.endLocal ?? ""}`;
                   } else if (override?.type === "TEMPLATE") {
                     if (!override.isActive || !override.templateId) {
                       actualWorking = false;
-                      actualLabel = "Выходной";
+                      actualLabel = t.dayOff;
                     } else {
                       const overrideTemplate = templatesById.get(override.templateId);
                       actualWorking = Boolean(overrideTemplate);
                       actualLabel = overrideTemplate
                         ? `${overrideTemplate.name} ${overrideTemplate.startLocal}–${overrideTemplate.endLocal}`
-                        : "Шаблон";
+                        : t.templateLabelShort;
                     }
                   }
 
@@ -1260,12 +1263,12 @@ export function ScheduleBuilder() {
 
         <Card className="h-full">
           <CardHeader className="pb-2">
-            <div className="text-base font-semibold">Действия с днем</div>
+            <div className="text-base font-semibold">{b.dayActionsTitle}</div>
             <div className="text-xs text-text-sec">{selectedDate}</div>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3 text-sm">
-              <div className="text-xs text-text-sec">По плану:</div>
+              <div className="text-xs text-text-sec">{b.basedOnPlan}</div>
               <div className="mt-1 text-sm font-medium text-text-main">
                 {formatPlanLabel({
                   isWorking: selectedBasePlan.isWorking,
@@ -1275,23 +1278,27 @@ export function ScheduleBuilder() {
                   kind: "weekly",
                 })}
               </div>
-              {selectedOverride ? <div className="mt-2 text-xs text-text-sec">Исключение: {formatPlanLabel(selectedResolved)}</div> : null}
+              {selectedOverride ? (
+                <div className="mt-2 text-xs text-text-sec">
+                  {b.overrideLabel}: {formatPlanLabel(selectedResolved)}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-2">
               <Button variant="secondary" onClick={makeOffday} disabled={readOnly}>
-                Сделать выходным
+                {t.makeHoliday}
               </Button>
               <Button variant="secondary" onClick={makeWorkdayFromPlan} disabled={readOnly}>
-                Сделать рабочим
+                {t.makeWorkday}
               </Button>
               <Button variant="secondary" onClick={resetOverride} disabled={readOnly || !selectedOverride}>
-                Сбросить к шаблону
+                {t.resetToBase}
               </Button>
             </div>
 
             <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
-              <div className="text-sm font-semibold text-text-main">Изменить время</div>
+              <div className="text-sm font-semibold text-text-main">{b.editTimeTitle}</div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <Input
                   type="time"
@@ -1310,7 +1317,7 @@ export function ScheduleBuilder() {
               </div>
               <div className="mt-2 space-y-2">
                 <div className="flex items-center justify-between text-xs text-text-sec">
-                  <span>Перерывы</span>
+                  <span>{b.breaksTitle}</span>
                   <button
                     type="button"
                     onClick={() =>
@@ -1321,7 +1328,7 @@ export function ScheduleBuilder() {
                     disabled={readOnly}
                     className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs text-text-main"
                   >
-                    + Перерыв
+                    {b.addBreak}
                   </button>
                 </div>
                 {rangeBreaks.map((item, index) => (
@@ -1356,7 +1363,7 @@ export function ScheduleBuilder() {
                       type="button"
                       onClick={() => setRangeBreaks((current) => current.filter((_, entryIndex) => entryIndex !== index))}
                       disabled={readOnly}
-                      aria-label="Удалить перерыв"
+                      aria-label={b.deleteBreakAria}
                       className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -1366,7 +1373,7 @@ export function ScheduleBuilder() {
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="primary" size="sm" onClick={applyTimeRange} disabled={readOnly}>
-                  Применить время
+                  {UI_TEXT.actions.save}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1374,7 +1381,7 @@ export function ScheduleBuilder() {
                   onClick={() => setRangeFromTemplate(selectedOverride?.templateId ?? selectedWeeklyTemplateId)}
                   disabled={readOnly}
                 >
-                  Подставить из шаблона
+                  {b.applyFromTemplate}
                 </Button>
               </div>
             </div>
@@ -1386,20 +1393,20 @@ export function ScheduleBuilder() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-card/90 p-4 shadow-card backdrop-blur">
           <div className="text-sm text-text-sec">
             {status.mode === "studio_member"
-              ? "Изменения отправляются на согласование администратора студии."
-              : "Сохраните изменения, чтобы обновить график."}
+              ? b.submitHintStudio
+              : b.submitHintSolo}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={resetChanges} disabled={saving || readOnly}>
-              Сбросить изменения
+              {b.resetChanges}
             </Button>
             {status.mode === "studio_member" ? (
               <Button onClick={() => void submitRequest()} disabled={saving || readOnly}>
-                {saving ? "Отправляем..." : "Отправить на согласование"}
+                {saving ? b.sending : b.submitForApproval}
               </Button>
             ) : (
               <Button onClick={() => void saveSolo()} disabled={saving || readOnly}>
-                {saving ? "Сохраняем..." : "Сохранить график"}
+                {saving ? UI_TEXT.status.saving : b.saveSchedule}
               </Button>
             )}
           </div>

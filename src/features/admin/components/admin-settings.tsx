@@ -207,7 +207,7 @@ export function AdminSettings() {
           </div>
           <div className="flex justify-end">
             <Button onClick={save} disabled={saving}>
-              {saving ? "Сохраняем…" : "Сохранить"}
+              {saving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
             </Button>
           </div>
         </CardContent>

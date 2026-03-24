@@ -47,7 +47,10 @@ function buildDescription(input: {
     .slice(0, 5);
 
   if (serviceNames.length > 0) {
-    return truncateText(`Услуги: ${serviceNames.join(", ")}. Запись онлайн.`, 160);
+    return truncateText(
+      UI_TEXT.pages.publicProfile.servicesDescriptionTemplate.replace("{services}", serviceNames.join(", ")),
+      160
+    );
   }
 
   const fallback =

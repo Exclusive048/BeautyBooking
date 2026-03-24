@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { AdvisorInsight } from "@/lib/advisor/types";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type AdvisorPayload = {
   insights: AdvisorInsight[];
@@ -26,6 +27,7 @@ function resolveWeightTone(weight: number): string {
 }
 
 export function MasterAdvisorSection() {
+  const t = UI_TEXT.master.advisor;
   const [state, setState] = useState<LoadState>({
     data: null,
     loading: true,
@@ -53,10 +55,10 @@ export function MasterAdvisorSection() {
       setState({
         data: null,
         loading: false,
-        error: error instanceof Error ? error.message : "Не удалось загрузить советы",
+        error: error instanceof Error ? error.message : t.errors.load,
       });
     }
-  }, []);
+  }, [t.errors.load]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -70,12 +72,12 @@ export function MasterAdvisorSection() {
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : "Не удалось обновить советы",
+        error: error instanceof Error ? error.message : t.errors.refresh,
       }));
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [t.errors.refresh]);
 
   useEffect(() => {
     void load();
@@ -86,7 +88,7 @@ export function MasterAdvisorSection() {
   return (
     <section className="lux-card rounded-[24px] p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Советы для роста</h3>
+        <h3 className="text-sm font-semibold">{t.title}</h3>
         {isStale ? (
           <button
             type="button"
@@ -94,7 +96,7 @@ export function MasterAdvisorSection() {
             disabled={refreshing}
             className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs disabled:opacity-60"
           >
-            {refreshing ? "Обновляем..." : "Обновить"}
+            {refreshing ? t.refreshing : t.refresh}
           </button>
         ) : null}
       </div>
@@ -111,7 +113,7 @@ export function MasterAdvisorSection() {
         </div>
       ) : insights.length === 0 ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
-          Всё отлично! 🎉
+          {t.staleSuccess}
         </div>
       ) : (
         <div className="space-y-2">

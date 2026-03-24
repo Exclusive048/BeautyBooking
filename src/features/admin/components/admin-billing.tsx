@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 import {
   FEATURE_CATALOG,
   type FeatureKey,
@@ -69,19 +70,19 @@ const TIER_ORDER: Record<PlanTier, number> = {
 };
 
 const TIER_LABEL: Record<PlanTier, string> = {
-  FREE: "Бесплатный",
-  PRO: "PRO",
-  PREMIUM: "Премиум",
+  FREE: UI_TEXT.admin.billing.tier.free,
+  PRO: UI_TEXT.admin.billing.tier.pro,
+  PREMIUM: UI_TEXT.admin.billing.tier.premium,
 };
 
 const PROVIDER_LABEL: Record<SubscriptionScope, string> = {
-  MASTER: "Мастер",
-  STUDIO: "Студия",
+  MASTER: UI_TEXT.admin.billing.scope.master,
+  STUDIO: UI_TEXT.admin.billing.scope.studio,
 };
 
 const MODAL_TABS: TabItem[] = [
-  { id: "main", label: "Основное" },
-  { id: "features", label: "Функции" },
+  { id: "main", label: UI_TEXT.admin.billing.tabs.main },
+  { id: "features", label: UI_TEXT.admin.billing.tabs.features },
 ];
 
 function buildPlanMap(plans: BillingPlan[]): Map<string, PlanNode> {
@@ -124,8 +125,8 @@ function getPriceForPeriod(plan: BillingPlan, periodMonths: PeriodMonths) {
 
 function resolvePlanMonthlyLabel(plan: BillingPlan) {
   const monthly = getPriceForPeriod(plan, 1);
-  if (!monthly || monthly.priceKopeks <= 0) return "Бесплатно";
-  return `${moneyRUBFromKopeks(monthly.priceKopeks)} /мес.`;
+  if (!monthly || monthly.priceKopeks <= 0) return UI_TEXT.admin.billing.freeMonthly;
+  return `${moneyRUBFromKopeks(monthly.priceKopeks)} ${UI_TEXT.admin.billing.monthShort}`;
 }
 
 function formatPriceInput(priceKopeks: number) {
@@ -155,6 +156,7 @@ function parsePriceInput(raw: string): number | null {
 }
 
 export function AdminBilling() {
+  const t = UI_TEXT.admin.billing;
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,15 +186,15 @@ export function AdminBilling() {
       const res = await fetch("/api/admin/billing", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<BillingResponse> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить тарифы");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.loadPlans);
       }
       setPlans(json.data.plans);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить тарифы");
+      setError(err instanceof Error ? err.message : t.errors.loadPlans);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t.errors.loadPlans]);
 
   const closeModal = useCallback(() => {
     setModalMode(null);
@@ -342,7 +344,7 @@ export function AdminBilling() {
     if (!isRelaxedLimit(parentValue, nextValue)) {
       setLimitErrors((current) => ({
         ...current,
-        [key]: "Лимит нельзя сделать строже, чем у родительского тарифа.",
+        [key]: t.errors.strictLimit,
       }));
       return false;
     }
@@ -379,14 +381,14 @@ export function AdminBilling() {
     setError(null);
     const sortOrderValue = Number(editingSortOrder);
     if (!Number.isFinite(sortOrderValue)) {
-      setError("Укажите корректный порядок сортировки.");
+      setError(t.errors.invalidSortOrder);
       setSaving(false);
       return;
     }
 
     for (const key of Object.keys(limitErrors)) {
       if (limitErrors[key]) {
-        setError("Исправьте ошибки лимитов.");
+        setError(t.errors.limitValidation);
         setSaving(false);
         return;
       }
@@ -398,7 +400,7 @@ export function AdminBilling() {
       if (FEATURE_CATALOG[key as FeatureKey].kind === "limit") {
         const parentLimit = parentEffective ? parentValueMap[key as LimitFeatureKey] : undefined;
         if (!isRelaxedLimit(parentLimit, value as number | null)) {
-          setError("Лимит нельзя сделать строже, чем у родительского тарифа.");
+          setError(t.errors.strictLimit);
           setSaving(false);
           return;
         }
@@ -412,7 +414,7 @@ export function AdminBilling() {
     });
 
     if (pricesPayload.some((entry) => entry === null)) {
-      setError("Укажите корректные цены для всех сроков.");
+      setError(t.errors.invalidPrices);
       setSaving(false);
       return;
     }
@@ -441,33 +443,31 @@ export function AdminBilling() {
 
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось сохранить тариф");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.savePlan);
       }
 
       await load();
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить тариф");
+      setError(err instanceof Error ? err.message : t.errors.savePlan);
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
   }
 
   return (
     <section className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-text-main">Тарифы и подписки</h1>
-          <p className="mt-1 text-sm text-text-sec">
-            Управляйте тарифами, функциями и наследованием между уровнями.
-          </p>
+          <h1 className="text-2xl font-semibold text-text-main">{t.title}</h1>
+          <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
         </div>
         <Button onClick={openCreate} variant="secondary">
-          Создать тариф
+          {t.createPlan}
         </Button>
       </header>
 
@@ -478,7 +478,7 @@ export function AdminBilling() {
       {(["MASTER", "STUDIO"] as SubscriptionScope[]).map((scope) => (
         <section key={scope} className="space-y-4">
           <h2 className="text-lg font-semibold text-text-main">
-            {scope === "MASTER" ? "Тарифы для мастеров" : "Тарифы для студий"}
+            {scope === "MASTER" ? t.plansForMaster : t.plansForStudio}
           </h2>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -498,11 +498,13 @@ export function AdminBilling() {
 
                 <CardContent className="flex-1 space-y-3">
                   <div className="text-xs text-text-sec">
-                    {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.scope]} • Сортировка: {plan.sortOrder}
+                    {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.scope]} • {t.sortOrderLabel}: {plan.sortOrder}
                   </div>
-                  <div className="text-xs text-text-sec">Статус: {plan.isActive ? "Активен" : "Отключён"}</div>
+                  <div className="text-xs text-text-sec">
+                    {t.statusLabel}: {plan.isActive ? t.statusActive : t.statusDisabled}
+                  </div>
                   <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
-                    Редактировать
+                    {t.edit}
                   </Button>
                 </CardContent>
               </Card>
@@ -516,16 +518,14 @@ export function AdminBilling() {
           <header className="flex items-center justify-between gap-4 border-b border-border-subtle/60 px-6 py-4">
             <div>
               <h3 className="text-lg font-semibold text-text-main">
-                {modalMode === "create" ? "Создание тарифа" : "Редактирование тарифа"}
+                {modalMode === "create" ? t.modalCreateTitle : t.modalEditTitle}
               </h3>
-              <p className="mt-1 text-xs text-text-sec">
-                Настройте основные параметры и включите нужные функции ниже.
-              </p>
+              <p className="mt-1 text-xs text-text-sec">{t.modalSubtitle}</p>
             </div>
             <button
               type="button"
               onClick={closeModal}
-              aria-label="Закрыть"
+              aria-label={t.closeAria}
               className="rounded-full border border-border-subtle p-2 text-text-sec transition hover:text-text-main"
             >
               ×
@@ -544,7 +544,7 @@ export function AdminBilling() {
               <div className="space-y-5">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-xs text-text-sec">
-                    Код
+                    {t.fields.code}
                     <Input
                       value={editingCode}
                       onChange={(event) => setEditingCode(event.target.value)}
@@ -553,47 +553,47 @@ export function AdminBilling() {
                   </label>
 
                   <label className="text-xs text-text-sec">
-                    Название
+                    {t.fields.name}
                     <Input
                       value={editingName}
                       onChange={(event) => setEditingName(event.target.value)}
-                      placeholder="Название тарифа"
+                      placeholder={t.fields.namePlaceholder}
                     />
                   </label>
 
                   <label className="text-xs text-text-sec">
-                    Тип
+                    {t.fields.type}
                     <select
                       value={editingScope}
                       onChange={(event) => setEditingScope(event.target.value as SubscriptionScope)}
                       className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
                     >
-                      <option value="MASTER">Мастер</option>
-                      <option value="STUDIO">Студия</option>
+                      <option value="MASTER">{t.scope.master}</option>
+                      <option value="STUDIO">{t.scope.studio}</option>
                     </select>
                   </label>
 
                   <label className="text-xs text-text-sec">
-                    Уровень
+                    {t.fields.level}
                     <select
                       value={editingTier}
                       onChange={(event) => setEditingTier(event.target.value as PlanTier)}
                       className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
                     >
-                      <option value="FREE">Бесплатный</option>
+                      <option value="FREE">{t.tier.free}</option>
                       <option value="PRO">PRO</option>
-                      <option value="PREMIUM">Премиум</option>
+                      <option value="PREMIUM">{t.tier.premium}</option>
                     </select>
                   </label>
 
                   <label className="text-xs text-text-sec sm:col-span-2">
-                    Наследуется от
+                    {t.fields.inheritsFrom}
                     <select
                       value={editingInheritsFromPlanId ?? ""}
                       onChange={(event) => setEditingInheritsFromPlanId(event.target.value ? event.target.value : null)}
                       className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
                     >
-                      <option value="">—</option>
+                      <option value="">{t.fields.noParent}</option>
                       {plans
                         .filter((plan) => plan.id !== activePlanId && plan.scope === editingScope)
                         .map((plan) => (
@@ -605,11 +605,11 @@ export function AdminBilling() {
                   </label>
 
                                     <div className="sm:col-span-2">
-                    <div className="text-xs text-text-sec">Цены по периодам, ₽</div>
+                    <div className="text-xs text-text-sec">{t.fields.pricesByPeriod}</div>
                     <div className="mt-2 grid gap-3 sm:grid-cols-2">
                       {PERIODS.map((periodMonths) => (
                         <label key={periodMonths} className="text-xs text-text-sec">
-                          {periodMonths} мес.
+                          {t.fields.periodMonths(periodMonths)}
                           <Input
                             type="number"
                             min={0}
@@ -628,7 +628,7 @@ export function AdminBilling() {
                   </div>
 
                   <label className="text-xs text-text-sec">
-                    Порядок сортировки
+                    {t.fields.sortOrder}
                     <Input
                       type="number"
                       min={0}
@@ -640,10 +640,8 @@ export function AdminBilling() {
 
                   <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm sm:col-span-2">
                     <div>
-                      <div className="text-xs text-text-sec">Активен</div>
-                      <div className="text-[11px] text-text-sec">
-                        Тариф отображается и доступен для назначения/оплаты.
-                      </div>
+                      <div className="text-xs text-text-sec">{t.fields.active}</div>
+                      <div className="text-[11px] text-text-sec">{t.fields.activeHint}</div>
                     </div>
                     <Switch checked={editingIsActive} onCheckedChange={setEditingIsActive} />
                   </div>
@@ -655,17 +653,17 @@ export function AdminBilling() {
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Input
-                    placeholder="Поиск функции..."
+                    placeholder={t.featureSearchPlaceholder}
                     value={featureQuery}
                     onChange={(event) => setFeatureQuery(event.target.value)}
                     className="max-w-sm"
                   />
-                  <div className="text-xs text-text-sec">Показано: {filteredCatalogEntries.length}</div>
+                  <div className="text-xs text-text-sec">{t.shownCount(filteredCatalogEntries.length)}</div>
                 </div>
 
                 {groupedCatalog.length === 0 ? (
                   <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-6 text-sm text-text-sec">
-                    Ничего не найдено.
+                    {t.nothingFound}
                   </div>
                 ) : null}
 
@@ -726,17 +724,17 @@ export function AdminBilling() {
 
                                   {isInherited ? (
                                     <div className="mt-1 text-[11px] text-text-sec">
-                                      Унаследовано из: {inheritedPlanCode}
+                                      {t.inheritedFrom(inheritedPlanCode)}
                                     </div>
                                   ) : null}
 
                                   {isInherited ? (
                                     <div className="text-[11px] text-text-sec">
-                                      Нельзя отключить, т.к. включено в базовом тарифе.
+                                      {t.cannotDisableInherited}
                                     </div>
                                   ) : isOverridden ? (
                                     <div className="mt-1 text-[11px] text-text-sec">
-                                      Переопределено для этого тарифа.
+                                      {t.overriddenForPlan}
                                     </div>
                                   ) : null}
                                 </div>
@@ -776,9 +774,9 @@ export function AdminBilling() {
                                   : String(effectiveValue);
 
                           const limitHint = isLocked
-                            ? "Лимит унаследован, изменить нельзя."
+                            ? t.limitInheritedLocked
                             : parentLimit !== undefined
-                              ? "Лимит можно только ослаблять относительно родителя."
+                              ? t.limitOnlyRelaxParent
                               : null;
 
                           return (
@@ -823,7 +821,7 @@ export function AdminBilling() {
                                       updateLimitOverride(key as LimitFeatureKey, checked ? null : undefined)
                                     }
                                   />
-                                  <span>Безлимит</span>
+                                  <span>{t.unlimited}</span>
                                 </div>
 
                                 {limitErrors[key as string] ? (
@@ -844,10 +842,10 @@ export function AdminBilling() {
           <footer className="shrink-0 border-t border-border-subtle/60 bg-bg-card/80 px-6 py-4 backdrop-blur">
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={closeModal}>
-                Отмена
+                {UI_TEXT.actions.cancel}
               </Button>
               <Button type="button" onClick={() => void savePlan()} disabled={saving}>
-                {saving ? "Сохранение..." : "Сохранить"}
+                {saving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
               </Button>
             </div>
           </footer>
