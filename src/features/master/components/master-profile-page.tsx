@@ -13,7 +13,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Camera, Trash2 } from "lucide-react";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -144,8 +144,8 @@ function buildDurationOptions(value: number): number[] {
 
 function formatCategoryOptionLabel(category: GlobalCategoryOption): string {
   const base = category.fullPath || category.title || category.name || "";
-  const pendingSuffix = category.status === "PENDING" ? " (на модерации)" : "";
-  const personalSuffix = category.isPersonal ? " (только у меня)" : "";
+  const pendingSuffix = category.status === "PENDING" ? " (РЅР° РјРѕРґРµСЂР°С†РёРё)" : "";
+  const personalSuffix = category.isPersonal ? " (С‚РѕР»СЊРєРѕ Сѓ РјРµРЅСЏ)" : "";
   return `${category.icon ? `${category.icon} ` : ""}${base}${pendingSuffix}${personalSuffix}`;
 }
 
@@ -776,7 +776,7 @@ export function MasterProfilePage() {
       router.refresh();
       await load();
     } catch (err) {
-      setLeaveStudioError(err instanceof Error ? err.message : "Не удалось покинуть студию");
+      setLeaveStudioError(err instanceof Error ? err.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ");
     } finally {
       setLeaveStudioLoading(false);
     }
@@ -1366,10 +1366,10 @@ export function MasterProfilePage() {
       setProposeCategoryTitle("");
       setProposeCategoryOpen(false);
       setProposeCategoryMessage(
-        "Категория отправлена на модерацию. Пока она доступна только вам."
+        "РљР°С‚РµРіРѕСЂРёСЏ РѕС‚РїСЂР°РІР»РµРЅР° РЅР° РјРѕРґРµСЂР°С†РёСЋ. РџРѕРєР° РѕРЅР° РґРѕСЃС‚СѓРїРЅР° С‚РѕР»СЊРєРѕ РІР°Рј."
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось создать категорию");
+      setError(err instanceof Error ? err.message : "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РєР°С‚РµРіРѕСЂРёСЋ");
     } finally {
       setProposeCategorySaving(false);
     }
@@ -1737,7 +1737,7 @@ export function MasterProfilePage() {
             <div className="truncate text-sm font-semibold text-text-main">{previewName}</div>
             <div className="mt-0.5 text-xs text-text-sec">{previewTagline}</div>
             <div className="mt-1 text-[11px] text-text-sec">
-              ⭐ {data?.master.ratingAvg.toFixed(1)} · {data?.master.ratingCount}{" "}
+              в­ђ {data?.master.ratingAvg.toFixed(1)} В· {data?.master.ratingCount}{" "}
               {UI_TEXT.master.profile.preview.reviewsLabel}
             </div>
           </div>
@@ -1892,10 +1892,10 @@ export function MasterProfilePage() {
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-amber-200">Вы работаете в составе студии</p>
+              <p className="text-sm font-medium text-amber-200">Р’С‹ СЂР°Р±РѕС‚Р°РµС‚Рµ РІ СЃРѕСЃС‚Р°РІРµ СЃС‚СѓРґРёРё</p>
               <p className="mt-1 text-xs text-text-sec">
-                Если нужно прекратить членство, вы можете самостоятельно выйти из студии. После выхода доступ к студийным
-                разделам и настройкам студии будет отключен.
+                Р•СЃР»Рё РЅСѓР¶РЅРѕ РїСЂРµРєСЂР°С‚РёС‚СЊ С‡Р»РµРЅСЃС‚РІРѕ, РІС‹ РјРѕР¶РµС‚Рµ СЃР°РјРѕСЃС‚РѕСЏС‚РµР»СЊРЅРѕ РІС‹Р№С‚Рё РёР· СЃС‚СѓРґРёРё. РџРѕСЃР»Рµ РІС‹С…РѕРґР° РґРѕСЃС‚СѓРї Рє СЃС‚СѓРґРёР№РЅС‹Рј
+                СЂР°Р·РґРµР»Р°Рј Рё РЅР°СЃС‚СЂРѕР№РєР°Рј СЃС‚СѓРґРёРё Р±СѓРґРµС‚ РѕС‚РєР»СЋС‡РµРЅ.
               </p>
             </div>
             <button
@@ -1903,7 +1903,7 @@ export function MasterProfilePage() {
               onClick={openLeaveStudioModal}
               className="rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
             >
-              Выйти из студии
+              Р’С‹Р№С‚Рё РёР· СЃС‚СѓРґРёРё
             </button>
           </div>
         </div>
@@ -1950,73 +1950,66 @@ export function MasterProfilePage() {
 
                   <div className="mt-4 space-y-4">
                     <div className="flex flex-wrap items-center gap-4">
-                      <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-bg-input">
-                        {avatarUrl ? (
-                          <FocalImage
-                            src={avatarUrl}
-                            alt={UI_TEXT.media.avatar.alt}
-                            focalX={avatarFocalX}
-                            focalY={avatarFocalY}
-                            className="h-full w-full rounded-2xl object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-text-sec">
-                            {UI_TEXT.common.noPhoto}
-                          </div>
-                        )}
-                        <div className="absolute right-1 top-1 flex gap-1">
-                          <button
-                            type="button"
-                            onClick={openAvatarFileDialog}
-                            className="rounded-lg bg-black/60 px-2 py-1 text-xs text-white"
-                            aria-label={UI_TEXT.master.profile.form.replaceAvatarAria}
-                          >
-                            ✏️
-                          </button>
-                          {avatarAssetId ? (
-                            <button
-                              type="button"
-                              onClick={() => void deleteAvatar()}
-                              className="rounded-lg bg-black/60 px-2 py-1 text-xs text-white"
-                              aria-label={UI_TEXT.master.profile.form.removeAvatarAria}
-                            >
-                              ✖️
-                            </button>
-                          ) : null}
-                        </div>
-                        <input
-                          ref={avatarInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0] ?? null;
-                            if (file) {
-                              void onAvatarFileSelected(file);
-                              event.currentTarget.value = "";
-                            }
-                          }}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2 text-xs text-text-sec">
+                      <div className="relative h-24 w-24">
                         <button
                           type="button"
                           onClick={openAvatarFileDialog}
-                          className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-left text-sm text-text-main transition hover:bg-bg-card"
+                          disabled={saving}
+                          className="group relative block h-full w-full overflow-hidden rounded-2xl bg-bg-input text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
+                          aria-label={UI_TEXT.master.profile.form.replaceAvatarAria}
                         >
-                          {UI_TEXT.master.profile.form.replaceAvatarAction}
+                          {avatarUrl ? (
+                            <FocalImage
+                              src={avatarUrl}
+                              alt={UI_TEXT.media.avatar.alt}
+                              focalX={avatarFocalX}
+                              focalY={avatarFocalY}
+                              className="h-full w-full rounded-2xl object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-text-sec">
+                              <Camera className="h-4 w-4" />
+                              <span className="text-[10px] leading-none">{UI_TEXT.common.noPhoto}</span>
+                            </div>
+                          )}
+                          <div
+                            className={`pointer-events-none absolute inset-0 bg-black/35 transition-opacity ${
+                              avatarUrl ? "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" : "opacity-100"
+                            }`}
+                          />
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-2 pt-6">
+                            <span className="block text-[10px] font-medium leading-none text-white">
+                              {avatarUrl ? UI_TEXT.master.profile.form.replaceAvatarAction : UI_TEXT.media.avatar.upload}
+                            </span>
+                          </div>
                         </button>
                         {avatarAssetId ? (
                           <button
                             type="button"
                             onClick={() => void deleteAvatar()}
-                            className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-left text-sm text-rose-400 transition hover:bg-bg-card"
+                            disabled={saving}
+                            className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80 disabled:opacity-60"
+                            aria-label={UI_TEXT.master.profile.form.removeAvatarAria}
+                            title={UI_TEXT.master.profile.form.removeAvatarAction}
                           >
-                            {UI_TEXT.master.profile.form.removeAvatarAction}
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         ) : null}
                       </div>
+
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          if (file) {
+                            void onAvatarFileSelected(file);
+                            event.currentTarget.value = "";
+                          }
+                        }}
+                      />
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -2284,7 +2277,7 @@ export function MasterProfilePage() {
                         }}
                         className="mt-3 mr-2 rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
                       >
-                        Покинуть студию
+                        РџРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ
                       </button>
                     ) : null}
                     <button
@@ -2332,8 +2325,8 @@ export function MasterProfilePage() {
 
               {pendingServiceCategoryNames.length > 0 ? (
                 <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-                  Категория «{pendingServiceCategoryNames.join("», «")}» ожидает проверки администратором. После
-                  одобрения она появится в общем каталоге.
+                  РљР°С‚РµРіРѕСЂРёСЏ В«{pendingServiceCategoryNames.join("В», В«")}В» РѕР¶РёРґР°РµС‚ РїСЂРѕРІРµСЂРєРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј. РџРѕСЃР»Рµ
+                  РѕРґРѕР±СЂРµРЅРёСЏ РѕРЅР° РїРѕСЏРІРёС‚СЃСЏ РІ РѕР±С‰РµРј РєР°С‚Р°Р»РѕРіРµ.
                 </div>
               ) : null}
 
@@ -2378,7 +2371,7 @@ export function MasterProfilePage() {
                       onClick={() => setProposeCategoryOpen(true)}
                       className="text-xs font-medium text-primary underline"
                     >
-                      + Своя категория
+                      + РЎРІРѕСЏ РєР°С‚РµРіРѕСЂРёСЏ
                     </button>
                     {proposeCategoryMessage ? (
                       <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
@@ -2395,7 +2388,7 @@ export function MasterProfilePage() {
                           setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
                         }}
                         className={`${inputBaseClass} ${newSoloServiceFieldErrors.title ? inputErrorClass : ""}`}
-                        placeholder="Например: Маникюр с гель-лаком"
+                        placeholder="РќР°РїСЂРёРјРµСЂ: РњР°РЅРёРєСЋСЂ СЃ РіРµР»СЊ-Р»Р°РєРѕРј"
                       />
                     </label>
                     <label className="text-xs text-text-sec">
@@ -2541,7 +2534,7 @@ export function MasterProfilePage() {
                           }
                           className={selectBaseClass}
                         >
-                          <option value="">Нет категории</option>
+                          <option value="">РќРµС‚ РєР°С‚РµРіРѕСЂРёРё</option>
                           {globalCategories.map((category) => (
                           <option key={`service-category-${service.serviceId}-${category.id}`} value={category.id}>
                               {formatCategoryOptionLabel(category)}
@@ -2550,7 +2543,7 @@ export function MasterProfilePage() {
                         </select>
                         {!service.globalCategoryId ? (
                           <div className="text-xs text-amber-500">
-                            Нет категории. Добавьте категорию, чтобы услуга участвовала в поиске и офферах.
+                            РќРµС‚ РєР°С‚РµРіРѕСЂРёРё. Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ, С‡С‚РѕР±С‹ СѓСЃР»СѓРіР° СѓС‡Р°СЃС‚РІРѕРІР°Р»Р° РІ РїРѕРёСЃРєРµ Рё РѕС„С„РµСЂР°С….
                           </div>
                         ) : null}
                       </div>
@@ -2642,7 +2635,7 @@ export function MasterProfilePage() {
                         }));
                       }}
                     />
-                    <span className="text-xs text-text-sec">₽</span>
+                    <span className="text-xs text-text-sec">в‚Ѕ</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <select
@@ -2808,10 +2801,10 @@ export function MasterProfilePage() {
                         <button
                           type="button"
                           onClick={() => openPortfolioCategoryModal(item)}
-                          title="Добавьте категорию чтобы фото появилось в поиске"
+                          title="Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ С‡С‚РѕР±С‹ С„РѕС‚Рѕ РїРѕСЏРІРёР»РѕСЃСЊ РІ РїРѕРёСЃРєРµ"
                           className="absolute left-3 top-3 rounded-full bg-amber-500/90 px-2 py-1 text-[11px] font-medium text-white"
                         >
-                          Не в поиске
+                          РќРµ РІ РїРѕРёСЃРєРµ
                         </button>
                       ) : null}
 
@@ -2820,7 +2813,7 @@ export function MasterProfilePage() {
                           className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-sm text-white"
                           title={UI_TEXT.master.profile.portfolio.replace}
                         >
-                          ✏️
+                          вњЏпёЏ
                           <input
                             type="file"
                             accept="image/png,image/jpeg,image/webp"
@@ -2840,7 +2833,7 @@ export function MasterProfilePage() {
                           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm text-white"
                           title={UI_TEXT.master.profile.portfolio.remove}
                         >
-                          ✖️
+                          вњ–пёЏ
                         </button>
                       </div>
 
@@ -3010,7 +3003,7 @@ export function MasterProfilePage() {
               setProposeCategoryTitle("");
             }
           }}
-          title="Предложить категорию"
+          title="РџСЂРµРґР»РѕР¶РёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ"
         >
           <div className="space-y-3">
             <input
@@ -3018,11 +3011,11 @@ export function MasterProfilePage() {
               value={proposeCategoryTitle}
               onChange={(event) => setProposeCategoryTitle(event.target.value)}
               className={inputBaseClass}
-              placeholder="Название категории"
+              placeholder="РќР°Р·РІР°РЅРёРµ РєР°С‚РµРіРѕСЂРёРё"
               maxLength={60}
             />
             <div className="text-xs text-text-sec">
-              Категория будет сразу доступна только в вашем кабинете.
+              РљР°С‚РµРіРѕСЂРёСЏ Р±СѓРґРµС‚ СЃСЂР°Р·Сѓ РґРѕСЃС‚СѓРїРЅР° С‚РѕР»СЊРєРѕ РІ РІР°С€РµРј РєР°Р±РёРЅРµС‚Рµ.
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -3042,7 +3035,7 @@ export function MasterProfilePage() {
                 disabled={proposeCategorySaving || !proposeCategoryTitle.trim()}
                 className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
               >
-                {proposeCategorySaving ? UI_TEXT.status.saving : "Отправить"}
+                {proposeCategorySaving ? UI_TEXT.status.saving : "РћС‚РїСЂР°РІРёС‚СЊ"}
               </button>
             </div>
           </div>
@@ -3058,7 +3051,7 @@ export function MasterProfilePage() {
               setPortfolioCategoryDraft("");
             }
           }}
-          title="Категория фото"
+          title="РљР°С‚РµРіРѕСЂРёСЏ С„РѕС‚Рѕ"
         >
           <div className="space-y-3">
             <select
@@ -3067,7 +3060,7 @@ export function MasterProfilePage() {
               className={selectBaseClass}
               disabled={portfolioCategorySaving}
             >
-              <option value="">Без категории</option>
+              <option value="">Р‘РµР· РєР°С‚РµРіРѕСЂРёРё</option>
               {globalCategories.map((category) => (
                 <option key={`portfolio-category-${category.id}`} value={category.id}>
                   {formatCategoryOptionLabel(category)}
@@ -3075,7 +3068,7 @@ export function MasterProfilePage() {
               ))}
             </select>
             <div className="text-xs text-text-sec">
-              Добавьте категорию чтобы фото появилось в поиске
+              Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ С‡С‚РѕР±С‹ С„РѕС‚Рѕ РїРѕСЏРІРёР»РѕСЃСЊ РІ РїРѕРёСЃРєРµ
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -3116,9 +3109,9 @@ export function MasterProfilePage() {
               <div className="space-y-1">
                 {portfolioCategoryOptions.length === 0 ? (
                   <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
-                    Добавьте категорию к услугам, чтобы фото попало в поиск.{" "}
+                    Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ Рє СѓСЃР»СѓРіР°Рј, С‡С‚РѕР±С‹ С„РѕС‚Рѕ РїРѕРїР°Р»Рѕ РІ РїРѕРёСЃРє.{" "}
                     <a href="/cabinet/master/profile" className="underline">
-                      Перейти к услугам
+                      РџРµСЂРµР№С‚Рё Рє СѓСЃР»СѓРіР°Рј
                     </a>
                   </div>
                 ) : null}
@@ -3140,7 +3133,7 @@ export function MasterProfilePage() {
                 </select>
                 {!portfolioGlobalCategoryId ? (
                   <div className="text-xs text-text-sec">
-                    Если категорию не выбрать, фото сохранится, но может не попасть в поиск сразу.
+                    Р•СЃР»Рё РєР°С‚РµРіРѕСЂРёСЋ РЅРµ РІС‹Р±СЂР°С‚СЊ, С„РѕС‚Рѕ СЃРѕС…СЂР°РЅРёС‚СЃСЏ, РЅРѕ РјРѕР¶РµС‚ РЅРµ РїРѕРїР°СЃС‚СЊ РІ РїРѕРёСЃРє СЃСЂР°Р·Сѓ.
                   </div>
                 ) : null}
               </div>
@@ -3191,11 +3184,11 @@ export function MasterProfilePage() {
         onClose={() => {
           if (!leaveStudioLoading) setLeaveStudioModalOpen(false);
         }}
-        title="Покинуть студию?"
+        title="РџРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ?"
       >
         <div className="space-y-4">
           <p className="text-sm text-text-main">
-            После выхода вы станете независимым мастером. Ваши будущие записи сохранятся.
+            РџРѕСЃР»Рµ РІС‹С…РѕРґР° РІС‹ СЃС‚Р°РЅРµС‚Рµ РЅРµР·Р°РІРёСЃРёРјС‹Рј РјР°СЃС‚РµСЂРѕРј. Р’Р°С€Рё Р±СѓРґСѓС‰РёРµ Р·Р°РїРёСЃРё СЃРѕС…СЂР°РЅСЏС‚СЃСЏ.
           </p>
           <label className="flex items-start gap-2 text-sm text-text-main">
             <input
@@ -3206,9 +3199,9 @@ export function MasterProfilePage() {
               className="mt-0.5"
             />
             <span>
-              Перенести услуги студии в мой прайс
+              РџРµСЂРµРЅРµСЃС‚Рё СѓСЃР»СѓРіРё СЃС‚СѓРґРёРё РІ РјРѕР№ РїСЂР°Р№СЃ
               <span className="mt-1 block text-xs text-text-sec">
-                Цены и длительность будут скопированы с вашими настройками
+                Р¦РµРЅС‹ Рё РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ Р±СѓРґСѓС‚ СЃРєРѕРїРёСЂРѕРІР°РЅС‹ СЃ РІР°С€РёРјРё РЅР°СЃС‚СЂРѕР№РєР°РјРё
               </span>
             </span>
           </label>
@@ -3224,7 +3217,7 @@ export function MasterProfilePage() {
               disabled={leaveStudioLoading}
               className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
             >
-              Отмена
+              РћС‚РјРµРЅР°
             </button>
             <button
               type="button"
@@ -3232,7 +3225,7 @@ export function MasterProfilePage() {
               disabled={leaveStudioLoading}
               className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-60"
             >
-              {leaveStudioLoading ? "Выходим..." : "Покинуть студию"}
+              {leaveStudioLoading ? "Р’С‹С…РѕРґРёРј..." : "РџРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ"}
             </button>
           </div>
         </div>
@@ -3249,4 +3242,3 @@ export function MasterProfilePage() {
     </section>
   );
 }
-

@@ -518,8 +518,6 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
     }
   };
 
-  const publicationStateLabel = isPublished ? "Опубликован" : "Не опубликован";
-  const publicationStatusClass = isPublished ? "text-emerald-300" : "text-amber-300";
   const canPickBannerFocal = Boolean(bannerAssetId && bannerUrl);
   const showSaveBar = activeTab === "main" || activeTab === "settings";
 
@@ -531,6 +529,8 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
           entityId={providerId}
           canEdit
           showAddButton={false}
+          interactionVariant="clickable"
+          showRemoveAction
           sizeClassName="h-20 w-20"
         />
       </div>
