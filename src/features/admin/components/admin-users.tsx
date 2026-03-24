@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type PlanInfo = {
   id: string;
@@ -63,12 +64,13 @@ function formatRoles(roles: string[]) {
 }
 
 function typeLabel(type: UserItem["type"]) {
-  if (type === "master") return "Мастер";
-  if (type === "studio") return "Студия";
-  return "Клиент";
+  if (type === "master") return UI_TEXT.admin.users.type.master;
+  if (type === "studio") return UI_TEXT.admin.users.type.studio;
+  return UI_TEXT.admin.users.type.client;
 }
 
 export function AdminUsers() {
+  const t = UI_TEXT.admin.users;
   const viewerTimeZone = useViewerTimeZoneContext();
   const [filter, setFilter] = useState("all");
   const [data, setData] = useState<UsersResponse | null>(null);
@@ -83,10 +85,10 @@ export function AdminUsers() {
     const res = await fetch("/api/admin/billing", { cache: "no-store" });
     const json = (await res.json().catch(() => null)) as ApiResponse<BillingResponse> | null;
     if (!res.ok || !json || !json.ok) {
-      throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить тарифы");
+      throw new Error(json && !json.ok ? json.error.message : t.errors.loadPlans);
     }
     return json.data.plans;
-  }, []);
+  }, [t.errors.loadPlans]);
 
   const loadUsers = useCallback(async (nextFilter: string) => {
     setLoading(true);
@@ -99,15 +101,15 @@ export function AdminUsers() {
       const res = await fetch(`/api/admin/users?${params.toString()}`, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<UsersResponse> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить пользователей");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.loadUsers);
       }
       setData(json.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить пользователей");
+      setError(err instanceof Error ? err.message : t.errors.loadUsers);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t.errors.loadUsers]);
 
   useEffect(() => {
     void loadUsers(filter);
@@ -145,12 +147,12 @@ export function AdminUsers() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось обновить тариф");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.updatePlan);
       }
       await loadUsers(filter);
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить тариф");
+      setError(err instanceof Error ? err.message : t.errors.updatePlan);
     } finally {
       setSavingPlan(false);
     }
@@ -160,19 +162,19 @@ export function AdminUsers() {
 
   const tabs = useMemo(
     () => [
-      { id: "all", label: "Все", badge: summary?.total ?? 0 },
-      { id: "masters", label: "Мастера", badge: summary?.masters ?? 0 },
-      { id: "studios", label: "Студии", badge: summary?.studios ?? 0 },
-      { id: "clients", label: "Клиенты", badge: summary?.clients ?? 0 },
+      { id: "all", label: t.tabs.all, badge: summary?.total ?? 0 },
+      { id: "masters", label: t.tabs.masters, badge: summary?.masters ?? 0 },
+      { id: "studios", label: t.tabs.studios, badge: summary?.studios ?? 0 },
+      { id: "clients", label: t.tabs.clients, badge: summary?.clients ?? 0 },
     ],
-    [summary]
+    [summary, t.tabs.all, t.tabs.clients, t.tabs.masters, t.tabs.studios]
   );
 
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-text-main">Пользователи</h1>
-        <p className="mt-1 text-sm text-text-sec">Все аккаунты системы и управление тарифами.</p>
+        <h1 className="text-2xl font-semibold text-text-main">{t.title}</h1>
+        <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
       </header>
 
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
@@ -180,19 +182,19 @@ export function AdminUsers() {
       <Tabs items={tabs} value={filter} onChange={setFilter} />
 
       {loading ? (
-        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка…</div>
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>
       ) : (
         <div className="lux-card overflow-hidden rounded-[24px]">
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
-                <th className="px-4 py-3 text-left">Имя</th>
-                <th className="px-4 py-3 text-left">Телефон</th>
-                <th className="px-4 py-3 text-left">Email</th>
-                <th className="px-4 py-3 text-left">Роли</th>
-                <th className="px-4 py-3 text-left">Тип</th>
-                <th className="px-4 py-3 text-left">Регистрация</th>
-                <th className="px-4 py-3 text-right">Тариф</th>
+                <th className="px-4 py-3 text-left">{t.table.name}</th>
+                <th className="px-4 py-3 text-left">{t.table.phone}</th>
+                <th className="px-4 py-3 text-left">{t.table.email}</th>
+                <th className="px-4 py-3 text-left">{t.table.roles}</th>
+                <th className="px-4 py-3 text-left">{t.table.type}</th>
+                <th className="px-4 py-3 text-left">{t.table.createdAt}</th>
+                <th className="px-4 py-3 text-right">{t.table.plan}</th>
               </tr>
             </thead>
             <tbody>
@@ -221,7 +223,7 @@ export function AdminUsers() {
                           )}
                         </div>
                         <Button size="sm" variant="secondary" onClick={() => openModal(user)}>
-                          Изменить тариф
+                          {t.changePlan}
                         </Button>
                       </div>
                     </td>
@@ -230,7 +232,7 @@ export function AdminUsers() {
               ) : (
                 <tr>
                   <td colSpan={7} className="px-4 py-6 text-center text-sm text-text-sec">
-                    Пользователи не найдены.
+                    {t.empty}
                   </td>
                 </tr>
               )}
@@ -242,32 +244,32 @@ export function AdminUsers() {
       <ModalSurface
         open={Boolean(activeUser)}
         onClose={closeModal}
-        title="Изменить тариф"
+        title={t.modalTitle}
       >
         {activeUser ? (
           <div className="space-y-4">
             <div className="text-sm text-text-sec">
-              Пользователь: <span className="font-medium text-text-main">{activeUser.displayName || "—"}</span>
+              {t.userLabel}: <span className="font-medium text-text-main">{activeUser.displayName || "—"}</span>
             </div>
             <Select
               value={selectedPlanId}
               onChange={(event) => setSelectedPlanId(event.target.value)}
             >
               <option value="" disabled>
-                Выберите тариф
+                {t.choosePlan}
               </option>
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name} ({plan.scope === "MASTER" ? "Мастер" : "Студия"})
+                  {plan.name} ({plan.scope === "MASTER" ? t.type.master : t.type.studio})
                 </option>
               ))}
             </Select>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={closeModal} disabled={savingPlan}>
-                Отмена
+                {UI_TEXT.actions.cancel}
               </Button>
               <Button onClick={savePlan} disabled={savingPlan || !selectedPlanId}>
-                {savingPlan ? "Сохраняем…" : "Сохранить"}
+                {savingPlan ? t.saving : t.save}
               </Button>
             </div>
           </div>

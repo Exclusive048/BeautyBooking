@@ -17,7 +17,7 @@ const NAV_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/cabinet/master/dashboard", label: UI_TEXT.master.topbar.nav.home },
   { href: "/cabinet/master/schedule", label: UI_TEXT.master.topbar.nav.schedule },
   { href: "/cabinet/master/clients", label: UI_TEXT.master.topbar.nav.clients },
-  { href: "/cabinet/master/reviews", label: UI_TEXT.master.topbar.reviews },
+  { href: "/cabinet/master/reviews", label: UI_TEXT.master.topbar.nav.reviews },
   { href: "/cabinet/master/model-offers", label: UI_TEXT.master.topbar.nav.models },
   { href: "/cabinet/master/analytics", label: UI_TEXT.master.topbar.nav.analytics },
 ];

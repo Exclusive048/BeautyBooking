@@ -64,6 +64,7 @@ export default async function RolesPage() {
           specialization: masterProvider.tagline || masterProvider.categories?.[0] || null,
           ratingAvg: masterProvider.ratingAvg,
           ratingCount: masterProvider.ratingCount,
+          isPublished: masterProvider.isPublished,
           statusLabel: masterProvider.isPublished
             ? UI_TEXT.cabinetRolesPage.masterPublished
             : UI_TEXT.cabinetRolesPage.masterDraft,

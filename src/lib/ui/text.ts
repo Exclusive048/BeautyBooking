@@ -17,7 +17,8 @@ export const UI_TEXT = {
     namePlaceholder: "Имя",
     saved: "Сохранено",
     saving: "Сохраняем...",
-    saveChanges: "Сохранить изменения",
+    // DEPRECATED: используйте `actions.save`.
+    saveChanges: "Сохранить",
     toggleTheme: "Переключить тему",
   },
   brand: {
@@ -45,11 +46,13 @@ export const UI_TEXT = {
     openChat: "Открыть чат",
     update: "Обновить",
     later: "Позже",
-    saveChanges: "Сохранить изменения",
+    // DEPRECATED: используйте `actions.save`.
+    saveChanges: "Сохранить",
     goTo: "Перейти",
   },
   status: {
     saving: "Сохранение...",
+    // DEPRECATED: используйте `common.saving` или `status.saving`.
     savingInProgress: "Сохраняем...",
     saved: "Сохранено",
     loading: "Загрузка...",
@@ -428,7 +431,10 @@ export const UI_TEXT = {
   studio: {
     profile: {
       subtitle: "Управление студией",
+      publicationLabel: "Опубликован",
+      // DEPRECATED: используйте `studio.profile.publicationLabel`.
       published: "Видна клиентам",
+      // DEPRECATED: используйте `studio.profile.publicationLabel` + значение переключателя.
       hidden: "Скрыта",
       coverUpload: "Загрузить обложку",
       editCover: "Изменить",
@@ -481,6 +487,36 @@ export const UI_TEXT = {
       remindersOn: "Включено",
       remindersOff: "Выключено",
     },
+    masterDrawer: {
+      titleFallback: "Мастер",
+      close: "Закрыть",
+      tabs: {
+        skills: "Услуги",
+        profile: "Профиль",
+      },
+      loading: "Загружаем...",
+      errors: {
+        loadMaster: "Не получилось загрузить мастера. Попробуйте ещё раз.",
+        saveServices: "Не получилось сохранить услуги. Попробуйте ещё раз.",
+        saveProfile: "Не получилось сохранить профиль. Попробуйте ещё раз.",
+      },
+      skills: {
+        searchPlaceholder: "Поиск услуги",
+        activeLabel: "Активна",
+        pricePlaceholder: "Стоимость",
+        durationPlaceholder: "Длительность",
+        save: "Сохранить",
+        saving: "Сохраняем...",
+      },
+      profile: {
+        title: "Профиль мастера",
+        namePlaceholder: "Имя",
+        statusPlaceholder: "Статус",
+        activeLabel: "Активен",
+        save: "Сохранить",
+        saving: "Сохраняем...",
+      },
+    },
     tabs: {
       notifications: "Уведомления",
       features: "Функции",
@@ -504,6 +540,16 @@ export const UI_TEXT = {
     open: "Открыть",
   },
   cabinetRoles: {
+    master: {
+      title: "Я — мастер",
+      description: "Создайте профиль, добавьте услуги и принимайте клиентов.",
+      working: "Принимаю заказы",
+      notWorking: "Не принимаю записи",
+      photoFallback: "Фото",
+      reviewsTemplate: (rating: string, count: number) => `★ ${rating} (${count} отзывов)`,
+      openCabinet: "Открыть кабинет",
+      deleteCabinet: "Удалить кабинет мастера",
+    },
     studio: {
       title: "У меня студия",
       description: "Управляйте командой мастеров, филиалами и общим расписанием",
@@ -520,6 +566,10 @@ export const UI_TEXT = {
   cabinetRolesPage: {
     title: "Профессиональные кабинеты",
     subtitle: "Управляйте своими кабинетами",
+    createMaster: "Создать кабинет мастера",
+    createStudio: "Создать студию",
+    deleteErrorPrefix: "Ошибка удаления",
+    deleteFailed: "Не получилось удалить кабинет. Попробуйте ещё раз.",
     masterProfileTitle: "Профиль мастера",
     studioTitle: "Студия",
     openCabinet: "Открыть кабинет",
@@ -756,11 +806,13 @@ export const UI_TEXT = {
   master: {
     topbar: {
       brand: "МастерРядом",
+      // DEPRECATED: используйте `master.topbar.nav.reviews`.
       reviews: "Отзывы",
       nav: {
         home: "Главная",
         schedule: "Расписание",
         clients: "Клиенты",
+        reviews: "Отзывы",
         analytics: "Аналитика",
         billing: "Тариф",
         models: "Модели",
@@ -1270,8 +1322,118 @@ export const UI_TEXT = {
   },
   admin: {
     catalog: {
+      title: "Каталог категорий",
+      subtitle: "Модерация пользовательских категорий и управление каталогом.",
+      loading: "Загружаем...",
+      addCategory: "Создать категорию",
+      pendingEmpty: "Категорий на модерации нет.",
+      tableEmpty: "Категории не найдены.",
+      unknownAuthor: "Неизвестно",
+      suggestedBy: "Предложил",
+      status: {
+        pending: "На модерации",
+        approved: "Одобрена",
+        rejected: "Отклонена",
+      },
+      tabs: {
+        all: "Все",
+        pending: "На модерации",
+        approved: "Одобренные",
+        rejected: "Отклонённые",
+      },
+      visibility: {
+        all: "Для всех",
+        authorOnly: "Только автор",
+      },
+      table: {
+        category: "Категория",
+        status: "Статус",
+        visibility: "Видимость",
+        author: "Автор",
+        date: "Дата",
+        usageCount: "Использований",
+      },
+      actions: {
+        approve: "Подтвердить",
+        reject: "Отклонить",
+        cancel: "Отмена",
+        create: "Создать",
+        creating: "Создаём...",
+      },
+      modal: {
+        title: "Новая категория",
+        titlePlaceholder: "Название категории",
+        iconPlaceholder: "Иконка (например •)",
+      },
+      toast: {
+        approved: "Категория одобрена",
+        rejected: "Категория отклонена и удалена",
+        created: "Категория добавлена",
+      },
+      errors: {
+        load: "Не получилось загрузить каталог. Попробуйте ещё раз.",
+        approve: "Не получилось подтвердить категорию. Попробуйте ещё раз.",
+        reject: "Не получилось отклонить категорию. Попробуйте ещё раз.",
+        create: "Не получилось создать категорию. Попробуйте ещё раз.",
+        emptyTitle: "Укажите название категории.",
+      },
       slugColumn: "Слаг",
       slugPlaceholder: "слаг (необязательно)",
+    },
+    users: {
+      title: "Пользователи",
+      subtitle: "Все аккаунты системы и управление тарифами.",
+      loading: "Загружаем...",
+      empty: "Пользователи не найдены.",
+      changePlan: "Изменить тариф",
+      modalTitle: "Изменить тариф",
+      userLabel: "Пользователь",
+      choosePlan: "Выберите тариф",
+      save: "Сохранить",
+      saving: "Сохраняем...",
+      type: {
+        master: "Мастер",
+        studio: "Студия",
+        client: "Клиент",
+      },
+      tabs: {
+        all: "Все",
+        masters: "Мастера",
+        studios: "Студии",
+        clients: "Клиенты",
+      },
+      table: {
+        name: "Имя",
+        phone: "Телефон",
+        email: "Email",
+        roles: "Роли",
+        type: "Тип",
+        createdAt: "Регистрация",
+        plan: "Тариф",
+      },
+      errors: {
+        loadPlans: "Не получилось загрузить тарифы. Попробуйте ещё раз.",
+        loadUsers: "Не получилось загрузить пользователей. Попробуйте ещё раз.",
+        updatePlan: "Не получилось обновить тариф. Попробуйте ещё раз.",
+      },
+    },
+    dashboard: {
+      title: "Дашборд",
+      subtitle: "Ключевые метрики сервиса за текущий период.",
+      loading: "Загружаем...",
+      totalLabel: "итого",
+      clientsLabel: "Клиенты",
+      prosLabel: "Мастера/студии",
+      conversionPeriod: "За последние 24 часа",
+      cards: {
+        registrationsToday: "Новые регистрации за сегодня",
+        bookingsLast24h: "Записей создано за 24 часа",
+        conversion: "Конверсия в запись",
+        activeSubscriptions: "Активных подписок",
+      },
+      errors: {
+        loadMetrics: "Не получилось загрузить метрики. Попробуйте ещё раз.",
+      },
     },
     settings: {
       loadFailed: "Не удалось загрузить настройки",

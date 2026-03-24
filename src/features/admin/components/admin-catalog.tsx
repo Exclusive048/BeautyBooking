@@ -43,13 +43,6 @@ type CategoriesResponse = {
   categories: CategoryItem[];
 };
 
-const TAB_ITEMS = [
-  { id: "all", label: "Все" },
-  { id: "pending", label: "На модерации" },
-  { id: "approved", label: "Одобренные" },
-  { id: "rejected", label: "Отклонённые" },
-];
-
 const TAB_STATUS: Record<string, CategoryStatus | null> = {
   all: null,
   pending: "PENDING",
@@ -61,18 +54,19 @@ function formatDate(value: string, timeZone: string) {
   return UI_FMT.dateTimeLong(value, { timeZone });
 }
 
-function statusLabel(status: CategoryStatus): string {
-  if (status === "PENDING") return "На модерации";
-  if (status === "APPROVED") return "Одобрена";
-  return "Отклонена";
+function statusLabel(status: CategoryStatus, t: typeof UI_TEXT.admin.catalog): string {
+  if (status === "PENDING") return t.status.pending;
+  if (status === "APPROVED") return t.status.approved;
+  return t.status.rejected;
 }
 
-function creatorName(creator: CreatorInfo | null): string {
-  if (!creator) return "Неизвестно";
-  return creator.name || creator.displayName || creator.phone || creator.email || "Неизвестно";
+function creatorName(creator: CreatorInfo | null, t: typeof UI_TEXT.admin.catalog): string {
+  if (!creator) return t.unknownAuthor;
+  return creator.name || creator.displayName || creator.phone || creator.email || t.unknownAuthor;
 }
 
 export function AdminCatalog() {
+  const t = UI_TEXT.admin.catalog;
   const viewerTimeZone = useViewerTimeZoneContext();
 
   const [tab, setTab] = useState<string>("all");
@@ -88,6 +82,15 @@ export function AdminCatalog() {
   const [newSlug, setNewSlug] = useState("");
   const [newIcon, setNewIcon] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
+  const tabs = useMemo(
+    () => [
+      { id: "all", label: t.tabs.all },
+      { id: "pending", label: t.tabs.pending },
+      { id: "approved", label: t.tabs.approved },
+      { id: "rejected", label: t.tabs.rejected },
+    ],
+    [t.tabs.all, t.tabs.approved, t.tabs.pending, t.tabs.rejected]
+  );
 
   const resetCreateForm = useCallback(() => {
     setNewTitle("");
@@ -109,15 +112,15 @@ export function AdminCatalog() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<CategoriesResponse> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить каталог");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.load);
       }
       setCategories(json.data.categories);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить каталог");
+      setError(err instanceof Error ? err.message : t.errors.load);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t.errors.load]);
 
   useEffect(() => {
     void load(tab);
@@ -144,12 +147,12 @@ export function AdminCatalog() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось одобрить категорию");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.approve);
       }
-      setToast("Категория одобрена");
+      setToast(t.toast.approved);
       await load(tab);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось одобрить категорию");
+      setError(err instanceof Error ? err.message : t.errors.approve);
     } finally {
       setBusyId(null);
     }
@@ -164,12 +167,12 @@ export function AdminCatalog() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось отклонить категорию");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.reject);
       }
-      setToast("Категория отклонена и удалена");
+      setToast(t.toast.rejected);
       await load(tab);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отклонить категорию");
+      setError(err instanceof Error ? err.message : t.errors.reject);
     } finally {
       setBusyId(null);
     }
@@ -177,7 +180,7 @@ export function AdminCatalog() {
 
   const submitCategory = async (): Promise<void> => {
     if (!newTitle.trim()) {
-      setError("Укажите название категории.");
+      setError(t.errors.emptyTitle);
       return;
     }
 
@@ -195,15 +198,15 @@ export function AdminCatalog() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ category: { id: string } }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось создать категорию");
+        throw new Error(json && !json.ok ? json.error.message : t.errors.create);
       }
 
       setShowCreateModal(false);
       resetCreateForm();
-      setToast("Категория добавлена");
+      setToast(t.toast.created);
       await load(tab);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось создать категорию");
+      setError(err instanceof Error ? err.message : t.errors.create);
     } finally {
       setSubmitting(false);
     }
@@ -215,14 +218,14 @@ export function AdminCatalog() {
   );
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
   }
 
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-text-main">Каталог категорий</h1>
-        <p className="mt-1 text-sm text-text-sec">Модерация пользовательских категорий и управление каталогом.</p>
+        <h1 className="text-2xl font-semibold text-text-main">{t.title}</h1>
+        <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
       </header>
 
       {toast ? (
@@ -236,9 +239,9 @@ export function AdminCatalog() {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs items={TAB_ITEMS} value={tab} onChange={setTab} />
+        <Tabs items={tabs} value={tab} onChange={setTab} />
         <Button type="button" size="sm" onClick={() => setShowCreateModal(true)}>
-          Добавить категорию
+          {t.addCategory}
         </Button>
       </div>
 
@@ -253,13 +256,13 @@ export function AdminCatalog() {
                 <div>
                   <p className="font-medium">{category.fullPath || category.title}</p>
                   <p className="text-xs text-text-sec">
-                    Предложил:{" "}
+                    {t.suggestedBy}:{" "}
                     {category.createdBy ? (
                       <Link href={category.createdBy.profileHref} className="underline hover:text-text-main">
-                        {creatorName(category.createdBy)}
+                        {creatorName(category.createdBy, t)}
                       </Link>
                     ) : (
-                      "Неизвестно"
+                      t.unknownAuthor
                     )}{" "}
                     · {formatDate(category.createdAt, viewerTimeZone)}
                   </p>
@@ -271,7 +274,7 @@ export function AdminCatalog() {
                     disabled={busyId === category.id}
                     className="rounded-xl bg-green-500/15 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-60"
                   >
-                    Одобрить
+                    {t.actions.approve}
                   </button>
                   <button
                     type="button"
@@ -279,13 +282,13 @@ export function AdminCatalog() {
                     disabled={busyId === category.id}
                     className="rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-60"
                   >
-                    Отклонить
+                    {t.actions.reject}
                   </button>
                 </div>
               </div>
             ))
           ) : (
-            <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Категорий на модерации нет.</div>
+            <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.pendingEmpty}</div>
           )}
         </div>
       ) : (
@@ -293,13 +296,13 @@ export function AdminCatalog() {
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
-                <th className="px-4 py-3 text-left">Категория</th>
-                <th className="px-4 py-3 text-left">{UI_TEXT.admin.catalog.slugColumn}</th>
-                <th className="px-4 py-3 text-left">Статус</th>
-                <th className="px-4 py-3 text-left">Видимость</th>
-                <th className="px-4 py-3 text-left">Автор</th>
-                <th className="px-4 py-3 text-left">Дата</th>
-                <th className="px-4 py-3 text-right">Использований</th>
+                <th className="px-4 py-3 text-left">{t.table.category}</th>
+                <th className="px-4 py-3 text-left">{t.slugColumn}</th>
+                <th className="px-4 py-3 text-left">{t.table.status}</th>
+                <th className="px-4 py-3 text-left">{t.table.visibility}</th>
+                <th className="px-4 py-3 text-left">{t.table.author}</th>
+                <th className="px-4 py-3 text-left">{t.table.date}</th>
+                <th className="px-4 py-3 text-right">{t.table.usageCount}</th>
               </tr>
             </thead>
             <tbody>
@@ -311,17 +314,17 @@ export function AdminCatalog() {
                       {category.fullPath || category.title}
                     </td>
                     <td className="px-4 py-3 text-sm text-text-sec">{category.slug}</td>
-                    <td className="px-4 py-3 text-sm text-text-sec">{statusLabel(category.status)}</td>
+                    <td className="px-4 py-3 text-sm text-text-sec">{statusLabel(category.status, t)}</td>
                     <td className="px-4 py-3 text-sm text-text-sec">
-                      {category.visibleToAll ? "Для всех" : "Только автор"}
+                      {category.visibleToAll ? t.visibility.all : t.visibility.authorOnly}
                     </td>
                     <td className="px-4 py-3 text-sm text-text-sec">
                       {category.createdBy ? (
                         <Link href={category.createdBy.profileHref} className="underline hover:text-text-main">
-                          {creatorName(category.createdBy)}
+                          {creatorName(category.createdBy, t)}
                         </Link>
                       ) : (
-                        "Неизвестно"
+                        t.unknownAuthor
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-text-sec">{formatDate(category.createdAt, viewerTimeZone)}</td>
@@ -331,7 +334,7 @@ export function AdminCatalog() {
               ) : (
                 <tr>
                   <td colSpan={7} className="px-4 py-6 text-center text-sm text-text-sec">
-                    Категории не найдены.
+                    {t.tableEmpty}
                   </td>
                 </tr>
               )}
@@ -346,13 +349,13 @@ export function AdminCatalog() {
           setShowCreateModal(false);
           resetCreateForm();
         }}
-        title="Новая категория"
+        title={t.modal.title}
       >
         <div className="space-y-4">
           <Input
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
-            placeholder="Название категории"
+            placeholder={t.modal.titlePlaceholder}
           />
           <Input
             value={newSlug}
@@ -360,12 +363,12 @@ export function AdminCatalog() {
               setNewSlug(event.target.value);
               setSlugTouched(true);
             }}
-            placeholder={UI_TEXT.admin.catalog.slugPlaceholder}
+            placeholder={t.slugPlaceholder}
           />
           <Input
             value={newIcon}
             onChange={(event) => setNewIcon(event.target.value)}
-            placeholder="Иконка (например •)"
+            placeholder={t.modal.iconPlaceholder}
           />
           <div className="flex justify-end gap-2">
             <Button
@@ -376,10 +379,10 @@ export function AdminCatalog() {
                 resetCreateForm();
               }}
             >
-              Отмена
+              {t.actions.cancel}
             </Button>
             <Button type="button" onClick={() => void submitCategory()} disabled={submitting}>
-              {submitting ? "Создаём..." : "Создать"}
+              {submitting ? t.actions.creating : t.actions.create}
             </Button>
           </div>
         </div>

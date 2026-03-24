@@ -6,6 +6,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { RoleCardMaster } from "@/features/cabinet/roles/role-card-master";
 import { RoleCardStudio } from "@/features/cabinet/roles/role-card-studio";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type MasterActiveData = {
   name: string;
@@ -13,6 +14,7 @@ type MasterActiveData = {
   ratingAvg?: number | null;
   ratingCount?: number | null;
   isActive?: boolean | null;
+  isPublished?: boolean | null;
   statusLabel?: string | null;
   avatarUrl?: string | null;
   avatarFocalX?: number | null;
@@ -85,7 +87,9 @@ export function RolesCards({
       const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | ErrorPayload | null;
       if (!res.ok || !json || !json.ok) {
         const message =
-          json && !json.ok ? json.error.message : `Ошибка удаления: ${res.status}`;
+          json && !json.ok
+            ? json.error.message
+            : `${UI_TEXT.cabinetRolesPage.deleteErrorPrefix}: ${res.status}`;
         const code = json && !json.ok ? json.error.code : null;
         if (code === "ACTIVE_BOOKINGS") {
           const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
@@ -98,7 +102,7 @@ export function RolesCards({
       closeModal();
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить кабинет.");
+      setError(err instanceof Error ? err.message : UI_TEXT.cabinetRolesPage.deleteFailed);
     } finally {
       setDeleting(false);
     }
@@ -120,7 +124,7 @@ export function RolesCards({
         ) : (
           <RoleCardMaster
             mode="empty"
-            actionLabel="Создать мастера"
+            actionLabel={UI_TEXT.cabinetRolesPage.createMaster}
             actionHref={createMasterHref}
             actionMethod="POST"
           />
@@ -139,14 +143,14 @@ export function RolesCards({
         ) : hasMasterProfile ? (
           <RoleCardStudio
             mode="upsell"
-            actionLabel="Создать студию"
+            actionLabel={UI_TEXT.cabinetRolesPage.createStudio}
             actionHref={createStudioHref}
             actionMethod="POST"
           />
         ) : (
           <RoleCardStudio
             mode="empty"
-            actionLabel="Создать студию"
+            actionLabel={UI_TEXT.cabinetRolesPage.createStudio}
             actionHref={createStudioHref}
             actionMethod="POST"
           />

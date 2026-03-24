@@ -32,7 +32,7 @@ export function StickySaveBar({
           {error ? <span className="truncate text-sm text-red-400">{error}</span> : null}
         </div>
         <Button onClick={onSave} size="md" disabled={disabled || isSaving} className="w-full md:w-auto">
-          {isSaving ? UI_TEXT.common.saving : UI_TEXT.common.saveChanges}
+          {isSaving ? UI_TEXT.common.saving : UI_TEXT.actions.save}
         </Button>
       </div>
     </div>

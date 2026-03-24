@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { FocalImage } from "@/components/ui/focal-image";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type MasterActiveData = {
   name: string;
@@ -12,6 +13,7 @@ type MasterActiveData = {
   ratingAvg?: number | null;
   ratingCount?: number | null;
   isActive?: boolean | null;
+  isPublished?: boolean | null;
   statusLabel?: string | null;
   avatarUrl?: string | null;
   avatarFocalX?: number | null;
@@ -40,9 +42,9 @@ export function RoleCardMaster(props: Props) {
               +
             </div>
             <div className="flex min-w-0 flex-col gap-1">
-              <div className="text-base font-semibold text-text-main">Я — мастер</div>
+              <div className="text-base font-semibold text-text-main">{UI_TEXT.cabinetRoles.master.title}</div>
               <div className="text-sm text-text-sec">
-                Создайте профиль, добавьте услуги и принимайте клиентов
+                {UI_TEXT.cabinetRoles.master.description}
               </div>
             </div>
           </div>
@@ -72,17 +74,15 @@ export function RoleCardMaster(props: Props) {
     (data.isActive === null || data.isActive === undefined
       ? null
       : data.isActive
-        ? "Принимаю заказы"
-        : "Не работаю");
-  const isPublished =
-    statusText !== null &&
-    statusText !== undefined &&
-    statusText.includes("опубликован") &&
-    !statusText.includes("не опубликован");
+        ? UI_TEXT.cabinetRoles.master.working
+        : UI_TEXT.cabinetRoles.master.notWorking);
+  const isPublished = Boolean(data.isPublished);
   const ratingAvg = typeof data.ratingAvg === "number" ? data.ratingAvg : null;
   const ratingCount = typeof data.ratingCount === "number" ? data.ratingCount : 0;
   const showRating = ratingAvg !== null && ratingCount > 0;
-  const ratingLabel = showRating ? `★ ${ratingAvg.toFixed(1)} (${ratingCount} отзывов)` : null;
+  const ratingLabel = showRating
+    ? UI_TEXT.cabinetRoles.master.reviewsTemplate(ratingAvg.toFixed(1), ratingCount)
+    : null;
 
   return (
     <Card
@@ -107,7 +107,7 @@ export function RoleCardMaster(props: Props) {
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
-                Фото
+                {UI_TEXT.cabinetRoles.master.photoFallback}
               </div>
             )}
           </div>
@@ -133,10 +133,12 @@ export function RoleCardMaster(props: Props) {
         <div className="mt-5">
           {data.actionHref ? (
             <Button asChild className="w-full">
-              <Link href={data.actionHref}>{data.actionLabel ?? "Открыть кабинет"}</Link>
+              <Link href={data.actionHref}>
+                {data.actionLabel ?? UI_TEXT.cabinetRoles.master.openCabinet}
+              </Link>
             </Button>
           ) : (
-            <Button className="w-full">{data.actionLabel ?? "Открыть кабинет"}</Button>
+            <Button className="w-full">{data.actionLabel ?? UI_TEXT.cabinetRoles.master.openCabinet}</Button>
           )}
           {"onDelete" in props && props.onDelete ? (
             <button
@@ -144,7 +146,7 @@ export function RoleCardMaster(props: Props) {
               onClick={props.onDelete}
               className="mt-4 text-xs text-text-sec transition-colors underline-offset-2 hover:text-red-500 hover:underline"
             >
-              Удаление кабинета студии
+              {UI_TEXT.cabinetRoles.master.deleteCabinet}
             </button>
           ) : null}
         </div>

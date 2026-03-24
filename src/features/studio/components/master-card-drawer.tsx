@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type MasterServiceItem = {
   serviceId: string;
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props) {
+  const t = UI_TEXT.studio.masterDrawer;
   const [tab, setTab] = useState<"skills" | "profile">("skills");
   const [details, setDetails] = useState<MasterDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
       setProfileActive(masterJson.data.isActive);
       setEdited(Object.fromEntries(masterJson.data.services.map((item) => [item.serviceId, { ...item }])));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить мастера");
+      setError(err instanceof Error ? err.message : t.errors.loadMaster);
     } finally {
       setLoading(false);
     }
@@ -100,7 +102,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
       }
       onSaved?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить услуги");
+      setError(err instanceof Error ? err.message : t.errors.saveServices);
     } finally {
       setSaving(false);
     }
@@ -127,7 +129,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
       await load();
       onSaved?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
+      setError(err instanceof Error ? err.message : t.errors.saveProfile);
     } finally {
       setSaving(false);
     }
@@ -139,7 +141,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl overflow-auto border-l border-border-subtle bg-bg-card p-5 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-base font-semibold text-text-main">{details?.name ?? "Мастер"}</div>
+            <div className="text-base font-semibold text-text-main">{details?.name ?? t.titleFallback}</div>
             <div className="text-xs text-text-sec">{details?.tagline ?? ""}</div>
           </div>
           <button
@@ -147,7 +149,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
             onClick={onClose}
             className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
           >
-            Закрыть
+            {t.close}
           </button>
         </div>
 
@@ -161,12 +163,12 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                 tab === item ? "border-primary/40 bg-bg-card text-text-main shadow-card" : "border-border-subtle text-text-sec"
               }`}
             >
-              {item === "skills" ? "Услуги" : "Профиль"}
+              {item === "skills" ? t.tabs.skills : t.tabs.profile}
             </button>
           ))}
         </div>
 
-        {loading ? <div className="mt-4 text-sm text-text-sec">Загружаем...</div> : null}
+        {loading ? <div className="mt-4 text-sm text-text-sec">{t.loading}</div> : null}
         {error ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         ) : null}
@@ -177,7 +179,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Поиск услуги"
+              placeholder={t.skills.searchPlaceholder}
               className="w-full rounded-2xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
             />
             {items.map((item) => (
@@ -195,14 +197,14 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                         }))
                       }
                     />{" "}
-                    Активна
+                    {t.skills.activeLabel}
                   </label>
                 </div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <input
                     type="number"
                     className="rounded-xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
-                    placeholder="Стоимость"
+                    placeholder={t.skills.pricePlaceholder}
                     value={item.priceOverride ?? ""}
                     onChange={(event) =>
                       setEdited((current) => ({
@@ -217,7 +219,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                   <input
                     type="number"
                     className="rounded-xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
-                    placeholder="Длительность"
+                    placeholder={t.skills.durationPlaceholder}
                     value={item.durationOverrideMin ?? ""}
                     onChange={(event) =>
                       setEdited((current) => ({
@@ -238,26 +240,26 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
               disabled={saving}
               className="rounded-2xl bg-primary px-4 py-2 text-sm text-white disabled:opacity-60"
             >
-              {saving ? "Сохраняем..." : "Сохранить услуги"}
+              {saving ? t.skills.saving : t.skills.save}
             </button>
           </div>
         ) : null}
 
         {!loading && tab === "profile" ? (
           <div className="mt-4 space-y-3 rounded-2xl border border-border-subtle bg-bg-input/60 p-4">
-            <div className="text-sm font-semibold text-text-main">Профиль мастера</div>
+            <div className="text-sm font-semibold text-text-main">{t.profile.title}</div>
             <input
               type="text"
               value={profileName}
               onChange={(event) => setProfileName(event.target.value)}
-              placeholder="Имя"
+              placeholder={t.profile.namePlaceholder}
               className="w-full rounded-2xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
             />
             <input
               type="text"
               value={profileTagline}
               onChange={(event) => setProfileTagline(event.target.value)}
-              placeholder="Статус"
+              placeholder={t.profile.statusPlaceholder}
               className="w-full rounded-2xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
             />
             <label className="text-sm text-text-sec">
@@ -266,7 +268,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                 checked={profileActive}
                 onChange={(event) => setProfileActive(event.target.checked)}
               />{" "}
-              Активен
+              {t.profile.activeLabel}
             </label>
             <button
               type="button"
@@ -274,7 +276,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
               disabled={saving}
               className="rounded-2xl bg-primary px-4 py-2 text-sm text-white disabled:opacity-60"
             >
-              {saving ? "Сохраняем..." : "Сохранить профиль"}
+              {saving ? t.profile.saving : t.profile.save}
             </button>
           </div>
         ) : null}

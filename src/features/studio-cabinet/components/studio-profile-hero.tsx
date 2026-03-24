@@ -35,7 +35,7 @@ export function StudioProfileHero({
   onEditFocal,
   isBusy = false,
 }: Props) {
-  const publicationLabel = "Опубликован";
+  const publicationLabel = UI_TEXT.studio.profile.publicationLabel;
 
   return (
     <section className="overflow-hidden rounded-[24px] border border-border-subtle bg-bg-card shadow-card">

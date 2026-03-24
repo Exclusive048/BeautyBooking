@@ -118,7 +118,7 @@ export function AdminSettings() {
   };
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка…</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{UI_TEXT.common.loading}</div>;
   }
 
   return (
