@@ -30,6 +30,7 @@ export type MasterDayBooking = {
   serviceTitle: string;
   serviceName: string;
   durationMin: number;
+  price: number;
 };
 
 export type MasterDayGap = {
@@ -231,7 +232,8 @@ export async function getMasterDay(input: {
         silentMode: true,
         referencePhotoAssetId: true,
         bookingAnswers: true,
-        service: { select: { name: true, title: true, durationMin: true } },
+        service: { select: { name: true, title: true, durationMin: true, price: true } },
+        serviceItems: { select: { priceSnapshot: true } },
       },
       orderBy: { startAtUtc: "asc" },
     }),
@@ -336,6 +338,7 @@ export async function getMasterDay(input: {
       serviceTitle: baseDto.serviceName,
       serviceName: baseDto.serviceName,
       durationMin: baseDto.durationMin,
+      price: sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price }),
     };
   });
 

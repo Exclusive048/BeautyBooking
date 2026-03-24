@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,38 @@ type SchedulePayload = {
   exceptions: ScheduleException[];
   templates: WeekTemplate[];
   approval?: ApprovalInfo;
+};
+
+type DayBooking = {
+  id: string;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  status: string;
+  clientName: string;
+  serviceTitle: string;
+  price?: number;
+};
+
+type MasterDayData = {
+  date: string;
+  isSolo: boolean;
+  bookings: DayBooking[];
+};
+
+type DayOffConflictDetails = {
+  bookings: Array<{
+    id: string;
+    clientName: string;
+    status: string;
+    timeLabel: string;
+    canCancel: boolean;
+  }>;
+  nonCancellableCount: number;
+};
+
+type PatchError = Error & {
+  code?: string;
+  details?: unknown;
 };
 
 const T = UI_TEXT.cabinet.master.schedule;
@@ -141,7 +174,66 @@ function normalizeSlots(values: string[]): string[] {
   return Array.from(unique).sort((left, right) => left.localeCompare(right));
 }
 
-export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" }: { apiPath?: string }) {
+function buildDraftFromSelection(base: DaySchedule, exception: ScheduleException | null): DaySchedule {
+  if (!exception) {
+    return {
+      ...base,
+      breaks: base.breaks.map((item) => ({ ...item })),
+      fixedSlotTimes: [...base.fixedSlotTimes],
+    };
+  }
+  return {
+    ...base,
+    isWorkday: exception.isWorkday,
+    scheduleMode: exception.scheduleMode,
+    startTime: exception.startTime ?? base.startTime,
+    endTime: exception.endTime ?? base.endTime,
+    breaks: exception.breaks.map((item) => ({ ...item })),
+    fixedSlotTimes: [...exception.fixedSlotTimes],
+  };
+}
+
+function isConflictStatus(status: string): boolean {
+  return status !== "REJECTED" && status !== "CANCELLED" && status !== "NO_SHOW" && status !== "FINISHED";
+}
+
+function canCancelForOffDay(status: string): boolean {
+  return status === "PENDING" || status === "CONFIRMED" || status === "CHANGE_REQUESTED";
+}
+
+function formatTimeLabel(dateTimeIso: string | null, timeZone: string): string {
+  if (!dateTimeIso) return "--:--";
+  const date = new Date(dateTimeIso);
+  if (Number.isNaN(date.getTime())) return "--:--";
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  }).format(date);
+}
+
+function formatMoney(amount: number | null | undefined): string {
+  if (!Number.isFinite(amount)) return "—";
+  return `${new Intl.NumberFormat("ru-RU").format(amount as number)} ${UI_TEXT.common.currencyRub}`;
+}
+
+function bookingStatusLabel(status: string): string {
+  if (status === "PENDING" || status === "NEW") return "Ожидает подтверждения";
+  if (status === "CONFIRMED") return "Подтверждено";
+  if (status === "CHANGE_REQUESTED") return "Запрошен перенос";
+  if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
+  if (status === "FINISHED") return "Завершено";
+  if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") return "Отменено";
+  return status;
+}
+
+export function MasterScheduleEditor({
+  apiPath = "/api/cabinet/master/schedule",
+  showDayConsole = false,
+}: {
+  apiPath?: string;
+  showDayConsole?: boolean;
+}) {
   const [timezone, setTimezone] = useState("Europe/Moscow");
   const [week, setWeek] = useState<DaySchedule[]>([]);
   const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
@@ -155,6 +247,11 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
   const [slotInputByDay, setSlotInputByDay] = useState<Record<number, string>>({});
   const [exceptionSlotInput, setExceptionSlotInput] = useState("10:00");
   const [draft, setDraft] = useState<DaySchedule | null>(null);
+  const [dayPanelMode, setDayPanelMode] = useState<"view" | "edit">("view");
+  const [dayData, setDayData] = useState<MasterDayData | null>(null);
+  const [dayLoading, setDayLoading] = useState(false);
+  const [dayError, setDayError] = useState<string | null>(null);
+  const [offDayConflict, setOffDayConflict] = useState<DayOffConflictDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingWeek, setSavingWeek] = useState(false);
   const [savingException, setSavingException] = useState(false);
@@ -172,20 +269,13 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
       setDraft(null);
       return;
     }
-    if (!selectedException) {
-      setDraft({ ...selectedBase, breaks: selectedBase.breaks.map((item) => ({ ...item })), fixedSlotTimes: [...selectedBase.fixedSlotTimes] });
-      return;
-    }
-    setDraft({
-      ...selectedBase,
-      isWorkday: selectedException.isWorkday,
-      scheduleMode: selectedException.scheduleMode,
-      startTime: selectedException.startTime ?? selectedBase.startTime,
-      endTime: selectedException.endTime ?? selectedBase.endTime,
-      breaks: selectedException.breaks.map((item) => ({ ...item })),
-      fixedSlotTimes: [...selectedException.fixedSlotTimes],
-    });
+    setDraft(buildDraftFromSelection(selectedBase, selectedException));
   }, [selectedBase, selectedException]);
+
+  useEffect(() => {
+    setDayPanelMode("view");
+    setOffDayConflict(null);
+  }, [selectedKey]);
 
   const calendarDays = useMemo(() => {
     const start = startOfWeekMonday(startOfMonth(month));
@@ -224,6 +314,43 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!showDayConsole || !selectedKey) {
+      setDayData(null);
+      setDayError(null);
+      setDayLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadDayData = async (): Promise<void> => {
+      setDayLoading(true);
+      setDayError(null);
+      try {
+        const response = await fetchWithAuth(`/api/master/day?date=${encodeURIComponent(selectedKey)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const json = (await response.json().catch(() => null)) as ApiResponse<MasterDayData> | null;
+        if (!response.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить записи дня");
+        }
+        setDayData(json.data);
+      } catch (dayLoadError) {
+        if (dayLoadError instanceof DOMException && dayLoadError.name === "AbortError") return;
+        setDayError(dayLoadError instanceof Error ? dayLoadError.message : "Не удалось загрузить записи дня");
+        setDayData(null);
+      } finally {
+        if (!controller.signal.aborted) {
+          setDayLoading(false);
+        }
+      }
+    };
+
+    void loadDayData();
+    return () => controller.abort();
+  }, [selectedKey, showDayConsole]);
+
   const patch = useCallback(async (body: unknown) => {
     const response = await fetchWithAuth(apiPath, {
       method: "PATCH",
@@ -231,7 +358,14 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
       body: JSON.stringify(body),
     });
     const json = (await response.json().catch(() => null)) as ApiResponse<SchedulePayload> | null;
-    if (!response.ok || !json || !json.ok) throw new Error(json && !json.ok ? json.error.message : T.errors.saveWeek);
+    if (!response.ok || !json || !json.ok) {
+      const patchError = new Error(json && !json.ok ? json.error.message : T.errors.saveWeek) as PatchError;
+      if (json && !json.ok) {
+        patchError.code = json.error.code;
+        patchError.details = json.error.details;
+      }
+      throw patchError;
+    }
     applyPayload(json.data);
     const action = json.data.approval?.lastAction;
     if (action === "REQUEST_CREATED" || action === "REQUEST_UPDATED") {
@@ -261,12 +395,25 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
     }
   };
 
-  const saveExceptionPayload = async (payload: unknown) => {
+  const saveExceptionPayload = async (
+    payload: unknown,
+    conflictResolution?: { action: "CANCEL_BOOKINGS_AND_SET_OFF"; bookingIds: string[] }
+  ) => {
     setSavingException(true);
     setError(null);
+    setOffDayConflict(null);
     try {
-      await patch({ exception: payload });
+      await patch(
+        conflictResolution
+          ? { exception: payload, dayOffConflictResolution: conflictResolution }
+          : { exception: payload }
+      );
+      setDayPanelMode("view");
     } catch (saveError) {
+      const patchError = saveError as PatchError;
+      if (patchError?.code === "SCHEDULE_DAY_OFF_CONFLICT") {
+        setOffDayConflict((patchError.details as DayOffConflictDetails) ?? null);
+      }
       setError(saveError instanceof Error ? saveError.message : T.errors.saveException);
     } finally {
       setSavingException(false);
@@ -287,6 +434,49 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
 
   const isStudioMaster = approval.mode === "STUDIO_MASTER";
   const hasPendingRequest = approval.requestStatus === "PENDING";
+
+  useEffect(() => {
+    if (draft?.isWorkday !== false) {
+      setOffDayConflict(null);
+    }
+  }, [draft?.isWorkday]);
+
+  const dayBookings = useMemo(() => {
+    if (!showDayConsole) return [];
+    return [...(dayData?.bookings ?? [])].sort((left, right) => {
+      const leftTime = left.startAtUtc ? new Date(left.startAtUtc).getTime() : 0;
+      const rightTime = right.startAtUtc ? new Date(right.startAtUtc).getTime() : 0;
+      return leftTime - rightTime;
+    });
+  }, [dayData?.bookings, showDayConsole]);
+
+  const conflictingDayBookings = useMemo(
+    () => dayBookings.filter((item) => isConflictStatus(item.status)),
+    [dayBookings]
+  );
+
+  const canConfirmOffDayCancellation = useMemo(
+    () => conflictingDayBookings.length > 0 && conflictingDayBookings.every((item) => canCancelForOffDay(item.status)),
+    [conflictingDayBookings]
+  );
+
+  const resolvedDayStatus = useMemo(() => {
+    const source = draft ?? selectedBase;
+    if (!source || !source.isWorkday) return T.baseStatusHoliday;
+    if (source.scheduleMode === "FIXED") return T.baseStatusWorkFixed;
+    return T.baseStatusWorkflexible(source.startTime, source.endTime);
+  }, [draft, selectedBase]);
+
+  const offDayWarningBookings = useMemo(() => {
+    if (offDayConflict?.bookings?.length) return offDayConflict.bookings;
+    return conflictingDayBookings.map((item) => ({
+      id: item.id,
+      clientName: item.clientName,
+      status: item.status,
+      timeLabel: formatTimeLabel(item.startAtUtc, timezone),
+      canCancel: canCancelForOffDay(item.status),
+    }));
+  }, [conflictingDayBookings, offDayConflict?.bookings, timezone]);
 
   if (loading) return <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 text-sm text-text-sec">{T.loading}</div>;
 
@@ -509,17 +699,112 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            {selectedDate ? (
-              <>
-                <h3 className="text-base font-semibold text-text-main">{formatRu(selectedDate, { day: "numeric", month: "long", year: "numeric" })}</h3>
-                <p className="text-xs text-text-sec">{capitalize(formatRu(selectedDate, { weekday: "long" }))}</p>
-              </>
-            ) : (
-              <h3 className="text-base font-semibold text-text-main">{T.futureExceptions}</h3>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-3">
+          {showDayConsole && selectedDate && selectedBase && draft && dayPanelMode === "view" ? (
+            <>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-text-main">
+                      {formatRu(selectedDate, { day: "numeric", month: "long", year: "numeric" })}
+                    </h3>
+                    <p className="text-xs text-text-sec">{capitalize(formatRu(selectedDate, { weekday: "long" }))}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    aria-label="Изменить график"
+                    title="Изменить график"
+                    onClick={() => setDayPanelMode("edit")}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-text-sec">{resolvedDayStatus}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {dayLoading ? (
+                  <p className="text-sm text-text-sec">{T.loading}</p>
+                ) : dayError ? (
+                  <p className="text-sm text-red-300">{dayError}</p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/50 px-3 py-2 text-sm text-text-main">
+                      <span>Записей на день</span>
+                      <span className="font-semibold">{dayBookings.length}</span>
+                    </div>
+                    {dayData?.isSolo ? (
+                      <Button asChild size="sm" variant="secondary" className="w-full">
+                        <Link href={`/cabinet/master/dashboard?manual=1&date=${encodeURIComponent(selectedKey ?? "")}`}>
+                          + Добавить запись
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {dayBookings.length === 0 ? (
+                      <div className="rounded-xl border border-border-subtle bg-bg-input/50 px-3 py-4 text-sm text-text-sec">
+                        Окошек занято: 0. День свободен.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {dayBookings.map((booking) => (
+                          <Link
+                            key={booking.id}
+                            href={`/cabinet/master/dashboard?date=${encodeURIComponent(selectedKey ?? "")}&bookingId=${encodeURIComponent(booking.id)}&chat=open`}
+                            className="block rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2 text-sm transition-colors hover:bg-bg-input"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-1">
+                                <div className="font-medium text-text-main">
+                                  {formatTimeLabel(booking.startAtUtc, timezone)} • {booking.serviceTitle}
+                                </div>
+                                <div className="text-xs text-text-sec">{booking.clientName}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xs text-text-main">{formatMoney(booking.price)}</div>
+                                <div className="text-[11px] text-text-sec">{bookingStatusLabel(booking.status)}</div>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </>
+          ) : (
+            <>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  {selectedDate ? (
+                    <div>
+                      <h3 className="text-base font-semibold text-text-main">
+                        {formatRu(selectedDate, { day: "numeric", month: "long", year: "numeric" })}
+                      </h3>
+                      <p className="text-xs text-text-sec">{capitalize(formatRu(selectedDate, { weekday: "long" }))}</p>
+                    </div>
+                  ) : (
+                    <h3 className="text-base font-semibold text-text-main">{T.futureExceptions}</h3>
+                  )}
+                  {showDayConsole && selectedBase && draft ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      aria-label="К дню"
+                      title="К дню"
+                      onClick={() => {
+                        setOffDayConflict(null);
+                        setDraft(buildDraftFromSelection(selectedBase, selectedException));
+                        setDayPanelMode("view");
+                      }}
+                    >
+                      <CalendarDays className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
             {!selectedDate ? (
               futureExceptions.length === 0 ? <p className="text-sm text-text-sec">{T.noExceptions}</p> : (
                 <div className="space-y-2">
@@ -603,9 +888,66 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
                       </div>
                     )}
 
-                    <Button className="w-full" onClick={() => void (selectedKey ? saveExceptionPayload({ date: selectedKey, isWorkday: draft.isWorkday, scheduleMode: draft.scheduleMode, startTime: draft.scheduleMode === "FIXED" ? FIXED_START : draft.startTime, endTime: draft.scheduleMode === "FIXED" ? FIXED_END : draft.endTime, breaks: draft.scheduleMode === "FLEXIBLE" ? draft.breaks : [], fixedSlotTimes: draft.scheduleMode === "FIXED" ? draft.fixedSlotTimes : [] }) : Promise.resolve())} disabled={savingException}>
-                      {T.applyException}
-                    </Button>
+                    {showDayConsole && approval.mode === "SOLO_MASTER" && !draft.isWorkday && offDayWarningBookings.length > 0 ? (
+                      <div className="space-y-2 rounded-xl border border-amber-400/35 bg-amber-500/10 p-3">
+                        <div className="text-sm font-medium text-amber-100">
+                          ⚠️ Внимание! На этот день есть {offDayWarningBookings.length} записей.
+                        </div>
+                        <div className="space-y-1 text-xs text-amber-100/90">
+                          {offDayWarningBookings.map((item) => (
+                            <div key={item.id}>
+                              {item.clientName} ({item.timeLabel}){item.canCancel ? "" : " — нельзя отменить автоматически"}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            disabled={savingException || !canConfirmOffDayCancellation}
+                            onClick={() =>
+                              void (
+                                selectedKey
+                                  ? saveExceptionPayload(
+                                      {
+                                        date: selectedKey,
+                                        isWorkday: draft.isWorkday,
+                                        scheduleMode: draft.scheduleMode,
+                                        startTime: draft.scheduleMode === "FIXED" ? FIXED_START : draft.startTime,
+                                        endTime: draft.scheduleMode === "FIXED" ? FIXED_END : draft.endTime,
+                                        breaks: draft.scheduleMode === "FLEXIBLE" ? draft.breaks : [],
+                                        fixedSlotTimes: draft.scheduleMode === "FIXED" ? draft.fixedSlotTimes : [],
+                                      },
+                                      {
+                                        action: "CANCEL_BOOKINGS_AND_SET_OFF",
+                                        bookingIds: offDayWarningBookings.map((item) => item.id),
+                                      }
+                                    )
+                                  : Promise.resolve()
+                              )
+                            }
+                          >
+                            Отменить записи и сделать выходным
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => {
+                              setOffDayConflict(null);
+                              if (selectedBase) {
+                                setDraft(buildDraftFromSelection(selectedBase, selectedException));
+                              }
+                              setDayPanelMode("view");
+                            }}
+                          >
+                            Оставить как есть
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button className="w-full" onClick={() => void (selectedKey ? saveExceptionPayload({ date: selectedKey, isWorkday: draft.isWorkday, scheduleMode: draft.scheduleMode, startTime: draft.scheduleMode === "FIXED" ? FIXED_START : draft.startTime, endTime: draft.scheduleMode === "FIXED" ? FIXED_END : draft.endTime, breaks: draft.scheduleMode === "FLEXIBLE" ? draft.breaks : [], fixedSlotTimes: draft.scheduleMode === "FIXED" ? draft.fixedSlotTimes : [] }) : Promise.resolve())} disabled={savingException}>
+                        {T.applyException}
+                      </Button>
+                    )}
                   </div>
                 ) : null}
 
@@ -617,6 +959,8 @@ export function MasterScheduleEditor({ apiPath = "/api/cabinet/master/schedule" 
               </>
             ) : <p className="text-sm text-text-sec">{T.noExceptions}</p>}
           </CardContent>
+            </>
+          )}
         </Card>
       </div>
 

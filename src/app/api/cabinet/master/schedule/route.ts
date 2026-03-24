@@ -2,9 +2,16 @@ import { StudioRole } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import { cancelBooking } from "@/lib/bookings/cancelBooking";
+import { resolveBookingRuntimeStatus, type BookingRuntimeStatus } from "@/lib/bookings/flow";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderContext } from "@/lib/master/access";
+import {
+  loadBookingWithRelations,
+  notifyCancelledByMaster,
+} from "@/lib/notifications/booking-notifications";
 import { prisma } from "@/lib/prisma";
+import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import {
   applyScheduleSnapshot,
   buildScheduleSnapshot,
@@ -29,6 +36,20 @@ type PatchBody = {
   weekSchedule?: unknown;
   exception?: unknown;
   deleteException?: unknown;
+  dayOffConflictResolution?: unknown;
+};
+
+type DayOffConflictResolution = {
+  action: "CANCEL_BOOKINGS_AND_SET_OFF";
+  bookingIds: string[];
+};
+
+type DayOffConflictBooking = {
+  id: string;
+  clientName: string;
+  status: BookingRuntimeStatus;
+  timeLabel: string;
+  canCancel: boolean;
 };
 
 type ActorMode = "SOLO_MASTER" | "STUDIO_ADMIN" | "STUDIO_MASTER";
@@ -54,6 +75,153 @@ type RouteResponse = ScheduleEditorSnapshot & {
 };
 
 type ExceptionWithId = EditorExceptionInput & { id?: string };
+
+function isCancellableStatus(status: BookingRuntimeStatus): boolean {
+  return status === "PENDING" || status === "CONFIRMED" || status === "CHANGE_REQUESTED";
+}
+
+function isConflictStatus(status: BookingRuntimeStatus): boolean {
+  return status !== "REJECTED" && status !== "FINISHED";
+}
+
+function parseDayOffConflictResolution(value: unknown): DayOffConflictResolution | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (record.action !== "CANCEL_BOOKINGS_AND_SET_OFF") return null;
+  if (!Array.isArray(record.bookingIds)) return null;
+  const bookingIds = record.bookingIds
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => Boolean(item));
+  if (bookingIds.length === 0) return null;
+  return {
+    action: "CANCEL_BOOKINGS_AND_SET_OFF",
+    bookingIds,
+  };
+}
+
+async function listDayOffConflicts(input: {
+  providerId: string;
+  dateKey: string;
+  timezone: string;
+}): Promise<DayOffConflictBooking[]> {
+  const dayStartUtc = dateFromLocalDateKey(input.dateKey, input.timezone, 0, 0);
+  const dayEndUtc = dateFromLocalDateKey(addDaysToDateKey(input.dateKey, 1), input.timezone, 0, 0);
+  const now = new Date();
+  const rows = await prisma.booking.findMany({
+    where: {
+      OR: [{ masterProviderId: input.providerId }, { masterProviderId: null, providerId: input.providerId }],
+      startAtUtc: { gte: dayStartUtc, lt: dayEndUtc },
+      endAtUtc: { gt: now },
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+    },
+    select: {
+      id: true,
+      clientName: true,
+      status: true,
+      startAtUtc: true,
+      endAtUtc: true,
+    },
+    orderBy: { startAtUtc: "asc" },
+  });
+
+  return rows
+    .map((row) => {
+      const runtimeStatus = resolveBookingRuntimeStatus({
+        status: row.status,
+        startAtUtc: row.startAtUtc,
+        endAtUtc: row.endAtUtc,
+        now,
+      });
+      if (!isConflictStatus(runtimeStatus)) return null;
+      const timeLabel = row.startAtUtc
+        ? new Intl.DateTimeFormat("ru-RU", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: input.timezone,
+          }).format(row.startAtUtc)
+        : "--:--";
+      return {
+        id: row.id,
+        clientName: row.clientName,
+        status: runtimeStatus,
+        timeLabel,
+        canCancel: isCancellableStatus(runtimeStatus),
+      };
+    })
+    .filter((item): item is DayOffConflictBooking => item !== null);
+}
+
+function assertConflictResolution(input: {
+  conflicts: DayOffConflictBooking[];
+  resolution: DayOffConflictResolution | null;
+}): void {
+  const nonCancellable = input.conflicts.filter((item) => !item.canCancel);
+  if (nonCancellable.length > 0) {
+    throw new AppError(
+      "На этот день есть записи, которые нельзя отменить автоматически.",
+      409,
+      "SCHEDULE_DAY_OFF_CONFLICT",
+      {
+        bookings: input.conflicts,
+        nonCancellableCount: nonCancellable.length,
+      }
+    );
+  }
+
+  if (!input.resolution) {
+    throw new AppError(
+      "На этот день есть записи. Подтвердите их отмену, чтобы сделать день выходным.",
+      409,
+      "SCHEDULE_DAY_OFF_CONFLICT",
+      {
+        bookings: input.conflicts,
+        nonCancellableCount: 0,
+      }
+    );
+  }
+
+  const requiredIds = new Set(input.conflicts.map((item) => item.id));
+  const providedIds = new Set(input.resolution.bookingIds);
+  if (
+    requiredIds.size !== providedIds.size ||
+    Array.from(requiredIds).some((bookingId) => !providedIds.has(bookingId))
+  ) {
+    throw new AppError(
+      "Список записей для отмены устарел. Обновите день и повторите действие.",
+      409,
+      "SCHEDULE_DAY_OFF_CONFLICT",
+      {
+        bookings: input.conflicts,
+        nonCancellableCount: 0,
+      }
+    );
+  }
+}
+
+async function cancelConflictingBookings(input: {
+  conflicts: DayOffConflictBooking[];
+  req: Request;
+}): Promise<void> {
+  for (const booking of input.conflicts) {
+    await cancelBooking({
+      bookingId: booking.id,
+      cancelledBy: "PROVIDER",
+      reason: "День отмечен выходным в расписании мастера",
+    });
+    try {
+      const fullBooking = await loadBookingWithRelations(booking.id);
+      if (fullBooking && fullBooking.status === "REJECTED") {
+        await notifyCancelledByMaster(fullBooking);
+      }
+    } catch (error) {
+      logError("PATCH /api/cabinet/master/schedule cancel notification failed", {
+        requestId: getRequestId(input.req),
+        route: "PATCH /api/cabinet/master/schedule",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+  }
+}
 
 async function resolveTargetProvider(req: Request, userId: string): Promise<ActorContext> {
   const url = new URL(req.url);
@@ -318,6 +486,22 @@ export async function PATCH(req: Request) {
         lastAction: "NO_CHANGES",
       });
       return jsonOk(data);
+    }
+
+    if (actor.mode === "SOLO_MASTER" && body.exception !== undefined) {
+      const normalizedException = normalizeExceptionInput(body.exception);
+      if (!normalizedException.isWorkday) {
+        const conflicts = await listDayOffConflicts({
+          providerId: actor.providerId,
+          dateKey: normalizedException.date,
+          timezone: currentSnapshot.timezone,
+        });
+        if (conflicts.length > 0) {
+          const resolution = parseDayOffConflictResolution(body.dayOffConflictResolution);
+          assertConflictResolution({ conflicts, resolution });
+          await cancelConflictingBookings({ conflicts, req });
+        }
+      }
     }
 
     if (actor.mode === "STUDIO_MASTER") {

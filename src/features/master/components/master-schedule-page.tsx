@@ -12,7 +12,7 @@ export function MasterSchedulePage() {
         <h2 className="text-xl font-semibold">{T.pageTitle}</h2>
         <p className="text-sm text-text-sec">{T.pageSubtitle}</p>
       </header>
-      <MasterScheduleEditor />
+      <MasterScheduleEditor showDayConsole />
     </section>
   );
 }
