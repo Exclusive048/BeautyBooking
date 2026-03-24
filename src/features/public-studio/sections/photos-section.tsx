@@ -33,9 +33,9 @@ export async function StudioPhotosSection({ studioId }: Props) {
   if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.sectionPhotos} subtitle={UI_TEXT.publicStudio.sectionPhotosSubtitle}>
-        <Card className="bg-surface">
+        <Card className="bg-bg-card">
           <CardContent className="p-5 md:p-6">
-            <div className="text-sm text-text-muted">Не удалось загрузить блок.</div>
+            <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.blockLoadFailed}</div>
           </CardContent>
         </Card>
       </Section>
@@ -45,17 +45,17 @@ export async function StudioPhotosSection({ studioId }: Props) {
   return (
     <div className="fade-in-up">
       <Section title={UI_TEXT.publicStudio.sectionPhotos} subtitle={UI_TEXT.publicStudio.sectionPhotosSubtitle}>
-        <Card className="bg-surface">
+        <Card className="bg-bg-card">
           <CardContent className="p-5 md:p-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {portfolio.length > 0
                 ? portfolio.map((asset) => (
-                    <div key={asset.id} className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
+                    <div key={asset.id} className="aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
                       <img src={asset.url} alt="" className="h-full w-full object-cover" />
                     </div>
                   ))
                 : Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="aspect-square rounded-2xl border border-border bg-muted" />
+                    <div key={i} className="aspect-square rounded-2xl border border-border-subtle bg-bg-input" />
                   ))}
             </div>
           </CardContent>

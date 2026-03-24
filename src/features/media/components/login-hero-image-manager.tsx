@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
@@ -22,6 +23,7 @@ function buildListUrl(): string {
 }
 
 export function LoginHeroImageManager() {
+  const t = UI_TEXT.admin.media;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [asset, setAsset] = useState<MediaAssetDto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,17 +38,17 @@ export function LoginHeroImageManager() {
       const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
 
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.admin.media.loadFailed);
+        throw new Error(json && !json.ok ? json.error.message : t.loadFailed);
       }
 
       setAsset(json.data.assets[0] ?? null);
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : UI_TEXT.admin.media.loadFailed;
+      const message = loadError instanceof Error ? loadError.message : t.loadFailed;
       setError(message);
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [t.loadFailed]);
 
   const upload = useCallback(
     async (file: File) => {
@@ -66,19 +68,19 @@ export function LoginHeroImageManager() {
         const res = await fetch("/api/media", { method: "POST", body: form });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : UI_TEXT.admin.media.uploadFailed);
+          throw new Error(json && !json.ok ? json.error.message : t.uploadFailed);
         }
 
         setAsset(json.data.asset);
         setPickingFocal(true);
       } catch (uploadError) {
-        const message = uploadError instanceof Error ? uploadError.message : UI_TEXT.admin.media.uploadFailed;
+        const message = uploadError instanceof Error ? uploadError.message : t.uploadFailed;
         setError(message);
       } finally {
         setBusy(false);
       }
     },
-    [asset]
+    [asset, t.uploadFailed]
   );
 
   const remove = useCallback(async () => {
@@ -90,16 +92,16 @@ export function LoginHeroImageManager() {
       const res = await fetch(`/api/media/${asset.id}`, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.admin.media.deleteFailed);
+        throw new Error(json && !json.ok ? json.error.message : t.deleteFailed);
       }
       setAsset(null);
     } catch (deleteError) {
-      const message = deleteError instanceof Error ? deleteError.message : UI_TEXT.admin.media.deleteFailed;
+      const message = deleteError instanceof Error ? deleteError.message : t.deleteFailed;
       setError(message);
     } finally {
       setBusy(false);
     }
-  }, [asset]);
+  }, [asset, t.deleteFailed]);
 
   useEffect(() => {
     if (!loaded) {
@@ -108,62 +110,68 @@ export function LoginHeroImageManager() {
   }, [load, loaded]);
 
   return (
-    <div className="space-y-3 rounded-2xl border p-5">
+    <div className="space-y-3 rounded-2xl border border-border-subtle bg-bg-card p-5">
       <div>
-        <h3 className="text-lg font-semibold">{UI_TEXT.admin.media.loginHeroTitle}</h3>
-        <p className="text-sm text-neutral-600">{UI_TEXT.admin.media.loginHeroDescription}</p>
+        <h3 className="text-lg font-semibold">{t.loginHeroTitle}</h3>
+        <p className="text-sm text-text-sec">{t.loginHeroDescription}</p>
       </div>
 
-      <div className="relative h-40 w-full overflow-hidden rounded-2xl border bg-neutral-100">
+      <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
         {asset ? (
           <FocalImage
             src={asset.url}
-            alt={UI_TEXT.admin.media.loginHeroTitle}
+            alt={t.loginHeroTitle}
             focalX={asset.focalX}
             focalY={asset.focalY}
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-neutral-500">
-            {UI_TEXT.admin.media.emptyImage}
+          <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">
+            {t.emptyImage}
           </div>
         )}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
-          className="rounded-xl border px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-60"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
+          variant="secondary"
+          size="sm"
+          className="rounded-xl"
         >
-          {asset ? UI_TEXT.admin.media.replaceImage : UI_TEXT.admin.media.uploadImage}
-        </button>
+          {asset ? t.replaceImage : t.uploadImage}
+        </Button>
 
         {asset ? (
-          <button
+          <Button
             type="button"
-            className="rounded-xl border px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-60"
             onClick={() => setPickingFocal(true)}
             disabled={busy}
+            variant="secondary"
+            size="sm"
+            className="rounded-xl"
           >
-            Точка фокуса
-          </button>
+            {t.focalPoint}
+          </Button>
         ) : null}
 
         {asset ? (
-          <button
+          <Button
             type="button"
-            className="rounded-xl border px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-60"
             onClick={remove}
             disabled={busy}
+            variant="secondary"
+            size="sm"
+            className="rounded-xl"
           >
-            {UI_TEXT.admin.media.removeImage}
-          </button>
+            {t.removeImage}
+          </Button>
         ) : null}
       </div>
 
-      {error ? <div className="text-sm text-red-600">{error}</div> : null}
+      {error ? <div className="text-sm text-rose-300">{error}</div> : null}
 
       <input
         ref={inputRef}
@@ -183,7 +191,7 @@ export function LoginHeroImageManager() {
         <ModalSurface
           open={pickingFocal}
           onClose={() => setPickingFocal(false)}
-          title="Точка фокуса"
+          title={t.focalPoint}
         >
           <FocalPointPicker
             assetId={asset.id}

@@ -4,6 +4,7 @@ import type { MediaAssetDto } from "@/lib/media/types";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
@@ -38,16 +39,16 @@ export async function StudioHeroSection({ studioId }: Props) {
 
   if (hasError) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-        Не удалось загрузить блок.
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+        {UI_TEXT.publicStudio.blockLoadFailed}
       </div>
     );
   }
 
   if (!studio) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-        Не удалось загрузить профиль студии.
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+        {UI_TEXT.publicStudio.profileLoadFailed}
       </div>
     );
   }

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -108,7 +109,7 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
   );
 
   if (!hasMasters) {
-    return <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-text-muted">{UI_TEXT.publicStudio.noMasters}</div>;
+    return <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 text-sm text-text-sec">{UI_TEXT.publicStudio.noMasters}</div>;
   }
 
   return (
@@ -126,7 +127,7 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
           );
 
           return (
-            <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+            <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
               <div className="relative h-48 overflow-hidden bg-muted">
                 {master.avatarUrl ? (
                   <FocalImage
@@ -137,9 +138,11 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
                     className="h-full w-full object-cover transition group-hover:scale-[1.03]"
                   />
                 ) : (
-                  <div className="h-full w-full bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-700" />
+                  <div className="h-full w-full bg-bg-input" />
                 )}
-                <div className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white">{master.grade}</div>
+                <div className="absolute left-3 top-3 rounded-full border border-border-subtle bg-bg-card/80 px-2 py-1 text-xs font-medium text-text-main backdrop-blur">
+                  {master.grade}
+                </div>
 
                 <div className="absolute inset-x-0 bottom-0 translate-y-full bg-black/65 p-3 transition duration-200 group-hover:translate-y-0">
                   {master.thumbs.length > 0 ? (
@@ -161,12 +164,9 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
                   <Link href={masterHref} className="text-xs font-medium text-text underline underline-offset-2">
                     {UI_TEXT.publicStudio.openMaster}
                   </Link>
-                  <Link
-                    href={bookingHref}
-                    className="ml-auto rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900"
-                  >
-                    {UI_TEXT.publicStudio.book}
-                  </Link>
+                  <Button asChild size="sm" className="ml-auto h-8 rounded-lg px-2.5 text-xs">
+                    <Link href={bookingHref}>{UI_TEXT.publicStudio.book}</Link>
+                  </Button>
                 </div>
               </div>
             </article>

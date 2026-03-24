@@ -23,9 +23,9 @@ export async function StudioDetailsSection({ studioId }: Props) {
 
   if (hasError) {
     return (
-      <Card className="bg-surface">
+      <Card className="bg-bg-card">
         <CardContent className="p-5 md:p-6">
-          <div className="text-sm text-text-muted">Не удалось загрузить блок.</div>
+          <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.blockLoadFailed}</div>
         </CardContent>
       </Card>
     );
@@ -33,9 +33,9 @@ export async function StudioDetailsSection({ studioId }: Props) {
 
   if (!studio) {
     return (
-      <Card className="bg-surface">
+      <Card className="bg-bg-card">
         <CardContent className="p-5 md:p-6">
-          <div className="text-sm text-text-muted">Не удалось загрузить данные студии.</div>
+          <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.studioDataLoadFailed}</div>
         </CardContent>
       </Card>
     );
@@ -43,7 +43,7 @@ export async function StudioDetailsSection({ studioId }: Props) {
 
   return (
     <div className="fade-in-up">
-      <Card className="bg-surface">
+      <Card className="bg-bg-card">
         <CardContent className="space-y-4 p-5 md:p-6">
           {studio.avatarUrl ? (
             <FocalImage

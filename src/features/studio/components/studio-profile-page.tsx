@@ -480,7 +480,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
 
       <div className="space-y-4 rounded-2xl bg-bg-card/90 p-4">
-        <div className="flex rounded-xl bg-white/6 p-1">
+        <div className="flex rounded-xl border border-border-subtle bg-bg-input p-1">
           {settingsTabs.map((tab) => (
             <button
               key={tab.id}
@@ -489,7 +489,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
               className={[
                 "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
                 settingsTab === tab.id
-                  ? "bg-white/12 text-text-main shadow-sm"
+                  ? "bg-bg-card text-text-main shadow-card"
                   : "text-text-sec hover:text-text-main",
               ].join(" ")}
             >
@@ -499,26 +499,26 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
         </div>
 
         {settingsTab === "notifications" ? (
-          <div className="overflow-hidden rounded-2xl bg-white/4">
+          <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
             <TelegramNotificationsSection
               embedded
               title={UI_TEXT.settings.telegram.title}
               hint={UI_TEXT.settings.telegram.hint}
               connectLabel={UI_TEXT.settings.telegram.connect}
-              connectButtonClassName="shrink-0 rounded-xl border border-white/12 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/8"
+              connectButtonClassName="shrink-0 rounded-xl border border-border-subtle bg-bg-input px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-card"
               leadingIcon={
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2AABEE]/15">
                   <Send className="h-5 w-5 text-[#2AABEE]" />
                 </div>
               }
             />
-            <div className="h-px bg-white/6" />
+            <div className="h-px bg-border-subtle" />
             <VkNotificationsSection
               embedded
               title={UI_TEXT.settings.vk.title}
               hint={UI_TEXT.settings.vk.hint}
               connectLabel={UI_TEXT.settings.vk.connect}
-              connectButtonClassName="shrink-0 rounded-xl border border-white/12 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/8"
+              connectButtonClassName="shrink-0 rounded-xl border border-border-subtle bg-bg-input px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-card"
               leadingIcon={
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#4C75A3]/15">
                   <Users className="h-5 w-5 text-[#4C75A3]" />

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type FocalPointPickerProps = {
   assetId: string;
@@ -38,6 +39,7 @@ export function FocalPointPicker({
     x: typeof initialFocalX === "number" ? initialFocalX : 0.5,
     y: typeof initialFocalY === "number" ? initialFocalY : 0.5,
   });
+  const t = UI_TEXT.media.focalPoint;
 
   const markerStyle = useMemo(
     () => ({
@@ -90,21 +92,19 @@ export function FocalPointPicker({
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: unknown }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось сохранить точку фокуса.");
+        throw new Error(json && !json.ok ? json.error.message : t.saveFailed);
       }
       onSave(point.x, point.y);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Не удалось сохранить точку фокуса.");
+      setError(saveError instanceof Error ? saveError.message : t.saveFailed);
     } finally {
       setBusy(false);
     }
-  }, [assetId, onSave, point.x, point.y]);
+  }, [assetId, onSave, point.x, point.y, t.saveFailed]);
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-text-sec">
-        Нажмите на главный объект фото — лицо или ключевой элемент.
-      </div>
+      <div className="text-sm text-text-sec">{t.hint}</div>
 
       <div
         ref={containerRef}
@@ -130,10 +130,10 @@ export function FocalPointPicker({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={() => void save()} disabled={busy}>
-          Сохранить
+          {t.save}
         </Button>
         <Button type="button" variant="secondary" onClick={onSkip} disabled={busy}>
-          Пропустить
+          {t.skip}
         </Button>
       </div>
     </div>

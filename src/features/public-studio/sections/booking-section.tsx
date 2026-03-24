@@ -24,16 +24,16 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
 
   if (hasError) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-        Не удалось загрузить блок.
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+        {UI_TEXT.publicStudio.blockLoadFailed}
       </div>
     );
   }
 
   if (!studio) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-        Не удалось загрузить запись.
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+        {UI_TEXT.publicStudio.bookingLoadFailed}
       </div>
     );
   }
@@ -51,7 +51,7 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
 
   return (
     <div className="fade-in-up" id="studio-booking-entry">
-      <div className="rounded-2xl border border-border bg-surface p-5 md:p-6">
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.heroBook}</div>
           <Button asChild variant="secondary">

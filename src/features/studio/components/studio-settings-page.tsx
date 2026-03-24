@@ -107,13 +107,13 @@ function SettingsSection({
           </span>
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-2xl bg-white/4">{children}</div>
+      <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">{children}</div>
     </section>
   );
 }
 
 function SectionDivider() {
-  return <div className="h-px bg-white/6" />;
+  return <div className="h-px bg-border-subtle" />;
 }
 
 function LockedAddonRow({
@@ -140,7 +140,7 @@ function LockedAddonRow({
         {icon}
         <Link
           href="/cabinet/billing?scope=STUDIO"
-          className="rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/12"
+          className="rounded-xl border border-border-subtle bg-bg-input px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-card"
         >
           {UI_TEXT.settings.billing.featureGate.cta}
         </Link>
@@ -700,7 +700,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                     title={UI_TEXT.settings.telegram.title}
                     hint={UI_TEXT.settings.telegram.hint}
                     connectLabel={UI_TEXT.settings.telegram.connect}
-                    connectButtonClassName="shrink-0 rounded-xl border border-white/12 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/8"
+                    connectButtonClassName="shrink-0 rounded-xl border border-border-subtle bg-bg-input px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-card"
                     leadingIcon={
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2AABEE]/15">
                         <Send className="h-5 w-5 text-[#2AABEE]" />
@@ -725,7 +725,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                     title={UI_TEXT.settings.vk.title}
                     hint={UI_TEXT.settings.vk.hint}
                     connectLabel={UI_TEXT.settings.vk.connect}
-                    connectButtonClassName="shrink-0 rounded-xl border border-white/12 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/8"
+                    connectButtonClassName="shrink-0 rounded-xl border border-border-subtle bg-bg-input px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-card"
                     leadingIcon={
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#4C75A3]/15">
                         <Users className="h-5 w-5 text-[#4C75A3]" />
@@ -751,7 +751,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                     title={UI_TEXT.settings.hotSlots.title}
                     hint={UI_TEXT.settings.hotSlots.hint}
                     icon={
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/8">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg-input">
                         <Lock className="h-5 w-5 text-text-main" />
                       </div>
                     }

@@ -80,9 +80,9 @@ export async function StudioReviewsSection({ studioId }: Props) {
   if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
-        <Card className="bg-surface">
+        <Card className="bg-bg-card">
           <CardContent className="p-5 md:p-6">
-            <div className="text-sm text-text-muted">Не удалось загрузить блок.</div>
+            <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.blockLoadFailed}</div>
           </CardContent>
         </Card>
       </Section>
@@ -92,9 +92,9 @@ export async function StudioReviewsSection({ studioId }: Props) {
   if (!studio) {
     return (
       <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
-        <Card className="bg-surface">
+        <Card className="bg-bg-card">
           <CardContent className="p-5 md:p-6">
-            <div className="text-sm text-text-muted">Не удалось загрузить отзывы.</div>
+            <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.reviewsLoadFailed}</div>
           </CardContent>
         </Card>
       </Section>
@@ -104,7 +104,7 @@ export async function StudioReviewsSection({ studioId }: Props) {
   return (
     <div className="fade-in-up">
       <Section title={UI_TEXT.publicStudio.sectionReviews} subtitle={UI_TEXT.publicStudio.sectionReviewsSubtitle}>
-        <Card className="bg-surface">
+        <Card className="bg-bg-card">
           <CardContent className="p-5 md:p-6">
             <StudioReviewsSectionClient
               studioId={studio.id}

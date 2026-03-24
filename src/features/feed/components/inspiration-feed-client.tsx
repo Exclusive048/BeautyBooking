@@ -75,9 +75,9 @@ function formatDuration(min: number): string {
   if (min <= 0) return "";
   const hours = Math.floor(min / 60);
   const minutes = min % 60;
-  if (hours > 0 && minutes > 0) return `${hours}ч ${minutes}м`;
-  if (hours > 0) return `${hours}ч`;
-  return `${minutes}м`;
+  if (hours > 0 && minutes > 0) return `${hours}${UI_TEXT.feed.durationHourShort} ${minutes}${UI_TEXT.feed.durationMinuteShort}`;
+  if (hours > 0) return `${hours}${UI_TEXT.feed.durationHourShort}`;
+  return `${minutes}${UI_TEXT.feed.durationMinuteShort}`;
 }
 
 function buildFeedUrl(params: {
@@ -428,14 +428,14 @@ export default function InspirationFeedClient() {
                     type="button"
                     onClick={() => onToggleFavorite(item.id)}
                     title={item.isFavorited ? UI_TEXT.feed.removeFromFavorites : UI_TEXT.feed.addToFavorites}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/88 text-base text-neutral-900 backdrop-blur"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/88 text-base text-text-main backdrop-blur"
                   >
                     {item.isFavorited ? "❤" : "♡"}
                   </button>
                   <span className="text-xs text-white/90">{item.favoritesCount > 0 ? `🔥 ${item.favoritesCount}` : ""}</span>
                   <Link
                     href={`/book?portfolioId=${item.id}`}
-                    className="ml-auto inline-flex items-center rounded-full border border-white/35 bg-white/90 px-3 py-2 text-xs font-semibold text-neutral-900 backdrop-blur transition hover:bg-white"
+                    className="ml-auto inline-flex items-center rounded-full border border-white/35 bg-white/90 px-3 py-2 text-xs font-semibold text-text-main backdrop-blur transition hover:bg-white"
                   >
                     {UI_TEXT.feed.bookNow}
                   </Link>
@@ -464,7 +464,7 @@ export default function InspirationFeedClient() {
         <div className="fixed inset-0 z-50">
           <button type="button" aria-label={UI_TEXT.common.cancel} className="absolute inset-0 bg-black/55" onClick={() => setSelectedId(null)} />
           <div className="absolute inset-0 overflow-y-auto p-3 sm:p-6">
-            <div className="mx-auto mt-4 w-full max-w-6xl rounded-2xl bg-white p-4 shadow-2xl sm:mt-8 sm:p-6">
+            <div className="mx-auto mt-4 w-full max-w-6xl rounded-2xl border border-border-subtle bg-bg-card p-4 shadow-hover sm:mt-8 sm:p-6">
               {detailError ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{detailError}</div> : null}
               {selectedItem ? (
                 <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
@@ -478,14 +478,14 @@ export default function InspirationFeedClient() {
 
                   <div className="space-y-4">
                     <div>
-                      <div className="text-sm text-neutral-500">{UI_TEXT.feed.byMaster}</div>
-                      <div className="text-lg font-semibold text-neutral-900">{selectedItem.masterName}</div>
-                      {selectedItem.studioName ? <div className="text-sm text-neutral-600">{selectedItem.studioName}</div> : null}
+                      <div className="text-sm text-text-sec">{UI_TEXT.feed.byMaster}</div>
+                      <div className="text-lg font-semibold text-text-main">{selectedItem.masterName}</div>
+                      {selectedItem.studioName ? <div className="text-sm text-text-sec">{selectedItem.studioName}</div> : null}
                     </div>
 
                     <div>
-                      <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.feed.whatOnPhoto}</div>
-                      <ul className="mt-2 space-y-1 text-sm text-neutral-700">
+                      <div className="text-sm font-semibold text-text-main">{UI_TEXT.feed.whatOnPhoto}</div>
+                      <ul className="mt-2 space-y-1 text-sm text-text-sec">
                         {selectedItem.serviceOptions.map((service) => (
                           <li key={service.serviceId}>
                             • {service.title} — {formatDuration(service.durationMin)} / {UI_FMT.priceLabel(service.price)}
@@ -494,19 +494,19 @@ export default function InspirationFeedClient() {
                       </ul>
                     </div>
 
-                    <div className="rounded-xl bg-neutral-50 p-3 text-sm text-neutral-900">
+                    <div className="rounded-xl bg-bg-input p-3 text-sm text-text-main">
                       <div className="font-semibold">{UI_TEXT.feed.total}</div>
                       <div className="mt-1">{formatDuration(selectedItem.totalDurationMin)} / {UI_FMT.priceLabel(selectedItem.totalPrice)}</div>
                     </div>
 
                     <div>
-                      <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.feed.nearestSlots}</div>
+                      <div className="text-sm font-semibold text-text-main">{UI_TEXT.feed.nearestSlots}</div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {selectedItem.nearestSlots.length === 0 ? (
-                          <span className="text-sm text-neutral-500">{UI_TEXT.feed.noSlots}</span>
+                          <span className="text-sm text-text-sec">{UI_TEXT.feed.noSlots}</span>
                         ) : (
                           selectedItem.nearestSlots.map((slot) => (
-                            <span key={slot.startAt} className="rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700">
+                            <span key={slot.startAt} className="rounded-full border border-border-subtle px-3 py-1 text-xs text-text-sec">
                               {UI_FMT.dateTimeShort(slot.startAt, { timeZone: viewerTimeZone })}
                             </span>
                           ))
@@ -516,7 +516,7 @@ export default function InspirationFeedClient() {
 
                     <Link
                       href={`/book?portfolioId=${selectedItem.id}`}
-                      className="inline-flex w-full items-center justify-center rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-3 text-sm font-semibold text-[rgb(var(--accent-foreground))]"
                     >
                       {UI_TEXT.feed.bookThisService}
                     </Link>
@@ -526,7 +526,7 @@ export default function InspirationFeedClient() {
 
               {selectedItem && selectedItem.similarItems.length > 0 ? (
                 <div className="mt-6">
-                  <div className="text-sm font-semibold text-neutral-900">{UI_TEXT.feed.similarWorks}</div>
+                  <div className="text-sm font-semibold text-text-main">{UI_TEXT.feed.similarWorks}</div>
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {selectedItem.similarItems.map((similar) => (
                       <button
@@ -537,8 +537,8 @@ export default function InspirationFeedClient() {
                       >
                         <img src={similar.mediaUrl} alt={similar.masterName} className="h-24 w-full object-cover" />
                         <div className="p-2 text-xs">
-                          <div className="truncate text-neutral-800">{similar.masterName}</div>
-                          <div className="text-neutral-500">{UI_FMT.priceLabel(similar.totalPrice)}</div>
+                          <div className="truncate text-text-main">{similar.masterName}</div>
+                          <div className="text-text-sec">{UI_FMT.priceLabel(similar.totalPrice)}</div>
                         </div>
                       </button>
                     ))}

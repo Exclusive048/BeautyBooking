@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { MapPin } from "lucide-react";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import { UI_TEXT } from "@/lib/ui/text";
 import { withQuery } from "@/lib/public-urls";
+import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 
 type StudioHeroData = {
@@ -49,7 +51,7 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
   const secondary = heroImages.slice(1);
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 shadow-lg">
+    <section className="relative overflow-hidden rounded-3xl border border-border-subtle bg-bg-card shadow-card">
       <div className="grid gap-2 p-2 md:grid-cols-[2fr_1fr]">
         <div className="relative h-64 overflow-hidden rounded-2xl md:h-[420px]">
           {primary ? (
@@ -80,7 +82,7 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="h-full w-full bg-white/5" />
+                  <div className="h-full w-full bg-bg-input/35" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
               </div>
@@ -101,18 +103,15 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
                 rel="noreferrer"
                 className="mt-2 inline-flex items-center gap-2 text-sm text-white/85 underline underline-offset-2"
               >
-                <span aria-hidden>📍</span>
+                <MapPin className="h-4 w-4 shrink-0" aria-hidden />
                 <span>{studio.address}</span>
               </a>
             ) : null}
           </div>
 
-          <Link
-            href={bookingUrl}
-            className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-white/90"
-          >
-            {UI_TEXT.publicStudio.heroBook}
-          </Link>
+          <Button asChild>
+            <Link href={bookingUrl}>{UI_TEXT.publicStudio.heroBook}</Link>
+          </Button>
         </div>
       </div>
 

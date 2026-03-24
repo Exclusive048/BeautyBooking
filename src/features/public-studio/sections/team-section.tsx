@@ -32,8 +32,8 @@ export async function StudioTeamSection({ studioId }: Props) {
   if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.teamTitle} subtitle={UI_TEXT.publicStudio.teamSubtitle}>
-        <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-          Не удалось загрузить блок.
+        <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+          {UI_TEXT.publicStudio.blockLoadFailed}
         </div>
       </Section>
     );

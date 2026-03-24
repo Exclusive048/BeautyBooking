@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import type { ReviewDto } from "@/lib/reviews/types";
@@ -33,7 +34,7 @@ function ReviewCard({ review }: { review: ReviewDto }) {
           {review.publicTags.map((tag) => (
             <span
               key={tag.id}
-              className="rounded-full border border-border-subtle bg-white/70 px-2 py-1 text-[11px] text-text-sec"
+              className="rounded-full border border-border-subtle bg-bg-card px-2 py-1 text-[11px] text-text-sec"
             >
               {tag.icon ? `${tag.icon} ` : ""}
               {tag.label}
@@ -42,8 +43,8 @@ function ReviewCard({ review }: { review: ReviewDto }) {
         </div>
       ) : null}
       {review.replyText ? (
-        <div className="mt-2 rounded-xl border border-border-subtle bg-white/60 p-2 text-sm text-text-main">
-          <div className="text-xs uppercase text-text-sec">Master reply</div>
+        <div className="mt-2 rounded-xl border border-border-subtle bg-bg-card p-2 text-sm text-text-main">
+          <div className="text-xs uppercase text-text-sec">{UI_TEXT.publicProfile.reviews.masterReply}</div>
           <div className="mt-1">{review.replyText}</div>
         </div>
       ) : null}
@@ -101,22 +102,26 @@ export function ReviewsPreview({
           </div>
           <div className="flex items-center gap-2">
             {hasMoreThanPreview ? (
-              <button
+              <Button
                 type="button"
                 onClick={() => void openAllReviews()}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm transition hover:bg-bg-card"
+                variant="secondary"
+                size="sm"
+                className="rounded-lg"
               >
                 {UI_TEXT.publicProfile.reviews.all}
-              </button>
+              </Button>
             ) : null}
             {canReviewBookingId && !showReviewForm ? (
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowReviewForm(true)}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm transition hover:bg-bg-card"
+                variant="secondary"
+                size="sm"
+                className="rounded-lg"
               >
                 {UI_TEXT.publicProfile.reviews.leaveReview}
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>

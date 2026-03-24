@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -35,6 +36,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const [dropActive, setDropActive] = useState(false);
   const plan = usePlanFeatures(entityType === "STUDIO" ? "STUDIO" : "MASTER");
   const portfolioText = UI_TEXT.master.profile.portfolio;
+  const mediaText = UI_TEXT.media.portfolio;
   const portfolioLimit =
     entityType === "STUDIO"
       ? plan.features
@@ -45,7 +47,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const limitWarning =
     portfolioLimit !== null && assets.length >= Math.max(portfolioLimit - 1, 1);
   const limitLabel =
-    portfolioLimit === null ? "Без лимита" : `${assets.length} / ${portfolioLimit}`;
+    portfolioLimit === null ? UI_TEXT.common.noLimit : `${assets.length} / ${portfolioLimit}`;
 
   const load = useCallback(async () => {
     setError(null);
@@ -53,13 +55,13 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       const res = await fetch(buildListUrl(entityType, entityId), { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить портфолио");
+        throw new Error(json && !json.ok ? json.error.message : mediaText.loadFailed);
       }
       setAssets(json.data.assets);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось загрузить портфолио");
+      setError(e instanceof Error ? e.message : mediaText.loadFailed);
     }
-  }, [entityType, entityId]);
+  }, [entityType, entityId, mediaText.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -68,7 +70,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const upload = useCallback(
     async (file: File, replaceAssetId?: string) => {
       if (!replaceAssetId && limitReached) {
-        setError("Достигнут лимит портфолио. Удалите фото или обновите тариф.");
+        setError(UI_TEXT.master.profile.errors.portfolioLimitReached);
         return;
       }
       setBusy(true);
@@ -84,16 +86,16 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         const res = await fetch("/api/media", { method: "POST", body: form });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить фото");
+          throw new Error(json && !json.ok ? json.error.message : mediaText.uploadFailed);
         }
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Не удалось загрузить фото");
+        setError(e instanceof Error ? e.message : mediaText.uploadFailed);
       } finally {
         setBusy(false);
       }
     },
-    [entityType, entityId, limitReached, load]
+    [entityType, entityId, limitReached, load, mediaText.uploadFailed]
   );
 
   const remove = useCallback(
@@ -104,16 +106,16 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         const res = await fetch(`/api/media/${id}`, { method: "DELETE" });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Не удалось удалить фото");
+          throw new Error(json && !json.ok ? json.error.message : mediaText.deleteFailed);
         }
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Не удалось удалить фото");
+        setError(e instanceof Error ? e.message : mediaText.deleteFailed);
       } finally {
         setBusy(false);
       }
     },
-    [load]
+    [load, mediaText.deleteFailed]
   );
 
   const handleDragOver = useCallback(
@@ -150,10 +152,10 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
           <button
             type="button"
             onClick={() => addInputRef.current?.click()}
-            className="rounded-xl border px-4 py-2 text-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition-colors hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-60"
             disabled={busy || limitReached}
           >
-            {limitReached ? "Лимит достигнут" : "Добавить фото"}
+            {limitReached ? mediaText.limitReached : mediaText.addPhoto}
           </button>
           <div className={`text-xs ${limitWarning ? "text-amber-600" : "text-text-sec"}`}>
             {limitLabel}
@@ -192,7 +194,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {assets.map((asset) => (
-          <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
+          <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             <button type="button" className="h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
               <img src={asset.url} alt="" className="h-full w-full object-cover" />
             </button>
@@ -205,20 +207,20 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
                     setReplaceTargetId(asset.id);
                     replaceInputRef.current?.click();
                   }}
-                  aria-label="Заменить фото"
+                  aria-label={mediaText.replacePhotoAria}
                   disabled={busy}
-                  className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input"
                 >
-                  ✏️
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => void remove(asset.id)}
-                  aria-label="Удалить фото"
+                  aria-label={mediaText.removePhotoAria}
                   disabled={busy}
-                  className="rounded-full bg-white/90 px-2 py-1 text-xs shadow-sm hover:bg-white"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input"
                 >
-                  ✖️
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             ) : null}
@@ -230,8 +232,8 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
       {previewUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <button className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label="Закрыть предпросмотр" />
-          <img src={previewUrl} alt="" className="relative max-h-[90vh] max-w-[90vw] rounded-2xl bg-white object-contain" />
+          <button className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label={mediaText.closePreviewAria} />
+          <img src={previewUrl} alt="" className="relative max-h-[90vh] max-w-[90vw] rounded-2xl bg-bg-card object-contain" />
         </div>
       ) : null}
 

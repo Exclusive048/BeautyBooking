@@ -10,6 +10,7 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from "react";
+import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -160,13 +161,13 @@ export function VisualSearchModal({ open, onClose }: Props) {
           <button
             onClick={onClose}
             aria-label={UI_TEXT.common.close}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-white/8 hover:text-text-main"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="h-px bg-white/6 mx-5" />
+        <div className="mx-5 h-px bg-border-subtle" />
 
         <div className="p-5 space-y-3">
 
@@ -183,12 +184,12 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 "transition-all duration-150 select-none",
                 isDragging
                   ? "border-[#c6a97e]/50 bg-[#c6a97e]/5"
-                  : "border-white/8 bg-white/2 hover:border-white/16 hover:bg-white/4",
+                  : "border-border-subtle bg-bg-input/40 hover:border-border-subtle/80 hover:bg-bg-input/70",
               ].join(" ")}
             >
               <div className={[
                 "flex h-11 w-11 items-center justify-center rounded-2xl transition-colors",
-                isDragging ? "bg-[#c6a97e]/15" : "bg-white/6",
+                isDragging ? "bg-[#c6a97e]/15" : "bg-bg-input",
               ].join(" ")}>
                 <Upload className={[
                   "h-5 w-5 transition-colors",
@@ -207,7 +208,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 </p>
               </div>
 
-              <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-white/10">
+              <span className="rounded-lg border border-border-subtle bg-bg-card px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-input">
                 {UI_TEXT.home.visualSearch.chooseFile}
               </span>
               <p className="text-[11px] text-text-sec/60">
@@ -224,10 +225,10 @@ export function VisualSearchModal({ open, onClose }: Props) {
             </div>
           ) : (
             /* Preview */
-            <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-black/20">
+            <div className="relative overflow-hidden rounded-2xl border border-border-subtle bg-black/20">
               <img
                 src={preview}
-                alt="Preview"
+                alt={UI_TEXT.home.visualSearch.previewAlt}
                 className="max-h-60 w-full object-contain"
               />
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/65 to-transparent px-3.5 py-3">
@@ -237,7 +238,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-white/12 px-2.5 py-1 text-xs font-medium text-white/80 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-card/80 px-2.5 py-1 text-xs font-medium text-text-main backdrop-blur-sm transition-colors hover:bg-bg-card"
                 >
                   <RotateCcw className="h-3 w-3" />
                   {UI_TEXT.home.visualSearch.changeFile}
@@ -276,7 +277,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
 
           {/* Soft error from API response */}
           {response && !response.ok && (
-            <div className="rounded-xl border border-white/8 bg-white/3 px-3.5 py-2.5 text-xs text-text-sec">
+            <div className="rounded-xl border border-border-subtle bg-bg-input px-3.5 py-2.5 text-xs text-text-sec">
               {response.message ?? UI_TEXT.home.visualSearch.messages.searchFailed}
             </div>
           )}
@@ -286,7 +287,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
             <div className="space-y-3">
               {/* Category label */}
               <div className="flex items-center gap-2">
-                <div className="h-px flex-1 bg-white/6" />
+                <div className="h-px flex-1 bg-border-subtle" />
                 <span className="flex items-center gap-1.5 rounded-full border border-[#c6a97e]/20 bg-[#c6a97e]/8 px-3 py-1 text-[11px] font-medium text-[#c6a97e]">
                   <Sparkles className="h-3 w-3" />
                   {UI_TEXT.home.visualSearch.searchingCategory.replace(
@@ -294,7 +295,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                     detectedCategoryLabel ?? response.category
                   )}
                 </span>
-                <div className="h-px flex-1 bg-white/6" />
+                <div className="h-px flex-1 bg-border-subtle" />
               </div>
 
               {/* Master cards */}
@@ -302,7 +303,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 {response.results.map((item) => (
                   <article
                     key={item.provider.id}
-                    className="overflow-hidden rounded-2xl border border-white/8 bg-white/3 transition-colors hover:border-white/12 hover:bg-white/5"
+                    className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition-colors hover:border-border-subtle/70 hover:bg-bg-input"
                   >
                     {/* Photo strip */}
                     {item.matchingPhotos.length > 0 && (
@@ -356,8 +357,8 @@ export function VisualSearchModal({ open, onClose }: Props) {
 
           {/* No results */}
           {noResults && (
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-white/8 bg-white/2 py-8 px-6 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/6">
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-border-subtle bg-bg-input/50 px-6 py-8 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-bg-card">
                 <Sparkles className="h-5 w-5 text-text-sec" />
               </div>
               <p className="text-sm font-medium text-text-main">{UI_TEXT.home.visualSearch.noResultsTitle}</p>
@@ -368,16 +369,16 @@ export function VisualSearchModal({ open, onClose }: Props) {
           )}
 
           {/* Search button */}
-          <button
+          <Button
             type="button"
             disabled={isSearching || !selectedFile}
             onClick={() => void runSearch()}
-            className="w-full rounded-2xl bg-[#c6a97e] py-3 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40 hover:opacity-90"
+            className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta py-3 text-sm font-semibold text-[rgb(var(--accent-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSearching
               ? UI_TEXT.home.visualSearch.analyzing
               : UI_TEXT.home.visualSearch.actions.startSearch}
-          </button>
+          </Button>
 
         </div>
       </div>

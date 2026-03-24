@@ -6,6 +6,7 @@ import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
@@ -136,7 +137,7 @@ export function AvatarEditor({
     [activeAsset, t.replace, t.upload]
   );
   const hasFocalPoint = activeAsset?.focalX !== null && activeAsset?.focalY !== null;
-  const focalButtonLabel = hasFocalPoint ? "Изменить точку фокуса" : "Задать точку фокуса";
+  const focalButtonLabel = hasFocalPoint ? t.editFocalPoint : t.setFocalPoint;
   const pickerAsset = focalAsset ?? activeAsset;
 
   const avatarPreview = imageUrl ? (
@@ -148,12 +149,12 @@ export function AvatarEditor({
       className="h-full w-full object-cover"
     />
   ) : (
-    <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500">{t.noAvatar}</div>
+    <div className="flex h-full w-full items-center justify-center text-xs text-text-sec">{t.noAvatar}</div>
   );
 
   return (
     <div className="space-y-2">
-      <div className={`group relative overflow-hidden rounded-2xl border bg-neutral-100 ${sizeClassName}`}>
+      <div className={`group relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-input ${sizeClassName}`}>
         {canEdit && isClickableVariant ? (
           <button
             type="button"
@@ -171,7 +172,7 @@ export function AvatarEditor({
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-neutral-500">
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-text-sec">
                 <Camera className="h-4 w-4" />
                 <span className="text-[10px] leading-none">{t.noAvatar}</span>
               </div>
@@ -198,7 +199,7 @@ export function AvatarEditor({
               onClick={() => inputRef.current?.click()}
               disabled={busy}
               aria-label={filePickerLabel}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-neutral-700 shadow-sm hover:bg-white disabled:opacity-60"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -212,7 +213,7 @@ export function AvatarEditor({
                   }}
                   disabled={busy}
                   aria-label={focalButtonLabel}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-neutral-700 shadow-sm hover:bg-white disabled:opacity-60"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
                   <Crosshair className="h-3.5 w-3.5" />
                 </button>
@@ -221,7 +222,7 @@ export function AvatarEditor({
                   onClick={remove}
                   disabled={busy}
                   aria-label={t.remove}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-neutral-700 shadow-sm hover:bg-white disabled:opacity-60"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -237,7 +238,7 @@ export function AvatarEditor({
             disabled={busy}
             aria-label={t.remove}
             title={t.remove}
-            className="absolute right-1.5 top-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80 disabled:opacity-60"
+            className="absolute right-1.5 top-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border-subtle bg-bg-card/85 text-text-main backdrop-blur-sm transition-colors hover:bg-bg-input disabled:opacity-60"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -245,14 +246,16 @@ export function AvatarEditor({
       </div>
 
       {canEdit && !activeAsset && showAddButton && !isClickableVariant ? (
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => inputRef.current?.click()}
-          className="rounded-xl border px-3 py-2 text-sm hover:bg-neutral-50"
           disabled={busy}
+          className="rounded-xl"
         >
           {t.upload}
-        </button>
+        </Button>
       ) : null}
 
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
@@ -272,7 +275,7 @@ export function AvatarEditor({
       />
 
       {pickerAsset ? (
-        <ModalSurface open={pickingFocal} onClose={() => setPickingFocal(false)} title="Точка фокуса">
+        <ModalSurface open={pickingFocal} onClose={() => setPickingFocal(false)} title={UI_TEXT.media.focalPoint.title}>
           <FocalPointPicker
             assetId={pickerAsset.id}
             imageUrl={pickerAsset.url}

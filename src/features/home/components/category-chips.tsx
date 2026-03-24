@@ -26,7 +26,7 @@ export function CategoryChips({ categories, selectedId, onSelect }: Props) {
         <button
           type="button"
           onClick={() => onSelect(null)}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-border-subtle px-3 py-1.5 text-xs text-text-sec transition-colors hover:bg-white/8"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-input px-3 py-1.5 text-xs text-text-sec transition-colors hover:bg-bg-card"
         >
           <X className="h-3 w-3" />
           {UI_TEXT.home.filters.reset}

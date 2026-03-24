@@ -22,8 +22,8 @@ export async function StudioServicesSection({ studioId }: Props) {
   if (hasError) {
     return (
       <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
-        <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-          Не удалось загрузить блок.
+        <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+          {UI_TEXT.publicStudio.blockLoadFailed}
         </div>
       </Section>
     );
@@ -32,8 +32,8 @@ export async function StudioServicesSection({ studioId }: Props) {
   if (!studio) {
     return (
       <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
-        <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-text-muted">
-          Не удалось загрузить услуги.
+        <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 text-sm text-text-sec">
+          {UI_TEXT.publicStudio.servicesLoadFailed}
         </div>
       </Section>
     );

@@ -198,7 +198,7 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
                       {review.publicTags.map((tag) => (
                         <span
                           key={tag.id}
-                          className="rounded-full border border-border-subtle bg-white/10 px-2 py-1 text-[11px] text-text-sec"
+                          className="rounded-full border border-border-subtle bg-bg-card px-2 py-1 text-[11px] text-text-sec"
                         >
                           {tag.icon ? `${tag.icon} ` : ""}
                           {tag.label}
@@ -215,4 +215,3 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
     </div>
   );
 }
-

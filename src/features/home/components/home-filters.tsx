@@ -22,7 +22,7 @@ export function HomeFilters({
   onSelectCategory,
 }: Props) {
   return (
-    <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 border-b border-white/6 bg-bg-page/90 backdrop-blur-md md:static md:mx-0 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
+    <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 border-b border-border-subtle/70 bg-bg-page/90 backdrop-blur-md md:static md:mx-0 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
       <div className="px-4 py-2 md:px-0 md:py-0">
         <div className="rounded-[22px] border border-border-subtle/70 bg-bg-card/75 p-3 shadow-card backdrop-blur">
           <div>

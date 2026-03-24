@@ -81,7 +81,7 @@ export function HomeFeed() {
   useEffect(() => {
     const deleted = searchParams.get("deleted");
     if (deleted !== "1") return;
-    setToast("Ваш аккаунт удалён");
+    setToast(UI_TEXT.home.accountDeleted);
     const timer = window.setTimeout(() => setToast(null), 2400);
     const next = new URLSearchParams(searchParams.toString());
     next.delete("deleted");
