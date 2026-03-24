@@ -25,8 +25,8 @@ export default async function StudioSettingsIndexPage({ searchParams }: PageProp
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-xl font-semibold">{UI_TEXT.studioCabinet.settings.profile}</h2>
-        <p className="text-sm text-neutral-600">{UI_TEXT.studio.profile.subtitle}</p>
+        <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.studioCabinet.settings.profile}</h2>
+        <p className="text-sm text-text-sec">{UI_TEXT.studio.profile.subtitle}</p>
       </header>
       <StudioSettingsPage providerId={providerId} studioId={studioId} initialTab={params?.tab ?? null} />
     </section>

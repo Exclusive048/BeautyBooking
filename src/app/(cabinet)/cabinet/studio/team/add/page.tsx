@@ -1,19 +1,21 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export default function AddStudioMasterPage() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-xl font-semibold">{UI_TEXT.studioCabinet.teamAdd.title}</h2>
-        <p className="text-sm text-neutral-600">{UI_TEXT.studioCabinet.teamAdd.subtitle}</p>
+        <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.studioCabinet.teamAdd.title}</h2>
+        <p className="text-sm text-text-sec">{UI_TEXT.studioCabinet.teamAdd.subtitle}</p>
       </header>
-      <div className="rounded-2xl border p-5 text-sm text-neutral-600">
-        {UI_TEXT.studioCabinet.teamAdd.info}
-      </div>
-      <Link href="/cabinet/studio/team" className="inline-flex rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50">
-        {UI_TEXT.studioCabinet.teamAdd.back}
-      </Link>
+      <Card>
+        <CardContent className="pt-5 text-sm text-text-sec">{UI_TEXT.studioCabinet.teamAdd.info}</CardContent>
+      </Card>
+      <Button asChild variant="secondary" size="sm">
+        <Link href="/cabinet/studio/team">{UI_TEXT.studioCabinet.teamAdd.back}</Link>
+      </Button>
     </section>
   );
 }

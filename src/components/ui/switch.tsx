@@ -1,15 +1,14 @@
 "use client";
 
+import React from "react";
 import { cn } from "@/lib/cn";
 
 type SwitchSize = "sm" | "md";
 
-type Props = {
+type Props = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> & {
   checked: boolean;
   onCheckedChange?: (checked: boolean) => void;
-  disabled?: boolean;
   size?: SwitchSize;
-  className?: string;
 };
 
 const SIZE_STYLES: Record<SwitchSize, { track: string; thumb: string; on: string; off: string }> = {
@@ -23,11 +22,13 @@ export function Switch({
   disabled = false,
   size = "md",
   className,
+  ...props
 }: Props) {
   const styles = SIZE_STYLES[size];
   return (
     <button
       type="button"
+      {...props}
       role="switch"
       aria-checked={checked}
       aria-disabled={disabled}

@@ -218,12 +218,13 @@ function formatMoney(amount: number | null | undefined): string {
 }
 
 function bookingStatusLabel(status: string): string {
-  if (status === "PENDING" || status === "NEW") return "Ожидает подтверждения";
-  if (status === "CONFIRMED") return "Подтверждено";
-  if (status === "CHANGE_REQUESTED") return "Запрошен перенос";
-  if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
-  if (status === "FINISHED") return "Завершено";
-  if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") return "Отменено";
+  const statusText = UI_TEXT.cabinet.master.schedule.bookingStatus;
+  if (status === "PENDING" || status === "NEW") return statusText.pending;
+  if (status === "CONFIRMED") return statusText.confirmed;
+  if (status === "CHANGE_REQUESTED") return statusText.changeRequested;
+  if (status === "IN_PROGRESS" || status === "STARTED") return statusText.inProgress;
+  if (status === "FINISHED") return statusText.finished;
+  if (status === "REJECTED" || status === "CANCELLED" || status === "NO_SHOW") return statusText.cancelled;
   return status;
 }
 
@@ -713,8 +714,8 @@ export function MasterScheduleEditor({
                     type="button"
                     size="icon"
                     variant="secondary"
-                    aria-label="Изменить график"
-                    title="Изменить график"
+                    aria-label={T.editDayAria}
+                    title={T.editDayAria}
                     onClick={() => setDayPanelMode("edit")}
                   >
                     <Pencil className="h-4 w-4" />
@@ -730,19 +731,19 @@ export function MasterScheduleEditor({
                 ) : (
                   <>
                     <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/50 px-3 py-2 text-sm text-text-main">
-                      <span>Записей на день</span>
+                      <span>{T.dayBookingsTitle}</span>
                       <span className="font-semibold">{dayBookings.length}</span>
                     </div>
                     {dayData?.isSolo ? (
                       <Button asChild size="sm" variant="secondary" className="w-full">
                         <Link href={`/cabinet/master/dashboard?manual=1&date=${encodeURIComponent(selectedKey ?? "")}`}>
-                          + Добавить запись
+                          {T.addBookingCta}
                         </Link>
                       </Button>
                     ) : null}
                     {dayBookings.length === 0 ? (
                       <div className="rounded-xl border border-border-subtle bg-bg-input/50 px-3 py-4 text-sm text-text-sec">
-                        Окошек занято: 0. День свободен.
+                        {T.dayFreeState}
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -791,8 +792,8 @@ export function MasterScheduleEditor({
                       type="button"
                       size="icon"
                       variant="secondary"
-                      aria-label="К дню"
-                      title="К дню"
+                      aria-label={T.backToDayAria}
+                      title={T.backToDayAria}
                       onClick={() => {
                         setOffDayConflict(null);
                         setDraft(buildDraftFromSelection(selectedBase, selectedException));
@@ -891,12 +892,13 @@ export function MasterScheduleEditor({
                     {showDayConsole && approval.mode === "SOLO_MASTER" && !draft.isWorkday && offDayWarningBookings.length > 0 ? (
                       <div className="space-y-2 rounded-xl border border-amber-400/35 bg-amber-500/10 p-3">
                         <div className="text-sm font-medium text-amber-100">
-                          ⚠️ Внимание! На этот день есть {offDayWarningBookings.length} записей.
+                          {T.offDayConflictTitle(offDayWarningBookings.length)}
                         </div>
                         <div className="space-y-1 text-xs text-amber-100/90">
                           {offDayWarningBookings.map((item) => (
                             <div key={item.id}>
-                              {item.clientName} ({item.timeLabel}){item.canCancel ? "" : " — нельзя отменить автоматически"}
+                              {item.clientName} ({item.timeLabel})
+                              {item.canCancel ? "" : ` ${T.offDayConflictCannotAutoCancel}`}
                             </div>
                           ))}
                         </div>
@@ -926,7 +928,7 @@ export function MasterScheduleEditor({
                               )
                             }
                           >
-                            Отменить записи и сделать выходным
+                            {T.offDayConflictConfirm}
                           </Button>
                           <Button
                             variant="secondary"
@@ -939,7 +941,7 @@ export function MasterScheduleEditor({
                               setDayPanelMode("view");
                             }}
                           >
-                            Оставить как есть
+                            {T.offDayConflictKeep}
                           </Button>
                         </div>
                       </div>

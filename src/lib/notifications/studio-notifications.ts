@@ -346,9 +346,9 @@ export async function notifyMasterScheduleUpdatedByStudio(input: {
   const masterUserId = provider.ownerUserId ?? provider.masterProfile?.userId ?? null;
   if (!masterUserId) return;
 
-  const studioName = studio.provider.name ?? "РЎС‚СѓРґРёСЏ";
-  const title = "Р“СЂР°С„РёРє РѕР±РЅРѕРІР»РµРЅ СЃС‚СѓРґРёРµР№";
-  const body = `РЎС‚СѓРґРёСЏ ${studioName} РѕР±РЅРѕРІРёР»Р° РІР°С€ СЂР°Р±РѕС‡РёР№ РіСЂР°С„РёРє.`;
+  const studioName = studio.provider.name ?? "Студия";
+  const title = "График обновлен студией";
+  const body = `Студия ${studioName} обновила ваш рабочий график.`;
 
   await deliverNotification({
     userId: masterUserId,

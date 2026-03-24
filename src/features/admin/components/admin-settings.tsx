@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { LoginHeroImageManager } from "@/features/media/components/login-hero-image-manager";
 import { SiteLogoManager } from "@/features/media/components/site-logo-manager";
 import type { ApiResponse } from "@/lib/types/api";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type SettingsResponse = {
   seoTitle: string | null;
@@ -20,6 +22,7 @@ type SystemConfigResponse = {
 };
 
 export function AdminSettings() {
+  const t = UI_TEXT.admin.settings;
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState(false);
@@ -41,7 +44,9 @@ export function AdminSettings() {
         ]);
         const json = (await settingsRes.json().catch(() => null)) as ApiResponse<SettingsResponse> | null;
         if (!settingsRes.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : "Failed to load settings");
+          throw new Error(
+            json && !json.ok ? json.error.message : UI_TEXT.admin.settings.loadFailed
+          );
         }
         setSeoTitle(json.data.seoTitle ?? "");
         setSeoDescription(json.data.seoDescription ?? "");
@@ -52,7 +57,9 @@ export function AdminSettings() {
           setVisualSearchEnabled(Boolean(flagsJson.data.visualSearchEnabled));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load settings");
+        setError(
+          err instanceof Error ? err.message : UI_TEXT.admin.settings.loadFailed
+        );
       } finally {
         setLoading(false);
       }
@@ -76,11 +83,11 @@ export function AdminSettings() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<SettingsResponse> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось сохранить настройки");
+        throw new Error(json && !json.ok ? json.error.message : t.saveFailed);
       }
-      setSuccess("Настройки сохранены.");
+      setSuccess(t.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить настройки");
+      setError(err instanceof Error ? err.message : t.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -98,13 +105,13 @@ export function AdminSettings() {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<SystemConfigResponse> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Failed to save settings");
+        throw new Error(json && !json.ok ? json.error.message : t.saveFailed);
       }
       setOnlinePaymentsEnabled(Boolean(json.data.onlinePaymentsEnabled));
       setVisualSearchEnabled(Boolean(json.data.visualSearchEnabled));
-      setSuccess("Settings saved.");
+      setSuccess(t.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      setError(err instanceof Error ? err.message : t.saveFailed);
     } finally {
       setFlagsSaving(false);
     }
@@ -117,8 +124,8 @@ export function AdminSettings() {
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-text-main">Настройки системы</h1>
-        <p className="mt-1 text-sm text-text-sec">Базовые параметры бренда и SEO.</p>
+        <h1 className="text-2xl font-semibold text-text-main">{t.title}</h1>
+        <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
       </header>
 
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
@@ -131,8 +138,8 @@ export function AdminSettings() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <div className="text-base font-semibold text-text-main">Логотип сервиса</div>
-            <p className="text-sm text-text-sec">Используется в верхней панели и публичных страницах.</p>
+            <div className="text-base font-semibold text-text-main">{t.logoTitle}</div>
+            <p className="text-sm text-text-sec">{t.logoSubtitle}</p>
           </CardHeader>
           <CardContent>
             <SiteLogoManager />
@@ -141,8 +148,8 @@ export function AdminSettings() {
 
         <Card>
           <CardHeader>
-            <div className="text-base font-semibold text-text-main">Баннеры страницы входа</div>
-            <p className="text-sm text-text-sec">Фоновое изображение на странице /login.</p>
+            <div className="text-base font-semibold text-text-main">{t.loginHeroTitle}</div>
+            <p className="text-sm text-text-sec">{t.loginHeroSubtitle}</p>
           </CardHeader>
           <CardContent>
             <LoginHeroImageManager />
@@ -152,31 +159,29 @@ export function AdminSettings() {
 
       <Card>
         <CardHeader>
-          <div className="text-base font-semibold text-text-main">System flags</div>
-          <p className="text-sm text-text-sec">Global feature toggles for the platform.</p>
+          <div className="text-base font-semibold text-text-main">{t.flagsTitle}</div>
+          <p className="text-sm text-text-sec">{t.flagsSubtitle}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <label className="flex items-center justify-between gap-3 text-sm text-text-main">
-            <span>Online payments enabled (global)</span>
-            <input
-              type="checkbox"
+            <span>{t.onlinePaymentsEnabled}</span>
+            <Switch
               checked={onlinePaymentsEnabled}
-              onChange={(event) => setOnlinePaymentsEnabled(event.target.checked)}
-              className="h-4 w-4 accent-primary"
+              onCheckedChange={setOnlinePaymentsEnabled}
+              aria-label={t.onlinePaymentsEnabled}
             />
           </label>
           <label className="flex items-center justify-between gap-3 text-sm text-text-main">
-            <span>Visual search enabled (global)</span>
-            <input
-              type="checkbox"
+            <span>{t.visualSearchEnabled}</span>
+            <Switch
               checked={visualSearchEnabled}
-              onChange={(event) => setVisualSearchEnabled(event.target.checked)}
-              className="h-4 w-4 accent-primary"
+              onCheckedChange={setVisualSearchEnabled}
+              aria-label={t.visualSearchEnabled}
             />
           </label>
           <div className="flex justify-end">
             <Button onClick={saveFlags} disabled={flagsSaving}>
-              {flagsSaving ? "Saving..." : "Save"}
+              {flagsSaving ? t.savingFlags : t.saveFlags}
             </Button>
           </div>
         </CardContent>
@@ -184,16 +189,16 @@ export function AdminSettings() {
 
       <Card>
         <CardHeader>
-          <div className="text-base font-semibold text-text-main">SEO-настройки</div>
-          <p className="text-sm text-text-sec">Заголовок и описание для поисковых систем.</p>
+          <div className="text-base font-semibold text-text-main">{t.seoTitle}</div>
+          <p className="text-sm text-text-sec">{t.seoSubtitle}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-text-sec">SEO-заголовок</label>
+            <label className="text-xs font-semibold text-text-sec">{t.seoTitleLabel}</label>
             <Input value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-text-sec">SEO-описание</label>
+            <label className="text-xs font-semibold text-text-sec">{t.seoDescriptionLabel}</label>
             <Textarea
               value={seoDescription}
               onChange={(event) => setSeoDescription(event.target.value)}

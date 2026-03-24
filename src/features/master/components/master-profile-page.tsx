@@ -144,8 +144,10 @@ function buildDurationOptions(value: number): number[] {
 
 function formatCategoryOptionLabel(category: GlobalCategoryOption): string {
   const base = category.fullPath || category.title || category.name || "";
-  const pendingSuffix = category.status === "PENDING" ? " (РЅР° РјРѕРґРµСЂР°С†РёРё)" : "";
-  const personalSuffix = category.isPersonal ? " (С‚РѕР»СЊРєРѕ Сѓ РјРµРЅСЏ)" : "";
+  const pendingSuffix =
+    category.status === "PENDING" ? UI_TEXT.master.profile.services.categoryPendingSuffix : "";
+  const personalSuffix =
+    category.isPersonal ? UI_TEXT.master.profile.services.categoryPersonalSuffix : "";
   return `${category.icon ? `${category.icon} ` : ""}${base}${pendingSuffix}${personalSuffix}`;
 }
 
@@ -776,7 +778,9 @@ export function MasterProfilePage() {
       router.refresh();
       await load();
     } catch (err) {
-      setLeaveStudioError(err instanceof Error ? err.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ");
+      setLeaveStudioError(
+        err instanceof Error ? err.message : UI_TEXT.master.profile.errors.leaveStudio
+      );
     } finally {
       setLeaveStudioLoading(false);
     }
@@ -1365,11 +1369,9 @@ export function MasterProfilePage() {
       await loadCategoryOptions();
       setProposeCategoryTitle("");
       setProposeCategoryOpen(false);
-      setProposeCategoryMessage(
-        "РљР°С‚РµРіРѕСЂРёСЏ РѕС‚РїСЂР°РІР»РµРЅР° РЅР° РјРѕРґРµСЂР°С†РёСЋ. РџРѕРєР° РѕРЅР° РґРѕСЃС‚СѓРїРЅР° С‚РѕР»СЊРєРѕ РІР°Рј."
-      );
+      setProposeCategoryMessage(UI_TEXT.master.profile.services.proposeCategorySuccess);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РєР°С‚РµРіРѕСЂРёСЋ");
+      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.proposeCategory);
     } finally {
       setProposeCategorySaving(false);
     }
@@ -1737,7 +1739,7 @@ export function MasterProfilePage() {
             <div className="truncate text-sm font-semibold text-text-main">{previewName}</div>
             <div className="mt-0.5 text-xs text-text-sec">{previewTagline}</div>
             <div className="mt-1 text-[11px] text-text-sec">
-              в­ђ {data?.master.ratingAvg.toFixed(1)} В· {data?.master.ratingCount}{" "}
+              ★ {data?.master.ratingAvg.toFixed(1)} • {data?.master.ratingCount}{" "}
               {UI_TEXT.master.profile.preview.reviewsLabel}
             </div>
           </div>
@@ -1892,10 +1894,11 @@ export function MasterProfilePage() {
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-amber-200">Р’С‹ СЂР°Р±РѕС‚Р°РµС‚Рµ РІ СЃРѕСЃС‚Р°РІРµ СЃС‚СѓРґРёРё</p>
+              <p className="text-sm font-medium text-amber-200">
+                {UI_TEXT.master.profile.leaveStudio.bannerTitle}
+              </p>
               <p className="mt-1 text-xs text-text-sec">
-                Р•СЃР»Рё РЅСѓР¶РЅРѕ РїСЂРµРєСЂР°С‚РёС‚СЊ С‡Р»РµРЅСЃС‚РІРѕ, РІС‹ РјРѕР¶РµС‚Рµ СЃР°РјРѕСЃС‚РѕСЏС‚РµР»СЊРЅРѕ РІС‹Р№С‚Рё РёР· СЃС‚СѓРґРёРё. РџРѕСЃР»Рµ РІС‹С…РѕРґР° РґРѕСЃС‚СѓРї Рє СЃС‚СѓРґРёР№РЅС‹Рј
-                СЂР°Р·РґРµР»Р°Рј Рё РЅР°СЃС‚СЂРѕР№РєР°Рј СЃС‚СѓРґРёРё Р±СѓРґРµС‚ РѕС‚РєР»СЋС‡РµРЅ.
+                {UI_TEXT.master.profile.leaveStudio.bannerDescription}
               </p>
             </div>
             <button
@@ -1903,7 +1906,7 @@ export function MasterProfilePage() {
               onClick={openLeaveStudioModal}
               className="rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
             >
-              Р’С‹Р№С‚Рё РёР· СЃС‚СѓРґРёРё
+              {UI_TEXT.master.profile.leaveStudio.bannerAction}
             </button>
           </div>
         </div>
@@ -2277,7 +2280,7 @@ export function MasterProfilePage() {
                         }}
                         className="mt-3 mr-2 rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
                       >
-                        РџРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ
+                        {UI_TEXT.master.profile.leaveStudio.leaveAction}
                       </button>
                     ) : null}
                     <button
@@ -2325,8 +2328,9 @@ export function MasterProfilePage() {
 
               {pendingServiceCategoryNames.length > 0 ? (
                 <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-                  РљР°С‚РµРіРѕСЂРёСЏ В«{pendingServiceCategoryNames.join("В», В«")}В» РѕР¶РёРґР°РµС‚ РїСЂРѕРІРµСЂРєРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј. РџРѕСЃР»Рµ
-                  РѕРґРѕР±СЂРµРЅРёСЏ РѕРЅР° РїРѕСЏРІРёС‚СЃСЏ РІ РѕР±С‰РµРј РєР°С‚Р°Р»РѕРіРµ.
+                  {UI_TEXT.master.profile.services.pendingCategoryNotice(
+                    pendingServiceCategoryNames.join("», «")
+                  )}
                 </div>
               ) : null}
 
@@ -2371,7 +2375,7 @@ export function MasterProfilePage() {
                       onClick={() => setProposeCategoryOpen(true)}
                       className="text-xs font-medium text-primary underline"
                     >
-                      + РЎРІРѕСЏ РєР°С‚РµРіРѕСЂРёСЏ
+                      {UI_TEXT.master.profile.services.addOwnCategoryCta}
                     </button>
                     {proposeCategoryMessage ? (
                       <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
@@ -2388,7 +2392,7 @@ export function MasterProfilePage() {
                           setNewSoloServiceFieldErrors((current) => ({ ...current, title: undefined }));
                         }}
                         className={`${inputBaseClass} ${newSoloServiceFieldErrors.title ? inputErrorClass : ""}`}
-                        placeholder="РќР°РїСЂРёРјРµСЂ: РњР°РЅРёРєСЋСЂ СЃ РіРµР»СЊ-Р»Р°РєРѕРј"
+                        placeholder={UI_TEXT.master.profile.services.serviceTitleExample}
                       />
                     </label>
                     <label className="text-xs text-text-sec">
@@ -2534,7 +2538,7 @@ export function MasterProfilePage() {
                           }
                           className={selectBaseClass}
                         >
-                          <option value="">РќРµС‚ РєР°С‚РµРіРѕСЂРёРё</option>
+                          <option value="">{UI_TEXT.master.profile.services.noCategoryOption}</option>
                           {globalCategories.map((category) => (
                           <option key={`service-category-${service.serviceId}-${category.id}`} value={category.id}>
                               {formatCategoryOptionLabel(category)}
@@ -2543,7 +2547,7 @@ export function MasterProfilePage() {
                         </select>
                         {!service.globalCategoryId ? (
                           <div className="text-xs text-amber-500">
-                            РќРµС‚ РєР°С‚РµРіРѕСЂРёРё. Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ, С‡С‚РѕР±С‹ СѓСЃР»СѓРіР° СѓС‡Р°СЃС‚РІРѕРІР°Р»Р° РІ РїРѕРёСЃРєРµ Рё РѕС„С„РµСЂР°С….
+                            {UI_TEXT.master.profile.services.noCategoryHint}
                           </div>
                         ) : null}
                       </div>
@@ -2635,7 +2639,7 @@ export function MasterProfilePage() {
                         }));
                       }}
                     />
-                    <span className="text-xs text-text-sec">в‚Ѕ</span>
+                    <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <select
@@ -2801,10 +2805,10 @@ export function MasterProfilePage() {
                         <button
                           type="button"
                           onClick={() => openPortfolioCategoryModal(item)}
-                          title="Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ С‡С‚РѕР±С‹ С„РѕС‚Рѕ РїРѕСЏРІРёР»РѕСЃСЊ РІ РїРѕРёСЃРєРµ"
+                          title={UI_TEXT.master.profile.portfolio.notInSearchHint}
                           className="absolute left-3 top-3 rounded-full bg-amber-500/90 px-2 py-1 text-[11px] font-medium text-white"
                         >
-                          РќРµ РІ РїРѕРёСЃРєРµ
+                          {UI_TEXT.master.profile.portfolio.notInSearchBadge}
                         </button>
                       ) : null}
 
@@ -2813,7 +2817,7 @@ export function MasterProfilePage() {
                           className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-sm text-white"
                           title={UI_TEXT.master.profile.portfolio.replace}
                         >
-                          вњЏпёЏ
+                          <Camera className="h-4 w-4" />
                           <input
                             type="file"
                             accept="image/png,image/jpeg,image/webp"
@@ -2833,7 +2837,7 @@ export function MasterProfilePage() {
                           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm text-white"
                           title={UI_TEXT.master.profile.portfolio.remove}
                         >
-                          вњ–пёЏ
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
 
@@ -3003,7 +3007,7 @@ export function MasterProfilePage() {
               setProposeCategoryTitle("");
             }
           }}
-          title="РџСЂРµРґР»РѕР¶РёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ"
+          title={UI_TEXT.master.profile.services.proposeCategoryTitle}
         >
           <div className="space-y-3">
             <input
@@ -3011,11 +3015,11 @@ export function MasterProfilePage() {
               value={proposeCategoryTitle}
               onChange={(event) => setProposeCategoryTitle(event.target.value)}
               className={inputBaseClass}
-              placeholder="РќР°Р·РІР°РЅРёРµ РєР°С‚РµРіРѕСЂРёРё"
+              placeholder={UI_TEXT.master.profile.services.proposeCategoryPlaceholder}
               maxLength={60}
             />
             <div className="text-xs text-text-sec">
-              РљР°С‚РµРіРѕСЂРёСЏ Р±СѓРґРµС‚ СЃСЂР°Р·Сѓ РґРѕСЃС‚СѓРїРЅР° С‚РѕР»СЊРєРѕ РІ РІР°С€РµРј РєР°Р±РёРЅРµС‚Рµ.
+              {UI_TEXT.master.profile.services.proposeCategoryHint}
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -3035,7 +3039,9 @@ export function MasterProfilePage() {
                 disabled={proposeCategorySaving || !proposeCategoryTitle.trim()}
                 className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
               >
-                {proposeCategorySaving ? UI_TEXT.status.saving : "РћС‚РїСЂР°РІРёС‚СЊ"}
+                {proposeCategorySaving
+                  ? UI_TEXT.status.saving
+                  : UI_TEXT.master.profile.services.proposeCategorySubmit}
               </button>
             </div>
           </div>
@@ -3051,7 +3057,7 @@ export function MasterProfilePage() {
               setPortfolioCategoryDraft("");
             }
           }}
-          title="РљР°С‚РµРіРѕСЂРёСЏ С„РѕС‚Рѕ"
+          title={UI_TEXT.master.profile.portfolioMeta.categoryModalTitle}
         >
           <div className="space-y-3">
             <select
@@ -3060,7 +3066,7 @@ export function MasterProfilePage() {
               className={selectBaseClass}
               disabled={portfolioCategorySaving}
             >
-              <option value="">Р‘РµР· РєР°С‚РµРіРѕСЂРёРё</option>
+              <option value="">{UI_TEXT.master.profile.portfolioMeta.noCategoryOption}</option>
               {globalCategories.map((category) => (
                 <option key={`portfolio-category-${category.id}`} value={category.id}>
                   {formatCategoryOptionLabel(category)}
@@ -3068,7 +3074,7 @@ export function MasterProfilePage() {
               ))}
             </select>
             <div className="text-xs text-text-sec">
-              Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ С‡С‚РѕР±С‹ С„РѕС‚Рѕ РїРѕСЏРІРёР»РѕСЃСЊ РІ РїРѕРёСЃРєРµ
+              {UI_TEXT.master.profile.portfolioMeta.categoryHint}
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -3109,9 +3115,9 @@ export function MasterProfilePage() {
               <div className="space-y-1">
                 {portfolioCategoryOptions.length === 0 ? (
                   <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
-                    Р”РѕР±Р°РІСЊС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ Рє СѓСЃР»СѓРіР°Рј, С‡С‚РѕР±С‹ С„РѕС‚Рѕ РїРѕРїР°Р»Рѕ РІ РїРѕРёСЃРє.{" "}
+                    {UI_TEXT.master.profile.portfolioMeta.addCategoryToServicesHint}{" "}
                     <a href="/cabinet/master/profile" className="underline">
-                      РџРµСЂРµР№С‚Рё Рє СѓСЃР»СѓРіР°Рј
+                      {UI_TEXT.master.profile.portfolioMeta.goToServices}
                     </a>
                   </div>
                 ) : null}
@@ -3133,7 +3139,7 @@ export function MasterProfilePage() {
                 </select>
                 {!portfolioGlobalCategoryId ? (
                   <div className="text-xs text-text-sec">
-                    Р•СЃР»Рё РєР°С‚РµРіРѕСЂРёСЋ РЅРµ РІС‹Р±СЂР°С‚СЊ, С„РѕС‚Рѕ СЃРѕС…СЂР°РЅРёС‚СЃСЏ, РЅРѕ РјРѕР¶РµС‚ РЅРµ РїРѕРїР°СЃС‚СЊ РІ РїРѕРёСЃРє СЃСЂР°Р·Сѓ.
+                    {UI_TEXT.master.profile.portfolioMeta.categoryMissingHint}
                   </div>
                 ) : null}
               </div>
@@ -3184,11 +3190,11 @@ export function MasterProfilePage() {
         onClose={() => {
           if (!leaveStudioLoading) setLeaveStudioModalOpen(false);
         }}
-        title="РџРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ?"
+        title={UI_TEXT.master.profile.leaveStudio.modalTitle}
       >
         <div className="space-y-4">
           <p className="text-sm text-text-main">
-            РџРѕСЃР»Рµ РІС‹С…РѕРґР° РІС‹ СЃС‚Р°РЅРµС‚Рµ РЅРµР·Р°РІРёСЃРёРјС‹Рј РјР°СЃС‚РµСЂРѕРј. Р’Р°С€Рё Р±СѓРґСѓС‰РёРµ Р·Р°РїРёСЃРё СЃРѕС…СЂР°РЅСЏС‚СЃСЏ.
+            {UI_TEXT.master.profile.leaveStudio.modalDescription}
           </p>
           <label className="flex items-start gap-2 text-sm text-text-main">
             <input
@@ -3199,9 +3205,9 @@ export function MasterProfilePage() {
               className="mt-0.5"
             />
             <span>
-              РџРµСЂРµРЅРµСЃС‚Рё СѓСЃР»СѓРіРё СЃС‚СѓРґРёРё РІ РјРѕР№ РїСЂР°Р№СЃ
+              {UI_TEXT.master.profile.leaveStudio.transferServicesLabel}
               <span className="mt-1 block text-xs text-text-sec">
-                Р¦РµРЅС‹ Рё РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ Р±СѓРґСѓС‚ СЃРєРѕРїРёСЂРѕРІР°РЅС‹ СЃ РІР°С€РёРјРё РЅР°СЃС‚СЂРѕР№РєР°РјРё
+                {UI_TEXT.master.profile.leaveStudio.transferServicesHint}
               </span>
             </span>
           </label>
@@ -3217,7 +3223,7 @@ export function MasterProfilePage() {
               disabled={leaveStudioLoading}
               className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
             >
-              РћС‚РјРµРЅР°
+              {UI_TEXT.common.cancel}
             </button>
             <button
               type="button"
@@ -3225,7 +3231,9 @@ export function MasterProfilePage() {
               disabled={leaveStudioLoading}
               className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-60"
             >
-              {leaveStudioLoading ? "Р’С‹С…РѕРґРёРј..." : "РџРѕРєРёРЅСѓС‚СЊ СЃС‚СѓРґРёСЋ"}
+              {leaveStudioLoading
+                ? UI_TEXT.master.profile.leaveStudio.leaving
+                : UI_TEXT.master.profile.leaveStudio.leaveAction}
             </button>
           </div>
         </div>

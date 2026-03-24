@@ -102,9 +102,6 @@ export function HomeFeed() {
           throw new Error(json && !json.ok ? json.error.message : UI_TEXT.home.loadFailed);
         }
         const payload = Array.isArray(json.data) ? json.data : (json.data?.categories ?? []);
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[home] global categories response", payload);
-        }
         if (!cancelled) {
           setCategories(
             payload

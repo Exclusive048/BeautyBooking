@@ -556,7 +556,7 @@ function buildBody(input: {
     });
     parts.push(label);
   }
-  return parts.join(" В· ");
+  return parts.join(" • ");
 }
 
 export async function createBookingNotifications(
