@@ -42,3 +42,6 @@ next-env.d.ts
 
 /src/generated/prisma
 _tmp_api_routes.txt
+CLAUDE.md
+MASTERRYADOM_AI_CONTEXT.md
+docs/QUALITY-GATES.md
