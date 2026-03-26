@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import type { ReviewDto } from "@/lib/reviews/types";
 import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
@@ -230,10 +231,10 @@ export function MasterReviewsPage({ masterId }: Props) {
         <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>
       ) : null}
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
       ) : null}
       {actionError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{actionError}</div>
       ) : null}
 
       {!loading && !error ? (
@@ -273,15 +274,15 @@ export function MasterReviewsPage({ masterId }: Props) {
                     </div>
                   ) : null}
                   {(review.privateTags?.length ?? 0) > 0 ? (
-                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-2">
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-amber-800">
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-2 dark:border-amber-400/40 dark:bg-amber-950/40">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:text-amber-300">
                         {t.privateTagsTitle}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {(review.privateTags ?? []).map((tag) => (
                           <span
                             key={tag.id}
-                            className="rounded-full border border-amber-300 bg-white/80 px-2 py-1 text-[11px] text-amber-900"
+                            className="rounded-full border border-amber-300 bg-white/80 px-2 py-1 text-[11px] text-amber-900 dark:border-amber-400/40 dark:bg-amber-900/30 dark:text-amber-200"
                           >
                             {tag.label}
                           </span>
@@ -299,24 +300,24 @@ export function MasterReviewsPage({ masterId }: Props) {
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     {!review.replyText ? (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => void replyToReview(review)}
                         disabled={actionId === review.id}
-                        className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs disabled:opacity-60"
+                        variant="secondary"
+                        size="sm"
                       >
                         {t.reply}
-                      </button>
+                      </Button>
                     ) : null}
                     {canReportReview(review) ? (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => void reportReview(review)}
                         disabled={actionId === review.id}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-700 disabled:opacity-60"
+                        variant="danger"
+                        size="sm"
                       >
                         {t.report}
-                      </button>
+                      </Button>
                     ) : null}
                     {review.reportedAt ? (
                       <div className="text-xs text-text-sec">

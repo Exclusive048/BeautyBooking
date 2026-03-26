@@ -177,7 +177,7 @@ export function StudioTeamPage({ studioId }: Props) {
       </div>
 
       {limitReached ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-300">
           {t.limitReachedMessage}{" "}
           <a href="/cabinet/billing?scope=STUDIO" className="underline">
             {t.viewPlans}
@@ -187,7 +187,7 @@ export function StudioTeamPage({ studioId }: Props) {
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
       ) : null}
 
       {masters.length === 0 ? (
@@ -209,8 +209,8 @@ export function StudioTeamPage({ studioId }: Props) {
                 <span
                   className={
                     master.status === "PENDING"
-                      ? "rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
-                      : "rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                      ? "rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-300"
+                      : "rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300"
                   }
                 >
                   {master.status === "PENDING" ? t.pending : t.active}

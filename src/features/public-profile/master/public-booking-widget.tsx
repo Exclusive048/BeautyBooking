@@ -2,6 +2,7 @@
 
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -999,46 +1000,47 @@ export function PublicBookingWidget({
               ) : null}
             </div>
           ) : null}
-          {submitError ? <div className="text-sm text-red-300">{submitError}</div> : null}
-          {submitSuccess ? <div className="text-sm text-emerald-300">{submitSuccess}</div> : null}
+          {submitError ? <div role="alert" className="text-sm text-red-600 dark:text-red-300">{submitError}</div> : null}
+          {submitSuccess ? <div role="status" className="text-sm text-emerald-600 dark:text-emerald-300">{submitSuccess}</div> : null}
         </div>
       ) : null}
 
       {step === "summary" ? (
-        <button
-          type="button"
+        <Button
           disabled={isEmpty}
           onClick={() => setStep("slots")}
-          className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-40"
+          size="lg"
+          className="mt-5 w-full"
         >
           {UI_TEXT.publicProfile.booking.chooseTime}
-        </button>
+        </Button>
       ) : step === "slots" ? (
-        <button
-          type="button"
+        <Button
           disabled={!selectedSlot}
           onClick={() => setStep("checkout")}
-          className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-40"
+          size="lg"
+          className="mt-5 w-full"
         >
           {UI_TEXT.publicProfile.booking.continueToConfirm}
-        </button>
+        </Button>
       ) : (
         <>
-          <button
-            type="button"
+          <Button
             disabled={submitLoading || referenceUploading || !selectedSlot || (!me && !guestPhone.trim())}
             onClick={() => void onConfirmBooking()}
-            className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-40"
+            size="lg"
+            className="mt-5 w-full"
           >
             {UI_TEXT.publicProfile.booking.confirm}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => setStep("slots")}
-            className="mt-2 w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm font-semibold text-text-main transition hover:bg-bg-card"
+            variant="secondary"
+            size="lg"
+            className="mt-2 w-full"
           >
             {UI_TEXT.publicProfile.booking.chooseTime}
-          </button>
+          </Button>
         </>
       )}
     </div>

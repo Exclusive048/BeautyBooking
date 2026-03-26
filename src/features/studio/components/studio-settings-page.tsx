@@ -5,6 +5,7 @@ import { AlertTriangle, Lock, Send, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
@@ -551,16 +552,15 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
           {STUDIO_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <Button
                 key={tab.id}
-                type="button"
                 onClick={() => switchTab(tab.id)}
-                className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm transition ${
-                  isActive ? "bg-bg-input text-text-main shadow-card" : "text-text-sec hover:text-text-main"
-                }`}
+                variant={isActive ? "secondary" : "ghost"}
+                size="sm"
+                className="justify-start whitespace-nowrap"
               >
                 {tab.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -759,23 +759,24 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                 )}
               </SettingsSection>
 
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/4 p-4">
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 dark:bg-red-950/30">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-red-300">{UI_TEXT.studio.danger.title}</p>
+                    <p className="text-sm font-semibold text-red-600 dark:text-red-300">{UI_TEXT.studio.danger.title}</p>
                     <p className="mt-1 text-xs text-text-sec">{UI_TEXT.studio.danger.hint}</p>
-                    <button
-                      type="button"
+                    <Button
                       onClick={() => {
                         setDeleteError(null);
                         setDeleteActiveCount(null);
                         setDeleteModalOpen(true);
                       }}
-                      className="mt-3 rounded-xl border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                      variant="danger"
+                      size="sm"
+                      className="mt-3"
                     >
                       {UI_TEXT.studio.danger.cta}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

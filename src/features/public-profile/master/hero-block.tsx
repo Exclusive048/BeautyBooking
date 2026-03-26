@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -56,22 +57,24 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
             providerId={provider.id}
             enabled={provider.type === "MASTER" && provider.hotSlotsEnabled}
           />
-          <button
-            type="button"
+          <Button
             onClick={onShare}
             aria-label={UI_TEXT.publicProfile.hero.share}
-            className="frost-panel rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
+            variant="ghost"
+            size="sm"
+            className="frost-panel text-white hover:bg-black/55"
           >
             {UI_TEXT.publicProfile.hero.share}
-          </button>
+          </Button>
           {showFavoriteButton ? (
-            <button
-              type="button"
+            <Button
               aria-label={UI_TEXT.publicProfile.hero.favorite}
-              className="frost-panel rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
+              variant="ghost"
+              size="sm"
+              className="frost-panel text-white hover:bg-black/55"
             >
               {UI_TEXT.publicProfile.hero.favorite}
-            </button>
+            </Button>
           ) : null}
         </div>
 

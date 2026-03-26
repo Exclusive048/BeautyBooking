@@ -25,11 +25,11 @@ export function StickySaveBar({
         <div className="min-w-0 flex items-center gap-2">
           {saved ? (
             <span className="flex items-center gap-1.5 text-sm text-text-sec">
-              <Check className="h-4 w-4 text-green-400" />
+              <Check className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
               {UI_TEXT.common.saved}
             </span>
           ) : null}
-          {error ? <span className="truncate text-sm text-red-400">{error}</span> : null}
+          {error ? <span className="truncate text-sm text-red-600 dark:text-red-400">{error}</span> : null}
         </div>
         <Button onClick={onSave} size="md" disabled={disabled || isSaving} className="w-full md:w-auto">
           {isSaving ? UI_TEXT.common.saving : UI_TEXT.actions.save}

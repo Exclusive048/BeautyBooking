@@ -33,8 +33,8 @@ export function TeamMemberCard({
             <div
               className={
                 statusTone === "busy"
-                  ? "mt-2 text-sm text-red-500"
-                  : "mt-2 text-sm text-emerald-600"
+                  ? "mt-2 text-sm text-red-600 dark:text-red-400"
+                  : "mt-2 text-sm text-emerald-600 dark:text-emerald-400"
               }
             >
               {statusLabel}

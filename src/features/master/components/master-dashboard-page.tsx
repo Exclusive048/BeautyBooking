@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -646,26 +648,26 @@ export function MasterDashboardPage() {
     <div className="space-y-4">
       <div className="lux-card rounded-[24px] p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setDate((d) => dateShift(d, -1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
+          <Button onClick={() => setDate((d) => dateShift(d, -1))} variant="secondary" size="sm">
             &lt;
-          </button>
-          <input
+          </Button>
+          <Input
             type="date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
-            className="lux-input rounded-lg px-3 py-2 text-sm"
+            className="w-auto rounded-lg px-3 py-2 text-sm"
           />
-          <button type="button" onClick={() => setDate((d) => dateShift(d, 1))} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm">
+          <Button onClick={() => setDate((d) => dateShift(d, 1))} variant="secondary" size="sm">
             &gt;
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => void load()}
-            className="rounded-lg border border-border-subtle bg-bg-input px-2.5 py-2 text-sm"
+            variant="secondary"
+            size="sm"
             aria-label={UI_TEXT.master.dashboard.labels.refresh}
           >
             {UI_TEXT.master.dashboard.labels.refresh}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1069,11 +1071,11 @@ export function MasterDashboardPage() {
           <div className="w-full max-w-md rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <h3 className="text-base font-semibold">{UI_TEXT.master.dashboard.manualBooking.title}</h3>
             <div className="mt-3 space-y-2">
-              <input
+              <Input
                 type="datetime-local"
                 value={manualStartAt}
                 onChange={(event) => setManualStartAt(event.target.value)}
-                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
+                className="rounded-lg px-3 py-2 text-sm"
               />
               <select
                 value={manualServiceId}
@@ -1087,19 +1089,19 @@ export function MasterDashboardPage() {
                   </option>
                 ))}
               </select>
-              <input
+              <Input
                 type="text"
                 value={manualClientName}
                 onChange={(event) => setManualClientName(event.target.value)}
                 placeholder={UI_TEXT.master.dashboard.manualBooking.clientNamePlaceholder}
-                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
+                className="rounded-lg px-3 py-2 text-sm"
               />
-              <input
+              <Input
                 type="text"
                 value={manualClientPhone}
                 onChange={(event) => setManualClientPhone(event.target.value)}
                 placeholder={UI_TEXT.master.dashboard.manualBooking.phonePlaceholder}
-                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
+                className="rounded-lg px-3 py-2 text-sm"
               />
               <textarea
                 value={manualNotes}
@@ -1109,21 +1111,20 @@ export function MasterDashboardPage() {
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
+              <Button
                 onClick={() => setManualOpen(false)}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                variant="secondary"
+                size="sm"
               >
                 {UI_TEXT.actions.cancel}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
                 onClick={() => void createManualBooking()}
                 disabled={savingManual}
-                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+                size="sm"
               >
                 {savingManual ? UI_TEXT.status.saving : UI_TEXT.master.dashboard.manualBooking.create}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

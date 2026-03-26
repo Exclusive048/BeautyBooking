@@ -66,9 +66,9 @@ export function StudioProfileForm({
   const studioFormText = UI_TEXT.studio.profileForm;
   const addressStatusTone =
     addressStatus?.tone === "success"
-      ? "text-emerald-500"
+      ? "text-emerald-600 dark:text-emerald-400"
       : addressStatus?.tone === "error"
-        ? "text-rose-400"
+        ? "text-red-600 dark:text-red-400"
         : "text-text-sec";
 
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);

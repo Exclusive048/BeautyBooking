@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
@@ -132,39 +133,33 @@ export function StudioReviewsPage({ providerId, initialFilter }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm text-text-sec">{summaryText}</div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
               onClick={() => setNextFilter("new")}
-              className={`rounded-xl px-3 py-1.5 text-xs transition ${
-                filter === "new" ? "bg-bg-input text-text-main" : "text-text-sec hover:text-text-main"
-              }`}
+              variant={filter === "new" ? "secondary" : "ghost"}
+              size="sm"
             >
               {t.new}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={() => setNextFilter("unanswered")}
-              className={`rounded-xl px-3 py-1.5 text-xs transition ${
-                filter === "unanswered" ? "bg-bg-input text-text-main" : "text-text-sec hover:text-text-main"
-              }`}
+              variant={filter === "unanswered" ? "secondary" : "ghost"}
+              size="sm"
             >
               {t.unanswered}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={() => setNextFilter("all")}
-              className={`rounded-xl px-3 py-1.5 text-xs transition ${
-                filter === "all" ? "bg-bg-input text-text-main" : "text-text-sec hover:text-text-main"
-              }`}
+              variant={filter === "all" ? "secondary" : "ghost"}
+              size="sm"
             >
               {t.all}
-            </button>
+            </Button>
           </div>
         </div>
       </section>
 
       {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div> : null}
-      {error ? <div className="rounded-2xl border border-rose-300/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
       {!loading && !error ? (
         <section className="lux-card rounded-[24px] p-4">
