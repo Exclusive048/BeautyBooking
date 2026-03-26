@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { AppError } from "@/lib/api/errors";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
+import { alertOtpRateLimitTriggered } from "@/lib/monitoring/api-alerts";
 
 const OTP_REQUEST_IP_LIMIT = 5;
 const OTP_REQUEST_IP_WINDOW_SECONDS = 60;
@@ -70,6 +71,7 @@ export async function checkOtpRequestRateLimit(input: {
   }
 
   if (ipCount > OTP_REQUEST_IP_LIMIT || phoneCount > OTP_REQUEST_PHONE_LIMIT) {
+    alertOtpRateLimitTriggered(input.ip, input.phone);
     const retryAfter = Math.max(
       ipCount > OTP_REQUEST_IP_LIMIT ? await ttlSeconds(ipKey) : 0,
       phoneCount > OTP_REQUEST_PHONE_LIMIT ? await ttlSeconds(phoneKey) : 0,
@@ -122,6 +124,7 @@ export async function registerOtpVerifyFailure(phone: string): Promise<RateLimit
       await client.expire(key, OTP_VERIFY_LOCK_SECONDS);
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
+      alertOtpRateLimitTriggered(null, phone);
       const lockKey = `otp:verify:lock:${hashKey(phone)}`;
       await client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS });
       const ttl = await client.ttl(lockKey);

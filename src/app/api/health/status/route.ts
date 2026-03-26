@@ -3,6 +3,7 @@ import { withRequestContext } from "@/lib/api/with-request-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { logError } from "@/lib/logging/logger";
 import { getAllSurfaceStatuses } from "@/lib/monitoring/status";
+import { alertDeadJobs, alertWorkerDown } from "@/lib/monitoring/api-alerts";
 import { getNotificationsNotifierRuntimeStatus, notificationsNotifier } from "@/lib/notifications/notifier";
 import { prisma } from "@/lib/prisma";
 import { getQueueStats } from "@/lib/queue/queue";
@@ -98,6 +99,14 @@ export async function GET(request: Request) {
       queueStats.pending > QUEUE_PENDING_OVERLOAD_THRESHOLD ||
       queueStats.processing > QUEUE_PROCESSING_THRESHOLD ||
       queueStats.dead > QUEUE_DEAD_THRESHOLD;
+
+    if (queueStats.dead > 0) {
+      alertDeadJobs(queueStats.dead);
+    }
+
+    if (!workerAlive && redisReady) {
+      alertWorkerDown(parsePingAgeSeconds(workerLastPingAtMs));
+    }
 
     const isProduction = process.env.NODE_ENV === "production";
     const readiness = {

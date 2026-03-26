@@ -5,15 +5,29 @@ import { getRedisConnection } from "@/lib/redis/connection";
 export const runtime = "nodejs";
 
 export async function GET() {
+  let db = false;
+  let redis = false;
+
   try {
     await prisma.$queryRaw`SELECT 1`;
-    const redis = await getRedisConnection();
-    if (!redis) {
-      return NextResponse.json({ ok: false }, { status: 503 });
-    }
-    await redis.ping();
-    return NextResponse.json({ ok: true });
+    db = true;
   } catch {
-    return NextResponse.json({ ok: false }, { status: 503 });
+    // db stays false
   }
+
+  try {
+    const client = await getRedisConnection();
+    if (client) {
+      await client.ping();
+      redis = true;
+    }
+  } catch {
+    // redis stays false
+  }
+
+  const allOk = db && redis;
+  return NextResponse.json(
+    { ok: allOk, db, redis },
+    { status: allOk ? 200 : 503 }
+  );
 }
