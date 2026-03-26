@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
 import { FilterChips } from "@/features/catalog/components/filter-chips";
@@ -580,7 +581,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       </div>
 
       {needsService || needsDate ? (
-        <div className="rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
+        <div role="status" className="rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
           {needsService ? UI_TEXT.catalog.timeSearch.selectServiceFirst : UI_TEXT.catalog.timeSearch.selectDateFirst}
         </div>
       ) : null}
@@ -590,43 +591,41 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
           {UI_TEXT.catalog.resultsCount}: <span className="font-semibold text-foreground">{resultCount}</span>
         </div>
         <div className="inline-flex rounded-full border border-border bg-card p-1">
-          <button
-            type="button"
+          <Button
             onClick={() => updateParams({ view: "list" })}
-            className={
-              view === "list"
-                ? "rounded-full bg-foreground px-3 py-1 text-sm text-background"
-                : "rounded-full px-3 py-1 text-sm text-foreground"
-            }
+            variant={view === "list" ? "primary" : "ghost"}
+            size="sm"
+            className="rounded-full"
           >
             {UI_TEXT.catalog.viewList}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => updateParams({ view: "map" })}
-            className={
-              view === "map"
-                ? "rounded-full bg-foreground px-3 py-1 text-sm text-background"
-                : "rounded-full px-3 py-1 text-sm text-foreground"
-            }
+            variant={view === "map" ? "primary" : "ghost"}
+            size="sm"
+            className="rounded-full"
           >
             {UI_TEXT.catalog.viewMap}
-          </button>
+          </Button>
         </div>
       </div>
 
       {currentLoading && view === "list" ? <CatalogSkeletonGrid /> : null}
 
       {currentError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+        >
           <div>{currentError}</div>
-          <button
-            type="button"
+          <Button
             onClick={() => void (timeModeActive ? fetchAvailability() : fetchCatalog())}
-            className="mt-3 rounded-full border border-red-300 px-4 py-2 text-sm"
+            variant="secondary"
+            size="sm"
+            className="mt-3"
           >
             {UI_TEXT.catalog.retry}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -678,15 +677,18 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
 
       {!timeModeActive && !loading && !error && data.nextCursor !== null && view === "list" ? (
         <div className="space-y-2 pt-2 text-center">
-          <button
-            type="button"
+          <Button
             onClick={() => void loadMore()}
             disabled={loadingMore}
-            className="rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground disabled:opacity-60"
+            variant="secondary"
+            size="md"
+            className="rounded-full"
           >
             {loadingMore ? UI_TEXT.common.loading : UI_TEXT.catalog.loadMore}
-          </button>
-          {loadMoreError ? <div className="text-xs text-red-600">{loadMoreError}</div> : null}
+          </Button>
+          {loadMoreError ? (
+            <div className="text-xs text-red-600 dark:text-red-400">{loadMoreError}</div>
+          ) : null}
         </div>
       ) : null}
 

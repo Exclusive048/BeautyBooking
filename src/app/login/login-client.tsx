@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -183,6 +185,7 @@ export default function LoginClient({
 
             {errorText ? (
               <div
+                role="alert"
                 aria-live="polite"
                 className="mb-4 rounded-2xl border border-red-300/70 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
               >
@@ -193,8 +196,8 @@ export default function LoginClient({
             {step === "phone" ? (
               <div className="space-y-4">
                 <label className="block text-sm font-medium">{UI_TEXT.auth.loginPage.phoneLabel}</label>
-                <input
-                  className="h-12 w-full rounded-2xl border border-border bg-background px-5 text-base outline-none transition focus:ring-2 focus:ring-primary/40"
+                <Input
+                  className="h-12 px-5 text-base"
                   placeholder={UI_TEXT.auth.loginPage.phonePlaceholderMask}
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
@@ -211,14 +214,14 @@ export default function LoginClient({
                   />
                 ) : null}
 
-                <button
-                  type="button"
+                <Button
                   onClick={sendCode}
                   disabled={loading || !phoneValid || (phoneValid && !agreedToTerms)}
-                  className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+                  size="lg"
+                  className="w-full"
                 >
                   {loading ? UI_TEXT.auth.loginPage.sending : UI_TEXT.auth.loginPage.sendCode}
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -228,8 +231,8 @@ export default function LoginClient({
                 </div>
 
                 <label className="block text-sm font-medium">{UI_TEXT.auth.loginPage.codeLabel}</label>
-                <input
-                  className="h-12 w-full rounded-2xl border border-border bg-background px-5 text-base tracking-[0.15em] outline-none transition focus:ring-2 focus:ring-primary/40"
+                <Input
+                  className="h-12 px-5 text-base tracking-[0.15em]"
                   placeholder={UI_TEXT.auth.loginPage.codePlaceholder}
                   value={code}
                   onChange={(event) => setCode(event.target.value.replace(/\s/g, ""))}
@@ -238,23 +241,24 @@ export default function LoginClient({
                   aria-label={UI_TEXT.auth.loginPage.codeLabel}
                 />
 
-                <button
-                  type="button"
+                <Button
                   onClick={verifyCode}
                   disabled={loading}
-                  className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+                  size="lg"
+                  className="w-full"
                 >
                   {loading ? UI_TEXT.auth.loginPage.verifying : UI_TEXT.auth.login}
-                </button>
+                </Button>
 
-                <button
-                  type="button"
+                <Button
                   onClick={() => setStep("phone")}
                   disabled={loading}
-                  className="h-11 w-full rounded-2xl border border-border bg-card text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
                 >
                   {UI_TEXT.auth.loginPage.changePhone}
-                </button>
+                </Button>
               </div>
             )}
 

@@ -197,19 +197,39 @@ export function HomeFeed() {
       />
 
       {toast ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+        <div
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300"
+        >
           {toast}
         </div>
       ) : null}
 
       {loading ? (
-        <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{UI_TEXT.home.loading}</div>
+        <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card">
+              <div className="aspect-[3/4] w-full animate-pulse bg-muted" />
+              <div className="space-y-2 p-4">
+                <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : null}
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+        >
+          {error}
+        </div>
       ) : null}
       {!loading && !error && items.length === 0 ? (
-        <div className="lux-card rounded-[24px] p-8 text-center text-sm text-text-sec">{UI_TEXT.home.empty}</div>
+        <div className="lux-card rounded-[24px] p-8 text-center">
+          <div className="text-base font-semibold text-text-main">{UI_TEXT.home.empty}</div>
+        </div>
       ) : null}
 
       {!loading && items.length > 0 ? (

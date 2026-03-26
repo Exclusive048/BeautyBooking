@@ -7,7 +7,8 @@
       "Bash(ls \"d:/BeautyBooking/beautyhub/src/app/\\(cabinet\\)/\")",
       "Bash(ls \"d:/BeautyBooking/beautyhub/src/app/\\(public\\)/providers/\")",
       "Bash(npx tsc:*)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(npx eslint:*)"
     ]
   }
 }
