@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
-import { webpush } from "@/lib/notifications/push/vapid";
+import { webpush, isPushEnabled } from "@/lib/notifications/push/vapid";
 
 type PushPayload = {
   title: string;
@@ -15,6 +15,8 @@ function getStatusCode(error: unknown): number | null {
 }
 
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
+  if (!isPushEnabled) return;
+
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
     select: { id: true, endpoint: true, p256dh: true, auth: true },

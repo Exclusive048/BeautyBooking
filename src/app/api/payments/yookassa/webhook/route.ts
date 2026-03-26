@@ -82,6 +82,17 @@ export async function POST(req: Request) {
 
     const token = getWebhookToken(req);
     const expectedToken = process.env.YOOKASSA_WEBHOOK_TOKEN?.trim();
+    const isProd = process.env.NODE_ENV === "production";
+    if (!expectedToken && isProd) {
+      logError("YooKassa webhook rejected: YOOKASSA_WEBHOOK_TOKEN not configured in production");
+      void recordSurfaceEvent({
+        surface: "webhook",
+        outcome: "denied",
+        operation: "yookassa-ingress",
+        code: "WEBHOOK_TOKEN_NOT_CONFIGURED",
+      });
+      return fail("Service unavailable", 503, "SERVICE_UNAVAILABLE");
+    }
     if (expectedToken && token !== expectedToken) {
       logError("YooKassa webhook rejected: invalid token", {
         ip: allowlistCheck.ip,

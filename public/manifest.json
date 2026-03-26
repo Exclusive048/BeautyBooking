@@ -1,13 +1,13 @@
 {
   "name": "МастерРядом",
   "short_name": "МастерРядом",
-  "description": "Запись к мастерам",
+  "description": "Онлайн-запись к мастерам красоты без звонков",
   "lang": "ru",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "theme_color": "#c6a97e",
-  "background_color": "#c6a97e",
+  "background_color": "#ffffff",
   "icons": [
     {
       "src": "/icons/icon-72.png",
