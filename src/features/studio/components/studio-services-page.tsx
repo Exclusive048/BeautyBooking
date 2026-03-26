@@ -356,14 +356,28 @@ export function StudioServicesPage({ studioId }: Props) {
       setNewCategoryTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.createCategoryFailed);
+      setError(err instanceof Error ? err.message : t.createSectionFailed);
     } finally {
       setSubmittingCategory(false);
     }
   };
 
+  const resolveLocalCategoryId = async (): Promise<string> => {
+    if (editableCategories.length === 1) return editableCategories[0].id;
+    if (editableCategories.length > 1 && newServiceCategoryId) return newServiceCategoryId;
+    if (editableCategories.length > 1) return editableCategories[0].id;
+    const res = await fetchWithAuth("/api/studio/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studioId, title: t.defaultSectionName }),
+    });
+    const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
+    if (!res.ok || !json || !json.ok) throw new Error(t.autoSectionFailed);
+    return json.data.id;
+  };
+
   const submitService = async (): Promise<void> => {
-    if (!newServiceTitle.trim() || !newServiceCategoryId) return;
+    if (!newServiceTitle.trim()) return;
     const normalizedPrice = normalizeStudioServicePrice(Number(newServicePrice.trim() === "" ? "0" : newServicePrice));
     const normalizedDuration = normalizeStudioServiceDurationMin(
       Number(newServiceDuration.trim() === "" ? "60" : newServiceDuration)
@@ -372,12 +386,13 @@ export function StudioServicesPage({ studioId }: Props) {
     setSubmittingService(true);
     setError(null);
     try {
+      const categoryId = await resolveLocalCategoryId();
       const res = await fetchWithAuth("/api/studio/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studioId,
-          categoryId: newServiceCategoryId,
+          categoryId,
           title: newServiceTitle.trim(),
           globalCategoryId: newServiceGlobalCategoryId || undefined,
           basePrice: normalizedPrice,
@@ -395,12 +410,13 @@ export function StudioServicesPage({ studioId }: Props) {
         const failed = results.filter((item) => item.status === "rejected").length;
         if (failed > 0) {
           setError(
-            `Услуга создана, но назначения мастеров сохранились частично (${failed}/${selectedMasterIds.length}).`
+            t.assignPartialError.replace("{failed}", String(failed)).replace("{total}", String(selectedMasterIds.length))
           );
         }
       }
       setShowServiceModal(false);
       setNewServiceTitle("");
+      setNewServiceCategoryId("");
       setNewServiceGlobalCategoryId("");
       setNewServicePrice("");
       setNewServiceDuration("");
@@ -431,9 +447,9 @@ export function StudioServicesPage({ studioId }: Props) {
       }
       setShowProposeCategoryModal(false);
       setProposedCategoryTitle("");
-      setProposeCategoryMessage("Категория отправлена на модерацию. Услугу можно сохранить и без категории.");
+      setProposeCategoryMessage(t.proposeCategorySent);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить категорию на модерацию");
+      setError(err instanceof Error ? err.message : t.proposeCategoryFailed);
     } finally {
       setProposingCategory(false);
     }
@@ -531,8 +547,8 @@ export function StudioServicesPage({ studioId }: Props) {
             <p className="mt-1 text-sm text-text-sec">{summaryText}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={() => setShowCategoryModal(true)} variant="secondary" size="sm">+ {t.createCategory}</Button>
-            <Button type="button" onClick={() => setShowServiceModal(true)} variant="secondary" size="sm" disabled={editableCategories.length === 0}>+ {t.addService}</Button>
+            <Button type="button" onClick={() => setShowCategoryModal(true)} variant="secondary" size="sm">+ {t.createSection}</Button>
+            <Button type="button" onClick={() => setShowServiceModal(true)} variant="secondary" size="sm">+ {t.addService}</Button>
           </div>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -745,12 +761,12 @@ export function StudioServicesPage({ studioId }: Props) {
 
       <ModalSurface open={showCategoryModal} onClose={() => setShowCategoryModal(false)}>
         <div className="space-y-4">
-          <h3 className="text-base font-semibold text-text-main">{t.createCategoryTitle}</h3>
+          <h3 className="text-base font-semibold text-text-main">{t.createSectionTitle}</h3>
           <Input
             type="text"
             value={newCategoryTitle}
             onChange={(event) => setNewCategoryTitle(event.target.value)}
-            placeholder={t.categoryTitlePlaceholder}
+            placeholder={t.sectionTitlePlaceholder}
           />
           <div className="flex justify-end gap-2">
             <Button type="button" onClick={() => setShowCategoryModal(false)} variant="secondary">
@@ -766,65 +782,85 @@ export function StudioServicesPage({ studioId }: Props) {
       <ModalSurface open={showServiceModal} onClose={() => setShowServiceModal(false)}>
         <div className="space-y-4">
           <h3 className="text-base font-semibold text-text-main">{t.createServiceTitle}</h3>
-          <div className="space-y-2">
-            <Select value={newServiceCategoryId} onChange={(event) => setNewServiceCategoryId(event.target.value)}>
-              <option value="">{t.selectCategory}</option>
-              {editableCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.title}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={newServiceGlobalCategoryId}
-              onChange={(event) => setNewServiceGlobalCategoryId(event.target.value)}
-            >
-              <option value="">Глобальная категория</option>
-              {globalCategories.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {categoryLabel(item)}
-                </option>
-              ))}
-            </Select>
-            <button
-              type="button"
-              onClick={() => setShowProposeCategoryModal(true)}
-              className="w-fit text-xs font-medium text-primary underline"
-            >
-              + Предложить свою категорию
-            </button>
-            {proposeCategoryMessage ? <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div> : null}
+
+          <div className="space-y-3">
             <Input
               type="text"
               value={newServiceTitle}
               onChange={(event) => setNewServiceTitle(event.target.value)}
               placeholder={t.serviceTitlePlaceholder}
             />
-            <Input
-              type="number"
-              min={0}
-              step={100}
-              value={newServicePrice}
-              onChange={(event) => setNewServicePrice(event.target.value)}
-              placeholder={t.pricePlaceholder}
-            />
-            <Input
-              type="number"
-              min={5}
-              step={5}
-              value={newServiceDuration}
-              onChange={(event) => setNewServiceDuration(event.target.value)}
-              placeholder={t.durationPlaceholder}
-            />
+
+            <div className="space-y-1">
+              <Select
+                value={newServiceGlobalCategoryId}
+                onChange={(event) => setNewServiceGlobalCategoryId(event.target.value)}
+              >
+                <option value="">{t.noCategoryOption}</option>
+                {globalCategories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {categoryLabel(item)}
+                  </option>
+                ))}
+              </Select>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-text-sec">{t.selectCategoryHint}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-0 py-0 text-xs font-medium text-primary underline"
+                  onClick={() => setShowProposeCategoryModal(true)}
+                >
+                  {t.proposeCategoryLink}
+                </Button>
+              </div>
+              {proposeCategoryMessage ? (
+                <div role="status" className="text-xs text-emerald-600 dark:text-emerald-400">{proposeCategoryMessage}</div>
+              ) : null}
+            </div>
+
+            <div className="flex gap-3">
+              <Input
+                type="number"
+                min={0}
+                step={100}
+                value={newServicePrice}
+                onChange={(event) => setNewServicePrice(event.target.value)}
+                placeholder={t.pricePlaceholder}
+              />
+              <Input
+                type="number"
+                min={5}
+                step={5}
+                value={newServiceDuration}
+                onChange={(event) => setNewServiceDuration(event.target.value)}
+                placeholder={t.durationPlaceholder}
+              />
+            </div>
+
+            {editableCategories.length > 1 ? (
+              <div className="space-y-1">
+                <Select value={newServiceCategoryId} onChange={(event) => setNewServiceCategoryId(event.target.value)}>
+                  <option value="">{t.sectionLabel}</option>
+                  {editableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.title}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-text-sec">{t.sectionHint}</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-medium text-text-main">Назначить мастеров сразу</div>
+              <div className="text-sm font-medium text-text-main">{t.assignMastersToggle}</div>
               <div className="text-xs text-text-sec">{newServiceMasterIds.length}</div>
             </div>
             {masters.length === 0 ? (
-              <p className="mt-2 text-xs text-text-sec">Сначала добавьте мастеров студии.</p>
+              <p className="mt-2 text-xs text-text-sec">{t.noMastersHint}</p>
             ) : (
               <>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -834,10 +870,10 @@ export function StudioServicesPage({ studioId }: Props) {
                     variant="ghost"
                     onClick={() => setNewServiceMasterIds(masters.map((master) => master.id))}
                   >
-                    Выбрать всех
+                    {t.selectAll}
                   </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setNewServiceMasterIds([])}>
-                    Очистить
+                    {t.clearSelection}
                   </Button>
                 </div>
                 <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
@@ -887,17 +923,15 @@ export function StudioServicesPage({ studioId }: Props) {
         }}
       >
         <div className="space-y-4">
-          <h3 className="text-base font-semibold text-text-main">Предложить категорию</h3>
+          <h3 className="text-base font-semibold text-text-main">{t.proposeCategoryTitle}</h3>
           <Input
             type="text"
             value={proposedCategoryTitle}
             onChange={(event) => setProposedCategoryTitle(event.target.value)}
-            placeholder={t.categoryTitlePlaceholder}
+            placeholder={t.proposeCategoryNamePlaceholder}
             maxLength={60}
           />
-          <div className="text-xs text-text-sec">
-            Категория будет отправлена на модерацию. Услугу можно сохранить и без категории.
-          </div>
+          <p className="text-xs text-text-sec">{t.proposeCategoryHint}</p>
           <div className="flex justify-end gap-2">
             <Button
               type="button"
@@ -915,7 +949,7 @@ export function StudioServicesPage({ studioId }: Props) {
               onClick={() => void submitCategoryProposal()}
               disabled={proposingCategory || !proposedCategoryTitle.trim()}
             >
-              {proposingCategory ? t.creating : "Отправить"}
+              {proposingCategory ? t.creating : t.proposeCategorySend}
             </Button>
           </div>
         </div>
