@@ -29,7 +29,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
   const removeInviteLocally = (inviteId: string) => {
     setItems((current) => {
       const nextItems = current.filter((invite) => invite.id !== inviteId);
-      onChanged?.(nextItems);
+      queueMicrotask(() => onChanged?.(nextItems));
       return nextItems;
     });
   };
@@ -136,7 +136,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
           </Card>
         ))}
       </div>
-      {error ? <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
     </div>
   );
 }

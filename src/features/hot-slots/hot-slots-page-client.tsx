@@ -127,15 +127,11 @@ export function HotSlotsPageClient() {
       {loading ? <div className="text-sm text-text-sec">Загрузка горячих слотов...</div> : null}
 
       {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+        <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300">
           <div>{error}</div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="mt-3 rounded-full border border-rose-300 px-4 py-2 text-sm"
-          >
+          <Button variant="secondary" size="sm" onClick={() => void load()} className="mt-3 rounded-full">
             Повторить
-          </button>
+          </Button>
         </div>
       ) : null}
 

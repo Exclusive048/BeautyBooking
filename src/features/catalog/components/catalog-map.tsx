@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { Button } from "@/components/ui/button";
 import { providerPublicUrl } from "@/lib/public-urls";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -640,16 +641,16 @@ export function CatalogMap({
       {mapStatus === "error" ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/40 text-center text-sm text-muted-foreground">
           <div>{mapError ?? "Не удалось загрузить карту"}</div>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => {
               destroyMap();
               void initMap();
             }}
-            className="rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground"
+            className="rounded-full"
           >
             Повторить
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -693,24 +694,25 @@ export function CatalogMap({
 
       {mapStatus === "ready" && searchEnabled && dirtyArea ? (
         <div className="absolute inset-x-0 top-4 z-10 flex justify-center">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={handleSearchArea}
-            className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm"
+            className="rounded-full shadow-sm"
           >
             Поиск в этой области
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {mapStatus === "ready" ? (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => requestGeolocation(true)}
-          className="absolute right-4 top-4 z-10 rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-foreground shadow-sm"
+          className="absolute right-4 top-4 z-10 rounded-full shadow-sm"
         >
           ◎ Моё местоположение
-        </button>
+        </Button>
       ) : null}
     </div>
   );

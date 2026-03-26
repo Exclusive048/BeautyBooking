@@ -3114,7 +3114,7 @@ export function MasterProfilePage() {
               />
               <div className="space-y-1">
                 {portfolioCategoryOptions.length === 0 ? (
-                  <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
+                  <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-300">
                     {UI_TEXT.master.profile.portfolioMeta.addCategoryToServicesHint}{" "}
                     <a href="/cabinet/master/profile" className="underline">
                       {UI_TEXT.master.profile.portfolioMeta.goToServices}

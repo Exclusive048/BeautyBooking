@@ -7,6 +7,7 @@ import type { BookingStatus } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { Button } from "@/components/ui/button";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type CardPhoto = {
@@ -234,18 +235,14 @@ export function ClientCardDrawer({
               Посещений: {visitsCount} • {formatDaysAgo(daysSinceLastVisit)}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
-          >
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Закрыть
-          </button>
+          </Button>
         </div>
 
         {loading ? <div className="mt-4 text-sm text-text-sec">Загружаем...</div> : null}
         {error ? (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
         ) : null}
 
         {!loading ? (
@@ -261,14 +258,9 @@ export function ClientCardDrawer({
               />
               <div className="mt-3 flex items-center justify-between gap-2">
                 <div className="text-xs text-text-sec">{notes.trim().length}/2000</div>
-                <button
-                  type="button"
-                  onClick={() => void save()}
-                  disabled={saving}
-                  className="rounded-2xl bg-primary px-4 py-2 text-sm text-white disabled:opacity-60"
-                >
+                <Button onClick={() => void save()} disabled={saving}>
                   {saving ? "Сохраняем..." : "Сохранить"}
-                </button>
+                </Button>
               </div>
             </section>
 
@@ -296,14 +288,14 @@ export function ClientCardDrawer({
             <section className="rounded-2xl border border-border-subtle bg-bg-input/60 p-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-text-main">Фото работ</div>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => fileRef.current?.click()}
                   disabled={saving || photos.length >= PHOTO_LIMIT}
-                  className="rounded-lg border border-border-subtle bg-bg-card px-3 py-1.5 text-xs disabled:opacity-60"
                 >
                   {photos.length >= PHOTO_LIMIT ? "Лимит" : "Добавить"}
-                </button>
+                </Button>
               </div>
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
                 {photos.map((photo) => (

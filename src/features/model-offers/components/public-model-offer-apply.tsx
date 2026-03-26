@@ -124,12 +124,12 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
   return (
     <div className="space-y-4">
       {errorText ? (
-        <div className="rounded-2xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="rounded-2xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
           {errorText}
         </div>
       ) : null}
       {success ? (
-        <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700">
+        <div role="status" className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300">
           <p>Заявка отправлена! Мастер рассмотрит её и предложит время.</p>
           <Link href="/cabinet/model-applications" className="mt-1 inline-block underline">
             Перейти в «Мои заявки на модель»

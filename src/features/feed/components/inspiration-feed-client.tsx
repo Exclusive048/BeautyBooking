@@ -8,6 +8,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
+import { Button } from "@/components/ui/button";
 
 type FeedItem = {
   id: string;
@@ -391,7 +392,7 @@ export default function InspirationFeedClient() {
       </header>
 
       {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{UI_TEXT.feed.loading}</div> : null}
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
       {!loading && items.length === 0 ? (
         <div className="lux-card rounded-[24px] p-8 text-center text-sm text-text-sec">{UI_TEXT.feed.emptyFeed}</div>
       ) : null}
@@ -448,14 +449,14 @@ export default function InspirationFeedClient() {
 
       {!loading && nextCursor ? (
         <div className="flex justify-center pb-8">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={loadMore}
             disabled={loadingMore}
-            className="rounded-full border border-border-subtle bg-bg-card px-4 py-2 text-sm text-text-main transition-all duration-300 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full"
           >
             {loadingMore ? UI_TEXT.common.loading : UI_TEXT.feed.showMore}
-          </button>
+          </Button>
         </div>
       ) : null}
       <div ref={loadMoreRef} className="h-1 w-full" />
@@ -465,7 +466,7 @@ export default function InspirationFeedClient() {
           <button type="button" aria-label={UI_TEXT.common.cancel} className="absolute inset-0 bg-black/55" onClick={() => setSelectedId(null)} />
           <div className="absolute inset-0 overflow-y-auto p-3 sm:p-6">
             <div className="mx-auto mt-4 w-full max-w-6xl rounded-2xl border border-border-subtle bg-bg-card p-4 shadow-hover sm:mt-8 sm:p-6">
-              {detailError ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{detailError}</div> : null}
+              {detailError ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{detailError}</div> : null}
               {selectedItem ? (
                 <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
                   <div>

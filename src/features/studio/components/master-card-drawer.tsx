@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -144,13 +146,9 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
             <div className="text-base font-semibold text-text-main">{details?.name ?? t.titleFallback}</div>
             <div className="text-xs text-text-sec">{details?.tagline ?? ""}</div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
-          >
+          <Button variant="secondary" size="sm" onClick={onClose}>
             {t.close}
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4 flex gap-2">
@@ -170,17 +168,16 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
 
         {loading ? <div className="mt-4 text-sm text-text-sec">{t.loading}</div> : null}
         {error ? (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
         ) : null}
 
         {!loading && tab === "skills" ? (
           <div className="mt-4 space-y-3">
-            <input
+            <Input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t.skills.searchPlaceholder}
-              className="w-full rounded-2xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
             />
             {items.map((item) => (
               <div key={item.serviceId} className="rounded-2xl border border-border-subtle bg-bg-input/60 p-3">
@@ -201,9 +198,8 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                   </label>
                 </div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <input
+                  <Input
                     type="number"
-                    className="rounded-xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
                     placeholder={t.skills.pricePlaceholder}
                     value={item.priceOverride ?? ""}
                     onChange={(event) =>
@@ -216,9 +212,8 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                       }))
                     }
                   />
-                  <input
+                  <Input
                     type="number"
-                    className="rounded-xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
                     placeholder={t.skills.durationPlaceholder}
                     value={item.durationOverrideMin ?? ""}
                     onChange={(event) =>
@@ -234,33 +229,26 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
                 </div>
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => void saveServices()}
-              disabled={saving}
-              className="rounded-2xl bg-primary px-4 py-2 text-sm text-white disabled:opacity-60"
-            >
+            <Button onClick={() => void saveServices()} disabled={saving}>
               {saving ? t.skills.saving : t.skills.save}
-            </button>
+            </Button>
           </div>
         ) : null}
 
         {!loading && tab === "profile" ? (
           <div className="mt-4 space-y-3 rounded-2xl border border-border-subtle bg-bg-input/60 p-4">
             <div className="text-sm font-semibold text-text-main">{t.profile.title}</div>
-            <input
+            <Input
               type="text"
               value={profileName}
               onChange={(event) => setProfileName(event.target.value)}
               placeholder={t.profile.namePlaceholder}
-              className="w-full rounded-2xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
             />
-            <input
+            <Input
               type="text"
               value={profileTagline}
               onChange={(event) => setProfileTagline(event.target.value)}
               placeholder={t.profile.statusPlaceholder}
-              className="w-full rounded-2xl border border-border-subtle bg-bg-card px-2 py-1 text-sm"
             />
             <label className="text-sm text-text-sec">
               <input
@@ -270,14 +258,9 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
               />{" "}
               {t.profile.activeLabel}
             </label>
-            <button
-              type="button"
-              onClick={() => void saveProfile()}
-              disabled={saving}
-              className="rounded-2xl bg-primary px-4 py-2 text-sm text-white disabled:opacity-60"
-            >
+            <Button onClick={() => void saveProfile()} disabled={saving}>
               {saving ? t.profile.saving : t.profile.save}
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>

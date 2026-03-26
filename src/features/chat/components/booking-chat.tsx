@@ -210,7 +210,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
         {error}
         <div className="mt-2">
           <Button size="sm" variant="secondary" onClick={() => void loadChat()}>

@@ -158,13 +158,15 @@ export function VisualSearchModal({ open, onClose }: Props) {
               </p>
             </div>
           </div>
-          <button
+          <Button
+            variant="icon"
+            size="icon"
             onClick={onClose}
             aria-label={UI_TEXT.common.close}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
+            className="h-7 w-7"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
 
         <div className="mx-5 h-px bg-border-subtle" />

@@ -144,7 +144,7 @@ export function StudioFinancePage({ studioId }: Props) {
   return (
     <section className="space-y-4">
       {summaryError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{summaryError}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{summaryError}</div>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -237,7 +237,7 @@ export function StudioFinancePage({ studioId }: Props) {
       </div>
 
       {loading ? <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div> : null}
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
       {!loading && !error && data ? (
         <div className="lux-card overflow-hidden rounded-[24px]">

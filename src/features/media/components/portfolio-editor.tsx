@@ -8,6 +8,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -149,14 +150,13 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
     <div className="space-y-3">
       {canEdit ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => addInputRef.current?.click()}
-            className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition-colors hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-60"
             disabled={busy || limitReached}
           >
             {limitReached ? mediaText.limitReached : mediaText.addPhoto}
-          </button>
+          </Button>
           <div className={`text-xs ${limitWarning ? "text-amber-600" : "text-text-sec"}`}>
             {limitLabel}
           </div>

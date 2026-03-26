@@ -426,7 +426,7 @@ export function ScheduleRequestsPanel() {
         </Button>
       </div>
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
       {loading ? (
         <div className="lux-card rounded-[24px] p-4 text-sm text-text-sec">Загружаем запросы...</div>
@@ -496,7 +496,7 @@ export function ScheduleRequestsPanel() {
               </div>
 
               {actionError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError}</div>
+                <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{actionError}</div>
               ) : null}
 
               <Textarea

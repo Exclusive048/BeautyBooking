@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { AdvisorInsight } from "@/lib/advisor/types";
 import type { ApiResponse } from "@/lib/types/api";
@@ -90,14 +91,9 @@ export function MasterAdvisorSection() {
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{t.title}</h3>
         {isStale ? (
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={refreshing}
-            className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs disabled:opacity-60"
-          >
+          <Button variant="secondary" size="sm" onClick={() => void refresh()} disabled={refreshing}>
             {refreshing ? t.refreshing : t.refresh}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -108,11 +104,11 @@ export function MasterAdvisorSection() {
           ))}
         </div>
       ) : state.error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300">
           {state.error}
         </div>
       ) : insights.length === 0 ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+        <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300">
           {t.staleSuccess}
         </div>
       ) : (

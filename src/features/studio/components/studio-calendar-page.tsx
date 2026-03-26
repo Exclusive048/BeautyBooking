@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
@@ -372,7 +373,7 @@ export function StudioCalendarPage({ studioId }: Props) {
       {panel === "schedule" ? (
         <>
           {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{t.loading}</div> : null}
-          {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+          {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
           {!loading && data.masters.length === 0 ? (
             <div className="lux-card rounded-[24px] p-5">
@@ -550,7 +551,7 @@ export function StudioCalendarPage({ studioId }: Props) {
           </div>
 
       {loading ? <div className="lux-card rounded-[24px] p-6 text-sm text-text-sec">{t.loading}</div> : null}
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
           {!loading && data.masters.length === 0 ? (
         <div className="lux-card rounded-[24px] p-5">
@@ -655,9 +656,9 @@ export function StudioCalendarPage({ studioId }: Props) {
           <div className="w-full max-w-2xl rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-base font-semibold">{t.dayDetails} — {dayLabel(monthDetailsDay, viewerTimeZone)}</h3>
-              <button type="button" onClick={() => setMonthDetailsDay(null)} className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1.5 text-sm">
+              <Button variant="secondary" size="sm" onClick={() => setMonthDetailsDay(null)}>
                 {UI_TEXT.common.close}
-              </button>
+              </Button>
             </div>
             <div className="mt-3 space-y-2">
               {monthDayDetails.bookings.map((booking) => (

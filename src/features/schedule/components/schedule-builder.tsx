@@ -825,9 +825,9 @@ export function ScheduleBuilder() {
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
       ) : null}
-      {info ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">{info}</div> : null}
+      {info ? <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300">{info}</div> : null}
 
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
         <Card className="h-full">

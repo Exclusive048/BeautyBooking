@@ -193,14 +193,15 @@ export function BookingDetailDrawer({
               {addressLine ? <div className="text-xs text-text-sec">{addressLine}</div> : null}
             </div>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            size="icon"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle bg-bg-input text-lg text-text-sec"
+            className="h-9 w-9 rounded-full border border-border-subtle bg-bg-input text-lg text-text-sec"
             aria-label="Закрыть"
           >
             ×
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-5 px-5 py-4">

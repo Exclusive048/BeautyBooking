@@ -354,7 +354,7 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
         <div className="mt-3 space-y-3">
           {loading ? <p className="text-sm text-text-sec">{APP_TEXT.loading}</p> : null}
           {error ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-400/40 dark:bg-rose-950/40">
               <p className="text-sm text-rose-700">{error}</p>
               <Button size="sm" variant="secondary" className="mt-2" onClick={() => void loadApplications()} disabled={loading}>
                 {APP_TEXT.retry}

@@ -531,6 +531,7 @@ export function StudioServicesPage({ studioId }: Props) {
             <p className="mt-1 text-sm text-text-sec">{summaryText}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => setShowCategoryModal(true)} variant="secondary" size="sm">+ {t.createCategory}</Button>
             <Button type="button" onClick={() => setShowServiceModal(true)} variant="secondary" size="sm" disabled={editableCategories.length === 0}>+ {t.addService}</Button>
           </div>
         </div>
@@ -541,7 +542,7 @@ export function StudioServicesPage({ studioId }: Props) {
         </div>
       </section>
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
       {totalServices === 0 ? (
         <section className="lux-card rounded-[24px] p-6 text-center">
