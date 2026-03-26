@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   SUPPORT_CONTACT_MAX_LENGTH,
   normalizeSupportContact,
@@ -159,14 +161,15 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
   if (sent) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl dark:bg-emerald-950/40">
           {"\u2714\uFE0F"}
         </div>
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.support.form.successTitle}</h2>
           <p className="max-w-[360px] text-sm text-text-sec">{UI_TEXT.pages.support.form.successDescription}</p>
         </div>
-        <button
+        <Button
+          variant="secondary"
           onClick={() => {
             setSent(false);
             setTitle("");
@@ -179,10 +182,9 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
             setError(null);
             if (fileRef.current) fileRef.current.value = "";
           }}
-          className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main transition-colors hover:bg-bg-card"
         >
           {UI_TEXT.pages.support.form.successAction}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -227,7 +229,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
         <label htmlFor="title" className="block text-sm font-medium text-text-main">
           {UI_TEXT.pages.support.form.titleLabel} <span className="text-red-500">*</span>
         </label>
-        <input
+        <Input
           id="title"
           type="text"
           value={title}
@@ -238,7 +240,6 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
               : UI_TEXT.pages.support.form.titlePlaceholderSuggestion
           }
           maxLength={120}
-          className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
@@ -285,35 +286,34 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
             </select>
 
             {!showManualContact ? (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowManualContact(true)}
-                className="text-xs font-medium text-primary hover:underline"
+                className="text-xs font-medium text-primary"
               >
                 {UI_TEXT.pages.support.form.contactCustomAction}
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : !showManualContact ? (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => setShowManualContact(true)}
-            className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-4 text-sm font-medium text-text-main transition-colors hover:bg-bg-card"
           >
             {UI_TEXT.pages.support.form.contactAddAction}
-          </button>
+          </Button>
         ) : null}
 
         {showManualContact ? (
           <div className="space-y-2">
-            <input
+            <Input
               id={CONTACT_MANUAL_ID}
               type="text"
               value={manualContact}
               onChange={(e) => setManualContact(e.target.value)}
               placeholder={UI_TEXT.pages.support.form.contactPlaceholder}
               maxLength={SUPPORT_CONTACT_MAX_LENGTH}
-              className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <p className="text-right text-xs text-text-sec">
               {manualContact.length} / {SUPPORT_CONTACT_MAX_LENGTH}
@@ -361,16 +361,17 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
       <div className="text-xs text-text-sec">{UI_TEXT.pages.support.form.responseNote}</div>
 
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
       ) : null}
 
-      <button
+      <Button
         type="submit"
         disabled={sending}
-        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-sm font-semibold text-white shadow-card transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        size="lg"
+        className="w-full"
       >
         {sending ? UI_TEXT.pages.support.form.submitSending : UI_TEXT.pages.support.form.submit}
-      </button>
+      </Button>
     </form>
   );
 }

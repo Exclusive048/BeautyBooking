@@ -261,7 +261,7 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
             {error}
           </div>
         ) : null}

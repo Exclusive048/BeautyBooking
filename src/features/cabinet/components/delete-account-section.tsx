@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import { DeleteAccountModal } from "@/components/deletion/DeleteAccountModal";
 
@@ -36,24 +37,24 @@ export function DeleteAccountSection({ phone }: Props) {
 
   return (
     <>
-      <section className="mt-12 border-t border-red-200/40 pt-8">
-        <h2 className="text-sm font-semibold text-red-500">Удаление аккаунта</h2>
+      <section className="mt-12 border-t border-red-200/40 pt-8 dark:border-red-400/20">
+        <h2 className="text-sm font-semibold text-red-500 dark:text-red-400">Удаление аккаунта</h2>
         <p className="mt-1 text-xs text-text-sec">
           Все ваши личные данные будут удалены с платформы безвозвратно в соответствии с
           Федеральным законом №152-ФЗ «О персональных данных». История платежей и
           завершённых записей хранится в обезличенном виде согласно требованиям налогового
           законодательства (5 лет).
         </p>
-        <button
-          type="button"
+        <Button
+          variant="danger"
           onClick={() => {
             setError(null);
             setOpen(true);
           }}
-          className="mt-4 rounded-xl border border-red-300/60 px-4 py-2 text-sm text-red-500 hover:bg-red-50/10 transition-colors"
+          className="mt-4"
         >
           Удалить аккаунт
-        </button>
+        </Button>
       </section>
 
       <DeleteAccountModal

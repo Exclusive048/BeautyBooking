@@ -229,13 +229,13 @@ export function AdminCatalog() {
       </header>
 
       {toast ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+        <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300">
           {toast}
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -268,22 +268,22 @@ export function AdminCatalog() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => void handleApprove(category.id)}
                     disabled={busyId === category.id}
-                    className="rounded-xl bg-green-500/15 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-60"
                   >
                     {t.actions.approve}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={() => void handleReject(category.id)}
                     disabled={busyId === category.id}
-                    className="rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-60"
                   >
                     {t.actions.reject}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))

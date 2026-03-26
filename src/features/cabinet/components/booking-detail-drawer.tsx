@@ -37,16 +37,16 @@ function statusLabel(status: BookingItem["status"]) {
 }
 
 function getStatusBadgeClasses(status: BookingItem["status"]): string {
-  if (status === "PENDING" || status === "NEW") return "bg-amber-50 text-amber-700";
+  if (status === "PENDING" || status === "NEW") return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
   if (status === "CONFIRMED" || status === "PREPAID" || status === "STARTED") {
-    return "bg-emerald-50 text-emerald-700";
+    return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
   }
-  if (status === "IN_PROGRESS") return "bg-blue-50 text-blue-700";
-  if (status === "FINISHED") return "bg-gray-100 text-gray-600";
+  if (status === "IN_PROGRESS") return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (status === "FINISHED") return "bg-gray-100 text-gray-600 dark:bg-gray-800/40 dark:text-gray-300";
   if (status === "CANCELLED" || status === "REJECTED" || status === "NO_SHOW") {
-    return "bg-red-50 text-red-700";
+    return "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300";
   }
-  if (status === "CHANGE_REQUESTED") return "bg-purple-50 text-purple-700";
+  if (status === "CHANGE_REQUESTED") return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
   return "bg-bg-input text-text-sec";
 }
 

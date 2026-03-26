@@ -472,7 +472,7 @@ export function AdminBilling() {
       </header>
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
       ) : null}
 
       {(["MASTER", "STUDIO"] as SubscriptionScope[]).map((scope) => (
@@ -522,14 +522,14 @@ export function AdminBilling() {
               </h3>
               <p className="mt-1 text-xs text-text-sec">{t.modalSubtitle}</p>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="icon"
+              size="icon"
               onClick={closeModal}
               aria-label={t.closeAria}
-              className="rounded-full border border-border-subtle p-2 text-text-sec transition hover:text-text-main"
             >
               ×
-            </button>
+            </Button>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -825,7 +825,7 @@ export function AdminBilling() {
                                 </div>
 
                                 {limitErrors[key as string] ? (
-                                  <span className="text-xs text-rose-500">{limitErrors[key as string]}</span>
+                                  <span className="text-xs text-red-600 dark:text-red-400">{limitErrors[key as string]}</span>
                                 ) : null}
                               </div>
                             </div>

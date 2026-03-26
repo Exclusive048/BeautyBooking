@@ -56,7 +56,7 @@ export function AdminDashboard() {
         <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
       </header>
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
       {data ? (
         <div className="grid gap-4 md:grid-cols-2">

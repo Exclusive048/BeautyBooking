@@ -2,6 +2,8 @@
 
 import { Check, Copy, ExternalLink, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -96,21 +98,21 @@ export function PublicUsernameCard({ endpoint }: Props) {
   return (
     <div className="space-y-3 p-4">
       <div className="relative">
-        <input
+        <Input
           readOnly
           value={url}
-          className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-20 text-sm text-text-sec outline-none"
+          className="pr-20"
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => void handleCopy()}
-            className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-white/8 hover:text-text-main"
             title={settingsText.publicLink.copy}
             aria-label={settingsText.publicLink.copy}
           >
             {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-          </button>
+          </Button>
           <a
             href={url}
             target="_blank"
@@ -127,52 +129,52 @@ export function PublicUsernameCard({ endpoint }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         {isEditing ? (
           <>
-            <input
+            <Input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              className="h-10 min-w-0 flex-1 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+              className="min-w-0 flex-1"
               placeholder="anna-manicure"
               autoFocus
             />
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={() => void handleSubmit()}
               disabled={submitDisabled}
-              className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
             >
               {UI_TEXT.actions.save}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 setDraft(username);
                 setIsEditing(false);
               }}
               disabled={saving}
-              className="shrink-0 rounded-xl bg-white/8 px-3 py-2 text-xs text-text-sec transition-colors hover:bg-white/12"
             >
               {UI_TEXT.actions.cancel}
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <span className="text-sm text-text-sec">{publicPath}</span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setDraft(username);
                 setIsEditing(true);
               }}
-              className="inline-flex items-center gap-1 text-xs text-text-sec transition-colors hover:text-text-main"
+              className="text-xs text-text-sec"
             >
               <Pencil className="h-3.5 w-3.5" />
               {settingsText.publicLink.editUsername}
-            </button>
+            </Button>
           </>
         )}
       </div>
 
-      {error ? <div className="text-xs text-rose-400">{error}</div> : null}
+      {error ? <div role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</div> : null}
       {copied ? <div className="text-xs text-text-sec">{settingsText.publicLink.copied}</div> : null}
     </div>
   );
