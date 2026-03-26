@@ -5,6 +5,41 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { verifyToken } from "@/lib/auth/jwt";
 
+const PRODUCTION_ORIGIN = "https://beautyhub.art";
+const ALLOWED_DEV_ORIGINS = new Set([
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
+const CORS_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
+const CORS_HEADERS = "Content-Type, Authorization, x-idempotency-key";
+
+function getAllowedOrigin(requestOrigin: string | null): string | null {
+  if (!requestOrigin) return null;
+
+  if (process.env.NODE_ENV === "production") {
+    if (
+      requestOrigin === PRODUCTION_ORIGIN ||
+      requestOrigin === `www.${PRODUCTION_ORIGIN.replace("https://", "")}`
+    ) {
+      return requestOrigin;
+    }
+    const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (envUrl && requestOrigin === envUrl) return requestOrigin;
+    return null;
+  }
+
+  if (ALLOWED_DEV_ORIGINS.has(requestOrigin)) return requestOrigin;
+  return requestOrigin;
+}
+
+function setCorsHeaders(response: NextResponse, origin: string): void {
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Access-Control-Allow-Methods", CORS_METHODS);
+  response.headers.set("Access-Control-Allow-Headers", CORS_HEADERS);
+  response.headers.set("Access-Control-Allow-Credentials", "true");
+  response.headers.set("Access-Control-Max-Age", "600");
+}
+
 type RateLimitTier =
   | "bookingCreate"
   | "reviewCreate"
@@ -109,11 +144,22 @@ function readSetCookieHeaders(headers: Headers): string[] {
 
 export async function proxy(request: NextRequest) {
   const requestId = resolveRequestId(request);
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-request-id", requestId);
-
   const method = request.method.toUpperCase();
   const pathname = normalizePathname(request.nextUrl.pathname);
+
+  // CORS: handle preflight for API routes
+  const isApiRoute = pathname.startsWith("/api/");
+  const corsOrigin = isApiRoute ? getAllowedOrigin(request.headers.get("origin")) : null;
+
+  if (isApiRoute && method === "OPTIONS") {
+    const preflightResponse = new NextResponse(null, { status: 204 });
+    if (corsOrigin) setCorsHeaders(preflightResponse, corsOrigin);
+    preflightResponse.headers.set("x-request-id", requestId);
+    return preflightResponse;
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-request-id", requestId);
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
   let refreshedSetCookies: string[] = [];
 
@@ -196,6 +242,10 @@ export async function proxy(request: NextRequest) {
   }
   for (const setCookie of refreshedSetCookies) {
     response.headers.append("set-cookie", setCookie);
+  }
+
+  if (corsOrigin) {
+    setCorsHeaders(response, corsOrigin);
   }
 
   return withRequestId(response, requestId);

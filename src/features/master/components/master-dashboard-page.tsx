@@ -267,7 +267,7 @@ export function MasterDashboardPage() {
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load is recreated each render, only re-fetch on date change
   }, [date]);
 
   useEffect(() => {

@@ -66,7 +66,7 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load is recreated each render, only re-fetch on ID change
   }, [masterId, studioId]);
 
   const items = useMemo(

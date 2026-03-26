@@ -18,9 +18,6 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
   const { selectedServices, removeService } = useSelectedServices();
 
   const masterKey = provider.publicUsername?.trim() || "";
-  if (!masterKey) {
-    console.warn("Missing master publicUsername for studio booking link.", { masterId: provider.id });
-  }
 
   const studioBookingHref =
     provider.type === "MASTER" && provider.studioId

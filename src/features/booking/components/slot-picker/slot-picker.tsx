@@ -264,7 +264,7 @@ const VirtualizedSlotList = memo(function VirtualizedSlotList({
   onChange,
 }: VirtualizedSlotListProps) {
   const parentRef = useRef<HTMLDivElement | null>(null);
-  // eslint-disable-next-line react-hooks/incompatible-library
+  // eslint-disable-next-line react-hooks/incompatible-library -- @tanstack/react-virtual hook is not recognized by eslint-plugin-react-hooks
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,

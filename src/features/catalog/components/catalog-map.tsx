@@ -483,7 +483,7 @@ export function CatalogMap({
       mountedRef.current = false;
       destroyMap();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- map initialization runs once on mount
   }, []);
 
   // theme sync (no re-init)

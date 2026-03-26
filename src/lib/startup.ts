@@ -3,10 +3,12 @@ import { ensureBillingPlans } from "@/lib/billing/ensure-billing-plans";
 import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 
-validateEnv();
-
 const shouldSkipDbStartup =
   process.env.NEXT_PHASE === "phase-production-build" || process.env.NODE_ENV === "test";
+
+if (!shouldSkipDbStartup) {
+  validateEnv();
+}
 
 async function runStartupChecks(): Promise<void> {
   if (shouldSkipDbStartup) return;

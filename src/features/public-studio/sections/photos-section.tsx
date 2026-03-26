@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- studio photo gallery with dynamic dimensions */
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import type { MediaAssetDto } from "@/lib/media/types";

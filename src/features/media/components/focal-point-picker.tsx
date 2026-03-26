@@ -115,7 +115,7 @@ export function FocalPointPicker({
         onPointerLeave={stopDragging}
         style={{ touchAction: "none" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- interactive focal point picker needs pointer events on raw img */}
         <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
         <div
           className="absolute h-4 w-4 rounded-full border-2 border-white bg-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.35)]"

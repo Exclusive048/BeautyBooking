@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- small portfolio thumbnails in hover overlay, dynamic external URLs */
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";

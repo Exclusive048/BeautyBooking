@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -96,10 +96,12 @@ export function PortfolioStrip({ items }: Props) {
                     {UI_TEXT.publicProfile.portfolio.indexedBadge}
                   </div>
                 ) : null}
-                <img
+                <Image
                   src={item.mediaUrl}
                   alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                  fill
+                  sizes="(max-width: 640px) 50vw, 33vw"
+                  className="object-cover transition duration-300 group-hover:scale-[1.03]"
                 />
               </div>
               <div className="p-2 text-xs text-text-sec">
@@ -123,15 +125,19 @@ export function PortfolioStrip({ items }: Props) {
               {error ? <div className="text-sm text-red-700">{error}</div> : null}
               {selectedItem ? (
                 <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                  <img
-                    src={selectedItem.mediaUrl}
-                    alt={
-                      selectedItem.caption ??
-                      selectedItem.primaryServiceTitle ??
-                      UI_TEXT.publicProfile.portfolio.untitledWork
-                    }
-                    className="max-h-[72vh] w-full rounded-2xl object-contain"
-                  />
+                  <div className="relative aspect-[3/4] max-h-[72vh] w-full">
+                    <Image
+                      src={selectedItem.mediaUrl}
+                      alt={
+                        selectedItem.caption ??
+                        selectedItem.primaryServiceTitle ??
+                        UI_TEXT.publicProfile.portfolio.untitledWork
+                      }
+                      fill
+                      sizes="(max-width: 1024px) 90vw, 50vw"
+                      className="rounded-2xl object-contain"
+                    />
+                  </div>
                   <div>
                     <div className="text-lg font-semibold text-text-main">{selectedItem.masterName}</div>
                     <div className="mt-2 text-sm text-text-sec">

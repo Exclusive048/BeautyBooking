@@ -212,7 +212,7 @@ export function StudioCalendarPage({ studioId }: Props) {
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load is recreated each render, only re-fetch on data deps
   }, [studioId, date, view, t.loadFailed]);
 
   const serviceMetaById = useMemo(() => {
@@ -420,7 +420,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                         >
                           <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-bg-card text-sm font-semibold text-text-main">
                             {master.avatarUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
+                              // eslint-disable-next-line @next/next/no-img-element -- small avatar (44px), cabinet-only view
                               <img src={master.avatarUrl} alt={master.name} className="h-full w-full object-cover" />
                             ) : (
                               <span>{masterInitials(master.name)}</span>

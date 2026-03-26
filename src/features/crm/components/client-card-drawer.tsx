@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- CRM client card photos, internal cabinet view */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BookingStatus } from "@prisma/client";

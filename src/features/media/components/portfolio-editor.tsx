@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- drag-and-drop editor needs direct DOM img for reordering */
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import type { MediaEntityType } from "@prisma/client";

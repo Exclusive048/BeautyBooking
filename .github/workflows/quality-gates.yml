@@ -40,6 +40,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Run tests
+        run: npm run test -- --reporter=verbose
+
       - name: Mojibake check
         run: npm run check:mojibake
 

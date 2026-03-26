@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- custom focal-point positioning via object-position requires direct img */
 import type { ImgHTMLAttributes } from "react";
 import { focalPointToObjectPosition } from "@/lib/media/focal-point";
 

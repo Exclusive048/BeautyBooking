@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -17,12 +18,12 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[24px] bg-muted">
       {current ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={current}
           alt={alt}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          loading="lazy"
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
       ) : null}
 

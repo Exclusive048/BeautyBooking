@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- user-uploaded preview and search result images with unknown dimensions */
 "use client";
 
 import Link from "next/link";

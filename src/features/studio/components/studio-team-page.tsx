@@ -71,7 +71,7 @@ export function StudioTeamPage({ studioId }: Props) {
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load is recreated each render, only re-fetch on studioId change
   }, [studioId, t.apiErrorPrefix, t.loadFailed]);
 
   const createMaster = async (): Promise<void> => {

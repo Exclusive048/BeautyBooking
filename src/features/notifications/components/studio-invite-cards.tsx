@@ -84,7 +84,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 {invite.studioAvatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  // eslint-disable-next-line @next/next/no-img-element -- small avatar (48px), notification card
                   <img
                     src={invite.studioAvatarUrl}
                     alt={invite.studioName}

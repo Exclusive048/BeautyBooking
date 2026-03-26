@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- full-screen modal with dynamic aspect ratio */
 "use client";
 
 import { useEffect, useState } from "react";
