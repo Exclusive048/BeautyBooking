@@ -5,6 +5,7 @@ import { createTelegramSendJob } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
 import { logError } from "@/lib/logging/logger";
 import { sendPushToUser } from "@/lib/notifications/push/send";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 
 type DeliveryInput = {
   userId: string;
@@ -54,6 +55,17 @@ export async function deliverNotification(input: DeliveryInput): Promise<void> {
   });
 
   if (input.telegramText) {
-    void enqueueTelegramMessage(input.userId, input.telegramText);
+    void (async () => {
+      try {
+        const plan = await getCurrentPlan(input.userId);
+        if (!plan.features.tgNotifications) return;
+        await enqueueTelegramMessage(input.userId, input.telegramText!);
+      } catch (error) {
+        logError("Failed to check tgNotifications feature", {
+          userId: input.userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
   }
 }

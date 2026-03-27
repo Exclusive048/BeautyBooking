@@ -59,14 +59,6 @@ export const FEATURE_CATALOG = {
     appliesTo: "MASTER",
     uiOrder: 60,
   },
-  analyticsCharts: {
-    kind: "boolean",
-    title: "Аналитика (графики)",
-    description: "Графики и виджеты аналитики.",
-    group: "Аналитика",
-    appliesTo: "BOTH",
-    uiOrder: 70,
-  },
   analytics_dashboard: {
     kind: "boolean",
     title: "Аналитика: Дашборд",

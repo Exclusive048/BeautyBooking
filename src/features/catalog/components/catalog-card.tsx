@@ -29,6 +29,7 @@ type CatalogCardItem = {
   } | null;
   nextSlot: { startAt: string } | null;
   todaySlotsCount?: number;
+  isHighlighted?: boolean;
 };
 
 type CatalogCardProps = {
@@ -63,7 +64,12 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
       : "";
 
   const cardBody = (
-    <article>
+    <article className="relative">
+      {item.isHighlighted && (
+        <div className="absolute top-3 right-3 z-10 rounded-full bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+          {UI_TEXT.catalog.highlightBadge}
+        </div>
+      )}
       <PhotoCarousel photos={item.photos} alt={item.title} />
 
       <div className="space-y-3 p-4">
@@ -103,8 +109,11 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
     </article>
   );
 
-  const baseClass =
-    "group block overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card transition-all duration-300";
+  const baseClass = `group block overflow-hidden rounded-[28px] bg-bg-card shadow-card transition-all duration-300 ${
+    item.isHighlighted
+      ? "border-2 border-primary/40 ring-1 ring-primary/20"
+      : "border border-border-subtle/80"
+  }`;
   const interactiveClass =
     "hover:scale-[1.01] hover:shadow-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40";
 

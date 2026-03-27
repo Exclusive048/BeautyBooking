@@ -1,7 +1,9 @@
-import { StudioRole } from "@prisma/client";
+import { StudioRole, SubscriptionScope } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createFeatureGateError } from "@/lib/billing/guards";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { ensureStudioRole } from "@/lib/studio/access";
 import { getStudioFinance } from "@/lib/studio/finance.service";
@@ -21,6 +23,11 @@ export async function GET(req: Request) {
       userId: user.id,
       allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
+
+    const plan = await getCurrentPlan(user.id, SubscriptionScope.STUDIO);
+    if (!plan.features.financeReport) {
+      throw createFeatureGateError("financeReport", "PRO");
+    }
 
     const data = await getStudioFinance({
       studioId: query.studioId,

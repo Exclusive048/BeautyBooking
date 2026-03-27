@@ -19,7 +19,23 @@
       "Bash(find /d/BeautyBooking/beautyhub/src/app/api -name *clients*card* -type f)",
       "Bash(grep -r \"plan\\\\.features\\\\|plan\\\\.can\\\\|plan\\\\.limit\\\\|ensureClientCardAccess\\\\|createFeatureGateError\\\\|createLimitReachedError\\\\|FEATURE_GATE\" /d/BeautyBooking/beautyhub/src/app/api --include=*.ts -l)",
       "Bash(ls d:/BeautyBooking/beautyhub/scripts/seed*.ts d:/BeautyBooking/beautyhub/scripts/seed*.mjs)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(grep -l \"import.*billing\\\\|import.*guard\\\\|ensureFeatureAccess\\\\|getCurrentPlan\" /d/BeautyBooking/beautyhub/src/app/api/master/model-offers/*/route.ts)",
+      "Bash(for file:*)",
+      "Bash(do grep:*)",
+      "Bash(done)",
+      "Bash(grep -l \"import.*billing\\\\|import.*guard\\\\|ensureFeatureAccess\\\\|getCurrentPlan\" /d/BeautyBooking/beautyhub/src/app/api/analytics/*/route.ts)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//d/BeautyBooking/beautyhub/**)",
+      "Bash(grep -L \"import.*billing\\\\|import.*guard\\\\|ensureFeatureAccess\\\\|getCurrentPlan\" /d/BeautyBooking/beautyhub/src/app/api/analytics/*/route.ts)",
+      "Bash(grep -L \"ensureFeatureAccess\\\\|getCurrentPlan\" /d/BeautyBooking/beautyhub/src/app/api/analytics/*/route.ts)",
+      "Bash(grep -L \"getCurrentPlan\\\\|FeatureGate\\\\|getBillingFeatures\\\\|canAccessClientCards\\\\|ensureFeatureAccess\\\\|createFeatureGateError\\\\|ensureStudioTeamLimit\\\\|requireAuth\\\\|getSessionUser\" /d/BeautyBooking/beautyhub/src/app/api/master/portfolio*/route.ts)",
+      "Bash(while read:*)",
+      "Bash(grep -n \"ensureStudioTeamLimit\" /d/BeautyBooking/beautyhub/src/app/api/studio/masters/*/route.ts)",
+      "Bash(grep -l \"getCurrentPlan\\\\|ensureFeatureAccess\\\\|canAccessClientCards\" /d/BeautyBooking/beautyhub/src/lib/**/*.ts)",
+      "Bash(grep -E \"route\\\\.ts$\")",
+      "Bash(grep -r \"highlightCard\\\\|highlight\" /d/BeautyBooking/beautyhub/src/features/catalog --include=*.tsx --include=*.ts)"
     ]
   }
 }

@@ -1,6 +1,7 @@
-import { Prisma, ProviderType } from "@prisma/client";
+import { Prisma, ProviderType, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { CatalogEntityType, CatalogSmartTagPreset } from "@/lib/catalog/schemas";
+import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
 
 // AUDIT (section 6):
 // - Search supports smart tag presets via soft ranking.
@@ -37,6 +38,7 @@ export type CatalogProviderItem = {
   minPrice: number | null;
   nextSlot: { startAt: string } | null;
   todaySlotsCount?: number;
+  isHighlighted?: boolean;
 };
 
 export type CatalogModelOfferItem = {
@@ -411,6 +413,64 @@ async function loadSmartTagCounts(
   return counts;
 }
 
+async function loadHighlightedUserIds(
+  ownerUserIds: string[],
+  providerTypes: Map<string, ProviderType>
+): Promise<Set<string>> {
+  if (ownerUserIds.length === 0) return new Set();
+
+  const scopes = new Set<SubscriptionScope>();
+  for (const type of providerTypes.values()) {
+    scopes.add(type === ProviderType.STUDIO ? SubscriptionScope.STUDIO : SubscriptionScope.MASTER);
+  }
+
+  const subscriptions = await prisma.userSubscription.findMany({
+    where: {
+      userId: { in: ownerUserIds },
+      scope: { in: Array.from(scopes) },
+      status: { in: ["ACTIVE", "PAST_DUE"] },
+    },
+    select: {
+      userId: true,
+      scope: true,
+      plan: {
+        select: {
+          id: true,
+          features: true,
+          inheritsFromPlanId: true,
+          inheritsFromPlan: {
+            select: {
+              id: true,
+              features: true,
+              inheritsFromPlanId: true,
+              inheritsFromPlan: {
+                select: { id: true, features: true, inheritsFromPlanId: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const highlighted = new Set<string>();
+  for (const sub of subscriptions) {
+    const chain: PlanNode[] = [];
+    let current: { id: string; features: unknown; inheritsFromPlanId: string | null; inheritsFromPlan?: { id: string; features: unknown; inheritsFromPlanId: string | null; inheritsFromPlan?: { id: string; features: unknown; inheritsFromPlanId: string | null } | null } | null } | null = sub.plan;
+    const visited = new Set<string>();
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      chain.push({ id: current.id, inheritsFromPlanId: current.inheritsFromPlanId, features: current.features });
+      current = (current as { inheritsFromPlan?: typeof current | null }).inheritsFromPlan ?? null;
+    }
+    const features = resolveEffectiveFeatures(sub.plan.id, new Map(chain.map((n) => [n.id, n])));
+    if (features.highlightCard) {
+      highlighted.add(sub.userId);
+    }
+  }
+  return highlighted;
+}
+
 async function loadHotProviderIds(): Promise<string[]> {
   const items = await prisma.discountRule.findMany({
     where: {
@@ -474,6 +534,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       geoLat: true,
       geoLng: true,
       availableToday: true,
+      ownerUserId: true,
       services: {
         where: { isEnabled: true, isActive: true },
         select: {
@@ -525,6 +586,10 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     rows.map((provider) => provider.id),
     input.smartTag
   );
+
+  const ownerUserIds = [...new Set(rows.filter((p) => p.ownerUserId).map((p) => p.ownerUserId!))];
+  const providerTypeMap = new Map(rows.map((p) => [p.ownerUserId ?? "", p.type]));
+  const highlightedUserIds = await loadHighlightedUserIds(ownerUserIds, providerTypeMap);
 
   const rankedRows = input.smartTag
     ? [...rows]
@@ -582,6 +647,9 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       minPrice,
       nextSlot: null,
       ...(provider.availableToday ? { todaySlotsCount: 1 } : {}),
+      ...(provider.ownerUserId && highlightedUserIds.has(provider.ownerUserId)
+        ? { isHighlighted: true }
+        : {}),
     };
   });
 

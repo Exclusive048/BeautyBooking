@@ -829,6 +829,7 @@ export const UI_TEXT = {
     mapPointsTitle: "Точки на карте",
     carouselPrev: "Предыдущее фото",
     carouselNext: "Следующее фото",
+    highlightBadge: "Premium",
     loadMore: "Показать ещё",
     loading: "Загружаем каталог...",
     loadFailed: "Не удалось загрузить каталог",

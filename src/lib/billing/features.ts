@@ -39,7 +39,6 @@ const DEFAULT_FEATURES: PlanFeatures = {
   profilePublicPage: false,
   onlinePayments: false,
   hotSlots: false,
-  analyticsCharts: false,
   analytics_dashboard: false,
   analytics_revenue: false,
   analytics_clients: false,

@@ -2,7 +2,10 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { resolveAnalyticsContext } from "@/features/analytics";
+import {
+  ensureFeatureAccess,
+  resolveAnalyticsContext,
+} from "@/features/analytics";
 import { parseScopeParams } from "@/features/analytics/api/routes";
 import { prisma } from "@/lib/prisma";
 
@@ -20,6 +23,8 @@ export async function GET(req: Request) {
     }
 
     const context = await resolveAnalyticsContext({ userId: user.id, scope, masterId: null });
+
+    await ensureFeatureAccess({ userId: user.id, scope, feature: "analytics_dashboard" });
 
     const masters = await prisma.provider.findMany({
       where: { studioId: context.providerId, type: "MASTER" },
