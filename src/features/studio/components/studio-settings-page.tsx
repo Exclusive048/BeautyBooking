@@ -10,6 +10,7 @@ import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import { ShareProfileSection } from "@/features/cabinet/components/share-profile-section";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
@@ -636,6 +637,10 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
 
               <SettingsSection title={UI_TEXT.settings.sections.publicPage}>
                 <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
+              </SettingsSection>
+
+              <SettingsSection title={UI_TEXT.settings.shareProfile.title}>
+                <ShareProfileSection endpoint="/api/cabinet/studio/public-username" />
               </SettingsSection>
 
               <SettingsSection title={UI_TEXT.settings.sections.bookingRules}>

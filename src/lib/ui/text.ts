@@ -398,6 +398,13 @@ export const UI_TEXT = {
       editUsername: "Изменить",
       open: "Открыть",
     },
+    shareProfile: {
+      title: "Поделиться профилем",
+      downloadQr: "Скачать QR",
+      downloadCard: "Скачать визитку",
+      yourLink: "Ваша ссылка",
+      copied: "Скопировано",
+    },
     telegram: {
       title: "Уведомления в Telegram",
       hint: "Получайте уведомления о новых записях прямо в Telegram",
@@ -3319,6 +3326,10 @@ export const UI_TEXT = {
         "Запись онлайн к мастеру {name}. Услуги, цены, отзывы и свободные окна.",
       titleTemplate: "{name} — запись онлайн | МастерРядом",
       servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
+      ogBookOnline: "Записаться онлайн",
+      ogReviews: "отзывов",
+      ogMaster: "Мастер",
+      ogStudio: "Студия",
       debugReasons: {
         unpublished: "найден, но профиль не опубликован",
         aliasUnpublished: "найден алиас, но профиль не опубликован",

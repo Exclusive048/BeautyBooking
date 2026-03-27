@@ -35,7 +35,9 @@
       "Bash(grep -n \"ensureStudioTeamLimit\" /d/BeautyBooking/beautyhub/src/app/api/studio/masters/*/route.ts)",
       "Bash(grep -l \"getCurrentPlan\\\\|ensureFeatureAccess\\\\|canAccessClientCards\" /d/BeautyBooking/beautyhub/src/lib/**/*.ts)",
       "Bash(grep -E \"route\\\\.ts$\")",
-      "Bash(grep -r \"highlightCard\\\\|highlight\" /d/BeautyBooking/beautyhub/src/features/catalog --include=*.tsx --include=*.ts)"
+      "Bash(grep -r \"highlightCard\\\\|highlight\" /d/BeautyBooking/beautyhub/src/features/catalog --include=*.tsx --include=*.ts)",
+      "Bash(node -e \"try { require.resolve\\(''next/og''\\); console.log\\(''next/og available''\\); } catch\\(e\\) { console.log\\(''not available:'', e.message\\); }\")",
+      "Bash(npm install:*)"
     ]
   }
 }

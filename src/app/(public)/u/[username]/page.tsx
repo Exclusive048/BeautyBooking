@@ -165,6 +165,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     services: provider.services,
   });
 
+  const ogImagePath = `/api/og/profile?username=${encodeURIComponent(canonicalUsername)}`;
+  const ogImageUrl = baseUrl ? `${baseUrl}${ogImagePath}` : ogImagePath;
+
   return {
     title,
     description,
@@ -175,13 +178,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       url: canonicalUrl,
       type: "profile",
-      images: provider.avatarUrl ? [provider.avatarUrl] : undefined,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: provider.name,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: provider.avatarUrl ? [provider.avatarUrl] : undefined,
+      images: [ogImageUrl],
     },
     robots: provider.isPublished ? undefined : { index: false, follow: false },
   };

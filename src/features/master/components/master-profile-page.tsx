@@ -21,6 +21,7 @@ import { FocalImage } from "@/components/ui/focal-image";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import { ShareProfileSection } from "@/features/cabinet/components/share-profile-section";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
@@ -2184,6 +2185,10 @@ export function MasterProfilePage() {
 
               <SettingsSection title={UI_TEXT.settings.sections.publicPage}>
                 <PublicUsernameCard endpoint="/api/cabinet/master/public-username" />
+              </SettingsSection>
+
+              <SettingsSection title={UI_TEXT.settings.shareProfile.title}>
+                <ShareProfileSection endpoint="/api/cabinet/master/public-username" />
               </SettingsSection>
 
               {data.master.isSolo ? (

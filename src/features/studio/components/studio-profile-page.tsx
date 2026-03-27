@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
+import { ShareProfileSection } from "@/features/cabinet/components/share-profile-section";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
@@ -478,6 +479,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       />
 
       <PublicUsernameCard endpoint="/api/cabinet/studio/public-username" />
+      <ShareProfileSection endpoint="/api/cabinet/studio/public-username" />
 
       <div className="space-y-4 rounded-2xl bg-bg-card/90 p-4">
         <div className="flex rounded-xl border border-border-subtle bg-bg-input p-1">
