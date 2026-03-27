@@ -304,7 +304,7 @@ export function StudioServicesPage({ studioId }: Props) {
           : null,
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить категорию услуги");
+      setError(err instanceof Error ? err.message : t.updateCategoryFailed);
     } finally {
       setSavingServiceCategoryId(null);
     }
@@ -323,7 +323,7 @@ export function StudioServicesPage({ studioId }: Props) {
       patchService(service.id, (current) => {
         const exists = current.masters.some((item) => item.masterId === masterId);
         if (nextEnabled && !exists) {
-          const masterName = mastersMap.get(masterId)?.name || "Мастер";
+          const masterName = mastersMap.get(masterId)?.name || t.masterFallbackName;
           return { ...current, masters: [...current.masters, { masterId, masterName }] };
         }
         if (!nextEnabled && exists) {
@@ -587,10 +587,10 @@ export function StudioServicesPage({ studioId }: Props) {
               const expanded = expandedAssignmentsServiceId === service.id;
               const assignmentSummary =
                 assignedMasters.length === 0
-                  ? "Не назначено ни одному мастеру"
+                  ? t.notAssigned
                   : assignedMasters.length === 1
-                    ? "Назначено 1 мастеру"
-                    : `Назначено ${assignedMasters.length} мастерам`;
+                    ? t.assignedOne
+                    : t.assignedMany.replace("{count}", String(assignedMasters.length));
 
               return (
                 <article key={service.id} className="rounded-2xl border border-border-subtle bg-bg-input/50 p-4">
@@ -599,12 +599,12 @@ export function StudioServicesPage({ studioId }: Props) {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-text-main">{service.title}</h3>
                         {service.globalCategory ? (
-                          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+                          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                             {service.globalCategory.name}
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
-                            Без категории
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                            {t.noCategoryBadge}
                           </span>
                         )}
                       </div>
@@ -648,7 +648,7 @@ export function StudioServicesPage({ studioId }: Props) {
                             }))
                           }
                         >
-                          <option value="">Без категории</option>
+                          <option value="">{t.noCategoryBadge}</option>
                           {globalCategories.map((item) => (
                             <option key={`service-global-category-${service.id}-${item.id}`} value={item.id}>
                               {categoryLabel(item)}
@@ -662,14 +662,14 @@ export function StudioServicesPage({ studioId }: Props) {
                           onClick={() => void saveServiceGlobalCategory(service)}
                           disabled={savingServiceCategoryId === service.id}
                         >
-                          {savingServiceCategoryId === service.id ? "Сохраняем..." : "Сохранить категорию"}
+                          {savingServiceCategoryId === service.id ? t.savingCategory : t.saveCategory}
                         </Button>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-2">
                       <label className="inline-flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-card px-3 py-2 text-xs text-text-sec">
-                        <span>{service.isActive ? "Вкл" : "Выкл"}</span>
+                        <span>{service.isActive ? t.activeOn : t.activeOff}</span>
                         <Switch
                           checked={service.isActive}
                           onCheckedChange={(next) => void toggleServiceActive(service, next)}
