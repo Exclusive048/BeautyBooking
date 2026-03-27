@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     const data = await getMasterClients({
       providerId,
       sort: query.sort,
-      includeCardSummary: canAccessClientCards(plan.tier),
+      includeCardSummary: canAccessClientCards(plan.features),
       cursor: query.cursor,
       limit: query.limit,
     });

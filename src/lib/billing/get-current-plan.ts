@@ -1,5 +1,6 @@
 import { SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import * as cache from "@/lib/cache/cache";
 import {
   getDefaultPlanFeatures,
   resolveEffectiveFeatures,
@@ -7,6 +8,12 @@ import {
   type PlanNode,
   type PlanTier,
 } from "@/lib/billing/features";
+
+const PLAN_CACHE_TTL_SECONDS = 300;
+
+function planCacheKey(userId: string, scope: SubscriptionScope): string {
+  return `plan:current:${userId}:${scope}`;
+}
 
 type SystemFlags = {
   onlinePaymentsEnabled: boolean;
@@ -58,6 +65,10 @@ export async function getCurrentPlan(
       ? SubscriptionScope.STUDIO
       : SubscriptionScope.MASTER);
 
+  const cacheKey = planCacheKey(userId, fallbackScope);
+  const cached = await cache.get<CurrentPlanInfo>(cacheKey);
+  if (cached) return cached;
+
   const subscription = await prisma.userSubscription.findUnique({
     where: { userId_scope: { userId, scope: fallbackScope } },
     select: {
@@ -106,7 +117,7 @@ export async function getCurrentPlan(
 
   const system = await getSystemFlags();
 
-  return {
+  const result: CurrentPlanInfo = {
     planId,
     planCode,
     tier,
@@ -114,6 +125,21 @@ export async function getCurrentPlan(
     features,
     system,
   };
+
+  await cache.set(cacheKey, result, PLAN_CACHE_TTL_SECONDS);
+
+  return result;
+}
+
+export async function invalidatePlanCache(userId: string, scope?: SubscriptionScope): Promise<void> {
+  if (scope) {
+    await cache.del(planCacheKey(userId, scope));
+  } else {
+    await Promise.all([
+      cache.del(planCacheKey(userId, SubscriptionScope.MASTER)),
+      cache.del(planCacheKey(userId, SubscriptionScope.STUDIO)),
+    ]);
+  }
 }
 
 async function loadPlanChain(planId: string): Promise<PlanNode[]> {

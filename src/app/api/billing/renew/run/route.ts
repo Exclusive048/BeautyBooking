@@ -7,6 +7,7 @@ import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError } from "@/lib/logging/logger";
 import { NotificationType } from "@prisma/client";
+import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 
 export const runtime = "nodejs";
 
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
     });
 
     for (const s of overdue) {
+      await invalidatePlanCache(s.userId, s.scope);
       await createBillingNotification({
         userId: s.userId,
         type: NotificationType.BILLING_SUBSCRIPTION_EXPIRED,
@@ -110,6 +112,7 @@ export async function POST(req: Request) {
     });
 
     for (const s of cancelCandidates) {
+      await invalidatePlanCache(s.userId, s.scope);
       await createBillingNotification({
         userId: s.userId,
         type: NotificationType.BILLING_SUBSCRIPTION_CANCELLED,

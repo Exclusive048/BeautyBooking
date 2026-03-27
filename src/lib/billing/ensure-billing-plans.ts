@@ -1,17 +1,20 @@
-import { ensureDefaultPlans } from "@/lib/billing/plan-seed";
+import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
 
-let ensurePlansPromise: Promise<void> | null = null;
+let plansExistPromise: Promise<boolean> | null = null;
 
-export async function ensureBillingPlans(): Promise<void> {
-  if (!ensurePlansPromise) {
-    ensurePlansPromise = ensureDefaultPlans().catch((error) => {
-      ensurePlansPromise = null;
-      logError("Failed to ensure billing plans", {
-        error: error instanceof Error ? error.stack ?? error.message : error,
+export async function ensureBillingPlansExist(): Promise<boolean> {
+  if (!plansExistPromise) {
+    plansExistPromise = prisma.billingPlan
+      .count({ where: { isActive: true } })
+      .then((count) => count > 0)
+      .catch((error) => {
+        plansExistPromise = null;
+        logError("Failed to check billing plans existence", {
+          error: error instanceof Error ? error.stack ?? error.message : error,
+        });
+        return false;
       });
-    });
   }
-  await ensurePlansPromise;
+  return plansExistPromise;
 }
-

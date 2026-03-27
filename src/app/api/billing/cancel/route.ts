@@ -6,6 +6,7 @@ import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { NotificationType } from "@prisma/client";
 import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
+import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,8 @@ export async function POST(req: Request) {
       cancelledAt: now,
     },
   });
+
+  await invalidatePlanCache(user.id, parsed.data.scope);
 
   await createBillingAuditLog({
     userId: user.id,

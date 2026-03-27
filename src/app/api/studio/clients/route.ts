@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     const data = await getStudioClients({
       studioId: query.studioId,
       sort: query.sort,
-      includeCardSummary: canAccessClientCards(plan.tier),
+      includeCardSummary: canAccessClientCards(plan.features),
       cursor: query.cursor,
       limit: query.limit,
     });

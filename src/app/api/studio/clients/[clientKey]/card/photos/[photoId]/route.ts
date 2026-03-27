@@ -37,7 +37,7 @@ export async function DELETE(req: Request, ctx: RouteContext) {
     });
 
     const plan = await getCurrentPlan(user.id, SubscriptionScope.STUDIO);
-    ensureClientCardAccess(plan.tier);
+    ensureClientCardAccess(plan.features);
 
     const studio = await prisma.studio.findUnique({
       where: { id: query.studioId },

@@ -7,6 +7,7 @@ import { BILLING_PERIODS, BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constant
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { formatTimeBucketUtc, sha256 } from "@/lib/billing/utils";
 import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
+import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 
 export const runtime = "nodejs";
 
@@ -108,6 +109,8 @@ export async function POST(req: Request) {
       },
       select: { id: true },
     });
+
+    await invalidatePlanCache(user.id, scope);
 
     await createBillingAuditLog({
       userId: user.id,

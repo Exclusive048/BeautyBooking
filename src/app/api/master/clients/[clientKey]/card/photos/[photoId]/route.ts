@@ -25,7 +25,7 @@ export async function DELETE(req: Request, ctx: RouteContext) {
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
-    ensureClientCardAccess(plan.tier);
+    ensureClientCardAccess(plan.features);
 
     const photo = await prisma.clientCardPhoto.findUnique({
       where: { id: params.photoId },

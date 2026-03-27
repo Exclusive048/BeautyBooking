@@ -28,7 +28,7 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
-    ensureClientCardAccess(plan.tier);
+    ensureClientCardAccess(plan.features);
 
     const card = await ensureClientCard({ providerId, clientKey: params.clientKey });
     const existingCount = await prisma.clientCardPhoto.count({ where: { cardId: card.id } });

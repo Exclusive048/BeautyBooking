@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import useSWR from "swr";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
-import type { PlanFeatures, PlanTier } from "@/lib/billing/types";
+import type { PlanFeatures } from "@/lib/billing/types";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type BooleanFeatureKey = {
@@ -11,7 +12,8 @@ type BooleanFeatureKey = {
 
 type FeatureGateProps = {
   feature: BooleanFeatureKey;
-  requiredPlan?: PlanTier;
+  /** @deprecated Computed automatically from plans API. Kept for backward compatibility. */
+  requiredPlan?: string;
   scope?: "MASTER" | "STUDIO";
   title?: string;
   description?: string;
@@ -21,9 +23,46 @@ type FeatureGateProps = {
   children: ReactNode;
 };
 
+type PlanWithFeatures = {
+  name: string;
+  tier: string;
+  scope: string;
+  sortOrder: number;
+  features: PlanFeatures;
+};
+
+type PlansResponse = {
+  ok: true;
+  data: {
+    plans: Record<string, PlanWithFeatures[]>;
+  };
+};
+
+async function fetchPlans(url: string): Promise<PlansResponse> {
+  const res = await fetch(url, { cache: "no-store" });
+  return res.json();
+}
+
+function findMinPlanName(
+  plansData: PlansResponse | undefined,
+  feature: BooleanFeatureKey,
+  scope: string
+): string | null {
+  if (!plansData?.data?.plans) return null;
+  const plans = plansData.data.plans[scope];
+  if (!plans) return null;
+  const sorted = [...plans].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const plan of sorted) {
+    if (plan.features && Boolean(plan.features[feature])) {
+      return plan.name;
+    }
+  }
+  return null;
+}
+
 export function FeatureGate({
   feature,
-  requiredPlan,
+  requiredPlan: requiredPlanOverride,
   scope,
   title,
   description,
@@ -33,6 +72,13 @@ export function FeatureGate({
   children,
 }: FeatureGateProps) {
   const plan = usePlanFeatures(scope);
+  const resolvedScope = scope === "STUDIO" ? "STUDIO" : "MASTER";
+
+  const { data: plansData } = useSWR<PlansResponse>(
+    plan.can(feature) ? null : "/api/billing/plans",
+    fetchPlans,
+    { revalidateOnFocus: false, dedupingInterval: 300_000 }
+  );
 
   if (plan.loading) {
     return (
@@ -50,8 +96,8 @@ export function FeatureGate({
     return <>{fallback}</>;
   }
 
-  const requiredLabel = requiredPlan ?? "PRO";
-  const billingHref = `/cabinet/billing?scope=${scope === "STUDIO" ? "STUDIO" : "MASTER"}`;
+  const requiredLabel = findMinPlanName(plansData, feature, resolvedScope) ?? requiredPlanOverride ?? "PRO";
+  const billingHref = `/cabinet/billing?scope=${resolvedScope}`;
   return (
     <div className={`relative ${className ?? ""}`}>
       <div className="pointer-events-none opacity-40">{children}</div>

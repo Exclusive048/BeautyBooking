@@ -28,7 +28,7 @@ export async function GET(req: Request, ctx: RouteContext) {
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
-    ensureClientCardAccess(plan.tier);
+    ensureClientCardAccess(plan.features);
 
     const provider = await prisma.provider.findUnique({
       where: { id: providerId },
@@ -66,7 +66,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
-    ensureClientCardAccess(plan.tier);
+    ensureClientCardAccess(plan.features);
 
     const body = await parseBody(req, clientCardPatchSchema);
     if (body.tags) {

@@ -2,7 +2,6 @@ import { ok } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
 import type { SubscriptionScope } from "@prisma/client";
-import { ensureDefaultPlans } from "@/lib/billing/plan-seed";
 
 export const runtime = "nodejs";
 
@@ -23,7 +22,6 @@ function buildPlanMap(plans: PlanRecord[]): Map<string, PlanNode> {
 }
 
 export async function GET() {
-  await ensureDefaultPlans();
   const plans = await prisma.billingPlan.findMany({
     where: { isActive: true },
     orderBy: [{ scope: "asc" }, { sortOrder: "asc" }],

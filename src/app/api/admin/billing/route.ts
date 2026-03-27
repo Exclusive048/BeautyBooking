@@ -18,7 +18,6 @@ import {
   type PlanFeatureOverrides,
   type PlanNode,
 } from "@/lib/billing/features";
-import { ensureDefaultPlans } from "@/lib/billing/plan-seed";
 
 const patchSchema = z.object({
   id: z.string().trim().min(1),
@@ -129,8 +128,6 @@ function assertRelaxedLimits(
 export async function GET() {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
-
-  await ensureDefaultPlans();
 
   const plans = await prisma.billingPlan.findMany({
     orderBy: [{ scope: "asc" }, { sortOrder: "asc" }],

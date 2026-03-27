@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { UI_TEXT } from "@/lib/ui/text";
+import { prisma } from "@/lib/prisma";
+import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
+import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
+import type { SubscriptionScope } from "@prisma/client";
 
 export const metadata: Metadata = {
   title: UI_TEXT.pages.pricing.title,
   description: UI_TEXT.pages.pricing.description,
 };
 
-type Plan = {
+type PlanCard = {
   code: string;
   name: string;
   price: string;
@@ -15,17 +19,148 @@ type Plan = {
   badge?: string;
   badgeColor?: string;
   desc: string;
-  features: readonly string[];
+  features: string[];
   cta: string;
   ctaHref: string;
   highlight?: boolean;
 };
 
-const MASTER_PLANS = UI_TEXT.pages.pricing.plans.master as readonly Plan[];
-const STUDIO_PLANS = UI_TEXT.pages.pricing.plans.studio as readonly Plan[];
-const PRICING_FAQ = UI_TEXT.pages.pricing.faqItems;
+const t = UI_TEXT.pages.pricing;
 
-function PricingCard({ plan }: { plan: Plan }) {
+const PRICING_FEATURE_KEYS: FeatureKey[] = [
+  "onlineBooking",
+  "catalogListing",
+  "profilePublicPage",
+  "pwaPush",
+  "notifications",
+  "onlinePayments",
+  "tgNotifications",
+  "clientVisitHistory",
+  "clientNotes",
+  "financeReport",
+  "hotSlots",
+  "highlightCard",
+  "analytics_dashboard",
+  "analytics_revenue",
+  "analytics_clients",
+  "analytics_booking_insights",
+  "analytics_cohorts",
+  "analytics_forecast",
+];
+
+function formatPrice(kopeks: number): string {
+  const rub = kopeks / 100;
+  return `${rub.toLocaleString("ru-RU")} ₽`;
+}
+
+function buildFeatureList(
+  features: Record<string, boolean | number | null>,
+  scope: SubscriptionScope,
+  parentName: string | null
+): string[] {
+  const lines: string[] = [];
+
+  if (parentName) {
+    lines.push(t.inheritPrefix.replace("{parent}", parentName));
+  }
+
+  if (scope === "STUDIO" && typeof features.maxTeamMasters === "number") {
+    lines.push(t.teamMastersLabel.replace("{count}", String(features.maxTeamMasters)));
+  }
+
+  if (scope === "MASTER" && typeof features.maxPortfolioPhotosSolo === "number") {
+    lines.push(t.portfolioLabel.replace("{count}", String(features.maxPortfolioPhotosSolo)));
+  }
+
+  if (scope === "STUDIO" && typeof features.maxPortfolioPhotosStudioDesign === "number" && typeof features.maxPortfolioPhotosPerStudioMaster === "number") {
+    lines.push(
+      t.portfolioStudioLabel
+        .replace("{count}", String(features.maxPortfolioPhotosStudioDesign))
+        .replace("{perMaster}", String(features.maxPortfolioPhotosPerStudioMaster))
+    );
+  }
+
+  for (const key of PRICING_FEATURE_KEYS) {
+    if (!features[key]) continue;
+    const def = FEATURE_CATALOG[key];
+    if (def.appliesTo !== "BOTH" && def.appliesTo !== scope) continue;
+    lines.push(def.title);
+  }
+
+  return lines;
+}
+
+async function loadPlans(): Promise<{ master: PlanCard[]; studio: PlanCard[] }> {
+  const plans = await prisma.billingPlan.findMany({
+    where: { isActive: true },
+    orderBy: [{ scope: "asc" }, { sortOrder: "asc" }],
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      tier: true,
+      scope: true,
+      sortOrder: true,
+      inheritsFromPlanId: true,
+      features: true,
+      prices: {
+        where: { isActive: true, periodMonths: 1 },
+        select: { priceKopeks: true },
+      },
+    },
+  });
+
+  const planMap = new Map<string, PlanNode>(
+    plans.map((p) => [p.id, { id: p.id, inheritsFromPlanId: p.inheritsFromPlanId, features: p.features }])
+  );
+
+  const parentNameById = new Map<string, string>();
+  for (const p of plans) {
+    parentNameById.set(p.id, p.name);
+  }
+
+  const grouped: Record<SubscriptionScope, PlanCard[]> = { MASTER: [], STUDIO: [] };
+
+  for (const plan of plans) {
+    const resolved = resolveEffectiveFeatures(plan.id, planMap);
+    const monthlyPrice = plan.prices[0]?.priceKopeks ?? 0;
+    const meta = t.planMeta[plan.code] ?? {};
+
+    const parentName = plan.inheritsFromPlanId
+      ? parentNameById.get(plan.inheritsFromPlanId) ?? null
+      : null;
+
+    const featureLines = buildFeatureList(
+      resolved as unknown as Record<string, boolean | number | null>,
+      plan.scope,
+      parentName
+    );
+
+    const extraFeatures = (meta as { extraFeatures?: string[] }).extraFeatures ?? [];
+
+    const allFeatures = parentName
+      ? [featureLines[0], ...extraFeatures, ...featureLines.slice(1)]
+      : [...extraFeatures, ...featureLines];
+
+    grouped[plan.scope].push({
+      code: plan.code,
+      name: plan.name,
+      price: formatPrice(monthlyPrice),
+      period: monthlyPrice === 0 ? t.freePeriod : t.paidPeriod,
+      badge: (meta as { badge?: string }).badge,
+      badgeColor: (meta as { badgeColor?: string }).badgeColor,
+      desc: (meta as { desc?: string }).desc ?? "",
+      features: allFeatures,
+      cta: (meta as { cta?: string }).cta ?? plan.name,
+      ctaHref: (meta as { ctaHref?: string }).ctaHref ?? "/login",
+      highlight: (meta as { highlight?: boolean }).highlight,
+    });
+  }
+
+  return { master: grouped.MASTER, studio: grouped.STUDIO };
+}
+
+function PricingCard({ plan }: { plan: PlanCard }) {
   return (
     <div
       className={`lux-card rounded-[24px] bg-bg-card p-7 flex flex-col gap-5 relative ${plan.highlight ? "ring-2 ring-primary/40" : ""}`}
@@ -68,31 +203,33 @@ function PricingCard({ plan }: { plan: Plan }) {
   );
 }
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const { master, studio } = await loadPlans();
+
   return (
     <main className="mx-auto max-w-[1100px] px-4 py-12 md:py-20 space-y-20">
 
       {/* Hero */}
       <section className="text-center space-y-4">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-          {UI_TEXT.pages.pricing.heroBadge}
+          {t.heroBadge}
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-text-main tracking-tight">
-          {UI_TEXT.pages.pricing.heroTitleMain}{" "}
+          {t.heroTitleMain}{" "}
           <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-            {UI_TEXT.pages.pricing.heroTitleHighlight}
+            {t.heroTitleHighlight}
           </span>
         </h1>
         <p className="text-text-sec text-lg max-w-[480px] mx-auto">
-          {UI_TEXT.pages.pricing.heroSubtitle}
+          {t.heroSubtitle}
         </p>
       </section>
 
       {/* Master plans */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.pricing.masterTitle}</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{t.masterTitle}</h2>
         <div className="grid md:grid-cols-3 gap-5">
-          {MASTER_PLANS.map((plan) => (
+          {master.map((plan) => (
             <PricingCard key={plan.code} plan={plan} />
           ))}
         </div>
@@ -100,9 +237,9 @@ export default function PricingPage() {
 
       {/* Studio plans */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.pricing.studioTitle}</h2>
+        <h2 className="text-2xl font-semibold text-text-main">{t.studioTitle}</h2>
         <div className="grid md:grid-cols-3 gap-5">
-          {STUDIO_PLANS.map((plan) => (
+          {studio.map((plan) => (
             <PricingCard key={plan.code} plan={plan} />
           ))}
         </div>
@@ -110,9 +247,9 @@ export default function PricingPage() {
 
       {/* FAQ */}
       <section className="space-y-5 max-w-[720px] mx-auto">
-        <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.pricing.faqTitle}</h2>
+        <h2 className="text-xl font-semibold text-text-main">{t.faqTitle}</h2>
         <div className="space-y-3">
-          {PRICING_FAQ.map(([q, a]) => (
+          {t.faqItems.map(([q, a]) => (
             <details key={q} className="lux-card rounded-[16px] bg-bg-card group">
               <summary className="flex items-center justify-between cursor-pointer p-5 font-medium text-sm text-text-main list-none">
                 {q}
@@ -126,4 +263,3 @@ export default function PricingPage() {
     </main>
   );
 }
-

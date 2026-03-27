@@ -5,6 +5,7 @@ import { PAST_DUE_GRACE_DAYS } from "@/lib/billing/constants";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 
 export type YookassaWebhookPayload = {
   event?: string;
@@ -150,6 +151,8 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
       }),
     ]);
 
+    await invalidatePlanCache(billingPayment.subscription.userId, billingPayment.subscription.scope);
+
     logInfo("YooKassa payment succeeded", {
       paymentId: billingPayment.id,
       subscriptionId: billingPayment.subscriptionId,
@@ -194,6 +197,7 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
         where: { id: billingPayment.subscriptionId },
         data: { status: "PAST_DUE", graceUntil: getGraceUntil(now) },
       });
+      await invalidatePlanCache(billingPayment.subscription.userId, billingPayment.subscription.scope);
     }
 
     await createBillingAuditLog({
