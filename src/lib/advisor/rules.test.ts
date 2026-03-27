@@ -7,6 +7,8 @@ describe("advisor/rules", () => {
     hasDescription: true,
     portfolioCount: 10,
     totalReviews: 5,
+    ratingAvg: 4.5,
+    bookingsLast30Days: 10,
     noShowRate: 0,
     hasDeadTimeSlots: false,
     newClientsLast30Days: 5,

@@ -46,6 +46,7 @@ export const upsertMasterServicesSchema = z.object({
         durationOverrideMin: z.number().int().min(15).max(12 * 60).nullable().optional(),
         priceOverride: z.number().int().min(0).nullable().optional(),
         globalCategoryId: z.string().trim().min(1).nullable().optional(),
+        description: z.string().trim().max(2000).nullable().optional(),
       })
     )
     .max(500),
@@ -56,6 +57,7 @@ export const createMasterServiceSchema = z.object({
   price: z.number().int().min(0),
   durationMin: z.number().int().min(15).max(12 * 60),
   globalCategoryId: z.string().trim().min(1).optional(),
+  description: z.string().trim().max(2000).optional(),
 });
 
 const bookingQuestionSchema = z.object({

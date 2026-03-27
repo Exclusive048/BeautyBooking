@@ -98,6 +98,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
 export type MasterProfileServiceItem = {
   serviceId: string;
   title: string;
+  description: string | null;
   isEnabled: boolean;
   onlinePaymentEnabled: boolean;
   globalCategoryId: string | null;
@@ -159,6 +160,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         id: true,
         name: true,
         title: true,
+        description: true,
         isEnabled: true,
         isActive: true,
         onlinePaymentEnabled: true,
@@ -187,6 +189,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       services: services.map((service) => ({
         serviceId: service.id,
         title: service.title?.trim() || service.name,
+        description: service.description ?? null,
         isEnabled: service.isEnabled && service.isActive,
         onlinePaymentEnabled: service.onlinePaymentEnabled,
         globalCategoryId: service.globalCategoryId ?? null,
@@ -221,6 +224,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       id: true,
       name: true,
       title: true,
+      description: true,
       isActive: true,
       onlinePaymentEnabled: true,
       globalCategoryId: true,
@@ -268,6 +272,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       return {
         serviceId: service.id,
         title: service.title?.trim() || service.name,
+        description: service.description ?? null,
         isEnabled: Boolean(service.isActive && override?.isEnabled),
         onlinePaymentEnabled: service.onlinePaymentEnabled,
         globalCategoryId: service.globalCategoryId ?? null,
@@ -404,6 +409,7 @@ export async function upsertMasterServices(
     durationOverrideMin?: number | null;
     priceOverride?: number | null;
     globalCategoryId?: string | null;
+    description?: string | null;
   }>
 ): Promise<{ updated: number }> {
   const context = await getMasterContext(masterId);
@@ -467,6 +473,9 @@ export async function upsertMasterServices(
             ...(typeof item.priceOverride === "number" ? { price: item.priceOverride } : {}),
             ...(nextGlobalCategoryId !== undefined
               ? { globalCategoryId: nextGlobalCategoryId }
+              : {}),
+            ...(item.description !== undefined
+              ? { description: item.description?.trim() || null }
               : {}),
           },
         });
@@ -538,7 +547,7 @@ export async function upsertMasterServices(
 
 export async function createSoloMasterService(
   masterId: string,
-  input: { title: string; price: number; durationMin: number; globalCategoryId?: string }
+  input: { title: string; price: number; durationMin: number; globalCategoryId?: string; description?: string }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
   if (!context.isSolo) {
@@ -602,6 +611,7 @@ export async function createSoloMasterService(
           providerId: masterId,
           title: normalizedTitle,
           name: normalizedTitle,
+          description: input.description?.trim() || null,
           price: input.price,
           durationMin: input.durationMin,
           globalCategoryId,

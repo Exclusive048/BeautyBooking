@@ -1,8 +1,10 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
 import type { ReviewDto } from "@/lib/reviews/types";
 import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
@@ -130,30 +132,59 @@ export function MasterReviewsPage({ masterId }: Props) {
 
   const topPrivateTags = useMemo(() => collectTopPrivateTags(reviews), [reviews]);
 
-  const replyToReview = async (review: ReviewDto): Promise<void> => {
-    if (review.replyText) return;
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [suggestingReplyId, setSuggestingReplyId] = useState<string | null>(null);
 
-    const text = window.prompt(t.replyPlaceholder);
-    const normalized = text?.trim() ?? "";
+  const openReplyForm = (review: ReviewDto) => {
+    if (review.replyText) return;
+    setReplyingToId(review.id);
+    setReplyDraft("");
+    setActionError(null);
+  };
+
+  const submitReply = async (reviewId: string): Promise<void> => {
+    const normalized = replyDraft.trim();
     if (!normalized) return;
 
     setActionError(null);
-    setActionId(review.id);
+    setActionId(reviewId);
     try {
-      const res = await fetch(`/api/reviews/${encodeURIComponent(review.id)}/reply`, {
+      const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: normalized }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `Ошибка API: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : `${t.replyFailed}`);
       }
       setReviews((prev) => updateReview(prev, json.data.review));
+      setReplyingToId(null);
+      setReplyDraft("");
     } catch (actionErrorValue) {
       setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : t.replyFailed);
     } finally {
       setActionId(null);
+    }
+  };
+
+  const suggestReply = async (reviewId: string): Promise<void> => {
+    setSuggestingReplyId(reviewId);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/suggest-reply`, {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ suggestion: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : t.suggestReplyFailed);
+      }
+      setReplyDraft(json.data.suggestion);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t.suggestReplyFailed);
+    } finally {
+      setSuggestingReplyId(null);
     }
   };
 
@@ -298,10 +329,49 @@ export function MasterReviewsPage({ masterId }: Props) {
                     </div>
                   ) : null}
 
+                  {replyingToId === review.id ? (
+                    <div className="mt-3 space-y-2">
+                      <Textarea
+                        value={replyDraft}
+                        onChange={(e) => setReplyDraft(e.target.value)}
+                        placeholder={t.replyPlaceholder}
+                        rows={3}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          onClick={() => void submitReply(review.id)}
+                          disabled={actionId === review.id || !replyDraft.trim()}
+                          size="sm"
+                        >
+                          {actionId === review.id ? t.replySave : t.replySave}
+                        </Button>
+                        <Button
+                          onClick={() => void suggestReply(review.id)}
+                          disabled={suggestingReplyId === review.id}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          <Sparkles className="mr-1 h-3.5 w-3.5" />
+                          {suggestingReplyId === review.id ? t.suggestReplyLoading : t.suggestReply}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setReplyingToId(null);
+                            setReplyDraft("");
+                          }}
+                          variant="ghost"
+                          size="sm"
+                        >
+                          {t.replyCancel}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {!review.replyText ? (
+                    {!review.replyText && replyingToId !== review.id ? (
                       <Button
-                        onClick={() => void replyToReview(review)}
+                        onClick={() => openReplyForm(review)}
                         disabled={actionId === review.id}
                         variant="secondary"
                         size="sm"

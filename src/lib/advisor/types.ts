@@ -16,6 +16,8 @@ export type MasterStats = {
   hasDescription: boolean;
   portfolioCount: number;
   totalReviews: number;
+  ratingAvg: number;
+  bookingsLast30Days: number;
   noShowRate: number;
   hasDeadTimeSlots: boolean;
   newClientsLast30Days: number;

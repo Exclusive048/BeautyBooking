@@ -14,6 +14,11 @@ export const RATE_LIMITS = {
   // Destructive account/cabinet deletion
   destructiveDelete: { windowSeconds: 60 * 60, maxRequests: 1 },
 
+  // AI-generated content
+  aiReviewSummary: { windowSeconds: 60, maxRequests: 10 },
+  aiSuggestReply: { windowSeconds: 3600, maxRequests: 20 },
+  aiSuggestDescription: { windowSeconds: 3600, maxRequests: 20 },
+
   // General public API
   publicApi: { windowSeconds: 60, maxRequests: 120 },
 } satisfies Record<string, RateLimitConfig>;

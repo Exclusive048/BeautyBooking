@@ -1,5 +1,6 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { invalidateReviewSummaryCache } from "@/lib/ai/review-summary";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { createReviewSchema, listReviewsQuerySchema } from "@/lib/reviews/schemas";
@@ -80,6 +81,7 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
+    void invalidateReviewSummaryCache(review.targetId);
     return jsonOk({ review }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

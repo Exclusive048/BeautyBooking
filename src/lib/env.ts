@@ -71,6 +71,7 @@ const envSchema = z.object({
   STORAGE_PROVIDER: z.enum(STORAGE_PROVIDERS).default("local"),
   MEDIA_DELIVERY_SECRET: z.string().trim().optional(),
   VISUAL_SEARCH_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
+  AI_FEATURES_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
   YOOKASSA_SECRET_KEY: z.string().trim().optional(),
   YOOKASSA_SHOP_ID: z.string().trim().optional(),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().trim().optional(),
@@ -135,7 +136,7 @@ export function validateEnv(): ValidatedEnv {
     requireVar("S3_REGION");
   }
 
-  if (parsed.VISUAL_SEARCH_ENABLED === "true") {
+  if (parsed.VISUAL_SEARCH_ENABLED === "true" || parsed.AI_FEATURES_ENABLED === "true") {
     requireVar("OPENAI_API_KEY");
   }
 

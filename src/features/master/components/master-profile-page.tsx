@@ -13,7 +13,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Camera, Trash2 } from "lucide-react";
+import { AlertTriangle, Camera, Sparkles, Trash2 } from "lucide-react";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -36,6 +36,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 type MasterServiceItem = {
   serviceId: string;
   title: string;
+  description: string | null;
   globalCategoryId: string | null;
   globalCategory: { id: string; name: string } | null;
   isEnabled: boolean;
@@ -430,6 +431,8 @@ export function MasterProfilePage() {
   const [serviceFieldErrors, setServiceFieldErrors] = useState<
     Record<string, { price?: string; duration?: string }>
   >({});
+
+  const [suggestingDescriptionId, setSuggestingDescriptionId] = useState<string | null>(null);
 
   const [bookingConfigServiceId, setBookingConfigServiceId] = useState<string | null>(null);
   const [bookingConfigDraft, setBookingConfigDraft] = useState<BookingConfigDraft | null>(null);
@@ -1218,6 +1221,7 @@ export function MasterProfilePage() {
         priceOverride:
           item.canEditPrice && item.isEnabled ? normalizePrice(item.effectivePrice) : undefined,
         globalCategoryId: item.canEditPrice ? item.globalCategoryId ?? null : undefined,
+        description: item.canEditPrice ? item.description ?? null : undefined,
       }));
 
       try {
@@ -1268,6 +1272,32 @@ export function MasterProfilePage() {
       setServicesSaveStatus("idle");
     }
   }, [hasServiceDraftChanges, servicesSaveStatus]);
+
+  const handleSuggestDescription = async (serviceId: string): Promise<void> => {
+    if (suggestingDescriptionId) return;
+    setSuggestingDescriptionId(serviceId);
+    try {
+      const res = await fetchWithAuth(`/api/master/services/${serviceId}/suggest-description`, {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ suggestion: string }> | null;
+      if (!res.ok || !json || !json.ok) {
+        setError(UI_TEXT.master.profile.services.suggestDescriptionFailed);
+        return;
+      }
+      setServicesDraft((current) => ({
+        ...current,
+        [serviceId]: {
+          ...current[serviceId],
+          description: json.data.suggestion,
+        },
+      }));
+    } catch {
+      setError(UI_TEXT.master.profile.services.suggestDescriptionFailed);
+    } finally {
+      setSuggestingDescriptionId(null);
+    }
+  };
 
   const createSoloService = async (): Promise<void> => {
     if (!data?.master.isSolo) return;
@@ -2550,6 +2580,40 @@ export function MasterProfilePage() {
                             {UI_TEXT.master.profile.services.noCategoryHint}
                           </div>
                         ) : null}
+                      </div>
+                    ) : null}
+                    {service.canEditPrice ? (
+                      <div className="mt-2 space-y-1">
+                        <label className="block text-xs font-medium text-text-sec">
+                          {UI_TEXT.master.profile.services.descriptionLabel}
+                        </label>
+                        <textarea
+                          className={`${selectBaseClass} min-h-[60px] resize-y`}
+                          rows={2}
+                          maxLength={2000}
+                          placeholder={UI_TEXT.master.profile.services.descriptionPlaceholder}
+                          value={service.description ?? ""}
+                          onChange={(event) =>
+                            setServicesDraft((current) => ({
+                              ...current,
+                              [service.serviceId]: {
+                                ...current[service.serviceId],
+                                description: event.target.value || null,
+                              },
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          disabled={suggestingDescriptionId === service.serviceId}
+                          onClick={() => void handleSuggestDescription(service.serviceId)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary transition hover:text-primary/80 disabled:opacity-50"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          {suggestingDescriptionId === service.serviceId
+                            ? UI_TEXT.master.profile.services.suggestDescriptionLoading
+                            : UI_TEXT.master.profile.services.suggestDescription}
+                        </button>
                       </div>
                     ) : null}
                     {false && (

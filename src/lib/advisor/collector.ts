@@ -104,6 +104,7 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
       avatarUrl: true,
       description: true,
       studioId: true,
+      ratingAvg: true,
     },
   });
   if (!provider || provider.type !== "MASTER") {
@@ -112,11 +113,13 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
 
   const context = await buildMasterAnalyticsContext(provider.id);
 
+  const bookingsRange = buildRollingRange(NEW_CLIENTS_WINDOW_DAYS, provider.timezone);
   const [
     portfolioCount,
     totalReviews,
     workingDaysPerWeek,
     servicesWithoutPriceCount,
+    bookingsLast30Days,
   ] = await Promise.all([
     prisma.portfolioItem.count({ where: { masterId: provider.id } }),
     prisma.review.count({ where: { targetType: "provider", targetId: provider.id } }),
@@ -128,6 +131,13 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
       : prisma.service.count({
           where: { providerId: provider.id, price: { lte: 0 } },
         }),
+    prisma.booking.count({
+      where: {
+        providerId: provider.id,
+        createdAt: { gte: bookingsRange.fromUtc },
+        status: { notIn: ["CANCELLED", "REJECTED"] },
+      },
+    }),
   ]);
 
   const [funnel, occupancy, newVsReturning, atRisk, lowRatedService] = await Promise.all([
@@ -164,6 +174,8 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
     hasDescription: Boolean(provider.description?.trim()),
     portfolioCount,
     totalReviews,
+    ratingAvg: provider.ratingAvg,
+    bookingsLast30Days,
     noShowRate: funnel.noShowRate,
     hasDeadTimeSlots,
     newClientsLast30Days,
