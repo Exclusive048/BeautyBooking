@@ -137,6 +137,7 @@ export async function saveDiscountRule(providerId: string, input: HotSlotRuleInp
     create: {
       providerId,
       isEnabled: input.isEnabled,
+      smartPriceEnabled: input.smartPriceEnabled ?? false,
       triggerHours: input.triggerHours,
       discountType: input.discountType,
       discountValue: input.discountValue,
@@ -146,6 +147,7 @@ export async function saveDiscountRule(providerId: string, input: HotSlotRuleInp
     },
     update: {
       isEnabled: input.isEnabled,
+      smartPriceEnabled: input.smartPriceEnabled ?? false,
       triggerHours: input.triggerHours,
       discountType: input.discountType,
       discountValue: input.discountValue,

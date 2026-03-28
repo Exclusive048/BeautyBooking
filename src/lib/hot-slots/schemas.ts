@@ -19,6 +19,7 @@ const applyModeSchema = z.enum(["ALL_SERVICES", "PRICE_FROM", "MANUAL"]);
 export const hotSlotRuleSchema = z
   .object({
     isEnabled: z.boolean(),
+    smartPriceEnabled: z.boolean().optional().default(false),
     triggerHours: triggerHoursSchema,
     discountType: discountTypeSchema,
     discountValue: z.coerce.number().int(),

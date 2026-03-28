@@ -472,6 +472,12 @@ export const UI_TEXT = {
       unavailable: "Правило пока недоступно.",
       loadFailed: "Не удалось загрузить настройки.",
       saveFailed: "Не удалось сохранить правило.",
+      smartPrice: {
+        label: "Умная цена",
+        hint: "Автоматически публиковать горящие слоты за выбранное время",
+        enabled: "Включена",
+        disabled: "Выключена",
+      },
     },
     billing: {
       featureGate: {

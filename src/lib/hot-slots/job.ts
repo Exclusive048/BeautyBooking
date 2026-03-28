@@ -136,6 +136,4 @@ export async function runHotSlotsJob(now = new Date()): Promise<HotSlotsJobStats
   return stats;
 }
 
-export async function runHotSlotExpiringJob(now = new Date()): Promise<void> {
-  void now;
-}
+export { runHotSlotExpiringJob } from "@/lib/hot-slots/smart-price-job";

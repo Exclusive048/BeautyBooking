@@ -938,6 +938,8 @@ model DiscountRule {
 
   isEnabled Boolean @default(false)
 
+  smartPriceEnabled Boolean @default(false)
+
   triggerHours Int
 
   discountType DiscountType
@@ -977,6 +979,8 @@ model HotSlot {
   discountValue Int
 
   isActive Boolean @default(true)
+
+  isAuto Boolean @default(false)
 
   activatedAt DateTime @default(now())
 

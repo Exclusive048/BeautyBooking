@@ -27,6 +27,7 @@ import {
   normalizeJobMeta,
 } from "@/lib/queue/types";
 import { runHotSlotExpiringJob } from "@/lib/hot-slots/job";
+import { runSmartPriceJob } from "@/lib/hot-slots/smart-price-job";
 import { runBookingReviewPromptJob } from "@/lib/bookings/review-prompts";
 import {
   indexMediaAsset,
@@ -118,6 +119,15 @@ function startPeriodicJobs() {
   setInterval(() => {
     void runWeeklyStatsJob().catch((error) => {
       logError("Weekly stats job failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, 60 * 60 * 1000);
+
+  // Smart price: auto-create HotSlots from free slots per DiscountRule
+  setInterval(() => {
+    void runSmartPriceJob().catch((error) => {
+      logError("Smart price job failed", {
         error: error instanceof Error ? error.message : String(error),
       });
     });
