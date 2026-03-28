@@ -788,6 +788,11 @@ export const UI_TEXT = {
       masterLabel: "Мастер",
       onPhotoLabel: "На фото",
     },
+    stories: {
+      title: "Работы мастеров",
+      bookNow: "Записаться",
+      photoCount: (current: number, total: number) => `${current} / ${total}`,
+    },
     rebook: {
       title: "Записаться снова",
       bookAgain: "Записаться",

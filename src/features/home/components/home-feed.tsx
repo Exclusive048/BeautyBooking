@@ -8,6 +8,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { HomeFilters } from "@/features/home/components/home-filters";
 import { PortfolioGrid } from "@/features/home/components/portfolio-grid";
 import { PortfolioPreviewModal } from "@/features/home/components/portfolio-preview-modal";
+import { PortfolioStoriesBar } from "@/features/home/components/portfolio-stories-bar";
 import { RecentMastersSection } from "@/features/home/components/recent-masters-section";
 
 type HomeCategory = {
@@ -191,6 +192,8 @@ export function HomeFeed() {
 
   return (
     <div className="space-y-6">
+      <PortfolioStoriesBar />
+
       <RecentMastersSection />
 
       <HomeFilters
