@@ -208,6 +208,14 @@ export const UI_TEXT = {
   notifications: {
     toastTitle: "У вас новое уведомление",
     declineReason: "Отклонено",
+    weeklyStats: {
+      title: "Итоги недели",
+      body: (bookings: number, revenue: number) =>
+        `На прошлой неделе: ${bookings} ${bookings === 1 ? "запись" : bookings < 5 ? "записи" : "записей"}, ${revenue.toLocaleString("ru-RU")} ₽`,
+      motivationGrowth: (pct: number) => `Рост на ${pct}%! Так держать 🚀`,
+      motivationDecline: "Добавьте горячие слоты, чтобы заполнить расписание",
+      motivationFirst: "Отличное начало! Продолжайте в том же духе ✨",
+    },
     slotFreed: {
       title: "Освободилось окно",
       body: (masterName: string, dateTime: string) =>

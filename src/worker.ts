@@ -37,6 +37,7 @@ import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/vi
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
 import { runMediaCleanup } from "@/lib/media/cleanup";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
+import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
 
 ensureVisualSearchStartupConfig();
 
@@ -112,6 +113,15 @@ function startPeriodicJobs() {
       });
     });
   }, mediaCleanupIntervalMs);
+
+  // Weekly stats: check every hour, fires only on Monday UTC
+  setInterval(() => {
+    void runWeeklyStatsJob().catch((error) => {
+      logError("Weekly stats job failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, 60 * 60 * 1000);
 }
 
 function getRetryDelaySeconds(attempts: number): number {
