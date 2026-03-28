@@ -776,6 +776,14 @@ export const UI_TEXT = {
       masterLabel: "Мастер",
       onPhotoLabel: "На фото",
     },
+    rebook: {
+      title: "Записаться снова",
+      bookAgain: "Записаться",
+      lastVisit: "Последний визит",
+      nextSlot: "Ближайшее окно",
+      noSlots: "Нет свободных окон",
+      loadFailed: "Не удалось загрузить мастеров",
+    },
   },
   services: {
     fields: {

@@ -14,6 +14,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { listProviderBookingsForOwner } from "@/lib/bookings/list";
 import { loadBookingWithRelations, notifyBookingConfirmed, notifyBookingCreated } from "@/lib/notifications/booking-notifications";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { invalidateRecentMastersCache } from "@/lib/bookings/recent-masters";
 
 export async function GET(req: Request) {
   try {
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
         outcome: "success",
         operation: "create-booking",
       });
+      void invalidateRecentMastersCache(user.userId);
       return jsonOk({ booking: created }, { status: 201 });
     }
 
@@ -157,6 +159,7 @@ export async function POST(req: Request) {
       outcome: "success",
       operation: "create-booking",
     });
+    void invalidateRecentMastersCache(userId);
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);
