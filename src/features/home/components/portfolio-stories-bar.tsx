@@ -75,7 +75,7 @@ export function PortfolioStoriesBar() {
     void fetchStories();
   }, [fetchStories]);
 
-  if (!loaded || masters.length === 0) return null;
+  if (!loaded || masters.length < 3) return null;
 
   return (
     <>

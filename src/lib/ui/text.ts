@@ -798,6 +798,11 @@ export const UI_TEXT = {
     detailsFailed: "Не удалось загрузить работу",
     bookService: "Записаться на услугу",
     goToMaster: "К мастеру",
+    card: {
+      book: "Записаться",
+      priceFrom: "от",
+      viewProfile: "Профиль",
+    },
     preview: {
       masterLabel: "Мастер",
       onPhotoLabel: "На фото",

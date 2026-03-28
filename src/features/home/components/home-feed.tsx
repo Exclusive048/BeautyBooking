@@ -53,7 +53,9 @@ export function HomeFeed() {
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | null>(null);
   const [categories, setCategories] = useState<HomeCategory[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(
+    () => searchParams.get("category")
+  );
   const [items, setItems] = useState<PortfolioFeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -199,7 +201,17 @@ export function HomeFeed() {
       <HomeFilters
         categories={categories}
         selectedCategoryId={activeCategory}
-        onSelectCategory={(next) => setActiveCategory(next)}
+        onSelectCategory={(next) => {
+          setActiveCategory(next);
+          const params = new URLSearchParams(searchParams.toString());
+          if (next) {
+            params.set("category", next);
+          } else {
+            params.delete("category");
+          }
+          const qs = params.toString();
+          router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+        }}
       />
 
       {toast ? (

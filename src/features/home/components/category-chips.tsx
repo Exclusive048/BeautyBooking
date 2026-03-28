@@ -1,5 +1,3 @@
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -23,17 +21,14 @@ export function CategoryChips({ categories, selectedId, onSelect }: Props) {
 
   return (
     <div className="mt-2 flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
-      {selectedId ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => onSelect(null)}
-          className="flex shrink-0 items-center gap-1.5 rounded-full px-3 text-xs text-text-sec"
-        >
-          <X className="h-3 w-3" />
-          {UI_TEXT.home.filters.reset}
-        </Button>
-      ) : null}
+      {/* "Все" chip — always first */}
+      <Chip
+        type="button"
+        onClick={() => onSelect(null)}
+        variant={selectedId === null ? "active" : "default"}
+      >
+        {UI_TEXT.home.filters.all}
+      </Chip>
 
       {chips.map((chip) => (
         <Chip
