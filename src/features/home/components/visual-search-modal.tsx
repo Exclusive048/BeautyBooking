@@ -237,14 +237,15 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 <span className="max-w-[60%] truncate text-xs text-white/60">
                   {selectedFile?.name}
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handleReset}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-card/80 px-2.5 py-1 text-xs font-medium text-text-main backdrop-blur-sm transition-colors hover:bg-bg-card"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs backdrop-blur-sm"
                 >
                   <RotateCcw className="h-3 w-3" />
                   {UI_TEXT.home.visualSearch.changeFile}
-                </button>
+                </Button>
               </div>
             </div>
           )}

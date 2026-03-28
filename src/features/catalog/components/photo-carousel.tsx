@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PhotoCarouselProps = {
@@ -29,22 +30,24 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
 
       {safePhotos.length > 1 ? (
         <>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="none"
             aria-label={UI_TEXT.catalog.carouselPrev}
             onClick={() => setIndex((prev) => (prev - 1 + safePhotos.length) % safePhotos.length)}
             className="absolute left-3 top-1/2 z-10 h-9 w-9 -translate-y-1/2 rounded-full border border-white/40 bg-black/35 text-sm text-white backdrop-blur transition hover:bg-black/55"
           >
             &lt;
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="none"
             aria-label={UI_TEXT.catalog.carouselNext}
             onClick={() => setIndex((prev) => (prev + 1) % safePhotos.length)}
             className="absolute right-3 top-1/2 z-10 h-9 w-9 -translate-y-1/2 rounded-full border border-white/40 bg-black/35 text-sm text-white backdrop-blur transition hover:bg-black/55"
           >
             &gt;
-          </button>
+          </Button>
         </>
       ) : null}
     </div>

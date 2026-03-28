@@ -63,10 +63,6 @@ type BillingPageProps = {
 };
 
 const PERIODS: PeriodMonths[] = [1, 12];
-const PERIOD_BUTTON_SELECTED =
-  "rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-card";
-const PERIOD_BUTTON_UNSELECTED =
-  "rounded-xl bg-white/8 px-4 py-2 text-sm font-medium text-text-main transition-colors hover:bg-white/12";
 
 function getPrice(plan: BillingPlan, periodMonths: PeriodMonths): PlanPrice | null {
   return plan.prices.find((price) => price.periodMonths === periodMonths) ?? null;
@@ -306,16 +302,17 @@ export function BillingPage({ scope }: BillingPageProps) {
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-text-sec">
           {PERIODS.map((periodMonths) => (
-            <button
+            <Button
               key={periodMonths}
-              type="button"
+              variant={selectedPeriod[scope] === periodMonths ? "primary" : "secondary"}
+              size="none"
               onClick={() =>
                 setSelectedPeriod((current) => ({
                   ...current,
                   [scope]: periodMonths,
                 }))
               }
-              className={selectedPeriod[scope] === periodMonths ? PERIOD_BUTTON_SELECTED : PERIOD_BUTTON_UNSELECTED}
+              className="rounded-xl px-4 py-2 text-sm font-semibold"
             >
               {periodMonths === 12 ? (
                 <span className="flex items-center gap-1.5">
@@ -334,7 +331,7 @@ export function BillingPage({ scope }: BillingPageProps) {
               ) : (
                 <span>{formatPeriodLabel(periodMonths)}</span>
               )}
-            </button>
+            </Button>
           ))}
         </div>
 

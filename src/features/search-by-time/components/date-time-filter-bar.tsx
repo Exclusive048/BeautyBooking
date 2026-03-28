@@ -163,8 +163,9 @@ export function DateTimeFilterBar({
                 <div className="px-3 py-2 text-xs text-text-sec">{UI_TEXT.common.loading}</div>
               ) : suggestions.length > 0 ? (
                 suggestions.map((item) => (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
                     key={item.id}
                     onClick={() => {
                       onServiceSelect(item);
@@ -175,7 +176,7 @@ export function DateTimeFilterBar({
                     }`}
                   >
                     <span>{item.title}</span>
-                  </button>
+                  </Button>
                 ))
               ) : (
                 <div className="px-3 py-2 text-xs text-text-sec">{UI_TEXT.catalog.timeSearch.noServices}</div>

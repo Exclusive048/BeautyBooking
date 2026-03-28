@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { moneyRUBPlain } from "@/lib/format";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
@@ -158,18 +160,15 @@ export function HotSlotsSettingsSection({
         <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{text.whenToApply}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {TRIGGER_OPTIONS.map((option) => (
-            <button
+            <Button
               key={option}
-              type="button"
+              variant={rule.triggerHours === option ? "primary" : "secondary"}
+              size="none"
               onClick={() => updateRule({ triggerHours: option })}
-              className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-                rule.triggerHours === option
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-white/8 text-text-main hover:bg-white/12"
-              }`}
+              className="rounded-xl px-3 py-1.5 text-xs"
             >
               {triggerLabel(option)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -177,56 +176,47 @@ export function HotSlotsSettingsSection({
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{text.discountType}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
+          <Button
+            variant={rule.discountType === "PERCENT" ? "primary" : "secondary"}
+            size="none"
             onClick={() => updateRule({ discountType: "PERCENT", discountValue: 10 })}
-            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-              rule.discountType === "PERCENT"
-                ? "bg-primary text-primary-foreground"
-                : "bg-white/8 text-text-main hover:bg-white/12"
-            }`}
+            className="rounded-xl px-3 py-1.5 text-xs"
           >
             {text.percent}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={rule.discountType === "FIXED" ? "primary" : "secondary"}
+            size="none"
             onClick={() => updateRule({ discountType: "FIXED", discountValue: 500 })}
-            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-              rule.discountType === "FIXED"
-                ? "bg-primary text-primary-foreground"
-                : "bg-white/8 text-text-main hover:bg-white/12"
-            }`}
+            className="rounded-xl px-3 py-1.5 text-xs"
           >
             {text.fixedAmount}
-          </button>
+          </Button>
         </div>
 
         {rule.discountType === "PERCENT" ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {PERCENT_OPTIONS.map((value) => (
-              <button
+              <Button
                 key={value}
-                type="button"
+                variant={rule.discountValue === value ? "primary" : "secondary"}
+                size="none"
                 onClick={() => updateRule({ discountValue: value })}
-                className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-                  rule.discountValue === value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/8 text-text-main hover:bg-white/12"
-                }`}
+                className="rounded-xl px-3 py-1.5 text-xs"
               >
                 {value}%
-              </button>
+              </Button>
             ))}
           </div>
         ) : (
           <div className="mt-2 flex items-center gap-2">
-            <input
+            <Input
               type="number"
               min={100}
               max={5000}
               value={Number.isFinite(rule.discountValue) ? rule.discountValue : 0}
               onChange={(event) => updateRule({ discountValue: Number(event.target.value) || 0 })}
-              className="h-10 w-32 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-28"
             />
             <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
           </div>
@@ -236,49 +226,40 @@ export function HotSlotsSettingsSection({
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{text.applyMode}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
+          <Button
+            variant={rule.applyMode === "ALL_SERVICES" ? "primary" : "secondary"}
+            size="none"
             onClick={() => updateRule({ applyMode: "ALL_SERVICES" })}
-            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-              rule.applyMode === "ALL_SERVICES"
-                ? "bg-primary text-primary-foreground"
-                : "bg-white/8 text-text-main hover:bg-white/12"
-            }`}
+            className="rounded-xl px-3 py-1.5 text-xs"
           >
             {text.applyAll}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={rule.applyMode === "PRICE_FROM" ? "primary" : "secondary"}
+            size="none"
             onClick={() => updateRule({ applyMode: "PRICE_FROM" })}
-            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-              rule.applyMode === "PRICE_FROM"
-                ? "bg-primary text-primary-foreground"
-                : "bg-white/8 text-text-main hover:bg-white/12"
-            }`}
+            className="rounded-xl px-3 py-1.5 text-xs"
           >
             {text.applyFrom}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={rule.applyMode === "MANUAL" ? "primary" : "secondary"}
+            size="none"
             onClick={() => updateRule({ applyMode: "MANUAL" })}
-            className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${
-              rule.applyMode === "MANUAL"
-                ? "bg-primary text-primary-foreground"
-                : "bg-white/8 text-text-main hover:bg-white/12"
-            }`}
+            className="rounded-xl px-3 py-1.5 text-xs"
           >
             {text.applyManual}
-          </button>
+          </Button>
         </div>
 
         {rule.applyMode === "PRICE_FROM" ? (
           <div className="mt-2 flex items-center gap-2">
-            <input
+            <Input
               type="number"
               min={0}
               value={rule.minPriceFrom ?? 0}
               onChange={(event) => updateRule({ minPriceFrom: Number(event.target.value) || 0 })}
-              className="h-10 w-32 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-28"
             />
             <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
           </div>
@@ -316,14 +297,14 @@ export function HotSlotsSettingsSection({
       {status ? <p className="text-xs text-text-sec">{status}</p> : null}
 
       <div className="flex justify-end">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => void saveRule()}
           disabled={saving}
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
         >
           {saving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
-        </button>
+        </Button>
       </div>
     </div>
   );

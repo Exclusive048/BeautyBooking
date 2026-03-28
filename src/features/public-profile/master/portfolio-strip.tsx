@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -80,9 +81,9 @@ export function PortfolioStrip({ items }: Props) {
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
           {items.map((item) => (
-            <button
+            <Button
               key={item.id}
-              type="button"
+              variant="wrapper"
               onClick={() => {
                 setError(null);
                 setSelectedItem(null);
@@ -107,15 +108,15 @@ export function PortfolioStrip({ items }: Props) {
               <div className="p-2 text-xs text-text-sec">
                 {item.primaryServiceTitle ?? item.caption ?? item.masterName}
               </div>
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
       {selectedId ? (
         <div className="fixed inset-0 z-50">
-          <button
-            type="button"
+          <Button
+            variant="wrapper"
             className="absolute inset-0 bg-black/55"
             onClick={closeViewer}
             aria-label={UI_TEXT.common.cancel}

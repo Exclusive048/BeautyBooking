@@ -195,14 +195,15 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {assets.map((asset) => (
           <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
-            <button type="button" className="h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
+            <Button variant="wrapper" className="h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
               <img src={asset.url} alt="" className="h-full w-full object-cover" />
-            </button>
+            </Button>
 
             {canEdit ? (
               <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="none"
                   onClick={() => {
                     setReplaceTargetId(asset.id);
                     replaceInputRef.current?.click();
@@ -212,16 +213,17 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input"
                 >
                   <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="none"
                   onClick={() => void remove(asset.id)}
                   aria-label={mediaText.removePhotoAria}
                   disabled={busy}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
@@ -232,7 +234,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
       {previewUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <button className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label={mediaText.closePreviewAria} />
+          <Button variant="wrapper" className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label={mediaText.closePreviewAria} />
           <img src={previewUrl} alt="" className="relative max-h-[90vh] max-w-[90vw] rounded-2xl bg-bg-card object-contain" />
         </div>
       ) : null}

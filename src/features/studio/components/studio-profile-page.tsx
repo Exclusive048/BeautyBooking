@@ -4,6 +4,8 @@ import { MediaEntityType } from "@prisma/client";
 import { AlertTriangle, Send, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
@@ -484,9 +486,10 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       <div className="space-y-4 rounded-2xl bg-bg-card/90 p-4">
         <div className="flex rounded-xl border border-border-subtle bg-bg-input p-1">
           {settingsTabs.map((tab) => (
-            <button
+            <Button
               key={tab.id}
-              type="button"
+              variant="secondary"
+              size="none"
               onClick={() => setSettingsTab(tab.id)}
               className={[
                 "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
@@ -496,7 +499,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
               ].join(" ")}
             >
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -548,7 +551,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
               <h3 className="text-sm font-semibold">{studioSettingsText.cancellationTitle}</h3>
               <p className="mt-1 text-xs text-text-sec">{studioSettingsText.cancellationHint}</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <input
+                <Input
                   type="number"
                   min={0}
                   max={168}
@@ -556,7 +559,7 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
                   value={cancellationDeadlineInput}
                   onChange={(event) => setCancellationDeadlineInput(event.target.value)}
                   placeholder={studioSettingsText.cancellationPlaceholder}
-                  className="h-10 w-[180px] rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+                  className="h-10 w-[180px] rounded-xl"
                 />
                 <div className="text-xs text-text-sec">
                   {studioSettingsText.currentValueLabel}
@@ -588,17 +591,18 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-red-300">{UI_TEXT.studio.danger.title}</p>
             <p className="mt-1 text-xs text-text-sec">{UI_TEXT.studio.danger.hint}</p>
-            <button
-              type="button"
+            <Button
+              variant="danger"
+              size="sm"
               onClick={() => {
                 setDeleteError(null);
                 setDeleteActiveCount(null);
                 setDeleteModalOpen(true);
               }}
-              className="mt-3 rounded-xl border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+              className="mt-3"
             >
               {UI_TEXT.studio.danger.cta}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

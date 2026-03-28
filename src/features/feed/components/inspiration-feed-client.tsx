@@ -9,6 +9,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type FeedItem = {
   id: string;
@@ -339,10 +340,10 @@ export default function InspirationFeedClient() {
               <div className="text-xs text-text-sec sm:text-sm">{UI_TEXT.feed.subtitle}</div>
             </div>
 
-            <input
+            <Input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              className="lux-input w-full rounded-full px-5 py-2.5 text-sm outline-none transition focus-visible:shadow-glow"
+              className="rounded-full px-5 py-2.5"
               placeholder={UI_TEXT.feed.aiSearchPlaceholder}
             />
 
@@ -350,20 +351,17 @@ export default function InspirationFeedClient() {
               {CATEGORY_OPTIONS.map((option) => {
                 const active = selectedCategory === option.key;
                 return (
-                  <button
+                  <Button
                     key={option.key}
-                    type="button"
+                    variant={active ? "primary" : "secondary"}
+                    size="none"
                     onClick={() =>
                       replaceSearchParams({ category: active ? "" : option.key })
                     }
-                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300 ${
-                      active
-                        ? "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))] shadow-card"
-                        : "border border-border-subtle/85 bg-bg-card/65 text-text-main hover:bg-bg-card"
-                    }`}
+                    className="rounded-full px-4 py-1.5 text-xs font-medium"
                   >
                     {option.label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -372,18 +370,15 @@ export default function InspirationFeedClient() {
               {TAG_OPTIONS.map((option) => {
                 const active = selectedTag === option.key;
                 return (
-                  <button
+                  <Button
                     key={option.key}
-                    type="button"
+                    variant={active ? "primary" : "secondary"}
+                    size="none"
                     onClick={() => replaceSearchParams({ tag: active ? "" : option.key })}
-                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300 ${
-                      active
-                        ? "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))] shadow-card"
-                        : "border border-border-subtle/85 bg-bg-card/60 text-text-main hover:bg-bg-card"
-                    }`}
+                    className="rounded-full px-4 py-1.5 text-xs font-medium"
                   >
                     {option.label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -404,14 +399,14 @@ export default function InspirationFeedClient() {
               key={item.id}
               className="group relative mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card transition-all duration-300 hover:scale-[1.012] hover:shadow-hover"
             >
-              <button type="button" onClick={() => setSelectedId(item.id)} className="block w-full text-left">
+              <Button variant="wrapper" onClick={() => setSelectedId(item.id)} className="block w-full text-left">
                 <img
                   src={item.mediaUrl}
                   alt={item.caption ?? item.primaryServiceTitle ?? item.masterName}
                   className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                   loading="lazy"
                 />
-              </button>
+              </Button>
 
               <div className="absolute left-3 top-3 rounded-full border border-white/30 bg-black/45 px-3 py-1 text-xs font-medium text-white backdrop-blur">
                 {item.totalPrice > 0 ? UI_FMT.priceLabel(item.totalPrice) : "—"}
@@ -425,14 +420,15 @@ export default function InspirationFeedClient() {
                 <div className="mt-1 text-xs text-white/90">{UI_TEXT.feed.byMaster}: {item.masterName}</div>
                 {item.studioName ? <div className="mt-0.5 text-xs text-white/80">{UI_TEXT.feed.byStudio}: {item.studioName}</div> : null}
                 <div className="pointer-events-auto mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
                     onClick={() => onToggleFavorite(item.id)}
                     title={item.isFavorited ? UI_TEXT.feed.removeFromFavorites : UI_TEXT.feed.addToFavorites}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/88 text-base text-text-main backdrop-blur"
                   >
                     {item.isFavorited ? "❤" : "♡"}
-                  </button>
+                  </Button>
                   <span className="text-xs text-white/90">{item.favoritesCount > 0 ? `🔥 ${item.favoritesCount}` : ""}</span>
                   <Link
                     href={`/book?portfolioId=${item.id}`}
@@ -463,7 +459,7 @@ export default function InspirationFeedClient() {
 
       {selectedId ? (
         <div className="fixed inset-0 z-50">
-          <button type="button" aria-label={UI_TEXT.common.cancel} className="absolute inset-0 bg-black/55" onClick={() => setSelectedId(null)} />
+          <Button variant="wrapper" aria-label={UI_TEXT.common.cancel} className="absolute inset-0 bg-black/55" onClick={() => setSelectedId(null)} />
           <div className="absolute inset-0 overflow-y-auto p-3 sm:p-6">
             <div className="mx-auto mt-4 w-full max-w-6xl rounded-2xl border border-border-subtle bg-bg-card p-4 shadow-hover sm:mt-8 sm:p-6">
               {detailError ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{detailError}</div> : null}
@@ -530,9 +526,9 @@ export default function InspirationFeedClient() {
                   <div className="text-sm font-semibold text-text-main">{UI_TEXT.feed.similarWorks}</div>
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {selectedItem.similarItems.map((similar) => (
-                      <button
+                      <Button
                         key={similar.id}
-                        type="button"
+                        variant="wrapper"
                         className="overflow-hidden rounded-xl border text-left"
                         onClick={() => setSelectedId(similar.id)}
                       >
@@ -541,7 +537,7 @@ export default function InspirationFeedClient() {
                           <div className="truncate text-text-main">{similar.masterName}</div>
                           <div className="text-text-sec">{UI_FMT.priceLabel(similar.totalPrice)}</div>
                         </div>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>

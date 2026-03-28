@@ -15,6 +15,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Camera, Sparkles, Trash2 } from "lucide-react";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalImage } from "@/components/ui/focal-image";
@@ -1932,13 +1936,14 @@ export function MasterProfilePage() {
                 {UI_TEXT.master.profile.leaveStudio.bannerDescription}
               </p>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="none"
               onClick={openLeaveStudioModal}
               className="rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
             >
               {UI_TEXT.master.profile.leaveStudio.bannerAction}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -1949,16 +1954,15 @@ export function MasterProfilePage() {
             const isActive = activeTab === tab.id;
 
   return (
-              <button
+              <Button
                 key={tab.id}
-                type="button"
+                variant={isActive ? "secondary" : "ghost"}
+                size="none"
                 onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm transition ${
-                  isActive ? "bg-bg-input text-text-main shadow-card" : "text-text-sec hover:text-text-main"
-                }`}
+                className="whitespace-nowrap rounded-xl px-3 py-2 text-sm transition"
               >
                 {tab.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -1973,20 +1977,21 @@ export function MasterProfilePage() {
                       <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.sections.profileShowcaseTitle}</h3>
                       <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.sections.profileShowcaseDesc}</p>
                     </div>
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="none"
                       onClick={() => setPreviewOpen(true)}
                       className="rounded-full border border-border-subtle px-3 py-1 text-xs text-text-sec transition hover:text-text-main lg:hidden"
                     >
                       {UI_TEXT.master.profile.preview.openAsClient}
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="mt-4 space-y-4">
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="relative h-24 w-24">
-                        <button
-                          type="button"
+                        <Button
+                          variant="wrapper"
                           onClick={openAvatarFileDialog}
                           disabled={saving}
                           className="group relative block h-full w-full overflow-hidden rounded-2xl bg-bg-input text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
@@ -2016,10 +2021,11 @@ export function MasterProfilePage() {
                               {avatarUrl ? UI_TEXT.master.profile.form.replaceAvatarAction : UI_TEXT.media.avatar.upload}
                             </span>
                           </div>
-                        </button>
+                        </Button>
                         {avatarAssetId ? (
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="none"
                             onClick={() => void deleteAvatar()}
                             disabled={saving}
                             className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80 disabled:opacity-60"
@@ -2027,7 +2033,7 @@ export function MasterProfilePage() {
                             title={UI_TEXT.master.profile.form.removeAvatarAction}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
 
@@ -2049,7 +2055,7 @@ export function MasterProfilePage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="text-xs text-text-sec">
                         {UI_TEXT.master.profile.form.nameLabel}
-                        <input
+                        <Input
                           className={`${inputBaseClass} ${profileFieldErrors.displayName ? inputErrorClass : ""}`}
                           value={displayName ?? ""}
                           onChange={(event) => {
@@ -2072,7 +2078,7 @@ export function MasterProfilePage() {
 
                       <label className="text-xs text-text-sec">
                         {UI_TEXT.master.profile.form.hashtagLabel}
-                        <input
+                        <Input
                           className={inputBaseClass}
                           value={tagline ?? ""}
                           onChange={(event) => setTagline(event.target.value)}
@@ -2085,7 +2091,7 @@ export function MasterProfilePage() {
                     <div ref={addressSuggestRootRef} className="relative">
                       <label className="text-xs text-text-sec">
                         {UI_TEXT.master.profile.form.addressLabel}
-                        <textarea
+                        <Textarea
                           ref={addressInputRef}
                           className={inputBaseClass}
                           value={addressText ?? ""}
@@ -2109,8 +2115,9 @@ export function MasterProfilePage() {
                       {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
                         <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
                           {addressSuggestions.map((item, index) => (
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
+                              size="none"
                               key={`${item.value}-${index}`}
                               onMouseDown={(event) => event.preventDefault()}
                               onMouseEnter={() => setAddressSuggestIndex(index)}
@@ -2121,7 +2128,7 @@ export function MasterProfilePage() {
                               aria-label={`${UI_TEXT.master.profile.form.selectAddressAria} ${item.value}`}
                             >
                               <span className="whitespace-normal break-words">{item.value}</span>
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       ) : null}
@@ -2132,7 +2139,7 @@ export function MasterProfilePage() {
 
                     <label className="text-xs text-text-sec">
                       {UI_TEXT.master.profile.form.bioLabel}
-                      <textarea
+                      <Textarea
                         className={inputBaseClass}
                         value={bio ?? ""}
                         rows={4}
@@ -2157,14 +2164,15 @@ export function MasterProfilePage() {
                     />
                   </div>
                   <div className="mt-3">
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary"
+                      size="none"
                       onClick={() => void handleSaveProfile()}
                       disabled={profileSaveStatus === "saving" || isPublishing}
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+                      className="rounded-xl px-4 py-2 text-sm font-semibold"
                     >
                       {profileSaveStatus === "saving" ? UI_TEXT.status.saving : UI_TEXT.actions.save}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -2211,7 +2219,7 @@ export function MasterProfilePage() {
                     <p className="mt-0.5 text-xs text-text-sec">{UI_TEXT.settings.cancellation.hint}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <div className="relative w-32">
-                        <input
+                        <Input
                           type="number"
                           min={0}
                           max={168}
@@ -2251,12 +2259,13 @@ export function MasterProfilePage() {
                     showUpgradeTip={upgradeTipKey === "telegram"}
                     onUpgradeClick={() => handleUpgradeClick("telegram")}
                   >
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="none"
                       className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
                     >
                       {UI_TEXT.settings.telegram.connect}
-                    </button>
+                    </Button>
                   </LockedFeatureRow>
                 )}
                 <SectionDivider />
@@ -2270,12 +2279,13 @@ export function MasterProfilePage() {
                     showUpgradeTip={upgradeTipKey === "vk"}
                     onUpgradeClick={() => handleUpgradeClick("vk")}
                   >
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="none"
                       className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
                     >
                       {UI_TEXT.settings.notifications.vk.connect}
-                    </button>
+                    </Button>
                   </LockedFeatureRow>
                 )}
                 <SectionDivider />
@@ -2289,12 +2299,13 @@ export function MasterProfilePage() {
                     showUpgradeTip={upgradeTipKey === "hotSlots"}
                     onUpgradeClick={() => handleUpgradeClick("hotSlots")}
                   >
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="none"
                       className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
                     >
                       {UI_TEXT.settings.hotSlots.configure}
-                    </button>
+                    </Button>
                   </LockedFeatureRow>
                 )}
               </SettingsSection>
@@ -2306,8 +2317,9 @@ export function MasterProfilePage() {
                     <p className="text-sm font-medium text-red-300">{UI_TEXT.settings.danger.title}</p>
                     <p className="mt-1 text-xs text-text-sec">{UI_TEXT.settings.danger.hint}</p>
                     {!data?.master.isSolo ? (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="none"
                         onClick={() => {
                           setLeaveStudioError(null);
                           setLeaveStudioTransferServices(true);
@@ -2316,10 +2328,11 @@ export function MasterProfilePage() {
                         className="mt-3 mr-2 rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
                       >
                         {UI_TEXT.master.profile.leaveStudio.leaveAction}
-                      </button>
+                      </Button>
                     ) : null}
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="none"
                       onClick={() => {
                         setDeleteError(null);
                         setDeleteActiveCount(null);
@@ -2328,7 +2341,7 @@ export function MasterProfilePage() {
                       className="mt-3 rounded-xl border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
                     >
                       {UI_TEXT.settings.danger.cta}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -2350,14 +2363,15 @@ export function MasterProfilePage() {
                   ) : servicesSaveStatus === "error" ? (
                     <div className="text-xs text-rose-400">{UI_TEXT.master.profile.errors.saveServices}</div>
                   ) : null}
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="none"
                     onClick={() => void handleSaveServices()}
                     disabled={servicesSaveStatus === "saving" || !hasServiceDraftChanges}
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
+                    className="rounded-xl px-4 py-2 text-sm font-semibold"
                   >
                     {servicesSaveStatus === "saving" ? UI_TEXT.status.saving : UI_TEXT.actions.save}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -2373,13 +2387,14 @@ export function MasterProfilePage() {
           <div className="rounded-2xl bg-bg-card/90 p-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold">{UI_TEXT.master.profile.services.newServiceTitle}</h4>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="none"
                 onClick={() => setShowAddServicePanel(false)}
                 className="text-xs text-text-sec"
               >
                 {UI_TEXT.master.profile.services.hide}
-              </button>
+              </Button>
             </div>
             <div className="mt-3 space-y-3">
               {data.master.isSolo ? (
@@ -2387,7 +2402,7 @@ export function MasterProfilePage() {
                   <div className="space-y-2">
                     <label className="text-xs text-text-sec">
                       {UI_TEXT.master.profile.services.globalCategoryLabel}
-                      <select
+                      <Select
                         value={newSoloServiceGlobalCategoryId}
                         onChange={(event) => setNewSoloServiceGlobalCategoryId(event.target.value)}
                         className={selectBaseClass}
@@ -2398,20 +2413,21 @@ export function MasterProfilePage() {
                             {formatCategoryOptionLabel(category)}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </label>
                     {!newSoloServiceGlobalCategoryId ? (
                       <div className="text-xs text-text-sec">
                         {UI_TEXT.master.profile.services.selectCategoryHint}
                       </div>
                     ) : null}
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="none"
                       onClick={() => setProposeCategoryOpen(true)}
                       className="text-xs font-medium text-primary underline"
                     >
                       {UI_TEXT.master.profile.services.addOwnCategoryCta}
-                    </button>
+                    </Button>
                     {proposeCategoryMessage ? (
                       <div className="text-xs text-emerald-500">{proposeCategoryMessage}</div>
                     ) : null}
@@ -2419,7 +2435,7 @@ export function MasterProfilePage() {
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_140px_150px]">
                     <label className="text-xs text-text-sec">
                       {UI_TEXT.master.profile.services.serviceTitleLabel}
-                      <input
+                      <Input
                         type="text"
                         value={newSoloServiceTitle}
                         onChange={(event) => {
@@ -2433,7 +2449,7 @@ export function MasterProfilePage() {
                     <label className="text-xs text-text-sec">
                       {UI_TEXT.master.profile.services.priceLabel}
                       <div className="mt-1 flex items-center gap-2">
-                        <input
+                        <Input
                           type="number"
                           min={0}
                           step={100}
@@ -2456,7 +2472,7 @@ export function MasterProfilePage() {
                     <label className="text-xs text-text-sec">
                       {UI_TEXT.services.fields.duration}
                       <div className="mt-1 flex items-center gap-2">
-                        <input
+                        <Input
                           type="number"
                           min={MIN_SERVICE_DURATION_MIN}
                           max={MAX_SERVICE_DURATION_MIN}
@@ -2493,18 +2509,19 @@ export function MasterProfilePage() {
                         newSoloServiceFieldErrors.durationMin}
                     </div>
                   ) : null}
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="none"
                     onClick={() => void createSoloService()}
                     disabled={saving}
-                    className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card disabled:opacity-60"
+                    className="rounded-xl px-4 py-2 text-sm"
                   >
                     {saving ? UI_TEXT.status.saving : UI_TEXT.master.profile.services.addService}
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <select
+                  <Select
                     value={selectedStudioServiceId}
                     onChange={(event) => setSelectedStudioServiceId(event.target.value)}
                     className={selectBaseClass}
@@ -2515,14 +2532,15 @@ export function MasterProfilePage() {
                         {service.title}
                       </option>
                     ))}
-                  </select>
-                  <button
-                    type="button"
+                  </Select>
+                  <Button
+                    variant="secondary"
+                    size="none"
                     onClick={addStudioService}
-                    className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main transition hover:bg-bg-card"
+                    className="rounded-xl px-4 py-2 text-sm"
                   >
                     {UI_TEXT.actions.add}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -2551,7 +2569,7 @@ export function MasterProfilePage() {
                     ) : null}
                     {service.canEditPrice ? (
                       <div className="mt-2 space-y-1">
-                        <select
+                        <Select
                           value={service.globalCategoryId ?? ""}
                           onChange={(event) =>
                             setServicesDraft((current) => ({
@@ -2579,7 +2597,7 @@ export function MasterProfilePage() {
                               {formatCategoryOptionLabel(category)}
                           </option>
                         ))}
-                        </select>
+                        </Select>
                         {!service.globalCategoryId ? (
                           <div className="text-xs text-amber-500">
                             {UI_TEXT.master.profile.services.noCategoryHint}
@@ -2592,7 +2610,7 @@ export function MasterProfilePage() {
                         <label className="block text-xs font-medium text-text-sec">
                           {UI_TEXT.master.profile.services.descriptionLabel}
                         </label>
-                        <textarea
+                        <Textarea
                           className={`${selectBaseClass} min-h-[60px] resize-y`}
                           rows={2}
                           maxLength={2000}
@@ -2608,8 +2626,9 @@ export function MasterProfilePage() {
                             }))
                           }
                         />
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          size="none"
                           disabled={suggestingDescriptionId === service.serviceId}
                           onClick={() => void handleSuggestDescription(service.serviceId)}
                           className="inline-flex items-center gap-1 text-xs font-medium text-primary transition hover:text-primary/80 disabled:opacity-50"
@@ -2618,7 +2637,7 @@ export function MasterProfilePage() {
                           {suggestingDescriptionId === service.serviceId
                             ? UI_TEXT.master.profile.services.suggestDescriptionLoading
                             : UI_TEXT.master.profile.services.suggestDescription}
-                        </button>
+                        </Button>
                       </div>
                     ) : null}
                     {false && (
@@ -2648,16 +2667,17 @@ export function MasterProfilePage() {
                         ) : null}
                       </>
                     )}
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="none"
                       onClick={() => setBookingConfigServiceId(service.serviceId)}
                       className="mt-2 inline-flex text-xs font-medium text-primary underline"
                     >
                       {UI_TEXT.master.profile.bookingConfig.open}
-                    </button>
+                    </Button>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input
+                    <Input
                       type="number"
                       className={`${selectBaseClass} ${
                         serviceFieldErrors[service.serviceId]?.price ? inputErrorClass : ""
@@ -2711,7 +2731,7 @@ export function MasterProfilePage() {
                     <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <select
+                    <Select
                       className={`${selectBaseClass} ${
                         serviceFieldErrors[service.serviceId]?.duration ? inputErrorClass : ""
                       }`}
@@ -2737,7 +2757,7 @@ export function MasterProfilePage() {
                           {option}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
                   </div>
                   <label className="flex items-center justify-center">
@@ -2758,13 +2778,14 @@ export function MasterProfilePage() {
           </div>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="none"
           onClick={() => setShowAddServicePanel(true)}
           className="w-full rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 px-4 py-3 text-sm text-text-main transition hover:bg-bg-card"
         >
           {UI_TEXT.master.profile.services.addServiceCta}
-        </button>
+        </Button>
       </div>
           ) : null}
 
@@ -2833,13 +2854,14 @@ export function MasterProfilePage() {
                     alt={UI_TEXT.master.profile.portfolio.draftAlt}
                     className="mt-3 h-48 w-full rounded-2xl object-cover"
                   />
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="none"
                     onClick={() => setPortfolioMetaOpen(true)}
-                    className="mt-3 rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main transition hover:bg-bg-card"
+                    className="mt-3 rounded-lg px-3 py-2 text-sm"
                   >
                     {UI_TEXT.master.profile.portfolio.addDescription}
-                  </button>
+                  </Button>
                 </div>
               ) : null}
 
@@ -2871,14 +2893,15 @@ export function MasterProfilePage() {
                       )}
 
                       {!item.inSearch ? (
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          size="none"
                           onClick={() => openPortfolioCategoryModal(item)}
                           title={UI_TEXT.master.profile.portfolio.notInSearchHint}
                           className="absolute left-3 top-3 rounded-full bg-amber-500/90 px-2 py-1 text-[11px] font-medium text-white"
                         >
                           {UI_TEXT.master.profile.portfolio.notInSearchBadge}
-                        </button>
+                        </Button>
                       ) : null}
 
                       <div className="absolute right-3 top-3 flex gap-2">
@@ -2900,14 +2923,15 @@ export function MasterProfilePage() {
                             }}
                           />
                         </label>
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          size="none"
                           onClick={() => void removePortfolio(item)}
                           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm text-white"
                           title={UI_TEXT.master.profile.portfolio.remove}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
 
                       {item.caption ? <div className="mt-2 text-xs text-text-sec">{item.caption}</div> : null}
@@ -2963,14 +2987,15 @@ export function MasterProfilePage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold">{UI_TEXT.master.profile.bookingConfig.questionsTitle}</div>
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="none"
                       onClick={addBookingQuestion}
                       disabled={bookingConfigDraft.questions.length >= 5}
-                      className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-xs text-text-main transition hover:bg-bg-card disabled:opacity-60"
+                      className="rounded-lg px-3 py-1 text-xs"
                     >
                       {UI_TEXT.master.profile.bookingConfig.addQuestion}
-                    </button>
+                    </Button>
                   </div>
 
                   {bookingConfigDraft.questions.length === 0 ? (
@@ -2984,7 +3009,7 @@ export function MasterProfilePage() {
                           <label className="block text-xs text-text-sec">
                             {UI_TEXT.master.profile.bookingConfig.questionLabel} {index + 1}
                           </label>
-                          <input
+                          <Input
                             type="text"
                             value={question.text}
                             onChange={(event) =>
@@ -2995,29 +3020,32 @@ export function MasterProfilePage() {
                           />
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
+                            size="none"
                             onClick={() => moveBookingQuestion(index, -1)}
                             disabled={index === 0}
-                            className="rounded-lg border border-border-subtle bg-bg-card px-2 py-1 disabled:opacity-40"
+                            className="rounded-lg px-2 py-1"
                           >
                             {UI_TEXT.master.profile.bookingConfig.moveUp}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="none"
                             onClick={() => moveBookingQuestion(index, 1)}
                             disabled={index === bookingConfigDraft.questions.length - 1}
-                            className="rounded-lg border border-border-subtle bg-bg-card px-2 py-1 disabled:opacity-40"
+                            className="rounded-lg px-2 py-1"
                           >
                             {UI_TEXT.master.profile.bookingConfig.moveDown}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="none"
                             onClick={() => removeBookingQuestion(question.tempId)}
-                            className="rounded-lg border border-border-subtle bg-bg-card px-2 py-1 text-rose-500"
+                            className="rounded-lg px-2 py-1"
                           >
                             {UI_TEXT.master.profile.bookingConfig.remove}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                       <label className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec">
@@ -3037,21 +3065,23 @@ export function MasterProfilePage() {
             ) : null}
 
             <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="none"
                 onClick={closeBookingConfig}
-                className="rounded-xl border border-border-subtle bg-bg-input px-4 py-2 text-sm text-text-main"
+                className="rounded-xl px-4 py-2 text-sm"
               >
                 {UI_TEXT.actions.close}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="none"
                 onClick={() => void saveBookingConfig()}
                 disabled={bookingConfigSaving || bookingConfigLoading || !bookingConfigDraft}
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                className="rounded-xl px-4 py-2 text-sm font-semibold"
               >
                 {bookingConfigSaving ? UI_TEXT.status.saving : UI_TEXT.status.saved}
-              </button>
+              </Button>
             </div>
           </div>
         </ModalSurface>
@@ -3079,7 +3109,7 @@ export function MasterProfilePage() {
           title={UI_TEXT.master.profile.services.proposeCategoryTitle}
         >
           <div className="space-y-3">
-            <input
+            <Input
               type="text"
               value={proposeCategoryTitle}
               onChange={(event) => setProposeCategoryTitle(event.target.value)}
@@ -3091,27 +3121,29 @@ export function MasterProfilePage() {
               {UI_TEXT.master.profile.services.proposeCategoryHint}
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="none"
                 onClick={() => {
                   setProposeCategoryOpen(false);
                   setProposeCategoryTitle("");
                 }}
                 disabled={proposeCategorySaving}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                className="rounded-lg px-3 py-2 text-sm"
               >
                 {UI_TEXT.actions.close}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="none"
                 onClick={() => void submitCategoryProposal()}
                 disabled={proposeCategorySaving || !proposeCategoryTitle.trim()}
-                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+                className="rounded-lg px-3 py-2 text-sm"
               >
                 {proposeCategorySaving
                   ? UI_TEXT.status.saving
                   : UI_TEXT.master.profile.services.proposeCategorySubmit}
-              </button>
+              </Button>
             </div>
           </div>
         </ModalSurface>
@@ -3129,7 +3161,7 @@ export function MasterProfilePage() {
           title={UI_TEXT.master.profile.portfolioMeta.categoryModalTitle}
         >
           <div className="space-y-3">
-            <select
+            <Select
               value={portfolioCategoryDraft}
               onChange={(event) => setPortfolioCategoryDraft(event.target.value)}
               className={selectBaseClass}
@@ -3141,30 +3173,32 @@ export function MasterProfilePage() {
                   {formatCategoryOptionLabel(category)}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className="text-xs text-text-sec">
               {UI_TEXT.master.profile.portfolioMeta.categoryHint}
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="none"
                 onClick={() => {
                   setPortfolioCategoryTarget(null);
                   setPortfolioCategoryDraft("");
                 }}
                 disabled={portfolioCategorySaving}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                className="rounded-lg px-3 py-2 text-sm"
               >
                 {UI_TEXT.actions.close}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="none"
                 onClick={() => void savePortfolioCategory()}
                 disabled={portfolioCategorySaving}
-                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+                className="rounded-lg px-3 py-2 text-sm"
               >
                 {portfolioCategorySaving ? UI_TEXT.status.saving : UI_TEXT.actions.save}
-              </button>
+              </Button>
             </div>
           </div>
         </ModalSurface>
@@ -3175,7 +3209,7 @@ export function MasterProfilePage() {
           <div className="w-full max-w-md rounded-2xl bg-bg-card p-4">
             <h3 className="text-base font-semibold">{UI_TEXT.master.profile.portfolioMeta.photoDescriptionTitle}</h3>
             <div className="mt-3 space-y-2">
-              <input
+              <Input
                 className={inputBaseClass}
                 value={portfolioCaption}
                 onChange={(event) => setPortfolioCaption(event.target.value)}
@@ -3190,7 +3224,7 @@ export function MasterProfilePage() {
                     </a>
                   </div>
                 ) : null}
-                <select
+                <Select
                   value={portfolioGlobalCategoryId}
                   onChange={(event) => {
                     setPortfolioGlobalCategoryId(event.target.value);
@@ -3205,7 +3239,7 @@ export function MasterProfilePage() {
                       {category.name}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {!portfolioGlobalCategoryId ? (
                   <div className="text-xs text-text-sec">
                     {UI_TEXT.master.profile.portfolioMeta.categoryMissingHint}
@@ -3214,7 +3248,7 @@ export function MasterProfilePage() {
               </div>
               {portfolioGlobalCategoryId ? (
                 <div className="space-y-1">
-                  <select
+                  <Select
                     value={portfolioServiceId}
                     onChange={(event) => setPortfolioServiceId(event.target.value)}
                     className={selectBaseClass}
@@ -3225,31 +3259,33 @@ export function MasterProfilePage() {
                         {service.title} - {service.effectiveDurationMin} {"\u043c\u0438\u043d"}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <div className="text-xs text-text-sec">{UI_TEXT.master.profile.portfolioMeta.serviceHint}</div>
                 </div>
               ) : null}
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="none"
                 onClick={() => {
                   setPortfolioMetaOpen(false);
                   setPortfolioServiceId("");
                   setPortfolioGlobalCategoryId("");
                 }}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                className="rounded-lg px-3 py-2 text-sm"
               >
                 {UI_TEXT.actions.close}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="none"
                 onClick={() => void commitPendingPortfolio()}
                 disabled={saving}
-                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))] disabled:opacity-60"
+                className="rounded-lg px-3 py-2 text-sm"
               >
                 {UI_TEXT.actions.save}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3286,24 +3322,26 @@ export function MasterProfilePage() {
             </div>
           ) : null}
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="none"
               onClick={() => setLeaveStudioModalOpen(false)}
               disabled={leaveStudioLoading}
-              className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+              className="rounded-lg px-3 py-2 text-sm"
             >
               {UI_TEXT.common.cancel}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="danger"
+              size="none"
               onClick={() => void handleLeaveStudio()}
               disabled={leaveStudioLoading}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-60"
+              className="rounded-lg px-3 py-2 text-sm"
             >
               {leaveStudioLoading
                 ? UI_TEXT.master.profile.leaveStudio.leaving
                 : UI_TEXT.master.profile.leaveStudio.leaveAction}
-            </button>
+            </Button>
           </div>
         </div>
       </ModalSurface>

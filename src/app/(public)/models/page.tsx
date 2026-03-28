@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listModelOfferFilters, listPublicModelOffers } from "@/lib/model-offers/public.service";
+import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -60,12 +63,12 @@ export default async function ModelsPage({ searchParams }: PageProps) {
       <form className="mb-8 grid gap-3 rounded-3xl border border-border-subtle/80 bg-bg-card/70 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label className="block text-xs font-semibold uppercase tracking-wide text-text-sec">
           {UI_TEXT.pages.models.cityLabel}
-          <input
+          <Input
             name="city"
             list="model-offer-city-options"
             defaultValue={city ?? ""}
             placeholder={UI_TEXT.pages.models.cityPlaceholder}
-            className="mt-2 w-full rounded-2xl border border-border/70 bg-bg-input px-4 py-2 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+            className="mt-2"
           />
           <datalist id="model-offer-city-options">
             {citySuggestions.map((cityOption) => (
@@ -76,10 +79,10 @@ export default async function ModelsPage({ searchParams }: PageProps) {
 
         <label className="block text-xs font-semibold uppercase tracking-wide text-text-sec">
           {UI_TEXT.pages.models.categoryLabel}
-          <select
+          <Select
             name="categoryId"
             defaultValue={categoryId ?? ""}
-            className="mt-2 w-full rounded-2xl border border-border/70 bg-bg-input px-4 py-2 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+            className="mt-2"
           >
             <option value="">{UI_TEXT.pages.models.categoryAll}</option>
             {categories.map((category) => (
@@ -87,15 +90,12 @@ export default async function ModelsPage({ searchParams }: PageProps) {
                 {category.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
-        <button
-          type="submit"
-          className="h-11 rounded-2xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
-        >
+        <Button type="submit" variant="primary">
           {UI_TEXT.pages.models.submit}
-        </button>
+        </Button>
       </form>
 
       {offers.items.length === 0 ? (

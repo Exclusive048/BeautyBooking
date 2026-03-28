@@ -196,14 +196,15 @@ export function StoryViewer({ masters, initialIndex, onClose }: Props) {
             ) : null}
           </div>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           onClick={onClose}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
           aria-label={UI_TEXT.actions.close}
         >
           <X className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
 
       {/* Photo */}
@@ -259,8 +260,9 @@ export function StoryViewer({ masters, initialIndex, onClose }: Props) {
       </div>
 
       {/* Desktop nav arrows */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="none"
         onClick={(e) => {
           e.stopPropagation();
           goPrev();
@@ -269,9 +271,10 @@ export function StoryViewer({ masters, initialIndex, onClose }: Props) {
         aria-label="Previous"
       >
         <ChevronLeft className="h-6 w-6" />
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
+        size="none"
         onClick={(e) => {
           e.stopPropagation();
           goNext();
@@ -280,7 +283,7 @@ export function StoryViewer({ masters, initialIndex, onClose }: Props) {
         aria-label="Next"
       >
         <ChevronRight className="h-6 w-6" />
-      </button>
+      </Button>
     </div>
   );
 }

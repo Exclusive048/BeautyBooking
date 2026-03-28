@@ -3,7 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
   SlotPickerOptimized,
@@ -455,15 +458,12 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           <h3 className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.chooseService}</h3>
           <div className="mt-3 space-y-2">
             {studio.services.map((service) => (
-              <button
+              <Button
                 key={service.id}
-                type="button"
+                variant={serviceId === service.id ? "primary" : "secondary"}
+                size="none"
                 onClick={() => setServiceId(service.id)}
-                className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                  serviceId === service.id
-                    ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
-                    : "border-border-subtle bg-bg-input/70 hover:bg-bg-elevated"
-                }`}
+                className="w-full rounded-xl border px-3 py-3 text-left"
               >
                 <div className="text-sm font-semibold">{service.name}</div>
                 <div className="mt-1 text-xs opacity-80">
@@ -471,7 +471,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                     ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
                     : UI_TEXT.publicStudio.servicePriceOnRequest}
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         </section>
@@ -488,30 +488,24 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           ) : null}
           {serviceId && !loadingSlots ? (
             <div className="mt-3 space-y-2">
-              <button
-                type="button"
+              <Button
+                variant={masterId === ANY_MASTER_ID ? "primary" : "secondary"}
+                size="none"
                 onClick={() => setMasterId(ANY_MASTER_ID)}
-                className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                  masterId === ANY_MASTER_ID
-                    ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
-                    : "border-border-subtle bg-bg-input/70 hover:bg-bg-elevated"
-                }`}
+                className="w-full rounded-xl border px-3 py-3 text-left"
               >
                 {UI_TEXT.publicStudio.anyMaster}
-              </button>
+              </Button>
               {availableMasters.map((master) => (
-                <button
+                <Button
                   key={master.id}
-                  type="button"
+                  variant={masterId === master.id ? "primary" : "secondary"}
+                  size="none"
                   onClick={() => setMasterId(master.id)}
-                    className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                      masterId === master.id
-                      ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
-                      : "border-border-subtle bg-bg-input/70 hover:bg-bg-elevated"
-                  }`}
+                  className="w-full rounded-xl border px-3 py-3 text-left"
                 >
                   {master.name}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
@@ -608,11 +602,11 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
             </div>
           </label>
           <label className="mt-3 block text-xs text-text-muted">{UI_TEXT.publicProfile.booking.comment}</label>
-          <textarea
+          <Textarea
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
-            className="mt-1 min-h-[84px] w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main outline-none"
+            className="mt-1 min-h-[84px]"
           />
 
           
@@ -672,13 +666,13 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                         {question.text}
                         {question.required ? <span className="text-red-500"> *</span> : null}
                       </span>
-                      <input
+                      <Input
                         type="text"
                         value={bookingAnswers[question.id] ?? ""}
                         onChange={(event) =>
                           setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                         }
-                        className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main outline-none"
+                        className="mt-2"
                         placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
                       />
                     </label>
@@ -691,20 +685,20 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           {submitSuccess ? <div className="mt-2 text-sm text-emerald-600">{submitSuccess}</div> : null}
           {!meLoading && !me ? <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicStudio.authRequiredText}</div> : null}
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => void onSubmit()}
             disabled={submitLoading || referenceUploading || !selectedService || !resolvedMasterId || !slotLabel}
-            className="mt-4 w-full rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-semibold text-[rgb(var(--accent-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-4 w-full"
           >
             {UI_TEXT.publicStudio.book}
-          </button>
+          </Button>
         </section>
       </div>
 
       {showAuthModal ? (
         <div className="fixed inset-0 z-50">
-          <button type="button" className="absolute inset-0 bg-black/45" onClick={() => setShowAuthModal(false)} aria-label={UI_TEXT.common.cancel} />
+          <Button variant="wrapper" className="absolute inset-0 bg-black/45" onClick={() => setShowAuthModal(false)} aria-label={UI_TEXT.common.cancel} />
           <div className="absolute inset-0 flex items-center justify-center p-4">
             <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-xl">
               <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.authRequiredTitle}</div>
@@ -716,13 +710,13 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                 >
                   {UI_TEXT.publicStudio.login}
                 </Link>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => setShowAuthModal(false)}
-                  className="flex-1 rounded-xl border border-border-subtle bg-bg-input py-2 text-sm font-semibold text-text-main"
+                  className="flex-1"
                 >
                   {UI_TEXT.common.cancel}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

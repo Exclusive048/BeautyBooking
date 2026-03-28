@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 
 type Props = {
@@ -12,7 +13,7 @@ export function PortfolioCard({ item, onSelect }: Props) {
 
   return (
     <article className="group relative mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card transition-all duration-300 hover:shadow-hover">
-      <button type="button" onClick={() => onSelect(item.id)} className="relative block w-full text-left">
+      <Button variant="wrapper" onClick={() => onSelect(item.id)} className="relative block w-full text-left">
         <div className="relative aspect-[3/4] w-full">
           <Image
             src={item.mediaUrl}
@@ -26,7 +27,7 @@ export function PortfolioCard({ item, onSelect }: Props) {
           <div className="text-sm font-semibold text-white">{title}</div>
           {subtitle ? <div className="mt-1 text-xs text-white/80">{subtitle}</div> : null}
         </div>
-      </button>
+      </Button>
     </article>
   );
 }

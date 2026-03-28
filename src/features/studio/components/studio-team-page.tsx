@@ -203,7 +203,7 @@ export function StudioTeamPage({ studioId }: Props) {
             key={master.id}
             className="lux-card rounded-[24px] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-hover"
           >
-            <button type="button" onClick={() => setSelectedMasterId(master.id)} className="w-full text-left">
+            <Button variant="wrapper" onClick={() => setSelectedMasterId(master.id)} className="w-full text-left">
               <div className="flex items-center justify-between gap-2">
                 <div className="font-medium text-text-main">{master.name}</div>
                 <span
@@ -223,7 +223,7 @@ export function StudioTeamPage({ studioId }: Props) {
               {master.status === "PENDING" && master.phone ? (
                 <div className="mt-1 text-xs text-text-sec">{master.phone}</div>
               ) : null}
-            </button>
+            </Button>
             <div className="mt-3 flex justify-end">
               <Button type="button" variant="danger" size="sm" onClick={() => openRemoveModal(master)}>
                 {t.removeAction}

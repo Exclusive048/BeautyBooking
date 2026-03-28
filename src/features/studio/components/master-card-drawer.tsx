@@ -153,16 +153,15 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
 
         <div className="mt-4 flex gap-2">
           {(["skills", "profile"] as const).map((item) => (
-            <button
+            <Button
               key={item}
-              type="button"
+              variant={tab === item ? "primary" : "secondary"}
+              size="none"
               onClick={() => setTab(item)}
-              className={`rounded-2xl border px-3 py-1.5 text-sm ${
-                tab === item ? "border-primary/40 bg-bg-card text-text-main shadow-card" : "border-border-subtle text-text-sec"
-              }`}
+              className="rounded-2xl border px-3 py-1.5 text-sm"
             >
               {item === "skills" ? t.tabs.skills : t.tabs.profile}
-            </button>
+            </Button>
           ))}
         </div>
 

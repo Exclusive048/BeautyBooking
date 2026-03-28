@@ -137,14 +137,14 @@ function CalendarBookingChat({ bookingId }: { bookingId: string }) {
 
   return (
     <div className="mt-2 rounded-xl border border-border-subtle bg-bg-input/40 p-2">
-      <button
-        type="button"
+      <Button
+        variant="wrapper"
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center justify-between text-xs font-medium"
       >
         <span>Чат</span>
         {unreadCount > 0 ? <Badge className="px-2 py-0.5 text-[10px]">{unreadCount}</Badge> : null}
-      </button>
+      </Button>
       {open ? (
         <div className="mt-2">
           <BookingChat bookingId={bookingId} currentRole="MASTER" onUnreadCountChange={setUnreadCount} />
@@ -408,9 +408,10 @@ export function StudioCalendarPage({ studioId }: Props) {
                     {data.masters.map((master) => {
                       const isActive = master.id === activeScheduleMasterId;
                       return (
-                        <button
+                        <Button
                           key={master.id}
-                          type="button"
+                          variant="secondary"
+                          size="none"
                           onClick={() => setActiveScheduleMasterId(master.id)}
                           aria-pressed={isActive}
                           className={`w-[116px] shrink-0 rounded-2xl border px-3 py-3 text-center transition-all ${
@@ -431,7 +432,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                           <div className={`mt-1 text-[11px] ${master.isActive ? "Профиль опубликован" : "Профиль скрыт"}`}>
                             {master.isActive ? "Профиль опубликован" : "Профиль скрыт"}
                           </div>
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
@@ -475,9 +476,10 @@ export function StudioCalendarPage({ studioId }: Props) {
               />
               <div className="inline-flex rounded-2xl border border-border-subtle bg-bg-input p-1">
                 {(["day", "week", "month"] as const).map((item) => (
-                  <button
+                  <Button
                     key={item}
-                    type="button"
+                    variant="secondary"
+                    size="none"
                     onClick={() => setView(item)}
                     className={`rounded-xl px-3 py-2 text-sm transition-all ${
                       view === item
@@ -486,7 +488,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                     }`}
                   >
                     {item === "day" ? t.day : item === "week" ? t.week : t.month}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <Input
@@ -579,9 +581,9 @@ export function StudioCalendarPage({ studioId }: Props) {
               const bookingsCount = bookingsByDay.get(dayKey)?.length ?? 0;
               const blocksCount = blocksByDay.get(dayKey)?.length ?? 0;
               return (
-                <button
+                <Button
                   key={dayKey}
-                  type="button"
+                  variant="wrapper"
                   onClick={() => setMonthDetailsDay(dayKey)}
                   className={`min-h-[92px] rounded-2xl border border-border-subtle/70 p-2 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card ${
                     isCurrentMonth ? "bg-bg-card" : "bg-bg-input text-text-sec"
@@ -596,7 +598,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                       <div className="rounded-full bg-bg-input px-2 py-1 text-text-sec">{t.blocksLabel}: {blocksCount}</div>
                     ) : null}
                   </div>
-                </button>
+                </Button>
               );
             })}
             </div>

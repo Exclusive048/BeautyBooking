@@ -166,13 +166,14 @@ export function RoleCardStudio(props: Props) {
             <Button className="w-full">{data.actionLabel ?? UI_TEXT.cabinetRoles.studio.openCabinet}</Button>
           )}
           {"onDelete" in props && props.onDelete ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="none"
               onClick={props.onDelete}
-              className="mt-4 text-xs text-text-sec transition-colors underline-offset-2 hover:text-red-500 hover:underline"
+              className="mt-4 text-xs text-text-sec underline-offset-2 hover:text-red-500 hover:underline"
             >
               {UI_TEXT.cabinetRoles.studio.deleteRole}
-            </button>
+            </Button>
           ) : null}
         </div>
       </CardContent>

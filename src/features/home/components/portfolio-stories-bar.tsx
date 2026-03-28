@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StoryMaster } from "@/lib/feed/stories.service";
 import type { ApiResponse } from "@/lib/types/api";
@@ -15,8 +16,8 @@ function AvatarBubble({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="wrapper"
       onClick={onClick}
       className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
     >
@@ -45,7 +46,7 @@ function AvatarBubble({
       <span className="w-full truncate text-center text-[11px] leading-tight text-text-sec">
         {master.masterName.split(" ")[0]}
       </span>
-    </button>
+    </Button>
   );
 }
 

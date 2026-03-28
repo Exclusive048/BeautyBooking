@@ -1,6 +1,7 @@
 "use client";
 
 import type { ProviderServiceDto } from "@/lib/providers/dto";
+import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -31,17 +32,18 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
                       : UI_TEXT.publicProfile.services.priceOnRequest}
                   </div>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => onAdd(service)}
                   disabled={isSelected}
-                  className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1.5 text-sm text-text-main transition-all duration-300 hover:border-primary/50 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border-border-subtle bg-bg-card px-3 py-1.5 hover:border-primary/50 hover:shadow-card"
                 >
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-bg-input text-xs">
                     +
                   </span>
                   <span>{UI_TEXT.publicProfile.services.add}</span>
-                </button>
+                </Button>
               </div>
             </article>
           );

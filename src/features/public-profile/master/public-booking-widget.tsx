@@ -3,6 +3,8 @@
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -698,13 +700,13 @@ export function PublicBookingWidget({
                       : UI_TEXT.publicProfile.services.priceOnRequest}
                   </div>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => onRemove(service.id)}
-                  className="rounded-md border border-border-subtle px-2 py-1 text-xs transition hover:bg-bg-card"
                 >
                   {UI_TEXT.publicProfile.services.remove}
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -725,8 +727,9 @@ export function PublicBookingWidget({
       {step === "slots" ? (
         <div className="mt-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 const nextAnchor = toLocalDateKey(new Date(), providerTimeZone);
                 setAnchorKey(nextAnchor);
@@ -734,21 +737,20 @@ export function PublicBookingWidget({
                 void loadSlotsPage(nextAnchor, INITIAL_PAGE_SIZE, false);
               }}
               disabled={slotsLoading}
-              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card disabled:opacity-60"
             >
               {UI_TEXT.publicProfile.slots.refresh}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 if (!loadedUntilExclusive || !hasMore) return;
                 void loadSlotsPage(loadedUntilExclusive, LOAD_MORE_SIZE, true);
               }}
               disabled={!loadedUntilExclusive || !hasMore || slotsLoading}
-              className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs transition hover:bg-bg-card disabled:opacity-60"
             >
               {UI_TEXT.publicProfile.slots.showMoreWeek}
-            </button>
+            </Button>
           </div>
 
           {slotsLoading ? (
@@ -764,16 +766,15 @@ export function PublicBookingWidget({
                   {datesWithSlots.map((item) => {
                     const active = selectedDate === item.dayKey;
                     return (
-                      <button
+                      <Button
                         key={item.dayKey}
-                        type="button"
+                        variant={active ? "primary" : "secondary"}
+                        size="none"
                         onClick={() => handleSelectDate(item.dayKey)}
-                        className={`rounded-lg border px-2 py-1 text-xs transition ${
-                          active ? "border-primary/60 bg-primary text-[rgb(var(--accent-foreground))]" : "border-border-subtle bg-bg-input hover:bg-bg-card"
-                        }`}
+                        className="rounded-lg border px-2 py-1 text-xs"
                       >
                         {item.label} ({item.count})
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -848,11 +849,11 @@ export function PublicBookingWidget({
               <div className="font-medium">{UI_TEXT.publicProfile.booking.authRequiredTitle}</div>
               <div className="mt-1 text-text-sec">{UI_TEXT.publicProfile.booking.authRequiredHint}</div>
               <label className="mt-3 block text-xs text-text-sec">{UI_TEXT.publicProfile.booking.phoneLabel}</label>
-              <input
+              <Input
                 value={guestPhone}
                 onChange={(event) => setGuestPhone(event.target.value)}
                 placeholder={UI_TEXT.publicProfile.booking.phonePlaceholder}
-                className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
+                className="mt-1"
               />
               <a
                 href={buildLoginUrl()}
@@ -919,11 +920,11 @@ export function PublicBookingWidget({
               </div>
             </label>
             <label className="mb-1 block text-xs text-text-sec">{UI_TEXT.publicProfile.booking.comment}</label>
-            <textarea
+            <Textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
-              className="lux-input min-h-[84px] w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
+              className="min-h-[84px]"
             />
           </div>
 
@@ -985,13 +986,13 @@ export function PublicBookingWidget({
                         {question.text}
                         {question.required ? <span className="text-rose-400"> *</span> : null}
                       </span>
-                      <input
+                      <Input
                         type="text"
                         value={bookingAnswers[question.id] ?? ""}
                         onChange={(event) =>
                           setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                         }
-                        className="lux-input mt-2 w-full rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-text-sec"
+                        className="mt-2"
                         placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
                       />
                     </label>

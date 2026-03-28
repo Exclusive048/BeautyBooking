@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   SUPPORT_CONTACT_MAX_LENGTH,
   normalizeSupportContact,
@@ -208,9 +210,9 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
               },
             ] as const
           ).map((opt) => (
-            <button
+            <Button
               key={opt.value}
-              type="button"
+              variant="wrapper"
               onClick={() => setType(opt.value)}
               className={`lux-card rounded-[16px] p-4 text-left transition-all ${
                 type === opt.value
@@ -220,7 +222,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
             >
               <p className="text-sm font-medium text-text-main">{opt.label}</p>
               <p className="mt-0.5 text-xs text-text-sec">{opt.desc}</p>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -247,7 +249,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
         <label htmlFor="description" className="block text-sm font-medium text-text-main">
           {UI_TEXT.pages.support.form.descriptionLabel} <span className="text-red-500">*</span>
         </label>
-        <textarea
+        <Textarea
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -257,7 +259,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
               ? UI_TEXT.pages.support.form.descriptionPlaceholderBug
               : UI_TEXT.pages.support.form.descriptionPlaceholderSuggestion
           }
-          className="w-full resize-none rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all placeholder:text-text-sec focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="resize-none"
         />
         <p className="text-right text-xs text-text-sec">{description.length} / 2000</p>
       </div>
@@ -272,18 +274,17 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
 
         {hasProfileOptions ? (
           <div className="space-y-2">
-            <select
+            <Select
               id={CONTACT_SELECT_ID}
               value={selectedProfileContact}
               onChange={(e) => setSelectedProfileContact(e.target.value)}
-              className="w-full rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-sm text-text-main transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {contactOptions.map((option) => (
                 <option key={`${option.kind}-${option.value}`} value={option.value}>
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
 
             {!showManualContact ? (
               <Button

@@ -156,12 +156,12 @@ export function AvatarEditor({
     <div className="space-y-2">
       <div className={`group relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-input ${sizeClassName}`}>
         {canEdit && isClickableVariant ? (
-          <button
-            type="button"
+          <Button
+            variant="wrapper"
             onClick={() => inputRef.current?.click()}
             disabled={busy}
             aria-label={filePickerLabel}
-            className="group relative block h-full w-full overflow-hidden text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
+            className="group relative block h-full w-full overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
           >
             {imageUrl ? (
               <FocalImage
@@ -187,26 +187,28 @@ export function AvatarEditor({
                 {imageUrl ? t.replace : t.upload}
               </span>
             </div>
-          </button>
+          </Button>
         ) : (
           avatarPreview
         )}
 
         {canEdit && !isClickableVariant ? (
           <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="none"
               onClick={() => inputRef.current?.click()}
               disabled={busy}
               aria-label={filePickerLabel}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
             >
               <Pencil className="h-3.5 w-3.5" />
-            </button>
+            </Button>
             {activeAsset ? (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="none"
                   onClick={() => {
                     setFocalAsset(activeAsset);
                     setPickingFocal(true);
@@ -216,24 +218,26 @@ export function AvatarEditor({
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
                   <Crosshair className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="none"
                   onClick={remove}
                   disabled={busy}
                   aria-label={t.remove}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </>
             ) : null}
           </div>
         ) : null}
 
         {canEdit && isClickableVariant && activeAsset && showRemoveAction ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="none"
             onClick={remove}
             disabled={busy}
             aria-label={t.remove}
@@ -241,7 +245,7 @@ export function AvatarEditor({
             className="absolute right-1.5 top-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border-subtle bg-bg-card/85 text-text-main backdrop-blur-sm transition-colors hover:bg-bg-input disabled:opacity-60"
           >
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         ) : null}
       </div>
 

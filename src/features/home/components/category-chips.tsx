@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -23,14 +24,15 @@ export function CategoryChips({ categories, selectedId, onSelect }: Props) {
   return (
     <div className="mt-2 flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
       {selectedId ? (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => onSelect(null)}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-input px-3 py-1.5 text-xs text-text-sec transition-colors hover:bg-bg-card"
+          className="flex shrink-0 items-center gap-1.5 rounded-full px-3 text-xs text-text-sec"
         >
           <X className="h-3 w-3" />
           {UI_TEXT.home.filters.reset}
-        </button>
+        </Button>
       ) : null}
 
       {chips.map((chip) => (

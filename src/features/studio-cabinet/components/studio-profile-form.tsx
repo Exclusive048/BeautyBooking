@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -208,19 +209,20 @@ export function StudioProfileForm({
                 {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
                   <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
                     {addressSuggestions.map((item, index) => (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="none"
                         key={`${item.value}-${index}`}
                         onMouseDown={(event) => event.preventDefault()}
                         onMouseEnter={() => setAddressSuggestIndex(index)}
                         onClick={() => selectAddressSuggestion(item)}
-                        className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition hover:bg-bg-input ${
+                        className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm ${
                           index === addressSuggestIndex ? "bg-bg-input" : ""
                         }`}
                         aria-label={studioFormText.selectAddressAria.replace("{address}", item.value)}
                       >
                         <span className="whitespace-normal break-words">{item.value}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : null}

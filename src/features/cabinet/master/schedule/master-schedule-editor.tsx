@@ -519,21 +519,21 @@ export function MasterScheduleEditor({
                 const isOpen = openDay === day.dayOfWeek;
                 return (
                   <div key={day.dayOfWeek} className="border-b border-border-subtle/70 last:border-b-0">
-                    <button type="button" className="flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => setOpenDay(isOpen ? null : day.dayOfWeek)}>
+                    <Button variant="wrapper" className="flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => setOpenDay(isOpen ? null : day.dayOfWeek)}>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-text-main">{DAY_NAMES[day.dayOfWeek]}</span>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] ${day.isWorkday ? day.scheduleMode === "FIXED" ? "bg-purple-500/15 text-purple-300" : "bg-blue-500/15 text-blue-300" : "bg-white/10 text-text-sec"}`}>{day.isWorkday ? day.scheduleMode === "FIXED" ? T.fixed : T.flexible : T.dayOff}</span>
                       </div>
                       <ChevronDown className={`h-4 w-4 text-text-sec transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                    </button>
+                    </Button>
                     {isOpen ? (
                       <div className="space-y-3 px-4 pb-4">
                         <div className="flex items-center justify-between"><span className="text-sm text-text-sec">{T.workday}</span><Switch checked={day.isWorkday} onCheckedChange={(value) => updateDay(day.dayOfWeek, { isWorkday: value })} size="sm" /></div>
                         {day.isWorkday ? (
                           <>
                             <div className="flex rounded-xl bg-white/6 p-1">
-                              <button type="button" className={`flex-1 rounded-lg py-1.5 text-xs ${day.scheduleMode === "FLEXIBLE" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => updateDay(day.dayOfWeek, { scheduleMode: "FLEXIBLE" })}>{T.flexible}</button>
-                              <button type="button" className={`flex-1 rounded-lg py-1.5 text-xs ${day.scheduleMode === "FIXED" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => updateDay(day.dayOfWeek, { scheduleMode: "FIXED" })}>{T.fixed}</button>
+                              <Button variant={day.scheduleMode === "FLEXIBLE" ? "primary" : "secondary"} size="none" className={`flex-1 rounded-lg py-1.5 text-xs ${day.scheduleMode === "FLEXIBLE" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => updateDay(day.dayOfWeek, { scheduleMode: "FLEXIBLE" })}>{T.flexible}</Button>
+                              <Button variant={day.scheduleMode === "FIXED" ? "primary" : "secondary"} size="none" className={`flex-1 rounded-lg py-1.5 text-xs ${day.scheduleMode === "FIXED" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => updateDay(day.dayOfWeek, { scheduleMode: "FIXED" })}>{T.fixed}</Button>
                             </div>
                             {day.scheduleMode === "FLEXIBLE" ? (
                               <div className="space-y-2">
@@ -583,8 +583,9 @@ export function MasterScheduleEditor({
                                       }
                                       className="h-9 rounded-xl px-3 text-sm"
                                     />
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="ghost"
+                                      size="none"
                                       onClick={() =>
                                         setWeek((current) =>
                                           current.map((entry) =>
@@ -597,11 +598,12 @@ export function MasterScheduleEditor({
                                       className="flex h-7 w-7 items-center justify-center rounded-full text-text-sec hover:bg-red-500/10 hover:text-red-300"
                                     >
                                       <X className="h-3.5 w-3.5" />
-                                    </button>
+                                    </Button>
                                   </div>
                                 ))}
-                                <button
-                                  type="button"
+                                <Button
+                                  variant="ghost"
+                                  size="none"
                                   onClick={() =>
                                     setWeek((current) =>
                                       current.map((entry) =>
@@ -614,7 +616,7 @@ export function MasterScheduleEditor({
                                   className="text-xs text-text-sec hover:text-text-main"
                                 >
                                   {T.addBreak}
-                                </button>
+                                </Button>
                               </div>
                             ) : (
                               <div className="space-y-2">
@@ -623,16 +625,17 @@ export function MasterScheduleEditor({
                                   {day.fixedSlotTimes.map((slot) => (
                                     <div key={`${day.dayOfWeek}-${slot}`} className="flex items-center gap-1 rounded-lg bg-purple-500/15 px-2 py-1">
                                       <span className="text-xs text-purple-200">{slot}</span>
-                                      <button type="button" onClick={() => setWeek((current) => current.map((entry) => entry.dayOfWeek === day.dayOfWeek ? { ...entry, fixedSlotTimes: entry.fixedSlotTimes.filter((value) => value !== slot) } : entry))}>
+                                      <Button variant="ghost" size="none" onClick={() => setWeek((current) => current.map((entry) => entry.dayOfWeek === day.dayOfWeek ? { ...entry, fixedSlotTimes: entry.fixedSlotTimes.filter((value) => value !== slot) } : entry))}>
                                         <X className="h-3 w-3 text-purple-200/70 hover:text-purple-100" />
-                                      </button>
+                                      </Button>
                                     </div>
                                   ))}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Input type="time" value={slotInputByDay[day.dayOfWeek] ?? ""} onChange={(event) => setSlotInputByDay((current) => ({ ...current, [day.dayOfWeek]: event.target.value }))} className="h-9 rounded-xl px-3 text-sm" />
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="ghost"
+                                    size="none"
                                     onClick={() => {
                                       const next = normalizeTime(slotInputByDay[day.dayOfWeek] ?? "");
                                       if (!next) return;
@@ -648,13 +651,13 @@ export function MasterScheduleEditor({
                                     className="rounded-xl border border-border-subtle px-3 py-2 text-xs text-text-main"
                                   >
                                     {T.addSlot}
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
                             )}
-                            <button type="button" className="w-full rounded-xl border border-border-subtle py-2 text-xs text-text-sec hover:bg-white/5" onClick={() => { setCopySource(day.dayOfWeek); setCopyTargets([]); }}>
+                            <Button variant="ghost" size="none" className="w-full rounded-xl border border-border-subtle py-2 text-xs text-text-sec hover:bg-white/5" onClick={() => { setCopySource(day.dayOfWeek); setCopyTargets([]); }}>
                               {T.copyToDays}
-                            </button>
+                            </Button>
                           </>
                         ) : null}
                       </div>
@@ -672,9 +675,9 @@ export function MasterScheduleEditor({
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-text-main">{T.calendar}</h3>
               <div className="flex items-center gap-2">
-                <button type="button" className="rounded-lg border border-border-subtle bg-bg-input p-1.5" onClick={() => setMonth((current) => addMonths(current, -1))}><ChevronLeft className="h-4 w-4" /></button>
+                <Button variant="secondary" size="none" className="rounded-lg border border-border-subtle bg-bg-input p-1.5" onClick={() => setMonth((current) => addMonths(current, -1))}><ChevronLeft className="h-4 w-4" /></Button>
                 <span className="min-w-[140px] text-center text-sm font-medium">{capitalize(formatRu(month, { month: "long", year: "numeric" }))}</span>
-                <button type="button" className="rounded-lg border border-border-subtle bg-bg-input p-1.5" onClick={() => setMonth((current) => addMonths(current, 1))}><ChevronRight className="h-4 w-4" /></button>
+                <Button variant="secondary" size="none" className="rounded-lg border border-border-subtle bg-bg-input p-1.5" onClick={() => setMonth((current) => addMonths(current, 1))}><ChevronRight className="h-4 w-4" /></Button>
               </div>
             </div>
           </CardHeader>
@@ -690,10 +693,10 @@ export function MasterScheduleEditor({
                 const isSelected = selectedDate ? isSameDay(selectedDate, date) : false;
                 const hasException = Boolean(exception);
                 return (
-                  <button key={key} type="button" onClick={() => setSelectedDate((current) => current && isSameDay(current, date) ? null : date)} className={`relative min-h-[64px] rounded-xl border border-border-subtle/70 p-2 text-left text-sm transition-colors hover:bg-white/4 ${isSameMonth(date, month) ? "bg-bg-card" : "bg-bg-input text-text-sec"} ${isSelected ? "ring-2 ring-primary/70" : ""} ${!isWorkday ? "opacity-40" : ""} ${hasException ? "ring-1 ring-amber-400/50" : ""}`}>
+                  <Button key={key} variant="wrapper" onClick={() => setSelectedDate((current) => current && isSameDay(current, date) ? null : date)} className={`relative min-h-[64px] rounded-xl border border-border-subtle/70 p-2 text-left text-sm transition-colors hover:bg-white/4 ${isSameMonth(date, month) ? "bg-bg-card" : "bg-bg-input text-text-sec"} ${isSelected ? "ring-2 ring-primary/70" : ""} ${!isWorkday ? "opacity-40" : ""} ${hasException ? "ring-1 ring-amber-400/50" : ""}`}>
                     <span>{formatRu(date, { day: "numeric" })}</span>
                     {isWorkday ? <span className={`absolute bottom-1.5 right-1.5 h-1.5 w-1.5 rounded-full ${hasException ? "bg-amber-400" : mode === "FIXED" ? "bg-purple-400" : "bg-blue-400"}`} /> : null}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -817,7 +820,7 @@ export function MasterScheduleEditor({
                         <p className="text-sm font-medium text-text-main">{formatRu(new Date(`${item.date}T00:00:00.000Z`), { day: "numeric", month: "long" })}</p>
                         <p className="text-xs text-text-sec">{!item.isWorkday ? T.dayOff : item.scheduleMode === "FIXED" ? `${T.fixed}: ${item.fixedSlotTimes.join(", ")}` : `${item.startTime ?? "--:--"}-${item.endTime ?? "--:--"}`}</p>
                       </div>
-                      <button type="button" onClick={() => void deleteExceptionById(item.id)} className="flex h-7 w-7 items-center justify-center rounded-full text-text-sec hover:bg-red-500/10 hover:text-red-300"><X className="h-3.5 w-3.5" /></button>
+                      <Button variant="ghost" size="none" onClick={() => void deleteExceptionById(item.id)} className="flex h-7 w-7 items-center justify-center rounded-full text-text-sec hover:bg-red-500/10 hover:text-red-300"><X className="h-3.5 w-3.5" /></Button>
                     </div>
                   ))}
                 </div>
@@ -842,8 +845,8 @@ export function MasterScheduleEditor({
                   <div className="space-y-3">
                     <p className="text-xs font-medium uppercase tracking-wide text-text-sec">{T.changeThisDay}</p>
                     <div className="flex rounded-xl bg-white/6 p-1">
-                      <button type="button" className={`flex-1 rounded-lg py-1.5 text-xs ${draft.scheduleMode === "FLEXIBLE" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => setDraft((current) => current ? { ...current, scheduleMode: "FLEXIBLE" } : current)}>{T.flexible}</button>
-                      <button type="button" className={`flex-1 rounded-lg py-1.5 text-xs ${draft.scheduleMode === "FIXED" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => setDraft((current) => current ? { ...current, scheduleMode: "FIXED" } : current)}>{T.fixed}</button>
+                      <Button variant={draft.scheduleMode === "FLEXIBLE" ? "primary" : "secondary"} size="none" className={`flex-1 rounded-lg py-1.5 text-xs ${draft.scheduleMode === "FLEXIBLE" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => setDraft((current) => current ? { ...current, scheduleMode: "FLEXIBLE" } : current)}>{T.flexible}</Button>
+                      <Button variant={draft.scheduleMode === "FIXED" ? "primary" : "secondary"} size="none" className={`flex-1 rounded-lg py-1.5 text-xs ${draft.scheduleMode === "FIXED" ? "bg-white/15 text-text-main" : "text-text-sec"}`} onClick={() => setDraft((current) => current ? { ...current, scheduleMode: "FIXED" } : current)}>{T.fixed}</Button>
                     </div>
 
                     {draft.scheduleMode === "FLEXIBLE" ? (
@@ -858,35 +861,35 @@ export function MasterScheduleEditor({
                             <Input type="time" value={item.start} onChange={(event) => setDraft((current) => current ? { ...current, breaks: current.breaks.map((entry, breakIndex) => breakIndex === index ? { ...entry, start: event.target.value } : entry) } : current)} className="h-9 rounded-xl px-3 text-sm" />
                             <span className="text-text-sec">-</span>
                             <Input type="time" value={item.end} onChange={(event) => setDraft((current) => current ? { ...current, breaks: current.breaks.map((entry, breakIndex) => breakIndex === index ? { ...entry, end: event.target.value } : entry) } : current)} className="h-9 rounded-xl px-3 text-sm" />
-                            <button type="button" onClick={() => setDraft((current) => current ? { ...current, breaks: current.breaks.filter((_, breakIndex) => breakIndex !== index) } : current)} className="flex h-7 w-7 items-center justify-center rounded-full text-text-sec hover:bg-red-500/10 hover:text-red-300">
+                            <Button variant="ghost" size="none" onClick={() => setDraft((current) => current ? { ...current, breaks: current.breaks.filter((_, breakIndex) => breakIndex !== index) } : current)} className="flex h-7 w-7 items-center justify-center rounded-full text-text-sec hover:bg-red-500/10 hover:text-red-300">
                               <X className="h-3.5 w-3.5" />
-                            </button>
+                            </Button>
                           </div>
                         ))}
-                        <button type="button" onClick={() => setDraft((current) => current ? { ...current, breaks: [...current.breaks, { start: "13:00", end: "14:00" }] } : current)} className="text-xs text-text-sec hover:text-text-main">
+                        <Button variant="ghost" size="none" onClick={() => setDraft((current) => current ? { ...current, breaks: [...current.breaks, { start: "13:00", end: "14:00" }] } : current)} className="text-xs text-text-sec hover:text-text-main">
                           {T.addBreak}
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         {draft.fixedSlotTimes.map((slot) => (
                           <div key={`exception-slot-${slot}`} className="flex items-center justify-between rounded-xl bg-bg-input/50 px-3 py-2">
                             <span className="text-sm">{slot}</span>
-                            <button type="button" onClick={() => setDraft((current) => current ? { ...current, fixedSlotTimes: current.fixedSlotTimes.filter((value) => value !== slot) } : current)}>
+                            <Button variant="ghost" size="none" onClick={() => setDraft((current) => current ? { ...current, fixedSlotTimes: current.fixedSlotTimes.filter((value) => value !== slot) } : current)}>
                               <X className="h-3.5 w-3.5 text-text-sec hover:text-red-300" />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                         <div className="flex gap-2">
                           <Input type="time" value={exceptionSlotInput} onChange={(event) => setExceptionSlotInput(event.target.value)} className="h-9 rounded-xl px-3 text-sm" />
-                          <button type="button" onClick={() => {
+                          <Button variant="ghost" size="none" onClick={() => {
                             const next = normalizeTime(exceptionSlotInput);
                             if (!next) return;
                             setDraft((current) => current ? { ...current, fixedSlotTimes: normalizeSlots([...current.fixedSlotTimes, next]) } : current);
                             setExceptionSlotInput("");
                           }} className="rounded-xl border border-border-subtle px-3 py-2 text-xs text-text-main">
                             {T.addSlot}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -970,7 +973,7 @@ export function MasterScheduleEditor({
 
       <ModalSurface open={copySource !== null} onClose={() => { setCopySource(null); setCopyTargets([]); }} title={T.copyModalTitle} className="max-w-md">
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">{copySource !== null ? DAY_SHORT.map((name, index) => index === copySource ? null : <button key={index} type="button" onClick={() => setCopyTargets((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index])} className={`rounded-xl px-4 py-2 text-sm ${copyTargets.includes(index) ? "bg-primary text-white" : "bg-bg-input text-text-main"}`}>{name}</button>) : null}</div>
+          <div className="flex flex-wrap gap-2">{copySource !== null ? DAY_SHORT.map((name, index) => index === copySource ? null : <Button key={index} variant={copyTargets.includes(index) ? "primary" : "secondary"} size="none" onClick={() => setCopyTargets((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index])} className={`rounded-xl px-4 py-2 text-sm ${copyTargets.includes(index) ? "bg-primary text-white" : "bg-bg-input text-text-main"}`}>{name}</Button>) : null}</div>
           <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => { setCopySource(null); setCopyTargets([]); }}>{T.cancel}</Button>
             <Button className="flex-1" onClick={() => {

@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
 import type { ReviewDto } from "@/lib/reviews/types";
@@ -244,16 +245,16 @@ export function MasterReviewsPage({ masterId }: Props) {
           </div>
           <label className="text-sm text-text-sec">
             {t.sortBy.label}
-            <select
+            <Select
               value={sortMode}
               onChange={(event) => setSortMode(event.target.value as SortMode)}
-              className="lux-input mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              className="mt-1"
             >
               <option value="DATE_ASC">{t.sortBy.oldest}</option>
               <option value="DATE_DESC">{t.sortBy.newest}</option>
               <option value="RATING_ASC">{t.sortBy.lowest}</option>
               <option value="RATING_DESC">{t.sortBy.highest}</option>
-            </select>
+            </Select>
           </label>
         </div>
       </section>

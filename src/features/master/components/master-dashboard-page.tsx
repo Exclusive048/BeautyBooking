@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -688,11 +690,11 @@ export function MasterDashboardPage() {
                   </Badge>
                 ) : null}
               </div>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setManualOpen(true)}
                 disabled={!data.isSolo}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm transition hover:bg-bg-card disabled:opacity-50"
                 title={
                   data.isSolo
                     ? UI_TEXT.master.dashboard.labels.addBooking
@@ -700,7 +702,7 @@ export function MasterDashboardPage() {
                 }
               >
                 {UI_TEXT.master.dashboard.labels.manualBookingButton}
-              </button>
+              </Button>
             </div>
 
             <div className="lux-card rounded-[24px] p-4 text-sm">
@@ -804,59 +806,59 @@ export function MasterDashboardPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {booking.status === "PENDING" && booking.actionRequiredBy === "MASTER" ? (
                     <>
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         disabled={actionId === booking.id}
                         onClick={() => void updateStatus(booking, "CONFIRMED")}
-                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
                         {UI_TEXT.master.dashboard.actions.confirm}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         disabled={actionId === booking.id}
                         onClick={() => void updateStatus(booking, "REJECTED")}
-                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
                         {UI_TEXT.master.dashboard.actions.reject}
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                   {booking.status === "CHANGE_REQUESTED" &&
                   booking.actionRequiredBy === "MASTER" ? (
                     <>
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         disabled={actionId === booking.id}
                         onClick={() => void updateStatus(booking, "CONFIRMED")}
-                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
                         {UI_TEXT.master.dashboard.actions.confirmMove}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         disabled={actionId === booking.id}
                         onClick={() => void updateStatus(booking, "REJECTED")}
-                        className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                       >
                         {UI_TEXT.master.dashboard.actions.rejectMove}
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                   {canMasterRequestMove(booking) ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       disabled={actionId === booking.id}
                       onClick={() => void requestReschedule(booking)}
-                      className="rounded-lg border border-border-subtle bg-bg-input px-3 py-1 text-sm transition hover:bg-bg-card"
                     >
                       {UI_TEXT.master.dashboard.actions.requestMove}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
                 <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3">
-                  <button
-                    type="button"
+                  <Button
+                    variant="wrapper"
                     onClick={() => toggleChat(booking.id)}
                     className="flex w-full items-center justify-between text-sm font-medium"
                   >
@@ -864,7 +866,7 @@ export function MasterDashboardPage() {
                     {chatUnreadMap[booking.id] ? (
                       <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[booking.id]}</Badge>
                     ) : null}
-                  </button>
+                  </Button>
                   {chatOpenMap[booking.id] ? (
                     <div className="mt-3">
                       <BookingChat
@@ -891,14 +893,15 @@ export function MasterDashboardPage() {
             <section className="lux-card rounded-[24px] p-4">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{UI_TEXT.master.dashboard.labels.balanceTitle}</h3>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="none"
                   onClick={() => setBalanceVisible((v) => !v)}
                   className="text-sm"
                   aria-label={UI_TEXT.master.dashboard.labels.balanceToggleAria}
                 >
                   {balanceVisible ? UI_TEXT.master.dashboard.labels.hideBalance : UI_TEXT.master.dashboard.labels.showBalance}
-                </button>
+                </Button>
               </div>
               <div className={`text-2xl font-semibold ${balanceVisible ? "" : "blur-sm select-none"}`}>
                 {formatMoney(data.monthEarnings)}
@@ -912,17 +915,23 @@ export function MasterDashboardPage() {
                   {UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })}
                 </h3>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="none"
                     onClick={() => setSlotsReloadTick((value) => value + 1)}
-                    className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs"
+                    className="rounded-lg px-2 py-1 text-xs"
                     aria-label={UI_TEXT.master.dashboard.labels.refreshSlotsAria}
                   >
                     {UI_TEXT.master.dashboard.labels.refresh}
-                  </button>
-                  <button type="button" onClick={() => setStoryOpen(true)} className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs">
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="none"
+                    onClick={() => setStoryOpen(true)}
+                    className="rounded-lg px-2 py-1 text-xs"
+                  >
                     {UI_TEXT.master.dashboard.labels.publishStories}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -940,9 +949,10 @@ export function MasterDashboardPage() {
                         <div className="w-12 shrink-0 text-sm font-semibold text-text-main">{slot.time}</div>
                         <div className="flex flex-1 flex-wrap gap-1.5">
                           {slot.slots.map((categorySlot) => (
-                            <button
+                            <Button
                               key={`${slot.key}:${categorySlot.categoryId}`}
-                              type="button"
+                              variant="ghost"
+                              size="none"
                               onClick={() => openManualBookingFromFreeSlot(categorySlot)}
                               disabled={!data.isSolo || !categorySlot.serviceId}
                               className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-xs text-text-main transition hover:bg-bg-card disabled:cursor-not-allowed disabled:opacity-60"
@@ -954,7 +964,7 @@ export function MasterDashboardPage() {
                             >
                               <span>{categorySlot.categoryName}</span>
                               <span className="text-text-sec">{formatFreeSlotDuration(categorySlot)}</span>
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </div>
@@ -971,9 +981,9 @@ export function MasterDashboardPage() {
                     <div className="text-sm text-text-sec">{UI_TEXT.master.dashboard.labels.noReviews}</div>
                 ) : (
                   data.latestReviews.map((review) => (
-                    <button
+                    <Button
                       key={review.id}
-                      type="button"
+                      variant="wrapper"
                       onClick={() => router.push("/cabinet/master/reviews")}
                       className="w-full rounded-xl border border-border-subtle bg-bg-input/70 p-2 text-left text-sm transition hover:bg-bg-input"
                     >
@@ -981,7 +991,7 @@ export function MasterDashboardPage() {
                         {review.authorName} • ★{review.rating}
                       </div>
                       {review.text ? <div className="text-text-sec">{review.text}</div> : null}
-                    </button>
+                    </Button>
                   ))
                 )}
               </div>
@@ -1014,28 +1024,28 @@ export function MasterDashboardPage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setStoryOpen(false)}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm"
               >
                 {UI_TEXT.actions.close}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => void uploadStoriesToMedia()}
                 disabled={storyGenerating}
-                className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm disabled:opacity-60"
               >
                 {storyGenerating ? UI_TEXT.status.saving : UI_TEXT.master.dashboard.stories.saveToMedia}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={downloadStory}
-                className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-3 py-2 text-sm text-[rgb(var(--accent-foreground))]"
               >
                 {UI_TEXT.master.dashboard.stories.download}
-              </button>
+              </Button>
               </div>
             {storyError ? <div className="mt-3 text-sm text-red-600">{storyError}</div> : null}
             {storyAssets.length > 0 ? (
@@ -1077,10 +1087,9 @@ export function MasterDashboardPage() {
                 onChange={(event) => setManualStartAt(event.target.value)}
                 className="rounded-lg px-3 py-2 text-sm"
               />
-              <select
+              <Select
                 value={manualServiceId}
                 onChange={(event) => setManualServiceId(event.target.value)}
-                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">{UI_TEXT.master.dashboard.manualBooking.chooseService}</option>
                 {data.services.map((service) => (
@@ -1088,7 +1097,7 @@ export function MasterDashboardPage() {
                     {service.title} • {service.durationMin} {UI_TEXT.common.minutesShort} • {formatMoney(service.price)}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input
                 type="text"
                 value={manualClientName}
@@ -1103,11 +1112,10 @@ export function MasterDashboardPage() {
                 placeholder={UI_TEXT.master.dashboard.manualBooking.phonePlaceholder}
                 className="rounded-lg px-3 py-2 text-sm"
               />
-              <textarea
+              <Textarea
                 value={manualNotes}
                 onChange={(event) => setManualNotes(event.target.value)}
                 placeholder={UI_TEXT.master.dashboard.manualBooking.commentPlaceholder}
-                className="lux-input w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">

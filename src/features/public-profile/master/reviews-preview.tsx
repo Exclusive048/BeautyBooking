@@ -222,8 +222,8 @@ export function ReviewsPreview({
 
       {showAllModal ? (
         <div className="fixed inset-0 z-50">
-          <button
-            type="button"
+          <Button
+            variant="wrapper"
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowAllModal(false)}
             aria-label={UI_TEXT.common.cancel}

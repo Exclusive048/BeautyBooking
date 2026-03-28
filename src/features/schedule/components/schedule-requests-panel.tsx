@@ -435,9 +435,9 @@ export function ScheduleRequestsPanel() {
       ) : (
         <div className="grid gap-3">
           {requests.map((item) => (
-            <button
+            <Button
               key={item.id}
-              type="button"
+              variant="wrapper"
               onClick={() => setSelectedId(item.id)}
               className="lux-card rounded-[24px] p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-hover"
             >
@@ -450,7 +450,7 @@ export function ScheduleRequestsPanel() {
               <div className="mt-1 text-xs text-text-sec">
                 {UI_FMT.dateTimeLong(item.createdAt, { timeZone: viewerTimeZone })}
               </div>
-            </button>
+            </Button>
           ))}
         </div>
       )}

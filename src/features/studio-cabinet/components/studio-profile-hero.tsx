@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Camera, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 import { Switch } from "@/components/ui/switch";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -40,11 +41,11 @@ export function StudioProfileHero({
   return (
     <section className="overflow-hidden rounded-[24px] border border-border-subtle bg-bg-card shadow-card">
       <div className="relative h-[220px] w-full overflow-hidden bg-bg-input">
-        <button
-          type="button"
+        <Button
+          variant="wrapper"
           onClick={onEditBanner}
           disabled={isBusy}
-          className="group relative block h-full w-full overflow-hidden text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-80"
+          className="group relative block h-full w-full overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-80"
           aria-label={UI_TEXT.studio.profile.coverUpload}
         >
           {bannerUrl ? (
@@ -71,21 +72,23 @@ export function StudioProfileHero({
               {bannerUrl ? UI_TEXT.studio.profile.editCover : UI_TEXT.studio.profile.coverUpload}
             </span>
           </div>
-        </button>
+        </Button>
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
           {onEditFocal ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="none"
               onClick={onEditFocal}
               disabled={isBusy}
               className="rounded-xl bg-black/40 px-3 py-1.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             >
               {UI_TEXT.studio.profilePage.bannerFocusTitle}
-            </button>
+            </Button>
           ) : null}
           {bannerUrl && onRemoveBanner ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="none"
               onClick={onRemoveBanner}
               disabled={isBusy}
               className="inline-flex items-center gap-1.5 rounded-xl bg-black/40 px-2.5 py-1.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-60"
@@ -94,7 +97,7 @@ export function StudioProfileHero({
             >
               <Trash2 className="h-3.5 w-3.5" />
               {UI_TEXT.actions.remove}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>

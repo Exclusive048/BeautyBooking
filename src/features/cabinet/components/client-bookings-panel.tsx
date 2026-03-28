@@ -371,8 +371,8 @@ export function ClientBookingsPanel() {
                 ) : null}
               </div>
               <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3" data-ignore-drawer>
-                <button
-                  type="button"
+                <Button
+                  variant="wrapper"
                   onClick={(event) => {
                     event.stopPropagation();
                     toggleChat(b.id);
@@ -383,7 +383,7 @@ export function ClientBookingsPanel() {
                   {chatUnreadMap[b.id] ? (
                     <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[b.id]}</Badge>
                   ) : null}
-                </button>
+                </Button>
                 {chatOpenMap[b.id] ? (
                   <div className="mt-3">
                     <BookingChat

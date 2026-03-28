@@ -43,7 +43,11 @@
       "Bash(find d:BeautyBookingbeautyhubsrclib -type f -name *queue* -o -name *job*)",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(find d:BeautyBookingbeautyhubsrclibdomain -type f -name *.ts)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(grep -rn --include=*.tsx \"<button\\\\b\\\\|<textarea\\\\b\\\\|<select\\\\b\" src/features/ src/app/)",
+      "Bash(grep -v 'type=\"\"\"\"file\"\"\"\"\\\\|type='\"''''\"'file'\"''''\"'\\\\|type=\"\"\"\"checkbox\"\"\"\"\\\\|type='\"''''\"'checkbox'\"''''\"'\\\\|type=\"\"\"\"radio\"\"\"\"\\\\|type='\"''''\"'radio'\"''''\"'\\\\|sr-only\\\\|//')",
+      "Bash(grep -v \"//.*<button\")",
+      "Bash(grep -v \"//.*<\")"
     ]
   }
 }

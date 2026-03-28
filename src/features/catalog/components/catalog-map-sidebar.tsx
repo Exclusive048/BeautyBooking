@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { moneyRUB } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import { FocalImage } from "@/components/ui/focal-image";
 
@@ -43,13 +44,14 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="text-sm font-semibold text-foreground">Найдено в этой точке: {items.length}</div>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onClose}
-            className="rounded-full border border-border px-3 py-1 text-xs text-foreground"
+            className="rounded-full px-3 py-1 text-xs"
           >
             {UI_TEXT.common.close}
-          </button>
+          </Button>
         </div>
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
           {items.map((item) => {
@@ -102,13 +104,14 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="text-sm font-semibold text-foreground">Найдено в этой точке: {items.length}</div>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onClose}
-            className="rounded-full border border-border px-3 py-1 text-xs text-foreground"
+            className="rounded-full px-3 py-1 text-xs"
           >
             {UI_TEXT.common.close}
-          </button>
+          </Button>
         </div>
         <div className="max-h-[45vh] space-y-2 overflow-y-auto p-4">
           {items.map((item) => {

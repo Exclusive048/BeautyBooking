@@ -332,8 +332,8 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
 
   return (
     <div className="rounded-2xl border border-border-subtle/80 bg-bg-card/60 p-3">
-      <button
-        type="button"
+      <Button
+        variant="wrapper"
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center justify-between gap-3 text-left"
       >
@@ -348,7 +348,7 @@ export function ModelOfferApplicationsSection({ offerId, applicationsCount }: Pr
           ) : null}
         </div>
         <span className="text-xs text-text-sec">{open ? APP_TEXT.collapse : APP_TEXT.expand}</span>
-      </button>
+      </Button>
 
       {open ? (
         <div className="mt-3 space-y-3">

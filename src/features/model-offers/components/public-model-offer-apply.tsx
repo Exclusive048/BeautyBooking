@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 
 type ApplyResponse = {
@@ -153,12 +154,12 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
 
       <label className="block text-sm font-medium text-text-main">
         Сообщение мастеру
-        <textarea
+        <Textarea
           rows={3}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder="Коротко расскажите о себе"
-          className="mt-2 w-full resize-none rounded-2xl border border-border/70 bg-bg-input px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          className="mt-2 resize-none"
         />
       </label>
 

@@ -890,7 +890,9 @@ export function ScheduleBuilder() {
                         className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-card px-3 py-2"
                       >
                         <span className="text-sm font-medium text-text-main">{slotTime}</span>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="none"
                           type="button"
                           onClick={() => removeFixedSlotTime(slotTime)}
                           aria-label={b.deleteWindowAria}
@@ -898,7 +900,7 @@ export function ScheduleBuilder() {
                           className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                         >
                           <X className="h-3.5 w-3.5" />
-                        </button>
+                        </Button>
                       </div>
                     ))
                   )}
@@ -995,7 +997,9 @@ export function ScheduleBuilder() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs text-text-sec">
                         <span>{b.breaksLimit}</span>
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           type="button"
                           onClick={() =>
                             setTemplateDraft((current) =>
@@ -1011,7 +1015,7 @@ export function ScheduleBuilder() {
                           className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs text-text-main"
                         >
                           {b.addBreak}
-                        </button>
+                        </Button>
                       </div>
                       {templateDraft.breaks.map((item, index) => (
                         <div key={`draft-break-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -1043,7 +1047,9 @@ export function ScheduleBuilder() {
                             }
                             disabled={readOnly}
                           />
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="none"
                             type="button"
                             onClick={() =>
                               setTemplateDraft((current) => ({
@@ -1056,7 +1062,7 @@ export function ScheduleBuilder() {
                             className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                           >
                             <X className="h-3.5 w-3.5" />
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -1151,7 +1157,9 @@ export function ScheduleBuilder() {
                               : t.byDateTemplateLabel}
                         </div>
                       </div>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="none"
                         type="button"
                         onClick={() => removeOverride(item.date)}
                         aria-label={b.deleteOverrideAria}
@@ -1159,7 +1167,7 @@ export function ScheduleBuilder() {
                         className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                       >
                         <X className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   ))
                 )}
@@ -1176,23 +1184,27 @@ export function ScheduleBuilder() {
                 <div className="text-xs text-text-sec">{b.calendarSubtitle}</div>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <button
+                <Button
+                  variant="secondary"
+                  size="none"
                   type="button"
                   className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-sm"
                   onClick={() => setMonth((prev) => monthShift(prev, -1))}
                 >
                   ◀
-                </button>
+                </Button>
                 <div className="min-w-[140px] text-center text-sm font-medium text-text-main">
                   {monthTitle(month, viewerTimeZone)}
                 </div>
-                <button
+                <Button
+                  variant="secondary"
+                  size="none"
                   type="button"
                   className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-sm"
                   onClick={() => setMonth((prev) => monthShift(prev, 1))}
                 >
                   ▶
-                </button>
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -1238,7 +1250,8 @@ export function ScheduleBuilder() {
                   }
 
                   return (
-                    <button
+                    <Button
+                      variant="wrapper"
                       key={dateKey}
                       type="button"
                       onClick={() => setSelectedDate(dateKey)}
@@ -1253,7 +1266,7 @@ export function ScheduleBuilder() {
                       <div className={`mt-2 text-[10px] ${actualWorking ? "text-emerald-700/80" : "text-rose-700/80"}`}>
                         {actualLabel}
                       </div>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -1318,7 +1331,9 @@ export function ScheduleBuilder() {
               <div className="mt-2 space-y-2">
                 <div className="flex items-center justify-between text-xs text-text-sec">
                   <span>{b.breaksTitle}</span>
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     type="button"
                     onClick={() =>
                       setRangeBreaks((current) =>
@@ -1329,7 +1344,7 @@ export function ScheduleBuilder() {
                     className="rounded-lg border border-border-subtle bg-bg-input px-2 py-1 text-xs text-text-main"
                   >
                     {b.addBreak}
-                  </button>
+                  </Button>
                 </div>
                 {rangeBreaks.map((item, index) => (
                   <div key={`range-break-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -1359,7 +1374,9 @@ export function ScheduleBuilder() {
                       }
                       disabled={readOnly}
                     />
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="none"
                       type="button"
                       onClick={() => setRangeBreaks((current) => current.filter((_, entryIndex) => entryIndex !== index))}
                       disabled={readOnly}
@@ -1367,7 +1384,7 @@ export function ScheduleBuilder() {
                       className="flex h-6 w-6 items-center justify-center rounded-full text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                     >
                       <X className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>

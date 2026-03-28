@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
@@ -100,8 +101,6 @@ export function VkNotificationsSection({
   const titleText = title ?? vkText.title;
   const hintText = hint ?? legacyVkText.hint;
   const connectText = connectLabel ?? UI_TEXT.settings.vk.connect;
-  const defaultConnectClass =
-    "shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-60";
 
   return (
     <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
@@ -119,14 +118,14 @@ export function VkNotificationsSection({
             className="shrink-0"
           />
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onConnect}
             disabled={saving}
-            className={connectButtonClassName ?? defaultConnectClass}
+            className={connectButtonClassName}
           >
             {connectText}
-          </button>
+          </Button>
         )}
       </div>
 

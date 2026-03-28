@@ -2,8 +2,8 @@ import React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "icon";
-export type ButtonSize = "sm" | "md" | "lg" | "icon";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "icon" | "wrapper";
+export type ButtonSize = "sm" | "md" | "lg" | "icon" | "none";
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -21,6 +21,8 @@ const variants: Record<ButtonVariant, string> = {
   danger: "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-500",
   icon:
     "border border-border-subtle/80 bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",
+  wrapper:
+    "bg-transparent text-inherit hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary-glow/35",
 };
 
 const sizes: Record<ButtonSize, string> = {
@@ -28,7 +30,13 @@ const sizes: Record<ButtonSize, string> = {
   md: "h-11 px-4 text-sm",
   lg: "h-12 px-5 text-base",
   icon: "h-10 w-10 p-0 text-sm",
+  none: "",
 };
+
+const WRAPPER_BASE =
+  "transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none";
+const DEFAULT_BASE =
+  "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-all duration-300 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none";
 
 export function Button({
   className,
@@ -39,15 +47,12 @@ export function Button({
   ...props
 }: Props) {
   const Comp = asChild ? Slot : "button";
+  const base = variant === "wrapper" ? WRAPPER_BASE : DEFAULT_BASE;
+  const resolvedSize = size === "none" || variant === "wrapper" ? sizes.none : sizes[size];
 
   return (
     <Comp
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-all duration-300 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none",
-        variants[variant],
-        sizes[size],
-        className
-      )}
+      className={cn(base, variants[variant], resolvedSize, className)}
       {...(!asChild ? { type: type ?? "button" } : {})}
       {...props}
     />

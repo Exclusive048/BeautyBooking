@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
@@ -660,7 +661,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                   <p className="mt-0.5 text-xs text-text-sec">{UI_TEXT.settings.cancellation.hint}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-32">
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         max={168}
@@ -668,7 +669,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
                         value={cancellationDeadlineInput}
                         onChange={(event) => setCancellationDeadlineInput(event.target.value)}
                         disabled={saving}
-                        className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-8 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
+                        className="h-10 w-full pr-8"
                         placeholder="24"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-sec">

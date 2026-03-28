@@ -8,6 +8,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type CardPhoto = {
@@ -249,11 +250,11 @@ export function ClientCardDrawer({
           <div className="mt-4 space-y-5">
             <section className="rounded-2xl border border-border-subtle bg-bg-input/60 p-4">
               <div className="text-sm font-semibold text-text-main">Заметки</div>
-              <textarea
+              <Textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 placeholder="Запишите важные детали о клиенте"
-                className="mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card px-3 py-2 text-sm"
+                className="mt-2"
                 rows={5}
               />
               <div className="mt-3 flex items-center justify-between gap-2">
@@ -268,18 +269,15 @@ export function ClientCardDrawer({
               <div className="text-sm font-semibold text-text-main">Теги</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {availableTags.map((tag) => (
-                  <button
+                  <Button
                     key={tag.id}
-                    type="button"
+                    variant={tag.selected ? "primary" : "secondary"}
+                    size="none"
                     onClick={() => toggleTag(tag.id)}
-                    className={`rounded-full border px-3 py-1 text-xs transition ${
-                      tag.selected
-                        ? "border-primary/40 bg-primary/10 text-text-main"
-                        : "border-border-subtle text-text-sec hover:bg-bg-card"
-                    }`}
+                    className="rounded-full border px-3 py-1 text-xs"
                   >
                     {tag.emoji} {tag.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <div className="mt-2 text-xs text-text-sec">Можно выбрать до {TAG_LIMIT} тегов.</div>
@@ -301,13 +299,14 @@ export function ClientCardDrawer({
                 {photos.map((photo) => (
                   <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
                     <img src={photo.url} alt="" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="none"
                       onClick={() => void removePhoto(photo.id)}
                       className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[11px] opacity-0 transition group-hover:opacity-100"
                     >
                       ✖
-                    </button>
+                    </Button>
                   </div>
                 ))}
                 {photos.length === 0 ? (

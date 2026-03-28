@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const SLOT_ROW_HEIGHT = 44;
@@ -177,15 +178,15 @@ const SlotGroupRow = memo(function SlotGroupRow({
 
   return (
     <div className="space-y-2">
-      <button
-        type="button"
+      <Button
+        variant="wrapper"
         onClick={() => onToggle(group.id)}
         className="flex w-full items-center justify-between rounded-xl border border-border-subtle bg-bg-input/70 px-3 py-2 text-left transition hover:bg-bg-input"
         aria-expanded={isOpen}
       >
         <span className="text-xs font-semibold text-text-main">{group.label}</span>
         <span className="text-xs text-text-sec">{group.items.length}</span>
-      </button>
+      </Button>
       {content}
     </div>
   );
@@ -223,8 +224,9 @@ const SlotButton = memo(function SlotButton({
       : null;
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="secondary"
+      size="none"
       onClick={handleClick}
       disabled={disabled}
       className={cn(
@@ -246,7 +248,7 @@ const SlotButton = memo(function SlotButton({
           </span>
         ) : null}
       </span>
-    </button>
+    </Button>
   );
 });
 

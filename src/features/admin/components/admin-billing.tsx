@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
@@ -563,35 +564,35 @@ export function AdminBilling() {
 
                   <label className="text-xs text-text-sec">
                     {t.fields.type}
-                    <select
+                    <Select
                       value={editingScope}
                       onChange={(event) => setEditingScope(event.target.value as SubscriptionScope)}
-                      className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                      className="mt-1"
                     >
                       <option value="MASTER">{t.scope.master}</option>
                       <option value="STUDIO">{t.scope.studio}</option>
-                    </select>
+                    </Select>
                   </label>
 
                   <label className="text-xs text-text-sec">
                     {t.fields.level}
-                    <select
+                    <Select
                       value={editingTier}
                       onChange={(event) => setEditingTier(event.target.value as PlanTier)}
-                      className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                      className="mt-1"
                     >
                       <option value="FREE">{t.tier.free}</option>
                       <option value="PRO">PRO</option>
                       <option value="PREMIUM">{t.tier.premium}</option>
-                    </select>
+                    </Select>
                   </label>
 
                   <label className="text-xs text-text-sec sm:col-span-2">
                     {t.fields.inheritsFrom}
-                    <select
+                    <Select
                       value={editingInheritsFromPlanId ?? ""}
                       onChange={(event) => setEditingInheritsFromPlanId(event.target.value ? event.target.value : null)}
-                      className="mt-1 w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm"
+                      className="mt-1"
                     >
                       <option value="">{t.fields.noParent}</option>
                       {plans
@@ -601,7 +602,7 @@ export function AdminBilling() {
                             {plan.name} ({plan.code})
                           </option>
                         ))}
-                    </select>
+                    </Select>
                   </label>
 
                                     <div className="sm:col-span-2">
