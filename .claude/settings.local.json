@@ -38,7 +38,12 @@
       "Bash(grep -r \"highlightCard\\\\|highlight\" /d/BeautyBooking/beautyhub/src/features/catalog --include=*.tsx --include=*.ts)",
       "Bash(node -e \"try { require.resolve\\(''next/og''\\); console.log\\(''next/og available''\\); } catch\\(e\\) { console.log\\(''not available:'', e.message\\); }\")",
       "Bash(npm install:*)",
-      "Bash(find /d/BeautyBooking/beautyhub/src -name *.prisma -o -name *booking*.prisma)"
+      "Bash(find /d/BeautyBooking/beautyhub/src -name *.prisma -o -name *booking*.prisma)",
+      "Bash(find d:BeautyBookingbeautyhub -type f -name *cancel*)",
+      "Bash(find d:BeautyBookingbeautyhubsrclib -type f -name *queue* -o -name *job*)",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(find d:BeautyBookingbeautyhubsrclibdomain -type f -name *.ts)",
+      "Bash(npx prisma:*)"
     ]
   }
 }

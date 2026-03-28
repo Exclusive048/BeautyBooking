@@ -19,6 +19,7 @@ import {
   BOOKING_REMINDER_JOB_TYPE,
   DEFAULT_JOB_MAX_ATTEMPTS,
   MEDIA_CLEANUP_JOB_TYPE,
+  SLOT_FREED_JOB_TYPE,
   TELEGRAM_SEND_JOB_TYPE,
   VISUAL_SEARCH_INDEX_JOB_TYPE,
   YOOKASSA_WEBHOOK_JOB_TYPE,
@@ -35,6 +36,7 @@ import {
 import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
 import { runMediaCleanup } from "@/lib/media/cleanup";
+import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 
 ensureVisualSearchStartupConfig();
 
@@ -383,6 +385,18 @@ async function processYookassaWebhookJob(
   }
 }
 
+async function processSlotFreedJob(
+  job: Extract<Job, { type: typeof SLOT_FREED_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  await processSlotFreed(job.payload);
+}
+
 async function processMediaCleanupJob(
   job: Extract<Job, { type: typeof MEDIA_CLEANUP_JOB_TYPE }>
 ): Promise<void> {
@@ -403,6 +417,8 @@ async function processJob(job: Job): Promise<void> {
       await processBookingReminderJob(job);
     } else if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
       await processVisualSearchIndexJob(job);
+    } else if (job.type === SLOT_FREED_JOB_TYPE) {
+      await processSlotFreedJob(job);
     } else if (job.type === YOOKASSA_WEBHOOK_JOB_TYPE) {
       await processYookassaWebhookJob(job);
     } else if (job.type === MEDIA_CLEANUP_JOB_TYPE) {

@@ -25,6 +25,7 @@ const BY_TYPE: Record<string, Partial<NotificationPresentation>> = {
   STUDIO_INVITE_ACCEPTED: { toastDurationMs: 15000 },
   STUDIO_INVITE_REJECTED: { toastDurationMs: 15000 },
   STUDIO_INVITE_REVOKED: { toastDurationMs: 15000 },
+  SLOT_FREED: { toastDurationMs: 15000 },
 };
 
 const BOOKING_ACTION_TYPES = new Set<string>(["BOOKING_CREATED", "BOOKING_REQUEST"]);

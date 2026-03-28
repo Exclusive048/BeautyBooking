@@ -208,6 +208,18 @@ export const UI_TEXT = {
   notifications: {
     toastTitle: "У вас новое уведомление",
     declineReason: "Отклонено",
+    slotFreed: {
+      title: "Освободилось окно",
+      body: (masterName: string, dateTime: string) =>
+        `У ${masterName} освободилось окно ${dateTime}. Записаться?`,
+      telegram: (masterName: string, dateTime: string, link: string | null) =>
+        [
+          `🔔 У ${masterName} освободилось окно ${dateTime}`,
+          link ? `Записаться: ${link}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+    },
   },
   billing: {
     featureGate: {

@@ -17,6 +17,17 @@ export type VisualSearchIndexPayload = {
   assetId: string;
 };
 
+export type SlotFreedPayload = {
+  providerId: string;
+  providerName: string;
+  providerPublicUsername: string | null;
+  timezone: string;
+  slotStartAtUtc: string;
+  slotEndAtUtc: string;
+  serviceName: string | null;
+  cancelledByUserId: string | null;
+};
+
 export type MediaCleanupPayload = Record<string, never>;
 
 export type YookassaWebhookPayload = {
@@ -70,6 +81,12 @@ export type YookassaWebhookJob = {
   payload: YookassaWebhookPayload;
 } & JobMeta;
 
+export type SlotFreedJob = {
+  id: string;
+  type: "slot.freed";
+  payload: SlotFreedPayload;
+} & JobMeta;
+
 export type MediaCleanupJob = {
   id: string;
   type: "media.cleanup";
@@ -80,12 +97,14 @@ export type Job =
   | TelegramSendJob
   | BookingReminderJob
   | VisualSearchIndexJob
+  | SlotFreedJob
   | MediaCleanupJob
   | YookassaWebhookJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
 export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
+export const SLOT_FREED_JOB_TYPE = "slot.freed";
 export const MEDIA_CLEANUP_JOB_TYPE = "media.cleanup";
 export const YOOKASSA_WEBHOOK_JOB_TYPE = "yookassa.webhook";
 export const DEFAULT_JOB_MAX_ATTEMPTS = 5;
@@ -122,6 +141,17 @@ function isBookingReminderPayload(value: unknown): value is BookingReminderPaylo
 function isVisualSearchIndexPayload(value: unknown): value is VisualSearchIndexPayload {
   if (!isRecord(value)) return false;
   return typeof value.assetId === "string" && value.assetId.length > 0;
+}
+
+function isSlotFreedPayload(value: unknown): value is SlotFreedPayload {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.providerId === "string" &&
+    typeof value.providerName === "string" &&
+    typeof value.slotStartAtUtc === "string" &&
+    typeof value.slotEndAtUtc === "string" &&
+    typeof value.timezone === "string"
+  );
 }
 
 function isMediaCleanupPayload(value: unknown): value is MediaCleanupPayload {
@@ -166,6 +196,10 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
     return isVisualSearchIndexPayload(value.payload);
+  }
+
+  if (value.type === SLOT_FREED_JOB_TYPE) {
+    return isSlotFreedPayload(value.payload);
   }
 
   if (value.type === MEDIA_CLEANUP_JOB_TYPE) {
@@ -254,6 +288,27 @@ export function createYookassaWebhookJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: YOOKASSA_WEBHOOK_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createSlotFreedJob(
+  payload: SlotFreedPayload,
+  input?: Partial<
+    Pick<
+      SlotFreedJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): SlotFreedJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: SLOT_FREED_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

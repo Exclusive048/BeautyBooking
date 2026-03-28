@@ -11,6 +11,7 @@ import {
   notifyCancelledByClient,
   notifyCancelledByMaster,
 } from "@/lib/notifications/booking-notifications";
+import { enqueueSlotFreedJob } from "@/lib/bookings/slot-freed-enqueue";
 
 export async function POST(
   req: Request,
@@ -39,6 +40,7 @@ export async function POST(
         } else {
           await notifyCancelledByMaster(fullBooking);
         }
+        void enqueueSlotFreedJob(fullBooking, userId);
       }
     } catch (error) {
       logError("POST /api/bookings/[id]/cancel notification failed", {
