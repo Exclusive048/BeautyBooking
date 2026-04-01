@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import "@/lib/startup";
 import {
   acknowledge,
