@@ -408,6 +408,17 @@
     animation: storyProgress linear both;
   }
 
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15%, 55% { transform: translateX(-5px); }
+    35%, 75% { transform: translateX(5px); }
+    90% { transform: translateX(-2px); }
+  }
+
+  .animate-shake {
+    animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .fade-in-up,
     .animate-slide-in-left,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { HomePage as HomeFeedPage } from "@/features/home/components/home-page";
+import { getSessionUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "МастерРядом — запись к мастерам онлайн",
@@ -7,6 +8,12 @@ export const metadata: Metadata = {
     "Найди мастера маникюра, массажа или стрижки рядом. Онлайн-запись.",
 };
 
-export default function HomePage() {
-  return <HomeFeedPage />;
+export default async function HomePage() {
+  const user = await getSessionUser();
+  return (
+    <HomeFeedPage
+      isAuthenticated={!!user}
+      userName={user?.displayName ?? null}
+    />
+  );
 }

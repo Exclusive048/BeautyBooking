@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { BecomeMasterBanner } from "@/features/home/components/become-master-banner";
+import { HeroSection } from "@/features/home/components/hero-section";
 import { HomeFilters } from "@/features/home/components/home-filters";
 import { PortfolioGrid } from "@/features/home/components/portfolio-grid";
 import { PortfolioPreviewModal } from "@/features/home/components/portfolio-preview-modal";
@@ -48,7 +50,12 @@ function buildFeedUrl(params: {
   return `/api/home/feed?${query.toString()}`;
 }
 
-export function HomeFeed() {
+type HomeFeedProps = {
+  isAuthenticated: boolean;
+  userName?: string | null;
+};
+
+export function HomeFeed({ isAuthenticated, userName }: HomeFeedProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | null>(null);
@@ -194,6 +201,18 @@ export function HomeFeed() {
 
   return (
     <div className="space-y-6">
+      {isAuthenticated ? (
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-text-main sm:text-2xl">
+            {userName
+              ? `${UI_TEXT.home.greeting.hello}, ${userName}`
+              : UI_TEXT.home.greeting.yourFeed}
+          </h1>
+        </div>
+      ) : (
+        <HeroSection />
+      )}
+
       <PortfolioStoriesBar />
 
       <RecentMastersSection />
@@ -259,6 +278,8 @@ export function HomeFeed() {
           <div ref={loadMoreRef} className="h-8 w-8" />
         </div>
       ) : null}
+
+      {!isAuthenticated && !loading ? <BecomeMasterBanner /> : null}
 
       <PortfolioPreviewModal
         itemId={selectedItemId}
