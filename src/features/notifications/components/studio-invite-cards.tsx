@@ -1,9 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -53,7 +53,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
           code === "INVITE_ALREADY_REJECTED"
         ) {
           removeInviteLocally(inviteId);
-          setError("Приглашение больше не активно.");
+          setError(t.inactive);
           return;
         }
         setError(json && !json.ok ? json.error.message : t.actionFailed);
@@ -80,63 +80,71 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
     <div className={className}>
       <div className="space-y-3">
         {items.map((invite) => (
-          <Card key={invite.id}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
+          <div
+            key={invite.id}
+            className="rounded-[22px] border border-border-subtle/80 bg-bg-card p-4 shadow-card"
+          >
+            <div className="flex items-start gap-3">
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-bg-input">
                 {invite.studioAvatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- small avatar (48px), notification card
-                  <img
+                  <Image
                     src={invite.studioAvatarUrl}
                     alt={invite.studioName}
-                    className="h-12 w-12 rounded-xl object-cover"
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-cover"
                   />
-                ) : (
-                  <div className="h-12 w-12 rounded-xl bg-bg-input" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-text-main">
-                    {t.titlePrefix} {invite.studioName} {t.titleSuffix}
-                  </div>
-                  {invite.studioTagline ? (
-                    <div className="mt-1 text-xs text-text-sec">{invite.studioTagline}</div>
-                  ) : null}
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-text-main">
+                  {t.titlePrefix} <span className="text-primary">{invite.studioName}</span> {t.titleSuffix}
                 </div>
+                {invite.studioTagline ? (
+                  <div className="mt-0.5 text-xs text-text-sec">{invite.studioTagline}</div>
+                ) : null}
               </div>
+            </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() => void postInviteAction(invite.id, "accept")}
-                  disabled={savingId === invite.id}
-                  size="sm"
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => void postInviteAction(invite.id, "accept")}
+                disabled={savingId === invite.id}
+                size="sm"
+                className="rounded-full"
+              >
+                {savingId === invite.id ? t.accepting : t.accept}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void postInviteAction(invite.id, "reject")}
+                disabled={savingId === invite.id}
+                variant="secondary"
+                size="sm"
+                className="rounded-full"
+              >
+                {savingId === invite.id ? t.rejecting : t.reject}
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="rounded-full">
+                <Link
+                  href={providerPublicUrl(
+                    { id: invite.studioId, publicUsername: invite.studioPublicUsername },
+                    "studio-invite"
+                  )}
                 >
-                  {savingId === invite.id ? t.accepting : t.accept}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => void postInviteAction(invite.id, "reject")}
-                  disabled={savingId === invite.id}
-                  variant="secondary"
-                  size="sm"
-                >
-                  {savingId === invite.id ? t.rejecting : t.reject}
-                </Button>
-                <Button asChild variant="ghost" size="sm">
-                  <Link
-                    href={providerPublicUrl(
-                      { id: invite.studioId, publicUsername: invite.studioPublicUsername },
-                      "studio-invite"
-                    )}
-                  >
-                    {t.studioProfile}
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  {t.studioProfile}
+                </Link>
+              </Button>
+            </div>
+          </div>
         ))}
       </div>
-      {error ? <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
+      {error ? (
+        <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,8 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import {
+  Bell,
+  BellOff,
+  Calendar,
+  CreditCard,
+  Star,
+  MessageCircle,
+  Zap,
+  Building2,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
@@ -179,6 +190,35 @@ function channelLabel(channel: "MASTER" | "STUDIO" | "SYSTEM"): string {
   if (channel === "STUDIO") return t.studio;
   return t.system;
 }
+
+function getNotificationIcon(type: string): LucideIcon {
+  if (type.startsWith("BOOKING_")) return Calendar;
+  if (type.startsWith("BILLING_") || type.startsWith("SUBSCRIPTION_")) return CreditCard;
+  if (type.startsWith("REVIEW_")) return Star;
+  if (type.startsWith("CHAT_")) return MessageCircle;
+  if (type.startsWith("HOT_SLOT_")) return Zap;
+  if (type.startsWith("STUDIO_")) return Building2;
+  return Bell;
+}
+
+const listVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.04, delayChildren: 0.05 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.25,
+      ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
+    },
+  },
+};
 
 export function NotificationsCenterPage({ initialData }: Props) {
   const t = UI_TEXT.notificationsCenter;
@@ -432,154 +472,214 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const showTimeline = filter !== "invites";
 
   return (
-    <section className="space-y-4">
-      <Card>
-        <CardHeader className="p-5 md:p-6">
-          <h1 className="text-xl font-semibold text-text-main">{t.title}</h1>
-          <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
-        </CardHeader>
-      </Card>
+    <section className="space-y-5">
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-text-main">{t.title}</h1>
+        <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
+      </div>
 
-      <Tabs items={filterItems} value={filter} onChange={(value) => setFilter(value as FilterKey)} />
-      {actionNotice ? (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            actionNotice.tone === "success"
-              ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
-              : "border-rose-500/35 bg-rose-500/10 text-rose-300"
-          }`}
-        >
-          {actionNotice.text}
+      {/* Filter tabs — horizontal scroll on mobile */}
+      <div className="overflow-x-auto scrollbar-hide">
+        <Tabs
+          items={filterItems}
+          value={filter}
+          onChange={(value) => setFilter(value as FilterKey)}
+          className="flex-nowrap w-max"
+        />
+      </div>
+
+      {/* Action notice toast */}
+      <AnimatePresence>
+        {actionNotice ? (
+          <motion.div
+            key="action-notice"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+            className={`rounded-2xl border px-4 py-3 text-sm ${
+              actionNotice.tone === "success"
+                ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
+                : "border-rose-500/35 bg-rose-500/10 text-rose-300"
+            }`}
+          >
+            {actionNotice.text}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      {/* Invites section */}
+      {showInvites ? (
+        <div className="rounded-[22px] border border-border-subtle bg-bg-card p-5 shadow-card md:p-6">
+          <h2 className="mb-3 text-sm font-semibold text-text-main">{t.invitesTitle}</h2>
+          {!initialData.hasPhone ? (
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/65 p-4 text-sm text-text-sec">
+              {t.phoneRequired}
+            </div>
+          ) : (
+            <StudioInviteCards
+              invites={invites}
+              onChanged={(items) => {
+                setInvites(items);
+                setInvitesCount(items.length);
+              }}
+            />
+          )}
         </div>
       ) : null}
 
-      {showInvites ? (
-        <Card>
-          <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
-            <h2 className="text-sm font-semibold text-text-main">{t.invitesTitle}</h2>
-          </CardHeader>
-          <CardContent className="space-y-3 px-5 pb-5 md:px-6 md:pb-6">
-            {!initialData.hasPhone ? (
-              <div className="rounded-2xl border border-border-subtle bg-bg-input/65 p-4 text-sm text-text-sec">
-                {t.phoneRequired}
-              </div>
-            ) : (
-              <StudioInviteCards
-                invites={invites}
-                onChanged={(items) => {
-                  setInvites(items);
-                  setInvitesCount(items.length);
-                }}
-              />
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-
+      {/* Notifications timeline */}
       {showTimeline ? (
-        <Card>
-          <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
-            <h2 className="text-sm font-semibold text-text-main">{t.timelineTitle}</h2>
-          </CardHeader>
-          <CardContent className="space-y-2 px-5 pb-5 md:px-6 md:pb-6">
-            {filteredNotifications.map((note) => {
-              const bookingPayload = parseBookingPayload(note.payloadJson);
-              const bookingStatus = bookingPayload?.bookingStatus?.toUpperCase();
-              const canAct =
-                isBookingActionNotification(note.type) &&
-                bookingPayload?.bookingId &&
-                (!bookingStatus || bookingStatus === "PENDING" || bookingStatus === "NEW");
-              const statusMeta =
-                isBookingActionNotification(note.type) && bookingPayload?.bookingId
-                  ? resolveBookingStatusMeta(bookingStatus)
-                  : null;
-              const isUnread = !note.isRead;
+        filteredNotifications.length > 0 ? (
+          <motion.div
+            className="space-y-2"
+            initial="hidden"
+            animate="visible"
+            variants={listVariants}
+          >
+            <AnimatePresence>
+              {filteredNotifications.map((note) => {
+                const bookingPayload = parseBookingPayload(note.payloadJson);
+                const bookingStatus = bookingPayload?.bookingStatus?.toUpperCase();
+                const canAct =
+                  isBookingActionNotification(note.type) &&
+                  bookingPayload?.bookingId &&
+                  (!bookingStatus || bookingStatus === "PENDING" || bookingStatus === "NEW");
+                const statusMeta =
+                  isBookingActionNotification(note.type) && bookingPayload?.bookingId
+                    ? resolveBookingStatusMeta(bookingStatus)
+                    : null;
+                const isUnread = !note.isRead;
+                const Icon = getNotificationIcon(note.type);
 
-              return (
-                <article
-                  key={note.id}
-                  className={`rounded-2xl border border-border-subtle p-3 ${
-                    isUnread ? "bg-bg-card/75 shadow-card" : "bg-bg-input/55"
-                  }`}
-                  onClick={() => void markNotificationRead(note.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      void markNotificationRead(note.id);
-                    }
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-medium text-text-main">{note.title}</div>
-                      <div className="mt-1 text-[11px] uppercase tracking-wide text-text-sec">
-                        {channelLabel(note.channel)}
+                return (
+                  <motion.article
+                    key={note.id}
+                    layout
+                    variants={itemVariants}
+                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+                    className={`relative flex gap-3 rounded-2xl border p-4 transition-colors ${
+                      isUnread
+                        ? "border-primary/20 bg-primary/5"
+                        : "border-border-subtle bg-bg-input/55"
+                    }`}
+                    onClick={() => void markNotificationRead(note.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void markNotificationRead(note.id);
+                    }}
+                  >
+                    {/* Unread dot */}
+                    {isUnread && (
+                      <span className="absolute right-3.5 top-3.5 h-2 w-2 rounded-full bg-primary" />
+                    )}
+
+                    {/* Type icon */}
+                    <div
+                      className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                        isUnread ? "bg-primary/15" : "bg-bg-card"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-5 w-5 ${isUnread ? "text-primary" : "text-text-sec"}`}
+                        aria-hidden
+                      />
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span
+                          className={`text-sm leading-snug ${
+                            isUnread
+                              ? "font-semibold text-text-main"
+                              : "font-medium text-text-main"
+                          }`}
+                        >
+                          {note.title}
+                        </span>
+                        <span className="shrink-0 text-xs text-text-sec">
+                          {UI_FMT.notificationTimeLabel(note.createdAt, { timeZone: viewerTimeZone })}
+                        </span>
                       </div>
-                    </div>
-                    <div className="text-xs text-text-sec">
-                      {UI_FMT.notificationTimeLabel(note.createdAt, { timeZone: viewerTimeZone })}
-                    </div>
-                  </div>
-                  {note.body ? <div className="mt-2 text-sm text-text-sec">{note.body}</div> : null}
 
-                  {canAct ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleBookingConfirm(note.id, note.payloadJson);
-                        }}
-                        disabled={actionPendingId === note.id}
-                      >
-                        {UI_TEXT.actions.confirm}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleBookingDecline(note.id, note.payloadJson);
-                        }}
-                        disabled={actionPendingId === note.id}
-                      >
-                        {UI_TEXT.actions.decline}
-                      </Button>
-                    </div>
-                  ) : null}
-                  {!canAct && statusMeta ? (
-                    <div className="mt-3">
-                      <span
-                        className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-medium ${statusMeta.className}`}
-                      >
-                        {statusMeta.label}
+                      {note.body ? (
+                        <p className="mt-1 line-clamp-2 text-sm text-text-sec">{note.body}</p>
+                      ) : null}
+
+                      <span className="mt-1.5 inline-block rounded-md bg-bg-card px-2 py-0.5 text-[10px] text-text-sec">
+                        {channelLabel(note.channel)}
                       </span>
-                    </div>
-                  ) : null}
 
-                  {note.openHref ? (
-                    <div className="mt-3">
-                      <Button
-                        asChild
-                        size="sm"
-                        variant="secondary"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <Link href={note.openHref}>{t.openAction}</Link>
-                      </Button>
+                      {canAct ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleBookingConfirm(note.id, note.payloadJson);
+                            }}
+                            disabled={actionPendingId === note.id}
+                          >
+                            {UI_TEXT.actions.confirm}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleBookingDecline(note.id, note.payloadJson);
+                            }}
+                            disabled={actionPendingId === note.id}
+                          >
+                            {UI_TEXT.actions.decline}
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {!canAct && statusMeta ? (
+                        <div className="mt-3">
+                          <span
+                            className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-medium ${statusMeta.className}`}
+                          >
+                            {statusMeta.label}
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {note.openHref ? (
+                        <div className="mt-3">
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="secondary"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <Link href={note.openHref}>{t.openAction}</Link>
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </article>
-              );
-            })}
-            {filteredNotifications.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border-subtle p-4 text-sm text-text-sec">
-                {t.emptyTimeline}
-              </div>
+                  </motion.article>
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-input">
+              <BellOff className="h-8 w-8 text-text-sec" aria-hidden />
+            </div>
+            <p className="mt-4 font-medium text-text-main">
+              {filter === "all" ? t.emptyAll : t.emptyFilter}
+            </p>
+            {filter === "all" ? (
+              <p className="mt-1.5 max-w-xs text-sm text-text-sec">{t.emptyAllSub}</p>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        )
       ) : null}
     </section>
   );

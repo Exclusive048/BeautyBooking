@@ -698,6 +698,11 @@ export const UI_TEXT = {
       declineSuccess: "Запись отклонена",
       declineFailed: "Не удалось отклонить запись. Попробуйте ещё раз.",
     },
+    emptyAll: "Уведомлений пока нет",
+    emptyAllSub: "Здесь появятся уведомления о записях, отзывах и оплатах",
+    emptyFilter: "Нет уведомлений в этой категории",
+    showAll: "Показать все",
+    markAllRead: "Прочитать все",
     invites: {
       titlePrefix: "Админ студии",
       titleSuffix: "приглашает вас стать мастером",
@@ -708,6 +713,7 @@ export const UI_TEXT = {
       studioProfile: "Профиль студии",
       actionFailed: "Не удалось выполнить действие",
       networkError: "Сеть недоступна или сервер не отвечает",
+      inactive: "Приглашение больше не активно.",
     },
   },
   feed: {
