@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- small portfolio thumbnails in hover overlay, dynamic external URLs */
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -148,7 +148,9 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
                   {master.thumbs.length > 0 ? (
                     <div className="grid grid-cols-3 gap-1">
                       {master.thumbs.map((thumb, index) => (
-                        <img key={`${master.id}-${index}`} src={thumb} alt="" className="h-12 w-full rounded-md object-cover" />
+                        <div key={`${master.id}-${index}`} className="relative h-12 w-full overflow-hidden rounded-md">
+                          <Image src={thumb} alt="" fill sizes="80px" className="object-cover" />
+                        </div>
                       ))}
                     </div>
                   ) : (

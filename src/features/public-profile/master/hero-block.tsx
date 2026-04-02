@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
@@ -82,24 +84,58 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
           <div className="frost-panel rounded-2xl p-4 md:p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="flex items-end gap-4">
-                {provider.avatarUrl ? (
-                  <FocalImage
-                    src={provider.avatarUrl}
-                    alt={provider.name}
-                    focalX={provider.avatarFocalX}
-                    focalY={provider.avatarFocalY}
-                    className="h-[120px] w-[120px] rounded-full border-4 border-white/65 object-cover shadow-card"
-                  />
-                ) : (
-                  <div className="h-[120px] w-[120px] rounded-full border-4 border-white/55 bg-white/20" />
-                )}
+                <motion.div
+                  initial={{ scale: 0.88, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
+                >
+                  {provider.avatarUrl ? (
+                    <FocalImage
+                      src={provider.avatarUrl}
+                      alt={provider.name}
+                      focalX={provider.avatarFocalX}
+                      focalY={provider.avatarFocalY}
+                      className="h-[120px] w-[120px] rounded-full border-4 border-white/65 object-cover shadow-card"
+                    />
+                  ) : (
+                    <div className="h-[120px] w-[120px] rounded-full border-4 border-white/55 bg-white/20" />
+                  )}
+                </motion.div>
 
                 <div className="pb-1 text-white">
-                  <h1 className="text-2xl font-semibold md:text-3xl">{provider.name}</h1>
-                  {specialization ? <div className="mt-1 text-sm text-white/85">{specialization}</div> : null}
-                  <div className="mt-2 text-sm">{UI_FMT.ratingLabel(provider.rating, provider.reviews)}</div>
+                  <motion.h1
+                    className="text-2xl font-semibold md:text-3xl"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
+                  >
+                    {provider.name}
+                  </motion.h1>
+                  {specialization ? (
+                    <motion.div
+                      className="mt-1 text-sm text-white/85"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.18, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
+                    >
+                      {specialization}
+                    </motion.div>
+                  ) : null}
+                  <motion.div
+                    className="mt-2 text-sm"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.24, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
+                  >
+                    {UI_FMT.ratingLabel(provider.rating, provider.reviews)}
+                  </motion.div>
                   {provider.superpowerBadges.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <motion.div
+                      className="mt-2 flex flex-wrap gap-1.5"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3, delay: 0.3 }}
+                    >
                       {provider.superpowerBadges.map((badge) => (
                         <span
                           key={badge.code}
@@ -109,22 +145,25 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
                           {badge.icon} {badge.title}
                         </span>
                       ))}
-                    </div>
+                    </motion.div>
                   ) : null}
                 </div>
               </div>
 
               {mapsHref ? (
-                <a
+                <motion.a
                   href={mapsHref}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`${UI_TEXT.publicProfile.hero.address}: ${provider.address}`}
                   className="frost-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.32, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
                 >
-                  <span aria-hidden>📍</span>
+                  <MapPin className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{provider.address}</span>
-                </a>
+                </motion.a>
               ) : null}
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReviewForm } from "@/features/reviews/components/review-form";
@@ -211,13 +212,28 @@ export function ReviewsPreview({
           </div>
         ) : null}
 
-        <div className="mt-4 space-y-3">
+        <motion.div
+          className="mt-4 space-y-3"
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
+        >
           {reviews.length === 0 ? (
             <div className="text-sm text-text-sec">{t.noReviews}</div>
           ) : (
-            reviews.map((review) => <ReviewCard key={review.id} review={review} />)
+            reviews.map((review) => (
+              <motion.div
+                key={review.id}
+                variants={{
+                  hidden: { opacity: 0, y: 8 },
+                  visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
+                }}
+              >
+                <ReviewCard review={review} />
+              </motion.div>
+            ))
           )}
-        </div>
+        </motion.div>
       </CardContent>
 
       {showAllModal ? (

@@ -1976,6 +1976,10 @@ export const UI_TEXT = {
       studioBookingDescription: "Этот мастер принимает записи через студийный календарь.",
       studioBookingCta: "Открыть запись в студии",
       unknownError: "Неизвестная ошибка",
+      bookNow: "Записаться",
+      sectionServices: "Услуги",
+      sectionPortfolio: "Портфолио",
+      sectionReviews: "Отзывы",
     },
     hero: {
       share: "Поделиться",
@@ -1997,6 +2001,9 @@ export const UI_TEXT = {
       viewError: "Не удалось загрузить работу",
       untitledWork: "Работа мастера",
       indexedBadge: "✓ В поиске",
+      close: "Закрыть",
+      loading: "Загружаем работу...",
+      bookThisService: "Записаться на услугу",
     },
     reviews: {
       title: "Отзывы",

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
 import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
 import { PortfolioSkeleton } from "@/components/blocks/skeletons/PortfolioSkeleton";
@@ -49,12 +51,13 @@ export function PublicStudioProfilePage({ studioId, bookingParams }: Props) {
         <StudioTeamSection studioId={studioId} />
       </Suspense>
 
-      <a
-        href="#studio-booking-entry"
-        className="fixed bottom-5 right-5 z-20 inline-flex items-center justify-center rounded-full border border-border-subtle bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-5 py-3 text-sm font-semibold text-[rgb(var(--accent-foreground))] shadow-hover transition hover:brightness-105"
+      <Button
+        asChild
+        className="fixed bottom-5 right-5 z-20 rounded-full px-5 py-3 shadow-hover"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
       >
-        {UI_TEXT.publicStudio.heroBook}
-      </a>
+        <Link href="#studio-booking-entry">{UI_TEXT.publicStudio.heroBook}</Link>
+      </Button>
     </div>
   );
 }
