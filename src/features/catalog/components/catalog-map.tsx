@@ -201,7 +201,7 @@ function loadYmaps(): Promise<YMapsApi> {
 
 function buildHintText(title: string, ratingAvg: number): string {
   if (Number.isFinite(ratingAvg) && ratingAvg > 0) {
-    return `${title} • Рейтинг ${ratingAvg.toFixed(1)}`;
+    return UI_TEXT.catalog.map.ratingHint(title, ratingAvg);
   }
   return title;
 }
@@ -470,7 +470,7 @@ export function CatalogMap({
       setMapStatus("ready");
     } catch (error) {
       setMapStatus("error");
-      setMapError(error instanceof Error ? error.message : "Не удалось загрузить карту");
+      setMapError(error instanceof Error ? error.message : UI_TEXT.catalog.map.loadFailed);
       ymapsLoader = null;
     }
   }, []);
@@ -634,13 +634,13 @@ export function CatalogMap({
 
       {mapStatus === "loading" ? (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/40 text-sm text-muted-foreground">
-          Загружаем карту…
+          {UI_TEXT.catalog.map.loading}
         </div>
       ) : null}
 
       {mapStatus === "error" ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/40 text-center text-sm text-muted-foreground">
-          <div>{mapError ?? "Не удалось загрузить карту"}</div>
+          <div>{mapError ?? UI_TEXT.catalog.map.loadFailed}</div>
           <Button
             variant="secondary"
             onClick={() => {
@@ -649,7 +649,7 @@ export function CatalogMap({
             }}
             className="rounded-full"
           >
-            Повторить
+            {UI_TEXT.catalog.map.retry}
           </Button>
         </div>
       ) : null}
@@ -657,38 +657,38 @@ export function CatalogMap({
       {mapStatus === "ready" && loadingResults ? (
         <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
           <div className="rounded-full border border-border bg-background/90 px-4 py-2 text-xs text-muted-foreground shadow-sm">
-            Обновляем результаты…
+            {UI_TEXT.catalog.map.updatingResults}
           </div>
         </div>
       ) : null}
 
-            {mapStatus === "ready" && showEmptySearchNote ? (
+      {mapStatus === "ready" && showEmptySearchNote ? (
         <div className="pointer-events-none absolute inset-x-4 top-24 z-10 rounded-2xl border border-border bg-background/95 p-3 text-center text-xs text-muted-foreground shadow-sm">
-          В этой области ничего не найдено. Передвиньте карту и нажмите «Поиск в этой области».
+          {UI_TEXT.catalog.map.emptyArea}
         </div>
       ) : null}
 
       {mapStatus === "ready" && missingCount > 0 ? (
         <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-full border border-border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-          Не отображены {missingCount} профилей без координат
+          {UI_TEXT.catalog.map.missingCoords(missingCount)}
         </div>
       ) : null}
 
       {mapStatus === "ready" && locationText ? (
         <div className="pointer-events-none absolute left-4 top-14 z-10 rounded-full border border-border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-          Ваше местоположение: {locationText}
+          {UI_TEXT.catalog.map.yourLocation} {locationText}
         </div>
       ) : null}
 
       {mapStatus === "ready" && geoStatus === "denied" ? (
         <div className="pointer-events-none absolute left-4 top-24 z-10 max-w-[320px] rounded-2xl border border-border bg-background/95 p-3 text-xs text-muted-foreground shadow-sm">
-          Разрешите доступ к геолокации, чтобы показывать мастеров рядом с вами.
+          {UI_TEXT.catalog.map.geoAccessDenied}
         </div>
       ) : null}
 
       {mapStatus === "ready" && geoStatus === "error" ? (
         <div className="pointer-events-none absolute left-4 top-24 z-10 max-w-[320px] rounded-2xl border border-border bg-background/95 p-3 text-xs text-muted-foreground shadow-sm">
-          Не удалось определить местоположение. Попробуйте ещё раз.
+          {UI_TEXT.catalog.map.geoError}
         </div>
       ) : null}
 
@@ -699,7 +699,7 @@ export function CatalogMap({
             onClick={handleSearchArea}
             className="rounded-full shadow-sm"
           >
-            Поиск в этой области
+            {UI_TEXT.catalog.map.searchArea}
           </Button>
         </div>
       ) : null}
@@ -711,7 +711,7 @@ export function CatalogMap({
           onClick={() => requestGeolocation(true)}
           className="absolute right-4 top-4 z-10 rounded-full shadow-sm"
         >
-          ◎ Моё местоположение
+          {UI_TEXT.catalog.map.myLocation}
         </Button>
       ) : null}
     </div>

@@ -43,7 +43,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
         className={`absolute right-4 top-4 bottom-4 hidden w-[360px] lg:flex ${panelBase} ${open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"}`}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="text-sm font-semibold text-foreground">Найдено в этой точке: {items.length}</div>
+          <div className="text-sm font-semibold text-foreground">{UI_TEXT.catalog.map.foundInPoint(items.length)}</div>
           <Button
             variant="secondary"
             size="sm"
@@ -93,7 +93,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
           })}
           {items.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card/60 px-3 py-4 text-center text-xs text-muted-foreground">
-              Выберите кластер, чтобы увидеть список мастеров.
+              {UI_TEXT.catalog.map.clusterHint}
             </div>
           ) : null}
         </div>
@@ -103,7 +103,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
         className={`absolute left-0 right-0 bottom-0 lg:hidden ${panelBase} ${open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="text-sm font-semibold text-foreground">Найдено в этой точке: {items.length}</div>
+          <div className="text-sm font-semibold text-foreground">{UI_TEXT.catalog.map.foundInPoint(items.length)}</div>
           <Button
             variant="secondary"
             size="sm"
@@ -153,7 +153,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
           })}
           {items.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card/60 px-3 py-4 text-center text-xs text-muted-foreground">
-              Выберите кластер, чтобы увидеть список мастеров.
+              {UI_TEXT.catalog.map.clusterHint}
             </div>
           ) : null}
         </div>

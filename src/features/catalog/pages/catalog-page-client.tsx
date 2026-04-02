@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
@@ -641,11 +642,30 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       ) : null}
 
       {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <motion.div
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+        >
           {timeModeActive
-            ? availabilityData.items.map((item) => <ProviderResultCard key={item.providerId} item={item} />)
-            : data.items.map((item) => <CatalogCard key={item.id} item={item} serviceQuery={serviceQuery} />)}
-        </div>
+            ? availabilityData.items.map((item) => (
+                <motion.div
+                  key={item.providerId}
+                  variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                >
+                  <ProviderResultCard item={item} />
+                </motion.div>
+              ))
+            : data.items.map((item) => (
+                <motion.div
+                  key={item.id}
+                  variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                >
+                  <CatalogCard item={item} serviceQuery={serviceQuery} />
+                </motion.div>
+              ))}
+        </motion.div>
       ) : null}
 
       {!currentError && view === "map" ? (

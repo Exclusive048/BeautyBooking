@@ -54,15 +54,15 @@ export function FilterChips({
   const [draftMin, setDraftMin] = useState(priceMin);
   const [draftMax, setDraftMax] = useState(priceMax);
   const [categories, setCategories] = useState<CatalogCategoryChip[]>([]);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const priceRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!priceOpen) return;
 
     const onDocumentClick = (event: MouseEvent) => {
-      if (!rootRef.current) return;
+      if (!priceRef.current) return;
       const target = event.target;
-      if (target instanceof Node && !rootRef.current.contains(target)) {
+      if (target instanceof Node && !priceRef.current.contains(target)) {
         setPriceOpen(false);
       }
     };
@@ -102,8 +102,9 @@ export function FilterChips({
   const priceActive = priceMin.length > 0 || priceMax.length > 0;
 
   return (
-    <div ref={rootRef} className="flex w-full flex-wrap items-center gap-2">
-      <div className="relative">
+    <div className="flex w-full items-center gap-2">
+      {/* Price chip — stays outside scroll container so dropdown isn't clipped */}
+      <div ref={priceRef} className="relative shrink-0">
         <Chip
           type="button"
           onClick={() => {
@@ -164,40 +165,45 @@ export function FilterChips({
         ) : null}
       </div>
 
-      <Chip type="button" onClick={onToggleAvailableToday} variant={availableToday ? "active" : "default"}>
-        {UI_TEXT.catalog.chips.availableToday}
-      </Chip>
-      <Chip type="button" onClick={onToggleRating45plus} variant={rating45plus ? "active" : "default"}>
-        {UI_TEXT.catalog.chips.rating45plus}
-      </Chip>
-      <Chip type="button" onClick={onToggleHot} variant={hot ? "active" : "default"}>
-        {UI_TEXT.catalog.chips.hot}
-      </Chip>
-      {topLevelCategories.map((category) => (
-        <Chip
-          key={category.id}
-          type="button"
-          variant={globalCategoryId === category.id ? "active" : "default"}
-          onClick={() => onGlobalCategoryChange?.(globalCategoryId === category.id ? null : category.id)}
-        >
-          {category.icon ? `${category.icon} ` : ""}
-          {category.title}
-        </Chip>
-      ))}
-      <Chip
-        type="button"
-        onClick={() => onEntityTypeChange(entityType === "studio" ? "all" : "studio")}
-        variant={entityType === "studio" ? "active" : "default"}
-      >
-        {UI_TEXT.catalog.chips.studios}
-      </Chip>
-      <Chip
-        type="button"
-        onClick={() => onEntityTypeChange(entityType === "master" ? "all" : "master")}
-        variant={entityType === "master" ? "active" : "default"}
-      >
-        {UI_TEXT.catalog.chips.privateMasters}
-      </Chip>
+      {/* Remaining chips — horizontally scrollable */}
+      <div className="flex-1 overflow-x-auto scrollbar-hide">
+        <div className="flex min-w-max gap-2">
+          <Chip type="button" onClick={onToggleAvailableToday} variant={availableToday ? "active" : "default"}>
+            {UI_TEXT.catalog.chips.availableToday}
+          </Chip>
+          <Chip type="button" onClick={onToggleRating45plus} variant={rating45plus ? "active" : "default"}>
+            {UI_TEXT.catalog.chips.rating45plus}
+          </Chip>
+          <Chip type="button" onClick={onToggleHot} variant={hot ? "active" : "default"}>
+            {UI_TEXT.catalog.chips.hot}
+          </Chip>
+          {topLevelCategories.map((category) => (
+            <Chip
+              key={category.id}
+              type="button"
+              variant={globalCategoryId === category.id ? "active" : "default"}
+              onClick={() => onGlobalCategoryChange?.(globalCategoryId === category.id ? null : category.id)}
+            >
+              {category.icon ? `${category.icon} ` : ""}
+              {category.title}
+            </Chip>
+          ))}
+          <Chip
+            type="button"
+            onClick={() => onEntityTypeChange(entityType === "studio" ? "all" : "studio")}
+            variant={entityType === "studio" ? "active" : "default"}
+          >
+            {UI_TEXT.catalog.chips.studios}
+          </Chip>
+          <Chip
+            type="button"
+            onClick={() => onEntityTypeChange(entityType === "master" ? "all" : "master")}
+            variant={entityType === "master" ? "active" : "default"}
+          >
+            {UI_TEXT.catalog.chips.privateMasters}
+          </Chip>
+        </div>
+      </div>
     </div>
   );
 }

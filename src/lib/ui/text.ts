@@ -960,6 +960,23 @@ export const UI_TEXT = {
     emptyTitle: "По этому запросу никого не нашли",
     emptyDesc: "Измените фильтры или поищите в другом районе.",
     retry: "Повторить",
+    book: "Записаться",
+    map: {
+      loading: "Загружаем карту…",
+      loadFailed: "Не удалось загрузить карту",
+      retry: "Повторить",
+      updatingResults: "Обновляем результаты…",
+      emptyArea: "В этой области ничего не найдено. Передвиньте карту и нажмите «Поиск в этой области».",
+      missingCoords: (count: number) => `Не отображены ${count} профилей без координат`,
+      yourLocation: "Ваше местоположение:",
+      geoAccessDenied: "Разрешите доступ к геолокации, чтобы показывать мастеров рядом с вами.",
+      geoError: "Не удалось определить местоположение. Попробуйте ещё раз.",
+      searchArea: "Поиск в этой области",
+      myLocation: "Моё местоположение",
+      ratingHint: (title: string, rating: number) => `${title} • Рейтинг ${rating.toFixed(1)}`,
+      foundInPoint: (count: number) => `Найдено в этой точке: ${count}`,
+      clusterHint: "Выберите кластер, чтобы увидеть список мастеров.",
+    },
   },
   analytics: {
     labels: {
