@@ -1,0 +1,242 @@
+// === DOMAIN: Auth ===
+
+model UserProfile {
+  id String @id @default(cuid())
+
+  roles AccountType[] @default([CLIENT])
+
+  displayName String?
+
+  phone String? @unique
+
+  email String? @unique
+
+  telegramId String? @unique
+
+  telegramUsername String?
+
+  externalPhotoUrl String?
+  avatarFocalX     Float?
+  avatarFocalY     Float?
+
+  telegramLink TelegramLink?
+
+  telegramLinkTokens TelegramLinkToken[]
+
+  vkLink VkLink?
+
+  createdCategories GlobalCategory[] @relation("GlobalCategoryCreator")
+
+  subscriptions        UserSubscription[]
+  hotSlotSubscriptions HotSlotSubscription[]
+
+  // NEW (optional profile fields)
+
+  firstName String?
+
+  lastName String?
+
+  middleName String?
+
+  birthDate DateTime?
+
+  address String?
+
+  geoLat Float?
+
+  geoLng Float?
+
+  publicUsername String? @unique
+
+  publicUsernameUpdatedAt DateTime?
+
+  providers Provider[] @relation("ProviderOwner")
+
+  ownedStudios Studio[] @relation("StudioOwner")
+
+  masterProfile MasterProfile?
+
+  studioMemberships StudioMembership[]
+
+  studioMembers StudioMember[]
+
+  studioInvites StudioInvite[] @relation("StudioInvitedBy")
+
+  bookings Booking[] @relation("BookingClient")
+
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  refreshSessions   RefreshSession[]
+
+  consents UserConsent[]
+
+  mediaAssetsCreated MediaAsset[] @relation("MediaAssetCreatedBy")
+
+  reviewsAuthored Review[] @relation("ReviewAuthor")
+
+  favorites Favorite[]
+
+  modelApplications ModelApplication[]
+
+  clientNotes ClientNote[] @relation("ClientNotesForClient")
+  clientCards ClientCard[] @relation("ClientCardsForUser")
+
+  publicUsernameAliases PublicUsernameAlias[] @relation("ClientPublicUsernameAliases")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+}
+
+model UserConsent {
+  id String @id @default(cuid())
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  consentType ConsentType
+
+  documentVersion String
+
+  agreedAt DateTime @default(now())
+
+  ipAddress String?
+
+  userAgent String?
+
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, consentType])
+  @@index([userId])
+}
+
+model OtpCode {
+  id String @id @default(cuid())
+
+  phone String
+
+  codeHash String
+
+  expiresAt DateTime
+
+  usedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+model RefreshSession {
+  id String @id @default(cuid())
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  jti String @unique
+
+  expiresAt DateTime
+
+  usedAt DateTime?
+
+  revokedAt DateTime?
+
+  rotatedToSessionId String? @unique
+
+  rotatedToSession RefreshSession? @relation("RefreshSessionRotation", fields: [rotatedToSessionId], references: [id], onDelete: SetNull)
+
+  rotatedFromSession RefreshSession[] @relation("RefreshSessionRotation")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([usedAt])
+}
+
+model TelegramLink {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  telegramUserId String?
+
+  chatId String? @unique
+
+  isEnabled Boolean @default(true)
+
+  linkedAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramLinkToken {
+  id String @id @default(cuid())
+
+  userId String
+
+  tokenHash String @unique
+
+  expiresAt DateTime
+
+  usedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VkLink {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  vkUserId String @unique
+
+  accessToken String
+
+  refreshToken String
+
+  deviceId String
+
+  isEnabled Boolean @default(true)
+
+  linkedAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PublicUsernameAlias {
+  id String @id @default(cuid())
+
+  username String @unique
+
+  providerId String?
+
+  provider Provider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  clientUserId String?
+
+  clientUser UserProfile? @relation("ClientPublicUsernameAliases", fields: [clientUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([providerId])
+  @@index([clientUserId])
+}

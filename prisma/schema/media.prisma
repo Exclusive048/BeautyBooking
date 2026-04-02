@@ -1,0 +1,167 @@
+// === DOMAIN: Media ===
+
+model MediaAsset {
+  id String @id @default(cuid())
+
+  entityType MediaEntityType
+
+  entityId String
+
+  kind MediaKind
+
+  storageProvider String
+
+  storageKey String
+
+  mimeType String
+
+  sizeBytes Int
+
+  originalFilename    String
+  focalX              Float?
+  focalY              Float?
+  visualIndexed       Boolean          @default(false)
+  visualIndexedAt     DateTime?
+  visualPromptVersion String?
+  visualDescription   String?
+  visualMeta          Json?
+  visualCategory      String?
+  status              MediaAssetStatus @default(READY)
+
+  createdByUserId String?
+
+  createdBy         UserProfile?         @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  clientCardPhotos  ClientCardPhoto[]    @relation("ClientCardPhotoAsset")
+  bookingReferences Booking[]            @relation("BookingReferencePhoto")
+  embedding         MediaAssetEmbedding?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  deletedAt DateTime?
+
+  @@index([entityType, entityId, kind, deletedAt])
+  @@index([storageKey])
+  @@index([createdByUserId])
+  @@index([kind, visualIndexed, visualCategory])
+  @@index([status, deletedAt, createdAt])
+}
+
+model MediaAssetEmbedding {
+  id        String                      @id @default(cuid())
+  assetId   String                      @unique @map("asset_id")
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                    @default(now()) @map("created_at")
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("media_asset_embeddings")
+}
+
+model ClientCardPhoto {
+  id String @id @default(cuid())
+
+  cardId String
+
+  card ClientCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  mediaAssetId String @unique
+
+  mediaAsset MediaAsset @relation("ClientCardPhotoAsset", fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  caption String?
+
+  createdAt DateTime @default(now())
+
+  @@index([cardId])
+}
+
+model PortfolioItem {
+  id String @id @default(cuid())
+
+  studioId String?
+
+  studio Studio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
+
+  masterId String
+
+  master Provider @relation(fields: [masterId], references: [id], onDelete: Cascade)
+
+  mediaUrl String
+
+  caption String?
+
+  globalCategoryId String?         @map("global_category_id")
+  globalCategory   GlobalCategory? @relation(fields: [globalCategoryId], references: [id])
+  categorySource   String?
+  inSearch         Boolean         @default(false)
+
+  isPublic Boolean @default(true)
+
+  width Int?
+
+  height Int?
+
+  services PortfolioItemService[]
+
+  tags PortfolioItemTag[]
+
+  favorites Favorite[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([masterId, createdAt])
+  @@index([studioId, createdAt])
+  @@index([globalCategoryId, inSearch])
+}
+
+model PortfolioItemService {
+  portfolioItemId String
+
+  portfolioItem PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  serviceId String
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([portfolioItemId, serviceId])
+  @@index([serviceId])
+}
+
+model PortfolioItemTag {
+  portfolioItemId String
+
+  portfolioItem PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  tagId String
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([portfolioItemId, tagId])
+  @@index([tagId])
+}
+
+model Favorite {
+  id String @id @default(cuid())
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  portfolioItemId String
+
+  portfolioItem PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, portfolioItemId])
+  @@index([portfolioItemId, createdAt])
+}

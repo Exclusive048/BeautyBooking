@@ -1,0 +1,152 @@
+// === DOMAIN: Billing ===
+
+model BillingPlan {
+  id String @id @default(cuid())
+
+  code String @unique
+
+  name String
+
+  tier PlanTier @default(FREE)
+
+  scope SubscriptionScope @default(MASTER)
+
+  features Json
+
+  sortOrder Int @default(0)
+
+  inheritsFromPlanId String?
+
+  inheritsFromPlan BillingPlan? @relation("BillingPlanInherit", fields: [inheritsFromPlanId], references: [id])
+
+  inheritedByPlans BillingPlan[] @relation("BillingPlanInherit")
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  prices BillingPlanPrice[]
+
+  subscriptions UserSubscription[]
+}
+
+model BillingPlanPrice {
+  id String @id @default(cuid())
+
+  planId String
+
+  plan BillingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  periodMonths Int
+
+  priceKopeks Int
+
+  isActive Boolean @default(true)
+
+  @@unique([planId, periodMonths])
+  @@index([periodMonths])
+}
+
+model UserSubscription {
+  id String @id @default(cuid())
+
+  userId String
+
+  planId String
+
+  status SubscriptionStatus @default(ACTIVE)
+
+  scope SubscriptionScope
+
+  startedAt DateTime @default(now())
+
+  currentPeriodStart DateTime?
+
+  currentPeriodEnd DateTime?
+
+  periodMonths Int @default(1)
+
+  autoRenew Boolean @default(true)
+
+  cancelAtPeriodEnd Boolean @default(false)
+
+  cancelledAt DateTime?
+
+  graceUntil DateTime?
+
+  nextBillingAt DateTime?
+
+  paymentMethodId String?
+
+  lastPaymentAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan BillingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  payments BillingPayment[]
+
+  @@unique([userId, scope])
+  @@index([status, autoRenew, nextBillingAt])
+  @@index([status, graceUntil])
+}
+
+model BillingPayment {
+  id String @id @default(cuid())
+
+  subscriptionId String
+
+  subscription UserSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  type String
+
+  status BillingPaymentStatus
+
+  amountKopeks Int
+
+  currency String @default("RUB")
+
+  periodMonths Int
+
+  yookassaPaymentId String? @unique
+
+  confirmationUrl String?
+
+  idempotenceKey String @unique
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([subscriptionId, status])
+  @@index([status, createdAt])
+}
+
+model BillingAuditLog {
+  id String @id @default(cuid())
+
+  userId String
+
+  scope SubscriptionScope?
+
+  subscriptionId String?
+
+  paymentId String?
+
+  action String
+
+  details Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}

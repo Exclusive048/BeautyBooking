@@ -1,0 +1,197 @@
+// === DOMAIN: Schedule ===
+
+model WeeklyScheduleConfig {
+  id String @id @default(cuid())
+
+  providerId String @unique
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  days WeeklyScheduleDay[]
+
+  updatedAt DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+}
+
+model WeeklyScheduleDay {
+  id String @id @default(cuid())
+
+  configId String
+
+  config WeeklyScheduleConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  weekday Int
+
+  templateId String?
+
+  template ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  isActive       Boolean      @default(false)
+  scheduleMode   ScheduleMode @default(FLEXIBLE)
+  fixedSlotTimes String[]     @default([])
+
+  @@unique([configId, weekday])
+  @@index([templateId])
+}
+
+model ScheduleTemplate {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  name String
+
+  startLocal String
+
+  endLocal String
+
+  color String?
+
+  breaks ScheduleTemplateBreak[]
+
+  scheduleOverrides ScheduleOverride[]
+
+  weeklyScheduleDays WeeklyScheduleDay[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, name])
+  @@index([providerId])
+}
+
+model ScheduleTemplateBreak {
+  id String @id @default(cuid())
+
+  templateId String
+
+  template ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  startLocal String
+
+  endLocal String
+
+  sortOrder Int @default(0)
+
+  @@index([templateId])
+}
+
+model ScheduleOverride {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  date DateTime
+
+  kind ScheduleOverrideKind @default(TIME_RANGE)
+
+  isDayOff       Boolean       @default(false)
+  isWorkday      Boolean?
+  scheduleMode   ScheduleMode?
+  fixedSlotTimes String[]      @default([])
+
+  startLocal String?
+
+  endLocal String?
+
+  templateId String?
+
+  template ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  isActive Boolean?
+
+  note String?
+
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, date])
+}
+
+model ScheduleBreak {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  kind ScheduleBreakKind
+
+  dayOfWeek Int?
+
+  date DateTime?
+
+  startLocal String
+
+  endLocal String
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, kind])
+  @@index([providerId, kind, dayOfWeek])
+  @@index([providerId, date])
+}
+
+model ScheduleChangeRequest {
+  id String @id @default(cuid())
+
+  studioId String?
+
+  studio Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  comment String?
+
+  payloadJson Json
+
+  status ScheduleChangeRequestStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, status, createdAt])
+  @@index([studioId, status, createdAt])
+}
+
+model TimeBlock {
+  id String @id @default(cuid())
+
+  studioId String?
+
+  studio Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  masterId String
+
+  startAt DateTime
+
+  endAt DateTime
+
+  type TimeBlockType
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([studioId, masterId, startAt, endAt])
+}

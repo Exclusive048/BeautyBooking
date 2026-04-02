@@ -1,0 +1,86 @@
+// === DOMAIN: Hot Slot ===
+
+model HotSlot {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  serviceId String?
+
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  startAtUtc DateTime
+
+  endAtUtc DateTime
+
+  discountType DiscountType
+
+  discountValue Int
+
+  isActive Boolean @default(true)
+
+  isAuto Boolean @default(false)
+
+  activatedAt DateTime @default(now())
+
+  expiresAtUtc DateTime
+
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, startAtUtc, endAtUtc])
+  @@index([providerId, startAtUtc])
+  @@index([isActive, expiresAtUtc])
+  @@index([providerId, isActive])
+}
+
+model HotSlotSubscription {
+  id String @id @default(cuid())
+
+  userId     String
+  providerId String
+
+  user     UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider Provider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, providerId])
+  @@index([providerId])
+  @@index([userId])
+}
+
+model DiscountRule {
+  id String @id @default(cuid())
+
+  providerId String @unique
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  isEnabled Boolean @default(false)
+
+  smartPriceEnabled Boolean @default(false)
+
+  triggerHours Int
+
+  discountType DiscountType
+
+  discountValue Int
+
+  applyMode DiscountApplyMode
+
+  minPriceFrom Int?
+
+  serviceIds String[] @default([])
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([isEnabled])
+}

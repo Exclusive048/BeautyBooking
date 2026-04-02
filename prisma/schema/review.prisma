@@ -1,0 +1,87 @@
+// === DOMAIN: Review ===
+
+model Review {
+  id String @id @default(cuid())
+
+  bookingId String? @unique
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  authorId String
+
+  author UserProfile @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  studioId String?
+
+  studio Studio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
+
+  masterId String?
+
+  master Provider? @relation(fields: [masterId], references: [id], onDelete: SetNull)
+
+  targetType ReviewTargetType
+
+  targetId String
+
+  rating Int
+
+  text String?
+
+  replyText String?
+
+  repliedAt DateTime?
+
+  reportComment String?
+
+  reportedAt DateTime?
+
+  tags ReviewTagOnReview[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([studioId, createdAt])
+  @@index([masterId, createdAt])
+}
+
+model ReviewTag {
+  id String @id @default(cuid())
+
+  code String @unique
+
+  label String
+
+  icon String?
+
+  type ReviewTagType
+
+  category String
+
+  isActive Boolean @default(true)
+
+  reviews ReviewTagOnReview[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([type, isActive])
+}
+
+model ReviewTagOnReview {
+  reviewId String
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  tagId String
+
+  tag ReviewTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([reviewId, tagId])
+  @@index([tagId])
+  @@index([reviewId])
+}

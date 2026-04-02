@@ -1,0 +1,353 @@
+// === Auth ===
+
+enum AccountType {
+  CLIENT
+
+  MASTER
+
+  STUDIO
+
+  STUDIO_ADMIN
+
+  ADMIN
+
+  SUPERADMIN
+}
+
+enum ConsentType {
+  TERMS
+
+  PRIVACY
+
+  MARKETING
+
+  PUBLIC_PROFILE
+}
+
+// === Provider / Studio ===
+
+enum ProviderType {
+  MASTER
+
+  STUDIO
+}
+
+enum StudioRole {
+  OWNER
+
+  ADMIN
+
+  MASTER
+}
+
+enum StudioMemberRole {
+  OWNER
+
+  ADMIN
+
+  MASTER
+
+  FINANCE
+}
+
+enum StudioMemberStatus {
+  ACTIVE
+
+  INVITED
+
+  DISABLED
+}
+
+enum MembershipStatus {
+  ACTIVE
+
+  PENDING
+
+  REJECTED
+
+  LEFT
+}
+
+// === Service / Catalog ===
+
+enum CategoryStatus {
+  PENDING
+
+  APPROVED
+
+  REJECTED
+}
+
+// === Booking ===
+
+enum BookingStatus {
+  NEW
+
+  PENDING
+
+  CONFIRMED
+
+  CHANGE_REQUESTED
+
+  REJECTED
+
+  IN_PROGRESS
+
+  PREPAID
+
+  STARTED
+
+  FINISHED
+
+  CANCELLED
+
+  NO_SHOW
+}
+
+enum BookingCancelledBy {
+  CLIENT
+
+  PROVIDER
+
+  SYSTEM
+}
+
+enum BookingRequestedBy {
+  CLIENT
+
+  MASTER
+}
+
+enum BookingActionRequiredBy {
+  CLIENT
+
+  MASTER
+}
+
+enum BookingSource {
+  MANUAL
+
+  WEB
+
+  APP
+}
+
+enum ChatSenderType {
+  CLIENT
+
+  MASTER
+}
+
+// === Schedule ===
+
+enum ScheduleMode {
+  FLEXIBLE
+
+  FIXED
+}
+
+enum ScheduleBreakKind {
+  WEEKLY
+
+  OVERRIDE
+}
+
+enum ScheduleOverrideKind {
+  OFF
+
+  TIME_RANGE
+
+  TEMPLATE
+}
+
+enum ScheduleChangeRequestStatus {
+  PENDING
+
+  APPROVED
+
+  REJECTED
+}
+
+enum TimeBlockType {
+  BREAK
+
+  BLOCK
+}
+
+// === Billing ===
+
+enum PlanTier {
+  FREE
+
+  PRO
+
+  PREMIUM
+}
+
+enum SubscriptionScope {
+  MASTER
+
+  STUDIO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+
+  PENDING
+
+  PAST_DUE
+
+  CANCELLED
+
+  EXPIRED
+}
+
+enum BillingPaymentStatus {
+  PENDING
+
+  SUCCEEDED
+
+  CANCELED
+
+  FAILED
+
+  REFUNDED
+}
+
+// === Notification ===
+
+enum NotificationType {
+  BOOKING_CREATED
+  BOOKING_CANCELLED
+  BOOKING_CANCELLED_BY_MASTER
+  BOOKING_CANCELLED_BY_CLIENT
+  BOOKING_RESCHEDULED
+  BOOKING_RESCHEDULE_REQUESTED
+  BOOKING_REQUEST
+  BOOKING_CONFIRMED
+  BOOKING_DECLINED
+  BOOKING_REJECTED
+  BOOKING_REMINDER_24H
+  BOOKING_REMINDER_2H
+  BOOKING_COMPLETED_REVIEW
+  BOOKING_NO_SHOW
+  REVIEW_LEFT
+  REVIEW_REPLIED
+  STUDIO_INVITE_RECEIVED
+  STUDIO_INVITE_ACCEPTED
+  STUDIO_INVITE_REJECTED
+  STUDIO_MEMBER_LEFT
+  STUDIO_SCHEDULE_REQUEST
+  STUDIO_SCHEDULE_APPROVED
+  STUDIO_SCHEDULE_REJECTED
+  STUDIO_DISBANDED
+  MASTER_CABINET_DELETED
+  MODEL_NEW_APPLICATION
+  MODEL_APPLICATION_RECEIVED
+  MODEL_APPLICATION_REJECTED
+  MODEL_TIME_PROPOSED
+  MODEL_BOOKING_CREATED
+  MODEL_TIME_CONFIRMED
+  HOT_SLOT_AVAILABLE
+  SLOT_FREED
+  HOT_SLOT_PUBLISHED
+  HOT_SLOT_BOOKED
+  HOT_SLOT_EXPIRING
+  MASTER_WEEKLY_STATS
+  BILLING_PAYMENT_SUCCEEDED
+  BILLING_PAYMENT_FAILED
+  BILLING_RENEWAL_CONFIRMATION_REQUIRED
+  BILLING_SUBSCRIPTION_CANCELLED
+  BILLING_SUBSCRIPTION_EXPIRED
+  CHAT_MESSAGE_RECEIVED
+  CATEGORY_APPROVED
+  CATEGORY_REJECTED
+}
+
+// === Media ===
+
+enum MediaEntityType {
+  USER
+
+  MASTER
+
+  STUDIO
+
+  SITE
+
+  MODEL_APPLICATION
+
+  CLIENT_CARD
+
+  BOOKING
+}
+
+enum MediaKind {
+  AVATAR
+
+  PORTFOLIO
+
+  MODEL_APPLICATION_PHOTO
+
+  CLIENT_CARD_PHOTO
+
+  BOOKING_REFERENCE
+}
+
+enum MediaAssetStatus {
+  PENDING
+
+  READY
+
+  BROKEN
+}
+
+// === Review ===
+
+enum ReviewTargetType {
+  provider
+
+  studio
+}
+
+enum ReviewTagType {
+  PUBLIC
+
+  PRIVATE
+}
+
+// === Hot Slot ===
+
+enum DiscountType {
+  PERCENT
+
+  FIXED
+}
+
+enum DiscountApplyMode {
+  ALL_SERVICES
+
+  PRICE_FROM
+
+  MANUAL
+}
+
+// === Model Offer ===
+
+enum ModelOfferStatus {
+  ACTIVE
+
+  CLOSED
+
+  ARCHIVED
+}
+
+enum ModelApplicationStatus {
+  PENDING
+
+  REJECTED
+
+  APPROVED_WAITING_CLIENT
+
+  CONFIRMED
+}

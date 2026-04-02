@@ -1,0 +1,81 @@
+// === DOMAIN: Model Offer ===
+
+model ModelOffer {
+  id String @id @default(cuid())
+
+  masterId String
+
+  master Provider @relation(fields: [masterId], references: [id], onDelete: Cascade)
+
+  masterServiceId String?
+
+  masterService MasterService? @relation(fields: [masterServiceId], references: [id], onDelete: SetNull)
+
+  serviceId String?
+
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  serviceIds String[] @default([])
+
+  dateLocal String
+
+  timeRangeStartLocal String
+
+  timeRangeEndLocal String
+
+  price Decimal?
+
+  requirements String[] @default([])
+
+  extraBusyMin Int @default(0)
+
+  status ModelOfferStatus @default(ACTIVE)
+
+  applications ModelApplication[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([masterId])
+  @@index([status])
+  @@index([dateLocal])
+  @@index([masterServiceId])
+  @@index([serviceId])
+  @@index([status, dateLocal, timeRangeStartLocal, createdAt(sort: Desc), id])
+}
+
+model ModelApplication {
+  id String @id @default(cuid())
+
+  offerId String
+
+  offer ModelOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  clientUserId String
+
+  clientUser UserProfile @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+
+  status ModelApplicationStatus @default(PENDING)
+
+  clientNote String?
+
+  consentToShoot Boolean
+
+  proposedTimeLocal String?
+
+  confirmedStartAt DateTime?
+
+  bookingId String? @unique
+
+  booking Booking? @relation("ModelApplicationBooking", fields: [bookingId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([offerId, clientUserId])
+  @@index([offerId])
+  @@index([status])
+  @@index([clientUserId])
+}

@@ -1,0 +1,52 @@
+// === DOMAIN: CRM ===
+
+model ClientCard {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  clientUserId String?
+
+  clientUser UserProfile? @relation("ClientCardsForUser", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  clientPhone String?
+
+  notes String? @db.Text
+
+  tags String[] @default([])
+
+  photos ClientCardPhoto[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId])
+  @@index([providerId, clientUserId])
+  @@index([providerId, clientPhone])
+  @@index([clientUserId])
+  @@index([clientPhone])
+}
+
+model ClientNote {
+  id String @id @default(cuid())
+
+  masterId String
+
+  master Provider @relation("ClientNotesForMaster", fields: [masterId], references: [id], onDelete: Cascade)
+
+  clientUserId String
+
+  clientUser UserProfile @relation("ClientNotesForClient", fields: [clientUserId], references: [id], onDelete: Cascade)
+
+  text String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([masterId, clientUserId])
+  @@index([clientUserId])
+}

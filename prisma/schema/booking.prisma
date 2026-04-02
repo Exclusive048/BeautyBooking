@@ -1,0 +1,179 @@
+// === DOMAIN: Booking ===
+
+model Booking {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  serviceId String
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  masterProviderId String?
+
+  masterProvider Provider? @relation("BookingMaster", fields: [masterProviderId], references: [id], onDelete: SetNull)
+
+  clientUserId String?
+
+  clientUser UserProfile? @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  // UTC instants only. Use these for all scheduling logic and UI formatting.
+
+  startAtUtc DateTime?
+
+  endAtUtc DateTime?
+
+  studioId String?
+
+  studio Studio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
+
+  masterId String?
+
+  clientId String?
+
+  // Legacy fields (deprecated). Do not use for formatting or logic.
+
+  startAt DateTime?
+
+  endAt DateTime?
+
+  slotLabel String
+
+  clientName String
+
+  clientPhone String
+
+  clientNameSnapshot String?
+
+  clientPhoneSnapshot String?
+
+  comment String?
+
+  source BookingSource @default(MANUAL)
+
+  notes String?
+
+  silentMode Boolean @default(false)
+
+  referencePhotoAssetId String?
+
+  bookingAnswers Json?
+
+  referencePhoto MediaAsset? @relation("BookingReferencePhoto", fields: [referencePhotoAssetId], references: [id])
+
+  status BookingStatus @default(PENDING)
+
+  cancelledBy BookingCancelledBy?
+
+  cancelReason String?
+
+  cancelledAtUtc DateTime?
+
+  proposedStartAt DateTime?
+
+  proposedEndAt DateTime?
+
+  requestedBy BookingRequestedBy?
+
+  changeComment String?
+
+  actionRequiredBy BookingActionRequiredBy?
+
+  clientChangeRequestsCount Int @default(0)
+
+  masterChangeRequestsCount Int @default(0)
+
+  reminder24hSentAt DateTime?
+  reminder2hSentAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+
+  chat BookingChat?
+
+  review Review?
+
+  serviceItems BookingServiceItem[]
+
+  modelApplication ModelApplication? @relation("ModelApplicationBooking")
+
+  @@index([providerId, startAtUtc, endAtUtc])
+  @@index([providerId])
+  @@index([masterProviderId])
+  @@index([startAtUtc])
+  @@index([serviceId])
+  @@index([clientUserId])
+  @@index([studioId])
+  @@index([masterId])
+  @@index([status, startAtUtc])
+}
+
+model BookingServiceItem {
+  id String @id @default(cuid())
+
+  bookingId String
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  studioId String?
+
+  studio Studio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
+
+  serviceId String?
+
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  titleSnapshot String
+
+  priceSnapshot Int
+
+  durationSnapshotMin Int
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([studioId])
+  @@index([serviceId])
+}
+
+model BookingChat {
+  id String @id @default(cuid())
+
+  bookingId String @unique
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  messages ChatMessage[]
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+
+  chatId String
+
+  chat BookingChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  senderType ChatSenderType
+
+  senderName String
+
+  body String @db.Text
+
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
+  @@index([chatId, readAt])
+}

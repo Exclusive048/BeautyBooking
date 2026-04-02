@@ -1,0 +1,265 @@
+// === DOMAIN: Provider ===
+
+model Provider {
+  id String @id @default(cuid())
+
+  type ProviderType
+
+  name String
+
+  tagline String
+
+  rating Float @default(0)
+
+  reviews Int @default(0)
+
+  ratingAvg Float @default(0)
+
+  ratingCount Int @default(0)
+
+  priceFrom Int @default(0)
+
+  address String
+
+  district String
+
+  categories String[] @default([])
+
+  availableToday Boolean @default(false)
+
+  timezone String @default("Asia/Almaty")
+
+  bufferBetweenBookingsMin Int @default(0)
+
+  autoConfirmBookings       Boolean      @default(false)
+  cancellationDeadlineHours Int?
+  remindersEnabled          Boolean      @default(true)
+  scheduleMode              ScheduleMode @default(FLEXIBLE)
+  fixedSlotTimes            String[]     @default([])
+
+  studioId String?
+
+  studio Provider? @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)
+
+  masters Provider[] @relation("StudioMasters")
+
+  // NEW (optional business contact + publish + geo)
+
+  contactName String?
+
+  contactPhone String?
+
+  contactEmail String?
+
+  description String?
+
+  avatarUrl    String?
+  avatarFocalX Float?
+  avatarFocalY Float?
+  bannerFocalX Float?
+  bannerFocalY Float?
+
+  geoLat Float?
+
+  geoLng Float?
+
+  isPublished Boolean @default(false)
+
+  publicUsername String? @unique
+
+  publicUsernameUpdatedAt DateTime?
+
+  ownerUserId String?
+
+  owner UserProfile? @relation("ProviderOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  services Service[]
+
+  masterServices MasterService[] @relation("MasterServices")
+
+  bookings Booking[]
+
+  masterBookings Booking[] @relation("BookingMaster")
+
+  scheduleOverrides ScheduleOverride[]
+
+  scheduleBreaks ScheduleBreak[]
+
+  scheduleTemplates ScheduleTemplate[]
+
+  weeklyScheduleConfig WeeklyScheduleConfig?
+
+  scheduleChangeRequests ScheduleChangeRequest[]
+
+  discountRule DiscountRule?
+
+  hotSlots             HotSlot[]
+  hotSlotSubscriptions HotSlotSubscription[]
+
+  studioProfile Studio? @relation("StudioProvider")
+
+  masterProfile MasterProfile? @relation("MasterProvider")
+
+  reviewsAbout Review[]
+
+  portfolioItems PortfolioItem[]
+
+  publicUsernameAliases PublicUsernameAlias[]
+
+  createdGlobalCategories GlobalCategory[] @relation("GlobalCategoryCreatorProvider")
+
+  modelOffers ModelOffer[]
+
+  clientNotes ClientNote[] @relation("ClientNotesForMaster")
+
+  clientCards ClientCard[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@index([studioId])
+  @@index([isPublished, rating(sort: Desc), reviews(sort: Desc)])
+  @@index([isPublished, ratingAvg(sort: Desc), reviews(sort: Desc), createdAt(sort: Desc)])
+  @@index([studioId, type, isPublished, createdAt])
+  @@index([type, isPublished, address])
+}
+
+model MasterProfile {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  providerId String @unique
+
+  provider Provider @relation("MasterProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  lastBookingsSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+model Studio {
+  id String @id @default(cuid())
+
+  providerId String @unique
+
+  provider Provider @relation("StudioProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  ownerUserId String?
+
+  owner UserProfile? @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  memberships StudioMembership[]
+
+  studioMembers StudioMember[]
+
+  invites StudioInvite[]
+
+  ratingAvg Float @default(0)
+
+  ratingCount Int @default(0)
+
+  serviceCategories ServiceCategory[]
+
+  masterServices MasterService[]
+
+  timeBlocks TimeBlock[]
+
+  scheduleRequests ScheduleChangeRequest[]
+
+  services Service[]
+
+  bookings Booking[]
+
+  bookingServiceItems BookingServiceItem[]
+
+  portfolioItems PortfolioItem[]
+
+  reviews Review[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+model StudioMember {
+  id String @id @default(cuid())
+
+  studioId String
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role StudioMemberRole
+
+  status StudioMemberStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, userId, role])
+  @@index([userId, status])
+  @@index([studioId, status])
+}
+
+model StudioMembership {
+  id String @id @default(cuid())
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  studioId String
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  roles StudioRole[]
+
+  status MembershipStatus @default(PENDING)
+
+  leftAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, studioId])
+  @@index([userId])
+  @@index([studioId])
+  @@index([status])
+}
+
+model StudioInvite {
+  id String @id @default(cuid())
+
+  studioId String
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  phone String
+
+  status MembershipStatus @default(PENDING)
+
+  invitedByUserId String
+
+  invitedBy UserProfile @relation("StudioInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, phone])
+  @@index([studioId])
+  @@index([phone])
+  @@index([status])
+}
