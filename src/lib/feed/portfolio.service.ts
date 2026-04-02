@@ -20,6 +20,7 @@ export type PortfolioFeedItem = {
   masterName: string;
   masterPublicUsername: string | null;
   masterAvatarUrl: string | null;
+  masterRatingAvg: number;
   studioName: string | null;
   serviceIds: string[];
   primaryServiceTitle: string | null;
@@ -220,6 +221,7 @@ export async function listPortfolioFeed(input: {
             name: true,
             publicUsername: true,
             avatarUrl: true,
+            ratingAvg: true,
             studio: { select: { name: true } },
           },
         },
@@ -288,6 +290,7 @@ export async function listPortfolioFeed(input: {
       masterName: row.master.name,
       masterPublicUsername: row.master.publicUsername ?? null,
       masterAvatarUrl: row.master.avatarUrl ?? null,
+      masterRatingAvg: row.master.ratingAvg,
       studioName: row.master.studio?.name ?? null,
       serviceIds: snapshot.serviceIds,
       primaryServiceTitle: snapshot.primaryServiceTitle,
@@ -343,6 +346,7 @@ export async function listHomePortfolioFeed(input: {
             name: true,
             publicUsername: true,
             avatarUrl: true,
+            ratingAvg: true,
             studio: { select: { name: true } },
           },
         },
@@ -411,6 +415,7 @@ export async function listHomePortfolioFeed(input: {
       masterName: row.master.name,
       masterPublicUsername: row.master.publicUsername ?? null,
       masterAvatarUrl: row.master.avatarUrl ?? null,
+      masterRatingAvg: row.master.ratingAvg,
       studioName: row.master.studio?.name ?? null,
       serviceIds: snapshot.serviceIds,
       primaryServiceTitle: snapshot.primaryServiceTitle,
@@ -440,6 +445,7 @@ export async function getPortfolioDetail(
           name: true,
           publicUsername: true,
           avatarUrl: true,
+          ratingAvg: true,
           studio: { select: { name: true } },
         },
       },
@@ -550,6 +556,7 @@ export async function getPortfolioDetail(
     masterName: item.master.name,
     masterPublicUsername: item.master.publicUsername ?? null,
     masterAvatarUrl: item.master.avatarUrl ?? null,
+    masterRatingAvg: item.master.ratingAvg,
     studioName: item.master.studio?.name ?? null,
     serviceIds: snapshot.serviceIds,
     primaryServiceTitle: snapshot.primaryServiceTitle,

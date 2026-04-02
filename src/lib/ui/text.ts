@@ -831,6 +831,7 @@ export const UI_TEXT = {
       book: "Записаться",
       priceFrom: "от",
       viewProfile: "Профиль",
+      ratingLabel: "рейтинг",
     },
     preview: {
       masterLabel: "Мастер",

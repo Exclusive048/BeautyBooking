@@ -1,4 +1,6 @@
-import { Chip } from "@/components/ui/chip";
+"use client";
+
+import { motion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type CategoryItem = {
@@ -16,31 +18,56 @@ type Props = {
   onSelect: (id: string | null) => void;
 };
 
+const LAYOUT_ID = "category-chip-active";
+
 export function CategoryChips({ categories, selectedId, onSelect }: Props) {
   const chips = categories.filter((category) => !category.parentId);
 
   return (
-    <div className="mt-2 flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+    <div className="mt-2 flex flex-nowrap gap-2 overflow-x-auto pb-1 scrollbar-hide sm:flex-wrap sm:overflow-visible">
       {/* "Все" chip — always first */}
-      <Chip
+      <button
         type="button"
         onClick={() => onSelect(null)}
-        variant={selectedId === null ? "active" : "default"}
+        className="relative shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        style={{ WebkitTapHighlightColor: "transparent" }}
       >
-        {UI_TEXT.home.filters.all}
-      </Chip>
+        {selectedId === null ? (
+          <motion.span
+            layoutId={LAYOUT_ID}
+            className="absolute inset-0 rounded-full bg-primary"
+            transition={{ type: "spring", stiffness: 400, damping: 35 }}
+          />
+        ) : null}
+        <span className={`relative z-10 ${selectedId === null ? "text-white" : "text-text-sec"}`}>
+          {UI_TEXT.home.filters.all}
+        </span>
+      </button>
 
-      {chips.map((chip) => (
-        <Chip
-          key={chip.id}
-          type="button"
-          onClick={() => onSelect(selectedId === chip.id ? null : chip.id)}
-          variant={selectedId === chip.id ? "active" : "default"}
-        >
-          {chip.icon ? `${chip.icon} ` : ""}
-          {chip.name}
-        </Chip>
-      ))}
+      {chips.map((chip) => {
+        const isActive = selectedId === chip.id;
+        return (
+          <button
+            key={chip.id}
+            type="button"
+            onClick={() => onSelect(isActive ? null : chip.id)}
+            className="relative shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            {isActive ? (
+              <motion.span
+                layoutId={LAYOUT_ID}
+                className="absolute inset-0 rounded-full bg-primary"
+                transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              />
+            ) : null}
+            <span className={`relative z-10 ${isActive ? "text-white" : "text-text-sec"}`}>
+              {chip.icon ? `${chip.icon} ` : ""}
+              {chip.name}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

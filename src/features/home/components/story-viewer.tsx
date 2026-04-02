@@ -36,6 +36,12 @@ export function StoryViewer({ masters, initialIndex, onClose }: Props) {
       ? `/providers/${master.masterId}`
       : "/";
 
+  const profileUrl = master?.masterPublicUsername
+    ? `/u/${master.masterPublicUsername}`
+    : master
+      ? `/providers/${master.masterId}`
+      : null;
+
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (!master) return;
@@ -247,11 +253,25 @@ export function StoryViewer({ masters, initialIndex, onClose }: Props) {
               </div>
             ) : null}
           </div>
-          <Button asChild size="sm" className="shrink-0">
-            <Link href={bookingUrl} onClick={(e) => e.stopPropagation()}>
-              {UI_TEXT.home.stories.bookNow}
-            </Link>
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {profileUrl ? (
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="border border-white/30 text-white hover:bg-white/10 hover:text-white"
+              >
+                <Link href={profileUrl} onClick={(e) => e.stopPropagation()}>
+                  {UI_TEXT.home.card.viewProfile}
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild size="sm" className="shrink-0">
+              <Link href={bookingUrl} onClick={(e) => e.stopPropagation()}>
+                {UI_TEXT.home.stories.bookNow}
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <div className="mt-2 text-center text-xs text-white/50">

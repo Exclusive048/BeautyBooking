@@ -1,5 +1,9 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { Star, ExternalLink } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -26,6 +30,9 @@ export function PortfolioCard({ item, onSelect }: Props) {
     .slice(0, 2)
     .toUpperCase();
 
+  const priceRub = item.totalPrice > 0 ? Math.round(item.totalPrice / 100) : null;
+  const rating = item.masterRatingAvg > 0 ? item.masterRatingAvg.toFixed(1) : null;
+
   return (
     <article className="group relative mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card transition-all duration-300 hover:shadow-hover">
       {/* Image area — click opens preview modal */}
@@ -45,19 +52,37 @@ export function PortfolioCard({ item, onSelect }: Props) {
           />
 
           {/* Price badge — top right */}
-          {item.totalPrice > 0 ? (
+          {priceRub ? (
             <div className="pointer-events-none absolute right-3 top-3 rounded-xl bg-black/50 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-              {UI_TEXT.home.card.priceFrom} {item.totalPrice} {UI_TEXT.common.currencyRub}
+              {UI_TEXT.home.card.priceFrom} {priceRub.toLocaleString("ru-RU")} {UI_TEXT.common.currencyRub}
             </div>
           ) : null}
 
-          {/* Hover overlay — desktop: subtle darkening */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          {/* Hover overlay — gradient + info text */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/20 to-transparent p-3"
+          >
+            <p className="line-clamp-1 text-sm font-semibold text-white drop-shadow">
+              {item.masterName}
+            </p>
+            {serviceLabel ? (
+              <p className="line-clamp-1 text-xs text-white/80">{serviceLabel}</p>
+            ) : null}
+            {rating ? (
+              <div className="mt-1 flex items-center gap-1">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                <span className="text-xs font-medium text-white">{rating}</span>
+              </div>
+            ) : null}
+          </motion.div>
         </div>
       </Button>
 
       {/* Bottom action strip */}
-      <div className="flex items-center gap-2.5 px-3 pb-3 pt-2.5">
+      <div className="flex items-center gap-2 px-3 pb-3 pt-2.5">
         {/* Avatar */}
         <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-primary/10">
           {item.masterAvatarUrl ? (
@@ -93,6 +118,21 @@ export function PortfolioCard({ item, onSelect }: Props) {
             <div className="truncate text-[11px] text-text-sec">{serviceLabel}</div>
           ) : null}
         </div>
+
+        {/* Profile icon button */}
+        {profileUrl ? (
+          <Button
+            asChild
+            variant="ghost"
+            size="none"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-primary/10"
+            aria-label={UI_TEXT.home.card.viewProfile}
+          >
+            <Link href={profileUrl}>
+              <ExternalLink className="h-3.5 w-3.5 text-text-sec" />
+            </Link>
+          </Button>
+        ) : null}
 
         {/* Booking button */}
         {bookingUrl ? (

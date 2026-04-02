@@ -83,7 +83,7 @@ export function PortfolioStoriesBar() {
         <h2 className="mb-3 text-lg font-semibold text-text-main">
           {UI_TEXT.home.stories.title}
         </h2>
-        <div className="overflow-x-auto pb-2">
+        <div className="overflow-x-auto pb-2 scrollbar-hide">
           <div className="flex min-w-max gap-3">
             {masters.map((master, i) => (
               <AvatarBubble

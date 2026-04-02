@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -269,9 +270,19 @@ export function HomeFeed({ isAuthenticated, userName }: HomeFeedProps) {
         </div>
       ) : null}
 
-      {!loading && items.length > 0 ? (
-        <PortfolioGrid items={items} onSelect={(id) => setSelectedItemId(id)} />
-      ) : null}
+      <AnimatePresence mode="wait">
+        {!loading && items.length > 0 ? (
+          <motion.div
+            key={activeCategory ?? "__all__"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <PortfolioGrid items={items} onSelect={(id) => setSelectedItemId(id)} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {nextCursor ? (
         <div className="flex justify-center pb-6">
