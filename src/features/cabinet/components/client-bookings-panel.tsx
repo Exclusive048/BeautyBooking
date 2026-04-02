@@ -81,12 +81,13 @@ function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
 }
 
 function statusLabel(status: BookingItem["status"]) {
-  if (status === "CHANGE_REQUESTED") return "Ожидает подтверждения другой стороны";
-  if (status === "PENDING") return UI_TEXT.clientCabinet.booking.pending;
-  if (status === "CONFIRMED") return UI_TEXT.clientCabinet.booking.confirmed;
-  if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
-  if (status === "FINISHED") return "Завершена";
-  return UI_TEXT.clientCabinet.booking.cancelled;
+  const b = UI_TEXT.clientCabinet.booking;
+  if (status === "CHANGE_REQUESTED") return b.changeRequested;
+  if (status === "PENDING" || status === "NEW") return b.pending;
+  if (status === "CONFIRMED" || status === "PREPAID") return b.confirmed;
+  if (status === "IN_PROGRESS" || status === "STARTED") return b.inProgress;
+  if (status === "FINISHED") return b.finished;
+  return b.cancelled;
 }
 
 function isExcludedStatus(status: BookingItem["status"]): boolean {
@@ -251,7 +252,7 @@ export function ClientBookingsPanel() {
       const res = await fetch(`/api/reviews/${reviewId}`, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ id: string }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(getErrorMessage(json, "Не удалось удалить отзыв"));
+        throw new Error(getErrorMessage(json, t.booking.deleteReviewFailed));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
@@ -268,8 +269,8 @@ export function ClientBookingsPanel() {
       const json = (await res.json().catch(() => null)) as
         | ApiResponse<{ booking: { id: string; status: BookingItem["status"] } }>
         | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, "Не удалось подтвердить запись"));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, "Не удалось подтвердить запись"));
+      if (!res.ok) throw new Error(getErrorMessage(json, t.booking.confirmFailed));
+      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.confirmFailed));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
       throw e;
@@ -347,25 +348,25 @@ export function ClientBookingsPanel() {
               <div className="mt-1 text-sm text-text-main">
                 {slotLabel} / {b.service.name}
               </div>
-              {masterName ? <div className="mt-1 text-sm text-text-sec">Мастер: {masterName}</div> : null}
-              {studioName ? <div className="mt-1 text-sm text-text-sec">Студия: {studioName}</div> : null}
+              {masterName ? <div className="mt-1 text-sm text-text-sec">{t.booking.masterLabel}: {masterName}</div> : null}
+              {studioName ? <div className="mt-1 text-sm text-text-sec">{t.booking.studioLabel}: {studioName}</div> : null}
               {addressLine ? <div className="mt-1 text-sm text-text-sec">{addressLine}</div> : null}
               {b.comment ? <div className="mt-2 text-sm text-text-sec">{b.comment}</div> : null}
               {waitsMasterDecision ? (
-                <div className="mt-2 text-xs text-text-sec">Ожидает подтверждения мастера</div>
+                <div className="mt-2 text-xs text-text-sec">{t.booking.waitsMaster}</div>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2" data-ignore-drawer>
                 {masterLink ? (
                   <Button asChild type="button" variant="secondary" size="sm">
                     <Link href={masterLink} onClick={(event) => event.stopPropagation()}>
-                      Перейти к мастеру
+                      {t.booking.goToMaster}
                     </Link>
                   </Button>
                 ) : null}
                 {studioLink ? (
                   <Button asChild type="button" variant="secondary" size="sm">
                     <Link href={studioLink} onClick={(event) => event.stopPropagation()}>
-                      Перейти в студию
+                      {t.booking.goToStudio}
                     </Link>
                   </Button>
                 ) : null}
@@ -379,7 +380,7 @@ export function ClientBookingsPanel() {
                   }}
                   className="flex w-full items-center justify-between text-sm font-medium"
                 >
-                  <span>Чат</span>
+                  <span>{t.booking.chatToggle}</span>
                   {chatUnreadMap[b.id] ? (
                     <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[b.id]}</Badge>
                   ) : null}

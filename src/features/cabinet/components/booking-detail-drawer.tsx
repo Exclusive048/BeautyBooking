@@ -28,12 +28,13 @@ interface BookingDetailDrawerProps {
 }
 
 function statusLabel(status: BookingItem["status"]) {
-  if (status === "CHANGE_REQUESTED") return "Ожидает подтверждения другой стороны";
-  if (status === "PENDING") return UI_TEXT.clientCabinet.booking.pending;
-  if (status === "CONFIRMED") return UI_TEXT.clientCabinet.booking.confirmed;
-  if (status === "IN_PROGRESS" || status === "STARTED") return "В процессе";
-  if (status === "FINISHED") return "Завершена";
-  return UI_TEXT.clientCabinet.booking.cancelled;
+  const b = UI_TEXT.clientCabinet.booking;
+  if (status === "CHANGE_REQUESTED") return b.changeRequested;
+  if (status === "PENDING" || status === "NEW") return b.pending;
+  if (status === "CONFIRMED" || status === "PREPAID") return b.confirmed;
+  if (status === "IN_PROGRESS" || status === "STARTED") return b.inProgress;
+  if (status === "FINISHED") return b.finished;
+  return b.cancelled;
 }
 
 function getStatusBadgeClasses(status: BookingItem["status"]): string {
