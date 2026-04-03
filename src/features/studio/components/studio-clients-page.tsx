@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -8,6 +9,7 @@ import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
+import { Button } from "@/components/ui/button";
 import { ClientCardDrawer } from "@/features/crm/components/client-card-drawer";
 import { ModalSurface } from "@/components/ui/modal-surface";
 
@@ -193,17 +195,16 @@ export function StudioClientsPage({ studioId }: Props) {
         />
       ) : null}
 
-      <ModalSurface open={showUpgrade} onClose={() => setShowUpgrade(false)} title="Доступно на тарифе PRO">
+      <ModalSurface open={showUpgrade} onClose={() => setShowUpgrade(false)} title={UI_TEXT.studioCabinet.clients.upgradeTitle}>
         <p className="text-sm text-text-sec">
-          Заметки, теги, фото работ и история визитов доступны с тарифа PRO.
+          {UI_TEXT.studioCabinet.clients.upgradeDescription}
         </p>
         <div className="mt-4 flex justify-end gap-2">
-          <a
-            href="/cabinet/billing?scope=STUDIO"
-            className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm text-[rgb(var(--accent-foreground))]"
-          >
-            Перейти к тарифам
-          </a>
+          <Button asChild>
+            <Link href="/cabinet/billing?scope=STUDIO">
+              {UI_TEXT.studioCabinet.clients.upgradeCta}
+            </Link>
+          </Button>
         </div>
       </ModalSurface>
     </section>

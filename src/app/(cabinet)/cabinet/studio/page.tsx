@@ -1,8 +1,12 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Users, Scissors, Wallet, ExternalLink } from "lucide-react";
 import { DashboardNavCards } from "@/features/studio-cabinet/components/dashboard-nav-cards";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { getStudioDashboardStats } from "@/lib/studio/dashboard.service";
+import { serverApiFetch } from "@/lib/api/server-fetch";
+import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
 function pluralize(value: number, one: string, few: string, many: string): string {
@@ -23,11 +27,20 @@ export default async function StudioCabinetIndexPage() {
   if (!user) redirect("/login");
 
   let studioId: string;
+  let providerId: string;
   try {
-    ({ studioId } = await resolveCurrentStudioAccess(user.id));
+    ({ studioId, providerId } = await resolveCurrentStudioAccess(user.id));
   } catch {
     redirect("/403");
   }
+
+  const providerRes = await serverApiFetch<{
+    provider: { id: string; name: string; publicUsername: string | null } | null;
+  }>(`/api/providers/me?studioId=${encodeURIComponent(studioId)}`);
+  const provider = providerRes.ok ? providerRes.data.provider : null;
+  const publicHref = provider?.publicUsername
+    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-dashboard")
+    : null;
 
   let stats: Awaited<ReturnType<typeof getStudioDashboardStats>> | null = null;
   try {
@@ -35,6 +48,8 @@ export default async function StudioCabinetIndexPage() {
   } catch {
     stats = null;
   }
+
+  void providerId;
 
   const items = stats
     ? [
@@ -120,6 +135,8 @@ export default async function StudioCabinetIndexPage() {
         },
       ];
 
+  const qa = UI_TEXT.studioCabinet.dashboard.quickActions;
+
   return (
     <section className="space-y-6">
       <div>
@@ -128,6 +145,53 @@ export default async function StudioCabinetIndexPage() {
       </div>
 
       <DashboardNavCards items={items} />
+
+      {/* Quick Actions */}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-text-sec">{qa.title}</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Link
+            href="/cabinet/studio/team"
+            className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-4 text-center text-sm font-medium text-text-main transition hover:bg-bg-input hover:shadow-card"
+          >
+            <Users className="h-5 w-5 text-primary" aria-hidden />
+            {qa.inviteMaster}
+          </Link>
+          <Link
+            href="/cabinet/studio/settings?tab=services"
+            className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-4 text-center text-sm font-medium text-text-main transition hover:bg-bg-input hover:shadow-card"
+          >
+            <Scissors className="h-5 w-5 text-primary" aria-hidden />
+            {qa.addService}
+          </Link>
+          <Link
+            href="/cabinet/studio/finance"
+            className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-4 text-center text-sm font-medium text-text-main transition hover:bg-bg-input hover:shadow-card"
+          >
+            <Wallet className="h-5 w-5 text-primary" aria-hidden />
+            {qa.viewFinance}
+          </Link>
+          {publicHref ? (
+            <Link
+              href={publicHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-4 text-center text-sm font-medium text-text-main transition hover:bg-bg-input hover:shadow-card"
+            >
+              <ExternalLink className="h-5 w-5 text-primary" aria-hidden />
+              {qa.shareStudio}
+            </Link>
+          ) : (
+            <Link
+              href="/cabinet/studio/settings?tab=main"
+              className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-4 text-center text-sm font-medium text-text-main transition hover:bg-bg-input hover:shadow-card"
+            >
+              <ExternalLink className="h-5 w-5 text-text-sec" aria-hidden />
+              {qa.shareStudio}
+            </Link>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

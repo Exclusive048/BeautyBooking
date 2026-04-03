@@ -4,6 +4,8 @@ import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
+import { StudioSidebar } from "@/features/studio-cabinet/components/studio-sidebar";
+import { StudioBottomNav } from "@/features/studio-cabinet/components/studio-bottom-nav";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -39,9 +41,28 @@ export default async function StudioCabinetLayout({
     : UI_TEXT.studioCabinet.layout.publicUsernameHint;
 
   return (
-    <div className="min-h-dvh bg-bg-page">
-      <StudioNavbar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
-      <div className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6">{children}</div>
+    <div className="flex min-h-screen bg-bg-base">
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block lg:shrink-0">
+        <div className="sticky top-0 h-screen overflow-y-auto">
+          <StudioSidebar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
+        </div>
+      </div>
+
+      {/* Main content column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile topbar */}
+        <div className="lg:hidden">
+          <StudioNavbar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
+        </div>
+
+        <main className="min-w-0 flex-1 p-4 pb-24 lg:p-6 lg:pb-6">
+          {children}
+        </main>
+      </div>
+
+      {/* Mobile bottom nav */}
+      <StudioBottomNav />
     </div>
   );
 }

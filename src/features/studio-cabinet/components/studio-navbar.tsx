@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -111,7 +112,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
             aria-expanded={adminOpen}
             onClick={() => setAdminOpen((current) => !current)}
           >
-            {"\u2699\ufe0f"}
+              <Settings className="h-4 w-4" aria-hidden />
           </Button>
           {adminOpen ? (
             <div className="absolute right-0 top-[calc(100%+8px)] z-30 min-w-[180px] rounded-2xl border border-border-subtle bg-bg-card/95 p-2 shadow-card backdrop-blur">

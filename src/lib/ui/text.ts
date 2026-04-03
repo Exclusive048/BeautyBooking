@@ -2136,6 +2136,13 @@ export const UI_TEXT = {
       title: "Главная",
       subtitle: "Ключевые показатели студии на сегодня.",
       emptyHint: "Данные появятся после первых записей",
+      quickActions: {
+        title: "Быстрые действия",
+        inviteMaster: "Пригласить мастера",
+        addService: "Добавить услугу",
+        viewFinance: "Посмотреть финансы",
+        shareStudio: "Страница студии",
+      },
       cards: {
         bookingsToday: "Записи сегодня",
         mastersOnShift: "Мастера в смене",
@@ -2182,6 +2189,13 @@ export const UI_TEXT = {
       timeNotSet: "Время не указано",
       loadFailed: "Не удалось загрузить календарь",
       apiErrorPrefix: "Ошибка API",
+      masterScheduleTitle: "График мастеров студии",
+      masterScheduleDescription: "Выберите мастера и настройте его личный график.",
+      masterPublished: "Профиль опубликован",
+      masterHidden: "Профиль скрыт",
+      draftNote: "Черновик изменений хранится отдельно для каждого мастера, пока вы не нажмёте сохранение в его графике.",
+      scheduleOf: "Расписание мастера:",
+      editing: "Редактируете:",
       weekdays: {
         mon: "Пн",
         tue: "Вт",
@@ -2350,6 +2364,7 @@ export const UI_TEXT = {
       apiErrorPrefix: "Ошибка API",
     },
     reviews: {
+      subtitle: "Новые и неотвеченные отзывы клиентов студии.",
       loadFailed: "Не удалось загрузить отзывы.",
       total: "Всего",
       new: "Новые",
@@ -2363,9 +2378,12 @@ export const UI_TEXT = {
     clients: {
       loading: "Загрузка клиентов...",
       empty: "Клиентов пока нет — список формируется автоматически из записей.",
-        loadFailed: "Не удалось загрузить клиентов",
-        apiErrorPrefix: "Ошибка API",
-        moneySuffix: "₽",
+      loadFailed: "Не удалось загрузить клиентов",
+      apiErrorPrefix: "Ошибка API",
+      moneySuffix: "₽",
+      upgradeTitle: "Доступно на тарифе PRO",
+      upgradeDescription: "Заметки, теги, фото работ и история визитов доступны с тарифа PRO.",
+      upgradeCta: "Перейти к тарифам",
       columns: {
         client: "Клиент",
         phone: "Телефон",

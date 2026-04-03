@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Clock, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -39,8 +40,12 @@ export function TeamMemberCard({
             >
               {statusLabel}
             </div>
-            <div className="mt-2 text-xs text-text-sec">🕒 {shift}</div>
-            <div className="mt-1 text-xs text-text-sec">📅 {bookingsInfo}</div>
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-text-sec">
+              <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden /> {shift}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-text-sec">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden /> {bookingsInfo}
+            </div>
           </div>
         </div>
         <Button asChild variant="secondary" className="self-start md:self-center">

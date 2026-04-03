@@ -378,7 +378,7 @@ export function StudioCalendarPage({ studioId }: Props) {
           {!loading && data.masters.length === 0 ? (
             <div className="lux-card rounded-[24px] p-5">
               <h3 className="text-base font-semibold">{t.noMasters}</h3>
-              <p className="mt-1 text-sm text-text-sec">Выберите мастера и настройте его личный график.</p>
+              <p className="mt-1 text-sm text-text-sec">{t.masterScheduleDescription}</p>
               <Link
                 href="/cabinet/studio/team"
                 className="mt-3 inline-flex rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-sm hover:bg-bg-card"
@@ -393,12 +393,12 @@ export function StudioCalendarPage({ studioId }: Props) {
               <section className="lux-card rounded-[24px] p-4">
                 <header className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="text-base font-semibold text-text-main">График мастеров студии</h3>
-                    <p className="mt-1 text-sm text-text-sec">Выберите мастера и настройте его личный график.</p>
+                    <h3 className="text-base font-semibold text-text-main">{t.masterScheduleTitle}</h3>
+                    <p className="mt-1 text-sm text-text-sec">{t.masterScheduleDescription}</p>
                   </div>
                   {activeScheduleMaster ? (
                     <div className="text-xs text-text-sec">
-                      Редактируете: <span className="font-medium text-text-main">{activeScheduleMaster.name}</span>
+                      {t.editing} <span className="font-medium text-text-main">{activeScheduleMaster.name}</span>
                     </div>
                   ) : null}
                 </header>
@@ -429,8 +429,8 @@ export function StudioCalendarPage({ studioId }: Props) {
                             )}
                           </div>
                           <div className="truncate text-sm font-medium text-text-main">{master.name}</div>
-                          <div className={`mt-1 text-[11px] ${master.isActive ? "Профиль опубликован" : "Профиль скрыт"}`}>
-                            {master.isActive ? "Профиль опубликован" : "Профиль скрыт"}
+                          <div className={`mt-1 text-[11px] ${master.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-text-sec"}`}>
+                            {master.isActive ? t.masterPublished : t.masterHidden}
                           </div>
                         </Button>
                       );
@@ -438,9 +438,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                   </div>
                 </div>
 
-                <p className="mt-3 text-xs text-text-sec">
-                  Черновик изменений хранится отдельно для каждого мастера, пока вы не нажмёте сохранение в его графике.
-                </p>
+                <p className="mt-3 text-xs text-text-sec">{t.draftNote}</p>
               </section>
 
               <section className="space-y-3">
@@ -452,7 +450,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                   return (
                     <div key={master.id} className={isActive ? "block" : "hidden"}>
                       <div className="rounded-2xl border border-border-subtle bg-bg-input/50 px-3 py-2 text-sm text-text-sec">
-                        Расписание мастера: <span className="font-medium text-text-main">{master.name}</span>
+                        {t.scheduleOf} <span className="font-medium text-text-main">{master.name}</span>
                       </div>
                       <div className="mt-3">
                         <MasterScheduleEditor apiPath={buildMasterScheduleApiPath(studioId, master.id)} />
