@@ -21,7 +21,8 @@
     "db:reset:dev": "npx prisma migrate reset --force && npm run redis:flush:dev",
     "redis:flush:dev": "node scripts/dev-redis-flush.mjs",
     "worker:build": "npx tsc --noEmit",
-    "worker": "npx --yes tsx src/worker.ts"
+    "worker": "npx --yes tsx src/worker.ts",
+    "seed:sql": "bash prisma/seed.sh"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs",
