@@ -6,6 +6,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { UI_TEXT } from "@/lib/ui/text";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { ClientCardDrawer } from "@/features/crm/components/client-card-drawer";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -46,16 +47,8 @@ function formatMoney(value: number): string {
 
 function formatDaysAgo(value: number | null): string {
   if (value === null) return "—";
-  if (value === 0) return "Сегодня";
-  const mod10 = value % 10;
-  const mod100 = value % 100;
-  const suffix =
-    mod10 === 1 && mod100 !== 11
-      ? "день"
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-        ? "дня"
-        : "дней";
-  return `${value} ${suffix} назад`;
+  if (value === 0) return UI_TEXT.master.clients.today;
+  return UI_TEXT.master.clients.daysAgo(value);
 }
 
 export function MasterClientsPage() {
@@ -90,7 +83,7 @@ export function MasterClientsPage() {
         }
         setData(json.data ?? null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось загрузить клиентов");
+        setError(err instanceof Error ? err.message : UI_TEXT.master.clients.loadFailed);
       } finally {
         setLoading(false);
       }
@@ -100,7 +93,7 @@ export function MasterClientsPage() {
   }, [reloadTick, sort]);
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка клиентов...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{UI_TEXT.master.clients.loading}</div>;
   }
 
   return (

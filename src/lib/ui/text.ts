@@ -995,6 +995,7 @@ export const UI_TEXT = {
       brand: "МастерРядом",
       nav: {
         home: "Главная",
+        bookings: "Записи",
         schedule: "Расписание",
         clients: "Клиенты",
         reviews: "Отзывы",
@@ -1002,7 +1003,28 @@ export const UI_TEXT = {
         billing: "Тариф",
         models: "Модели",
         profile: "Профиль",
+        more: "Ещё",
+        myPage: "Моя страница",
       },
+    },
+    sidebar: {
+      myPage: "Моя страница →",
+      ratingLabel: "Рейтинг",
+      noRating: "Нет оценок",
+    },
+    clients: {
+      title: "Клиенты",
+      subtitle: "База клиентов по вашим записям",
+      loading: "Загрузка клиентов...",
+      loadFailed: "Не удалось загрузить клиентов",
+      daysAgo: (n: number) => {
+        const mod10 = n % 10;
+        const mod100 = n % 100;
+        const suffix =
+          mod10 === 1 && mod100 !== 11 ? "день" : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "дня" : "дней";
+        return `${n} ${suffix} назад`;
+      },
+      today: "Сегодня",
     },
     advisor: {
       title: "Советы для роста",
@@ -1478,10 +1500,6 @@ export const UI_TEXT = {
         replaceAvatarAria: "Заменить аватар",
         removeAvatarAria: "Удалить аватар",
       },
-    },
-    clients: {
-      title: "Клиенты",
-      subtitle: "База клиентов по вашим записям",
     },
     reviews: {
       title: "Отзывы",

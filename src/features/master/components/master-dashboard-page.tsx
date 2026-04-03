@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -650,8 +652,8 @@ export function MasterDashboardPage() {
     <div className="space-y-4">
       <div className="lux-card rounded-[24px] p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setDate((d) => dateShift(d, -1))} variant="secondary" size="sm">
-            &lt;
+          <Button onClick={() => setDate((d) => dateShift(d, -1))} variant="secondary" size="sm" aria-label="Предыдущий день">
+            <ChevronLeft className="h-4 w-4" aria-hidden />
           </Button>
           <Input
             type="date"
@@ -659,8 +661,8 @@ export function MasterDashboardPage() {
             onChange={(event) => setDate(event.target.value)}
             className="w-auto rounded-lg px-3 py-2 text-sm"
           />
-          <Button onClick={() => setDate((d) => dateShift(d, 1))} variant="secondary" size="sm">
-            &gt;
+          <Button onClick={() => setDate((d) => dateShift(d, 1))} variant="secondary" size="sm" aria-label="Следующий день">
+            <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
           <Button
             onClick={() => void load()}
@@ -709,9 +711,9 @@ export function MasterDashboardPage() {
               {data.workingHours.isDayOff ? (
                 <div className="flex items-center justify-between gap-2">
                   <span>{UI_TEXT.master.dashboard.labels.todayOff}</span>
-                  <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
+                  <Link href="/cabinet/master/schedule" className="text-xs text-primary underline">
                     {UI_TEXT.master.dashboard.labels.change}
-                  </a>
+                  </Link>
                 </div>
               ) : data.workingHours.startLocal && data.workingHours.endLocal ? (
                 <div className="flex items-center justify-between gap-2">
@@ -722,16 +724,16 @@ export function MasterDashboardPage() {
                       .replace("{buffer}", String(data.workingHours.bufferBetweenBookingsMin))
                       .replace("{minutes}", UI_TEXT.common.minutesShort)}
                   </span>
-                  <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
+                  <Link href="/cabinet/master/schedule" className="text-xs text-primary underline">
                     {UI_TEXT.master.dashboard.labels.change}
-                  </a>
+                  </Link>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-2">
                   <span>{UI_TEXT.master.dashboard.labels.workingHoursNotSet}</span>
-                  <a href="/cabinet/master/schedule" className="text-xs text-primary underline">
+                  <Link href="/cabinet/master/schedule" className="text-xs text-primary underline">
                     {UI_TEXT.master.dashboard.labels.setup}
-                  </a>
+                  </Link>
                 </div>
               )}
             </div>
