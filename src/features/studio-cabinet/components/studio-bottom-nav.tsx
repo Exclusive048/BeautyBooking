@@ -25,7 +25,7 @@ const MORE_PATHS = [
   "/cabinet/studio/finance",
   "/cabinet/studio/analytics",
   "/cabinet/studio/settings",
-  "/cabinet/billing",
+  "/cabinet/studio/billing",
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean): boolean {

@@ -46,19 +46,15 @@ export default async function StudioTeamRoute({ searchParams }: Props) {
       {filter === "working_today" ? (
         workingMasters.length > 0 ? (
           <div className="grid gap-4">
-            {workingMasters.map((master, index) => (
+            {workingMasters.map((master) => (
               <TeamMemberCard
                 key={master.id}
                 name={master.name}
                 specialty={master.title}
                 statusLabel={UI_TEXT.studioCabinet.teamPage.statusFree}
                 statusTone="free"
-                shift={UI_TEXT.studioCabinet.teamPage.shiftTemplate
-                  .replace("{start}", "10:00")
-                  .replace("{end}", "19:00")}
-                bookingsInfo={UI_TEXT.studioCabinet.teamPage.bookingsInfoTemplate
-                  .replace("{count}", String(2 + index))
-                  .replace("{time}", "15:30")}
+                shift="—"
+                bookingsInfo="—"
                 actionHref={`/cabinet/studio/calendar?masterId=${master.id}&view=day&date=today`}
               />
             ))}

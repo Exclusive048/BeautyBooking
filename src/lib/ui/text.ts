@@ -2102,7 +2102,8 @@ export const UI_TEXT = {
     teamPage: {
       title: "Команда студии",
       subtitle: "Управляйте мастерами и расписанием смен.",
-      statusFree: "🟢 Свободен",
+      statusFree: "Свободен",
+      statusBusy: "Занят",
       shiftTemplate: "Смена {start}–{end}",
       bookingsInfoTemplate: "Записей: {count} • Следующее окно {time}",
       emptyActiveShifts: "Сегодня нет активных смен.",
@@ -2127,10 +2128,13 @@ export const UI_TEXT = {
       calendar: "Календарь",
       team: "Команда",
       clients: "Клиенты",
+      reviews: "Отзывы",
+      services: "Услуги",
       analytics: "Аналитика",
       finance: "Финансы",
       billing: "Тарифы",
       settingsAria: "Настройки",
+      myPage: "Страница студии",
     },
     dashboard: {
       title: "Главная",

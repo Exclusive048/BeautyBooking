@@ -43,7 +43,7 @@ export default async function StudioCabinetLayout({
   return (
     <div className="flex min-h-screen bg-bg-base">
       {/* Desktop sidebar */}
-      <div className="hidden lg:block lg:shrink-0">
+      <div className="hidden lg:block lg:shrink-0 border-r border-border-subtle">
         <div className="sticky top-0 h-screen overflow-y-auto">
           <StudioSidebar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
         </div>
@@ -56,8 +56,10 @@ export default async function StudioCabinetLayout({
           <StudioNavbar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
         </div>
 
-        <main className="min-w-0 flex-1 p-4 pb-24 lg:p-6 lg:pb-6">
-          {children}
+        <main className="min-w-0 flex-1 p-4 pb-24 lg:p-8 lg:pb-8">
+          <div className="mx-auto w-full max-w-6xl">
+            {children}
+          </div>
         </main>
       </div>
 

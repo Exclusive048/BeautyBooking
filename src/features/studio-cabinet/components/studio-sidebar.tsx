@@ -11,6 +11,7 @@ import {
   Wallet,
   BarChart3,
   Settings,
+  Scissors,
   ExternalLink,
   ChevronDown,
   type LucideIcon,
@@ -50,7 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/cabinet/studio/reviews",
-    label: UI_TEXT.studioCabinet.dashboard.cards.reviews,
+    label: UI_TEXT.studioCabinet.nav.reviews,
     icon: Star,
   },
   {
@@ -62,6 +63,11 @@ const NAV_ITEMS: NavItem[] = [
     href: "/cabinet/studio/analytics",
     label: UI_TEXT.studioCabinet.nav.analytics,
     icon: BarChart3,
+  },
+  {
+    href: "/cabinet/studio/settings?tab=services",
+    label: UI_TEXT.studioCabinet.nav.services,
+    icon: Scissors,
   },
   {
     href: "/cabinet/studio/settings",
@@ -101,7 +107,7 @@ export function StudioSidebar({ studioName, publicHref, publicHint }: Props) {
   const tab = searchParams.get("tab");
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-border-subtle bg-bg-card">
+    <aside className="flex w-64 flex-col bg-bg-card">
       {/* Logo */}
       <div className="shrink-0 border-b border-border-subtle px-5 py-4">
         <Link href="/" className="text-base font-bold text-text-main transition hover:text-primary">
@@ -125,7 +131,7 @@ export function StudioSidebar({ studioName, publicHref, publicHint }: Props) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Навигация студии">
+      <nav className="px-3 py-2" aria-label="Навигация студии">
         <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
             const active = isItemActive(pathname, tab, item);
@@ -197,10 +203,10 @@ export function StudioSidebar({ studioName, publicHref, publicHint }: Props) {
           <li className="pt-2">
             <div className="mb-2 border-t border-border-subtle" />
             <Link
-              href="/cabinet/billing?scope=STUDIO"
+              href="/cabinet/studio/billing"
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                pathname === "/cabinet/billing"
+                pathname === "/cabinet/studio/billing"
                   ? "bg-primary/10 text-primary"
                   : "text-text-sec hover:bg-bg-input hover:text-text-main"
               )}
@@ -213,7 +219,7 @@ export function StudioSidebar({ studioName, publicHref, publicHint }: Props) {
       </nav>
 
       {/* Public page link */}
-      <div className="shrink-0 border-t border-border-subtle p-3">
+      <div className="mt-6 px-3 pb-3">
         <Link
           href={publicHref}
           target={publicHint ? undefined : "_blank"}
@@ -221,7 +227,7 @@ export function StudioSidebar({ studioName, publicHref, publicHint }: Props) {
           className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-sec transition hover:bg-bg-input hover:text-text-main"
         >
           <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-          {studioName}
+          {UI_TEXT.studioCabinet.nav.myPage}
         </Link>
       </div>
     </aside>
