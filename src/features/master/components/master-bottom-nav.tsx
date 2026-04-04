@@ -27,7 +27,7 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
 }
 
 function isMoreActive(pathname: string): boolean {
-  const morePaths = ["/cabinet/master/reviews", "/cabinet/master/model-offers", "/cabinet/master/analytics", "/cabinet/master/profile", "/cabinet/billing"];
+  const morePaths = ["/cabinet/master/reviews", "/cabinet/master/model-offers", "/cabinet/master/analytics", "/cabinet/master/profile", "/cabinet/master/billing"];
   return morePaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

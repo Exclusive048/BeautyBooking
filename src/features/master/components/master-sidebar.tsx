@@ -39,7 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/cabinet/master/model-offers", label: UI_TEXT.master.topbar.nav.models, icon: Sparkles },
   { href: "/cabinet/master/analytics", label: UI_TEXT.master.topbar.nav.analytics, icon: BarChart3 },
   { href: "/cabinet/master/profile", label: UI_TEXT.master.topbar.nav.profile, icon: User },
-  { href: "/cabinet/billing?scope=MASTER", label: UI_TEXT.master.topbar.nav.billing, icon: CreditCard },
+  { href: "/cabinet/master/billing", label: UI_TEXT.master.topbar.nav.billing, icon: CreditCard },
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean): boolean {
@@ -53,7 +53,7 @@ export function MasterSidebar({ ratingLabel, publicUsername }: Props) {
   const t = UI_TEXT.master;
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-border-subtle bg-bg-card">
+    <aside className="flex w-64 flex-col bg-bg-card">
       {/* Logo */}
       <div className="shrink-0 border-b border-border-subtle px-5 py-4">
         <Link href="/" className="text-base font-bold text-text-main transition hover:text-primary">
@@ -70,7 +70,7 @@ export function MasterSidebar({ ratingLabel, publicUsername }: Props) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Навигация кабинета">
+      <nav className="px-3 py-2" aria-label="Навигация кабинета">
         <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
             const active = isActive(pathname, item.href, item.exact);
@@ -103,7 +103,7 @@ export function MasterSidebar({ ratingLabel, publicUsername }: Props) {
 
       {/* My page link */}
       {publicUsername ? (
-        <div className="shrink-0 border-t border-border-subtle p-3">
+        <div className="mt-6 px-3 pb-3">
           <Link
             href={`/u/${publicUsername}`}
             target="_blank"
