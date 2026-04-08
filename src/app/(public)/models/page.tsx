@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listModelOfferFilters, listPublicModelOffers } from "@/lib/model-offers/public.service";
-import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ModelsHero } from "@/features/model-offers/components/models-hero";
+import { ModelsFilterChips } from "@/features/model-offers/components/models-filter-chips";
+import { ModelOfferCard } from "@/features/model-offers/components/model-offer-card";
+import { ModelsEmptyState } from "@/features/model-offers/components/models-empty-state";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -37,7 +39,7 @@ function buildPageHref(input: {
   if (input.city) params.set("city", input.city);
   if (input.page > 1) params.set("page", String(input.page));
   const query = params.toString();
-  return query ? `?${query}` : "";
+  return query ? `/models?${query}` : "/models";
 }
 
 export default async function ModelsPage({ searchParams }: PageProps) {
@@ -52,128 +54,89 @@ export default async function ModelsPage({ searchParams }: PageProps) {
     listPublicModelOffers({ categoryId, city, page, limit }),
   ]);
 
+  const isFiltered = Boolean(categoryId || city);
+
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10">
-      <header className="mb-8 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-sec">{UI_TEXT.pages.models.brand}</p>
-        <h1 className="text-3xl font-semibold text-text-main sm:text-4xl">{UI_TEXT.pages.models.heading}</h1>
-        <p className="max-w-2xl text-sm text-text-sec">{UI_TEXT.pages.models.lead}</p>
-      </header>
+    <div className="min-h-dvh bg-background">
+      {/* Hero */}
+      <ModelsHero />
 
-      <form className="mb-8 grid gap-3 rounded-3xl border border-border-subtle/80 bg-bg-card/70 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-text-sec">
-          {UI_TEXT.pages.models.cityLabel}
-          <Input
-            name="city"
-            list="model-offer-city-options"
-            defaultValue={city ?? ""}
-            placeholder={UI_TEXT.pages.models.cityPlaceholder}
-            className="mt-2"
-          />
-          <datalist id="model-offer-city-options">
-            {citySuggestions.map((cityOption) => (
-              <option key={cityOption} value={cityOption} />
-            ))}
-          </datalist>
-        </label>
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16">
+        {/* City search form */}
+        <form
+          method="get"
+          action="/models"
+          className="mb-6 flex items-end gap-3 rounded-2xl border border-border bg-card/80 p-4"
+        >
+          <label className="flex-1 text-xs font-medium text-muted-foreground">
+            <span className="mb-1.5 block">{UI_TEXT.pages.models.cityLabel}</span>
+            <Input
+              name="city"
+              list="model-offer-city-options"
+              defaultValue={city ?? ""}
+              placeholder={UI_TEXT.pages.models.cityPlaceholder}
+            />
+            <datalist id="model-offer-city-options">
+              {citySuggestions.map((cityOption) => (
+                <option key={cityOption} value={cityOption} />
+              ))}
+            </datalist>
+          </label>
+          {/* Preserve categoryId on city submit */}
+          {categoryId ? (
+            <input type="hidden" name="categoryId" value={categoryId} />
+          ) : null}
+          <Button type="submit" variant="primary" className="shrink-0">
+            {UI_TEXT.pages.models.submit}
+          </Button>
+        </form>
 
-        <label className="block text-xs font-semibold uppercase tracking-wide text-text-sec">
-          {UI_TEXT.pages.models.categoryLabel}
-          <Select
-            name="categoryId"
-            defaultValue={categoryId ?? ""}
-            className="mt-2"
-          >
-            <option value="">{UI_TEXT.pages.models.categoryAll}</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </Select>
-        </label>
-
-        <Button type="submit" variant="primary">
-          {UI_TEXT.pages.models.submit}
-        </Button>
-      </form>
-
-      {offers.items.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-border-subtle/80 bg-bg-card/50 p-10 text-center text-sm text-text-sec">
-          {UI_TEXT.pages.models.empty}
-        </div>
-      ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {offers.items.map((offer) => (
-            <Link
-              key={offer.id}
-              href={`/models/${offer.id}`}
-              className="group flex h-full flex-col rounded-3xl border border-border-subtle/80 bg-bg-card/80 p-5 transition hover:border-primary/40 hover:shadow-card"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 overflow-hidden rounded-2xl border border-border-subtle/80 bg-bg-input">
-                  {offer.master.avatarUrl ? (
-                    <FocalImage
-                      src={offer.master.avatarUrl}
-                      alt=""
-                      focalX={offer.master.avatarFocalX}
-                      focalY={offer.master.avatarFocalY}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
-                      {offer.master.name.slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-text-main">{offer.master.name}</div>
-                  <div className="text-xs text-text-sec">
-                    {offer.master.city ?? UI_TEXT.pages.models.cityFallback} • {offer.master.ratingAvg.toFixed(1)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 text-xs text-text-sec">
-                {offer.service.category?.title ?? UI_TEXT.pages.models.categoryFallback}
-              </div>
-              <div className="mt-2 text-lg font-semibold text-text-main">{offer.service.title}</div>
-              {offer.service.description ? (
-                <p className="mt-2 line-clamp-2 text-sm text-text-sec">{offer.service.description}</p>
-              ) : null}
-
-              <div className="mt-4 text-sm text-text-main">
-                {offer.dateLocal} • {offer.timeRangeStartLocal}-{offer.timeRangeEndLocal}
-              </div>
-              <div className="mt-1 text-sm text-text-sec">
-                {offer.price !== null ? `${offer.price} ${UI_TEXT.common.currencyRub}` : UI_TEXT.pages.models.priceFree} •{" "}
-                {offer.service.durationMin} {UI_TEXT.common.minutesShort}
-              </div>
-
-              <div className="mt-auto pt-5 text-sm font-semibold text-primary">{UI_TEXT.pages.models.applyAction}</div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-10 flex items-center justify-center gap-3">
-        {page > 1 ? (
-          <Link
-            href={buildPageHref({ page: page - 1, categoryId, city })}
-            className="rounded-2xl border border-border-subtle/80 bg-bg-card px-4 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
-          >
-            {UI_TEXT.pages.models.paginationPrev}
-          </Link>
+        {/* Category filter chips */}
+        {categories.length > 0 ? (
+          <div className="mb-8">
+            <ModelsFilterChips
+              categories={categories}
+              activeCategoryId={categoryId}
+              city={city}
+            />
+          </div>
         ) : null}
-        {offers.nextPage ? (
-          <Link
-            href={buildPageHref({ page: offers.nextPage, categoryId, city })}
-            className="rounded-2xl border border-border-subtle/80 bg-bg-card px-4 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
-          >
-            {UI_TEXT.pages.models.paginationNext}
-          </Link>
-        ) : null}
+
+        {/* Offer grid */}
+        {offers.items.length === 0 ? (
+          <ModelsEmptyState isFiltered={isFiltered} />
+        ) : (
+          <>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {offers.items.map((offer, i) => (
+                <ModelOfferCard key={offer.id} offer={offer} index={i} />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {(page > 1 || offers.nextPage) ? (
+              <div className="mt-10 flex items-center justify-center gap-3">
+                {page > 1 ? (
+                  <Link
+                    href={buildPageHref({ page: page - 1, categoryId, city })}
+                    className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                  >
+                    {UI_TEXT.pages.models.paginationPrev}
+                  </Link>
+                ) : null}
+                {offers.nextPage ? (
+                  <Link
+                    href={buildPageHref({ page: offers.nextPage, categoryId, city })}
+                    className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                  >
+                    {UI_TEXT.pages.models.paginationNext}
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
-    </section>
+    </div>
   );
 }
