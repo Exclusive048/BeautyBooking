@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MembershipStatus, StudioRole } from "@prisma/client";
+import { Scissors, Building2 } from "lucide-react";
 import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
 import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -26,11 +27,11 @@ type WorkspaceLink = {
   fallbackIcon: string;
 };
 
-function WorkspaceShortcutLink({ item }: { item: WorkspaceLink }) {
+function WorkspaceShortcutLink({ item, isStudio }: { item: WorkspaceLink; isStudio?: boolean }) {
   return (
-    <Button asChild variant="secondary" size="icon" className="h-11 w-11 rounded-full">
+    <Button asChild variant="secondary" size="icon" className="h-10 w-10 rounded-full p-0">
       <Link href={item.href} aria-label={item.ariaLabel} title={item.label}>
-        <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border-subtle/80 bg-bg-card text-sm">
+        <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border-subtle/80 bg-bg-card text-text-sec">
           {item.avatarUrl ? (
             <FocalImage
               src={item.avatarUrl}
@@ -39,8 +40,10 @@ function WorkspaceShortcutLink({ item }: { item: WorkspaceLink }) {
               focalY={item.avatarFocalY}
               className="h-full w-full object-cover"
             />
+          ) : isStudio ? (
+            <Building2 className="h-4 w-4" aria-hidden />
           ) : (
-            <span aria-hidden>{item.fallbackIcon}</span>
+            <Scissors className="h-4 w-4" aria-hidden />
           )}
         </span>
       </Link>
@@ -99,7 +102,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           avatarUrl: masterProfile?.provider.avatarUrl ?? null,
           avatarFocalX: masterProfile?.provider.avatarFocalX ?? null,
           avatarFocalY: masterProfile?.provider.avatarFocalY ?? null,
-          fallbackIcon: "✂️",
+          fallbackIcon: UI_TEXT.nav.masterWorkspaceFallback,
         }
       : null,
     studio: hasStudio
@@ -110,11 +113,18 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           avatarUrl: studioProvider?.avatarUrl ?? null,
           avatarFocalX: studioProvider?.avatarFocalX ?? null,
           avatarFocalY: studioProvider?.avatarFocalY ?? null,
-          fallbackIcon: "🏢",
+          fallbackIcon: UI_TEXT.nav.studioWorkspaceFallback,
         }
       : null,
   };
 }
+
+const NAV_LINKS = [
+  { href: "/catalog", label: UI_TEXT.nav.catalog },
+  { href: "/hot", label: UI_TEXT.nav.hotSlots },
+  { href: "/models", label: UI_TEXT.nav.forModels },
+  { href: "/cabinet/bookings", label: UI_TEXT.nav.myBookings },
+];
 
 export async function Topbar() {
   const user = await getSessionUser();
@@ -136,47 +146,66 @@ export async function Topbar() {
 
   return (
     <header className="sticky top-0 z-30">
-      <div className="mx-auto mt-3 flex h-[var(--topbar-h)] w-full max-w-6xl min-w-0 items-center justify-between rounded-[26px] border border-border-subtle/80 bg-bg-card/75 px-4 shadow-card backdrop-blur">
-        <Link href="/" className="flex min-w-0 items-center gap-3">
+      <div className="mx-auto mt-3 flex h-[var(--topbar-h)] w-full max-w-6xl min-w-0 items-center justify-between rounded-[26px] border border-border-subtle/80 bg-bg-card/80 px-4 shadow-card backdrop-blur-md">
+        {/* Logo */}
+        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
           {siteLogo?.url ? (
             <FocalImage
               src={siteLogo.url}
               alt={UI_TEXT.nav.siteLogoAlt}
               focalX={siteLogo.focalX}
               focalY={siteLogo.focalY}
-              className="h-10 w-10 rounded-2xl object-cover"
+              className="h-9 w-9 rounded-xl object-cover"
             />
           ) : (
-            <div className="h-10 w-10 rounded-2xl bg-primary/35" />
+            <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500" />
           )}
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold text-text-main">{UI_TEXT.brand.name}</div>
+            <div className="truncate text-sm font-bold bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
+              {UI_TEXT.brand.name}
+            </div>
             <div className="hidden xs:block truncate text-xs text-text-sec">{UI_TEXT.nav.bookingToMasters}</div>
           </div>
         </Link>
 
-        <nav className="flex items-center gap-2 flex-shrink-0">
-          <Button asChild variant="secondary" className="hidden sm:inline-flex">
-            <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
-          </Button>
-          <Button asChild variant="secondary" className="hidden sm:inline-flex">
-            <Link href="/models">{UI_TEXT.nav.forModels}</Link>
-          </Button>
-          <Button asChild variant="secondary" className="hidden sm:inline-flex">
-            <Link href="/cabinet/bookings">{UI_TEXT.nav.myBookings}</Link>
-          </Button>
+        {/* Center nav (desktop) */}
+        <nav className="hidden lg:flex items-center gap-1" aria-label="Основная навигация">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-xl px-3 py-1.5 text-sm text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Right side */}
+        <nav className="flex items-center gap-2 shrink-0">
+          {/* Compact nav for medium screens */}
+          <div className="hidden sm:flex lg:hidden items-center gap-1.5">
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
+            </Button>
+            <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
+              <Link href="/hot">{UI_TEXT.nav.hotSlots}</Link>
+            </Button>
+          </div>
 
           {user ? (
             <>
               <NotificationsBell ariaLabel={UI_TEXT.nav.notifications} />
               <ThemeToggle />
-
               <div className="hidden items-center gap-2 md:flex">
-                {workspaceLinks.master ? <WorkspaceShortcutLink item={workspaceLinks.master} /> : null}
-                {workspaceLinks.studio ? <WorkspaceShortcutLink item={workspaceLinks.studio} /> : null}
+                {workspaceLinks.master ? (
+                  <WorkspaceShortcutLink item={workspaceLinks.master} />
+                ) : null}
+                {workspaceLinks.studio ? (
+                  <WorkspaceShortcutLink item={workspaceLinks.studio} isStudio />
+                ) : null}
                 <AuthUserMenu userLabel={userLabel} showAdminLink={showAdminLink} />
               </div>
-
               <AuthMobileMenu
                 userLabel={userLabel}
                 showAdminLink={showAdminLink}
@@ -188,6 +217,13 @@ export async function Topbar() {
             <>
               <ThemeToggle />
               <TopbarAuthButton />
+              <AuthMobileMenu
+                userLabel={UI_TEXT.auth.menu}
+                showAdminLink={false}
+                masterWorkspace={null}
+                studioWorkspace={null}
+                isGuest
+              />
             </>
           )}
         </nav>
@@ -195,4 +231,3 @@ export async function Topbar() {
     </header>
   );
 }
-

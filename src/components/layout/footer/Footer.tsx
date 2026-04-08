@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import Link from "next/link";
 import { FooterCTA } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
@@ -65,24 +66,30 @@ export function Footer() {
   return (
     <footer
       role="contentinfo"
-      className="bg-bg-page text-text-main"
+      className="border-t border-border-subtle/60 bg-bg-card/50 text-text-main"
       itemScope
       itemType="https://schema.org/WPFooter"
     >
-      <div className="mx-auto max-w-[1280px] space-y-8 px-4 py-12 md:py-16">
+      <div className="mx-auto max-w-[1280px] px-4 py-12 md:py-16">
+        {/* CTA Banner */}
         <FooterCTA />
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,3fr)]">
-          <div className="space-y-4">
-            <div className="text-[18px] font-semibold" itemScope itemType="https://schema.org/Organization">
-              <span itemProp="name">{UI_TEXT.brand.name}</span>
-            </div>
-            <p className="text-sm text-text-sec">{UI_TEXT.footer.brandDescription}</p>
+        {/* Main grid */}
+        <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,3fr)]">
+          {/* Brand column */}
+          <div className="space-y-5">
+            <Link href="/" className="inline-block">
+              <span className="text-lg font-bold bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
+                {UI_TEXT.brand.name}
+              </span>
+            </Link>
+            <p className="text-sm leading-relaxed text-text-sec">{UI_TEXT.footer.brandDescription}</p>
             <FooterSocials />
           </div>
 
+          {/* Links grid */}
           <nav aria-label={UI_TEXT.footer.aria.nav}>
-            <div className="grid gap-8 md:grid-cols-2 md:gap-12 lg:grid-cols-4">
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
               <FooterColumn title={UI_TEXT.footer.columns.about} links={about} />
               <FooterColumn title={UI_TEXT.footer.columns.clients} links={clients} />
               <FooterColumn title={UI_TEXT.footer.columns.masters} links={masters} />
@@ -91,11 +98,11 @@ export function Footer() {
           </nav>
         </div>
 
-        <div className="border-t border-border-subtle pt-6">
+        {/* Copyright */}
+        <div className="mt-12 border-t border-border-subtle/60 pt-6">
           <FooterCopyright />
         </div>
       </div>
     </footer>
   );
 }
-

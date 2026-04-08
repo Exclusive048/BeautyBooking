@@ -13,11 +13,9 @@ type FooterColumnProps = {
 
 export function FooterColumn({ title, links }: FooterColumnProps) {
   return (
-    <div className="space-y-3">
-      <div className="text-[14px] font-medium uppercase tracking-wide text-text-sec">
-        {title}
-      </div>
-      <ul className="space-y-2">
+    <div className="space-y-4">
+      <div className="text-sm font-semibold text-text-main">{title}</div>
+      <ul className="space-y-2.5">
         {links.map((link) => (
           <li key={link.href}>
             <FooterLink href={link.href} external={link.external}>

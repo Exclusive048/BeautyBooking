@@ -31,7 +31,7 @@ const socials: SocialLink[] = [
         />
       </svg>
     ),
-  }
+  },
 ];
 
 export function FooterSocials() {
@@ -44,7 +44,7 @@ export function FooterSocials() {
           aria-label={social.label}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-text-sec transition-transform duration-200 hover:scale-110 hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle/80 bg-bg-input text-text-sec transition-all duration-200 hover:scale-105 hover:border-primary/40 hover:bg-bg-card hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
         >
           {social.icon}
         </a>

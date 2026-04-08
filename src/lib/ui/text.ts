@@ -134,6 +134,17 @@ export const UI_TEXT = {
     services: "Услуги",
     adminShort: "Админ",
     loginAction: "Войти",
+    becomeMaster: "Стать мастером",
+    hotSlots: "Горячие слоты",
+    howItWorks: "Как работает",
+    pricing: "Тарифы",
+    closeMenu: "Закрыть меню",
+    openMenu: "Открыть меню",
+    masterWorkspaceFallback: "М",
+    studioWorkspaceFallback: "С",
+    myBookingsShort: "Записи",
+    myProfile: "Мой профиль",
+    myCabinet: "Мой кабинет",
   },
   footer: {
     aria: {
@@ -142,7 +153,9 @@ export const UI_TEXT = {
     cta: {
       title: "Вы мастер красоты?",
       subtitle: "Начните принимать клиентов онлайн уже сегодня",
+      subtitleAccent: "Бесплатно для начала",
       button: "Создать профиль бесплатно",
+      hint: "Без скрытых платежей",
     },
     columns: {
       about: "О платформе",

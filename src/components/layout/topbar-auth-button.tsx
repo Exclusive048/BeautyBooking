@@ -10,7 +10,7 @@ export function TopbarAuthButton() {
 
   if (isLoading && !user) {
     return (
-      <Button variant="secondary" disabled className="min-w-[110px]">
+      <Button variant="secondary" disabled className="min-w-[80px]">
         {UI_TEXT.status.loading}
       </Button>
     );
@@ -29,9 +29,13 @@ export function TopbarAuthButton() {
   }
 
   return (
-    <Button asChild>
-      <Link href="/login">{UI_TEXT.auth.login}</Link>
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button asChild variant="secondary" size="sm" className="hidden sm:inline-flex">
+        <Link href="/become-master">{UI_TEXT.nav.becomeMaster}</Link>
+      </Button>
+      <Button asChild size="sm">
+        <Link href="/login">{UI_TEXT.auth.login}</Link>
+      </Button>
+    </div>
   );
 }
-
