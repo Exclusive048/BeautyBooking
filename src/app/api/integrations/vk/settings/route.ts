@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { vkSettingsSchema } from "@/lib/vk/schemas";
 import { setVkLinkEnabled } from "@/lib/vk/links";
 
@@ -14,6 +15,14 @@ export async function PATCH(req: Request) {
     const parsed = vkSettingsSchema.safeParse(body);
     if (!parsed.success) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    // Silent skip: if trying to enable but feature not available on plan, return disabled state.
+    if (parsed.data.enabled) {
+      const plan = await getCurrentPlan(auth.user.id);
+      if (!plan.features.vkNotifications) {
+        return ok({ enabled: false });
+      }
     }
 
     const result = await setVkLinkEnabled(auth.user.id, parsed.data.enabled);

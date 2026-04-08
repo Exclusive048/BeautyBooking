@@ -32,11 +32,16 @@ export type FeatureUiState = {
   inheritedFromPlanId: string | null;
 };
 
+// Base features are always available to every provider regardless of plan.
+// Paid features default to false — they are enabled via BillingPlan.features in DB.
 const DEFAULT_FEATURES: PlanFeatures = {
-  onlineBooking: false,
-  catalogListing: false,
-  pwaPush: false,
-  profilePublicPage: false,
+  // ── Base (always true) ───────────────────────────────────────────────────
+  onlineBooking: true,
+  catalogListing: true,
+  profilePublicPage: true,
+  pwaPush: true,
+  notifications: true,
+  // ── Paid (false until plan enables them) ─────────────────────────────────
   onlinePayments: false,
   hotSlots: false,
   analytics_dashboard: false,
@@ -46,7 +51,6 @@ const DEFAULT_FEATURES: PlanFeatures = {
   analytics_cohorts: false,
   analytics_forecast: false,
   financeReport: false,
-  notifications: false,
   tgNotifications: false,
   vkNotifications: false,
   maxNotifications: false,
@@ -55,6 +59,7 @@ const DEFAULT_FEATURES: PlanFeatures = {
   clientNotes: false,
   clientImport: false,
   highlightCard: false,
+  // ── Limits (seed values; plan overrides relax them) ───────────────────────
   maxTeamMasters: 2,
   maxPortfolioPhotosSolo: 15,
   maxPortfolioPhotosStudioDesign: 15,

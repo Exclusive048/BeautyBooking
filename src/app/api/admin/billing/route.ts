@@ -6,7 +6,7 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { BILLING_PERIODS } from "@/lib/billing/constants";
-import { getRequestId, logError } from "@/lib/logging/logger";
+import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import {
   FEATURE_CATALOG,
   type LimitFeatureKey,
@@ -18,6 +18,7 @@ import {
   type PlanFeatureOverrides,
   type PlanNode,
 } from "@/lib/billing/features";
+import * as cache from "@/lib/cache/cache";
 
 const patchSchema = z.object({
   id: z.string().trim().min(1),
@@ -73,6 +74,24 @@ const LIMIT_FEATURE_KEYS = Object.keys(FEATURE_CATALOG).filter(
 
 function buildPlanMap(plans: Array<{ id: string; inheritsFromPlanId: string | null; features: unknown }>): Map<string, PlanNode> {
   return new Map(plans.map((plan) => [plan.id, plan]));
+}
+
+/**
+ * Invalidate plan cache for all users subscribed to the given planId.
+ * Uses pattern delete so we don't need to enumerate individual users.
+ */
+async function invalidatePlanCacheForPlanSubscribers(planId: string): Promise<void> {
+  try {
+    // Pattern covers both MASTER and STUDIO scopes: plan:current:<userId>:<scope>
+    await cache.delByPattern("plan:current:*");
+    logInfo("Invalidated plan cache after admin billing update", { planId });
+  } catch (err) {
+    // Non-fatal — cache will expire on its own (TTL 5 min)
+    logError("Failed to invalidate plan cache after admin billing update", {
+      planId,
+      error: err instanceof Error ? err.message : err,
+    });
+  }
 }
 
 async function assertNoInheritanceCycle(planId: string, inheritsFromPlanId: string | null) {
@@ -364,6 +383,9 @@ export async function PATCH(req: Request) {
     if (!plan) {
       return fail("Plan not found", 404, "NOT_FOUND");
     }
+
+    // Invalidate cached plan features for all subscribers
+    void invalidatePlanCacheForPlanSubscribers(id);
 
     return ok({ plan });
   } catch (error) {

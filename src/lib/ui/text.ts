@@ -269,6 +269,15 @@ export const UI_TEXT = {
       yearSavings: (amount: number) => `Экономия ${amount}₽ в год`,
       yearDiscount: "−20%",
     },
+    currentFeatures: {
+      sectionTitle: (planName: string) => `Что включено в тариф «${planName}»`,
+      included: "Включено",
+      notIncluded: "Недоступно",
+      upgradeHint: "Доступно на более высоком тарифе",
+      unlimitedValue: "Без ограничений",
+      limitValue: (n: number) => `до ${n}`,
+      upgradeCta: "Сменить тариф",
+    },
   },
   schedule: {
     mode: {
@@ -3161,6 +3170,17 @@ export const UI_TEXT = {
       portfolioStudioLabel: "Портфолио студии до {count} фото + {perMaster} фото/мастер",
       teamMastersLabel: "До {count} мастеров",
       loadError: "Не удалось загрузить тарифы. Попробуйте обновить страницу.",
+      scopeMaster: "Мастерам",
+      scopeStudio: "Студиям",
+      periodLabel: "Период оплаты",
+      period1: "1 мес",
+      period3: "3 мес",
+      period6: "6 мес",
+      period12: "12 мес",
+      savingsBadge: "−{pct}%",
+      featureAvailable: "Включено",
+      featureUnavailable: "Нет",
+      featuresSectionTitle: "Что входит",
     },
     partners: {
       title: "Партнёрам — МастерРядом",

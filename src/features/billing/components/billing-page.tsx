@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
 import { BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
 import { cn } from "@/lib/cn";
 import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
@@ -25,7 +27,7 @@ type BillingPlan = {
   tier: string;
   scope: SubscriptionScope;
   prices: PlanPrice[];
-  features: Record<string, unknown>;
+  features: Record<string, boolean | number | null>;
 };
 
 type PlansResponse = {
@@ -109,6 +111,133 @@ function formatPeriodLabel(periodMonths: PeriodMonths) {
 
 function buildDefaultPeriods() {
   return { MASTER: 1, STUDIO: 1 } as Record<SubscriptionScope, PeriodMonths>;
+}
+
+// ── Active Features Panel ─────────────────────────────────────────────────────
+
+type FeatureGroup = {
+  group: string;
+  items: Array<{
+    key: FeatureKey;
+    title: string;
+    description: string;
+    enabled: boolean;
+    limitValue: number | null | undefined;
+  }>;
+};
+
+function buildFeatureGroups(
+  features: Record<string, boolean | number | null>,
+  scope: SubscriptionScope
+): FeatureGroup[] {
+  const groupMap = new Map<string, FeatureGroup>();
+
+  const sortedKeys = (Object.keys(FEATURE_CATALOG) as FeatureKey[]).sort(
+    (a, b) => FEATURE_CATALOG[a].uiOrder - FEATURE_CATALOG[b].uiOrder
+  );
+
+  for (const key of sortedKeys) {
+    const def = FEATURE_CATALOG[key];
+    if (def.appliesTo !== "BOTH" && def.appliesTo !== scope) continue;
+
+    const raw = features[key];
+    let enabled: boolean;
+    let limitValue: number | null | undefined;
+
+    if (def.kind === "limit") {
+      limitValue = raw as number | null | undefined;
+      enabled = raw !== 0 && raw !== undefined;
+    } else {
+      enabled = Boolean(raw);
+      limitValue = undefined;
+    }
+
+    if (!groupMap.has(def.group)) {
+      groupMap.set(def.group, { group: def.group, items: [] });
+    }
+    groupMap.get(def.group)!.items.push({ key, title: def.title, description: def.description, enabled, limitValue });
+  }
+
+  return Array.from(groupMap.values());
+}
+
+function ActiveFeaturesPanel({
+  plan,
+  scope,
+}: {
+  plan: BillingPlan;
+  scope: SubscriptionScope;
+}) {
+  const groups = useMemo(() => buildFeatureGroups(plan.features, scope), [plan.features, scope]);
+  const enabledGroups = groups.filter((g) => g.items.some((i) => i.enabled));
+  const lockedItems = groups.flatMap((g) => g.items.filter((i) => !i.enabled));
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-base font-semibold text-text-main">
+        {UI_TEXT.billing.currentFeatures.sectionTitle(plan.name)}
+      </h2>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {enabledGroups.map((group) => (
+          <div key={group.group} className="lux-card rounded-2xl p-4">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-sec">
+              {group.group}
+            </div>
+            <ul className="space-y-2">
+              {group.items
+                .filter((item) => item.enabled)
+                .map((item) => (
+                  <li key={item.key} className="flex items-start gap-2">
+                    <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+                      <Check className="h-2.5 w-2.5 text-emerald-500" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-text-main leading-snug">
+                        {item.title}
+                        {item.limitValue === null ? (
+                          <span className="ml-1.5 text-[10px] text-emerald-500 font-normal">
+                            ({UI_TEXT.billing.currentFeatures.unlimitedValue})
+                          </span>
+                        ) : item.limitValue !== undefined ? (
+                          <span className="ml-1.5 text-[10px] text-text-sec font-normal">
+                            ({UI_TEXT.billing.currentFeatures.limitValue(item.limitValue)})
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-[11px] text-text-sec leading-snug">{item.description}</div>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {lockedItems.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer select-none list-none text-xs text-text-sec hover:text-text-main">
+            <span className="underline decoration-dashed underline-offset-2">
+              {UI_TEXT.billing.currentFeatures.upgradeHint} ({lockedItems.length})
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {lockedItems.map((item) => (
+              <div key={item.key} className="flex items-start gap-2 rounded-xl border border-border-subtle/60 bg-bg-elevated/60 px-3 py-2 opacity-60">
+                <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-bg-input">
+                  <X className="h-2.5 w-2.5 text-text-sec" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-text-main leading-snug">{item.title}</div>
+                  <div className="text-[11px] text-text-sec leading-snug">{item.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </section>
+  );
 }
 
 export function BillingPage({ scope }: BillingPageProps) {
@@ -219,6 +348,15 @@ export function BillingPage({ scope }: BillingPageProps) {
     if (!plans) return null;
     return plans.plans[scope] ?? [];
   }, [plans, scope]);
+
+  const activePlan = useMemo(() => {
+    if (!scopePlans) return null;
+    const sub = status?.subscriptions[scope];
+    if (sub) {
+      return scopePlans.find((p) => p.id === sub.plan.id) ?? scopePlans[0] ?? null;
+    }
+    return scopePlans[0] ?? null;
+  }, [scopePlans, status, scope]);
 
   if (loading) {
     return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>;
@@ -393,6 +531,10 @@ export function BillingPage({ scope }: BillingPageProps) {
           })}
         </div>
       </section>
+
+      {activePlan ? (
+        <ActiveFeaturesPanel plan={activePlan} scope={scope} />
+      ) : null}
     </section>
   );
 }

@@ -164,10 +164,11 @@ export async function ensureDefaultPlans() {
         isActive: true,
       },
       update: {
+        // Never overwrite features on update — admin configures them via UI.
+        // Only structural fields are kept in sync.
         name: plan.name,
         tier: plan.tier,
         scope: plan.scope,
-        features: plan.features as Prisma.InputJsonValue,
         sortOrder: plan.sortOrder ?? 0,
         inheritsFromPlanId,
         isActive: true,
