@@ -97,7 +97,7 @@ export function FeatureGate({
   }
 
   const requiredLabel = findMinPlanName(plansData, feature, resolvedScope) ?? requiredPlanOverride ?? "PRO";
-  const billingHref = `/cabinet/billing?scope=${resolvedScope}`;
+  const billingHref = resolvedScope === "STUDIO" ? "/cabinet/studio/billing" : "/cabinet/master/billing";
   return (
     <div className={`relative ${className ?? ""}`}>
       <div className="pointer-events-none opacity-40">{children}</div>

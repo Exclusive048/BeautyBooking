@@ -25,7 +25,7 @@ const NAV_ITEMS: Array<{ href: string; label: string }> = [
 
 const ACCOUNT_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/cabinet/master/profile", label: UI_TEXT.master.topbar.nav.profile },
-  { href: "/cabinet/billing?scope=MASTER", label: UI_TEXT.master.topbar.nav.billing },
+  { href: "/cabinet/master/billing", label: UI_TEXT.master.topbar.nav.billing },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -37,7 +37,7 @@ export function MasterCabinetTopbar({ ratingLabel, studioName, isStudioMember = 
   const pathname = usePathname();
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
-  const accountActive = pathname.startsWith("/cabinet/master/profile") || pathname === "/cabinet/billing";
+  const accountActive = pathname.startsWith("/cabinet/master/profile") || pathname === "/cabinet/master/billing";
 
   useEffect(() => {
     if (!accountOpen) return;

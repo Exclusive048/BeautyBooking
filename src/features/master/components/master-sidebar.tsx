@@ -53,57 +53,65 @@ export function MasterSidebar({ ratingLabel, publicUsername }: Props) {
   const t = UI_TEXT.master;
 
   return (
-    <aside className="flex w-64 flex-col bg-bg-card">
-      {/* Logo */}
-      <div className="shrink-0 border-b border-border-subtle px-5 py-4">
-        <Link href="/" className="text-base font-bold text-text-main transition hover:text-primary">
-          {t.topbar.brand}
-        </Link>
-      </div>
-
-      {/* Rating badge */}
-      <div className="shrink-0 px-4 py-3">
-        <div className="flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2">
-          <Star className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
-          <span className="text-sm font-medium text-text-main">{ratingLabel}</span>
+    // h-full fills the sticky h-screen container — needed so "Моя страница" reaches the bottom.
+    // No bg here: the top content section carries the card bg; the spacer is transparent.
+    <aside className="flex h-full w-64 flex-col">
+      {/* Top content block — has card background */}
+      <div className="bg-bg-card">
+        {/* Logo */}
+        <div className="border-b border-border-subtle px-5 py-4">
+          <Link href="/" className="text-base font-bold text-text-main transition hover:text-primary">
+            {t.topbar.brand}
+          </Link>
         </div>
+
+        {/* Rating badge */}
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2">
+            <Star className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+            <span className="text-sm font-medium text-text-main">{ratingLabel}</span>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="px-3 pb-3 pt-1" aria-label="Навигация кабинета">
+          <ul className="space-y-0.5">
+            {NAV_ITEMS.map((item) => {
+              const active = isActive(pathname, item.href, item.exact);
+              const Icon = item.icon;
+              return (
+                <li key={`${item.href}-${item.label}`}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                      active
+                        ? "bg-primary/10 text-primary"
+                        : "text-text-sec hover:bg-bg-input hover:text-text-main"
+                    )}
+                  >
+                    <Icon
+                      className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-text-sec")}
+                      aria-hidden
+                    />
+                    {item.label}
+                    {active && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </div>
 
-      {/* Navigation */}
-      <nav className="px-3 py-2" aria-label="Навигация кабинета">
-        <ul className="space-y-0.5">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(pathname, item.href, item.exact);
-            const Icon = item.icon;
-            return (
-              <li key={`${item.href}-${item.label}`}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                    active
-                      ? "bg-primary/10 text-primary"
-                      : "text-text-sec hover:bg-bg-input hover:text-text-main"
-                  )}
-                >
-                  <Icon
-                    className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-text-sec")}
-                    aria-hidden
-                  />
-                  {item.label}
-                  {active && (
-                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      {/* Transparent spacer — pushes "Моя страница" to the bottom */}
+      <div className="flex-1" aria-hidden />
 
-      {/* My page link */}
+      {/* My page link — pinned to bottom, outside the card block */}
       {publicUsername ? (
-        <div className="mt-6 px-3 pb-3">
+        <div className="px-3 pb-4">
           <Link
             href={`/u/${publicUsername}`}
             target="_blank"

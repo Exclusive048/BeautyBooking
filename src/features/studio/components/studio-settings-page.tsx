@@ -142,7 +142,7 @@ function LockedAddonRow({
       <div className="flex shrink-0 items-center gap-2">
         {icon}
         <Link
-          href="/cabinet/billing?scope=STUDIO"
+          href="/cabinet/studio/billing"
           className="rounded-xl border border-border-subtle bg-bg-input px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-card"
         >
           {UI_TEXT.settings.billing.featureGate.cta}

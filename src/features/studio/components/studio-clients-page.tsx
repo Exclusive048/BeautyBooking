@@ -201,7 +201,7 @@ export function StudioClientsPage({ studioId }: Props) {
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button asChild>
-            <Link href="/cabinet/billing?scope=STUDIO">
+            <Link href="/cabinet/studio/billing">
               {UI_TEXT.studioCabinet.clients.upgradeCta}
             </Link>
           </Button>

@@ -172,7 +172,7 @@ export function BillingPage({ scope }: BillingPageProps) {
           planId: plan.id,
           periodMonths,
           totalAmountKopeks,
-          returnUrl: `${window.location.origin}/cabinet/billing?scope=${selectedScope}`,
+          returnUrl: `${window.location.origin}${selectedScope === "STUDIO" ? "/cabinet/studio/billing" : "/cabinet/master/billing"}`,
         }),
       });
       const json = (await res.json().catch(() => null)) as

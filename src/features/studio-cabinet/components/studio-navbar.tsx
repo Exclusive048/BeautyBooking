@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 
 const ADMIN_ITEMS = [
   { href: "/cabinet/studio/settings", label: UI_TEXT.studioCabinet.nav.settingsAria },
-  { href: "/cabinet/billing?scope=STUDIO", label: UI_TEXT.studioCabinet.nav.billing },
+  { href: "/cabinet/studio/billing", label: UI_TEXT.studioCabinet.nav.billing },
 ];
 
 type Props = {
@@ -37,7 +37,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
   const pathname = usePathname();
-  const settingsActive = pathname.startsWith("/cabinet/studio/settings") || pathname === "/cabinet/billing";
+  const settingsActive = pathname.startsWith("/cabinet/studio/settings") || pathname === "/cabinet/studio/billing";
   const [adminOpen, setAdminOpen] = useState(false);
   const adminRef = useRef<HTMLDivElement | null>(null);
 

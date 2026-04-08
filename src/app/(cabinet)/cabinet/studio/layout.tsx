@@ -56,7 +56,7 @@ export default async function StudioCabinetLayout({
           <StudioNavbar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
         </div>
 
-        <main className="min-w-0 flex-1 p-4 pb-24 lg:p-8 lg:pb-8">
+        <main className="min-w-0 flex-1 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
           <div className="mx-auto w-full max-w-6xl">
             {children}
           </div>

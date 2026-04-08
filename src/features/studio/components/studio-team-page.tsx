@@ -179,7 +179,7 @@ export function StudioTeamPage({ studioId }: Props) {
       {limitReached ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-300">
           {t.limitReachedMessage}{" "}
-          <a href="/cabinet/billing?scope=STUDIO" className="underline">
+          <a href="/cabinet/studio/billing" className="underline">
             {t.viewPlans}
           </a>
           .

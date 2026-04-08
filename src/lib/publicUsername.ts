@@ -234,7 +234,27 @@ export async function resolvePublicUsername(
     return { status: "not-found", reason: "invalid" };
   }
 
-  const provider = await deps.findProviderByUsernameOrAlias(normalized);
+  let provider = await deps.findProviderByUsernameOrAlias(normalized);
+
+  // Fallback: if not found by slugified username, try the exact (lowercased) input.
+  // This handles legacy usernames that contain underscores or other characters
+  // that slugifyUsername converts to hyphens (e.g. "anna_nails" → "anna-nails").
+  if (!provider) {
+    const rawLower = rawUsername.trim().toLowerCase();
+    if (rawLower !== normalized && rawLower.length >= 3) {
+      const rawProvider = await deps.findProviderByUsernameOrAlias(rawLower);
+      // Only treat as a direct match if publicUsername exactly equals what was requested,
+      // to avoid triggering the alias-redirect logic below.
+      if (rawProvider?.publicUsername === rawLower) {
+        if (!rawProvider.isPublished) {
+          return { status: "not-found", reason: "unpublished" };
+        }
+        return { status: "found", providerId: rawProvider.id, providerType: rawProvider.type };
+      }
+      provider = rawProvider ?? null;
+    }
+  }
+
   if (!provider) {
     return { status: "not-found", reason: "missing" };
   }

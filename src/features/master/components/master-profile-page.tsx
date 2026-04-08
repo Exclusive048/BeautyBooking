@@ -351,7 +351,7 @@ function LockedFeatureRow({
           <p className="text-xs font-medium">{UI_TEXT.settings.billing.featureGate.title}</p>
           <p className="mt-1 text-xs text-text-sec">{UI_TEXT.settings.billing.featureGate.hint}</p>
           <Link
-            href="/cabinet/billing?scope=MASTER"
+            href="/cabinet/master/billing"
             className="mt-2 block rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-semibold text-white"
           >
             {UI_TEXT.settings.billing.featureGate.cta}
@@ -2803,7 +2803,7 @@ export function MasterProfilePage() {
                 {portfolioLimitReached ? (
                   <span className="text-rose-400">
                     {UI_TEXT.master.profile.portfolio.limitReached}{" "}
-                    <a href="/cabinet/billing?scope=MASTER" className="underline">
+                    <a href="/cabinet/master/billing" className="underline">
                       {UI_TEXT.master.profile.portfolio.plans}
                     </a>
                   </span>

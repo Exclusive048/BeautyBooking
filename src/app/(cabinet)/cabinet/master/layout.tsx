@@ -39,6 +39,8 @@ export default async function MasterCabinetLayout({
     <div className="flex min-h-screen bg-bg-base">
       {/* Desktop sidebar */}
       <div className="hidden lg:block lg:shrink-0 border-r border-border-subtle">
+        {/* h-screen on sticky so sidebar fills viewport height;
+            the aside inside uses h-full to pin "Моя страница" to the bottom. */}
         <div className="sticky top-0 h-screen overflow-y-auto">
           <MasterSidebar
             ratingLabel={ratingLabel}
@@ -58,7 +60,7 @@ export default async function MasterCabinetLayout({
           />
         </div>
 
-        <main className="min-w-0 flex-1 p-4 pb-24 lg:p-8 lg:pb-8">
+        <main className="min-w-0 flex-1 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
           <div className="mx-auto w-full max-w-6xl">
             {children}
           </div>

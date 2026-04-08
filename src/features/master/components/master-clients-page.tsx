@@ -185,7 +185,7 @@ export function MasterClientsPage() {
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <a
-            href="/cabinet/billing?scope=MASTER"
+            href="/cabinet/master/billing"
             className="rounded-lg bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm text-[rgb(var(--accent-foreground))]"
           >
             Перейти к тарифам
