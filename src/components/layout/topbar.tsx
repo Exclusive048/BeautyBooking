@@ -189,7 +189,7 @@ export async function Topbar() {
               <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
             </Button>
             <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
-              <Link href="/hot">{UI_TEXT.nav.hotSlots}</Link>
+              <Link href="/catalog?hot=true">{UI_TEXT.nav.hotSlots}</Link>
             </Button>
           </div>
 

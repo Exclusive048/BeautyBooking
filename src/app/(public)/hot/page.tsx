@@ -1,5 +1,6 @@
-import { HotSlotsPage } from "@/features/hot-slots/hot-slots-page";
+import { permanentRedirect } from "next/navigation";
 
+// Hot slots are now integrated as a filter in /catalog?hot=true
 export default function HotSlotsRoute() {
-  return <HotSlotsPage />;
+  permanentRedirect("/catalog?hot=true");
 }

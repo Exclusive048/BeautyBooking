@@ -65,7 +65,7 @@ export default function HowToBookPage() {
           </p>
         ))}
         <Link
-          href="/hot"
+          href="/catalog?hot=true"
           className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
         >
           {UI_TEXT.pages.howToBook.hotSlotsCta}

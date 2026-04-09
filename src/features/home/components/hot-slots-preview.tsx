@@ -122,7 +122,7 @@ export function HotSlotsPreview() {
             </p>
           </div>
         </div>
-        <Link href="/hot" className="shrink-0 text-sm font-medium text-primary hover:underline">
+        <Link href="/catalog?hot=true" className="shrink-0 text-sm font-medium text-primary hover:underline">
           {UI_TEXT.home.hotSlotsPreview.showAll}
         </Link>
       </div>
