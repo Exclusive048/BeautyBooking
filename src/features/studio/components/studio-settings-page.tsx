@@ -73,6 +73,8 @@ type Props = {
   providerId: string;
   studioId: string;
   initialTab?: string | null;
+  /** When true, hides the internal tab navigation (sidebar handles routing) */
+  hideTabNav?: boolean;
 };
 
 type StudioTab = "main" | "services" | "portfolio" | "settings";
@@ -152,7 +154,7 @@ function LockedAddonRow({
   );
 }
 
-export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) {
+export function StudioSettingsPage({ providerId, studioId, initialTab, hideTabNav = false }: Props) {
   const t = UI_TEXT.studio.profilePage;
   const router = useRouter();
   const pathname = usePathname();
@@ -161,6 +163,7 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
 
   const [activeTab, setActiveTab] = useState<StudioTab>(() => normalizeTab(initialTab));
   const [loading, setLoading] = useState(true);
+  // When hideTabNav is true, the tab is fixed to initialTab and URL params are ignored.
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -222,9 +225,10 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
   const hasHotSlotsAccess = plan.can("hotSlots");
 
   useEffect(() => {
+    if (hideTabNav) return; // tab is fixed when nav is hidden
     const tab = normalizeTab(searchParams.get("tab"));
     setActiveTab(tab);
-  }, [searchParams]);
+  }, [hideTabNav, searchParams]);
 
   const switchTab = useCallback(
     (tab: StudioTab) => {
@@ -549,23 +553,25 @@ export function StudioSettingsPage({ providerId, studioId, initialTab }: Props) 
     <div className="space-y-6">
       {error ? <div className="rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-        <nav className="flex gap-2 overflow-x-auto rounded-2xl bg-bg-card/70 p-2 lg:flex-col lg:p-3">
-          {STUDIO_TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <Button
-                key={tab.id}
-                onClick={() => switchTab(tab.id)}
-                variant={isActive ? "secondary" : "ghost"}
-                size="sm"
-                className="justify-start whitespace-nowrap"
-              >
-                {tab.label}
-              </Button>
-            );
-          })}
-        </nav>
+      <div className={hideTabNav ? "" : "grid gap-6 lg:grid-cols-[220px_1fr]"}>
+        {!hideTabNav && (
+          <nav className="flex gap-2 overflow-x-auto rounded-2xl bg-bg-card/70 p-2 lg:flex-col lg:p-3">
+            {STUDIO_TABS.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <Button
+                  key={tab.id}
+                  onClick={() => switchTab(tab.id)}
+                  variant={isActive ? "secondary" : "ghost"}
+                  size="sm"
+                  className="justify-start whitespace-nowrap"
+                >
+                  {tab.label}
+                </Button>
+              );
+            })}
+          </nav>
+        )}
 
         <div className="min-w-0 space-y-6">
           {activeTab === "main" ? (
