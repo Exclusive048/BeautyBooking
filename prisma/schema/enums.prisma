@@ -1,5 +1,11 @@
 // === Auth ===
 
+enum OtpChannel {
+  PHONE
+
+  EMAIL
+}
+
 enum AccountType {
   CLIENT
 

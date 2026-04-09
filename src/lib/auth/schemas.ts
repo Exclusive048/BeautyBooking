@@ -16,6 +16,15 @@ export const otpVerifySchema = z.object({
   code: z.string().trim().min(4, "Code is too short"),
 });
 
+export const otpEmailRequestSchema = z.object({
+  email: z.string().trim().email("Invalid email"),
+});
+
+export const otpEmailVerifySchema = z.object({
+  email: z.string().trim().email("Invalid email"),
+  code: z.string().trim().min(4, "Code is too short"),
+});
+
 const telegramIdSchema = z.preprocess(
   (value) => (typeof value === "string" || typeof value === "number" ? Number(value) : value),
   z.number().int().positive("Telegram id must be a positive integer")

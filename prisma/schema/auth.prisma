@@ -121,7 +121,11 @@ model UserConsent {
 model OtpCode {
   id String @id @default(cuid())
 
-  phone String
+  phone String?
+
+  email String?
+
+  channel OtpChannel @default(PHONE)
 
   codeHash String
 
@@ -132,6 +136,7 @@ model OtpCode {
   createdAt DateTime @default(now())
 
   @@index([phone])
+  @@index([email])
   @@index([expiresAt])
 }
 

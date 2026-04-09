@@ -17,10 +17,13 @@ import { UI_TEXT } from "@/lib/ui/text";
 const RESEND_TIMEOUT = 60;
 const OTP_LENGTH = 6;
 
+type LoginMode = "phone" | "email";
+
 type LoginClientProps = {
   heroImageUrl: string | null;
   heroImageFocalX: number | null;
   heroImageFocalY: number | null;
+  emailEnabled?: boolean;
 };
 
 function normalizePhone(input: string): string {
@@ -34,6 +37,10 @@ function normalizePhone(input: string): string {
 
 function isPhoneValid(input: string): boolean {
   return /^\+7\d{10}$/.test(normalizePhone(input));
+}
+
+function isEmailValid(input: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
 }
 
 function safeNext(nextRaw: string | null) {
@@ -179,13 +186,15 @@ const stepVariants = {
 
 // ---------- Main component ----------
 
-export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFocalY }: LoginClientProps) {
+export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFocalY, emailEnabled = false }: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
 
+  const [mode, setMode] = useState<LoginMode>("phone");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"phone" | "code">("phone");
+  const [step, setStep] = useState<"input" | "code">("input");
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -194,6 +203,8 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
 
   const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phoneValid = isPhoneValid(phone);
+  const emailValid = isEmailValid(email);
+  const inputValid = mode === "phone" ? phoneValid : emailValid;
 
   // Lock body scroll on desktop
   useEffect(() => {
@@ -237,7 +248,17 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
     setShakeKey((k) => k + 1);
   }
 
-  async function requestOtp(normalized: string): Promise<void> {
+  function switchMode(newMode: LoginMode) {
+    if (newMode === mode) return;
+    setMode(newMode);
+    setStep("input");
+    setPhone("");
+    setEmail("");
+    setCode("");
+    setErrorText(null);
+  }
+
+  async function requestPhoneOtp(normalized: string): Promise<void> {
     await fetchJson<Record<string, never>>("/api/auth/otp/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -245,33 +266,70 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
     });
   }
 
+  async function requestEmailOtp(normalizedEmail: string): Promise<void> {
+    await fetchJson<Record<string, never>>("/api/auth/otp/email/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizedEmail }),
+    });
+  }
+
   async function sendCode() {
     setErrorText(null);
-    if (!isPhoneValid(phone)) {
-      setErrorText(UI_TEXT.auth.loginPage.invalidPhone);
-      triggerShake();
-      return;
-    }
-    if (!agreedToTerms) {
-      setErrorText(UI_TEXT.auth.loginPage.consentRequired);
-      triggerShake();
-      return;
-    }
-    setLoading(true);
-    try {
-      await requestOtp(normalizePhone(phone));
-      setCode("");
-      setStep("code");
-      startResendTimer();
-    } catch (error) {
-      const msg =
-        error instanceof ApiClientError
-          ? (getErrorMessageByCode(error.code) ?? error.message ?? UI_TEXT.auth.loginPage.sendCodeFailed)
-          : UI_TEXT.auth.loginPage.sendCodeFailed;
-      setErrorText(msg);
-      triggerShake();
-    } finally {
-      setLoading(false);
+    if (mode === "phone") {
+      if (!isPhoneValid(phone)) {
+        setErrorText(UI_TEXT.auth.loginPage.invalidPhone);
+        triggerShake();
+        return;
+      }
+      if (!agreedToTerms) {
+        setErrorText(UI_TEXT.auth.loginPage.consentRequired);
+        triggerShake();
+        return;
+      }
+      setLoading(true);
+      try {
+        await requestPhoneOtp(normalizePhone(phone));
+        setCode("");
+        setStep("code");
+        startResendTimer();
+      } catch (error) {
+        const msg =
+          error instanceof ApiClientError
+            ? (getErrorMessageByCode(error.code) ?? error.message ?? UI_TEXT.auth.loginPage.sendCodeFailed)
+            : UI_TEXT.auth.loginPage.sendCodeFailed;
+        setErrorText(msg);
+        triggerShake();
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      if (!isEmailValid(email)) {
+        setErrorText(UI_TEXT.auth.loginPage.invalidEmail);
+        triggerShake();
+        return;
+      }
+      if (!agreedToTerms) {
+        setErrorText(UI_TEXT.auth.loginPage.consentRequired);
+        triggerShake();
+        return;
+      }
+      setLoading(true);
+      try {
+        await requestEmailOtp(email.trim().toLowerCase());
+        setCode("");
+        setStep("code");
+        startResendTimer();
+      } catch (error) {
+        const msg =
+          error instanceof ApiClientError
+            ? (getErrorMessageByCode(error.code) ?? error.message ?? UI_TEXT.auth.loginPage.sendCodeEmailFailed)
+            : UI_TEXT.auth.loginPage.sendCodeEmailFailed;
+        setErrorText(msg);
+        triggerShake();
+      } finally {
+        setLoading(false);
+      }
     }
   }
 
@@ -285,10 +343,15 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
     }
     setLoading(true);
     try {
-      const result = await fetchJson<{ redirect: string }>("/api/auth/otp/verify", {
+      const body =
+        mode === "phone"
+          ? { phone: normalizePhone(phone), code: finalCode }
+          : { email: email.trim().toLowerCase(), code: finalCode };
+      const endpoint = mode === "phone" ? "/api/auth/otp/verify" : "/api/auth/otp/email/verify";
+      const result = await fetchJson<{ redirect: string }>(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: normalizePhone(phone), code: finalCode }),
+        body: JSON.stringify(body),
       });
       window.location.replace(nextPath ?? result.redirect);
     } catch (error) {
@@ -310,13 +373,18 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
     setCode("");
     setLoading(true);
     try {
-      await requestOtp(normalizePhone(phone));
+      if (mode === "phone") {
+        await requestPhoneOtp(normalizePhone(phone));
+      } else {
+        await requestEmailOtp(email.trim().toLowerCase());
+      }
       startResendTimer();
     } catch (error) {
+      const fallback = mode === "phone" ? UI_TEXT.auth.loginPage.sendCodeFailed : UI_TEXT.auth.loginPage.sendCodeEmailFailed;
       const msg =
         error instanceof ApiClientError
-          ? (getErrorMessageByCode(error.code) ?? error.message ?? UI_TEXT.auth.loginPage.sendCodeFailed)
-          : UI_TEXT.auth.loginPage.sendCodeFailed;
+          ? (getErrorMessageByCode(error.code) ?? error.message ?? fallback)
+          : fallback;
       setErrorText(msg);
       triggerShake();
     } finally {
@@ -324,8 +392,8 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
     }
   }
 
-  function goBackToPhone() {
-    setStep("phone");
+  function goBackToInput() {
+    setStep("input");
     setCode("");
     setErrorText(null);
   }
@@ -472,34 +540,74 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
                 ) : null}
               </AnimatePresence>
 
+              {/* Mode tabs (phone / email) — shown only on input step */}
+              {emailEnabled && step === "input" ? (
+                <div className="mb-5 flex rounded-2xl border border-border-subtle/60 bg-bg-input/50 p-1">
+                  {(["phone", "email"] as LoginMode[]).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => switchMode(m)}
+                      className={cn(
+                        "flex-1 rounded-xl py-1.5 text-sm font-medium transition-all duration-150",
+                        mode === m
+                          ? "bg-bg-card text-text-main shadow-sm"
+                          : "text-text-sec hover:text-text-main"
+                      )}
+                    >
+                      {m === "phone" ? UI_TEXT.auth.loginPage.tabPhone : UI_TEXT.auth.loginPage.tabEmail}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
               {/* Form steps */}
               <AnimatePresence mode="wait">
-                {step === "phone" ? (
+                {step === "input" ? (
                   <motion.div
-                    key="phone-step"
+                    key={`input-step-${mode}`}
                     variants={stepVariants}
                     initial="enter"
                     animate="center"
                     exit="exit"
                     className="space-y-4"
                   >
-                    <div className="space-y-1.5">
-                      <label htmlFor="phone-input" className="block text-sm font-medium">
-                        {UI_TEXT.auth.loginPage.phoneLabel}
-                      </label>
-                      <Input
-                        id="phone-input"
-                        className="h-12 px-5 text-base"
-                        placeholder={UI_TEXT.auth.loginPage.phonePlaceholderMask}
-                        value={phone}
-                        onChange={(ev) => setPhone(ev.target.value)}
-                        inputMode="tel"
-                        autoComplete="tel"
-                        aria-label={UI_TEXT.auth.loginPage.phoneLabel}
-                      />
-                    </div>
+                    {mode === "phone" ? (
+                      <div className="space-y-1.5">
+                        <label htmlFor="phone-input" className="block text-sm font-medium">
+                          {UI_TEXT.auth.loginPage.phoneLabel}
+                        </label>
+                        <Input
+                          id="phone-input"
+                          className="h-12 px-5 text-base"
+                          placeholder={UI_TEXT.auth.loginPage.phonePlaceholderMask}
+                          value={phone}
+                          onChange={(ev) => setPhone(ev.target.value)}
+                          inputMode="tel"
+                          autoComplete="tel"
+                          aria-label={UI_TEXT.auth.loginPage.phoneLabel}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <label htmlFor="email-input" className="block text-sm font-medium">
+                          {UI_TEXT.auth.loginPage.emailLabel}
+                        </label>
+                        <Input
+                          id="email-input"
+                          className="h-12 px-5 text-base"
+                          placeholder={UI_TEXT.auth.loginPage.emailPlaceholder}
+                          value={email}
+                          onChange={(ev) => setEmail(ev.target.value)}
+                          type="email"
+                          inputMode="email"
+                          autoComplete="email"
+                          aria-label={UI_TEXT.auth.loginPage.emailLabel}
+                        />
+                      </div>
+                    )}
 
-                    {phoneValid ? (
+                    {inputValid ? (
                       <LegalConsentCheckbox
                         checked={agreedToTerms}
                         onCheckedChange={setAgreedToTerms}
@@ -510,7 +618,7 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
                     <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                       <Button
                         onClick={sendCode}
-                        disabled={loading || !phoneValid || (phoneValid && !agreedToTerms)}
+                        disabled={loading || !inputValid || (inputValid && !agreedToTerms)}
                         size="lg"
                         className="w-full"
                       >
@@ -527,20 +635,20 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
                     exit="exit"
                     className="space-y-4"
                   >
-                    {/* Phone number display */}
+                    {/* Identifier display */}
                     <div className="rounded-2xl border border-border-subtle/60 bg-bg-input/40 px-4 py-3">
                       <p className="text-xs text-muted-foreground">
-                        {UI_TEXT.auth.loginPage.codeSentTo}
+                        {mode === "email" ? UI_TEXT.auth.loginPage.codeSentToEmail : UI_TEXT.auth.loginPage.codeSentTo}
                       </p>
                       <p className="mt-0.5 text-sm font-semibold text-foreground">
-                        {normalizePhone(phone)}
+                        {mode === "phone" ? normalizePhone(phone) : email.trim().toLowerCase()}
                       </p>
                     </div>
 
                     {/* OTP inputs */}
                     <div className="space-y-1.5">
                       <label className="block text-sm font-medium">
-                        {UI_TEXT.auth.loginPage.codeLabel}
+                        {mode === "email" ? UI_TEXT.auth.loginPage.codeFromEmail : UI_TEXT.auth.loginPage.codeLabel}
                       </label>
                       <OtpInput
                         value={code}
@@ -562,15 +670,15 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
                       </Button>
                     </motion.div>
 
-                    {/* Resend + change number row */}
+                    {/* Resend + change identifier row */}
                     <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
-                        onClick={goBackToPhone}
+                        onClick={goBackToInput}
                         disabled={loading}
                         className="text-sm text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                       >
-                        {UI_TEXT.auth.loginPage.changePhoneNumber}
+                        {mode === "email" ? UI_TEXT.auth.loginPage.changeEmail : UI_TEXT.auth.loginPage.changePhoneNumber}
                       </button>
 
                       {resendTimer > 0 ? (
