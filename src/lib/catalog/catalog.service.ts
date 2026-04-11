@@ -178,7 +178,7 @@ async function resolveCategoryFilterIds(
     where: { id: normalizedId },
     select: { id: true, status: true, isSystem: true },
   });
-  if (!root || root.status !== "APPROVED" || root.isSystem) return [];
+  if (!root || root.status !== "APPROVED") return [];
 
   if (includeChildCategories === false) {
     return [root.id];

@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
-import { FilterChips } from "@/features/catalog/components/filter-chips";
+import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
+import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-drawer";
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
 import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
@@ -199,7 +201,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const priceMax = searchParams.get("priceMax") ?? "";
   const globalCategoryId = searchParams.get("globalCategoryId") ?? "";
   const availableToday = searchParams.get("availableToday") === "true";
-  const rating45plus = searchParams.get("ratingMin") === "4.5";
+  const ratingMin = searchParams.get("ratingMin") ?? "";
   const hot = searchParams.get("hot") === "true";
   const smartTag = parseSmartTag(searchParams.get("smartTag"));
   const entityType = parseEntityType(searchParams.get("entityType"));
@@ -217,6 +219,19 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const needsDate = hasTimeRange && !date;
   const timeModeActive = hasTimeRange && !needsService && !needsDate;
 
+  // Active sidebar filter count (excludes time/service/date handled by DateTimeFilterBar)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (globalCategoryId) count++;
+    if (district) count++;
+    if (ratingMin) count++;
+    if (priceMin || priceMax) count++;
+    if (hot) count++;
+    if (entityType !== "all") count++;
+    if (availableToday) count++;
+    return count;
+  }, [globalCategoryId, district, ratingMin, priceMin, priceMax, hot, entityType, availableToday]);
+
   const [draftServiceQuery, setDraftServiceQuery] = useState(serviceQuery);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -229,6 +244,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const [mapSidebarOpen, setMapSidebarOpen] = useState(false);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [visualSearchOpen, setVisualSearchOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -249,6 +265,19 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     },
     [pathname, router, searchParams]
   );
+
+  const resetFilters = useCallback(() => {
+    updateParams({
+      globalCategoryId: null,
+      district: null,
+      ratingMin: null,
+      priceMin: null,
+      priceMax: null,
+      hot: null,
+      entityType: null,
+      availableToday: null,
+    });
+  }, [updateParams]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -289,7 +318,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       if (priceMax) params.set("priceMax", priceMax);
       if (globalCategoryId) params.set("globalCategoryId", globalCategoryId);
       if (effectiveAvailableToday) params.set("availableToday", "true");
-      if (rating45plus) params.set("ratingMin", "4.5");
+      if (ratingMin) params.set("ratingMin", ratingMin);
       if (hot) params.set("hot", "true");
       if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
@@ -317,7 +346,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       mapSearch,
       priceMax,
       priceMin,
-      rating45plus,
+      ratingMin,
       serviceQuery,
       smartTag,
     ]
@@ -336,7 +365,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       if (priceMax) params.set("priceMax", priceMax);
       if (globalCategoryId) params.set("globalCategoryId", globalCategoryId);
       if (effectiveAvailableToday) params.set("availableToday", "true");
-      if (rating45plus) params.set("ratingMin", "4.5");
+      if (ratingMin) params.set("ratingMin", ratingMin);
       if (hot) params.set("hot", "true");
       if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
@@ -362,7 +391,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       globalCategoryId,
       priceMax,
       priceMin,
-      rating45plus,
+      ratingMin,
       serviceId,
       smartTag,
     ]
@@ -514,13 +543,38 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     }
   }, [closeMapSidebar, view]);
 
+  // Shared filter props for sidebar and drawer
+  const filterProps = {
+    globalCategoryId: globalCategoryId || null,
+    district,
+    ratingMin,
+    priceMin,
+    priceMax,
+    hot,
+    entityType,
+    availableToday,
+    onGlobalCategoryChange: (value: string | null) => updateParams({ globalCategoryId: value }),
+    onDistrictChange: (value: string) => updateParams({ district: value || null }),
+    onRatingMinChange: (value: string) => updateParams({ ratingMin: value || null }),
+    onPriceChange: (min: string, max: string) =>
+      updateParams({
+        priceMin: min.length > 0 ? min : null,
+        priceMax: max.length > 0 ? max : null,
+      }),
+    onToggleHot: () => updateParams({ hot: hot ? null : "true" }),
+    onEntityTypeChange: (value: EntityType) => updateParams({ entityType: value === "all" ? null : value }),
+    onToggleAvailableToday: () => updateParams({ availableToday: availableToday ? null : "true" }),
+    onReset: resetFilters,
+    activeCount: activeFilterCount,
+  };
+
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-4 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      <div className="top-16 z-20 mx-auto w-full max-w-5xl space-y-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
+    <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
+      {/* Search bar — full width */}
+      <div className="mb-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
         <DateTimeFilterBar
           serviceQuery={draftServiceQuery}
           serviceId={serviceId}
-          district={district}
           date={date}
           timePreset={timePreset}
           timeFrom={effectiveTimeFrom}
@@ -530,7 +584,6 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
             setDraftServiceQuery(service.title);
             updateParams({ serviceQuery: service.title, serviceId: service.id });
           }}
-          onDistrictChange={(value) => updateParams({ district: value })}
           onDateChange={(value) => updateParams({ date: value })}
           onPresetChange={(preset, from, to) =>
             updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
@@ -543,54 +596,27 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
           }}
           onSubmit={onSubmit}
         />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-full md:max-w-[260px]">
-            <Input
-              value={district}
-              onChange={(event) => updateParams({ district: event.target.value })}
-              placeholder={UI_TEXT.catalog.capsule.districtPlaceholder}
-              className="h-10 rounded-full bg-bg-input/90"
-              aria-label={UI_TEXT.catalog.capsule.districtPlaceholder}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <FilterChips
-              availableToday={effectiveAvailableToday}
-              rating45plus={rating45plus}
-              hot={hot}
-              smartTag={smartTag}
-              entityType={entityType}
-              globalCategoryId={globalCategoryId || null}
-              priceMin={priceMin}
-              priceMax={priceMax}
-              onToggleAvailableToday={() => updateParams({ availableToday: availableToday ? null : "true" })}
-              onToggleRating45plus={() => updateParams({ ratingMin: rating45plus ? null : "4.5" })}
-              onToggleHot={() => updateParams({ hot: hot ? null : "true" })}
-              onSmartTagChange={(value) => updateParams({ smartTag: value })}
-              onEntityTypeChange={(value) => updateParams({ entityType: value === "all" ? null : value })}
-              onGlobalCategoryChange={(value) => updateParams({ globalCategoryId: value })}
-              onPriceApply={(nextMin, nextMax) =>
-                updateParams({
-                  priceMin: nextMin.length > 0 ? nextMin : null,
-                  priceMax: nextMax.length > 0 ? nextMax : null,
-                })
-              }
-              onPriceReset={() => updateParams({ priceMin: null, priceMax: null })}
-            />
-          </div>
-        </div>
       </div>
 
-      {needsService || needsDate ? (
-        <div role="status" className="rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
-          {needsService ? UI_TEXT.catalog.timeSearch.selectServiceFirst : UI_TEXT.catalog.timeSearch.selectDateFirst}
-        </div>
-      ) : null}
+      {/* Mobile filter button row */}
+      <div className="mb-4 flex items-center justify-between lg:hidden">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setDrawerOpen(true)}
+          className="flex items-center gap-2 rounded-full"
+          aria-label={UI_TEXT.catalog.sidebar.filtersButton}
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          {UI_TEXT.catalog.sidebar.filtersButton}
+          {activeFilterCount > 0 ? (
+            <Badge className="ml-0.5 h-5 min-w-5 rounded-full bg-primary px-1.5 text-[11px] text-white">
+              {UI_TEXT.catalog.sidebar.activeFiltersCount(activeFilterCount)}
+            </Badge>
+          ) : null}
+        </Button>
 
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card/80 px-4 py-3">
-        <div className="text-sm text-muted-foreground">
-          {UI_TEXT.catalog.resultsCount}: <span className="font-semibold text-foreground">{resultCount}</span>
-        </div>
+        {/* View toggle — mobile */}
         <div className="inline-flex rounded-full border border-border bg-card p-1">
           <Button
             onClick={() => updateParams({ view: "list" })}
@@ -611,106 +637,160 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
         </div>
       </div>
 
-      {currentLoading && view === "list" ? <CatalogSkeletonGrid /> : null}
-
-      {currentError ? (
-        <div
-          role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
-        >
-          <div>{currentError}</div>
-          <Button
-            onClick={() => void (timeModeActive ? fetchAvailability() : fetchCatalog())}
-            variant="secondary"
-            size="sm"
-            className="mt-3"
-          >
-            {UI_TEXT.catalog.retry}
-          </Button>
-        </div>
-      ) : null}
-
-      {!currentLoading && !currentError && view === "list" && currentItems.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card/70 p-8 text-center">
-          <div className="text-base font-semibold text-foreground">
-            {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyTitle : UI_TEXT.catalog.emptyTitle}
+      {/* Main layout: sidebar + content */}
+      <div className="flex gap-6">
+        {/* Sidebar — desktop only */}
+        <aside className="hidden w-64 shrink-0 lg:block">
+          <div className="sticky top-20 rounded-2xl border border-border bg-card/80 p-5">
+            <CatalogSidebar {...filterProps} />
           </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyDesc : UI_TEXT.catalog.emptyDesc}
+        </aside>
+
+        {/* Content area */}
+        <div className="min-w-0 flex-1">
+          {/* Results bar — desktop view toggle */}
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/80 px-4 py-3">
+            <div className="text-sm text-muted-foreground">
+              {UI_TEXT.catalog.resultsCount}:{" "}
+              <span className="font-semibold text-foreground">{resultCount}</span>
+            </div>
+            {/* View toggle — desktop only */}
+            <div className="hidden lg:inline-flex rounded-full border border-border bg-card p-1">
+              <Button
+                onClick={() => updateParams({ view: "list" })}
+                variant={view === "list" ? "primary" : "ghost"}
+                size="sm"
+                className="rounded-full"
+              >
+                {UI_TEXT.catalog.viewList}
+              </Button>
+              <Button
+                onClick={() => updateParams({ view: "map" })}
+                variant={view === "map" ? "primary" : "ghost"}
+                size="sm"
+                className="rounded-full"
+              >
+                {UI_TEXT.catalog.viewMap}
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : null}
 
-      {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
-        <motion.div
-          className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-          initial="hidden"
-          animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
-        >
-          {timeModeActive
-            ? availabilityData.items.map((item) => (
-                <motion.div
-                  key={item.providerId}
-                  variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
-                >
-                  <ProviderResultCard item={item} />
-                </motion.div>
-              ))
-            : data.items.map((item) => (
-                <motion.div
-                  key={item.id}
-                  variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
-                >
-                  <CatalogCard item={item} serviceQuery={serviceQuery} />
-                </motion.div>
-              ))}
-        </motion.div>
-      ) : null}
+          {needsService || needsDate ? (
+            <div role="status" className="mb-4 rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
+              {needsService ? UI_TEXT.catalog.timeSearch.selectServiceFirst : UI_TEXT.catalog.timeSearch.selectDateFirst}
+            </div>
+          ) : null}
 
-      {!currentError && view === "map" ? (
-        <div className="relative min-h-[60vh] overflow-hidden rounded-2xl border border-border bg-card/60 lg:min-h-[620px]">
-          <CatalogMap
-            points={mapPoints}
-            itemsCount={currentItems.length}
-            missingCount={missingMapCount}
-            activeId={activeMapId}
-            searchEnabled={!timeModeActive}
-            loadingResults={currentLoading}
-            showEmptySearchNote={
-              mapSearchApplied && !currentLoading && currentItems.length === 0 && !currentError && view === "map"
-            }
-            onSearchArea={(payload, source) => {
-              if (timeModeActive) return;
-              void applyMapSearch(payload, source);
-            }}
-            onClusterSelect={handleClusterSelect}
-          />
-          <CatalogMapSidebar
-            open={mapSidebarOpen}
-            items={mapSidebarItems}
-            onClose={closeMapSidebar}
-            onHover={setActiveMapId}
-          />
-        </div>
-      ) : null}
+          {currentLoading && view === "list" ? <CatalogSkeletonGrid /> : null}
 
-      {!timeModeActive && !loading && !error && data.nextCursor !== null && view === "list" ? (
-        <div className="space-y-2 pt-2 text-center">
-          <Button
-            onClick={() => void loadMore()}
-            disabled={loadingMore}
-            variant="secondary"
-            size="md"
-            className="rounded-full"
-          >
-            {loadingMore ? UI_TEXT.common.loading : UI_TEXT.catalog.loadMore}
-          </Button>
-          {loadMoreError ? (
-            <div className="text-xs text-red-600 dark:text-red-400">{loadMoreError}</div>
+          {currentError ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+            >
+              <div>{currentError}</div>
+              <Button
+                onClick={() => void (timeModeActive ? fetchAvailability() : fetchCatalog())}
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+              >
+                {UI_TEXT.catalog.retry}
+              </Button>
+            </div>
+          ) : null}
+
+          {!currentLoading && !currentError && view === "list" && currentItems.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-card/70 p-8 text-center">
+              <div className="text-base font-semibold text-foreground">
+                {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyTitle : UI_TEXT.catalog.emptyTitle}
+              </div>
+              <div className="mt-2 text-sm text-muted-foreground">
+                {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyDesc : UI_TEXT.catalog.emptyDesc}
+              </div>
+            </div>
+          ) : null}
+
+          {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
+            <motion.div
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+              initial="hidden"
+              animate="visible"
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+            >
+              {timeModeActive
+                ? availabilityData.items.map((item) => (
+                    <motion.div
+                      key={item.providerId}
+                      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                    >
+                      <ProviderResultCard item={item} />
+                    </motion.div>
+                  ))
+                : data.items.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                    >
+                      <CatalogCard item={item} serviceQuery={serviceQuery} />
+                    </motion.div>
+                  ))}
+            </motion.div>
+          ) : null}
+
+          {!currentError && view === "map" ? (
+            <div className="relative min-h-[60vh] overflow-hidden rounded-2xl border border-border bg-card/60 lg:min-h-[620px]">
+              <CatalogMap
+                points={mapPoints}
+                itemsCount={currentItems.length}
+                missingCount={missingMapCount}
+                activeId={activeMapId}
+                searchEnabled={!timeModeActive}
+                loadingResults={currentLoading}
+                showEmptySearchNote={
+                  mapSearchApplied && !currentLoading && currentItems.length === 0 && !currentError && view === "map"
+                }
+                onSearchArea={(payload, source) => {
+                  if (timeModeActive) return;
+                  void applyMapSearch(payload, source);
+                }}
+                onClusterSelect={handleClusterSelect}
+              />
+              <CatalogMapSidebar
+                open={mapSidebarOpen}
+                items={mapSidebarItems}
+                onClose={closeMapSidebar}
+                onHover={setActiveMapId}
+              />
+            </div>
+          ) : null}
+
+          {!timeModeActive && !loading && !error && data.nextCursor !== null && view === "list" ? (
+            <div className="space-y-2 pt-4 text-center">
+              <Button
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                variant="secondary"
+                size="md"
+                className="rounded-full"
+              >
+                {loadingMore ? UI_TEXT.common.loading : UI_TEXT.catalog.loadMore}
+              </Button>
+              {loadMoreError ? (
+                <div className="text-xs text-red-600 dark:text-red-400">{loadMoreError}</div>
+              ) : null}
+            </div>
           ) : null}
         </div>
-      ) : null}
+      </div>
+
+      {/* Mobile filter drawer */}
+      <MobileFilterDrawer
+        {...filterProps}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onApply={() => setDrawerOpen(false)}
+      />
 
       {visualSearchEnabled ? (
         <VisualSearchModal open={visualSearchOpen} onClose={() => setVisualSearchOpen(false)} />

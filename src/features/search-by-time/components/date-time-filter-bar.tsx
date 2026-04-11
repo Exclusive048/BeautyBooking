@@ -12,14 +12,12 @@ import { UI_TEXT } from "@/lib/ui/text";
 type Props = {
   serviceQuery: string;
   serviceId: string;
-  district: string;
   date: string;
   timePreset: TimePreset | null;
   timeFrom: string;
   timeTo: string;
   onServiceQueryChange: (value: string) => void;
   onServiceSelect: (service: ServiceSuggestion) => void;
-  onDistrictChange: (value: string) => void;
   onDateChange: (value: string) => void;
   onPresetChange: (preset: Exclude<TimePreset, "custom">, timeFrom: string, timeTo: string) => void;
   onCustomTimeChange: (timeFrom: string, timeTo: string) => void;
