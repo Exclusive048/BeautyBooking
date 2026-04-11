@@ -28,7 +28,7 @@ export type PublicModelOfferMaster = {
 };
 
 export type PublicModelOfferItem = {
-  id: string;
+  publicCode: string;
   dateLocal: string;
   timeRangeStartLocal: string;
   timeRangeEndLocal: string;
@@ -146,6 +146,7 @@ function resolveOfferService(input: {
 
 function toPublicItem(input: {
   id: string;
+  publicCode: string;
   dateLocal: string;
   timeRangeStartLocal: string;
   timeRangeEndLocal: string;
@@ -193,7 +194,7 @@ function toPublicItem(input: {
 
   const service = offerService.service;
   return {
-    id: input.id,
+    publicCode: input.publicCode,
     dateLocal: input.dateLocal,
     timeRangeStartLocal: input.timeRangeStartLocal,
     timeRangeEndLocal: input.timeRangeEndLocal,
@@ -317,24 +318,43 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
   const hasMore = offers.length > take;
   const rows = hasMore ? offers.slice(0, -1) : offers;
 
+  // TODO: inline publicCode into select above after `npx prisma generate` (migration 20260411180000)
+  const offerIds = rows.map((o) => o.id);
+  const codeRows = offerIds.length
+    ? await prisma.$queryRaw<Array<{ id: string; publicCode: string }>>`
+        SELECT id, "publicCode" FROM "ModelOffer" WHERE id = ANY(${offerIds})`
+    : [];
+  const publicCodeMap = new Map(codeRows.map((r) => [r.id, r.publicCode]));
+
   return {
     items: rows
-      .map(toPublicItem)
+      .map((o) => {
+        const publicCode = publicCodeMap.get(o.id);
+        if (!publicCode) return null;
+        return toPublicItem({ ...o, publicCode });
+      })
       .filter((item): item is PublicModelOfferItem => Boolean(item)),
     nextPage: hasMore ? input.page + 1 : null,
   };
 }
 
-export async function getPublicModelOffer(offerId: string): Promise<PublicModelOfferItem | null> {
-  if (!offerId) return null;
+export async function getPublicModelOffer(code: string): Promise<PublicModelOfferItem | null> {
+  if (!code) return null;
+
+  // TODO: replace $queryRaw with typed findFirst after `npx prisma generate` (migration 20260411180000)
+  const [codeRow] = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT mo.id FROM "ModelOffer" mo
+    JOIN "Provider" p ON p.id = mo."masterId"
+    WHERE mo."publicCode" = ${code}
+      AND mo.status = 'ACTIVE'
+      AND mo."dateLocal" >= ${todayDateString()}
+      AND p."isPublished" = true
+      AND p.type = 'MASTER'
+    LIMIT 1`;
+  if (!codeRow) return null;
 
   const offer = await prisma.modelOffer.findFirst({
-    where: {
-      id: offerId,
-      status: "ACTIVE",
-      dateLocal: { gte: todayDateString() },
-      master: { isPublished: true, type: ProviderType.MASTER },
-    },
+    where: { id: codeRow.id },
     select: {
       id: true,
       dateLocal: true,
@@ -387,7 +407,7 @@ export async function getPublicModelOffer(offerId: string): Promise<PublicModelO
   });
 
   if (!offer) return null;
-  return toPublicItem(offer);
+  return toPublicItem({ ...offer, publicCode: code });
 }
 
 export type PublicModelOfferFilterCategory = {

@@ -536,7 +536,7 @@ export function CatalogMap({
 
       placemark.events.add("click", () => {
         const href = providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map");
-        router.push(href);
+        if (href) router.push(href);
       });
 
       placemarksRef.current.set(point.id, { placemark, baseClass });

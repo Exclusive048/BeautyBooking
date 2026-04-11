@@ -3,7 +3,7 @@ import { getAiFeaturesEnabled } from "@/lib/ai/config";
 import { getReviewSummary } from "@/lib/ai/review-summary";
 import { getClientIp } from "@/lib/http/ip";
 import { logError } from "@/lib/logging/logger";
-import { prisma } from "@/lib/prisma";
+import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
@@ -24,9 +24,10 @@ export async function GET(
     return fail("Too many requests", 429, "RATE_LIMITED");
   }
 
-  const provider = await prisma.provider.findFirst({
-    where: { id: providerId, isPublished: true },
+  const provider = await resolveProviderBySlugOrId({
+    key: providerId,
     select: { id: true },
+    requirePublished: true,
   });
 
   if (!provider) {

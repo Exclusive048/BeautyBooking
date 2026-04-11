@@ -3,6 +3,21 @@ import { prisma } from "@/lib/prisma";
 import type { CatalogEntityType, CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
 
+/** Encode an internal row ID as an opaque, URL-safe cursor token. */
+function encodeCursor(id: string): string {
+  return Buffer.from(id, "utf-8").toString("base64url");
+}
+
+/** Decode a cursor token back to the internal row ID, or return null on failure. */
+function decodeCursor(cursor: string): string | null {
+  try {
+    const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
+    return decoded.length > 0 ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
 // AUDIT (section 6):
 // - Search supports smart tag presets via soft ranking.
 // - Strategy: boost providers with selected-tag count >= threshold, never hard-filter all others.
@@ -43,8 +58,7 @@ export type CatalogProviderItem = {
 
 export type CatalogModelOfferItem = {
   type: "modelOffer";
-  id: string;
-  masterId: string;
+  publicCode: string;
   masterName: string;
   masterAvatarUrl: string | null;
   masterPublicUsername: string | null;
@@ -506,7 +520,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     parseBbox(input.bbox),
     categoryIds.length > 0 ? categoryIds : undefined
   );
-  const cursorId = input.cursor?.trim();
+  const cursorId = input.cursor ? decodeCursor(input.cursor) : null;
   const take = Math.min(Math.max(input.limit, 1), 40);
 
   const providers = await prisma.provider.findMany({
@@ -655,7 +669,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
 
   return {
     items,
-    nextCursor: hasMore ? rows[rows.length - 1]?.id ?? null : null,
+    nextCursor: hasMore ? encodeCursor(rows[rows.length - 1]!.id) : null,
   };
 }
 
@@ -814,7 +828,7 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
   const where: Prisma.ModelOfferWhereInput =
     and.length > 0 ? { AND: and, master: { isPublished: true } } : { master: { isPublished: true } };
 
-  const cursorId = input.cursor?.trim();
+  const cursorId = input.cursor ? decodeCursor(input.cursor) : null;
   const take = Math.min(Math.max(input.limit, 1), 40);
 
   const offers = await prisma.modelOffer.findMany({
@@ -834,7 +848,6 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
       : {}),
     select: {
       id: true,
-      masterId: true,
       dateLocal: true,
       timeRangeStartLocal: true,
       timeRangeEndLocal: true,
@@ -879,6 +892,14 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
   const hasMore = offers.length > take;
   const rows = hasMore ? offers.slice(0, -1) : offers;
 
+  // TODO: inline into the select above after `npx prisma generate` for migration 20260411180000
+  const offerIds = rows.map((o) => o.id);
+  const codeRows = offerIds.length
+    ? await prisma.$queryRaw<Array<{ id: string; publicCode: string }>>`
+        SELECT id, "publicCode" FROM "ModelOffer" WHERE id = ANY(${offerIds})`
+    : [];
+  const publicCodeMap = new Map(codeRows.map((r) => [r.id, r.publicCode]));
+
   const items: CatalogModelOfferItem[] = rows
     .map((offer) => {
       const offerService = resolveModelOfferService({
@@ -887,10 +908,11 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
       });
       if (!offerService) return null;
       const service = offerService.service;
+      const publicCode = publicCodeMap.get(offer.id);
+      if (!publicCode) return null;
       return {
         type: "modelOffer",
-        id: offer.id,
-        masterId: offer.masterId,
+        publicCode,
         masterName: offer.master?.name ?? "Master",
         masterAvatarUrl: offer.master?.avatarUrl ?? null,
         masterPublicUsername: offer.master?.publicUsername ?? null,
@@ -912,7 +934,7 @@ async function searchModelOffers(input: CatalogSearchInput): Promise<CatalogSear
 
   return {
     items,
-    nextCursor: hasMore ? rows[rows.length - 1]?.id ?? null : null,
+    nextCursor: hasMore ? encodeCursor(rows[rows.length - 1]!.id) : null,
   };
 }
 

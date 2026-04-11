@@ -22,7 +22,7 @@ export function ProviderResultCard({ item }: Props) {
         ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}`
         : UI_TEXT.catalog.priceOnRequest;
 
-  const href = providerPublicUrl({ id: item.providerId, publicUsername: item.publicUsername }, "search-result-card");
+  const href = providerPublicUrl({ id: item.providerId, publicUsername: item.publicUsername }, "search-result-card") ?? "#";
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card">

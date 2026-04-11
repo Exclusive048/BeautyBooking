@@ -213,7 +213,7 @@ export function ClientDashboard({ displayName, avatarUrl }: Props) {
               <div className="overflow-x-auto scrollbar-hide">
                 <div className="flex min-w-max gap-3 pb-1">
                   {rebookProviders.map((p) => {
-                    const href = providerPublicUrl({ id: p.id, publicUsername: p.publicUsername }, "dashboard-rebook");
+                    const href = providerPublicUrl({ id: p.id, publicUsername: p.publicUsername }, "dashboard-rebook") ?? "#";
                     return (
                       <Link
                         key={p.id}
@@ -296,7 +296,7 @@ function NextBookingCard({ booking, viewerTz }: { booking: BookingItem; viewerTz
   const bookingUrl = providerPublicUrl(
     { id: booking.provider.id, publicUsername: booking.provider.publicUsername },
     "dashboard-next"
-  );
+  ) ?? "#";
   const countdown = booking.startAtUtc ? getCountdown(booking.startAtUtc) : "";
   const relativeLabel = booking.startAtUtc ? getRelativeLabel(booking.startAtUtc, viewerTz) : "";
   const priceRub = booking.service.price > 0 ? Math.round(booking.service.price / 100) : null;

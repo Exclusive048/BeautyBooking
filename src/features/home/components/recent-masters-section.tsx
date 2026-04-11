@@ -48,10 +48,10 @@ function RecentMasterCard({ item }: { item: RecentMasterItem }) {
   const profileUrl = providerPublicUrl(
     { id: item.provider.id, publicUsername: item.provider.publicUsername },
     "rebook"
-  );
+  ) ?? "#";
   const bookingUrl = item.provider.publicUsername
     ? `/u/${item.provider.publicUsername}/booking?serviceId=${item.lastService.id}`
-    : `/providers/${item.provider.id}`;
+    : "#";
 
   return (
     <article className="flex w-64 shrink-0 flex-col rounded-2xl border border-border-subtle bg-bg-card p-4 shadow-card">

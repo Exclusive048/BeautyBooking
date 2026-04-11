@@ -131,7 +131,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
                   href={providerPublicUrl(
                     { id: invite.studioId, publicUsername: invite.studioPublicUsername },
                     "studio-invite"
-                  )}
+                  ) ?? "#"}
                 >
                   {t.studioProfile}
                 </Link>

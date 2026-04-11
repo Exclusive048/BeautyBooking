@@ -234,12 +234,13 @@ export function ModelOffersPage() {
     []
   );
 
-  const statusStyles = useMemo(
-    () => ({
-      ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      CLOSED: "border-amber-200 bg-amber-50 text-amber-700",
-      ARCHIVED: "border-slate-200 bg-slate-50 text-slate-600",
-    }),
+  const statusVariants = useMemo(
+    () =>
+      ({
+        ACTIVE: "success",
+        CLOSED: "warning",
+        ARCHIVED: "muted",
+      }) as const,
     []
   );
 
@@ -861,7 +862,7 @@ export function ModelOffersPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {offers.map((offer) => {
             const statusLabel = statusLabels[offer.status] ?? offer.status;
-            const statusClass = statusStyles[offer.status] ?? "";
+            const statusVariant = statusVariants[offer.status] ?? "muted";
             return (
               <Card key={offer.id} className="border border-border-subtle bg-bg-card/90">
                 <CardContent className="space-y-4">
@@ -874,7 +875,7 @@ export function ModelOffersPage() {
                         {offer.timeRangeStartLocal} – {offer.timeRangeEndLocal}
                       </div>
                     </div>
-                    <Badge className={statusClass}>{statusLabel}</Badge>
+                    <Badge variant={statusVariant}>{statusLabel}</Badge>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-text-main">

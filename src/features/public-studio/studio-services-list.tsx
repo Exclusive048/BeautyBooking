@@ -99,7 +99,7 @@ export function StudioServicesList({ studio, categories, services }: Props) {
               </div>
               <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
                 <Link
-                  href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services")}
+                  href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services") ?? "#"}
                   aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
                 >
                   {UI_TEXT.publicStudio.addService}

@@ -66,35 +66,20 @@ function extractApiError<T>(json: ApiResponse<T> | null, fallback: string): stri
 
 const APP_TEXT = UI_TEXT.master.modelOffers.applications;
 
-function statusMeta(status: ModelApplicationStatus): { label: string; className: string } {
+function statusMeta(status: ModelApplicationStatus): { label: string; variant: "warning" | "success" | "muted" | "info" | "danger" } {
   if (status === "PENDING") {
-    return {
-      label: APP_TEXT.status.pending,
-      className: "border-amber-200 bg-amber-50 text-amber-700",
-    };
+    return { label: APP_TEXT.status.pending, variant: "warning" };
   }
   if (status === "APPROVED_WAITING_CLIENT" || status === "ACCEPTED") {
-    return {
-      label: APP_TEXT.status.accepted,
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    };
+    return { label: APP_TEXT.status.accepted, variant: "success" };
   }
   if (status === "REJECTED") {
-    return {
-      label: APP_TEXT.status.rejected,
-      className: "border-slate-200 bg-slate-50 text-slate-600",
-    };
+    return { label: APP_TEXT.status.rejected, variant: "muted" };
   }
   if (status === "CONFIRMED") {
-    return {
-      label: APP_TEXT.status.confirmed,
-      className: "border-blue-200 bg-blue-50 text-blue-700",
-    };
+    return { label: APP_TEXT.status.confirmed, variant: "info" };
   }
-  return {
-    label: status,
-    className: "border-border-subtle bg-bg-input text-text-main",
-  };
+  return { label: status, variant: "muted" as const };
 }
 
 function ProposeTimeModal({ open, onClose, onSubmit, submitting, initialValue, timeRange }: ProposeTimeModalProps) {
@@ -159,9 +144,7 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
   const status = statusMeta(application.status);
   const photo = application.photos[0]?.url ?? null;
   const isPending = application.status === "PENDING";
-  const consentClass = application.consentToShoot
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-slate-200 bg-slate-50 text-slate-600";
+  const consentVariant = application.consentToShoot ? "success" : "muted";
 
   return (
     <article className="rounded-2xl border border-border-subtle/80 bg-bg-card/70 p-4">
@@ -188,20 +171,20 @@ function ApplicationCard({ application, onPropose, onReject, rejecting, proposin
             </p>
           </div>
         </div>
-        <Badge className={status.className}>{status.label}</Badge>
+        <Badge variant={status.variant}>{status.label}</Badge>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Badge className={consentClass}>
+        <Badge variant={consentVariant}>
           {application.consentToShoot ? APP_TEXT.card.consentYes : APP_TEXT.card.consentNo}
         </Badge>
         {application.proposedTimeLocal ? (
-          <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+          <Badge variant="info">
             {APP_TEXT.card.proposed.replace("{time}", application.proposedTimeLocal)}
           </Badge>
         ) : null}
         {application.confirmedStartAt ? (
-          <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+          <Badge variant="info">
             {APP_TEXT.card.confirmed.replace("{datetime}", UI_FMT.dateTimeShort(application.confirmedStartAt))}
           </Badge>
         ) : null}

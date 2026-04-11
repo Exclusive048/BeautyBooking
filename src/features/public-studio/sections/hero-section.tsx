@@ -69,7 +69,7 @@ export async function StudioHeroSection({ studioId }: Props) {
     { id: studio.id, publicUsername: studio.publicUsername },
     undefined,
     "public-studio-hero"
-  );
+  ) ?? "#";
 
   return (
     <div className="fade-in-up">

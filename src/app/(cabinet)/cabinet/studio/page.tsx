@@ -39,7 +39,7 @@ export default async function StudioCabinetIndexPage() {
   }>(`/api/providers/me?studioId=${encodeURIComponent(studioId)}`);
   const provider = providerRes.ok ? providerRes.data.provider : null;
   const publicHref = provider?.publicUsername
-    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-dashboard")
+    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-dashboard") ?? null
     : null;
 
   let stats: Awaited<ReturnType<typeof getStudioDashboardStats>> | null = null;

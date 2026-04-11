@@ -157,7 +157,9 @@ export function HotSlotsPageClient() {
               { id: item.provider.id, publicUsername: item.provider.publicUsername },
               "hot-slots-card"
             );
-            const href = hasService ? withQuery(base, { serviceId: item.service!.id }) : base;
+            const href = base
+              ? hasService ? withQuery(base, { serviceId: item.service!.id }) : base
+              : "#";
 
             return (
               <Card key={item.id} className="h-full border border-border-subtle bg-bg-card/90">

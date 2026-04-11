@@ -34,7 +34,7 @@ export default async function StudioCabinetLayout({
   const provider = providerRes.ok ? providerRes.data.provider : null;
   const studioName = provider?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
   const publicHref = provider?.publicUsername
-    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-cabinet")
+    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-cabinet") ?? "/cabinet/studio/settings"
     : "/cabinet/studio/settings";
   const publicHint = provider?.publicUsername
     ? null

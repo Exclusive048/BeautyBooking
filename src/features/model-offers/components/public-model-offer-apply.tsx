@@ -21,14 +21,14 @@ type UploadResponse = {
 };
 
 type Props = {
-  offerId: string;
+  offerCode: string;
   userId: string | null;
   loginHref: string;
 };
 
 const MAX_FILES = 3;
 
-export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
+export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [note, setNote] = useState("");
   const [consent, setConsent] = useState(false);
@@ -104,7 +104,7 @@ export function ModelOfferApplyForm({ offerId, userId, loginHref }: Props) {
     setLoading(true);
     try {
       const mediaIds = await uploadAssets();
-      await fetchJson<ApplyResponse>(`/api/model-offers/${offerId}/apply`, {
+      await fetchJson<ApplyResponse>(`/api/model-offers/${offerCode}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

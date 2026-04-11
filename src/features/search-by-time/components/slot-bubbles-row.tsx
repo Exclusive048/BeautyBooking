@@ -15,6 +15,7 @@ function buildSlotHref(
   slotStartAt: string
 ): string {
   const base = providerPublicUrl(provider, "slot-bubbles-row");
+  if (!base) return "#";
   return withQuery(base, {
     serviceId: serviceId || undefined,
     slotStartAt: slotStartAt || undefined,

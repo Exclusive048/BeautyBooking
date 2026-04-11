@@ -42,10 +42,8 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
   const router = useRouter();
   const viewerTimeZone = useViewerTimeZoneContext();
   const hasServiceQuery = serviceQuery.trim().length > 0;
-  const href = providerPublicUrl({ id: item.id, publicUsername: item.publicUsername }, "catalog-card");
-  const bookingHref = item.publicUsername
-    ? `/u/${item.publicUsername}/booking`
-    : `/providers/${item.id}`;
+  const href = providerPublicUrl({ id: item.id, publicUsername: item.publicUsername }, "catalog-card") ?? "#";
+  const bookingHref = item.publicUsername ? `/u/${item.publicUsername}/booking` : "#";
 
   const priceText =
     hasServiceQuery && item.primaryService && item.primaryService.price > 0

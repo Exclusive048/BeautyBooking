@@ -3,6 +3,8 @@
 model ModelOffer {
   id String @id @default(cuid())
 
+  publicCode String @unique @default(cuid())
+
   masterId String
 
   master Provider @relation(fields: [masterId], references: [id], onDelete: Cascade)

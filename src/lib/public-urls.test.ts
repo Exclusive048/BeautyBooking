@@ -18,15 +18,15 @@ describe("public-urls", () => {
     expect(url).toBe("/path?a=x&b=2&c=1&c=2");
   });
 
-  it("returns fallback provider url and alerts when username missing", () => {
-    const url = providerPublicUrl({ id: "p1", publicUsername: null }, "ctx", "providers");
-    expect(url).toBe("/providers/p1");
+  it("returns null and alerts when provider username missing", () => {
+    const url = providerPublicUrl({ id: "p1", publicUsername: null }, "ctx");
+    expect(url).toBeNull();
     expect(alertMock).toHaveBeenCalledTimes(1);
   });
 
-  it("returns client url and alerts when username missing", () => {
+  it("returns null and alerts when client username missing", () => {
     const url = clientPublicUrl({ id: "c1", publicUsername: null }, "ctx");
-    expect(url).toBe("/clients/c1");
+    expect(url).toBeNull();
     expect(alertMock).toHaveBeenCalledTimes(1);
   });
 

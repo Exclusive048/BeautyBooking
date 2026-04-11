@@ -139,7 +139,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           { id: studioId, publicUsername: studio?.publicUsername ?? null },
           undefined,
           "studio-booking-flow"
-        );
+        ) ?? "#";
 
   useEffect(() => {
     let cancelled = false;

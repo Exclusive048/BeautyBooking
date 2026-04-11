@@ -27,7 +27,7 @@ export function ModelOfferCard({ offer, index = 0 }: Props) {
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
     >
       <Link
-        href={`/models/${offer.id}`}
+        href={`/models/${offer.publicCode}`}
         className="group flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={`${offer.service.title} — ${offer.master.name}`}
       >

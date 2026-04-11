@@ -55,7 +55,7 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.heroBook}</div>
           <Button asChild variant="secondary">
-            <Link href={bookingHref}>{UI_TEXT.publicStudio.openBookingFlow}</Link>
+            <Link href={bookingHref ?? "#"}>{UI_TEXT.publicStudio.openBookingFlow}</Link>
           </Button>
         </div>
         <StudioBookingFlow

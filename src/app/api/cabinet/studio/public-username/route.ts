@@ -11,7 +11,6 @@ import {
   normalizeUsernameInput,
   validateUsername,
 } from "@/lib/publicUsername";
-import { providerPublicUrl } from "@/lib/public-urls";
 import { parseBody } from "@/lib/validation";
 import { ProviderType } from "@prisma/client";
 
@@ -21,8 +20,8 @@ const bodySchema = z.object({
   username: z.string().trim().min(1),
 });
 
-function buildPublicUrl(appUrl: string, providerId: string, username: string) {
-  return `${appUrl}${providerPublicUrl({ id: providerId, publicUsername: username }, "studio-public-username")}`;
+function buildPublicUrl(appUrl: string, username: string) {
+  return `${appUrl}/u/${username}`;
 }
 
 export async function GET(req: Request) {
@@ -58,7 +57,7 @@ export async function GET(req: Request) {
       username = updated.publicUsername ?? username;
     }
 
-    return jsonOk({ username, url: buildPublicUrl(appUrl, provider.id, username) });
+    return jsonOk({ username, url: buildPublicUrl(appUrl, username) });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
@@ -91,7 +90,7 @@ export async function POST(req: Request) {
     }
 
     if (provider.publicUsername === normalized) {
-      return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, provider.id, normalized) });
+      return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, normalized) });
     }
 
     if (await isUsernameTaken(prisma, normalized)) {
@@ -138,7 +137,7 @@ export async function POST(req: Request) {
       });
     }
 
-    return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, provider.id, normalized) });
+    return jsonOk({ username: normalized, url: buildPublicUrl(appUrl, normalized) });
   } catch (error) {
     const appError = toAppError(error);
     return jsonFail(appError.status, appError.message, appError.code, appError.details);

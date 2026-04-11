@@ -66,6 +66,7 @@ export function PortfolioPreviewModal({ itemId, open, onClose }: Props) {
           { id: detail.masterId, publicUsername: detail.masterPublicUsername },
           "portfolio-preview"
         );
+        if (!base) return null;
         return primaryService ? withQuery(base, { serviceId: primaryService.serviceId }) : base;
       })()
     : null;

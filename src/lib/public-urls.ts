@@ -62,19 +62,18 @@ function reportMissing(input: { kind: "provider" | "client"; id: string; context
 export function providerPublicUrl(
   entity: PublicUrlable,
   context?: string,
-  fallbackPrefix: "providers" | "studios" = "providers"
-): string {
+): string | null {
   if (!entity.publicUsername) {
     reportMissing({ kind: "provider", id: entity.id, context });
-    return `/${fallbackPrefix}/${entity.id}`;
+    return null;
   }
   return `/u/${entity.publicUsername}`;
 }
 
-export function clientPublicUrl(entity: PublicUrlable, context?: string): string {
+export function clientPublicUrl(entity: PublicUrlable, context?: string): string | null {
   if (!entity.publicUsername) {
     reportMissing({ kind: "client", id: entity.id, context });
-    return `/clients/${entity.id}`;
+    return null;
   }
   return `/c/${entity.publicUsername}`;
 }
@@ -83,10 +82,10 @@ export function studioBookingUrl(
   studio: PublicUrlable,
   params?: QueryParams,
   context: string = "studio-booking"
-): string {
+): string | null {
   if (!studio.publicUsername) {
     reportMissing({ kind: "provider", id: studio.id, context });
+    return null;
   }
-  const studioKey = studio.publicUsername ?? studio.id;
-  return withQuery(`/u/${studioKey}/booking`, params);
+  return withQuery(`/u/${studio.publicUsername}/booking`, params);
 }

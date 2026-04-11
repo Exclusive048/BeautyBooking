@@ -129,7 +129,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   const studioName = provider?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
   const publicHref = provider?.publicUsername
-    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-cabinet")
+    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-cabinet") ?? "/cabinet/studio/settings"
     : "/cabinet/studio/settings";
   const publicHint = provider?.publicUsername ? null : UI_TEXT.studioCabinet.layout.publicUsernameHint;
 

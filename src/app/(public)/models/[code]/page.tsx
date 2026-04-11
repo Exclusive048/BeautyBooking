@@ -17,12 +17,12 @@ import { ModelOfferApplyForm } from "@/features/model-offers/components/public-m
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PageProps = {
-  params: Promise<{ offerId: string }>;
+  params: Promise<{ code: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { offerId } = await params;
-  const offer = await getPublicModelOffer(offerId);
+  const { code } = await params;
+  const offer = await getPublicModelOffer(code);
   if (!offer) {
     return {
       title: UI_TEXT.pages.modelOffer.notFoundTitle,
@@ -41,12 +41,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function ModelOfferPage({ params }: PageProps) {
-  const { offerId } = await params;
-  const offer = await getPublicModelOffer(offerId);
+  const { code } = await params;
+  const offer = await getPublicModelOffer(code);
   if (!offer) return notFound();
 
   const user = await getSessionUser();
-  const loginHref = `/login?next=${encodeURIComponent(`/models/${offer.id}`)}`;
+  const loginHref = `/login?next=${encodeURIComponent(`/models/${offer.publicCode}`)}`;
   const isFree = offer.price === null || offer.price === 0;
   const priceLabel = isFree
     ? UI_TEXT.pages.models.priceFree
@@ -223,7 +223,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
               </p>
               <div className="mt-5">
                 <ModelOfferApplyForm
-                  offerId={offer.id}
+                  offerCode={offer.publicCode}
                   userId={user?.id ?? null}
                   loginHref={loginHref}
                 />

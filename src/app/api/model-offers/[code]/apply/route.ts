@@ -9,7 +9,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
-  params: Promise<{ offerId: string }>;
+  params: Promise<{ code: string }>;
 };
 
 export const runtime = "nodejs";
@@ -23,25 +23,30 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     const params = await ctx.params;
-    const offerId = params.offerId;
-    if (!offerId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    const offerCode = params.code;
+    if (!offerCode) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
 
     const body = await parseBody(req, applyModelOfferSchema);
 
-    const offer = await prisma.modelOffer.findUnique({
-      where: { id: offerId },
-      select: {
-        id: true,
-        status: true,
-        masterId: true,
-        dateLocal: true,
-        timeRangeStartLocal: true,
-        timeRangeEndLocal: true,
-        master: {
-          select: { id: true, ownerUserId: true, masterProfile: { select: { userId: true } }, name: true },
-        },
-      },
-    });
+    // TODO: replace with findUnique({ where: { publicCode } }) after prisma generate (migration 20260411180000)
+    const [codeRow] = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "ModelOffer" WHERE "publicCode" = ${offerCode} LIMIT 1`;
+    const offer = codeRow
+      ? await prisma.modelOffer.findFirst({
+          where: { id: codeRow.id },
+          select: {
+            id: true,
+            status: true,
+            masterId: true,
+            dateLocal: true,
+            timeRangeStartLocal: true,
+            timeRangeEndLocal: true,
+            master: {
+              select: { id: true, ownerUserId: true, masterProfile: { select: { userId: true } }, name: true },
+            },
+          },
+        })
+      : null;
     if (!offer) return jsonFail(404, "Предложение не найдено", "NOT_FOUND");
     if (offer.status !== "ACTIVE") {
       return jsonFail(409, "Предложение не активно", "CONFLICT");
@@ -117,9 +122,9 @@ export async function POST(req: Request, ctx: RouteContext) {
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {
-      logError("POST /api/model-offers/[offerId]/apply failed", {
+      logError("POST /api/model-offers/[code]/apply failed", {
         requestId: getRequestId(req),
-        route: "POST /api/model-offers/{offerId}/apply",
+        route: "POST /api/model-offers/{code}/apply",
         stack: error instanceof Error ? error.stack : undefined,
       });
     }

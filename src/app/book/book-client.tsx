@@ -75,6 +75,7 @@ export default function BookFromPortfolioClient() {
       { id: detail.masterId, publicUsername: detail.masterPublicUsername },
       "portfolio-book"
     );
+    if (!base) return "#";
     return primaryService ? withQuery(base, { serviceId: primaryService.serviceId }) : base;
   }, [detail, primaryService]);
   const canOpenProfile = Boolean(detail);

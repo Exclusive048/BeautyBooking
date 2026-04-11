@@ -59,34 +59,34 @@ function normalizeStatus(status: RawStatus): NormalizedStatus {
 
 function statusMeta(status: RawStatus, proposedTimeLocal: string | null, confirmedStartAt: string | null): {
   badge: string;
-  badgeClass: string;
+  badgeVariant: "warning" | "muted" | "info" | "success";
   description: string;
 } {
   const normalized = normalizeStatus(status);
   if (normalized === "PENDING") {
     return {
       badge: "Ожидает",
-      badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+      badgeVariant: "warning",
       description: "Ожидает ответа мастера",
     };
   }
   if (normalized === "REJECTED") {
     return {
       badge: "Отклонена",
-      badgeClass: "border-slate-200 bg-slate-50 text-slate-600",
+      badgeVariant: "muted",
       description: "Мастер не принял заявку",
     };
   }
   if (normalized === "TIME_PROPOSED") {
     return {
       badge: "Предложено время",
-      badgeClass: "border-blue-200 bg-blue-50 text-blue-700",
+      badgeVariant: "info",
       description: `Мастер предлагает время ${proposedTimeLocal ?? "—"}`,
     };
   }
   return {
     badge: "Подтверждено",
-    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    badgeVariant: "success",
     description: confirmedStartAt ? `Подтверждено! ${UI_FMT.dateTimeLong(confirmedStartAt)}` : "Подтверждено!",
   };
 }
@@ -210,7 +210,7 @@ export function ClientModelApplicationsPage() {
                 </div>
                 <h3 className="mt-1 truncate text-base font-semibold text-text-main">{item.offer.service.title}</h3>
               </div>
-              <Badge className={meta.badgeClass}>{meta.badge}</Badge>
+              <Badge variant={meta.badgeVariant}>{meta.badge}</Badge>
             </div>
 
             <div className="mt-3 flex items-center gap-3">

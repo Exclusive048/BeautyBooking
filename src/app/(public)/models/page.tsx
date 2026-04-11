@@ -109,7 +109,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
           <>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {offers.items.map((offer, i) => (
-                <ModelOfferCard key={offer.id} offer={offer} index={i} />
+                <ModelOfferCard key={offer.publicCode} offer={offer} index={i} />
               ))}
             </div>
 
