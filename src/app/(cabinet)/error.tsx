@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 import { UI_TEXT } from "@/lib/ui/text";
+
+const t = UI_TEXT.pages.error;
 
 export default function CabinetError({
   error,
@@ -13,25 +14,25 @@ export default function CabinetError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[cabinet] Unhandled error:", error);
+    fetch("/api/log-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: error.message,
+        digest: error.digest,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      }),
+    }).catch(() => {});
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <h1 className="text-2xl font-semibold text-text-main">
-        {UI_TEXT.pages.error.cabinet.title}
-      </h1>
-      <p className="mt-2 text-text-sec">
-        {UI_TEXT.pages.error.cabinet.subtitle}
-      </p>
-      <div className="mt-6 flex items-center justify-center gap-3">
-        <Button onClick={reset}>
-          {UI_TEXT.pages.error.retry}
-        </Button>
-        <Button variant="secondary" asChild>
-          <Link href="/cabinet">{UI_TEXT.pages.error.goBack}</Link>
-        </Button>
-      </div>
-    </div>
+    <ErrorState
+      variant="default"
+      title={t.cabinet.title}
+      description={t.cabinet.subtitle}
+      primaryAction={{ label: t.retry, onClick: reset }}
+      secondaryAction={{ label: t.goBack, href: "/cabinet" }}
+    />
   );
 }
