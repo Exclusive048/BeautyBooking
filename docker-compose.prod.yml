@@ -1,0 +1,110 @@
+# Production docker-compose.
+#
+# Usage:
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+#
+# Required env (in .env.production):
+#   REGISTRY          - Yandex CR prefix, e.g. cr.yandex/<registry-id>
+#   IMAGE_TAG         - image tag to deploy, e.g. a1b2c3d4
+#   POSTGRES_DB       - database name
+#   POSTGRES_USER     - database user
+#   POSTGRES_PASSWORD - database password
+#   REDIS_PASSWORD    - Redis requirepass value
+#   DATABASE_URL      - postgresql://user:pass@postgres:5432/db
+#   REDIS_URL         - redis://:pass@redis:6379
+
+services:
+  app:
+    image: ${REGISTRY}/beautyhub-app:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    ports:
+      - "127.0.0.1:3000:3000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  worker:
+    image: ${REGISTRY}/beautyhub-worker:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-beautyhub}
+      POSTGRES_USER: ${POSTGRES_USER:-beautyhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U ${POSTGRES_USER:-beautyhub} -d ${POSTGRES_DB:-beautyhub}"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-a"
+        - "${REDIS_PASSWORD}"
+        - "ping"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

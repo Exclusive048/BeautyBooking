@@ -67,7 +67,14 @@ const nextConfig = {
   // Note: duplicate API calls in dev logs are caused by React StrictMode.
   // This does NOT happen in production builds.
   reactStrictMode: true,
-  serverExternalPackages: ["redis", "@redis/client"],
+  output: "standalone",
+  serverExternalPackages: [
+    "redis",
+    "@redis/client",
+    "@prisma/client",
+    "sharp",
+    "@aws-sdk/client-s3",
+  ],
   images: {
     remotePatterns: [
       {

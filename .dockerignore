@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next.js build output
+.next
+out
+
+# Local env files
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Dev files
+.git
+.gitignore
+.github
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.ts
+
+# Docs and scripts
+docs
+scripts
+DEPLOY_GUIDE.md
+*.md
+!README.md
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+
+# Dev upload storage
+public/uploads

@@ -1,0 +1,30 @@
+# ─── Stage 1: Full deps + Prisma generate ────────────────────────────────────
+# prisma CLI (in devDeps) is needed only for generate; we copy the output to stage 2.
+FROM node:20-alpine AS prisma-builder
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# ─── Stage 2: Production runtime ─────────────────────────────────────────────
+FROM node:20-alpine AS runner
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+
+# Production dependencies only (tsx + prisma are now in dependencies)
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Copy the generated Prisma client from the full-deps stage
+COPY --from=prisma-builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Source files required by the worker
+COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY src ./src
+
+ENV NODE_ENV=production
+
+CMD ["node_modules/.bin/tsx", "src/worker.ts"]

@@ -1,0 +1,33 @@
+# Development docker-compose — runs only the backing services.
+# The Next.js app and worker run locally via `npm run dev` and `npm run worker`.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# DATABASE_URL=postgresql://beautyhub:beautyhub_dev@localhost:5432/beautyhub
+# REDIS_URL=redis://localhost:6379
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: beautyhub
+      POSTGRES_USER: beautyhub
+      POSTGRES_PASSWORD: beautyhub_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:

@@ -1,0 +1,137 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
+
+jobs:
+  # ─── Quality gates (mirrors quality-gates.yml, fast-fail before build) ──────
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm run test
+
+  # ─── Build & push Docker images ──────────────────────────────────────────────
+  build:
+    needs: quality
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag (short SHA)
+        id: tag
+        run: echo "tag=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Login to Yandex Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: cr.yandex
+          username: oauth
+          password: ${{ secrets.YC_OAUTH_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/beautyhub-app:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/beautyhub-app:latest
+          build-args: |
+            NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+            NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME }}
+            NEXT_PUBLIC_VK_ENABLED=${{ vars.NEXT_PUBLIC_VK_ENABLED || 'false' }}
+            NEXT_PUBLIC_YANDEX_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_YANDEX_MAPS_API_KEY }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/beautyhub-app:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/beautyhub-app:buildcache,mode=max
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/beautyhub-worker:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/beautyhub-worker:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/beautyhub-worker:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/beautyhub-worker:buildcache,mode=max
+
+  # ─── Deploy to production server ─────────────────────────────────────────────
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+          YC_REGISTRY_ID: ${{ secrets.YC_REGISTRY_ID }}
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: IMAGE_TAG,YC_OAUTH_TOKEN,YC_REGISTRY_ID
+          script: |
+            set -e
+            cd /opt/beautyhub
+
+            REGISTRY="cr.yandex/${YC_REGISTRY_ID}"
+
+            # Authenticate with Yandex Container Registry
+            echo "$YC_OAUTH_TOKEN" | docker login --username oauth --password-stdin cr.yandex
+
+            # Pull new images
+            REGISTRY=$REGISTRY IMAGE_TAG=$IMAGE_TAG \
+              docker compose --env-file .env.production -f docker-compose.prod.yml pull app worker
+
+            # Run database migrations before starting the new app
+            docker run --rm \
+              --env-file .env.production \
+              --network beautyhub_internal \
+              ${REGISTRY}/beautyhub-worker:${IMAGE_TAG} \
+              node_modules/.bin/prisma migrate deploy
+
+            # Rolling restart — app and worker only (postgres/redis untouched)
+            REGISTRY=$REGISTRY IMAGE_TAG=$IMAGE_TAG \
+              docker compose --env-file .env.production -f docker-compose.prod.yml \
+              up -d --no-deps --remove-orphans app worker
+
+            # Clean up dangling images
+            docker image prune -f
+
+            echo "Deployed ${IMAGE_TAG} successfully"
