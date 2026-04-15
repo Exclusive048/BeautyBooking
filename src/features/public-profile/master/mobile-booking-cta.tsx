@@ -2,12 +2,18 @@
 
 import { UI_TEXT } from "@/lib/ui/text";
 
+export const BOOKING_OPEN_SHEET_EVENT = "booking:open-sheet";
+
 export function MobileBookingCta() {
-  function scrollToBooking() {
+  function handleClick() {
+    // Notify BookingSectionClient to open the bottom sheet
+    document.dispatchEvent(new CustomEvent(BOOKING_OPEN_SHEET_EVENT));
+    // Scroll fallback in case the section hasn't loaded yet
     const el = document.getElementById("booking");
-    if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 16;
-    window.scrollTo({ top: y, behavior: "smooth" });
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 16;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
   }
 
   return (
@@ -18,7 +24,7 @@ export function MobileBookingCta() {
       <div className="mx-4 mb-4">
         <button
           type="button"
-          onClick={scrollToBooking}
+          onClick={handleClick}
           className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 py-4 text-base font-semibold text-[rgb(var(--accent-foreground))] shadow-hover transition active:scale-[0.98]"
         >
           {UI_TEXT.publicProfile.page.bookNow}

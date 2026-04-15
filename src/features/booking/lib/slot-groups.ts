@@ -1,8 +1,11 @@
 import type { SlotGroup } from "@/features/booking/model/types";
 import { timeToMinutes } from "@/lib/schedule/time";
 import type { SlotItem } from "@/features/booking/lib/studio-booking";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export function groupSlotsByDayPeriod(slots: SlotItem[]): SlotGroup[] {
+  const t = UI_TEXT.publicProfile.slots;
+
   const items = slots
     .map((slot) => {
       const [, time] = slot.label.split(" ");
@@ -16,9 +19,9 @@ export function groupSlotsByDayPeriod(slots: SlotItem[]): SlotGroup[] {
   items.sort((a, b) => a.minutes - b.minutes);
 
   const groups = [
-    { id: "morning", label: "Утро", items: [] as string[] },
-    { id: "day", label: "День", items: [] as string[] },
-    { id: "evening", label: "Вечер", items: [] as string[] },
+    { id: "morning", label: t.periodMorning, items: [] as string[] },
+    { id: "day", label: t.periodDay, items: [] as string[] },
+    { id: "evening", label: t.periodEvening, items: [] as string[] },
   ];
 
   for (const item of items) {

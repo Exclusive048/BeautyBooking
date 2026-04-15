@@ -178,6 +178,8 @@ export async function POST(req: Request) {
       operation: "create-booking",
       code: appError.code,
     });
-    return jsonFail(appError.status, appError.message, appError.code);
+    const response = jsonFail(appError.status, appError.message, appError.code);
+    if (appError.status === 429) response.headers.set("Retry-After", "60");
+    return response;
   }
 }

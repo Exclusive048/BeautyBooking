@@ -782,9 +782,9 @@ export function PublicBookingWidget({
 
               <div>
                 <div className="mb-2 text-xs text-text-sec">{UI_TEXT.publicProfile.slots.chooseSlot}</div>
-                {slotNotice ? <div className="mb-2 text-xs text-amber-600">{slotNotice}</div> : null}
+                {slotNotice ? <div className="mb-2 text-xs text-amber-600 dark:text-amber-300">{slotNotice}</div> : null}
                 {selectedSlot?.isHot ? (
-                  <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-2 py-1 text-[11px] font-semibold text-orange-400">
+                  <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-2 py-1 text-[11px] font-semibold text-orange-400 dark:bg-orange-500/10 dark:text-orange-300">
                     <span>{UI_TEXT.publicProfile.slots.hotBadge}</span>
                     <span>
                       -{selectedSlotDiscountPercent ?? selectedSlot.discountValue ?? 0}%
@@ -912,7 +912,7 @@ export function PublicBookingWidget({
                     className="sr-only"
                   />
                   <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-bg-page transition dark:bg-slate-200 ${
                       silentMode ? "left-6" : "left-0.5"
                     }`}
                   />
