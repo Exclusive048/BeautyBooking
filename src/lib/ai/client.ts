@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { AppError } from "@/lib/api/errors";
+import { env } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 
@@ -10,7 +11,7 @@ const AI_MAX_RETRIES = 1;
 let client: OpenAI | null = null;
 
 function getApiKey(): string {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new AppError("OPENAI_API_KEY is not configured", 500, "INTERNAL_ERROR");
   }

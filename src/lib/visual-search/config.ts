@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/api/errors";
+import { env, isVisualSearchEnabled } from "@/lib/env";
 import { createSystemDisabledError } from "@/lib/billing/guards";
 import { del, get, set } from "@/lib/cache/cache";
 import { prisma } from "@/lib/prisma";
@@ -11,21 +12,13 @@ export type VisualSearchConfig = {
   enabled: boolean;
 };
 
-function parseBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (!value) return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
-  if (normalized === "false" || normalized === "0" || normalized === "no") return false;
-  return fallback;
-}
-
 export function getVisualSearchEnabledByEnv(): boolean {
-  return parseBoolean(process.env.VISUAL_SEARCH_ENABLED, false);
+  return isVisualSearchEnabled;
 }
 
 export function ensureVisualSearchStartupConfig(): void {
-  if (!getVisualSearchEnabledByEnv()) return;
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!isVisualSearchEnabled) return;
+  const apiKey = env.OPENAI_API_KEY?.trim();
   if (apiKey) return;
   throw new AppError(
     "OPENAI_API_KEY is required when VISUAL_SEARCH_ENABLED=true",

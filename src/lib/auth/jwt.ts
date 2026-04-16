@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { env } from "@/lib/env";
 
 function base64url(input: Buffer | string) {
   const b = Buffer.isBuffer(input) ? input : Buffer.from(input);
@@ -37,7 +38,7 @@ function createToken(
   tokenType: "access" | "refresh",
   input?: { jti?: string }
 ) {
-  const secret = process.env.AUTH_JWT_SECRET!;
+  const secret = env.AUTH_JWT_SECRET;
   if (!secret) throw new Error("AUTH_JWT_SECRET is not set");
 
   const header = { alg: "HS256", typ: "JWT" };
@@ -78,7 +79,7 @@ export function signRefreshToken(payload: RefreshTokenPayload): string {
 }
 
 export function verifyToken(token: string, type: "access" | "refresh" = "access"): SessionPayload | null {
-  const secret = process.env.AUTH_JWT_SECRET!;
+  const secret = env.AUTH_JWT_SECRET;
   if (!secret) throw new Error("AUTH_JWT_SECRET is not set");
 
   const parts = token.split(".");

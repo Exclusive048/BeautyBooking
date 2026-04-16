@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { env } from "@/lib/env";
 
 export const PRIVATE_MEDIA_TOKEN_QUERY_PARAM = "mt";
 const PRIVATE_MEDIA_TOKEN_PURPOSE = "media-read";
@@ -21,14 +22,14 @@ function fromBase64url(input: string): string {
 }
 
 function getMediaDeliverySecret(): string {
-  const explicitSecret = process.env.MEDIA_DELIVERY_SECRET?.trim();
+  const explicitSecret = env.MEDIA_DELIVERY_SECRET?.trim();
   if (explicitSecret) return explicitSecret;
 
-  if (process.env.NODE_ENV === "production") {
+  if (env.NODE_ENV === "production") {
     throw new Error("MEDIA_DELIVERY_SECRET is required in production");
   }
 
-  const authSecret = process.env.AUTH_JWT_SECRET?.trim();
+  const authSecret = env.AUTH_JWT_SECRET?.trim();
   if (authSecret) return `media:${authSecret}`;
   return "dev-media-delivery-secret";
 }

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { env } from "@/lib/env";
 
 export function normalizePhone(input: string): string {
   const cleaned = input.replace(/[()\s-]/g, "");
@@ -12,7 +13,7 @@ export function generateOtpCode(): string {
 }
 
 export function hashOtpCode(phone: string, code: string): string {
-  const secret = process.env.OTP_HMAC_SECRET;
+  const secret = env.OTP_HMAC_SECRET;
   if (!secret) {
     throw new Error("OTP_HMAC_SECRET is not set");
   }

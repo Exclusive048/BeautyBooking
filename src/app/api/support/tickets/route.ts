@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
@@ -244,17 +245,17 @@ export async function POST(req: Request) {
     }
   }
 
-  const supportToRaw = process.env.SUPPORT_TO?.trim();
-  const smtpHost = process.env.SMTP_HOST?.trim();
-  const smtpPortRaw = process.env.SMTP_PORT?.trim();
-  const smtpUserRaw = process.env.SMTP_USER?.trim();
-  const smtpPass = process.env.SMTP_PASS?.trim();
-  const smtpFromRaw = process.env.SMTP_FROM?.trim();
+  const supportToRaw = env.SUPPORT_TO?.trim();
+  const smtpHost = env.SMTP_HOST?.trim();
+  const smtpPort = env.SMTP_PORT;
+  const smtpUserRaw = env.SMTP_USER?.trim();
+  const smtpPass = env.SMTP_PASS?.trim();
+  const smtpFromRaw = env.SMTP_FROM?.trim();
 
   const missingEnv = [
     !supportToRaw ? "SUPPORT_TO" : null,
     !smtpHost ? "SMTP_HOST" : null,
-    !smtpPortRaw ? "SMTP_PORT" : null,
+    smtpPort === undefined ? "SMTP_PORT" : null,
     !smtpUserRaw ? "SMTP_USER" : null,
     !smtpPass ? "SMTP_PASS" : null,
     !smtpFromRaw ? "SMTP_FROM" : null,
@@ -267,7 +268,7 @@ export async function POST(req: Request) {
       errorKind: "smtp_env_missing",
       missingEnv,
       smtpHost: smtpHost ?? null,
-      smtpPortRaw: smtpPortRaw ?? null,
+      smtpPort: smtpPort ?? null,
       smtpUser: maskSmtpIdentity(smtpUserRaw),
       smtpFrom: maskSmtpIdentity(smtpFromRaw),
       supportTo: maskSmtpIdentity(supportToRaw),
@@ -278,17 +279,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
   }
 
-  if (!supportToRaw || !smtpHost || !smtpPortRaw || !smtpUserRaw || !smtpPass || !smtpFromRaw) {
+  if (!supportToRaw || !smtpHost || smtpPort === undefined || !smtpUserRaw || !smtpPass || !smtpFromRaw) {
     return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
   }
 
-  const smtpPort = Number(smtpPortRaw);
-  if (!Number.isFinite(smtpPort) || smtpPort <= 0 || smtpPort > 65535 || !Number.isInteger(smtpPort)) {
+  if (smtpPort > 65535) {
     logError("Support ticket SMTP port invalid", {
       requestId,
       route,
       errorKind: "smtp_port_invalid",
-      smtpPortRaw,
+      smtpPort,
       smtpHost,
       smtpUser: maskSmtpIdentity(smtpUserRaw),
       smtpFrom: maskSmtpIdentity(smtpFromRaw),

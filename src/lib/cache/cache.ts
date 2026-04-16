@@ -1,10 +1,11 @@
+import { env } from "@/lib/env";
 import type { CacheClient } from "@/lib/cache/types";
 import { redisClient } from "@/lib/cache/redisClient";
 import { memoryClient } from "@/lib/cache/memoryClient";
 import { logInfo } from "@/lib/logging/logger";
 
-const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim().length > 0);
-const isProduction = process.env.NODE_ENV === "production";
+const hasRedisUrl = Boolean(env.REDIS_URL && env.REDIS_URL.trim().length > 0);
+const isProduction = env.NODE_ENV === "production";
 
 let client: CacheClient | null = null;
 

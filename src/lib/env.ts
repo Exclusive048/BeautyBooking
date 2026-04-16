@@ -1,150 +1,181 @@
-// TODO: The following files access process.env directly and should be
-// migrated to use this module after launch:
-// - src/proxy.ts (NODE_ENV)
-// - src/lib/app-url.ts (APP_PUBLIC_URL, NEXT_PUBLIC_APP_URL)
-// - src/lib/cache/cache.ts (REDIS_URL)
-// - src/lib/auth/access.ts (AUTH_COOKIE_NAME)
-// - src/lib/auth/jwt.ts (AUTH_JWT_SECRET)
-// - src/lib/auth/otp.ts (OTP_HMAC_SECRET)
-// - src/lib/auth/session.ts (AUTH_COOKIE_NAME)
-// - src/lib/auth/jwt.test.ts (AUTH_JWT_SECRET)
-// - src/lib/auth/otp.test.ts (OTP_HMAC_SECRET)
-// - src/lib/auth/__tests__/otp-flow.test.ts (OTP_HMAC_SECRET)
-// - src/components/pwa/install-prompt.tsx (NODE_ENV)
-// - src/components/pwa/update-prompt.tsx (NODE_ENV)
-// - src/components/auth/telegram-login-button.tsx (NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)
-// - src/lib/prisma.ts (NODE_ENV)
-// - src/lib/maps/address-suggest.ts (YANDEX_SUGGEST_API_KEY)
-// - src/lib/payments/yookassa/client.ts (YOOKASSA_SECRET_KEY, YOOKASSA_SHOP_ID)
-// - src/lib/vk/cookies.ts (AUTH_JWT_SECRET)
-// - src/lib/monitoring/alert.ts (MONITORING_TELEGRAM_BOT_TOKEN, MONITORING_TELEGRAM_CHAT_ID, NODE_ENV)
-// - src/lib/visual-search/openai.ts (OPENAI_API_KEY)
-// - src/lib/visual-search/config.ts (OPENAI_API_KEY, VISUAL_SEARCH_ENABLED)
-// - src/lib/redis/connection.ts (REDIS_URL)
-// - src/lib/media/storage/index.ts (STORAGE_PROVIDER)
-// - src/lib/media/storage/local.ts (MEDIA_LOCAL_ROOT)
-// - src/lib/media/storage/s3.ts (S3_ACCESS_KEY, S3_BUCKET, S3_ENDPOINT, S3_REGION, S3_SECRET_KEY)
-// - src/lib/notifications/push/vapid.ts (NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_EMAIL, VAPID_PRIVATE_KEY)
-// - src/worker.ts (APP_PUBLIC_URL, NEXT_PUBLIC_APP_URL, WORKER_SECRET)
-// - src/lib/schedule/usecases.ts (NODE_ENV)
-// - src/features/admin/components/admin-billing.tsx (NODE_ENV)
-// - src/features/booking/components/slot-picker/slot-picker.tsx (NODE_ENV)
-// - src/features/catalog/components/catalog-map.tsx (NEXT_PUBLIC_YANDEX_MAPS_API_KEY)
-// - src/features/public-profile/master/public-booking-widget.tsx (NODE_ENV)
-// - src/features/public-profile/master/server/block-error.ts (NODE_ENV)
-// - src/features/public-studio/server/block-error.ts (NODE_ENV)
-// - src/app/robots.ts (NODE_ENV)
-// - src/app/logout/route.ts (AUTH_COOKIE_NAME, NODE_ENV)
-// - src/app/api/address/geocode/route.ts (YANDEX_GEOCODER_API_KEY)
-// - src/app/api/auth/otp/verify/route.ts (AUTH_COOKIE_NAME, NODE_ENV)
-// - src/app/api/auth/profile/ensure/route.ts (AUTH_COOKIE_NAME)
-// - src/app/api/auth/telegram/login/route.ts (AUTH_COOKIE_NAME, NODE_ENV, TELEGRAM_BOT_TOKEN)
-// - src/app/api/auth/vk/start/route.ts (NODE_ENV)
-// - src/app/api/auth/vk/callback/route.ts (AUTH_COOKIE_NAME, NODE_ENV)
-// - src/app/api/integrations/vk/start/route.ts (NODE_ENV)
-// - src/app/api/integrations/vk/callback/route.ts (NODE_ENV)
-// - src/app/api/billing/renew/run/route.ts (BILLING_RENEW_SECRET)
-// - src/app/api/payments/yookassa/webhook/route.ts (YOOKASSA_SECRET_KEY, YOOKASSA_WEBHOOK_TOKEN)
-// - src/app/api/health/worker/route.ts (WORKER_SECRET)
-// - src/app/api/support/tickets/route.ts (SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER, SUPPORT_TO)
-// - src/app/api/me/delete/route.ts (AUTH_COOKIE_NAME, NODE_ENV)
 import { z } from "zod";
 
-const STORAGE_PROVIDERS = ["local", "s3"] as const;
-const NODE_ENVS = ["development", "test", "production"] as const;
-const BOOLEAN_LITERALS = ["true", "false"] as const;
+// String env var → boolean. Accepts any string; only "true" (case-insensitive) → true.
+const boolFlag = z
+  .string()
+  .optional()
+  .default("false")
+  .transform((v) => v.trim().toLowerCase() === "true");
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(NODE_ENVS).default("development"),
-  DATABASE_URL: z.string().trim().optional(),
-  AUTH_JWT_SECRET: z.string().trim().optional(),
-  OTP_HMAC_SECRET: z.string().trim().optional(),
-  VK_CLIENT_ID: z.string().trim().optional(),
-  VK_CLIENT_SECRET: z.string().trim().optional(),
-  VK_REDIRECT_URI: z.string().trim().optional(),
-  TELEGRAM_BOT_TOKEN: z.string().trim().optional(),
-  NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: z.string().trim().optional(),
-  NEXT_PUBLIC_VK_ENABLED: z.string().trim().optional(),
-  DEFAULT_TIMEZONE: z.string().trim().optional().default("Europe/Moscow"),
-  AUTH_COOKIE_NAME: z.string().trim().min(1).default("bh_session"),
-  WORKER_SECRET: z.string().trim().optional(),
-  STORAGE_PROVIDER: z.enum(STORAGE_PROVIDERS).default("local"),
-  MEDIA_DELIVERY_SECRET: z.string().trim().optional(),
-  VISUAL_SEARCH_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
-  AI_FEATURES_ENABLED: z.enum(BOOLEAN_LITERALS).default("false"),
-  YOOKASSA_SECRET_KEY: z.string().trim().optional(),
-  YOOKASSA_SHOP_ID: z.string().trim().optional(),
-  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().trim().optional(),
-  VAPID_PRIVATE_KEY: z.string().trim().optional(),
-  VAPID_EMAIL: z.string().trim().optional(),
-  S3_ACCESS_KEY: z.string().trim().optional(),
-  S3_SECRET_KEY: z.string().trim().optional(),
-  S3_BUCKET: z.string().trim().optional(),
-  S3_ENDPOINT: z.string().trim().optional(),
-  S3_REGION: z.string().trim().optional(),
-  OPENAI_API_KEY: z.string().trim().optional(),
-  YANDEX_GEOCODER_API_KEY: z.string().trim().optional(),
-  YANDEX_SUGGEST_API_KEY: z.string().trim().optional(),
-  REDIS_URL: z.string().trim().optional(),
+  // ── Runtime ──────────────────────────────────────────────────────────────
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+
+  // ── Required always ──────────────────────────────────────────────────────
+  DATABASE_URL: z
+    .string()
+    .min(1, "DATABASE_URL is required — postgresql://user:pass@host:5432/db"),
+  AUTH_JWT_SECRET: z
+    .string()
+    .min(32, "AUTH_JWT_SECRET must be at least 32 chars (generate: openssl rand -hex 64)"),
+  OTP_HMAC_SECRET: z
+    .string()
+    .min(16, "OTP_HMAC_SECRET must be at least 16 chars (generate: openssl rand -hex 32)"),
+
+  // ── Database ──────────────────────────────────────────────────────────────
+  DIRECT_URL: z.string().optional(),
+
+  // ── App URL ───────────────────────────────────────────────────────────────
+  NEXT_PUBLIC_APP_URL: z.url().optional(),
+  APP_PUBLIC_URL: z.url().optional(),
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  AUTH_COOKIE_NAME: z.string().min(1).default("bh_session"),
+
+  // ── Redis ─────────────────────────────────────────────────────────────────
+  REDIS_URL: z.string().optional(),
+  REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+
+  // ── Worker / cron ─────────────────────────────────────────────────────────
+  WORKER_SECRET: z.string().optional(),
+  BILLING_RENEW_SECRET: z.string().optional(),
+
+  // ── Storage ───────────────────────────────────────────────────────────────
+  STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+  MEDIA_LOCAL_ROOT: z.string().optional(),
+  MEDIA_LOCAL_PUBLIC_URL: z.string().optional(),
+  MEDIA_DELIVERY_SECRET: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().optional(),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_PUBLIC_URL: z.string().optional(),
+
+  // ── Telegram ──────────────────────────────────────────────────────────────
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: z.string().optional(),
+
+  // ── VK OAuth ──────────────────────────────────────────────────────────────
+  VK_CLIENT_ID: z.string().optional(),
+  VK_CLIENT_SECRET: z.string().optional(),
+  VK_REDIRECT_URI: z.string().optional(),
+  NEXT_PUBLIC_VK_ENABLED: boolFlag,
+
+  // ── YooKassa ─────────────────────────────────────────────────────────────
+  YOOKASSA_SHOP_ID: z.string().optional(),
+  YOOKASSA_SECRET_KEY: z.string().optional(),
+  YOOKASSA_WEBHOOK_TOKEN: z.string().optional(),
+
+  // ── Push (VAPID) ─────────────────────────────────────────────────────────
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_EMAIL: z.string().optional(),
+
+  // ── Yandex ────────────────────────────────────────────────────────────────
+  YANDEX_GEOCODER_API_KEY: z.string().optional(),
+  YANDEX_SUGGEST_API_KEY: z.string().optional(),
+  NEXT_PUBLIC_YANDEX_MAPS_API_KEY: z.string().optional(),
+
+  // ── OpenAI ────────────────────────────────────────────────────────────────
+  OPENAI_API_KEY: z.string().optional(),
+
+  // ── SMTP ──────────────────────────────────────────────────────────────────
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  SUPPORT_TO: z.string().optional(),
+
+  // ── Monitoring ────────────────────────────────────────────────────────────
+  MONITORING_TELEGRAM_BOT_TOKEN: z.string().optional(),
+  MONITORING_TELEGRAM_CHAT_ID: z.string().optional(),
+
+  // ── Feature flags (boolean after transform) ───────────────────────────────
+  VISUAL_SEARCH_ENABLED: boolFlag,
+  AI_FEATURES_ENABLED: boolFlag,
+  EMAIL_AUTH_ENABLED: boolFlag,
+
+  // ── Timezone ─────────────────────────────────────────────────────────────
+  DEFAULT_TIMEZONE: z.string().min(1).default("Europe/Moscow"),
 });
 
-export type ValidatedEnv = z.infer<typeof envSchema>;
+// ── Conditional refinements ───────────────────────────────────────────────────
+const refinedSchema = envSchema
+  .refine(
+    (e) => e.NODE_ENV !== "production" || Boolean(e.REDIS_URL),
+    "REDIS_URL is required in production"
+  )
+  .refine(
+    (e) => e.NODE_ENV !== "production" || Boolean(e.WORKER_SECRET),
+    "WORKER_SECRET is required in production"
+  )
+  .refine(
+    (e) => e.NODE_ENV !== "production" || Boolean(e.MEDIA_DELIVERY_SECRET),
+    "MEDIA_DELIVERY_SECRET is required in production"
+  )
+  .refine(
+    (e) => e.NODE_ENV !== "production" || Boolean(e.NEXT_PUBLIC_APP_URL ?? e.APP_PUBLIC_URL),
+    "NEXT_PUBLIC_APP_URL is required in production"
+  )
+  .refine(
+    (e) =>
+      e.STORAGE_PROVIDER !== "s3" ||
+      (Boolean(e.S3_BUCKET) && Boolean(e.S3_ACCESS_KEY) && Boolean(e.S3_SECRET_KEY)),
+    "S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY are required when STORAGE_PROVIDER=s3"
+  )
+  .refine(
+    (e) => !e.VISUAL_SEARCH_ENABLED || Boolean(e.OPENAI_API_KEY),
+    "OPENAI_API_KEY is required when VISUAL_SEARCH_ENABLED=true"
+  )
+  .refine(
+    (e) => !e.AI_FEATURES_ENABLED || Boolean(e.OPENAI_API_KEY),
+    "OPENAI_API_KEY is required when AI_FEATURES_ENABLED=true"
+  );
 
-function isMissing(value: string | undefined): boolean {
-  return !value || value.trim().length === 0;
+// ── Parse ─────────────────────────────────────────────────────────────────────
+// Never crash the process during Next.js static build or Vitest runs.
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+const isTestEnv = process.env.NODE_ENV === "test";
+const isProdRuntime = process.env.NODE_ENV === "production" && !isBuildPhase;
+
+const _parsed = refinedSchema.safeParse(process.env);
+
+if (!_parsed.success) {
+  const lines = _parsed.error.issues
+    .map((i) => `  • ${i.path.length ? i.path.join(".") : "root"}: ${i.message}`)
+    .join("\n");
+
+  if (isProdRuntime) {
+    console.error(`\n❌ Invalid environment variables:\n${lines}\n\nCheck .env.example for required variables.\n`);
+    process.exit(1);
+  } else if (!isTestEnv) {
+    console.warn(`\n⚠️  Environment variables:\n${lines}\n`);
+  }
 }
 
-let cachedEnv: ValidatedEnv | null = null;
+export type AppEnv = z.infer<typeof refinedSchema>;
 
-export function validateEnv(): ValidatedEnv {
-  if (cachedEnv) return cachedEnv;
+export const env: AppEnv = _parsed.success
+  ? _parsed.data
+  : (process.env as unknown as AppEnv);
 
-  const parsed = envSchema.parse(process.env);
-  const missing = new Set<string>();
+// ── Computed flags ────────────────────────────────────────────────────────────
+export const isPushEnabled = Boolean(
+  env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_EMAIL
+);
+export const isPaymentsEnabled = Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
+export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
+export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
+export const isEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+export const isS3Enabled = env.STORAGE_PROVIDER === "s3";
+export const isVisualSearchEnabled = env.VISUAL_SEARCH_ENABLED;
+export const isAiFeaturesEnabled = env.AI_FEATURES_ENABLED;
 
-  const requireVar = (name: keyof ValidatedEnv) => {
-    const value = parsed[name];
-    if (typeof value !== "string" || isMissing(value)) {
-      missing.add(name);
-    }
-  };
-
-  requireVar("AUTH_JWT_SECRET");
-  requireVar("OTP_HMAC_SECRET");
-  requireVar("DATABASE_URL");
-
-  requireVar("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
-  requireVar("VAPID_PRIVATE_KEY");
-  requireVar("VAPID_EMAIL");
-
-  requireVar("YANDEX_GEOCODER_API_KEY");
-  requireVar("YANDEX_SUGGEST_API_KEY");
-
-  if (parsed.NODE_ENV === "production") {
-    requireVar("REDIS_URL");
-    requireVar("WORKER_SECRET");
-    requireVar("MEDIA_DELIVERY_SECRET");
-    requireVar("YOOKASSA_SECRET_KEY");
-    requireVar("YOOKASSA_SHOP_ID");
-  }
-
-  if (parsed.STORAGE_PROVIDER === "s3") {
-    requireVar("S3_ACCESS_KEY");
-    requireVar("S3_SECRET_KEY");
-    requireVar("S3_BUCKET");
-    requireVar("S3_ENDPOINT");
-    requireVar("S3_REGION");
-  }
-
-  if (parsed.VISUAL_SEARCH_ENABLED === "true" || parsed.AI_FEATURES_ENABLED === "true") {
-    requireVar("OPENAI_API_KEY");
-  }
-
-  if (missing.size > 0) {
-    const missingList = Array.from(missing).sort().join(", ");
-    throw new Error(`Environment validation failed. Missing required variables: ${missingList}`);
-  }
-
-  cachedEnv = parsed;
-  return parsed;
+// ── Backward compat shim (used in src/lib/startup.ts, src/lib/master/profile.service.ts) ─
+export type ValidatedEnv = AppEnv;
+export function validateEnv(): AppEnv {
+  return env;
 }

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 import {
   REFRESH_TOKEN_TTL_SECONDS,
   signAccessToken,
@@ -17,7 +18,7 @@ const REFRESH_COOKIE_NAME = "bh_refresh";
 const REFRESH_COOKIE_PATH = "/api/auth/refresh";
 
 export function getAccessCookieName(): string {
-  return process.env.AUTH_COOKIE_NAME ?? "bh_session";
+  return env.AUTH_COOKIE_NAME;
 }
 
 export function getRefreshCookieName(): string {

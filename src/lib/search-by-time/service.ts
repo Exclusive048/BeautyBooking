@@ -1,5 +1,6 @@
 import { Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 import { AppError } from "@/lib/api/errors";
 import type { AvailabilitySearchQuery } from "@/lib/search-by-time/schemas";
 import type { AvailabilityProviderItem, AvailabilitySearchResponse } from "@/lib/search-by-time/types";
@@ -8,10 +9,7 @@ import { isDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import type { CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 
-const DEFAULT_SEARCH_TIMEZONE =
-  process.env.DEFAULT_TIMEZONE?.trim() && process.env.DEFAULT_TIMEZONE.trim().length > 0
-    ? process.env.DEFAULT_TIMEZONE.trim()
-    : "Europe/Moscow";
+const DEFAULT_SEARCH_TIMEZONE = env.DEFAULT_TIMEZONE;
 const MAX_SLOTS_PER_PROVIDER = 12;
 const CANDIDATE_MULTIPLIER = 3;
 const MAX_CANDIDATES = 120;

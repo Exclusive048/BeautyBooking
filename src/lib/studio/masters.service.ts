@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/api/errors";
+import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus, ProviderType } from "@prisma/client";
 
@@ -134,7 +135,7 @@ export async function createStudioMaster(input: {
             contactPhone: input.phone,
             address: "",
             district: "",
-            timezone: "Asia/Almaty",
+            timezone: env.DEFAULT_TIMEZONE,
             categories: [],
             availableToday: false,
           },

@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 import type { VisualSearchResult, VisualSearchStrategy } from "@/lib/visual-search/prompt";
+import { env } from "@/lib/env";
 
 const OPENAI_VISION_MODEL = "gpt-4o-mini";
 const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
@@ -14,7 +15,7 @@ const EMBEDDING_DIMENSIONS = 1536;
 let client: OpenAI | null = null;
 
 function getApiKey(): string {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new AppError("OPENAI_API_KEY is not configured", 500, "INTERNAL_ERROR");
   }

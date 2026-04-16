@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { logError } from "@/lib/logging/logger";
 
 export type AlertLevel = "critical" | "error" | "warning";
@@ -38,10 +39,10 @@ export async function sendAlert(
   message: string,
   context?: AlertContext
 ): Promise<void> {
-  if (process.env.NODE_ENV !== "production") return;
+  if (env.NODE_ENV !== "production") return;
 
-  const token = process.env.MONITORING_TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.MONITORING_TELEGRAM_CHAT_ID?.trim();
+  const token = env.MONITORING_TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = env.MONITORING_TELEGRAM_CHAT_ID?.trim();
   if (!token || !chatId) {
     logError(message, {
       level,

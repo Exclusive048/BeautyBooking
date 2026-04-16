@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { AppError } from "@/lib/api/errors";
+import { env } from "@/lib/env";
 
 export const VK_ID_STATE_COOKIE = "vk_id_state";
 export const VK_ID_VERIFIER_COOKIE = "vk_id_verifier";
 export const VK_ID_STATE_TTL_SECONDS = 10 * 60;
 
 function requireSigningSecret(): string {
-  const secret = process.env.AUTH_JWT_SECRET;
+  const secret = env.AUTH_JWT_SECRET;
   if (!secret) {
     throw new AppError("AUTH_JWT_SECRET is not configured", 500, "INTERNAL_ERROR");
   }

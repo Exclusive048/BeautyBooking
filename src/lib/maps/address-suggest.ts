@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/api/errors";
+import { env } from "@/lib/env";
 
 export type AddressSuggestion = {
   value: string;
@@ -22,7 +23,7 @@ function clampLimit(value: number): number {
 }
 
 function getSuggestKey(): string {
-  const key = process.env.YANDEX_SUGGEST_API_KEY ?? "";
+  const key = env.YANDEX_SUGGEST_API_KEY ?? "";
   const trimmed = key.trim();
   if (!trimmed) {
     throw new AppError("Address suggestions unavailable", 503, "INTERNAL_ERROR");

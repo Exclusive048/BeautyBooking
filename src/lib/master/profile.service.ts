@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
-import { validateEnv } from "@/lib/env";
+import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
@@ -392,7 +392,7 @@ async function resolvePortfolioMediaUrl(input: {
     throw new AppError("Invalid media URL", 400, "VALIDATION_ERROR");
   }
 
-  const allowedS3Endpoint = validateEnv().S3_ENDPOINT?.trim();
+  const allowedS3Endpoint = env.S3_ENDPOINT?.trim();
   if (allowedS3Endpoint && mediaUrl.startsWith(allowedS3Endpoint)) {
     return mediaUrl;
   }

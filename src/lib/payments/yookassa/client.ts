@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/api/errors";
+import { env } from "@/lib/env";
 
 type YookassaConfirmation = {
   type: string;
@@ -57,8 +58,8 @@ function formatAmount(kopeks: number): string {
 }
 
 function getAuthHeader(): string {
-  const shopId = process.env.YOOKASSA_SHOP_ID?.trim();
-  const secret = process.env.YOOKASSA_SECRET_KEY?.trim();
+  const shopId = env.YOOKASSA_SHOP_ID?.trim();
+  const secret = env.YOOKASSA_SECRET_KEY?.trim();
   if (!shopId || !secret) {
     throw new Error("YOOKASSA credentials are not configured");
   }

@@ -1,8 +1,9 @@
 import { Readable } from "stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/lib/media/storage/types";
+import { env } from "@/lib/env";
 
-type S3Env = {
+type S3Config = {
   bucket: string;
   endpoint: string;
   region: string;
@@ -10,12 +11,12 @@ type S3Env = {
   secretKey: string;
 };
 
-function requireS3Env(): S3Env {
-  const bucket = process.env.S3_BUCKET?.trim() ?? "";
-  const endpoint = process.env.S3_ENDPOINT?.trim() ?? "";
-  const region = process.env.S3_REGION?.trim() ?? "";
-  const accessKey = process.env.S3_ACCESS_KEY?.trim() ?? "";
-  const secretKey = process.env.S3_SECRET_KEY?.trim() ?? "";
+function requireS3Config(): S3Config {
+  const bucket = env.S3_BUCKET?.trim() ?? "";
+  const endpoint = env.S3_ENDPOINT?.trim() ?? "";
+  const region = env.S3_REGION?.trim() ?? "";
+  const accessKey = env.S3_ACCESS_KEY?.trim() ?? "";
+  const secretKey = env.S3_SECRET_KEY?.trim() ?? "";
 
   const missing = [
     !bucket ? "S3_BUCKET" : null,
@@ -45,7 +46,7 @@ export class S3StorageProvider implements StorageProvider {
   private readonly bucket: string;
 
   getPublicUrl(key: string): string | null {
-    const publicUrl = process.env.S3_PUBLIC_URL?.trim();
+    const publicUrl = env.S3_PUBLIC_URL?.trim();
     if (!publicUrl) return null;
     const normalizedBase = publicUrl.replace(/\/+$/, "");
     const normalizedKey = key.replace(/\\/g, "/").replace(/^\/+/, "");
@@ -53,15 +54,15 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   constructor() {
-    const env = requireS3Env();
-    this.bucket = env.bucket;
+    const cfg = requireS3Config();
+    this.bucket = cfg.bucket;
     this.client = new S3Client({
-      endpoint: env.endpoint,
-      region: env.region,
+      endpoint: cfg.endpoint,
+      region: cfg.region,
       forcePathStyle: true,
       credentials: {
-        accessKeyId: env.accessKey,
-        secretAccessKey: env.secretKey,
+        accessKeyId: cfg.accessKey,
+        secretAccessKey: cfg.secretKey,
       },
     });
   }

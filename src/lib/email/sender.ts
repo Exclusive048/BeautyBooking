@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { env } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
 
 type MailOptions = {
@@ -9,11 +10,11 @@ type MailOptions = {
 };
 
 function buildTransporter() {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const host = env.SMTP_HOST;
+  const user = env.SMTP_USER;
+  const pass = env.SMTP_PASS;
   if (!host || !user || !pass) return null;
-  const port = parseInt(process.env.SMTP_PORT ?? "587", 10);
+  const port = env.SMTP_PORT ?? 587;
   return nodemailer.createTransport({
     host,
     port,
@@ -31,7 +32,7 @@ function getTransporter() {
 }
 
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 }
 
 export async function sendEmail(opts: MailOptions): Promise<boolean> {
@@ -40,7 +41,7 @@ export async function sendEmail(opts: MailOptions): Promise<boolean> {
     logError("SMTP not configured — email not sent", { to: opts.to, subject: opts.subject });
     return false;
   }
-  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER;
+  const from = env.SMTP_FROM ?? env.SMTP_USER;
   try {
     await transport.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, text: opts.text });
     logInfo("Email sent", { to: opts.to, subject: opts.subject });

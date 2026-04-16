@@ -1,6 +1,7 @@
 import { createClient } from "redis";
 import type { RedisClientType } from "redis";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { env } from "@/lib/env";
 
 type RedisClient = RedisClientType;
 type RedisTimeoutError = Error & {
@@ -9,27 +10,17 @@ type RedisTimeoutError = Error & {
   timeoutMs: number;
 };
 
-const REDIS_URL = process.env.REDIS_URL?.trim() ?? "";
+const REDIS_URL = env.REDIS_URL?.trim() ?? "";
 const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 3_000;
 const DEFAULT_REDIS_COMMAND_TIMEOUT_MS = 2_500;
 
 let commandClientPromise: Promise<RedisClient | null> | null = null;
 let subscriberClientPromise: Promise<RedisClient | null> | null = null;
 
-function parseTimeoutMs(raw: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(raw?.trim() ?? "", 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
-
-const REDIS_CONNECT_TIMEOUT_MS = parseTimeoutMs(
-  process.env.REDIS_CONNECT_TIMEOUT_MS,
-  DEFAULT_REDIS_CONNECT_TIMEOUT_MS
-);
-const REDIS_COMMAND_TIMEOUT_MS = parseTimeoutMs(
-  process.env.REDIS_COMMAND_TIMEOUT_MS,
-  DEFAULT_REDIS_COMMAND_TIMEOUT_MS
-);
+const REDIS_CONNECT_TIMEOUT_MS =
+  env.REDIS_CONNECT_TIMEOUT_MS ?? DEFAULT_REDIS_CONNECT_TIMEOUT_MS;
+const REDIS_COMMAND_TIMEOUT_MS =
+  env.REDIS_COMMAND_TIMEOUT_MS ?? DEFAULT_REDIS_COMMAND_TIMEOUT_MS;
 
 function createRedisTimeoutError(operation: string, timeoutMs: number): RedisTimeoutError {
   const error = new Error(
