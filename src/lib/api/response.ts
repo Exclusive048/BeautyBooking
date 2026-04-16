@@ -33,3 +33,22 @@ export function fail(
     { status }
   );
 }
+
+export function tooManyRequests(retryAfterSeconds: number, message?: string, code?: ErrorCode | string) {
+  const requestId = getRequestId();
+  return NextResponse.json<ApiError>(
+    {
+      ok: false,
+      requestId,
+      error: {
+        message: message ?? "Too many requests",
+        code: code ?? "RATE_LIMITED",
+        details: { retryAfterSeconds },
+      },
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(Math.ceil(retryAfterSeconds)) },
+    }
+  );
+}

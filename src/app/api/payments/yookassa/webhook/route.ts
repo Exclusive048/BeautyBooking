@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
+import { env } from "@/lib/env";
 import { checkYookassaIpAllowlist } from "@/lib/payments/yookassa/allowlist";
 import { createYookassaWebhookJob, type YookassaWebhookPayload } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
   return withRequestContext(req, async () => {
     const rawBody = Buffer.from(await req.arrayBuffer());
     const signature = req.headers.get("x-api-signature-sha256")?.trim();
-    const secret = process.env.YOOKASSA_SECRET_KEY?.trim();
+    const secret = env.YOOKASSA_SECRET_KEY?.trim();
     if (!signature || !secret || !verifySignature(rawBody, signature, secret)) {
       logError("YooKassa webhook rejected: invalid signature", {
         signaturePresent: Boolean(signature),
@@ -81,8 +82,8 @@ export async function POST(req: Request) {
     }
 
     const token = getWebhookToken(req);
-    const expectedToken = process.env.YOOKASSA_WEBHOOK_TOKEN?.trim();
-    const isProd = process.env.NODE_ENV === "production";
+    const expectedToken = env.YOOKASSA_WEBHOOK_TOKEN?.trim();
+    const isProd = env.NODE_ENV === "production";
     if (!expectedToken && isProd) {
       logError("YooKassa webhook rejected: YOOKASSA_WEBHOOK_TOKEN not configured in production");
       void recordSurfaceEvent({
@@ -93,17 +94,24 @@ export async function POST(req: Request) {
       });
       return fail("Service unavailable", 503, "SERVICE_UNAVAILABLE");
     }
-    if (expectedToken && token !== expectedToken) {
-      logError("YooKassa webhook rejected: invalid token", {
-        ip: allowlistCheck.ip,
-      });
-      void recordSurfaceEvent({
-        surface: "webhook",
-        outcome: "denied",
-        operation: "yookassa-ingress",
-        code: "INVALID_WEBHOOK_TOKEN",
-      });
-      return fail("Unauthorized", 401, "UNAUTHORIZED");
+    if (expectedToken) {
+      const tokenBuf = Buffer.from(token ?? "");
+      const expectedBuf = Buffer.from(expectedToken);
+      const tokenValid =
+        tokenBuf.length === expectedBuf.length &&
+        crypto.timingSafeEqual(tokenBuf, expectedBuf);
+      if (!tokenValid) {
+        logError("YooKassa webhook rejected: invalid token", {
+          ip: allowlistCheck.ip,
+        });
+        void recordSurfaceEvent({
+          surface: "webhook",
+          outcome: "denied",
+          operation: "yookassa-ingress",
+          code: "INVALID_WEBHOOK_TOKEN",
+        });
+        return fail("Unauthorized", 401, "UNAUTHORIZED");
+      }
     }
 
     const payload = parsePayload(rawBody);

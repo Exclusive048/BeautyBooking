@@ -41,4 +41,27 @@ describe("auth/jwt", () => {
   it("returns null for malformed token", () => {
     expect(verifySessionToken("invalid.token")).toBeNull();
   });
+
+  it("returns null for token with corrupted base64 payload", () => {
+    const token = createSessionToken({ sub: "user-1" }, 60);
+    const parts = token.split(".");
+    // Replace payload with non-base64 garbage
+    const tampered = `${parts[0]}.!!!not-base64!!$.${parts[2]}`;
+    expect(verifySessionToken(tampered)).toBeNull();
+  });
+
+  it("returns null for token with valid base64 but non-JSON payload", () => {
+    const token = createSessionToken({ sub: "user-1" }, 60);
+    const parts = token.split(".");
+    // Valid base64url but plain text, not JSON
+    const notJson = Buffer.from("this is not json").toString("base64url");
+    const tampered = `${parts[0]}.${notJson}.${parts[2]}`;
+    expect(verifySessionToken(tampered)).toBeNull();
+  });
+
+  it("returns null when secret is missing", () => {
+    const token = createSessionToken({ sub: "user-1" }, 60);
+    delete process.env.AUTH_JWT_SECRET;
+    expect(verifySessionToken(token)).toBeNull();
+  });
 });

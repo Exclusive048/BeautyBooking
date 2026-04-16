@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { ok, fail } from "@/lib/api/response";
+import { ok, fail, tooManyRequests } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { slugifyCategory } from "@/lib/slug";
@@ -45,11 +45,9 @@ export async function POST(req: Request) {
   try {
     const rateLimit = await checkRateLimit(`rl:categories:propose:${auth.user.id}`, PROPOSAL_RATE_LIMIT);
     if (rateLimit.limited) {
-      return fail(
-        "Слишком много заявок на категории. Попробуйте позже.",
-        429,
-        "RATE_LIMITED",
-        { retryAfterSeconds: rateLimit.retryAfterSeconds }
+      return tooManyRequests(
+        rateLimit.retryAfterSeconds,
+        "Слишком много заявок на категории. Попробуйте позже."
       );
     }
 

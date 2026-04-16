@@ -2,6 +2,7 @@ import { z } from "zod";
 import { fileTypeFromBuffer } from "file-type";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { tooManyRequests } from "@/lib/api/response";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -43,11 +44,9 @@ export async function POST(req: Request) {
       VISUAL_SEARCH_RATE_LIMIT
     );
     if (rateLimit.limited) {
-      return jsonFail(
-        429,
-        UI_TEXT.home.visualSearch.messages.rateLimited,
-        "RATE_LIMITED",
-        { retryAfterSeconds: rateLimit.retryAfterSeconds }
+      return tooManyRequests(
+        rateLimit.retryAfterSeconds,
+        UI_TEXT.home.visualSearch.messages.rateLimited
       );
     }
 

@@ -79,36 +79,42 @@ export function signRefreshToken(payload: RefreshTokenPayload): string {
 }
 
 export function verifyToken(token: string, type: "access" | "refresh" = "access"): SessionPayload | null {
-  const secret = env.AUTH_JWT_SECRET;
-  if (!secret) throw new Error("AUTH_JWT_SECRET is not set");
-
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  const [h, p, s] = parts;
-  const data = `${h}.${p}`;
-  const expected = sign(data, secret);
-
-  const expectedBuf = Buffer.from(expected);
-  const sigBuf = Buffer.from(s);
-  if (expectedBuf.length !== sigBuf.length) return null;
-  if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
-
-  let payload: SessionPayload;
   try {
-    payload = JSON.parse(fromBase64url(p)) as SessionPayload;
+    const secret = env.AUTH_JWT_SECRET;
+    if (!secret) return null;
+
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const [h, p, s] = parts;
+    const data = `${h}.${p}`;
+    const expected = sign(data, secret);
+
+    const expectedBuf = Buffer.from(expected);
+    const sigBuf = Buffer.from(s);
+    if (expectedBuf.length !== sigBuf.length) return null;
+    if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
+
+    let payload: SessionPayload;
+    try {
+      payload = JSON.parse(fromBase64url(p)) as SessionPayload;
+    } catch {
+      return null;
+    }
+
+    if (typeof payload !== "object" || payload === null) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp <= now) return null;
+
+    const tokenType = payload.tokenType ?? "access";
+    if (type === "refresh" && tokenType !== "refresh") return null;
+    if (type === "access" && tokenType === "refresh") return null;
+
+    return payload;
   } catch {
     return null;
   }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.exp <= now) return null;
-
-  const tokenType = payload.tokenType ?? "access";
-  if (type === "refresh" && tokenType !== "refresh") return null;
-  if (type === "access" && tokenType === "refresh") return null;
-
-  return payload;
 }
 
 export function verifySessionToken(token: string): SessionPayload | null {

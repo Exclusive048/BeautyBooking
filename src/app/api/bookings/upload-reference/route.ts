@@ -1,6 +1,6 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
-import { fail } from "@/lib/api/response";
+import { fail, tooManyRequests } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
@@ -41,9 +41,7 @@ export async function POST(req: Request) {
       BOOKING_REFERENCE_UPLOAD_RATE_LIMIT
     );
     if (rateLimit.limited) {
-      return fail("Too many uploads. Try again later.", 429, "RATE_LIMITED", {
-        retryAfterSeconds: rateLimit.retryAfterSeconds,
-      });
+      return tooManyRequests(rateLimit.retryAfterSeconds, "Too many uploads. Try again later.");
     }
 
     const contentLengthHeader = req.headers.get("content-length");

@@ -1,5 +1,6 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { tooManyRequests } from "@/lib/api/response";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
 import { searchCatalog } from "@/lib/catalog/catalog.service";
@@ -20,9 +21,7 @@ export async function GET(req: Request) {
       CATALOG_SEARCH_RATE_LIMIT
     );
     if (rateLimit.limited) {
-      return jsonFail(429, "Too many requests", "RATE_LIMITED", {
-        retryAfterSeconds: rateLimit.retryAfterSeconds,
-      });
+      return tooManyRequests(rateLimit.retryAfterSeconds);
     }
 
     const query = parseQuery(new URL(req.url), catalogSearchQuerySchema);
