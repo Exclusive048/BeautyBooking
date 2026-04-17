@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -32,8 +33,8 @@ import {
 } from "@/lib/billing/features";
 
 type SubscriptionScope = "MASTER" | "STUDIO";
-
 type PeriodMonths = 1 | 3 | 6 | 12;
+type SectionTab = "plans" | "subscriptions" | "payments";
 
 const PERIODS: PeriodMonths[] = [1, 3, 6, 12];
 
@@ -58,17 +59,44 @@ type BillingPlanPrice = {
   isActive: boolean;
 };
 
-type BillingResponse = {
-  plans: BillingPlan[];
-};
-
+type BillingResponse = { plans: BillingPlan[] };
 type ModalMode = "create" | "edit";
 
-const TIER_ORDER: Record<PlanTier, number> = {
-  FREE: 0,
-  PRO: 1,
-  PREMIUM: 2,
+type SubscriptionItem = {
+  id: string;
+  scope: "MASTER" | "STUDIO";
+  status: string;
+  periodMonths: number;
+  autoRenew: boolean;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  updatedAt: string;
+  user: {
+    id: string;
+    displayName: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  plan: { id: string; name: string; code: string; tier: string };
 };
+
+type PaymentItem = {
+  id: string;
+  status: string;
+  amountKopeks: number;
+  yookassaPaymentId: string | null;
+  createdAt: string;
+  scope: string | null;
+  planName: string | null;
+  user: {
+    id: string;
+    displayName: string | null;
+    phone: string | null;
+    email: string | null;
+  } | null;
+};
+
+const TIER_ORDER: Record<PlanTier, number> = { FREE: 0, PRO: 1, PREMIUM: 2 };
 
 const TIER_LABEL: Record<PlanTier, string> = {
   FREE: UI_TEXT.admin.billing.tier.free,
@@ -90,11 +118,7 @@ function buildPlanMap(plans: BillingPlan[]): Map<string, PlanNode> {
   return new Map(
     plans.map((plan) => [
       plan.id,
-      {
-        id: plan.id,
-        inheritsFromPlanId: plan.inheritsFromPlanId,
-        features: plan.features,
-      },
+      { id: plan.id, inheritsFromPlanId: plan.inheritsFromPlanId, features: plan.features },
     ])
   );
 }
@@ -102,9 +126,7 @@ function buildPlanMap(plans: BillingPlan[]): Map<string, PlanNode> {
 function filterCatalog(
   scope: SubscriptionScope
 ): Array<[FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]> {
-  return (Object.entries(FEATURE_CATALOG) as Array<
-    [FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]
-  >)
+  return (Object.entries(FEATURE_CATALOG) as Array<[FeatureKey, (typeof FEATURE_CATALOG)[FeatureKey]]>)
     .filter(([, def]) => def.appliesTo === "BOTH" || def.appliesTo === scope)
     .sort((a, b) => a[1].uiOrder - b[1].uiOrder);
 }
@@ -121,7 +143,7 @@ function groupCatalog(entries: Array<[FeatureKey, (typeof FEATURE_CATALOG)[Featu
 }
 
 function getPriceForPeriod(plan: BillingPlan, periodMonths: PeriodMonths) {
-  return plan.prices.find((price) => price.periodMonths === periodMonths) ?? null;
+  return plan.prices.find((p) => p.periodMonths === periodMonths) ?? null;
 }
 
 function resolvePlanMonthlyLabel(plan: BillingPlan) {
@@ -137,9 +159,7 @@ function formatPriceInput(priceKopeks: number) {
 }
 
 function buildPriceDraft(prices: BillingPlanPrice[]): Record<PeriodMonths, string> {
-  const map = new Map<PeriodMonths, BillingPlanPrice>(
-    prices.map((price) => [price.periodMonths, price])
-  );
+  const map = new Map<PeriodMonths, BillingPlanPrice>(prices.map((p) => [p.periodMonths, p]));
   return {
     1: formatPriceInput(map.get(1)?.priceKopeks ?? 0),
     3: formatPriceInput(map.get(3)?.priceKopeks ?? 0),
@@ -156,8 +176,370 @@ function parsePriceInput(raw: string): number | null {
   return Math.round(value * 100);
 }
 
+function formatDate(value: string, timeZone: string) {
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone,
+  });
+}
+
+function subStatusBadge(status: string) {
+  const t = UI_TEXT.admin.billing.subscriptions.status;
+  const label = t[status as keyof typeof t] ?? status;
+  let cls = "inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ";
+  if (status === "ACTIVE") cls += "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+  else if (status === "PAST_DUE") cls += "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+  else if (status === "CANCELLED") cls += "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+  else if (status === "EXPIRED") cls += "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+  else cls += "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+  return <span className={cls}>{label}</span>;
+}
+
+function payStatusBadge(status: string) {
+  const t = UI_TEXT.admin.billing.payments.status;
+  const label = t[status as keyof typeof t] ?? status;
+  let cls = "inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ";
+  if (status === "SUCCEEDED") cls += "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+  else if (status === "CANCELED") cls += "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+  else if (status === "FAILED") cls += "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+  else if (status === "REFUNDED") cls += "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+  else cls += "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+  return <span className={cls}>{label}</span>;
+}
+
+// ─── Subscriptions Panel ────────────────────────────────────────────────────
+
+function SubscriptionsPanel() {
+  const t = UI_TEXT.admin.billing;
+  const ts = t.subscriptions;
+  const viewerTimeZone = useViewerTimeZoneContext();
+
+  const [items, setItems] = useState<SubscriptionItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const buildUrl = (cursor?: string | null) => {
+    const params = new URLSearchParams({ limit: "50" });
+    if (statusFilter) params.set("status", statusFilter);
+    if (cursor) params.set("cursor", cursor);
+    return `/api/admin/billing/subscriptions?${params.toString()}`;
+  };
+
+  const load = useCallback(
+    async (reset: boolean) => {
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      setError(null);
+      try {
+        const url = reset ? buildUrl() : buildUrl(nextCursor);
+        const res = await fetch(url, { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as ApiResponse<{
+          subscriptions: SubscriptionItem[];
+          nextCursor: string | null;
+        }> | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : t.errors.loadSubscriptions);
+        }
+        if (reset) setItems(json.data.subscriptions);
+        else setItems((prev) => [...prev, ...json.data.subscriptions]);
+        setNextCursor(json.data.nextCursor);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.errors.loadSubscriptions);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [statusFilter, nextCursor]
+  );
+
+  useEffect(() => {
+    void load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-48"
+        >
+          <option value="">{t.sectionTabs.subscriptions}</option>
+          {Object.keys(ts.status).map((s) => (
+            <option key={s} value={s}>
+              {ts.status[s as keyof typeof ts.status]}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {error ? (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>
+      ) : (
+        <div className="lux-card overflow-hidden rounded-[24px]">
+          <div className="overflow-x-auto">
+            <table className="w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
+                  <th className="px-4 py-3 text-left">{ts.table.user}</th>
+                  <th className="px-4 py-3 text-left">{ts.table.plan}</th>
+                  <th className="px-4 py-3 text-left">{ts.table.scope}</th>
+                  <th className="px-4 py-3 text-left">{ts.table.status}</th>
+                  <th className="px-4 py-3 text-left">{ts.table.periodEnd}</th>
+                  <th className="px-4 py-3 text-left">{ts.table.autoRenew}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length > 0 ? (
+                  items.map((sub, i) => (
+                    <tr key={sub.id} className={i % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
+                      <td className="px-4 py-3 text-sm text-text-main">
+                        <div>{sub.user.displayName || "—"}</div>
+                        <div className="text-xs text-text-sec tabular-nums">{sub.user.phone || sub.user.email || "—"}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-sec">
+                        {sub.plan.name}
+                        <div className="text-xs text-text-sec/70">{sub.plan.code}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-sec">
+                        {PROVIDER_LABEL[sub.scope]}
+                      </td>
+                      <td className="px-4 py-3">{subStatusBadge(sub.status)}</td>
+                      <td className="px-4 py-3 text-sm tabular-nums text-text-sec">
+                        {sub.currentPeriodEnd
+                          ? formatDate(sub.currentPeriodEnd, viewerTimeZone)
+                          : ts.noEnd}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-sec">
+                        {sub.autoRenew ? ts.autoRenewYes : ts.autoRenewNo}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-text-sec">
+                      {ts.empty}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {nextCursor ? (
+            <div className="border-t border-border-subtle/60 px-4 py-3">
+              <Button variant="secondary" size="sm" onClick={() => void load(false)} disabled={loadingMore}>
+                {loadingMore ? ts.loadingMore : ts.loadMore}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Payments Panel ─────────────────────────────────────────────────────────
+
+function PaymentsPanel() {
+  const t = UI_TEXT.admin.billing;
+  const tp = t.payments;
+  const viewerTimeZone = useViewerTimeZoneContext();
+
+  const [items, setItems] = useState<PaymentItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const [refundedIds, setRefundedIds] = useState<Set<string>>(new Set());
+
+  const buildUrl = (cursor?: string | null) => {
+    const params = new URLSearchParams({ limit: "50" });
+    if (statusFilter) params.set("status", statusFilter);
+    if (cursor) params.set("cursor", cursor);
+    return `/api/admin/billing/payments?${params.toString()}`;
+  };
+
+  const load = useCallback(
+    async (reset: boolean) => {
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      setError(null);
+      try {
+        const url = reset ? buildUrl() : buildUrl(nextCursor);
+        const res = await fetch(url, { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as ApiResponse<{
+          payments: PaymentItem[];
+          nextCursor: string | null;
+        }> | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : t.errors.loadPayments);
+        }
+        if (reset) setItems(json.data.payments);
+        else setItems((prev) => [...prev, ...json.data.payments]);
+        setNextCursor(json.data.nextCursor);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.errors.loadPayments);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [statusFilter, nextCursor]
+  );
+
+  useEffect(() => {
+    void load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  const refund = async (paymentId: string) => {
+    setRefundingId(paymentId);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/billing/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentId }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : t.errors.refund);
+      }
+      setRefundedIds((prev) => new Set([...prev, paymentId]));
+      setItems((prev) =>
+        prev.map((item) => (item.id === paymentId ? { ...item, status: "REFUNDED" } : item))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errors.refund);
+    } finally {
+      setRefundingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-48"
+        >
+          <option value="">{t.sectionTabs.payments}</option>
+          {Object.keys(tp.status).map((s) => (
+            <option key={s} value={s}>
+              {tp.status[s as keyof typeof tp.status]}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {error ? (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>
+      ) : (
+        <div className="lux-card overflow-hidden rounded-[24px]">
+          <div className="overflow-x-auto">
+            <table className="w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="bg-bg-input/55 text-xs font-semibold text-text-sec">
+                  <th className="px-4 py-3 text-left">{tp.table.user}</th>
+                  <th className="px-4 py-3 text-left">{tp.table.plan}</th>
+                  <th className="px-4 py-3 text-left">{tp.table.amount}</th>
+                  <th className="px-4 py-3 text-left">{tp.table.status}</th>
+                  <th className="px-4 py-3 text-left">{tp.table.date}</th>
+                  <th className="px-4 py-3 text-right" />
+                </tr>
+              </thead>
+              <tbody>
+                {items.length > 0 ? (
+                  items.map((pay, i) => (
+                    <tr key={pay.id} className={i % 2 === 0 ? "bg-bg-card" : "bg-bg-input/30"}>
+                      <td className="px-4 py-3 text-sm text-text-main">
+                        <div>{pay.user?.displayName || "—"}</div>
+                        <div className="text-xs text-text-sec tabular-nums">
+                          {pay.user?.phone || pay.user?.email || "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-sec">
+                        {pay.planName || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-sm tabular-nums text-text-main">
+                        {moneyRUBFromKopeks(pay.amountKopeks)}
+                      </td>
+                      <td className="px-4 py-3">{payStatusBadge(pay.status)}</td>
+                      <td className="px-4 py-3 text-sm tabular-nums text-text-sec">
+                        {formatDate(pay.createdAt, viewerTimeZone)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {pay.status === "SUCCEEDED" && !refundedIds.has(pay.id) ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={refundingId === pay.id}
+                            onClick={() => void refund(pay.id)}
+                          >
+                            {refundingId === pay.id ? UI_TEXT.status.saving : tp.refund}
+                          </Button>
+                        ) : refundedIds.has(pay.id) ? (
+                          <span className="text-xs text-text-sec">{tp.refundDone}</span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-text-sec">
+                      {tp.empty}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {nextCursor ? (
+            <div className="border-t border-border-subtle/60 px-4 py-3">
+              <Button variant="secondary" size="sm" onClick={() => void load(false)} disabled={loadingMore}>
+                {loadingMore ? tp.loadingMore : tp.loadMore}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
 export function AdminBilling() {
   const t = UI_TEXT.admin.billing;
+
+  const [section, setSection] = useState<SectionTab>("plans");
+
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -179,6 +561,15 @@ export function AdminBilling() {
   const [editingOverrides, setEditingOverrides] = useState<PlanFeatureOverrides>({});
   const [limitErrors, setLimitErrors] = useState<Record<string, string | null>>({});
   const modalRef = useRef<HTMLDivElement>(null);
+
+  const SECTION_TABS: TabItem[] = useMemo(
+    () => [
+      { id: "plans", label: t.sectionTabs.plans },
+      { id: "subscriptions", label: t.sectionTabs.subscriptions },
+      { id: "payments", label: t.sectionTabs.payments },
+    ],
+    [t.sectionTabs]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -218,7 +609,6 @@ export function AdminBilling() {
 
   useEffect(() => {
     if (!modalMode) return;
-
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -226,22 +616,17 @@ export function AdminBilling() {
         return;
       }
       if (event.key !== "Tab") return;
-
       const container = modalRef.current;
       if (!container) return;
-
       const focusable = Array.from(
         container.querySelectorAll<HTMLElement>(
           "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
         )
       ).filter((el) => !el.hasAttribute("disabled"));
-
       if (focusable.length === 0) return;
-
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const active = document.activeElement as HTMLElement | null;
-
       if (event.shiftKey && active === first) {
         event.preventDefault();
         last.focus();
@@ -250,7 +635,6 @@ export function AdminBilling() {
         first.focus();
       }
     };
-
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [modalMode, closeModal]);
@@ -327,7 +711,6 @@ export function AdminBilling() {
   }, [draftPlanId, draftPlansById]);
 
   const catalogEntries = useMemo(() => filterCatalog(editingScope), [editingScope]);
-
   const normalizedQuery = featureQuery.trim().toLowerCase();
 
   const filteredCatalogEntries = useMemo(() => {
@@ -343,10 +726,7 @@ export function AdminBilling() {
   const validateLimitOverride = (key: LimitFeatureKey, nextValue: number | null) => {
     const parentValue = parentEffective ? parentEffective[key] : undefined;
     if (!isRelaxedLimit(parentValue, nextValue)) {
-      setLimitErrors((current) => ({
-        ...current,
-        [key]: t.errors.strictLimit,
-      }));
+      setLimitErrors((current) => ({ ...current, [key]: t.errors.strictLimit }));
       return false;
     }
     setLimitErrors((current) => ({ ...current, [key]: null }));
@@ -386,7 +766,6 @@ export function AdminBilling() {
       setSaving(false);
       return;
     }
-
     for (const key of Object.keys(limitErrors)) {
       if (limitErrors[key]) {
         setError(t.errors.limitValidation);
@@ -394,7 +773,6 @@ export function AdminBilling() {
         return;
       }
     }
-
     const parentValueMap = parentEffective ?? getDefaultPlanFeatures();
     for (const [key, value] of Object.entries(editingOverrides)) {
       if (!FEATURE_CATALOG[key as FeatureKey]) continue;
@@ -407,21 +785,17 @@ export function AdminBilling() {
         }
       }
     }
-
     const pricesPayload = PERIODS.map((periodMonths) => {
       const priceKopeks = parsePriceInput(editingPrices[periodMonths] ?? "");
       if (priceKopeks === null) return null;
       return { periodMonths, priceKopeks };
     });
-
     if (pricesPayload.some((entry) => entry === null)) {
       setError(t.errors.invalidPrices);
       setSaving(false);
       return;
     }
-
     try {
-      const endpoint = "/api/admin/billing";
       const payload = {
         code: editingCode.trim(),
         name: editingName.trim(),
@@ -435,18 +809,15 @@ export function AdminBilling() {
         features: editingOverrides,
         isActive: editingIsActive,
       };
-
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/admin/billing", {
         method: modalMode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(modalMode === "create" ? payload : { id: activePlanId, ...payload }),
       });
-
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : t.errors.savePlan);
       }
-
       await load();
       closeModal();
     } catch (err) {
@@ -456,10 +827,6 @@ export function AdminBilling() {
     }
   };
 
-  if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>;
-  }
-
   return (
     <section className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -467,52 +834,73 @@ export function AdminBilling() {
           <h1 className="text-2xl font-semibold text-text-main">{t.title}</h1>
           <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
         </div>
-        <Button onClick={openCreate} variant="secondary">
-          {t.createPlan}
-        </Button>
+        {section === "plans" ? (
+          <Button onClick={openCreate} variant="secondary">
+            {t.createPlan}
+          </Button>
+        ) : null}
       </header>
 
-      {error ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
+      <Tabs
+        items={SECTION_TABS}
+        value={section}
+        onChange={(v) => setSection(v as SectionTab)}
+      />
+
+      {error && section === "plans" ? (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </div>
       ) : null}
 
-      {(["MASTER", "STUDIO"] as SubscriptionScope[]).map((scope) => (
-        <section key={scope} className="space-y-4">
-          <h2 className="text-lg font-semibold text-text-main">
-            {scope === "MASTER" ? t.plansForMaster : t.plansForStudio}
-          </h2>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {groupedPlans[scope].map((plan) => (
-              <Card key={plan.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-base font-semibold text-text-main">{plan.name}</div>
-                      <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
-                    </div>
-                    <div className="text-sm font-semibold text-text-main">
-                      {resolvePlanMonthlyLabel(plan)}
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="flex-1 space-y-3">
-                  <div className="text-xs text-text-sec">
-                    {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.scope]} • {t.sortOrderLabel}: {plan.sortOrder}
-                  </div>
-                  <div className="text-xs text-text-sec">
-                    {t.statusLabel}: {plan.isActive ? t.statusActive : t.statusDisabled}
-                  </div>
-                  <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
-                    {t.edit}
-                  </Button>
-                </CardContent>
-              </Card>
+      {section === "plans" ? (
+        loading ? (
+          <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.loading}</div>
+        ) : (
+          <>
+            {(["MASTER", "STUDIO"] as SubscriptionScope[]).map((scope) => (
+              <section key={scope} className="space-y-4">
+                <h2 className="text-lg font-semibold text-text-main">
+                  {scope === "MASTER" ? t.plansForMaster : t.plansForStudio}
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {groupedPlans[scope].map((plan) => (
+                    <Card key={plan.id} className="flex flex-col">
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-base font-semibold text-text-main">{plan.name}</div>
+                            <div className="mt-1 text-sm text-text-sec">{plan.code}</div>
+                          </div>
+                          <div className="text-sm font-semibold text-text-main">
+                            {resolvePlanMonthlyLabel(plan)}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex-1 space-y-3">
+                        <div className="text-xs text-text-sec">
+                          {TIER_LABEL[plan.tier]} • {PROVIDER_LABEL[plan.scope]} •{" "}
+                          {t.sortOrderLabel}: {plan.sortOrder}
+                        </div>
+                        <div className="text-xs text-text-sec">
+                          {t.statusLabel}: {plan.isActive ? t.statusActive : t.statusDisabled}
+                        </div>
+                        <Button variant="secondary" size="sm" onClick={() => openEdit(plan)}>
+                          {t.edit}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
             ))}
-          </div>
-        </section>
-      ))}
+          </>
+        )
+      ) : section === "subscriptions" ? (
+        <SubscriptionsPanel />
+      ) : (
+        <PaymentsPanel />
+      )}
 
       <ModalSurface open={Boolean(modalMode)} onClose={closeModal} className="max-w-3xl p-0">
         <div ref={modalRef} className="flex max-h-[80dvh] flex-col">
@@ -523,12 +911,7 @@ export function AdminBilling() {
               </h3>
               <p className="mt-1 text-xs text-text-sec">{t.modalSubtitle}</p>
             </div>
-            <Button
-              variant="icon"
-              size="icon"
-              onClick={closeModal}
-              aria-label={t.closeAria}
-            >
+            <Button variant="icon" size="icon" onClick={closeModal} aria-label={t.closeAria}>
               ×
             </Button>
           </header>
@@ -591,7 +974,9 @@ export function AdminBilling() {
                     {t.fields.inheritsFrom}
                     <Select
                       value={editingInheritsFromPlanId ?? ""}
-                      onChange={(event) => setEditingInheritsFromPlanId(event.target.value ? event.target.value : null)}
+                      onChange={(event) =>
+                        setEditingInheritsFromPlanId(event.target.value ? event.target.value : null)
+                      }
                       className="mt-1"
                     >
                       <option value="">{t.fields.noParent}</option>
@@ -605,7 +990,7 @@ export function AdminBilling() {
                     </Select>
                   </label>
 
-                                    <div className="sm:col-span-2">
+                  <div className="sm:col-span-2">
                     <div className="text-xs text-text-sec">{t.fields.pricesByPeriod}</div>
                     <div className="mt-2 grid gap-3 sm:grid-cols-2">
                       {PERIODS.map((periodMonths) => (
@@ -659,7 +1044,9 @@ export function AdminBilling() {
                     onChange={(event) => setFeatureQuery(event.target.value)}
                     className="max-w-sm"
                   />
-                  <div className="text-xs text-text-sec">{t.shownCount(filteredCatalogEntries.length)}</div>
+                  <div className="text-xs text-text-sec">
+                    {t.shownCount(filteredCatalogEntries.length)}
+                  </div>
                 </div>
 
                 {groupedCatalog.length === 0 ? (
@@ -722,13 +1109,11 @@ export function AdminBilling() {
                                   {def.description ? (
                                     <div className="text-xs text-text-sec">{def.description}</div>
                                   ) : null}
-
                                   {isInherited ? (
                                     <div className="mt-1 text-[11px] text-text-sec">
                                       {t.inheritedFrom(inheritedPlanCode)}
                                     </div>
                                   ) : null}
-
                                   {isInherited ? (
                                     <div className="text-[11px] text-text-sec">
                                       {t.cannotDisableInherited}
@@ -748,7 +1133,9 @@ export function AdminBilling() {
                                   <Switch
                                     checked={checked}
                                     disabled={disabled}
-                                    onCheckedChange={(value) => updateOverride(key as BooleanFeatureKey, value)}
+                                    onCheckedChange={(value) =>
+                                      updateOverride(key as BooleanFeatureKey, value)
+                                    }
                                   />
                                 </div>
                               </div>
@@ -758,11 +1145,13 @@ export function AdminBilling() {
                           // limit
                           const overrideValue = editingOverrides[key as LimitFeatureKey];
                           const effectiveValue = state.effectiveValue as number | null;
-                          const parentLimit = parentEffective ? parentEffective[key as LimitFeatureKey] : undefined;
+                          const parentLimit = parentEffective
+                            ? parentEffective[key as LimitFeatureKey]
+                            : undefined;
 
                           const isUnlimited =
-                            overrideValue === null || (overrideValue === undefined && effectiveValue === null);
-
+                            overrideValue === null ||
+                            (overrideValue === undefined && effectiveValue === null);
                           const isLocked = parentLimit === null && overrideValue === undefined;
 
                           const inputValue =
@@ -790,8 +1179,12 @@ export function AdminBilling() {
                             >
                               <div>
                                 <div className="text-sm font-medium text-text-main">{def.title}</div>
-                                {def.description ? <div className="text-xs text-text-sec">{def.description}</div> : null}
-                                {limitHint ? <div className="mt-1 text-[11px] text-text-sec">{limitHint}</div> : null}
+                                {def.description ? (
+                                  <div className="text-xs text-text-sec">{def.description}</div>
+                                ) : null}
+                                {limitHint ? (
+                                  <div className="mt-1 text-[11px] text-text-sec">{limitHint}</div>
+                                ) : null}
                               </div>
 
                               <div className="flex flex-wrap items-center gap-3">
@@ -813,20 +1206,23 @@ export function AdminBilling() {
                                   }}
                                   className="w-28"
                                 />
-
                                 <div className="flex items-center gap-2 text-xs text-text-sec">
                                   <Switch
                                     checked={isUnlimited}
                                     disabled={isLocked}
                                     onCheckedChange={(checked) =>
-                                      updateLimitOverride(key as LimitFeatureKey, checked ? null : undefined)
+                                      updateLimitOverride(
+                                        key as LimitFeatureKey,
+                                        checked ? null : undefined
+                                      )
                                     }
                                   />
                                   <span>{t.unlimited}</span>
                                 </div>
-
                                 {limitErrors[key as string] ? (
-                                  <span className="text-xs text-red-600 dark:text-red-400">{limitErrors[key as string]}</span>
+                                  <span className="text-xs text-red-600 dark:text-red-400">
+                                    {limitErrors[key as string]}
+                                  </span>
                                 ) : null}
                               </div>
                             </div>
@@ -855,9 +1251,3 @@ export function AdminBilling() {
     </section>
   );
 }
-
-
-
-
-
-

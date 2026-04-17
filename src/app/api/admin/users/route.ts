@@ -9,6 +9,7 @@ import { formatZodError } from "@/lib/api/validation";
 
 const querySchema = z.object({
   filter: z.enum(["all", "masters", "studios", "clients"]).optional(),
+  search: z.string().trim().max(100).optional(),
   cursor: z.string().trim().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -75,7 +76,23 @@ export async function GET(req: Request) {
   try {
     const query = parseQuery(new URL(req.url), querySchema);
     const filter = query.filter ?? "all";
-    const where = buildUserFilterWhere(filter);
+    const filterWhere = buildUserFilterWhere(filter);
+
+    const searchTerm = query.search?.trim();
+    const searchWhere: Prisma.UserProfileWhereInput | undefined = searchTerm
+      ? {
+          OR: [
+            { displayName: { contains: searchTerm, mode: "insensitive" } },
+            { phone: { contains: searchTerm } },
+            { email: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        }
+      : undefined;
+
+    const where: Prisma.UserProfileWhereInput =
+      filterWhere && searchWhere
+        ? { AND: [filterWhere, searchWhere] }
+        : (filterWhere ?? searchWhere ?? {});
 
     const users = await prisma.userProfile.findMany({
       where,

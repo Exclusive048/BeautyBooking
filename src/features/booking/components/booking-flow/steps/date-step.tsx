@@ -8,21 +8,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 const t = UI_TEXT.publicProfile.bookingFlow;
 
-// Months in genitive case for header display
-const MONTHS_GENITIVE = [
-  "января",
-  "февраля",
-  "марта",
-  "апреля",
-  "мая",
-  "июня",
-  "июля",
-  "августа",
-  "сентября",
-  "октября",
-  "ноября",
-  "декабря",
-];
+const MONTHS_GENITIVE = t.monthsGenitive;
 
 const DAYS_BATCH_SIZE = 14;
 
