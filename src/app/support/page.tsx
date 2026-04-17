@@ -12,6 +12,7 @@ import { InfoPageLayout } from "@/components/layout/info-page-layout";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.support.title,
   description: UI_TEXT.pages.support.description,
+  alternates: { canonical: "/support" },
 };
 
 export default async function SupportPage() {

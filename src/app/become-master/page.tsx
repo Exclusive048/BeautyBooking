@@ -9,6 +9,7 @@ import type { DynamicIconName } from "@/components/ui/dynamic-icon";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.becomeMaster.title,
   description: UI_TEXT.pages.becomeMaster.description,
+  alternates: { canonical: "/become-master" },
 };
 
 const ADVANTAGES = UI_TEXT.pages.becomeMaster.advantages;

@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "МастерРядом — запись к мастерам онлайн",
   description:
     "Найди мастера маникюра, массажа или стрижки рядом. Онлайн-запись.",
+  alternates: { canonical: "/" },
 };
 
 export default async function HomePage() {

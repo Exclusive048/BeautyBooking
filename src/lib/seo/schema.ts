@@ -26,7 +26,7 @@ export function buildProviderSchema(input: ProviderSchemaInput, baseUrl?: string
   const url = baseUrl ? `${baseUrl}/u/${input.publicUsername}` : `/u/${input.publicUsername}`;
   const schema: Record<string, unknown> = {
     "@context": "https://schema.org",
-    "@type": input.type === "STUDIO" ? "LocalBusiness" : "Person",
+    "@type": "HealthAndBeautyBusiness",
     name: input.name,
     url,
   };

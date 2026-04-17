@@ -7,13 +7,30 @@ import { FAQAccordion } from "@/components/ui/faq-accordion";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.faq.title,
   description: UI_TEXT.pages.faq.description,
+  alternates: { canonical: "/faq" },
 };
 
 const FAQS = UI_TEXT.pages.faq.groups;
 
+const FAQ_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.flatMap((group) =>
+    group.items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    }))
+  ),
+};
+
 export default function FaqPage() {
   return (
     <main className="mx-auto max-w-[820px] px-4 py-12 md:py-20 space-y-14">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
+      />
       <InfoPageLayout breadcrumb={UI_TEXT.pages.faq.navLabel}>
 
         {/* Hero */}

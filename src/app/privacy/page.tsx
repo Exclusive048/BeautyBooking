@@ -19,6 +19,7 @@ const UPDATED_AT = "12.03.2026";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.privacy.title,
   description: UI_TEXT.pages.privacy.description,
+  alternates: { canonical: "/privacy" },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 import LoginClient from "./login-client";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { getSessionUser } from "@/lib/auth/session";

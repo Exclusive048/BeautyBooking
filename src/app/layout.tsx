@@ -61,8 +61,35 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: UI_TEXT.meta.title,
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"),
+  title: {
+    default: UI_TEXT.meta.title,
+    template: `%s | ${UI_TEXT.brand.name}`,
+  },
   description: UI_TEXT.meta.description,
+  keywords: [
+    "запись к мастеру",
+    "онлайн запись красота",
+    "маникюр запись",
+    "стрижки онлайн",
+    "мастер красоты рядом",
+    "салон красоты",
+    "массаж запись",
+    "бьюти мастер",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "ru_RU",
+    siteName: UI_TEXT.brand.name,
+    title: UI_TEXT.meta.title,
+    description: UI_TEXT.meta.description,
+    images: [{ url: "/icons/icon-512.png", width: 512, height: 512, alt: UI_TEXT.brand.name }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: UI_TEXT.meta.title,
+    description: UI_TEXT.meta.description,
+  },
   manifest: "/manifest.json",
   icons: {
     apple: [
@@ -102,6 +129,23 @@ export const metadata: Metadata = {
   },
 };
 
+const SITE_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "МастерРядом",
+  url: "https://мастеррядом.online",
+  description: "Маркетплейс онлайн-записи к мастерам красоты",
+  applicationCategory: "LifestyleApplication",
+  operatingSystem: "Web, iOS, Android",
+  inLanguage: "ru",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "RUB",
+    description: "Бесплатная запись для клиентов",
+  },
+};
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = await getNonce();
   return (
@@ -109,6 +153,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta property="csp-nonce" content={nonce} />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: LOCAL_SW_RESET_SCRIPT }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSON_LD) }}
+        />
       </head>
       <body>
         <ThemeProvider>

@@ -12,6 +12,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.models.title,
   description: UI_TEXT.pages.models.description,
+  alternates: { canonical: "/models" },
 };
 
 type PageProps = {

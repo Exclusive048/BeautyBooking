@@ -8,6 +8,7 @@ import { FAQAccordion } from "@/components/ui/faq-accordion";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.howToBook.title,
   description: UI_TEXT.pages.howToBook.description,
+  alternates: { canonical: "/how-to-book" },
 };
 
 const STEPS = UI_TEXT.pages.howToBook.steps;

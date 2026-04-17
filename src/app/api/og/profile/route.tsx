@@ -7,7 +7,7 @@ const CARD_WIDTH = 1200;
 const CARD_HEIGHT = 630;
 
 const BRAND_NAME = "МастерРядом";
-const BRAND_DOMAIN = "beautyhub.art";
+const BRAND_DOMAIN = "мастеррядом.online";
 
 const GRADIENT_START = "rgb(198, 169, 126)";
 const GRADIENT_END = "rgb(191, 130, 176)";

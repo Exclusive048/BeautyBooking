@@ -10,6 +10,7 @@ import type { SubscriptionScope } from "@prisma/client";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.pricing.title,
   description: UI_TEXT.pages.pricing.description,
+  alternates: { canonical: "/pricing" },
 };
 
 const t = UI_TEXT.pages.pricing;

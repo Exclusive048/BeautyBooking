@@ -3,45 +3,29 @@ import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { logError } from "@/lib/logging/logger";
 
+const FALLBACK_BASE_URL = "https://мастеррядом.online";
 const PAGE_SIZE = 1000;
 
 function buildStaticRoutes(baseUrl: string): MetadataRoute.Sitemap {
   return [
-    {
-      url: `${baseUrl}/`,
-      changeFrequency: "daily",
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/catalog`,
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/hot`,
-      changeFrequency: "daily",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/models`,
-      changeFrequency: "daily",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/terms`,
-      changeFrequency: "monthly",
-      priority: 0.4,
-    },
-    {
-      url: `${baseUrl}/privacy`,
-      changeFrequency: "monthly",
-      priority: 0.4,
-    },
+    { url: `${baseUrl}/`, changeFrequency: "daily", priority: 1.0 },
+    { url: `${baseUrl}/catalog`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${baseUrl}/hot`, changeFrequency: "daily", priority: 0.7 },
+    { url: `${baseUrl}/models`, changeFrequency: "daily", priority: 0.7 },
+    { url: `${baseUrl}/pricing`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${baseUrl}/become-master`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${baseUrl}/about`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/how-it-works`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/how-to-book`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/faq`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/support`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${baseUrl}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${baseUrl}/terms`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = resolvePublicAppUrl() ?? "http://localhost:3000";
+  const baseUrl = resolvePublicAppUrl() ?? FALLBACK_BASE_URL;
   const staticRoutes = buildStaticRoutes(baseUrl);
   const dynamicRoutes: MetadataRoute.Sitemap = [];
 
@@ -67,7 +51,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           url: `${baseUrl}/u/${row.publicUsername}`,
           lastModified: row.updatedAt,
           changeFrequency: "weekly",
-          priority: 0.7,
+          priority: 0.8,
         });
       }
 

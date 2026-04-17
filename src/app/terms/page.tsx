@@ -24,6 +24,7 @@ const UPDATED_AT = "12.03.2026";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.terms.title,
   description: UI_TEXT.pages.terms.description,
+  alternates: { canonical: "/terms" },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
