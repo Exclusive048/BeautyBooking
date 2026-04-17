@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { UI_TEXT } from "@/lib/ui/text";
+import { InfoPageLayout } from "@/components/layout/info-page-layout";
 
 const LEGAL_ENTITY_NAME = UI_TEXT.pages.terms.legalEntityNamePlaceholder;
 const INN = UI_TEXT.pages.terms.innPlaceholder;
@@ -37,7 +38,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function TermsPage() {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
-      <header className="space-y-2">
+      <InfoPageLayout breadcrumb={UI_TEXT.pages.terms.navLabel}>
+      <header className="space-y-2 pt-4">
         <p className="text-xs text-text-sec">
           {UI_TEXT.pages.terms.metaLine
             .replace("{version}", DOCUMENT_VERSION)
@@ -132,6 +134,7 @@ export default function TermsPage() {
           </Section>
         </CardContent>
       </Card>
+      </InfoPageLayout>
     </div>
   );
 }
