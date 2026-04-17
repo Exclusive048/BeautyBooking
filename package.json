@@ -24,7 +24,8 @@
     "worker": "npx --yes tsx src/worker.ts",
     "seed:sql": "bash prisma/seed.sh",
     "seed:billing": "npx tsx scripts/seed-billing-plans.ts",
-    "migrate:billing": "npx tsx scripts/migrate-billing-plans.ts"
+    "migrate:billing": "npx tsx scripts/migrate-billing-plans.ts",
+    "generate:icons": "node scripts/generate-icons.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs",

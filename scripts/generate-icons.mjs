@@ -7,7 +7,7 @@ const publicDir = path.join(root, "public");
 const iconsDir = path.join(publicDir, "icons");
 const fallbackSvgPath = path.join(iconsDir, "icon.svg");
 
-const ICON_SIZES = [72, 96, 128, 144, 152, 192, 384, 512];
+const ICON_SIZES = [16, 32, 48, 72, 96, 128, 144, 152, 180, 192, 384, 512];
 const MASKABLE_SIZES = [192, 512];
 const SHORTCUTS = [
   { name: "shortcut-bookings.png", size: 96 },
