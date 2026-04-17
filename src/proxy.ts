@@ -5,7 +5,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { verifyToken } from "@/lib/auth/jwt";
 
-const PRODUCTION_ORIGIN = "https://beautyhub.art";
+const PRODUCTION_ORIGIN = "https://мастеррядом.online";
 const ALLOWED_DEV_ORIGINS = new Set([
   "http://localhost:3000",
   "http://127.0.0.1:3000",

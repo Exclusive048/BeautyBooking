@@ -13,6 +13,7 @@ import { sendTelegramMessage } from "@/lib/telegram/client";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
+import { alertDeadJobs } from "@/lib/monitoring/api-alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
@@ -246,6 +247,7 @@ function getJobScheduleAt(job: Job): number | null {
 
 async function moveToDeadQueue(job: Job): Promise<void> {
   await enqueueDeadJob(normalizeJobMeta(job));
+  alertDeadJobs(1);
 }
 
 async function processTelegramSend(

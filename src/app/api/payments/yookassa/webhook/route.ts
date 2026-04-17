@@ -6,6 +6,7 @@ import { checkYookassaIpAllowlist } from "@/lib/payments/yookassa/allowlist";
 import { createYookassaWebhookJob, type YookassaWebhookPayload } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
 import { alertCritical } from "@/lib/monitoring";
+import { alertWebhookFailure } from "@/lib/monitoring/api-alerts";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
         operation: "yookassa-ingress",
         code: "INVALID_SIGNATURE",
       });
+      alertWebhookFailure("yookassa", "INVALID_SIGNATURE");
       return fail("Invalid signature", 401, "UNAUTHORIZED");
     }
 
@@ -78,6 +80,7 @@ export async function POST(req: Request) {
         operation: "yookassa-ingress",
         code: "IP_NOT_ALLOWED",
       });
+      alertWebhookFailure("yookassa", "IP_NOT_ALLOWED", { ip: allowlistCheck.ip });
       return fail("Forbidden", 403, "FORBIDDEN");
     }
 
@@ -110,6 +113,7 @@ export async function POST(req: Request) {
           operation: "yookassa-ingress",
           code: "INVALID_WEBHOOK_TOKEN",
         });
+        alertWebhookFailure("yookassa", "INVALID_WEBHOOK_TOKEN", { ip: allowlistCheck.ip });
         return fail("Unauthorized", 401, "UNAUTHORIZED");
       }
     }

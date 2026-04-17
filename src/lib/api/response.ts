@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ErrorCode } from "@/lib/api/errors";
-import { getRequestId } from "@/lib/logging/logger";
+import { getRequestId, logError } from "@/lib/logging/logger";
+import { track5xxError } from "@/lib/monitoring/api-alerts";
 
 type ApiOk<T> = {
   ok: true;
@@ -28,6 +29,10 @@ export function fail(
   details?: unknown
 ) {
   const requestId = getRequestId();
+  if (status >= 500) {
+    logError(message, { status, code, requestId, __skipAlert: true });
+    track5xxError("", requestId, message);
+  }
   return NextResponse.json<ApiError>(
     { ok: false, requestId, error: { message, code, details } },
     { status }

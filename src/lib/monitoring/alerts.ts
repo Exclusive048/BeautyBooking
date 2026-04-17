@@ -4,7 +4,7 @@ import { logError } from "@/lib/logging/logger";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 
 const ERROR_WINDOW_MS = 60_000;
-const ALERT_COOLDOWN_MS = 5 * 60_000;
+const DEFAULT_ALERT_COOLDOWN_MS = 5 * 60_000;
 const ALERT_COOLDOWN_KEY_PREFIX = "mon:alert:cooldown:";
 const isProduction = process.env.NODE_ENV === "production";
 const COOLDOWN_DEGRADED_LOG_INTERVAL_MS = 60_000;
@@ -26,7 +26,10 @@ function buildCooldownStoreKey(alertKey: string): string {
   return `${ALERT_COOLDOWN_KEY_PREFIX}${digest}`;
 }
 
-async function acquireSharedCooldown(alertKey: string): Promise<"sent" | "cooldown" | "degraded"> {
+async function acquireSharedCooldown(
+  alertKey: string,
+  cooldownMs: number
+): Promise<"sent" | "cooldown" | "degraded"> {
   const client = await getRedisConnection();
   if (!client) {
     return "degraded";
@@ -36,7 +39,7 @@ async function acquireSharedCooldown(alertKey: string): Promise<"sent" | "cooldo
     "monitoring:alerts:cooldown-set",
     client.set(buildCooldownStoreKey(alertKey), String(Date.now()), {
       NX: true,
-      PX: ALERT_COOLDOWN_MS,
+      PX: cooldownMs,
     })
   );
   if (result === "OK") {
@@ -45,10 +48,10 @@ async function acquireSharedCooldown(alertKey: string): Promise<"sent" | "cooldo
   return "cooldown";
 }
 
-function acquireMemoryCooldown(alertKey: string): boolean {
+function acquireMemoryCooldown(alertKey: string, cooldownMs: number): boolean {
   const now = Date.now();
   const lastSentAt = lastAlertAt.get(alertKey) ?? 0;
-  if (now - lastSentAt < ALERT_COOLDOWN_MS) {
+  if (now - lastSentAt < cooldownMs) {
     return false;
   }
   lastAlertAt.set(alertKey, now);
@@ -62,10 +65,14 @@ function maybeLogCooldownDegraded(message: string, details: Record<string, unkno
   logError(message, { ...details, __skipAlert: true });
 }
 
-export async function sendTelegramAlert(message: string, alertKey?: string): Promise<boolean> {
+export async function sendTelegramAlert(
+  message: string,
+  alertKey?: string,
+  cooldownMs = DEFAULT_ALERT_COOLDOWN_MS
+): Promise<boolean> {
   const normalizedAlertKey = alertKey?.trim() || message;
   try {
-    const sharedCooldown = await acquireSharedCooldown(normalizedAlertKey);
+    const sharedCooldown = await acquireSharedCooldown(normalizedAlertKey, cooldownMs);
     if (sharedCooldown === "cooldown") {
       return false;
     }
@@ -76,7 +83,7 @@ export async function sendTelegramAlert(message: string, alertKey?: string): Pro
           alertKey: normalizedAlertKey,
         });
       }
-      if (!acquireMemoryCooldown(normalizedAlertKey)) {
+      if (!acquireMemoryCooldown(normalizedAlertKey, cooldownMs)) {
         return false;
       }
     }
@@ -94,7 +101,7 @@ export async function sendTelegramAlert(message: string, alertKey?: string): Pro
       });
     }
 
-    if (!acquireMemoryCooldown(normalizedAlertKey)) {
+    if (!acquireMemoryCooldown(normalizedAlertKey, cooldownMs)) {
       return false;
     }
   }

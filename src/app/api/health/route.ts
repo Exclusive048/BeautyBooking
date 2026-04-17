@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   let db = false;
-  let redis = false;
+  let redis: boolean | null = null;
 
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -20,14 +20,16 @@ export async function GET() {
     if (client) {
       await client.ping();
       redis = true;
+    } else {
+      redis = null;
     }
   } catch {
-    // redis stays false
+    redis = false;
   }
 
-  const allOk = db && redis;
+  const allOk = db && redis !== false;
   return NextResponse.json(
-    { ok: allOk, db, redis },
+    { ok: allOk, db, redis, timestamp: new Date().toISOString() },
     { status: allOk ? 200 : 503 }
   );
 }
