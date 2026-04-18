@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element -- studio photo gallery with dynamic dimensions */
+import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -50,8 +50,8 @@ export async function StudioPhotosSection({ studioId }: Props) {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {portfolio.length > 0
                 ? portfolio.map((asset) => (
-                    <div key={asset.id} className="aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
-                      <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                    <div key={asset.id} className="relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
+                      <Image src={asset.url} alt="" fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover" />
                     </div>
                   ))
                 : Array.from({ length: 8 }).map((_, i) => (

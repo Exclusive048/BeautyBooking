@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- masonry feed with dynamic aspect ratios, needs natural img sizing */
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -400,6 +400,7 @@ export default function InspirationFeedClient() {
               className="group relative mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card transition-all duration-300 hover:scale-[1.012] hover:shadow-hover"
             >
               <Button variant="wrapper" onClick={() => setSelectedId(item.id)} className="block w-full text-left">
+                {/* eslint-disable-next-line @next/next/no-img-element -- masonry needs natural image height for CSS columns layout */}
                 <img
                   src={item.mediaUrl}
                   alt={item.caption ?? item.primaryServiceTitle ?? item.masterName}
@@ -466,6 +467,7 @@ export default function InspirationFeedClient() {
               {selectedItem ? (
                 <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
                   <div>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- detail view needs max-h constraint with object-contain, dimensions unknown */}
                     <img
                       src={selectedItem.mediaUrl}
                       alt={selectedItem.caption ?? selectedItem.primaryServiceTitle ?? selectedItem.masterName}
@@ -532,7 +534,9 @@ export default function InspirationFeedClient() {
                         className="overflow-hidden rounded-xl border text-left"
                         onClick={() => setSelectedId(similar.id)}
                       >
-                        <img src={similar.mediaUrl} alt={similar.masterName} className="h-24 w-full object-cover" />
+                        <div className="relative h-24 w-full">
+                          <Image src={similar.mediaUrl} alt={similar.masterName} fill sizes="(max-width: 640px) 50vw, 25vw" className="object-cover" />
+                        </div>
                         <div className="p-2 text-xs">
                           <div className="truncate text-text-main">{similar.masterName}</div>
                           <div className="text-text-sec">{UI_FMT.priceLabel(similar.totalPrice)}</div>

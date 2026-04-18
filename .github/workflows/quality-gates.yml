@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, Types, Prisma, Encoding
+    name: Lint, Types, Tests, Prisma, Encoding
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -41,7 +41,13 @@ jobs:
         run: npm run typecheck
 
       - name: Run tests
-        run: npm run test -- --reporter=verbose
+        run: npm run test -- --reporter=verbose --bail 1
+        env:
+          NODE_ENV: test
+          AUTH_JWT_SECRET: test-jwt-secret-for-ci-must-be-at-least-64-characters-long-xxxxxxxxxxxxxxx
+          OTP_HMAC_SECRET: test-otp-secret-for-ci-at-least-32chars
+          DATABASE_URL: ""
+          REDIS_URL: ""
 
       - name: Mojibake check
         run: npm run check:mojibake

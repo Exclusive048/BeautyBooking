@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // worker_threads fail on Windows with native modules (sharp, prisma); forks is stable cross-platform
+    pool: "forks",
   },
 });
