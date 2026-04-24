@@ -7,6 +7,10 @@ type FocalImageProps = {
   alt: string;
   focalX?: number | null;
   focalY?: number | null;
+  cropX?: number | null;
+  cropY?: number | null;
+  cropWidth?: number | null;
+  cropHeight?: number | null;
   // Fixed-size mode (for avatars with known dimensions)
   width?: number;
   height?: number;
@@ -19,11 +23,33 @@ type FocalImageProps = {
   style?: CSSProperties;
 };
 
+function buildObjectPosition(
+  cropX: number | null | undefined,
+  cropY: number | null | undefined,
+  cropWidth: number | null | undefined,
+  cropHeight: number | null | undefined,
+  focalX: number | null | undefined,
+  focalY: number | null | undefined,
+): string {
+  // Crop data takes priority: position the focal center of the crop area
+  if (cropX != null && cropY != null && cropWidth != null && cropHeight != null) {
+    const cx = Math.round((cropX + cropWidth / 2) * 100);
+    const cy = Math.round((cropY + cropHeight / 2) * 100);
+    return `${cx}% ${cy}%`;
+  }
+  // Fall back to legacy focal point
+  return focalPointToObjectPosition(focalX, focalY);
+}
+
 export function FocalImage({
   src,
   alt,
   focalX,
   focalY,
+  cropX,
+  cropY,
+  cropWidth,
+  cropHeight,
   width,
   height,
   sizes,
@@ -32,7 +58,7 @@ export function FocalImage({
   className,
   style,
 }: FocalImageProps) {
-  const objectPosition = focalPointToObjectPosition(focalX, focalY);
+  const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight, focalX, focalY);
   const combinedStyle: CSSProperties = { ...style, objectPosition };
 
   if (width && height) {

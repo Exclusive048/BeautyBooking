@@ -20,6 +20,10 @@ model MediaAsset {
   originalFilename    String
   focalX              Float?
   focalY              Float?
+  cropX               Float?
+  cropY               Float?
+  cropWidth           Float?
+  cropHeight          Float?
   visualIndexed       Boolean          @default(false)
   visualIndexedAt     DateTime?
   visualPromptVersion String?

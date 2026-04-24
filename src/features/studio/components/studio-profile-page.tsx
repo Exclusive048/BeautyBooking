@@ -20,7 +20,7 @@ import { StudioProfileHero } from "@/features/studio-cabinet/components/studio-p
 import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-profile-form";
 import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-bar";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
+import { CropPicker } from "@/features/media/components/crop-picker";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 
 type StudioProfileData = {
@@ -437,13 +437,13 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
         <ModalSurface
           open={pickingBannerFocal}
           onClose={() => setPickingBannerFocal(false)}
-          title={t.bannerFocusTitle}
+          title={UI_TEXT.media.crop.titleBanner}
         >
-          <FocalPointPicker
+          <CropPicker
             assetId={bannerAssetId!}
             imageUrl={bannerUrl!}
-            initialFocalX={bannerFocalX}
-            initialFocalY={bannerFocalY}
+            shape="rect"
+            aspectRatio={16 / 9}
             onSave={async () => {
               await load();
               setPickingBannerFocal(false);

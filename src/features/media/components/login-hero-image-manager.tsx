@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
+import { CropPicker } from "@/features/media/components/crop-picker";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -24,12 +24,13 @@ function buildListUrl(): string {
 
 export function LoginHeroImageManager() {
   const t = UI_TEXT.admin.media;
+  const tc = UI_TEXT.media.crop;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [asset, setAsset] = useState<MediaAssetDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pickingFocal, setPickingFocal] = useState(false);
+  const [pickingCrop, setPickingCrop] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -72,7 +73,7 @@ export function LoginHeroImageManager() {
         }
 
         setAsset(json.data.asset);
-        setPickingFocal(true);
+        setPickingCrop(true);
       } catch (uploadError) {
         const message = uploadError instanceof Error ? uploadError.message : t.uploadFailed;
         setError(message);
@@ -123,6 +124,10 @@ export function LoginHeroImageManager() {
             alt={t.loginHeroTitle}
             focalX={asset.focalX}
             focalY={asset.focalY}
+            cropX={asset.cropX}
+            cropY={asset.cropY}
+            cropWidth={asset.cropWidth}
+            cropHeight={asset.cropHeight}
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover"
           />
@@ -148,13 +153,13 @@ export function LoginHeroImageManager() {
         {asset ? (
           <Button
             type="button"
-            onClick={() => setPickingFocal(true)}
+            onClick={() => setPickingCrop(true)}
             disabled={busy}
             variant="secondary"
             size="sm"
             className="rounded-xl"
           >
-            {t.focalPoint}
+            {tc.setCrop}
           </Button>
         ) : null}
 
@@ -190,24 +195,27 @@ export function LoginHeroImageManager() {
 
       {asset ? (
         <ModalSurface
-          open={pickingFocal}
-          onClose={() => setPickingFocal(false)}
-          title={t.focalPoint}
+          open={pickingCrop}
+          onClose={() => setPickingCrop(false)}
+          title={tc.titleBanner}
         >
-          <FocalPointPicker
+          <CropPicker
             assetId={asset.id}
             imageUrl={asset.url}
-            initialFocalX={asset.focalX}
-            initialFocalY={asset.focalY}
+            shape="rect"
+            aspectRatio={16 / 9}
+            initialCropX={asset.cropX}
+            initialCropY={asset.cropY}
+            initialCropWidth={asset.cropWidth}
+            initialCropHeight={asset.cropHeight}
             onSave={async () => {
               await load();
-              setPickingFocal(false);
+              setPickingCrop(false);
             }}
-            onSkip={() => setPickingFocal(false)}
+            onSkip={() => setPickingCrop(false)}
           />
         </ModalSurface>
       ) : null}
     </div>
   );
 }
-

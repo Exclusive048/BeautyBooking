@@ -11,6 +11,13 @@ export const MEDIA_PORTFOLIO_LIMIT = 20;
 
 export type AllowedMediaMimeType = (typeof MEDIA_ALLOWED_MIME_TYPES)[number];
 
+export type CropArea = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type MediaAssetDto = {
   id: string;
   entityType: MediaEntityType;
@@ -22,6 +29,10 @@ export type MediaAssetDto = {
   url: string;
   focalX: number | null;
   focalY: number | null;
+  cropX: number | null;
+  cropY: number | null;
+  cropWidth: number | null;
+  cropHeight: number | null;
   createdAt: string;
 };
 
@@ -37,6 +48,19 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     url: `/api/media/file/${asset.id}`,
     focalX: asset.focalX ?? null,
     focalY: asset.focalY ?? null,
+    cropX: asset.cropX ?? null,
+    cropY: asset.cropY ?? null,
+    cropWidth: asset.cropWidth ?? null,
+    cropHeight: asset.cropHeight ?? null,
     createdAt: asset.createdAt.toISOString(),
   };
+}
+
+export function assetHasCrop(asset: Pick<MediaAssetDto, "cropX" | "cropY" | "cropWidth" | "cropHeight">): boolean {
+  return (
+    asset.cropX !== null &&
+    asset.cropY !== null &&
+    asset.cropWidth !== null &&
+    asset.cropHeight !== null
+  );
 }

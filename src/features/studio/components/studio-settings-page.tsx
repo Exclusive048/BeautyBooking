@@ -15,7 +15,7 @@ import { ShareProfileSection } from "@/features/cabinet/components/share-profile
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
-import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
+import { CropPicker } from "@/features/media/components/crop-picker";
 import { PortfolioEditor } from "@/features/media/components/portfolio-editor";
 import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
 import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-bar";
@@ -817,13 +817,13 @@ export function StudioSettingsPage({ providerId, studioId, initialTab, hideTabNa
         <ModalSurface
           open={pickingBannerFocal}
           onClose={() => setPickingBannerFocal(false)}
-          title={t.bannerFocusTitle}
+          title={UI_TEXT.media.crop.titleBanner}
         >
-          <FocalPointPicker
+          <CropPicker
             assetId={bannerAssetId!}
             imageUrl={bannerUrl!}
-            initialFocalX={bannerFocalX}
-            initialFocalY={bannerFocalY}
+            shape="rect"
+            aspectRatio={16 / 9}
             onSave={async () => {
               await load();
               setPickingBannerFocal(false);

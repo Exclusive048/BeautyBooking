@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Crosshair, Pencil, Trash2 } from "lucide-react";
+import { Camera, Crop, Pencil, Trash2 } from "lucide-react";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
+import { assetHasCrop } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { FocalPointPicker } from "@/features/media/components/focal-point-picker";
+import { CropPicker } from "@/features/media/components/crop-picker";
 
 type Props = {
   entityType: MediaEntityType;
@@ -47,9 +48,9 @@ export function AvatarEditor({
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pickingFocal, setPickingFocal] = useState(false);
-  const [focalAsset, setFocalAsset] = useState<MediaAssetDto | null>(null);
-  const openFocalAfterLoadRef = useRef(false);
+  const [pickingCrop, setPickingCrop] = useState(false);
+  const [cropAsset, setCropAsset] = useState<MediaAssetDto | null>(null);
+  const openCropAfterLoadRef = useRef(false);
 
   const activeAsset = assets[0] ?? null;
   const imageUrl = activeAsset?.url ?? fallbackUrl ?? null;
@@ -65,12 +66,12 @@ export function AvatarEditor({
       }
       const nextAssets = json.data.assets;
       setAssets(nextAssets);
-      if (openFocalAfterLoadRef.current) {
-        openFocalAfterLoadRef.current = false;
+      if (openCropAfterLoadRef.current) {
+        openCropAfterLoadRef.current = false;
         const nextAsset = nextAssets[0] ?? null;
         if (nextAsset) {
-          setFocalAsset(nextAsset);
-          setPickingFocal(true);
+          setCropAsset(nextAsset);
+          setPickingCrop(true);
         }
       }
     } catch (e) {
@@ -97,7 +98,7 @@ export function AvatarEditor({
         if (!res.ok || !json || !json.ok) {
           throw new Error(json && !json.ok ? json.error.message : t.uploadFailed);
         }
-        openFocalAfterLoadRef.current = true;
+        openCropAfterLoadRef.current = true;
         await load();
       } catch (e) {
         setError(e instanceof Error ? e.message : t.uploadFailed);
@@ -136,9 +137,9 @@ export function AvatarEditor({
     () => (activeAsset ? t.replace : t.upload),
     [activeAsset, t.replace, t.upload]
   );
-  const hasFocalPoint = activeAsset?.focalX !== null && activeAsset?.focalY !== null;
-  const focalButtonLabel = hasFocalPoint ? t.editFocalPoint : t.setFocalPoint;
-  const pickerAsset = focalAsset ?? activeAsset;
+  const hasCrop = activeAsset ? assetHasCrop(activeAsset) : false;
+  const cropButtonLabel = hasCrop ? t.editCrop : t.setCrop;
+  const pickerAsset = cropAsset ?? activeAsset;
 
   const avatarPreview = imageUrl ? (
     <FocalImage
@@ -146,6 +147,10 @@ export function AvatarEditor({
       alt=""
       focalX={activeAsset?.focalX ?? null}
       focalY={activeAsset?.focalY ?? null}
+      cropX={activeAsset?.cropX ?? null}
+      cropY={activeAsset?.cropY ?? null}
+      cropWidth={activeAsset?.cropWidth ?? null}
+      cropHeight={activeAsset?.cropHeight ?? null}
       sizes="(max-width: 768px) 30vw, 200px"
       className="object-cover"
     />
@@ -170,6 +175,10 @@ export function AvatarEditor({
                 alt=""
                 focalX={activeAsset?.focalX ?? null}
                 focalY={activeAsset?.focalY ?? null}
+                cropX={activeAsset?.cropX ?? null}
+                cropY={activeAsset?.cropY ?? null}
+                cropWidth={activeAsset?.cropWidth ?? null}
+                cropHeight={activeAsset?.cropHeight ?? null}
                 sizes="(max-width: 768px) 30vw, 200px"
                 className="object-cover"
               />
@@ -212,14 +221,14 @@ export function AvatarEditor({
                   variant="ghost"
                   size="none"
                   onClick={() => {
-                    setFocalAsset(activeAsset);
-                    setPickingFocal(true);
+                    setCropAsset(activeAsset);
+                    setPickingCrop(true);
                   }}
                   disabled={busy}
-                  aria-label={focalButtonLabel}
+                  aria-label={cropButtonLabel}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
-                  <Crosshair className="h-3.5 w-3.5" />
+                  <Crop className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -281,17 +290,22 @@ export function AvatarEditor({
       />
 
       {pickerAsset ? (
-        <ModalSurface open={pickingFocal} onClose={() => setPickingFocal(false)} title={UI_TEXT.media.focalPoint.title}>
-          <FocalPointPicker
+        <ModalSurface open={pickingCrop} onClose={() => setPickingCrop(false)} title={UI_TEXT.media.crop.titleAvatar}>
+          <CropPicker
             assetId={pickerAsset.id}
             imageUrl={pickerAsset.url}
-            initialFocalX={pickerAsset.focalX}
-            initialFocalY={pickerAsset.focalY}
+            shape="circle"
+            aspectRatio={1}
+            initialCropX={pickerAsset.cropX}
+            initialCropY={pickerAsset.cropY}
+            initialCropWidth={pickerAsset.cropWidth}
+            initialCropHeight={pickerAsset.cropHeight}
+            previewSizes={[120, 40]}
             onSave={async () => {
               await load();
-              setPickingFocal(false);
+              setPickingCrop(false);
             }}
-            onSkip={() => setPickingFocal(false)}
+            onSkip={() => setPickingCrop(false)}
           />
         </ModalSurface>
       ) : null}

@@ -583,6 +583,33 @@ export async function updateMediaFocalPoint(
   return toMediaAssetDto(updated);
 }
 
+export async function updateMediaCrop(
+  user: UserProfile,
+  assetId: string,
+  input: { cropX: number; cropY: number; cropWidth: number; cropHeight: number }
+): Promise<MediaAssetDto> {
+  const asset = await prisma.mediaAsset.findUnique({
+    where: { id: assetId },
+  });
+  if (!asset || asset.deletedAt) {
+    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+  }
+
+  await ensureCanManageMedia(user, asset.entityType, asset.entityId, asset.kind);
+
+  const updated = await prisma.mediaAsset.update({
+    where: { id: asset.id },
+    data: {
+      cropX: input.cropX,
+      cropY: input.cropY,
+      cropWidth: input.cropWidth,
+      cropHeight: input.cropHeight,
+    },
+  });
+
+  return toMediaAssetDto(updated);
+}
+
 export async function getMediaFile(
   user: UserProfile | null,
   assetId: string
