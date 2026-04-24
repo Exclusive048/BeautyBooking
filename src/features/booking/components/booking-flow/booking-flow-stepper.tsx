@@ -418,8 +418,22 @@ export function BookingFlowStepper({
   const isFirstStep = currentStepIdx === 0;
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-      {/* ── Left: Step content ── */}
+    <div className="flex flex-col gap-4">
+      {/* ── Desktop booking summary (above steps) ── */}
+      {!isSuccess && (
+        <BookingSummary
+          step={state.step}
+          serviceName={serviceName}
+          servicePrice={servicePrice}
+          serviceDurationMin={serviceDurationMin}
+          selectedDateKey={state.selectedDateKey}
+          selectedSlot={state.selectedSlot}
+          variant="sidebar"
+          className="hidden lg:block"
+        />
+      )}
+
+      {/* ── Step content ── */}
       <div className="min-w-0 flex-1">
         {/* Step indicator (hidden on success) */}
         {!isSuccess && (
@@ -581,20 +595,6 @@ export function BookingFlowStepper({
         )}
       </div>
 
-      {/* ── Desktop sidebar ── */}
-      {!isSuccess && (
-        <div className="hidden w-72 shrink-0 lg:block">
-          <BookingSummary
-            step={state.step}
-            serviceName={serviceName}
-            servicePrice={servicePrice}
-            serviceDurationMin={serviceDurationMin}
-            selectedDateKey={state.selectedDateKey}
-            selectedSlot={state.selectedSlot}
-            variant="sidebar"
-          />
-        </div>
-      )}
     </div>
   );
 }

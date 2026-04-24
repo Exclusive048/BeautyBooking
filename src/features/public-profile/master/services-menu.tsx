@@ -47,9 +47,9 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
                   size="sm"
                   onClick={() => onAdd(service)}
                   disabled={isSelected}
-                  className="rounded-full border-border-subtle bg-bg-card px-3 py-1.5 hover:border-primary/50 hover:shadow-card"
+                  className="flex items-center gap-1.5 rounded-full border-border-subtle bg-bg-card px-3 py-1.5 hover:border-primary/50 hover:shadow-card"
                 >
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-bg-input text-xs">
+                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-bg-input text-xs" aria-hidden="true">
                     +
                   </span>
                   <span>{UI_TEXT.publicProfile.services.add}</span>

@@ -2315,7 +2315,7 @@ export const UI_TEXT = {
     },
     services: {
       title: "Услуги",
-      add: "+ Добавить",
+      add: "Добавить",
       remove: "Удалить",
       priceOnRequest: "Цена по запросу",
     },
