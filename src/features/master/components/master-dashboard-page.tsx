@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Share2, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,10 +75,16 @@ type DayWorkingHours = {
   timezone: string;
 };
 
+type SlotsRounding = "exact" | "30min" | "1hour";
+type StoryBgVariant = "gradient" | "light" | "dark";
+
 type DayData = {
   masterId: string;
   date: string;
   isSolo: boolean;
+  masterName: string;
+  masterAvatarUrl: string | null;
+  masterPublicUsername: string | null;
   workingHours: DayWorkingHours;
   newBookingsCount: number;
   bookings: DayBooking[];
@@ -146,6 +152,204 @@ function canMasterRequestMove(booking: DayBooking): boolean {
 
 const STORIES_SLOTS_PER_CARD = 10;
 
+const MONTHS_RU = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"] as const;
+const WEEKDAYS_SHORT_RU = ["вс","пн","вт","ср","чт","пт","сб"] as const;
+
+function formatDateCompact(dateKey: string): string {
+  const parts = dateKey.split("-").map(Number);
+  const y = parts[0] ?? 2026;
+  const m = parts[1] ?? 1;
+  const d = parts[2] ?? 1;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return `${d} ${MONTHS_RU[dt.getUTCMonth()] ?? ""}, ${WEEKDAYS_SHORT_RU[dt.getUTCDay()] ?? ""}`;
+}
+
+function applyRounding(slots: DashboardFreeSlot[], rounding: SlotsRounding): DashboardFreeSlot[] {
+  if (rounding === "exact") return slots;
+  const step = rounding === "30min" ? 30 : 60;
+  const seen = new Set<string>();
+  const result: DashboardFreeSlot[] = [];
+  for (const slot of slots) {
+    const [hStr, mStr] = slot.time.split(":");
+    const h = parseInt(hStr ?? "0", 10);
+    const min = parseInt(mStr ?? "0", 10);
+    const totalMin = h * 60 + min;
+    const rounded = Math.floor(totalMin / step) * step;
+    const rh = Math.floor(rounded / 60);
+    const rm = rounded % 60;
+    const key = `${String(rh).padStart(2, "0")}:${String(rm).padStart(2, "0")}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ ...slot, time: key });
+    }
+  }
+  return result;
+}
+
+function loadCanvasImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+async function renderStoryToCanvas(
+  canvas: HTMLCanvasElement,
+  opts: {
+    slots: string[];
+    masterName: string;
+    masterAvatarUrl: string | null;
+    masterPublicUsername: string | null;
+    dateStr: string;
+    bgVariant: StoryBgVariant;
+    serviceLabel: string;
+  }
+): Promise<void> {
+  const W = canvas.width;
+  const H = canvas.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const s = W / 1080;
+
+  // Background
+  if (opts.bgVariant === "gradient") {
+    const g = ctx.createLinearGradient(0, 0, W * 0.6, H);
+    g.addColorStop(0, "#6d28d9");
+    g.addColorStop(0.5, "#a855f7");
+    g.addColorStop(1, "#ec4899");
+    ctx.fillStyle = g;
+  } else if (opts.bgVariant === "light") {
+    ctx.fillStyle = "#f5f3ff";
+  } else {
+    ctx.fillStyle = "#0d0d14";
+  }
+  ctx.fillRect(0, 0, W, H);
+
+  const ink = opts.bgVariant === "light" ? "#1a1033" : "#ffffff";
+  const sub = opts.bgVariant === "light" ? "rgba(30,10,80,0.45)" : "rgba(255,255,255,0.55)";
+  const chipBg = opts.bgVariant === "light" ? "rgba(109,40,217,0.10)" : "rgba(255,255,255,0.15)";
+  const chipInk = opts.bgVariant === "light" ? "#6d28d9" : "#ffffff";
+
+  // Brand
+  ctx.fillStyle = opts.bgVariant === "light" ? "rgba(109,40,217,0.55)" : "rgba(255,255,255,0.45)";
+  ctx.font = `600 ${26 * s}px system-ui,-apple-system,sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("МастерРядом", W / 2, 90 * s);
+
+  // Avatar
+  const avR = 90 * s;
+  const avX = W / 2;
+  const avY = 250 * s;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+  ctx.clip();
+  const avImg = opts.masterAvatarUrl ? await loadCanvasImage(opts.masterAvatarUrl) : null;
+  if (avImg) {
+    ctx.drawImage(avImg, avX - avR, avY - avR, avR * 2, avR * 2);
+  } else {
+    ctx.fillStyle = opts.bgVariant === "light" ? "#e0d4ff" : "rgba(255,255,255,0.15)";
+    ctx.fillRect(avX - avR, avY - avR, avR * 2, avR * 2);
+    ctx.fillStyle = chipInk;
+    ctx.font = `bold ${60 * s}px system-ui`;
+    ctx.textAlign = "center";
+    ctx.fillText(opts.masterName.slice(0, 1).toUpperCase(), avX, avY + 20 * s);
+  }
+  ctx.restore();
+
+  // Name
+  ctx.fillStyle = ink;
+  ctx.font = `bold ${50 * s}px system-ui,-apple-system,sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(opts.masterName, W / 2, 390 * s);
+
+  if (opts.serviceLabel) {
+    ctx.fillStyle = sub;
+    ctx.font = `${32 * s}px system-ui,-apple-system,sans-serif`;
+    ctx.fillText(opts.serviceLabel, W / 2, 438 * s);
+  }
+
+  // Divider
+  ctx.fillStyle = opts.bgVariant === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.15)";
+  ctx.fillRect(80 * s, 488 * s, W - 160 * s, 1.5 * s);
+
+  // Title
+  ctx.fillStyle = ink;
+  ctx.font = `bold ${46 * s}px system-ui,-apple-system,sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("Свободные окошки", W / 2, 566 * s);
+
+  ctx.fillStyle = sub;
+  ctx.font = `${32 * s}px system-ui,-apple-system,sans-serif`;
+  ctx.fillText(opts.dateStr, W / 2, 614 * s);
+
+  // Slots chips
+  const shown = opts.slots.slice(0, STORIES_SLOTS_PER_CARD);
+  const extra = opts.slots.length - STORIES_SLOTS_PER_CARD;
+  const COLS = 3;
+  const cW = 290 * s;
+  const cH = 80 * s;
+  const cR = 18 * s;
+  const gX = (W - COLS * cW) / (COLS + 1);
+  const gY = 18 * s;
+  const startY = 680 * s;
+
+  for (let i = 0; i < shown.length; i++) {
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    const cx = gX + col * (cW + gX);
+    const cy = startY + row * (cH + gY);
+    ctx.fillStyle = chipBg;
+    drawRoundRect(ctx, cx, cy, cW, cH, cR);
+    ctx.fill();
+    ctx.fillStyle = chipInk;
+    ctx.font = `bold ${30 * s}px system-ui,-apple-system,sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(shown[i] ?? "", cx + cW / 2, cy + cH / 2 + 11 * s);
+  }
+
+  if (extra > 0) {
+    const rows = Math.ceil(shown.length / COLS);
+    ctx.fillStyle = sub;
+    ctx.font = `${28 * s}px system-ui,-apple-system,sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(`и ещё ${extra} окошек`, W / 2, startY + rows * (cH + gY) + 20 * s);
+  }
+
+  if (opts.slots.length === 0) {
+    ctx.fillStyle = sub;
+    ctx.font = `${32 * s}px system-ui,-apple-system,sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("Нет свободных слотов", W / 2, startY + 50 * s);
+  }
+
+  // Footer
+  ctx.fillStyle = opts.bgVariant === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.15)";
+  ctx.fillRect(80 * s, 1710 * s, W - 160 * s, 1.5 * s);
+  const profileUrl = opts.masterPublicUsername ? `beautyhub.art/u/${opts.masterPublicUsername}` : "beautyhub.art";
+  ctx.fillStyle = sub;
+  ctx.font = `${28 * s}px system-ui,-apple-system,sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(profileUrl, W / 2, 1778 * s);
+}
+
 function toDateTimeLocalInputValue(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return `${todayDateKey()}T10:00`;
@@ -165,6 +369,9 @@ export function MasterDashboardPage() {
     masterId: "",
     date: todayDateKey(),
     isSolo: true,
+    masterName: "",
+    masterAvatarUrl: null,
+    masterPublicUsername: null,
     workingHours: {
       isDayOff: false,
       startLocal: null,
@@ -189,6 +396,11 @@ export function MasterDashboardPage() {
   const [storyGenerating, setStoryGenerating] = useState(false);
   const [storyAssets, setStoryAssets] = useState<MediaAssetDto[]>([]);
   const [storyError, setStoryError] = useState<string | null>(null);
+  const [storyServiceId, setStoryServiceId] = useState<string>("all");
+  const [storyRounding, setStoryRounding] = useState<SlotsRounding>("1hour");
+  const [storyBgVariant, setStoryBgVariant] = useState<StoryBgVariant>("gradient");
+  const [slotsRounding, setSlotsRounding] = useState<SlotsRounding>("exact");
+  const storyPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const bookingsSeenSentRef = useRef(false);
@@ -220,30 +432,44 @@ export function MasterDashboardPage() {
     });
   }, [data.bookings]);
 
-  const displayFreeSlots = useMemo<DisplayFreeSlotHour[]>(() => {
+  const buildDisplaySlots = (slots: DashboardFreeSlot[]): DisplayFreeSlotHour[] => {
     const byHour = new Map<string, DisplayFreeSlotHour>();
-    for (const slot of freeSlots) {
+    for (const slot of slots) {
       const existing = byHour.get(slot.time);
       if (existing) {
         existing.slots.push(slot);
         continue;
       }
-
-      byHour.set(slot.time, {
-        key: slot.time,
-        time: slot.time,
-        startsAt: slot.startsAt,
-        slots: [slot],
-      });
+      byHour.set(slot.time, { key: slot.time, time: slot.time, startsAt: slot.startsAt, slots: [slot] });
     }
-
     return Array.from(byHour.values())
       .sort((a, b) => a.time.localeCompare(b.time))
-      .map((group) => ({
-        ...group,
-        slots: group.slots.slice().sort((a, b) => a.categoryName.localeCompare(b.categoryName, "ru")),
-      }));
-  }, [freeSlots]);
+      .map((group) => ({ ...group, slots: group.slots.slice().sort((a, b) => a.categoryName.localeCompare(b.categoryName, "ru")) }));
+  };
+
+  const displayFreeSlots = useMemo<DisplayFreeSlotHour[]>(() => {
+    return buildDisplaySlots(applyRounding(freeSlots, slotsRounding));
+  }, [freeSlots, slotsRounding]);
+
+  const storySlotsForService = useMemo<string[]>(() => {
+    let base = freeSlots;
+    if (storyServiceId !== "all") {
+      const svc = data.services.find((s) => s.id === storyServiceId);
+      if (svc) {
+        base = base.filter((slot) => slot.maxFitDuration >= svc.durationMin);
+      }
+    }
+    const rounded = applyRounding(base, storyRounding);
+    const seen = new Set<string>();
+    const times: string[] = [];
+    for (const slot of rounded) {
+      if (!seen.has(slot.time)) {
+        seen.add(slot.time);
+        times.push(slot.time);
+      }
+    }
+    return times;
+  }, [freeSlots, storyServiceId, storyRounding, data.services]);
 
   const load = async (signal?: AbortSignal): Promise<void> => {
     setLoading(true);
@@ -368,6 +594,34 @@ export function MasterDashboardPage() {
     void loadSlots();
     return () => controller.abort();
   }, [data.masterId, slotsReloadTick]);
+
+  useEffect(() => {
+    if (!storyOpen) return;
+    const canvas = storyPreviewCanvasRef.current;
+    if (!canvas) return;
+
+    const svc = data.services.find((s) => s.id === storyServiceId);
+    const serviceLabel = svc ? `${svc.title}` : "";
+    const dateStr = formatDateCompact(new Date(freeSlotsDate).toISOString().slice(0, 10));
+
+    let active = true;
+    void renderStoryToCanvas(canvas, {
+      slots: storySlotsForService,
+      masterName: data.masterName || "Мастер",
+      masterAvatarUrl: data.masterAvatarUrl,
+      masterPublicUsername: data.masterPublicUsername,
+      dateStr,
+      bgVariant: storyBgVariant,
+      serviceLabel,
+    }).catch(() => {
+      // canvas render error — preview stays as last rendered
+    });
+
+    return () => {
+      active = false;
+      void active; // prevent unused variable lint warning
+    };
+  }, [storyOpen, storySlotsForService, storyBgVariant, storyServiceId, data.masterName, data.masterAvatarUrl, data.masterPublicUsername, data.services, freeSlotsDate]);
 
   const updateStatus = async (
     booking: DayBooking,
@@ -535,75 +789,6 @@ export function MasterDashboardPage() {
     }
   };
 
-  const downloadStory = (): void => {
-    setStoryError(null);
-    const cards = generateStoryCards();
-    cards.forEach((canvas, index) => {
-      const link = document.createElement("a");
-      link.download = `story-${date}-${index + 1}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    });
-  };
-
-  const generateStoryCards = (): HTMLCanvasElement[] => {
-    const labels = displayFreeSlots.map((hour) => {
-      const categories = hour.slots
-        .map((slot) => `${slot.categoryName} (${formatFreeSlotDuration(slot)})`)
-        .join(", ");
-      return `${hour.time} - ${categories}`;
-    });
-    const chunks: string[][] = [];
-    for (let i = 0; i < labels.length; i += STORIES_SLOTS_PER_CARD) {
-      chunks.push(labels.slice(i, i + STORIES_SLOTS_PER_CARD));
-    }
-    const pages = chunks.length > 0 ? chunks : [[UI_TEXT.master.dashboard.labels.noSlots]];
-
-    return pages.map((pageSlots, pageIndex) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1080;
-      canvas.height = 1920;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return canvas;
-
-      ctx.fillStyle = "#101114";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 56px sans-serif";
-      ctx.fillText(UI_TEXT.master.dashboard.stories.brand, 80, 170);
-      ctx.font = "42px sans-serif";
-      ctx.fillText(
-        UI_TEXT.master.dashboard.stories.slotsTitle.replace(
-          "{date}",
-          UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })
-        ),
-        80,
-        250
-      );
-
-      if (pages.length > 1) {
-        ctx.font = "28px sans-serif";
-        ctx.fillStyle = "#c8cad0";
-        ctx.fillText(
-          UI_TEXT.master.dashboard.stories.cardTitle
-            .replace("{index}", String(pageIndex + 1))
-            .replace("{total}", String(pages.length)),
-          80,
-          305
-        );
-      }
-
-      ctx.font = "bold 52px sans-serif";
-      ctx.fillStyle = "#f2f4f8";
-      pageSlots.forEach((slotLabel, slotIndex) => {
-        ctx.fillText(slotLabel, 80, 430 + slotIndex * 120);
-      });
-
-      return canvas;
-    });
-  };
-
   const canvasToFile = (canvas: HTMLCanvasElement, name: string): Promise<File> =>
     new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
@@ -617,30 +802,37 @@ export function MasterDashboardPage() {
 
   const uploadStoriesToMedia = async (): Promise<void> => {
     if (!data.masterId) return;
+    const previewCanvas = storyPreviewCanvasRef.current;
+    if (!previewCanvas) return;
     setStoryGenerating(true);
     setStoryError(null);
     setStoryAssets([]);
     try {
-      const cards = generateStoryCards();
-      const uploaded: MediaAssetDto[] = [];
-      for (let i = 0; i < cards.length; i += 1) {
-        const file = await canvasToFile(cards[i], `story-${date}-${i + 1}.png`);
-        const formData = new FormData();
-        formData.set("file", file);
-        formData.set("entityType", "MASTER");
-        formData.set("entityId", data.masterId);
-        formData.set("kind", "PORTFOLIO");
-        const response = await fetch("/api/media", {
-          method: "POST",
-          body: formData,
-        });
-        const json = (await response.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
-        if (!response.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${response.status}`);
-        }
-        uploaded.push(json.data.asset);
+      const fullCanvas = document.createElement("canvas");
+      fullCanvas.width = 1080;
+      fullCanvas.height = 1920;
+      const svc = data.services.find((s) => s.id === storyServiceId);
+      await renderStoryToCanvas(fullCanvas, {
+        slots: storySlotsForService,
+        masterName: data.masterName || "Мастер",
+        masterAvatarUrl: data.masterAvatarUrl,
+        masterPublicUsername: data.masterPublicUsername,
+        dateStr: formatDateCompact(new Date(freeSlotsDate).toISOString().slice(0, 10)),
+        bgVariant: storyBgVariant,
+        serviceLabel: svc ? svc.title : "",
+      });
+      const file = await canvasToFile(fullCanvas, `story-${date}.png`);
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("entityType", "MASTER");
+      formData.set("entityId", data.masterId);
+      formData.set("kind", "PORTFOLIO");
+      const response = await fetch("/api/media", { method: "POST", body: formData });
+      const json = (await response.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
+      if (!response.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : `API error: ${response.status}`);
       }
-      setStoryAssets(uploaded);
+      setStoryAssets([json.data.asset]);
     } catch (uploadError) {
       setStoryError(uploadError instanceof Error ? uploadError.message : UI_TEXT.master.dashboard.errors.saveStories);
     } finally {
@@ -650,27 +842,48 @@ export function MasterDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="lux-card rounded-[24px] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setDate((d) => dateShift(d, -1))} variant="secondary" size="sm" aria-label="Предыдущий день">
+      <div className="lux-card rounded-[24px] p-3">
+        <div className="flex items-center gap-1">
+          <Button
+            onClick={() => setDate((d) => dateShift(d, -1))}
+            variant="ghost"
+            size="none"
+            aria-label={UI_TEXT.master.dashboard.dateNav.prevDay}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-text-sec hover:bg-bg-input"
+          >
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </Button>
-          <Input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="w-auto rounded-lg px-3 py-2 text-sm"
-          />
-          <Button onClick={() => setDate((d) => dateShift(d, 1))} variant="secondary" size="sm" aria-label="Следующий день">
+
+          <div className="flex min-w-0 flex-1 flex-col items-center">
+            <span className="text-sm font-semibold text-text-main">
+              {formatDateCompact(date)}
+            </span>
+            {date === todayDateKey() ? (
+              <span className="mt-0.5 rounded-full bg-primary/10 px-2 py-px text-[10px] font-medium text-primary">
+                {UI_TEXT.master.dashboard.stories.today}
+              </span>
+            ) : null}
+          </div>
+
+          <Button
+            onClick={() => setDate((d) => dateShift(d, 1))}
+            variant="ghost"
+            size="none"
+            aria-label={UI_TEXT.master.dashboard.dateNav.nextDay}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-text-sec hover:bg-bg-input"
+          >
             <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
+
           <Button
             onClick={() => void load()}
-            variant="secondary"
-            size="sm"
-            aria-label={UI_TEXT.master.dashboard.labels.refresh}
+            variant="ghost"
+            size="none"
+            aria-label={UI_TEXT.master.dashboard.dateNav.refresh}
+            title={UI_TEXT.master.dashboard.dateNav.refresh}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-text-sec hover:bg-bg-input"
           >
-            {UI_TEXT.master.dashboard.labels.refresh}
+            <RefreshCw className="h-4 w-4" aria-hidden />
           </Button>
         </div>
       </div>
@@ -911,30 +1124,54 @@ export function MasterDashboardPage() {
             </section>
 
             <section className="lux-card rounded-[24px] p-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">
-                  {UI_TEXT.master.dashboard.freeSlots.title},{" "}
-                  {UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })}
-                </h3>
-                <div className="flex items-center gap-2">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold">
+                    {UI_TEXT.master.dashboard.freeSlots.title}
+                  </h3>
+                  <div className="mt-0.5 text-xs text-text-sec">
+                    {UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="none"
                     onClick={() => setSlotsReloadTick((value) => value + 1)}
-                    className="rounded-lg px-2 py-1 text-xs"
                     aria-label={UI_TEXT.master.dashboard.labels.refreshSlotsAria}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-text-sec hover:bg-bg-input"
                   >
-                    {UI_TEXT.master.dashboard.labels.refresh}
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                   </Button>
                   <Button
                     variant="secondary"
                     size="none"
                     onClick={() => setStoryOpen(true)}
-                    className="rounded-lg px-2 py-1 text-xs"
+                    className="rounded-lg px-2.5 py-1 text-xs"
                   >
                     {UI_TEXT.master.dashboard.labels.publishStories}
                   </Button>
                 </div>
+              </div>
+
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {(["exact", "30min", "1hour"] as SlotsRounding[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setSlotsRounding(r)}
+                    className={[
+                      "rounded-full border px-3 py-1 text-xs transition",
+                      slotsRounding === r
+                        ? "border-primary bg-primary/10 font-medium text-primary"
+                        : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card",
+                    ].join(" ")}
+                  >
+                    {r === "exact" && UI_TEXT.master.dashboard.freeSlots.roundingExact}
+                    {r === "30min" && UI_TEXT.master.dashboard.freeSlots.rounding30min}
+                    {r === "1hour" && UI_TEXT.master.dashboard.freeSlots.rounding1hour}
+                  </button>
+                ))}
               </div>
 
               {slotsLoading ? (
@@ -1003,77 +1240,169 @@ export function MasterDashboardPage() {
       ) : null}
 
       {storyOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-[24px] border border-border-subtle bg-bg-card p-4 shadow-hover">
-            <h3 className="text-base font-semibold">{UI_TEXT.master.dashboard.stories.previewTitle}</h3>
-            <div className="mt-3 rounded-xl border border-border-subtle bg-bg-input p-3 text-sm">
-              <div className="font-medium">
-                {UI_TEXT.master.dashboard.labels.slotsOnDate.replace(
-                  "{date}",
-                  UI_FMT.dateShort(freeSlotsDate, { timeZone: freeSlotsTimezone })
-                )}
-              </div>
-              <div className="mt-2 space-y-1">
-                {displayFreeSlots.length === 0 ? <div>{UI_TEXT.master.dashboard.freeSlots.empty}</div> : null}
-                {displayFreeSlots.slice(0, STORIES_SLOTS_PER_CARD).map((slot) => (
-                  <div key={slot.key}>
-                    {slot.time}:{" "}
-                    {slot.slots
-                      .map((categorySlot) => `${categorySlot.categoryName} (${formatFreeSlotDuration(categorySlot)})`)
-                      .join(", ")}
-                  </div>
-                ))}
-              </div>
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-t-[28px] border border-border-subtle bg-bg-card shadow-hover sm:rounded-[28px]">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-5 py-4">
+              <h3 className="text-base font-semibold text-text-main">{UI_TEXT.master.dashboard.stories.previewTitle}</h3>
+              <Button variant="ghost" size="none" onClick={() => setStoryOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-text-sec hover:bg-bg-input"
+                aria-label={UI_TEXT.actions.close}>
+                ✕
+              </Button>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setStoryOpen(false)}
-              >
-                {UI_TEXT.actions.close}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void uploadStoriesToMedia()}
-                disabled={storyGenerating}
-              >
-                {storyGenerating ? UI_TEXT.status.saving : UI_TEXT.master.dashboard.stories.saveToMedia}
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={downloadStory}
-              >
-                {UI_TEXT.master.dashboard.stories.download}
-              </Button>
-              </div>
-            {storyError ? <div className="mt-3 text-sm text-red-600">{storyError}</div> : null}
-            {storyAssets.length > 0 ? (
-              <div className="mt-4 space-y-2">
-                <div className="text-sm font-medium">{UI_TEXT.master.dashboard.labels.savedCardsTitle}</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {storyAssets.map((asset) => (
-                    <a
-                      key={asset.id}
-                      href={asset.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="relative block h-40 overflow-hidden rounded-xl border border-border-subtle"
-                    >
-                      <Image
-                        src={asset.url}
-                        alt={UI_TEXT.master.dashboard.stories.cardAlt}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 320px"
-                        className="object-cover"
-                      />
-                    </a>
-                  ))}
+
+            <div className="max-h-[80dvh] overflow-y-auto p-5">
+              {/* Settings row */}
+              <div className="space-y-3">
+                {/* Service selector */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-sec">Услуга</label>
+                  <Select value={storyServiceId} onChange={(e) => setStoryServiceId(e.target.value)}>
+                    <option value="all">{UI_TEXT.master.dashboard.stories.allServices}</option>
+                    {data.services.map((svc) => (
+                      <option key={svc.id} value={svc.id}>
+                        {svc.title} • {svc.durationMin} {UI_TEXT.common.minutesShort}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Rounding chips */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-sec">Округление</label>
+                  <div className="flex gap-1.5">
+                    {(["exact", "30min", "1hour"] as SlotsRounding[]).map((r) => (
+                      <button key={r} type="button" onClick={() => setStoryRounding(r)}
+                        className={["rounded-full border px-3 py-1 text-xs transition",
+                          storyRounding === r ? "border-primary bg-primary/10 font-medium text-primary" : "border-border-subtle bg-bg-input text-text-sec hover:bg-bg-card"].join(" ")}>
+                        {r === "exact" && UI_TEXT.master.dashboard.freeSlots.roundingExact}
+                        {r === "30min" && UI_TEXT.master.dashboard.freeSlots.rounding30min}
+                        {r === "1hour" && UI_TEXT.master.dashboard.freeSlots.rounding1hour}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Background variant */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-sec">Фон</label>
+                  <div className="flex gap-1.5">
+                    {([
+                      { v: "gradient" as StoryBgVariant, label: UI_TEXT.master.dashboard.stories.bgGradient, cls: "bg-gradient-to-r from-violet-600 to-pink-500 text-white border-transparent" },
+                      { v: "light" as StoryBgVariant, label: UI_TEXT.master.dashboard.stories.bgLight, cls: "bg-white text-gray-900 border-gray-200" },
+                      { v: "dark" as StoryBgVariant, label: UI_TEXT.master.dashboard.stories.bgDark, cls: "bg-gray-950 text-white border-gray-700" },
+                    ]).map(({ v, label, cls }) => (
+                      <button key={v} type="button" onClick={() => setStoryBgVariant(v)}
+                        className={["rounded-full border px-3 py-1 text-xs transition", cls,
+                          storyBgVariant === v ? "ring-2 ring-primary ring-offset-1" : "opacity-70 hover:opacity-100"].join(" ")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            ) : null}
+
+              {/* Canvas preview */}
+              <div className="mt-4 flex justify-center">
+                <div className="relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-input" style={{ width: 270, height: 480 }}>
+                  <canvas
+                    ref={storyPreviewCanvasRef}
+                    width={1080}
+                    height={1920}
+                    className="h-full w-full"
+                    aria-label={UI_TEXT.master.dashboard.stories.cardAlt}
+                  />
+                  {storyGenerating ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-sm text-white">
+                      {UI_TEXT.master.dashboard.stories.generating}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Slot count hint */}
+              <div className="mt-2 text-center text-xs text-text-sec">
+                {storySlotsForService.length === 0
+                  ? UI_TEXT.master.dashboard.stories.noSlots
+                  : `${storySlotsForService.length} окошек`}
+              </div>
+
+              {storyError ? (
+                <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-400/30 dark:bg-red-950/30 dark:text-red-300">
+                  {storyError}
+                </div>
+              ) : null}
+
+              {/* Actions */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const canvas = storyPreviewCanvasRef.current;
+                    if (!canvas) return;
+                    const link = document.createElement("a");
+                    link.download = `okoshki-${new Date(freeSlotsDate).toISOString().slice(0, 10)}.png`;
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                  }}
+                  disabled={storyGenerating}
+                  className="flex items-center gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  {UI_TEXT.master.dashboard.stories.download}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    const canvas = storyPreviewCanvasRef.current;
+                    if (!canvas) return;
+                    canvas.toBlob(async (blob) => {
+                      if (!blob) return;
+                      const file = new File([blob], `okoshki-${new Date(freeSlotsDate).toISOString().slice(0, 10)}.png`, { type: "image/png" });
+                      const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+                      if (nav.canShare?.({ files: [file] })) {
+                        await navigator.share({ files: [file], title: "Свободные окошки" });
+                      } else {
+                        const link = document.createElement("a");
+                        link.download = file.name;
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                      }
+                    }, "image/png");
+                  }}
+                  disabled={storyGenerating}
+                  className="flex items-center gap-1.5"
+                >
+                  <Share2 className="h-3.5 w-3.5" aria-hidden />
+                  {UI_TEXT.master.dashboard.stories.share}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void uploadStoriesToMedia()}
+                  disabled={storyGenerating}
+                >
+                  {storyGenerating ? UI_TEXT.status.saving : UI_TEXT.master.dashboard.stories.saveToMedia}
+                </Button>
+              </div>
+
+              {storyAssets.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm font-medium">{UI_TEXT.master.dashboard.labels.savedCardsTitle}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {storyAssets.map((asset) => (
+                      <a key={asset.id} href={asset.url} target="_blank" rel="noreferrer"
+                        className="relative block h-40 overflow-hidden rounded-xl border border-border-subtle">
+                        <Image src={asset.url} alt={UI_TEXT.master.dashboard.stories.cardAlt}
+                          fill sizes="(max-width: 768px) 50vw, 320px" className="object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}

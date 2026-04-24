@@ -66,6 +66,9 @@ type BaseDayData = {
   masterId: string;
   date: string;
   isSolo: boolean;
+  masterName: string;
+  masterAvatarUrl: string | null;
+  masterPublicUsername: string | null;
   workingHours: MasterDayWorkingHours;
   newBookingsCount: number;
   bookings: MasterDayBooking[];
@@ -195,6 +198,9 @@ export async function getMasterDay(input: {
     where: { id: input.masterId },
     select: {
       id: true,
+      name: true,
+      avatarUrl: true,
+      publicUsername: true,
       studioId: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
@@ -375,6 +381,9 @@ export async function getMasterDay(input: {
     masterId: input.masterId,
     date: input.date,
     isSolo: master.studioId == null,
+    masterName: master.name,
+    masterAvatarUrl: master.avatarUrl ?? null,
+    masterPublicUsername: master.publicUsername ?? null,
     workingHours: {
       isDayOff: !dayPlan.isWorking,
       startLocal: dayPlan.workingIntervals[0]?.start ?? null,
