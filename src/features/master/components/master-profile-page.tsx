@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- cabinet portfolio management with inline editing */
+/* eslint-disable @typescript-eslint/no-unused-vars -- settings-tab state/helpers retained for future re-integration */
 "use client";
 
 import {
@@ -13,7 +14,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Camera, Sparkles, Trash2 } from "lucide-react";
+import { Camera, Sparkles, Trash2 } from "lucide-react";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +24,6 @@ import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalImage } from "@/components/ui/focal-image";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
-import { HotSlotsSettingsSection } from "@/features/master/components/hot-slots-settings-section";
-import { PublicUsernameCard } from "@/features/cabinet/components/public-username-card";
-import { ShareProfileSection } from "@/features/cabinet/components/share-profile-section";
-import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
-import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import {
@@ -128,13 +124,12 @@ type ApiErrorShape = {
   code?: string;
 };
 
-type ProfileTab = "main" | "services" | "portfolio" | "settings";
+type ProfileTab = "main" | "services" | "portfolio";
 
 const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
   { id: "main", label: UI_TEXT.master.profile.tabs.main },
   { id: "services", label: UI_TEXT.master.profile.tabs.services },
   { id: "portfolio", label: UI_TEXT.master.profile.tabs.portfolio },
-  { id: "settings", label: UI_TEXT.master.profile.tabs.settings },
 ];
 
 const MIN_SERVICE_DURATION_MIN = 15;
@@ -800,6 +795,19 @@ export function MasterProfilePage() {
     setLeaveStudioModalOpen(true);
   }, []);
 
+  const missingPublishFields = useMemo<string[]>(() => {
+    const t = UI_TEXT.master.profile.publication;
+    const missing: string[] = [];
+    if (!avatarUrl?.trim()) missing.push(t.fieldAvatar);
+    if (!displayName?.trim()) missing.push(t.fieldName);
+    if (!tagline?.trim()) missing.push(t.fieldHashtag);
+    if (!addressText?.trim()) missing.push(t.fieldAddress);
+    if (!bio?.trim()) missing.push(t.fieldBio);
+    return missing;
+  }, [avatarUrl, displayName, tagline, addressText, bio]);
+
+  const canPublish = missingPublishFields.length === 0;
+
   const serviceList = useMemo(() => Object.values(servicesDraft), [servicesDraft]);
   const hasServiceDraftChanges = useMemo(() => {
     if (!data) return false;
@@ -1065,6 +1073,10 @@ export function MasterProfilePage() {
   const handlePublishToggle = useCallback(
     async (nextValue: boolean): Promise<void> => {
       if (isPublishing) return;
+      if (nextValue && missingPublishFields.length > 0) {
+        setError(`${UI_TEXT.master.profile.publication.missingFieldsPrefix} ${missingPublishFields.join(", ")}`);
+        return;
+      }
       setIsPublishing(true);
       setError(null);
       setProfileSaveStatus("saving");
@@ -1108,7 +1120,7 @@ export function MasterProfilePage() {
         setIsPublishing(false);
       }
     },
-    [isPublishing]
+    [isPublishing, missingPublishFields]
   );
 
   const updateAutoConfirm = async (nextValue: boolean): Promise<void> => {
@@ -1950,29 +1962,34 @@ export function MasterProfilePage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-        <nav className="flex gap-2 overflow-x-auto rounded-2xl bg-bg-card/70 p-2 lg:flex-col lg:p-3">
+      <div className="space-y-5">
+        <nav className="flex gap-0.5 overflow-x-auto border-b border-border-subtle" role="tablist">
           {PROFILE_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
-
-  return (
-              <Button
+            return (
+              <button
                 key={tab.id}
-                variant={isActive ? "secondary" : "ghost"}
-                size="none"
+                type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => setActiveTab(tab.id)}
-                className="whitespace-nowrap rounded-xl px-3 py-2 text-sm transition"
+                className={[
+                  "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-text-sec hover:text-text-main",
+                ].join(" ")}
               >
                 {tab.label}
-              </Button>
+              </button>
             );
           })}
         </nav>
 
         <div className="min-w-0">
           {activeTab === "main" ? (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="max-w-3xl space-y-6">
                 <div className="rounded-2xl bg-bg-card/90 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -2156,13 +2173,39 @@ export function MasterProfilePage() {
                 <div className="rounded-2xl bg-bg-card/90 p-4">
                   <h3 className="text-sm font-semibold">{UI_TEXT.master.profile.publication.title}</h3>
                   <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.publication.desc}</p>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="text-sm">
-                      {isPublishing ? UI_TEXT.status.saving : UI_TEXT.master.profile.publication.publishAction}
-                    </span>
+
+                  {/* Publish readiness checklist */}
+                  <div className="mt-3 space-y-1.5">
+                    {[
+                      { label: UI_TEXT.master.profile.publication.fieldAvatar, done: Boolean(avatarUrl?.trim()) },
+                      { label: UI_TEXT.master.profile.publication.fieldName, done: Boolean(displayName?.trim()) },
+                      { label: UI_TEXT.master.profile.publication.fieldHashtag, done: Boolean(tagline?.trim()) },
+                      { label: UI_TEXT.master.profile.publication.fieldAddress, done: Boolean(addressText?.trim()) },
+                      { label: UI_TEXT.master.profile.publication.fieldBio, done: Boolean(bio?.trim()) },
+                    ].map(({ label, done }) => (
+                      <div key={label} className="flex items-center gap-2 text-xs">
+                        <span className={done ? "text-emerald-500" : "text-text-sec"}>
+                          {done ? "✓" : "○"}
+                        </span>
+                        <span className={done ? "text-text-main" : "text-text-sec"}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="text-sm">
+                        {isPublishing ? UI_TEXT.status.saving : UI_TEXT.master.profile.publication.publishAction}
+                      </span>
+                      {!canPublish && !isPublished ? (
+                        <p className="mt-0.5 text-xs text-text-sec">
+                          {UI_TEXT.master.profile.publication.cannotPublish}
+                        </p>
+                      ) : null}
+                    </div>
                     <Switch
                       checked={isPublished}
-                      disabled={isPublishing}
+                      disabled={isPublishing || (!isPublished && !canPublish)}
                       onCheckedChange={(nextValue) => void handlePublishToggle(nextValue)}
                     />
                   </div>
@@ -2180,176 +2223,12 @@ export function MasterProfilePage() {
                 </div>
               </div>
 
-              <aside className="sticky top-6 hidden lg:block">
+              <aside className="sticky top-6 hidden xl:block">
                 <div className="mb-2 text-xs text-text-sec">{UI_TEXT.master.profile.preview.title}</div>
                 {previewPanel}
               </aside>
             </div>
           ) : null}
-
-          {activeTab === "settings" ? (
-            <div className="space-y-8 p-1">
-              <div>
-                <h3 className="text-xl font-semibold">{UI_TEXT.settings.title}</h3>
-                <p className="mt-1 text-sm text-text-sec">{UI_TEXT.settings.subtitle}</p>
-              </div>
-
-              <SettingsSection title={UI_TEXT.settings.sections.publicPage}>
-                <PublicUsernameCard endpoint="/api/cabinet/master/public-username" />
-              </SettingsSection>
-
-              <SettingsSection title={UI_TEXT.settings.shareProfile.title}>
-                <ShareProfileSection endpoint="/api/cabinet/master/public-username" />
-              </SettingsSection>
-
-              {data.master.isSolo ? (
-                <SettingsSection title={UI_TEXT.settings.sections.bookingRules}>
-                  <div className="flex items-center justify-between gap-3 p-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{UI_TEXT.settings.autoConfirm.title}</p>
-                      <p className="mt-0.5 text-xs text-text-sec">{UI_TEXT.settings.autoConfirm.hint}</p>
-                    </div>
-                    <Switch
-                      checked={autoConfirmBookings ?? false}
-                      onCheckedChange={(nextValue) => void updateAutoConfirm(nextValue)}
-                      disabled={autoConfirmLoading || autoConfirmSaving}
-                      className="shrink-0"
-                    />
-                  </div>
-                  <SectionDivider />
-                  <div className="p-4">
-                    <p className="text-sm font-medium">{UI_TEXT.settings.cancellation.title}</p>
-                    <p className="mt-0.5 text-xs text-text-sec">{UI_TEXT.settings.cancellation.hint}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <div className="relative w-32">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={168}
-                          inputMode="numeric"
-                          value={cancellationDeadlineInput}
-                          onChange={(event) => setCancellationDeadlineInput(event.target.value)}
-                          onBlur={() => void saveCancellationDeadline()}
-                          disabled={autoConfirmLoading || cancellationDeadlineSaving}
-                          className="h-10 w-full rounded-xl border border-border-subtle bg-bg-input px-3 pr-8 text-sm text-text-main outline-none focus:ring-2 focus:ring-primary/30"
-                          placeholder="24"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-sec">
-                          {UI_TEXT.common.hoursShortLetter}
-                        </span>
-                      </div>
-                      {cancellationSaved ? (
-                        <span className="text-xs text-text-sec">{UI_TEXT.common.saved}</span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-xs text-text-sec">
-                      {cancellationDeadlineHours === null
-                        ? UI_TEXT.common.noLimit
-                        : `${cancellationDeadlineHours} ${UI_TEXT.common.hoursShortLetter}`}
-                    </p>
-                  </div>
-                </SettingsSection>
-              ) : null}
-
-              <SettingsSection title={UI_TEXT.settings.sections.proFeatures} pro>
-                {hasTelegramAccess ? (
-                  <TelegramNotificationsSection embedded />
-                ) : (
-                  <LockedFeatureRow
-                    title={UI_TEXT.settings.telegram.title}
-                    hint={UI_TEXT.settings.telegram.hint}
-                    hasAccess={false}
-                    showUpgradeTip={upgradeTipKey === "telegram"}
-                    onUpgradeClick={() => handleUpgradeClick("telegram")}
-                  >
-                    <Button
-                      variant="secondary"
-                      size="none"
-                      className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
-                    >
-                      {UI_TEXT.settings.telegram.connect}
-                    </Button>
-                  </LockedFeatureRow>
-                )}
-                <SectionDivider />
-                {hasVkAccess ? (
-                  <VkNotificationsSection embedded />
-                ) : (
-                  <LockedFeatureRow
-                    title={UI_TEXT.settings.notifications.vk.title}
-                    hint={UI_TEXT.settings.notifications.vk.enable}
-                    hasAccess={false}
-                    showUpgradeTip={upgradeTipKey === "vk"}
-                    onUpgradeClick={() => handleUpgradeClick("vk")}
-                  >
-                    <Button
-                      variant="secondary"
-                      size="none"
-                      className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
-                    >
-                      {UI_TEXT.settings.notifications.vk.connect}
-                    </Button>
-                  </LockedFeatureRow>
-                )}
-                <SectionDivider />
-                {hasHotSlotsAccess ? (
-                  <HotSlotsSettingsSection services={serviceList} embedded />
-                ) : (
-                  <LockedFeatureRow
-                    title={UI_TEXT.settings.hotSlots.title}
-                    hint={UI_TEXT.settings.hotSlots.hint}
-                    hasAccess={false}
-                    showUpgradeTip={upgradeTipKey === "hotSlots"}
-                    onUpgradeClick={() => handleUpgradeClick("hotSlots")}
-                  >
-                    <Button
-                      variant="secondary"
-                      size="none"
-                      className="shrink-0 rounded-xl bg-white/8 px-3 py-1.5 text-xs font-medium text-text-main"
-                    >
-                      {UI_TEXT.settings.hotSlots.configure}
-                    </Button>
-                  </LockedFeatureRow>
-                )}
-              </SettingsSection>
-
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/4 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-red-300">{UI_TEXT.settings.danger.title}</p>
-                    <p className="mt-1 text-xs text-text-sec">{UI_TEXT.settings.danger.hint}</p>
-                    {!data?.master.isSolo ? (
-                      <Button
-                        variant="secondary"
-                        size="none"
-                        onClick={() => {
-                          setLeaveStudioError(null);
-                          setLeaveStudioTransferServices(true);
-                          setLeaveStudioModalOpen(true);
-                        }}
-                        className="mt-3 mr-2 rounded-xl border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
-                      >
-                        {UI_TEXT.master.profile.leaveStudio.leaveAction}
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="secondary"
-                      size="none"
-                      onClick={() => {
-                        setDeleteError(null);
-                        setDeleteActiveCount(null);
-                        setDeleteModalOpen(true);
-                      }}
-                      className="mt-3 rounded-xl border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
-                    >
-                      {UI_TEXT.settings.danger.cta}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            ) : null}
 
           {activeTab === "services" ? (
             <div className="space-y-6">
@@ -2550,236 +2429,199 @@ export function MasterProfilePage() {
           </div>
         ) : null}
 
-        <div className="rounded-2xl bg-bg-card/90 p-4">
-          <div className="grid grid-cols-[minmax(0,2fr)_150px_150px_90px] items-center gap-3 border-b border-border-subtle pb-2 text-xs text-text-sec">
-            <div>{UI_TEXT.master.profile.services.columnTitle}</div>
-            <div>{UI_TEXT.master.profile.services.columnPrice}</div>
-            <div>{UI_TEXT.master.profile.services.columnDuration}</div>
-            <div className="text-center">{UI_TEXT.master.profile.services.columnEnabled}</div>
+        {serviceList.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 px-6 py-10 text-center">
+            <div className="text-sm font-medium text-text-main">{UI_TEXT.master.profile.services.emptyTitle}</div>
+            <p className="mt-1 text-xs text-text-sec">{UI_TEXT.master.profile.services.emptyDesc}</p>
           </div>
-          <div className="divide-y divide-border-subtle">
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {serviceList.map((service) => {
               const durationOptions = buildDurationOptions(service.effectiveDurationMin);
-
-  return (
-                <div key={service.serviceId} className="grid grid-cols-[minmax(0,2fr)_150px_150px_90px] items-center gap-3 py-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-text-main">{service.title}</div>
-                    {!service.canEditPrice ? (
-                      <div className="mt-1 text-xs text-text-sec">
-                        {UI_TEXT.master.profile.services.priceManagedHint}
-                      </div>
-                    ) : null}
-                    {service.canEditPrice ? (
-                      <div className="mt-2 space-y-1">
-                        <Select
-                          value={service.globalCategoryId ?? ""}
-                          onChange={(event) =>
-                            setServicesDraft((current) => ({
-                              ...current,
-                              [service.serviceId]: {
-                                ...current[service.serviceId],
-                                globalCategoryId: event.target.value || null,
-                                globalCategory:
-                                  globalCategories.find((category) => category.id === event.target.value)
-                                    ? {
-                                        id: event.target.value,
-                                        name:
-                                          globalCategories.find((category) => category.id === event.target.value)
-                                            ?.title ?? "",
-                                      }
-                                    : null,
-                              },
-                            }))
-                          }
-                          className={selectBaseClass}
-                        >
-                          <option value="">{UI_TEXT.master.profile.services.noCategoryOption}</option>
-                          {globalCategories.map((category) => (
-                          <option key={`service-category-${service.serviceId}-${category.id}`} value={category.id}>
-                              {formatCategoryOptionLabel(category)}
-                          </option>
-                        ))}
-                        </Select>
-                        {!service.globalCategoryId ? (
-                          <div className="text-xs text-amber-500">
-                            {UI_TEXT.master.profile.services.noCategoryHint}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {service.canEditPrice ? (
-                      <div className="mt-2 space-y-1">
-                        <label className="block text-xs font-medium text-text-sec">
-                          {UI_TEXT.master.profile.services.descriptionLabel}
-                        </label>
-                        <Textarea
-                          className={`${selectBaseClass} min-h-[60px] resize-y`}
-                          rows={2}
-                          maxLength={2000}
-                          placeholder={UI_TEXT.master.profile.services.descriptionPlaceholder}
-                          value={service.description ?? ""}
-                          onChange={(event) =>
-                            setServicesDraft((current) => ({
-                              ...current,
-                              [service.serviceId]: {
-                                ...current[service.serviceId],
-                                description: event.target.value || null,
-                              },
-                            }))
-                          }
-                        />
-                        <Button
-                          variant="ghost"
-                          size="none"
-                          disabled={suggestingDescriptionId === service.serviceId}
-                          onClick={() => void handleSuggestDescription(service.serviceId)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-primary transition hover:text-primary/80 disabled:opacity-50"
-                        >
-                          <Sparkles className="h-3.5 w-3.5" />
-                          {suggestingDescriptionId === service.serviceId
-                            ? UI_TEXT.master.profile.services.suggestDescriptionLoading
-                            : UI_TEXT.master.profile.services.suggestDescription}
-                        </Button>
-                      </div>
-                    ) : null}
-                    {false && (
-                      <>
-                        {/* TODO: Online payments for services - not yet implemented */}
-                        {showOnlinePaymentsToggle ? (
-                          <label
-                            className="mt-2 inline-flex items-center gap-2 text-xs text-text-sec"
-                            title={onlinePaymentsLockedMessage ?? undefined}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={service.onlinePaymentEnabled}
-                              disabled={!canOnlinePayments}
-                              onChange={(event) =>
-                                setServicesDraft((current) => ({
-                                  ...current,
-                                  [service.serviceId]: {
-                                    ...current[service.serviceId],
-                                    onlinePaymentEnabled: event.target.checked,
-                                  },
-                                }))
-                              }
-                            />
-                            {UI_TEXT.master.profile.services.onlinePaymentsLabel}
-                          </label>
-                        ) : null}
-                      </>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="none"
-                      onClick={() => setBookingConfigServiceId(service.serviceId)}
-                      className="mt-2 inline-flex text-xs font-medium text-primary underline"
-                    >
-                      {UI_TEXT.master.profile.bookingConfig.open}
-                    </Button>
+              return (
+                <div key={service.serviceId} className="rounded-2xl border border-border-subtle bg-bg-card/90 p-4">
+                  {/* Card header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-text-main">{service.title}</div>
+                      {service.globalCategory ? (
+                        <div className="mt-0.5 text-xs text-text-sec">{service.globalCategory.name}</div>
+                      ) : null}
+                    </div>
+                    <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-text-sec">
+                      <input
+                        type="checkbox"
+                        checked={service.isEnabled}
+                        onChange={(event) =>
+                          setServicesDraft((current) => ({
+                            ...current,
+                            [service.serviceId]: { ...current[service.serviceId], isEnabled: event.target.checked },
+                          }))
+                        }
+                      />
+                      {UI_TEXT.master.profile.services.columnEnabled}
+                    </label>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      className={`${selectBaseClass} ${
-                        serviceFieldErrors[service.serviceId]?.price ? inputErrorClass : ""
-                      }`}
-                      value={service.effectivePrice === 0 ? "" : String(service.effectivePrice)}
-                      disabled={!service.canEditPrice}
-                      placeholder="1500"
-                      inputMode="numeric"
-                      step={100}
-                      min={0}
-                      onChange={(event) => {
-                        const rawValue = event.target.value;
-                        const raw = rawValue === "" ? 0 : Number(rawValue);
-                        setServicesDraft((current) => ({
-                          ...current,
-                          [service.serviceId]: {
-                            ...current[service.serviceId],
-                            effectivePrice: Number.isFinite(raw) ? raw : 0,
-                            priceOverride: Number.isFinite(raw) && raw > 0 ? raw : null,
-                          },
-                        }));
-                        setServiceFieldErrors((current) => ({
-                          ...current,
-                          [service.serviceId]: { ...current[service.serviceId], price: undefined },
-                        }));
-                      }}
-                      onBlur={() => {
-                        if (!service.canEditPrice) return;
-                        const currentValue = servicesDraft[service.serviceId]?.effectivePrice ?? 0;
-                        if (!Number.isFinite(currentValue) || currentValue <= 0) {
-                          setServiceFieldErrors((current) => ({
+
+                  {/* Price + Duration */}
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        type="number"
+                        className={`w-24 ${selectBaseClass} ${
+                          serviceFieldErrors[service.serviceId]?.price ? inputErrorClass : ""
+                        }`}
+                        value={service.effectivePrice === 0 ? "" : String(service.effectivePrice)}
+                        disabled={!service.canEditPrice}
+                        placeholder="1500"
+                        inputMode="numeric"
+                        step={100}
+                        min={0}
+                        onChange={(event) => {
+                          const rawValue = event.target.value;
+                          const raw = rawValue === "" ? 0 : Number(rawValue);
+                          setServicesDraft((current) => ({
                             ...current,
                             [service.serviceId]: {
                               ...current[service.serviceId],
-                              price: UI_TEXT.master.profile.errors.priceTooLow,
+                              effectivePrice: Number.isFinite(raw) ? raw : 0,
+                              priceOverride: Number.isFinite(raw) && raw > 0 ? raw : null,
                             },
                           }));
-                          return;
+                          setServiceFieldErrors((current) => ({
+                            ...current,
+                            [service.serviceId]: { ...current[service.serviceId], price: undefined },
+                          }));
+                        }}
+                        onBlur={() => {
+                          if (!service.canEditPrice) return;
+                          const currentValue = servicesDraft[service.serviceId]?.effectivePrice ?? 0;
+                          if (!Number.isFinite(currentValue) || currentValue <= 0) {
+                            setServiceFieldErrors((current) => ({
+                              ...current,
+                              [service.serviceId]: { ...current[service.serviceId], price: UI_TEXT.master.profile.errors.priceTooLow },
+                            }));
+                            return;
+                          }
+                          const normalized = normalizePrice(currentValue);
+                          setServicesDraft((current) => ({
+                            ...current,
+                            [service.serviceId]: { ...current[service.serviceId], effectivePrice: normalized, priceOverride: normalized },
+                          }));
+                        }}
+                      />
+                      <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Select
+                        className={`w-20 ${selectBaseClass} ${
+                          serviceFieldErrors[service.serviceId]?.duration ? inputErrorClass : ""
+                        }`}
+                        value={service.effectiveDurationMin}
+                        onChange={(event) => {
+                          const raw = Number(event.target.value);
+                          setServicesDraft((current) => ({
+                            ...current,
+                            [service.serviceId]: {
+                              ...current[service.serviceId],
+                              effectiveDurationMin: Number.isFinite(raw) ? raw : 0,
+                              durationOverrideMin: Number.isFinite(raw) ? raw : null,
+                            },
+                          }));
+                          setServiceFieldErrors((current) => ({
+                            ...current,
+                            [service.serviceId]: { ...current[service.serviceId], duration: undefined },
+                          }));
+                        }}
+                      >
+                        {durationOptions.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </Select>
+                      <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
+                    </div>
+                  </div>
+
+                  {!service.canEditPrice ? (
+                    <div className="mt-2 text-xs text-text-sec">{UI_TEXT.master.profile.services.priceManagedHint}</div>
+                  ) : null}
+
+                  {/* Category select (solo) */}
+                  {service.canEditPrice ? (
+                    <div className="mt-3">
+                      <Select
+                        value={service.globalCategoryId ?? ""}
+                        onChange={(event) =>
+                          setServicesDraft((current) => ({
+                            ...current,
+                            [service.serviceId]: {
+                              ...current[service.serviceId],
+                              globalCategoryId: event.target.value || null,
+                              globalCategory: globalCategories.find((c) => c.id === event.target.value)
+                                ? { id: event.target.value, name: globalCategories.find((c) => c.id === event.target.value)?.title ?? "" }
+                                : null,
+                            },
+                          }))
                         }
-                        const normalized = normalizePrice(currentValue);
-                        setServicesDraft((current) => ({
-                          ...current,
-                          [service.serviceId]: {
-                            ...current[service.serviceId],
-                            effectivePrice: normalized,
-                            priceOverride: normalized,
-                          },
-                        }));
-                      }}
-                    />
-                    <span className="text-xs text-text-sec">{UI_TEXT.common.currencyRub}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      className={`${selectBaseClass} ${
-                        serviceFieldErrors[service.serviceId]?.duration ? inputErrorClass : ""
-                      }`}
-                      value={service.effectiveDurationMin}
-                      onChange={(event) => {
-                        const raw = Number(event.target.value);
-                        setServicesDraft((current) => ({
-                          ...current,
-                          [service.serviceId]: {
-                            ...current[service.serviceId],
-                            effectiveDurationMin: Number.isFinite(raw) ? raw : 0,
-                            durationOverrideMin: Number.isFinite(raw) ? raw : null,
-                          },
-                        }));
-                        setServiceFieldErrors((current) => ({
-                          ...current,
-                          [service.serviceId]: { ...current[service.serviceId], duration: undefined },
-                        }));
-                      }}
-                    >
-                      {durationOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </Select>
-                    <span className="text-xs text-text-sec">{UI_TEXT.common.minutesShort}</span>
-                  </div>
-                  <label className="flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={service.isEnabled}
-                      onChange={(event) =>
-                        setServicesDraft((current) => ({
-                          ...current,
-                          [service.serviceId]: { ...current[service.serviceId], isEnabled: event.target.checked },
-                        }))
-                      }
-                    />
-                  </label>
+                        className={selectBaseClass}
+                      >
+                        <option value="">{UI_TEXT.master.profile.services.noCategoryOption}</option>
+                        {globalCategories.map((category) => (
+                          <option key={`sc-${service.serviceId}-${category.id}`} value={category.id}>
+                            {formatCategoryOptionLabel(category)}
+                          </option>
+                        ))}
+                      </Select>
+                      {!service.globalCategoryId ? (
+                        <div className="mt-1 text-xs text-amber-500">{UI_TEXT.master.profile.services.noCategoryHint}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* Description */}
+                  {service.canEditPrice ? (
+                    <div className="mt-3">
+                      <Textarea
+                        className={`${selectBaseClass} min-h-[56px] resize-y`}
+                        rows={2}
+                        maxLength={2000}
+                        placeholder={UI_TEXT.master.profile.services.descriptionPlaceholder}
+                        value={service.description ?? ""}
+                        onChange={(event) =>
+                          setServicesDraft((current) => ({
+                            ...current,
+                            [service.serviceId]: { ...current[service.serviceId], description: event.target.value || null },
+                          }))
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="none"
+                        disabled={suggestingDescriptionId === service.serviceId}
+                        onClick={() => void handleSuggestDescription(service.serviceId)}
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary transition hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {suggestingDescriptionId === service.serviceId
+                          ? UI_TEXT.master.profile.services.suggestDescriptionLoading
+                          : UI_TEXT.master.profile.services.suggestDescription}
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  <Button
+                    variant="ghost"
+                    size="none"
+                    onClick={() => setBookingConfigServiceId(service.serviceId)}
+                    className="mt-2 inline-flex text-xs font-medium text-primary underline"
+                  >
+                    {UI_TEXT.master.profile.bookingConfig.open}
+                  </Button>
                 </div>
               );
             })}
           </div>
-        </div>
+        )}
 
         <Button
           variant="secondary"
