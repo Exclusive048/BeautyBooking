@@ -1,9 +1,17 @@
+import { z } from "zod";
 import { AccountType, Prisma } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
+import { cursorPage } from "@/lib/api/pagination";
+import { parseQuery } from "@/lib/validation";
+
+const querySchema = z.object({
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
 export const runtime = "nodejs";
 
@@ -29,9 +37,15 @@ export async function GET(req: Request) {
       return jsonFail(403, "Forbidden", "FORBIDDEN");
     }
 
+    const query = parseQuery(new URL(req.url), querySchema);
+    const cursorId = query.cursor;
+
     const applications = await prisma.modelApplication.findMany({
       where: { clientUserId: user.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: query.limit + 1,
+      cursor: cursorId ? { id: cursorId } : undefined,
+      skip: cursorId ? 1 : undefined,
       select: {
         id: true,
         status: true,
@@ -84,7 +98,9 @@ export async function GET(req: Request) {
       },
     });
 
-    const items = applications
+    const { items: appPage, nextCursor } = cursorPage(applications, query.limit);
+
+    const items = appPage
       .map((item) => {
         const service = item.offer.masterService?.service ?? item.offer.service;
         if (!service) return null;
@@ -128,7 +144,7 @@ export async function GET(req: Request) {
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
-    return jsonOk({ applications: items });
+    return jsonOk({ applications: items, nextCursor });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

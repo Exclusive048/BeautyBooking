@@ -51,7 +51,9 @@ export async function StudioDetailsSection({ studioId }: Props) {
               alt=""
               focalX={studio.avatarFocalX}
               focalY={studio.avatarFocalY}
-              className="h-20 w-20 rounded-2xl object-cover"
+              width={80}
+              height={80}
+              className="rounded-2xl object-cover"
             />
           ) : null}
           <div className="flex flex-wrap items-center gap-2">

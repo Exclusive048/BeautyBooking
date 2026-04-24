@@ -1,24 +1,66 @@
-/* eslint-disable @next/next/no-img-element -- custom focal-point positioning via object-position requires direct img */
-import type { ImgHTMLAttributes } from "react";
+import Image from "next/image";
+import type { CSSProperties } from "react";
 import { focalPointToObjectPosition } from "@/lib/media/focal-point";
 
-type FocalImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "alt"> & {
+type FocalImageProps = {
   src: string;
   alt: string;
   focalX?: number | null;
   focalY?: number | null;
+  // Fixed-size mode (for avatars with known dimensions)
+  width?: number;
+  height?: number;
+  // Fill mode: fills the parent (parent must have position:relative + explicit dimensions)
+  // Used automatically when width/height are not provided
+  sizes?: string;
+  priority?: boolean;
+  loading?: "lazy" | "eager";
+  className?: string;
+  style?: CSSProperties;
 };
 
-export function FocalImage({ src, alt, focalX, focalY, style, ...rest }: FocalImageProps) {
+export function FocalImage({
+  src,
+  alt,
+  focalX,
+  focalY,
+  width,
+  height,
+  sizes,
+  priority,
+  loading,
+  className,
+  style,
+}: FocalImageProps) {
+  const objectPosition = focalPointToObjectPosition(focalX, focalY);
+  const combinedStyle: CSSProperties = { ...style, objectPosition };
+
+  if (width && height) {
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        sizes={sizes ?? `${width}px`}
+        priority={priority}
+        loading={loading}
+        className={className}
+        style={combinedStyle}
+      />
+    );
+  }
+
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
-      {...rest}
-      style={{
-        ...style,
-        objectPosition: focalPointToObjectPosition(focalX, focalY),
-      }}
+      fill
+      sizes={sizes ?? "100vw"}
+      priority={priority}
+      loading={loading}
+      className={className}
+      style={combinedStyle}
     />
   );
 }

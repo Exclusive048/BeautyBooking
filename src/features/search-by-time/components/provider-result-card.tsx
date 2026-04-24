@@ -38,8 +38,10 @@ export function ProviderResultCard({ item }: Props) {
               alt={item.name}
               focalX={item.avatarFocalX}
               focalY={item.avatarFocalY}
-              className={`h-10 w-10 object-cover ring-1 ring-border-subtle ${item.providerType === "MASTER" ? "rounded-full" : "rounded-xl"}`}
+              width={40}
+              height={40}
               loading="lazy"
+              className={`object-cover ring-1 ring-border-subtle ${item.providerType === "MASTER" ? "rounded-full" : "rounded-xl"}`}
             />
           ) : (
             <div

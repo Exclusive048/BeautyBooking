@@ -103,7 +103,9 @@ export function RoleCardMaster(props: Props) {
                 alt={data.name}
                 focalX={data.avatarFocalX}
                 focalY={data.avatarFocalY}
-                className="h-full w-full object-cover"
+                width={60}
+                height={60}
+                className="object-cover"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">

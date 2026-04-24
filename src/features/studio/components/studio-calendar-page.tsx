@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -422,8 +423,7 @@ export function StudioCalendarPage({ studioId }: Props) {
                         >
                           <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-bg-card text-sm font-semibold text-text-main">
                             {master.avatarUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- small avatar (44px), cabinet-only view
-                              <img src={master.avatarUrl} alt={master.name} className="h-full w-full object-cover" />
+                              <Image src={master.avatarUrl} alt={master.name} width={44} height={44} className="object-cover" />
                             ) : (
                               <span>{masterInitials(master.name)}</span>
                             )}

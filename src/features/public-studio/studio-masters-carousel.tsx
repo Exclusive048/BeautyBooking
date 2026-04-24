@@ -135,7 +135,8 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
                     alt={master.name}
                     focalX={master.avatarFocalX}
                     focalY={master.avatarFocalY}
-                    className="h-full w-full object-cover transition group-hover:scale-[1.03]"
+                    sizes="288px"
+                    className="object-cover transition group-hover:scale-[1.03]"
                   />
                 ) : (
                   <div className="h-full w-full bg-bg-input" />

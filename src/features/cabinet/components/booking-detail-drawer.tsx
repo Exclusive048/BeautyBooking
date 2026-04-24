@@ -181,7 +181,9 @@ export function BookingDetailDrawer({
                   alt=""
                   focalX={booking.provider.avatarFocalX}
                   focalY={booking.provider.avatarFocalY}
-                  className="h-full w-full object-cover"
+                  width={48}
+                  height={48}
+                  className="rounded-full object-cover"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
@@ -244,7 +246,9 @@ export function BookingDetailDrawer({
                       alt=""
                       focalX={booking.masterProvider.avatarFocalX}
                       focalY={booking.masterProvider.avatarFocalY}
-                      className="h-full w-full object-cover"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">

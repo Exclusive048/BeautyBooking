@@ -172,7 +172,9 @@ export function HotSlotsPageClient() {
                           alt={item.provider.name}
                           focalX={item.provider.avatarFocalX}
                           focalY={item.provider.avatarFocalY}
-                          className="h-full w-full object-cover"
+                          width={48}
+                          height={48}
+                          className="rounded-full object-cover"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-[10px] text-text-sec">

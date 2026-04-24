@@ -38,7 +38,9 @@ function WorkspaceShortcutLink({ item, isStudio }: { item: WorkspaceLink; isStud
               alt=""
               focalX={item.avatarFocalX}
               focalY={item.avatarFocalY}
-              className="h-full w-full object-cover"
+              width={32}
+              height={32}
+              className="rounded-full object-cover"
             />
           ) : isStudio ? (
             <Building2 className="h-4 w-4" aria-hidden />
@@ -155,7 +157,9 @@ export async function Topbar() {
               alt={UI_TEXT.nav.siteLogoAlt}
               focalX={siteLogo.focalX}
               focalY={siteLogo.focalY}
-              className="h-9 w-9 rounded-xl object-cover"
+              width={36}
+              height={36}
+              className="rounded-xl object-cover"
             />
           ) : (
             <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500" />

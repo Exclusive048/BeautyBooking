@@ -54,7 +54,8 @@ export function StudioProfileHero({
               alt=""
               focalX={bannerFocalX}
               focalY={bannerFocalY}
-              className="h-full w-full object-cover"
+              sizes="(max-width: 768px) 100vw, 960px"
+              className="object-cover"
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2">

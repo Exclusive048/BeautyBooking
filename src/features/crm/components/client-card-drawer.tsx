@@ -1,7 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- CRM client card photos, internal cabinet view */
-
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BookingStatus } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
@@ -298,7 +297,7 @@ export function ClientCardDrawer({
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
                 {photos.map((photo) => (
                   <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
-                    <img src={photo.url} alt="" className="h-full w-full object-cover" />
+                    <Image src={photo.url} alt="" fill sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
                     <Button
                       variant="ghost"
                       size="none"

@@ -123,7 +123,8 @@ export function LoginHeroImageManager() {
             alt={t.loginHeroTitle}
             focalX={asset.focalX}
             focalY={asset.focalY}
-            className="h-full w-full object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="object-cover"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-text-sec">

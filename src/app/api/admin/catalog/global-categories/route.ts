@@ -4,6 +4,7 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
+import { offsetMeta } from "@/lib/api/pagination";
 
 function parseStatus(value: string | null): CategoryStatus | null {
   if (value === CategoryStatus.PENDING) return CategoryStatus.PENDING;
@@ -25,6 +26,8 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const status = parseStatus(url.searchParams.get("status"));
+    const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") ?? "100", 10) || 100));
 
     const where: Prisma.GlobalCategoryWhereInput = status ? { status } : {};
 
@@ -95,8 +98,12 @@ export async function GET(req: Request) {
       return (orderById.get(left.id) ?? 0) - (orderById.get(right.id) ?? 0);
     });
 
+    const total = sorted.length;
+    const skip = (page - 1) * limit;
+    const pageItems = sorted.slice(skip, skip + limit);
+
     return ok({
-      categories: sorted.map((category) => {
+      categories: pageItems.map((category) => {
         const creator = creatorById.get(category.id);
         return {
           id: category.id,
@@ -124,6 +131,7 @@ export async function GET(req: Request) {
             : null,
         };
       }),
+      pagination: offsetMeta(total, page, limit),
     });
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);

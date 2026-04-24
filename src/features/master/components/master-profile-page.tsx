@@ -1757,7 +1757,9 @@ export function MasterProfilePage() {
       alt={UI_TEXT.media.avatar.alt}
       focalX={avatarFocalX}
       focalY={avatarFocalY}
-      className="h-full w-full rounded-2xl object-cover"
+      width={64}
+      height={64}
+      className="rounded-2xl object-cover"
     />
   ) : (
     <div className="flex h-full w-full items-center justify-center rounded-2xl bg-bg-input text-xs text-text-sec">
@@ -2003,7 +2005,8 @@ export function MasterProfilePage() {
                               alt={UI_TEXT.media.avatar.alt}
                               focalX={avatarFocalX}
                               focalY={avatarFocalY}
-                              className="h-full w-full rounded-2xl object-cover"
+                              sizes="(max-width: 768px) 30vw, 200px"
+                              className="rounded-2xl object-cover"
                             />
                           ) : (
                             <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-text-sec">

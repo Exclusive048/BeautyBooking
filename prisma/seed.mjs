@@ -99,16 +99,24 @@ async function seedReviewTags() {
 }*/
 
 async function main() {
-  await prisma.booking.deleteMany();
-  await prisma.service.deleteMany();
-  await prisma.provider.deleteMany();
-  await prisma.systemConfig.upsert({
-    where: { key: "onlinePaymentsEnabled" },
-    update: { value: false },
-    create: { key: "onlinePaymentsEnabled", value: false },
-  });
+  try {
+    await prisma.booking.deleteMany();
+    await prisma.service.deleteMany();
+    await prisma.provider.deleteMany();
 
-  console.log("✅ Seed done");
+
+
+    console.log("✅ Seed done");
+  } catch (e) {
+    if (e.code === "P2021") {
+      console.log("⚠️ Tables not found, skipping seed");
+    } else {
+      console.error("❌ Seed error:", e);
+      throw e;
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 main()

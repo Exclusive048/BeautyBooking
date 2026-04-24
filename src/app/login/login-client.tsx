@@ -427,7 +427,8 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
               alt=""
               focalX={heroImageFocalX}
               focalY={heroImageFocalY}
-              className="absolute inset-0 h-full w-full object-cover opacity-20"
+              sizes="(max-width: 1200px) 50vw, 500px"
+              className="object-cover opacity-20"
             />
           ) : null}
 

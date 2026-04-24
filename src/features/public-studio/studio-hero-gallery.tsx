@@ -60,7 +60,9 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
               alt={studio.name}
               focalX={primary.focalX}
               focalY={primary.focalY}
-              className="h-full w-full object-cover"
+              sizes="(max-width: 768px) 100vw, 66vw"
+              priority
+              className="object-cover"
             />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
@@ -79,7 +81,8 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
                     alt=""
                     focalX={item.focalX}
                     focalY={item.focalY}
-                    className="h-full w-full object-cover"
+                    sizes="(max-width: 768px) 50vw, 17vw"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="h-full w-full bg-bg-input/35" />

@@ -97,6 +97,8 @@ export function ClientModelApplicationsPage() {
 
   const [items, setItems] = useState<ModelApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -106,11 +108,12 @@ export function ClientModelApplicationsPage() {
     setError(null);
     try {
       const res = await fetchWithAuth("/api/me/model-applications", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ applications: ModelApplicationItem[] }> | null;
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ applications: ModelApplicationItem[]; nextCursor: string | null }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(extractApiError(json, "Не удалось загрузить заявки"));
       }
       setItems(Array.isArray(json.data.applications) ? json.data.applications : []);
+      setNextCursor(json.data.nextCursor ?? null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить заявки");
       setItems([]);
@@ -118,6 +121,25 @@ export function ClientModelApplicationsPage() {
       setLoading(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const url = `/api/me/model-applications?cursor=${encodeURIComponent(nextCursor)}`;
+      const res = await fetchWithAuth(url, { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ applications: ModelApplicationItem[]; nextCursor: string | null }> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(extractApiError(json, "Не удалось загрузить заявки"));
+      }
+      setItems((prev) => [...prev, ...(Array.isArray(json.data.applications) ? json.data.applications : [])]);
+      setNextCursor(json.data.nextCursor ?? null);
+    } catch (moreError) {
+      setActionError(moreError instanceof Error ? moreError.message : "Не удалось загрузить заявки");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor]);
 
   useEffect(() => {
     void load();
@@ -218,7 +240,9 @@ export function ClientModelApplicationsPage() {
                 <FocalImage
                   src={item.offer.master.avatarUrl}
                   alt=""
-                  className="h-9 w-9 rounded-full object-cover"
+                  width={36}
+                  height={36}
+                  className="rounded-full object-cover"
                 />
               ) : (
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-bg-input text-xs font-semibold text-text-sec">
@@ -267,6 +291,19 @@ export function ClientModelApplicationsPage() {
           </article>
         );
       })}
+
+      {nextCursor ? (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void loadMore()}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Загружаем..." : "Показать ещё"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

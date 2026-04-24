@@ -36,7 +36,6 @@ export function FooterCTA() {
           </h2>
           <p className="max-w-md text-sm text-text-sec">
             {UI_TEXT.footer.cta.subtitle}{" "}
-            <span className="font-medium text-text-main">{UI_TEXT.footer.cta.subtitleAccent}</span>
           </p>
         </div>
         <Button asChild size="md" className="shrink-0">

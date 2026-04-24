@@ -67,7 +67,9 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                     alt={item.title}
                     focalX={item.avatarFocalX}
                     focalY={item.avatarFocalY}
-                    className={`h-10 w-10 object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}
+                    width={40}
+                    height={40}
+                    className={`object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}
                   />
                 ) : (
                   <div className={`h-10 w-10 bg-muted ${item.type === "master" ? "rounded-full" : "rounded-xl"}`} />
@@ -127,7 +129,9 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                     alt={item.title}
                     focalX={item.avatarFocalX}
                     focalY={item.avatarFocalY}
-                    className={`h-10 w-10 object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}
+                    width={40}
+                    height={40}
+                    className={`object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}
                   />
                 ) : (
                   <div className={`h-10 w-10 bg-muted ${item.type === "master" ? "rounded-full" : "rounded-xl"}`} />

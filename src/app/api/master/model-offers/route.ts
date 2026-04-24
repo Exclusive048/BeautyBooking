@@ -11,9 +11,12 @@ import { createModelOfferSchema, normalizePrice, normalizeRequirements } from "@
 import { prisma } from "@/lib/prisma";
 import { parseBody, parseQuery } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { cursorPage } from "@/lib/api/pagination";
 
 const querySchema = z.object({
   masterId: z.string().trim().min(1).optional(),
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 export const runtime = "nodejs";
@@ -63,12 +66,16 @@ export async function GET(req: Request) {
       ? (await resolveMasterAccess(query.masterId, user.id)).id
       : await getCurrentMasterProviderId(user.id);
     const context = await getMasterContext(masterId);
+    const cursorId = query.cursor;
 
     if (context.isSolo) {
       const [offers, services] = await Promise.all([
         prisma.modelOffer.findMany({
           where: { masterId },
-          orderBy: [{ createdAt: "desc" }],
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: query.limit + 1,
+          cursor: cursorId ? { id: cursorId } : undefined,
+          skip: cursorId ? 1 : undefined,
           select: {
             id: true,
             masterId: true,
@@ -147,7 +154,9 @@ export async function GET(req: Request) {
         ])
       );
 
-      const offerItems = offers
+      const { items: offersPage, nextCursor } = cursorPage(offers, query.limit);
+
+      const offerItems = offersPage
         .map((offer) => {
           const primaryService = offer.service ?? offer.masterService?.service ?? null;
           if (!primaryService) return null;
@@ -213,7 +222,7 @@ export async function GET(req: Request) {
         durationMin: service.durationMin,
       }));
 
-      return jsonOk({ offers: offerItems, services: serviceItems });
+      return jsonOk({ offers: offerItems, services: serviceItems, nextCursor });
     }
 
     const [offers, services] = await Promise.all([
@@ -222,7 +231,10 @@ export async function GET(req: Request) {
           masterId,
           masterServiceId: { not: null },
         },
-        orderBy: [{ createdAt: "desc" }],
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: query.limit + 1,
+        cursor: cursorId ? { id: cursorId } : undefined,
+        skip: cursorId ? 1 : undefined,
         select: {
           id: true,
           masterId: true,
@@ -302,7 +314,9 @@ export async function GET(req: Request) {
       ])
     );
 
-    const offerItems = offers
+    const { items: offersPage2, nextCursor: nextCursor2 } = cursorPage(offers, query.limit);
+
+    const offerItems = offersPage2
       .map((offer) => {
         if (!offer.masterService) return null;
 
@@ -371,7 +385,7 @@ export async function GET(req: Request) {
       }),
     }));
 
-    return jsonOk({ offers: offerItems, services: serviceItems });
+    return jsonOk({ offers: offerItems, services: serviceItems, nextCursor: nextCursor2 });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

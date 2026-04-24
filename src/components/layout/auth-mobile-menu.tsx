@@ -50,7 +50,9 @@ function WorkspaceMenuItem({
             alt=""
             focalX={item.avatarFocalX}
             focalY={item.avatarFocalY}
-            className="h-full w-full object-cover"
+            width={32}
+            height={32}
+            className="rounded-full object-cover"
           />
         ) : isStudio ? (
           <Building2 className="h-4 w-4" aria-hidden />

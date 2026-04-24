@@ -46,7 +46,7 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
     <section className="relative overflow-hidden rounded-[32px] border border-border-subtle/70 bg-bg-card shadow-hover">
       <div className="relative h-[280px] md:h-[340px]">
         {coverUrl ? (
-          <FocalImage src={coverUrl} alt="" className="h-full w-full object-cover" />
+          <FocalImage src={coverUrl} alt="" sizes="(max-width: 768px) 100vw, 960px" priority className="object-cover" />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-bg-card via-bg-input to-muted" />
         )}
@@ -95,7 +95,10 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
                       alt={provider.name}
                       focalX={provider.avatarFocalX}
                       focalY={provider.avatarFocalY}
-                      className="h-[120px] w-[120px] rounded-full border-4 border-white/65 object-cover shadow-card"
+                      width={120}
+                      height={120}
+                      priority
+                      className="rounded-full border-4 border-white/65 object-cover shadow-card"
                     />
                   ) : (
                     <div className="h-[120px] w-[120px] rounded-full border-4 border-white/55 bg-white/20" />

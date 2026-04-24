@@ -146,7 +146,8 @@ export function AvatarEditor({
       alt=""
       focalX={activeAsset?.focalX ?? null}
       focalY={activeAsset?.focalY ?? null}
-      className="h-full w-full object-cover"
+      sizes="(max-width: 768px) 30vw, 200px"
+      className="object-cover"
     />
   ) : (
     <div className="flex h-full w-full items-center justify-center text-xs text-text-sec">{t.noAvatar}</div>
@@ -169,7 +170,8 @@ export function AvatarEditor({
                 alt=""
                 focalX={activeAsset?.focalX ?? null}
                 focalY={activeAsset?.focalY ?? null}
-                className="h-full w-full object-cover"
+                sizes="(max-width: 768px) 30vw, 200px"
+                className="object-cover"
               />
             ) : (
               <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-text-sec">
