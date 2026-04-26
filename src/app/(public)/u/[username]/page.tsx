@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Suspense } from "react";
+import Link from "next/link";
+import { Building2, User } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
 import { PublicMasterProfilePage } from "@/features/public-profile/master/public-profile-page";
@@ -12,6 +14,7 @@ import { SelectedServicesProvider } from "@/features/public-profile/master/selec
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
 import { PortfolioSkeleton } from "@/components/blocks/skeletons/PortfolioSkeleton";
@@ -104,6 +107,39 @@ function PublicProfilePageSkeleton() {
           <BookingSkeleton />
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProviderNotFoundView({
+  type,
+  unpublished,
+}: {
+  type: "MASTER" | "STUDIO" | null;
+  unpublished: boolean;
+}) {
+  const t = UI_TEXT.publicProfile.page;
+  const isStudio = type === "STUDIO";
+
+  const title = isStudio ? t.studioNotFound : t.masterNotFound;
+  const desc = unpublished
+    ? isStudio
+      ? t.studioUnpublishedDesc
+      : t.masterUnpublishedDesc
+    : isStudio
+      ? t.studioNotFoundDesc
+      : t.masterNotFoundDesc;
+
+  const Icon = isStudio ? Building2 : User;
+
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+      <Icon className="mb-4 h-16 w-16 text-text-sec/40" aria-hidden />
+      <h1 className="mb-2 text-2xl font-bold text-text-main">{title}</h1>
+      <p className="mb-6 max-w-md text-sm text-text-sec">{desc}</p>
+      <Button asChild>
+        <Link href="/catalog">{t.goToCatalog}</Link>
+      </Button>
     </div>
   );
 }
@@ -227,7 +263,17 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
   );
 
   if (result.status === "not-found") {
-    notFound();
+    const reason = result.reason;
+    const isUnpublished = reason === "unpublished" || reason === "alias-unpublished";
+
+    if (isUnpublished) {
+      // Provider exists but is not published — quick lookup to get type for better UX
+      const provider = await findProviderForMeta(username);
+      return <ProviderNotFoundView type={provider?.type ?? null} unpublished />;
+    }
+
+    // Truly not found (missing or invalid username)
+    return <ProviderNotFoundView type={null} unpublished={false} />;
   }
 
   if (result.status === "redirect") {
