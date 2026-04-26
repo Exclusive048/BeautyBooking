@@ -13,7 +13,13 @@ export default async function MasterSettingsPublicPage() {
 
   const provider = await prisma.provider.findFirst({
     where: { ownerUserId: user.id, type: ProviderType.MASTER },
-    select: { name: true },
+    select: {
+      name: true,
+      tagline: true,
+      address: true,
+      description: true,
+      avatarUrl: true,
+    },
   });
   if (!provider) redirect("/403");
 
@@ -28,6 +34,10 @@ export default async function MasterSettingsPublicPage() {
       <PublicSettingsClient
         endpoint="/api/cabinet/master/public-username"
         name={provider.name}
+        tagline={provider.tagline ?? ""}
+        address={provider.address ?? ""}
+        bio={provider.description ?? ""}
+        avatarUrl={provider.avatarUrl ?? null}
       />
     </section>
   );
