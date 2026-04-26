@@ -35,7 +35,8 @@ type ClientItem = {
 };
 
 type ClientsData = {
-  clients: ClientItem[];
+  items: ClientItem[];
+  nextCursor: string | null;
 };
 
 type Props = {
@@ -72,7 +73,7 @@ export function StudioClientsPage({ studioId }: Props) {
   const searchParams = useSearchParams();
   const sort = searchParams.get("sort") === "newest" ? "newest" : undefined;
   const plan = usePlanFeatures("STUDIO");
-  const [data, setData] = useState<ClientsData>({ clients: [] });
+  const [data, setData] = useState<ClientsData>({ items: [], nextCursor: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedClient | null>(null);
@@ -115,7 +116,7 @@ export function StudioClientsPage({ studioId }: Props) {
     <section className="space-y-4">
       {error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
 
-      {data.clients.length === 0 ? (
+      {data.items.length === 0 ? (
         <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.empty}</div>
       ) : (
         <div className="lux-card overflow-hidden rounded-[24px]">
@@ -132,7 +133,7 @@ export function StudioClientsPage({ studioId }: Props) {
               </tr>
             </thead>
             <tbody>
-              {data.clients.map((client, index) => {
+              {data.items.map((client, index) => {
                 const tagIds = client.card?.tags ?? [];
                 const visibleTags = tagIds.slice(0, 3);
                 const extraTags = Math.max(0, tagIds.length - visibleTags.length);
