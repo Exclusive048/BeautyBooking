@@ -184,7 +184,13 @@ export async function rejectStudioInvite(
 ): Promise<Result<InviteRejectResult>> {
   const invite = await prisma.studioInvite.findUnique({
     where: { id: inviteId },
-    select: { id: true, phone: true, status: true },
+    select: {
+      id: true,
+      phone: true,
+      status: true,
+      studioId: true,
+      studio: { select: { providerId: true } },
+    },
   });
 
   if (!invite) {
@@ -207,11 +213,26 @@ export async function rejectStudioInvite(
     return { ok: true, data: { inviteId: invite.id } };
   }
 
-  await prisma.studioInvite.update({
-    where: { id: invite.id },
-    data: { status: MembershipStatus.REJECTED },
-    select: { id: true },
-  });
+  const normalizedPhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
+
+  await prisma.$transaction([
+    // Mark invite as rejected
+    prisma.studioInvite.update({
+      where: { id: invite.id },
+      data: { status: MembershipStatus.REJECTED },
+      select: { id: true },
+    }),
+    // Remove the staged (unclaimed) Provider slot created when the invite was sent.
+    // Only deletes if ownerUserId is null — never removes a Provider already claimed by a user.
+    prisma.provider.deleteMany({
+      where: {
+        type: ProviderType.MASTER,
+        studioId: invite.studio.providerId,
+        contactPhone: normalizedPhone,
+        ownerUserId: null,
+      },
+    }),
+  ]);
 
   return { ok: true, data: { inviteId: invite.id } };
 }
