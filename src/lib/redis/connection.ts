@@ -14,8 +14,13 @@ const REDIS_URL = env.REDIS_URL?.trim() ?? "";
 const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 3_000;
 const DEFAULT_REDIS_COMMAND_TIMEOUT_MS = 2_500;
 
-let commandClientPromise: Promise<RedisClient | null> | null = null;
-let subscriberClientPromise: Promise<RedisClient | null> | null = null;
+// Use globalThis to survive HMR module reloads in dev — same pattern as Prisma singleton.
+const g = globalThis as typeof globalThis & {
+  __bhRedisCommand: Promise<RedisClient | null> | null | undefined;
+  __bhRedisSubscriber: Promise<RedisClient | null> | null | undefined;
+};
+if (g.__bhRedisCommand === undefined) g.__bhRedisCommand = null;
+if (g.__bhRedisSubscriber === undefined) g.__bhRedisSubscriber = null;
 
 const REDIS_CONNECT_TIMEOUT_MS =
   env.REDIS_CONNECT_TIMEOUT_MS ?? DEFAULT_REDIS_CONNECT_TIMEOUT_MS;
@@ -83,8 +88,8 @@ async function getOrCreateClient(
   role: "command" | "subscriber"
 ): Promise<RedisClient | null> {
   if (!REDIS_URL) return null;
-  const target = role === "subscriber" ? subscriberClientPromise : commandClientPromise;
-  if (!target) {
+  const current = role === "subscriber" ? g.__bhRedisSubscriber : g.__bhRedisCommand;
+  if (!current) {
     const promise = (async () => {
       const client = buildClient(role);
       try {
@@ -101,20 +106,20 @@ async function getOrCreateClient(
           error: error instanceof Error ? error.message : String(error),
         });
         if (role === "subscriber") {
-          subscriberClientPromise = null;
+          g.__bhRedisSubscriber = null;
         } else {
-          commandClientPromise = null;
+          g.__bhRedisCommand = null;
         }
         return null;
       }
     })();
     if (role === "subscriber") {
-      subscriberClientPromise = promise;
+      g.__bhRedisSubscriber = promise;
     } else {
-      commandClientPromise = promise;
+      g.__bhRedisCommand = promise;
     }
   }
-  return role === "subscriber" ? subscriberClientPromise : commandClientPromise;
+  return role === "subscriber" ? g.__bhRedisSubscriber! : g.__bhRedisCommand!;
 }
 
 export async function getRedisConnection(): Promise<RedisClient | null> {
