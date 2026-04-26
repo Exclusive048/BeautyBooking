@@ -1,5 +1,8 @@
 export type FeatureKind = "boolean" | "limit";
 export type FeatureAppliesTo = "MASTER" | "STUDIO" | "BOTH";
+export type FeatureStatus =
+  | "active"    // implemented and gated in code
+  | "planned";  // in roadmap, no code yet — cannot be enabled in plans
 
 export type FeatureDefinition = {
   kind: FeatureKind;
@@ -8,6 +11,7 @@ export type FeatureDefinition = {
   group: string;
   appliesTo: FeatureAppliesTo;
   uiOrder: number;
+  status: FeatureStatus;
 };
 
 export const FEATURE_CATALOG = {
@@ -18,6 +22,7 @@ export const FEATURE_CATALOG = {
     group: "Бронирование",
     appliesTo: "BOTH",
     uiOrder: 10,
+    status: "active",
   },
   catalogListing: {
     kind: "boolean",
@@ -26,6 +31,7 @@ export const FEATURE_CATALOG = {
     group: "Каталог",
     appliesTo: "BOTH",
     uiOrder: 20,
+    status: "active",
   },
   pwaPush: {
     kind: "boolean",
@@ -34,6 +40,7 @@ export const FEATURE_CATALOG = {
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 30,
+    status: "active",
   },
   profilePublicPage: {
     kind: "boolean",
@@ -42,6 +49,7 @@ export const FEATURE_CATALOG = {
     group: "Профиль",
     appliesTo: "BOTH",
     uiOrder: 40,
+    status: "active",
   },
   onlinePayments: {
     kind: "boolean",
@@ -50,6 +58,7 @@ export const FEATURE_CATALOG = {
     group: "Платежи",
     appliesTo: "BOTH",
     uiOrder: 50,
+    status: "active",
   },
   hotSlots: {
     kind: "boolean",
@@ -58,6 +67,7 @@ export const FEATURE_CATALOG = {
     group: "Продвижение",
     appliesTo: "MASTER",
     uiOrder: 60,
+    status: "active",
   },
   analytics_dashboard: {
     kind: "boolean",
@@ -66,6 +76,7 @@ export const FEATURE_CATALOG = {
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 72,
+    status: "active",
   },
   analytics_revenue: {
     kind: "boolean",
@@ -74,6 +85,7 @@ export const FEATURE_CATALOG = {
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 74,
+    status: "active",
   },
   analytics_clients: {
     kind: "boolean",
@@ -82,6 +94,7 @@ export const FEATURE_CATALOG = {
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 76,
+    status: "active",
   },
   analytics_booking_insights: {
     kind: "boolean",
@@ -90,6 +103,7 @@ export const FEATURE_CATALOG = {
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 78,
+    status: "active",
   },
   analytics_cohorts: {
     kind: "boolean",
@@ -98,6 +112,7 @@ export const FEATURE_CATALOG = {
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 79,
+    status: "active",
   },
   analytics_forecast: {
     kind: "boolean",
@@ -106,6 +121,7 @@ export const FEATURE_CATALOG = {
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 80,
+    status: "active",
   },
   financeReport: {
     kind: "boolean",
@@ -113,7 +129,8 @@ export const FEATURE_CATALOG = {
     description: "Базовый финансовый отчет.",
     group: "Аналитика",
     appliesTo: "BOTH",
-    uiOrder: 80,
+    uiOrder: 81,
+    status: "active",
   },
   notifications: {
     kind: "boolean",
@@ -122,6 +139,7 @@ export const FEATURE_CATALOG = {
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 85,
+    status: "active",
   },
   tgNotifications: {
     kind: "boolean",
@@ -130,6 +148,7 @@ export const FEATURE_CATALOG = {
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 90,
+    status: "active",
   },
   vkNotifications: {
     kind: "boolean",
@@ -138,6 +157,7 @@ export const FEATURE_CATALOG = {
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 100,
+    status: "active",
   },
   maxNotifications: {
     kind: "boolean",
@@ -146,14 +166,16 @@ export const FEATURE_CATALOG = {
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 110,
+    status: "planned",
   },
   smsNotifications: {
     kind: "boolean",
     title: "SMS-уведомления",
-    description: "Отправка SMS.",
+    description: "Отправка SMS клиентам.",
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 120,
+    status: "planned",
   },
   clientVisitHistory: {
     kind: "boolean",
@@ -162,6 +184,7 @@ export const FEATURE_CATALOG = {
     group: "Клиенты",
     appliesTo: "BOTH",
     uiOrder: 130,
+    status: "active",
   },
   clientNotes: {
     kind: "boolean",
@@ -170,6 +193,7 @@ export const FEATURE_CATALOG = {
     group: "Клиенты",
     appliesTo: "MASTER",
     uiOrder: 140,
+    status: "active",
   },
   clientImport: {
     kind: "boolean",
@@ -178,6 +202,7 @@ export const FEATURE_CATALOG = {
     group: "Клиенты",
     appliesTo: "BOTH",
     uiOrder: 150,
+    status: "planned",
   },
   highlightCard: {
     kind: "boolean",
@@ -186,6 +211,7 @@ export const FEATURE_CATALOG = {
     group: "Каталог",
     appliesTo: "BOTH",
     uiOrder: 160,
+    status: "active",
   },
   maxTeamMasters: {
     kind: "limit",
@@ -194,6 +220,7 @@ export const FEATURE_CATALOG = {
     group: "Лимиты",
     appliesTo: "STUDIO",
     uiOrder: 170,
+    status: "active",
   },
   maxPortfolioPhotosSolo: {
     kind: "limit",
@@ -202,6 +229,7 @@ export const FEATURE_CATALOG = {
     group: "Лимиты",
     appliesTo: "MASTER",
     uiOrder: 180,
+    status: "active",
   },
   maxPortfolioPhotosStudioDesign: {
     kind: "limit",
@@ -210,6 +238,7 @@ export const FEATURE_CATALOG = {
     group: "Лимиты",
     appliesTo: "STUDIO",
     uiOrder: 190,
+    status: "active",
   },
   maxPortfolioPhotosPerStudioMaster: {
     kind: "limit",
@@ -218,6 +247,7 @@ export const FEATURE_CATALOG = {
     group: "Лимиты",
     appliesTo: "BOTH",
     uiOrder: 200,
+    status: "active",
   },
 } as const satisfies Record<string, FeatureDefinition>;
 
