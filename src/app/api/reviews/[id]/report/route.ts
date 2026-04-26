@@ -26,13 +26,14 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     const body = await parseBody(req, reviewReportSchema);
-    const review = await reportReview({
+    const result = await reportReview({
       reviewId: parsedParams.data.id,
       currentUserId: user.id,
+      reason: body.reason,
       comment: body.comment,
     });
 
-    return jsonOk({ review });
+    return jsonOk(result);
   } catch (error) {
     const appError = toAppError(error);
     const requestId = getRequestId(req);

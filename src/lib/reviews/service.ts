@@ -492,17 +492,18 @@ export async function replyToReview(input: {
 export async function reportReview(input: {
   reviewId: string;
   currentUserId: string;
-  comment: string;
+  reason: "SPAM" | "FAKE" | "OFFENSIVE" | "INAPPROPRIATE" | "OTHER";
+  comment?: string;
   nowUtc?: Date;
-}): Promise<ReviewDto> {
+}): Promise<{ reported: boolean }> {
   const now = input.nowUtc ?? new Date();
   const review = await prisma.review.findUnique({
     where: { id: input.reviewId },
     select: {
       id: true,
+      authorId: true,
       targetType: true,
       targetId: true,
-      createdAt: true,
       reportedAt: true,
     },
   });
@@ -511,27 +512,24 @@ export async function reportReview(input: {
     throw new AppError("Review not found", 404, "NOT_FOUND");
   }
 
-  await ensureMasterReviewAccess(review, input.currentUserId);
+  if (review.authorId === input.currentUserId) {
+    throw new AppError("Cannot report own review", 400, "FORBIDDEN");
+  }
 
   if (review.reportedAt) {
     throw new AppError("Review already reported", 409, "CONFLICT");
   }
 
-  const reportDeadline = new Date(review.createdAt.getTime() + REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  if (now > reportDeadline) {
-    throw new AppError("Review report window expired", 409, "CONFLICT");
-  }
-
-  const updated = await prisma.review.update({
+  await prisma.review.update({
     where: { id: review.id },
     data: {
-      reportComment: input.comment.trim(),
+      reportReason: input.reason,
+      reportComment: input.comment?.trim() ?? null,
       reportedAt: now,
     },
-    include: reviewInclude,
   });
 
-  return toReviewDto(updated, { includePrivateTags: true });
+  return { reported: true };
 }
 
 export async function deleteReview(input: {

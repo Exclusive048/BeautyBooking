@@ -12,6 +12,7 @@ type Props = {
   initialReviewsCount: number;
   initialReviews: ReviewDto[];
   canReviewBookingId: string | null;
+  currentUserId?: string | null;
 };
 
 export function ReviewsSectionClient({
@@ -20,6 +21,7 @@ export function ReviewsSectionClient({
   initialReviewsCount,
   initialReviews,
   canReviewBookingId,
+  currentUserId = null,
 }: Props) {
   const [rating, setRating] = useState(initialRating);
   const [reviewsCount, setReviewsCount] = useState(initialReviewsCount);
@@ -40,6 +42,7 @@ export function ReviewsSectionClient({
       initialReviews={initialReviews}
       canReviewBookingId={canReviewBookingId}
       onRatingRefresh={handleRatingRefresh}
+      currentUserId={currentUserId}
     />
   );
 }

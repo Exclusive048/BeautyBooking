@@ -15,6 +15,8 @@ type ReviewItem = {
   text: string | null;
   replyText: string | null;
   reportedAt: string | null;
+  reportReason: string | null;
+  reportComment: string | null;
   createdAt: string;
   targetType: string;
   targetName: string | null;
@@ -55,6 +57,7 @@ export function AdminReviews() {
   const [toast, setToast] = useState<string | null>(null);
   const [reportedOnly, setReportedOnly] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
 
   const buildUrl = (cursor?: string | null) => {
     const params = new URLSearchParams({ limit: "50" });
@@ -116,6 +119,32 @@ export function AdminReviews() {
       setError(err instanceof Error ? err.message : t.errors.delete);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDismiss = async (id: string) => {
+    setDismissingId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/reviews/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss_report" }),
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : t.errors.dismiss);
+      }
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === id ? { ...r, reportedAt: null, reportReason: null, reportComment: null } : r
+        )
+      );
+      setToast(t.dismissed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errors.dismiss);
+    } finally {
+      setDismissingId(null);
     }
   };
 
@@ -190,22 +219,46 @@ export function AdminReviews() {
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {review.reportedAt ? (
-                          <span className="text-red-600 dark:text-red-400">
-                            {formatDate(review.reportedAt, viewerTimeZone)}
-                          </span>
+                          <div className="space-y-0.5">
+                            <div className="text-red-600 dark:text-red-400">
+                              {formatDate(review.reportedAt, viewerTimeZone)}
+                            </div>
+                            {review.reportReason ? (
+                              <div className="text-xs text-text-sec">
+                                {t.reportReason} {review.reportReason}
+                              </div>
+                            ) : null}
+                            {review.reportComment ? (
+                              <div className="max-w-[180px] truncate text-xs text-text-sec/70 italic">
+                                {review.reportComment}
+                              </div>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-text-sec">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => void handleDelete(review.id)}
-                          disabled={deletingId === review.id}
-                        >
-                          {t.delete}
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {review.reportedAt ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void handleDismiss(review.id)}
+                              disabled={dismissingId === review.id || deletingId === review.id}
+                            >
+                              {t.dismissReport}
+                            </Button>
+                          ) : null}
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => void handleDelete(review.id)}
+                            disabled={deletingId === review.id || dismissingId === review.id}
+                          >
+                            {t.delete}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))

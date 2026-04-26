@@ -11,6 +11,7 @@ import type { ReviewDto } from "@/lib/reviews/types";
 import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { ReportReviewModal } from "@/features/reviews/components/report-review-modal";
 
 // AUDIT (sections 4,7):
 // - Master cabinet renders both public tags and private "improve" tags.
@@ -64,6 +65,7 @@ export function MasterReviewsPage({ masterId }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("DATE_DESC");
   const [actionId, setActionId] = useState<string | null>(null);
+  const [reportingReviewId, setReportingReviewId] = useState<string | null>(null);
 
   const loadReviews = useCallback(async (signal?: AbortSignal): Promise<void> => {
     setLoading(true);
@@ -189,32 +191,17 @@ export function MasterReviewsPage({ masterId }: Props) {
     }
   };
 
-  const reportReview = async (review: ReviewDto): Promise<void> => {
-    if (!canReportReview(review)) return;
-
-    const comment = window.prompt(t.reportPrompt);
-    const normalized = comment?.trim() ?? "";
-    if (!normalized) return;
-
+  const handleReportSuccess = useCallback(() => {
     setActionError(null);
-    setActionId(review.id);
-    try {
-      const res = await fetch(`/api/reviews/${encodeURIComponent(review.id)}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comment: normalized }),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `Ошибка API: ${res.status}`);
-      }
-      setReviews((prev) => updateReview(prev, json.data.review));
-    } catch (actionErrorValue) {
-      setActionError(actionErrorValue instanceof Error ? actionErrorValue.message : t.reportFailed);
-    } finally {
-      setActionId(null);
-    }
-  };
+    setReviews((prev) =>
+      prev.map((r) =>
+        r.id === reportingReviewId
+          ? { ...r, reportedAt: new Date().toISOString() }
+          : r
+      )
+    );
+    setReportingReviewId(null);
+  }, [reportingReviewId]);
 
   return (
     <div className="space-y-4">
@@ -382,8 +369,7 @@ export function MasterReviewsPage({ masterId }: Props) {
                     ) : null}
                     {canReportReview(review) ? (
                       <Button
-                        onClick={() => void reportReview(review)}
-                        disabled={actionId === review.id}
+                        onClick={() => setReportingReviewId(review.id)}
                         variant="danger"
                         size="sm"
                       >
@@ -401,6 +387,15 @@ export function MasterReviewsPage({ masterId }: Props) {
             </div>
           )}
         </section>
+      ) : null}
+
+      {reportingReviewId ? (
+        <ReportReviewModal
+          reviewId={reportingReviewId}
+          open={true}
+          onClose={() => setReportingReviewId(null)}
+          onSuccess={handleReportSuccess}
+        />
       ) : null}
     </div>
   );

@@ -33,6 +33,8 @@ model Review {
 
   reportComment String?
 
+  reportReason ReviewReportReason?
+
   reportedAt DateTime?
 
   tags ReviewTagOnReview[]

@@ -6,6 +6,7 @@ import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ClientBooking } from "@/lib/bookings/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
 import { UI_TEXT } from "@/lib/ui/text";
+import { getSessionUser } from "@/lib/auth/session";
 
 type Props = {
   providerId: string;
@@ -55,9 +56,15 @@ export async function ReviewsSection({ providerId }: Props) {
   let reviews: ReviewDto[] = [];
   let canReviewBookingId: string | null = null;
   let hasError = false;
+  let currentUserId: string | null = null;
 
   try {
-    provider = await getProvider(providerId);
+    const [providerResult, sessionUser] = await Promise.all([
+      getProvider(providerId),
+      getSessionUser(),
+    ]);
+    provider = providerResult;
+    currentUserId = sessionUser?.id ?? null;
     if (provider) {
       const result = await Promise.all([
         fetchReviews(provider.id),
@@ -99,6 +106,7 @@ export async function ReviewsSection({ providerId }: Props) {
         initialReviewsCount={provider.reviews}
         initialReviews={reviews}
         canReviewBookingId={canReviewBookingId}
+        currentUserId={currentUserId}
       />
     </div>
   );

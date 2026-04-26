@@ -31,5 +31,6 @@ export const reviewReplySchema = z.object({
 });
 
 export const reviewReportSchema = z.object({
-  comment: z.string().trim().min(1, "comment is required").max(1500),
+  reason: z.enum(["SPAM", "FAKE", "OFFENSIVE", "INAPPROPRIATE", "OTHER"]),
+  comment: z.string().trim().max(500).optional(),
 });

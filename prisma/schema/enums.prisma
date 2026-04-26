@@ -322,6 +322,14 @@ enum ReviewTagType {
   PRIVATE
 }
 
+enum ReviewReportReason {
+  SPAM
+  FAKE
+  OFFENSIVE
+  INAPPROPRIATE
+  OTHER
+}
+
 // === Hot Slot ===
 
 enum DiscountType {
