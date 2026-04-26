@@ -62,8 +62,8 @@ export const FEATURE_CATALOG = {
   },
   hotSlots: {
     kind: "boolean",
-    title: "Горячие слоты",
-    description: "Выделение свободных слотов.",
+    title: "Горящие окошки",
+    description: "Выделение свободных окошек со скидкой.",
     group: "Продвижение",
     appliesTo: "MASTER",
     uiOrder: 60,

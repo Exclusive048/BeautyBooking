@@ -42,7 +42,7 @@ function buildNotificationBody(input: HotSlotNotificationInput, slotLabel: strin
 }
 
 function buildTelegramText(input: HotSlotNotificationInput, slotLabel: string, linkUrl: string | null): string {
-  const lines: string[] = ["🔥 Горячий слот доступен"];
+  const lines: string[] = ["🔥 Горящее окошко доступно"];
   lines.push(`Мастер: ${input.providerName}`);
   if (input.serviceTitle) {
     lines.push(`Услуга: ${input.serviceTitle}`);
@@ -72,7 +72,7 @@ export async function notifyHotSlotSubscribers(input: HotSlotNotificationInput):
   if (!primarySlot) return;
 
   const slotLabel = formatSlotLabel(primarySlot.startAtUtc, input.timezone);
-  const title = "Горячий слот доступен";
+  const title = "Горящее окошко доступно";
   const body = buildNotificationBody(input, slotLabel);
 
   const appUrl = getAppPublicUrl();

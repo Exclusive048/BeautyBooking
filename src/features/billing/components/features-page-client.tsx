@@ -63,7 +63,7 @@ const GROUP_META: Record<string, GroupMeta> = {
   Каталог:        { icon: Sparkles,  order: 2 },
   Профиль:        { icon: Image,     order: 3 },
   Уведомления:    { icon: Bell,      order: 4 },
-  "Горячие слоты":{ icon: Zap,       order: 5 },
+  "Горящие окошки":{ icon: Zap,       order: 5 },
   Аналитика:      { icon: BarChart3, order: 6 },
   Платежи:        { icon: CreditCard,order: 7 },
   Клиенты:        { icon: Users,     order: 8 },

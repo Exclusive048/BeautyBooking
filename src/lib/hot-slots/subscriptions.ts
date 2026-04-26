@@ -31,7 +31,7 @@ async function ensureMasterWithHotSlots(providerId: string) {
   }
 
   if (!provider.discountRule?.isEnabled) {
-    throw new AppError("Горячие слоты не активны.", 409, "CONFLICT");
+    throw new AppError("Горящие окошки не активны.", 409, "CONFLICT");
   }
 
   return provider;

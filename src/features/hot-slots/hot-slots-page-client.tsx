@@ -98,11 +98,11 @@ export function HotSlotsPageClient() {
       const res = await fetch("/api/hot-slots", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ items: HotSlotItem[] }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить горячие слоты.");
+        throw new Error(json && !json.ok ? json.error.message : "Не удалось загрузить горящие окошки.");
       }
       setItems(json.data.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить горячие слоты.");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить горящие окошки.");
       setItems([]);
     } finally {
       setLoading(false);
@@ -124,7 +124,7 @@ export function HotSlotsPageClient() {
         </p>
       </div>
 
-      {loading ? <div className="text-sm text-text-sec">Загрузка горячих слотов...</div> : null}
+      {loading ? <div className="text-sm text-text-sec">Загрузка горящих окошек...</div> : null}
 
       {error ? (
         <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300">
@@ -137,7 +137,7 @@ export function HotSlotsPageClient() {
 
       {emptyState ? (
         <div className="rounded-2xl border border-border bg-bg-card/80 p-8 text-center">
-          <div className="text-base font-semibold text-text-main">Пока нет горячих слотов</div>
+          <div className="text-base font-semibold text-text-main">Пока нет горящих окошек</div>
           <div className="mt-2 text-sm text-text-sec">Попробуйте позже или загляните в каталог.</div>
         </div>
       ) : null}
@@ -194,7 +194,7 @@ export function HotSlotsPageClient() {
                       </div>
                     </div>
                     <span className="rounded-full bg-amber-200/60 px-2 py-1 text-[10px] font-semibold text-amber-900">
-                      Горячее
+                      Горящее
                     </span>
                   </div>
 

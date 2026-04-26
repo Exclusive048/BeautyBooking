@@ -63,7 +63,7 @@ export async function notifyHotSlotPublished(hotSlot: HotSlotWithRelations): Pro
   const slotLabel = formatSlotLabel(hotSlot.startAtUtc, hotSlot.provider.timezone);
   const discountLabel = formatDiscount(hotSlot.discountType, hotSlot.discountValue);
 
-  const title = "Горячий слот опубликован";
+  const title = "Горящее окошко опубликовано";
   const body = serviceName
     ? `Слот ${slotLabel} для услуги ${serviceName}. Скидка ${discountLabel}.`
     : `Слот ${slotLabel}. Скидка ${discountLabel}.`;
@@ -95,7 +95,7 @@ export async function notifyHotSlotBooked(
 
   const serviceName = resolveServiceLabel(hotSlot.service);
   const slotLabel = formatSlotLabel(hotSlot.startAtUtc, hotSlot.provider.timezone);
-  const title = "Горячий слот забронирован";
+  const title = "Горящее окошко забронировано";
   const body = serviceName
     ? `Клиент ${clientName} забронировал слот ${slotLabel} (${serviceName}).`
     : `Клиент ${clientName} забронировал слот ${slotLabel}.`;
@@ -123,7 +123,7 @@ export async function notifyHotSlotExpiring(hotSlot: HotSlotWithRelations): Prom
 
   const serviceName = resolveServiceLabel(hotSlot.service);
   const slotLabel = formatSlotLabel(hotSlot.startAtUtc, hotSlot.provider.timezone);
-  const title = "Горячий слот скоро истекает";
+  const title = "Горящее окошко скоро истекает";
   const body = serviceName
     ? `Слот ${slotLabel} для услуги ${serviceName} истекает через 1 час.`
     : `Слот ${slotLabel} истекает через 1 час.`;
