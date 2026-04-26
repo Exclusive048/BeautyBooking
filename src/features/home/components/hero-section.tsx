@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
+import type { PublicStats } from "@/lib/stats/public-stats";
 
 const containerVariants = {
   hidden: {},
@@ -24,22 +25,28 @@ const itemVariants = {
   },
 };
 
-const stats = [
-  {
-    num: UI_TEXT.home.hero.statMasters,
-    label: UI_TEXT.home.hero.statMastersLabel,
-  },
-  {
-    num: UI_TEXT.home.hero.statCategories,
-    label: UI_TEXT.home.hero.statCategoriesLabel,
-  },
-  {
-    num: UI_TEXT.home.hero.statBookings,
-    label: UI_TEXT.home.hero.statBookingsLabel,
-  },
-];
+const STATS_MIN_MASTERS = 10;
 
-export function HeroSection() {
+function formatNum(n: number): string {
+  return new Intl.NumberFormat("ru-RU").format(n);
+}
+
+type Props = {
+  stats: PublicStats | null;
+};
+
+export function HeroSection({ stats }: Props) {
+  const t = UI_TEXT.home.hero;
+  const showStats = stats !== null && stats.masters >= STATS_MIN_MASTERS;
+
+  const statItems = showStats && stats
+    ? [
+        { num: `${formatNum(stats.masters)}+`, label: t.statMastersLabel },
+        { num: `${formatNum(stats.services)}+`, label: t.statServicesLabel },
+        { num: `${formatNum(stats.bookings)}+`, label: t.statBookingsLabel },
+      ]
+    : [];
+
   return (
     <motion.section
       variants={containerVariants}
@@ -67,9 +74,9 @@ export function HeroSection() {
           variants={itemVariants}
           className="text-[2.4rem] font-bold leading-[1.15] tracking-tight text-text-main sm:text-5xl lg:text-[3.25rem]"
         >
-          {UI_TEXT.home.hero.title}{" "}
+          {t.title}{" "}
           <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {UI_TEXT.home.hero.titleHighlight}
+            {t.titleHighlight}
           </span>
         </motion.h1>
 
@@ -78,7 +85,7 @@ export function HeroSection() {
           variants={itemVariants}
           className="mx-auto mt-4 max-w-[480px] text-base leading-relaxed text-text-sec sm:text-lg"
         >
-          {UI_TEXT.home.hero.subtitle}
+          {t.subtitle}
         </motion.p>
 
         {/* CTAs */}
@@ -88,30 +95,32 @@ export function HeroSection() {
         >
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
             <Button asChild size="lg" className="min-w-[168px]">
-              <Link href="/catalog">{UI_TEXT.home.hero.ctaFind}</Link>
+              <Link href="/catalog">{t.ctaFind}</Link>
             </Button>
           </motion.div>
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
             <Button asChild variant="secondary" size="lg" className="min-w-[168px]">
-              <Link href="/become-master">{UI_TEXT.home.hero.ctaBecome}</Link>
+              <Link href="/become-master">{t.ctaBecome}</Link>
             </Button>
           </motion.div>
         </motion.div>
 
-        {/* Stats row */}
-        <motion.div
-          variants={itemVariants}
-          className="mt-9 flex items-center justify-center gap-0 divide-x divide-border-subtle/60"
-        >
-          {stats.map((stat) => (
-            <div key={stat.label} className="px-5 text-center first:pl-0 last:pr-0 sm:px-7">
-              <div className="text-xl font-bold tabular-nums text-text-main sm:text-2xl">
-                {stat.num}
+        {/* Stats row — only when data is real and meaningful */}
+        {statItems.length > 0 ? (
+          <motion.div
+            variants={itemVariants}
+            className="mt-9 flex items-center justify-center gap-0 divide-x divide-border-subtle/60"
+          >
+            {statItems.map((stat) => (
+              <div key={stat.label} className="px-5 text-center first:pl-0 last:pr-0 sm:px-7">
+                <div className="text-xl font-bold tabular-nums text-text-main sm:text-2xl">
+                  {stat.num}
+                </div>
+                <div className="mt-0.5 text-xs text-text-sec">{stat.label}</div>
               </div>
-              <div className="mt-0.5 text-xs text-text-sec">{stat.label}</div>
-            </div>
-          ))}
-        </motion.div>
+            ))}
+          </motion.div>
+        ) : null}
       </div>
     </motion.section>
   );

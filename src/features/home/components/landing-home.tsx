@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { HeroSection } from "@/features/home/components/hero-section";
 import { HowItWorksSection } from "@/features/home/components/how-it-works-section";
+import type { PublicStats } from "@/lib/stats/public-stats";
 
 const PopularCategoriesSection = dynamic(
   () => import("@/features/home/components/popular-categories-section").then((m) => m.PopularCategoriesSection),
@@ -29,10 +30,14 @@ const BecomeMasterBanner = dynamic(
   { ssr: false, loading: () => <div className="h-32" /> }
 );
 
-export function LandingHome() {
+type Props = {
+  stats: PublicStats | null;
+};
+
+export function LandingHome({ stats }: Props) {
   return (
     <div className="space-y-12 sm:space-y-16">
-      <HeroSection />
+      <HeroSection stats={stats} />
       <HowItWorksSection />
       <PopularCategoriesSection />
       <PortfolioStoriesBar />

@@ -211,7 +211,7 @@ export function HomeFeed({ isAuthenticated, userName }: HomeFeedProps) {
           </h1>
         </div>
       ) : (
-        <HeroSection />
+        <HeroSection stats={null} />
       )}
 
       <PortfolioStoriesBar />

@@ -882,11 +882,8 @@ export const UI_TEXT = {
         "Находи специалистов по портфолио, смотри отзывы и бронируй время без звонков и ожидания",
       ctaFind: "Найти мастера",
       ctaBecome: "Стать мастером",
-      statMasters: "2 000+",
       statMastersLabel: "мастеров",
-      statCategories: "20+",
-      statCategoriesLabel: "категорий",
-      statBookings: "15 000+",
+      statServicesLabel: "услуг",
       statBookingsLabel: "записей",
       becomeMasterTitle: "Вы мастер или студия?",
       becomeMasterSubtitle:
