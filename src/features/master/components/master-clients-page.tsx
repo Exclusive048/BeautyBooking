@@ -67,7 +67,7 @@ export function MasterClientsPage() {
 
   const tagMap = useMemo(() => new Map(CLIENT_TAGS.map((tag) => [tag.id, tag])), []);
 
-  const canOpenCards = plan.tier ? plan.tier !== "FREE" : false;
+  const canOpenCards = plan.can("clientVisitHistory");
 
   useEffect(() => {
     const load = async () => {

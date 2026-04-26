@@ -420,7 +420,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
       ) : null}
 
       {tab === "overview" ? (
-        <FeatureGate feature="analytics_dashboard" requiredPlan="FREE" scope={scope}>
+        <FeatureGate feature="analytics_dashboard" scope={scope}>
           {dashboardLoading || !dashboard ? (
             <Skeleton className="h-40 w-full" />
           ) : (
@@ -489,7 +489,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
       ) : null}
 
       {tab === "revenue" ? (
-        <FeatureGate feature="analytics_revenue" requiredPlan="PRO" scope={scope}>
+        <FeatureGate feature="analytics_revenue" scope={scope}>
           {!range ? (
             <Skeleton className="h-40 w-full" />
           ) : (
@@ -555,7 +555,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
                 ) : null}
               </div>
 
-              <FeatureGate feature="analytics_forecast" requiredPlan="PREMIUM" scope={scope}>
+              <FeatureGate feature="analytics_forecast" scope={scope}>
                 <div className="lux-card rounded-[22px] p-4">
                   <SectionHeader title="Прогноз" />
                   {revenue.forecast ? (
@@ -574,7 +574,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
       ) : null}
 
       {tab === "clients" ? (
-        <FeatureGate feature="analytics_clients" requiredPlan="PRO" scope={scope}>
+        <FeatureGate feature="analytics_clients" scope={scope}>
           {!range ? (
             <Skeleton className="h-40 w-full" />
           ) : (
@@ -653,7 +653,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
       ) : null}
 
       {tab === "bookings" ? (
-        <FeatureGate feature="analytics_booking_insights" requiredPlan="PREMIUM" scope={scope}>
+        <FeatureGate feature="analytics_booking_insights" scope={scope}>
           {!range ? (
             <Skeleton className="h-40 w-full" />
           ) : (
@@ -731,7 +731,7 @@ export function AnalyticsPage({ scope }: { scope: Scope }) {
       ) : null}
 
       {tab === "cohorts" ? (
-        <FeatureGate feature="analytics_cohorts" requiredPlan="PREMIUM" scope={scope}>
+        <FeatureGate feature="analytics_cohorts" scope={scope}>
           <div className="space-y-6">
             <div className="lux-card rounded-[22px] p-4">
               <SectionHeader title="Удержание" subtitle="Retention по когортам" />

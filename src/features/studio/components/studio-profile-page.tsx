@@ -536,7 +536,6 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
         {settingsTab === "features" ? (
           <FeatureGate
             feature="hotSlots"
-            requiredPlan="PREMIUM"
             scope="STUDIO"
             title={studioSettingsText.hotSlotsTitle}
             description={studioSettingsText.hotSlotsDescription}

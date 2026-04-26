@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Lock, ChevronDown, Sparkles, Bell, Zap, BarChart3, CreditCard, Users, Image, Wallet, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
@@ -16,6 +17,42 @@ type Props = {
   scope: Scope;
   billingHref: string;
 };
+
+// ── Plans data for dynamic min-tier label ─────────────────────────────────────
+
+type PlanEntry = {
+  name: string;
+  tier: string;
+  sortOrder: number;
+  features: Record<string, boolean | number | null>;
+};
+
+type PlansApiResponse = {
+  ok: true;
+  data: { plans: Record<string, PlanEntry[]> };
+};
+
+async function fetchPlans(url: string): Promise<PlansApiResponse> {
+  const res = await fetch(url, { cache: "no-store" });
+  return res.json() as Promise<PlansApiResponse>;
+}
+
+function findMinPlanLabel(
+  plans: PlansApiResponse | undefined,
+  key: string,
+  scope: Scope
+): string | null {
+  if (!plans?.data?.plans) return null;
+  const scopePlans = plans.data.plans[scope];
+  if (!scopePlans) return null;
+  const sorted = [...scopePlans].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const plan of sorted) {
+    if (plan.features && Boolean(plan.features[key])) {
+      return plan.name;
+    }
+  }
+  return null;
+}
 
 // ── Group metadata (icon + order) ────────────────────────────────────────────
 
@@ -45,6 +82,7 @@ type FeatureItem = {
   description: string;
   enabled: boolean;
   planned?: boolean;
+  minTierLabel?: string | null;
 };
 
 type FeatureGroup = {
@@ -55,7 +93,8 @@ type FeatureGroup = {
 
 function buildGroups(
   features: Record<string, boolean | number | null> | null,
-  scope: Scope
+  scope: Scope,
+  plans: PlansApiResponse | undefined
 ): FeatureGroup[] {
   const map = new Map<string, FeatureItem[]>();
 
@@ -76,11 +115,11 @@ function buildGroups(
       enabled = Boolean(raw);
     }
 
-    // Mark SMS/Max/VK as planned (not yet implemented at delivery level)
-    const planned = key === "smsNotifications" || key === "maxNotifications";
+    const planned = def.status === "planned";
+    const minTierLabel = (!planned && !enabled) ? findMinPlanLabel(plans, key, scope) : null;
 
     if (!map.has(def.group)) map.set(def.group, []);
-    map.get(def.group)!.push({ key, title: def.title, description: def.description, enabled, planned });
+    map.get(def.group)!.push({ key, title: def.title, description: def.description, enabled, planned, minTierLabel });
   }
 
   return Array.from(map.entries())
@@ -134,9 +173,11 @@ function FeatureRow({
           <span className="text-sm text-text-main">{item.title}</span>
           <p className="text-xs text-text-sec">{item.description}</p>
         </div>
-        <span className="shrink-0 text-[11px] text-primary underline-offset-2 group-hover:underline">
-          PRO
-        </span>
+        {item.minTierLabel ? (
+          <span className="shrink-0 text-[11px] text-primary underline-offset-2 group-hover:underline">
+            {item.minTierLabel}
+          </span>
+        ) : null}
       </Link>
     );
   }
@@ -217,8 +258,14 @@ export function FeaturesPageClient({ scope, billingHref }: Props) {
   const plan = usePlanFeatures(scope);
   const t = UI_TEXT.billing.featuresPage;
 
+  const { data: plansData } = useSWR<PlansApiResponse>(
+    "/api/billing/plans",
+    fetchPlans,
+    { revalidateOnFocus: false, dedupingInterval: 300_000 }
+  );
+
   const features = plan.features as Record<string, boolean | number | null> | null;
-  const groups = buildGroups(features, scope);
+  const groups = buildGroups(features, scope, plansData);
 
   const planName = plan.tier ?? "FREE";
   const allUnlocked = plan.tier === "PREMIUM";
