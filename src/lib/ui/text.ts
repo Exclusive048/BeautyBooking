@@ -656,6 +656,7 @@ export const UI_TEXT = {
       bannerFocusTitle: "Точка фокуса",
     },
     settingsPanel: {
+      settingsSubtitle: "Правила записи, уведомления и горящие слоты для всей студии.",
       hotSlotsTitle: "Горящие слоты",
       hotSlotsDescription:
         "Автоскидки на свободные окна по правилам студии.",
@@ -2554,6 +2555,7 @@ export const UI_TEXT = {
       profile: "Профиль студии",
       services: "Услуги и прайс",
       portfolio: "Портфолио",
+      general: "Настройки записей",
       features: "Функции",
       publicPage: "Публичная страница",
       billing: "Тариф",

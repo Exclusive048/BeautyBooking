@@ -12,6 +12,7 @@ import {
   Wallet,
   BarChart3,
   Settings,
+  Settings2,
   Scissors,
   ExternalLink,
   ChevronDown,
@@ -71,6 +72,7 @@ const MAIN_NAV: NavItem[] = [
 const SETTINGS_CHILDREN: SettingsChild[] = [
   { href: "/cabinet/studio/settings/profile", label: UI_TEXT.studioCabinet.settings.profile, icon: Building2 },
   { href: "/cabinet/studio/settings/portfolio", label: UI_TEXT.studioCabinet.settings.portfolio, icon: Image },
+  { href: "/cabinet/studio/settings/general", label: UI_TEXT.studioCabinet.settings.general, icon: Settings2 },
   { href: "/cabinet/studio/settings/features", label: UI_TEXT.studioCabinet.settings.features, icon: Sparkles },
   { href: "/cabinet/studio/settings/public", label: UI_TEXT.studioCabinet.settings.publicPage, icon: Share2 },
   { href: "/cabinet/studio/billing", label: UI_TEXT.studioCabinet.settings.billing, icon: CreditCard },
