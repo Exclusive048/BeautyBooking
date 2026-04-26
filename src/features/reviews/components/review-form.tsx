@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UI_TEXT } from "@/lib/ui/text";
+import { cn } from "@/lib/cn";
 import type { ReviewDto, ReviewTagDto } from "@/lib/reviews/types";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -20,8 +22,42 @@ type ReviewTagsResponse = {
 
 const MAX_TAGS_PER_GROUP = 3;
 
-function starsLabel(rating: number): string {
-  return "*".repeat(rating) + "-".repeat(Math.max(0, 5 - rating));
+function StarRating({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
+  const [hovered, setHovered] = useState(0);
+  const effective = hovered || value;
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => !disabled && onChange(star)}
+          onMouseEnter={() => !disabled && setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          disabled={disabled}
+          aria-label={`${star} звезд`}
+          className="p-1 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Star
+            className={cn(
+              "h-8 w-8 transition-colors",
+              star <= effective
+                ? "fill-amber-400 stroke-amber-400"
+                : "fill-none stroke-text-sec/30"
+            )}
+          />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function ChipButton(props: {
@@ -32,19 +68,20 @@ function ChipButton(props: {
 }) {
   const { tag, selected, disabled, onClick } = props;
   return (
-    <Button
+    <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      size="sm"
-      variant={selected ? "primary" : "secondary"}
-      className={`rounded-full px-3 text-xs ${
-        selected ? "" : "border-border-subtle bg-bg-input text-text-main hover:bg-bg-elevated"
-      }`}
+      className={cn(
+        "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+        selected
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border-subtle bg-bg-input text-text-sec hover:border-border hover:text-text-main"
+      )}
     >
-      {tag.icon ? `${tag.icon} ` : ""}
+      {tag.icon ? <span>{tag.icon}</span> : null}
       {tag.label}
-    </Button>
+    </button>
   );
 }
 
@@ -80,9 +117,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         if (cancelled) return;
         setTagsError(loadError instanceof Error ? loadError.message : t.loadTagsFailed);
       } finally {
-        if (!cancelled) {
-          setTagsLoading(false);
-        }
+        if (!cancelled) setTagsLoading(false);
       }
     })();
     return () => {
@@ -132,12 +167,12 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         const fieldMessage =
           fieldErrors && typeof fieldErrors === "object"
             ? Object.values(fieldErrors)
-                .map((value) => (Array.isArray(value) ? value.join(", ") : String(value)))
-                .find((value) => value.trim().length > 0)
+                .map((v) => (Array.isArray(v) ? v.join(", ") : String(v)))
+                .find((v) => v.trim().length > 0)
             : undefined;
-        const message =
-          fieldMessage || (json && !json.ok ? json.error.message : `API error: ${res.status}`);
-        throw new Error(message);
+        throw new Error(
+          fieldMessage || (json && !json.ok ? json.error.message : `API error: ${res.status}`)
+        );
       }
       onSubmitted(json.data.review);
       setText("");
@@ -156,27 +191,19 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
       <div className="text-sm font-semibold text-text-main">{t.title}</div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {[1, 2, 3, 4, 5].map((value) => (
-          <Button
-            key={value}
-            type="button"
-            onClick={() => setRating(value)}
-            size="sm"
-            variant={rating === value ? "primary" : "secondary"}
-            className="h-8 rounded-lg px-3 text-sm"
-            disabled={loading}
-          >
-            {starsLabel(value)}
-          </Button>
-        ))}
+      {/* Star rating */}
+      <div className="mt-3">
+        <StarRating value={rating} onChange={setRating} disabled={loading} />
       </div>
 
+      {/* Public tags */}
       <div className="mt-4">
         <div className="text-xs font-medium text-text-main">{t.publicTagsTitle}</div>
-        {tagsLoading ? <div className="mt-2 text-xs text-text-sec">{t.tagsLoading}</div> : null}
-        {tagsError ? <div className="mt-2 text-xs text-red-600">{tagsError}</div> : null}
-        {!tagsLoading && !tagsError ? (
+        {tagsLoading ? (
+          <div className="mt-2 text-xs text-text-sec">{t.tagsLoading}</div>
+        ) : tagsError ? (
+          <div className="mt-2 text-xs text-red-600">{tagsError}</div>
+        ) : publicTags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {publicTags.map((tag) => (
               <ChipButton
@@ -198,45 +225,51 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         ) : null}
       </div>
 
-      <Textarea
-        className="mt-3 min-h-[100px]"
-        placeholder={t.textPlaceholder}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        maxLength={1000}
-        disabled={loading}
-      />
-
+      {/* Text */}
       <div className="mt-4">
-        <div className="text-xs font-medium text-text-main">{t.privateTagsTitle}</div>
-        <div className="mt-1 text-[11px] text-text-sec">{t.privateTagsHint}</div>
-        {tagsLoading ? <div className="mt-2 text-xs text-text-sec">{t.tagsLoading}</div> : null}
-        {!tagsLoading && !tagsError ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {privateTags.map((tag) => (
-              <ChipButton
-                key={tag.id}
-                tag={tag}
-                selected={selectedPrivateTagIds.includes(tag.id)}
-                disabled={loading}
-                onClick={() =>
-                  toggleSelection(
-                    tag.id,
-                    selectedPrivateTagIds,
-                    setSelectedPrivateTagIds,
-                    t.tagsLimit.replace("{count}", String(MAX_TAGS_PER_GROUP))
-                  )
-                }
-              />
-            ))}
-          </div>
-        ) : null}
+        <Textarea
+          className="min-h-[100px]"
+          placeholder={t.textPlaceholder}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          maxLength={1000}
+          disabled={loading}
+        />
+        <p className="mt-1 text-right text-xs text-text-sec">{text.length}/1000</p>
       </div>
 
-      {hint ? <div className="mt-2 text-xs text-amber-300">{hint}</div> : null}
-      {error ? <div className="mt-2 text-sm text-red-600">{error}</div> : null}
+      {/* Private tags */}
+      {privateTags.length > 0 ? (
+        <div className="mt-4">
+          <div className="text-xs font-medium text-text-main">{t.privateTagsTitle}</div>
+          <div className="mt-0.5 text-[11px] text-text-sec">{t.privateTagsHint}</div>
+          {!tagsLoading ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {privateTags.map((tag) => (
+                <ChipButton
+                  key={tag.id}
+                  tag={tag}
+                  selected={selectedPrivateTagIds.includes(tag.id)}
+                  disabled={loading}
+                  onClick={() =>
+                    toggleSelection(
+                      tag.id,
+                      selectedPrivateTagIds,
+                      setSelectedPrivateTagIds,
+                      t.tagsLimit.replace("{count}", String(MAX_TAGS_PER_GROUP))
+                    )
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="mt-3 flex gap-2">
+      {hint ? <div className="mt-2 text-xs text-amber-500">{hint}</div> : null}
+      {error ? <div className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</div> : null}
+
+      <div className="mt-4 flex gap-2">
         <Button type="button" onClick={submit} disabled={!canSubmit}>
           {loading ? t.sending : t.submit}
         </Button>

@@ -2,18 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
 import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
 import { BookingDetailDrawer } from "@/features/cabinet/components/booking-detail-drawer";
-import { ReviewForm } from "@/features/reviews/components/review-form";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { BookingChat } from "@/features/chat/components/booking-chat";
+import type { ReviewDto } from "@/lib/reviews/types";
+import { cn } from "@/lib/cn";
 
 export type BookingItem = {
   id: string;
@@ -76,6 +77,8 @@ export type BookingReviewState = {
   canDelete: boolean;
 };
 
+type FilterKey = "all" | "today" | "upcoming" | "finished" | "cancelled";
+
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
@@ -109,22 +112,82 @@ function sortBookings(items: BookingItem[]): BookingItem[] {
   });
 }
 
+function filterBookings(items: BookingItem[], filter: FilterKey, tz: string): BookingItem[] {
+  if (filter === "all") return items;
+  if (filter === "today") {
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+    return items.filter((b) => {
+      if (!b.startAtUtc) return false;
+      return new Date(b.startAtUtc).toLocaleDateString("en-CA", { timeZone: tz }) === todayStr;
+    });
+  }
+  if (filter === "upcoming") {
+    return items.filter(
+      (b) =>
+        b.status === "CONFIRMED" ||
+        b.status === "PENDING" ||
+        b.status === "NEW" ||
+        b.status === "PREPAID" ||
+        b.status === "CHANGE_REQUESTED"
+    );
+  }
+  if (filter === "finished") {
+    return items.filter(
+      (b) => b.status === "FINISHED" || b.status === "IN_PROGRESS" || b.status === "STARTED"
+    );
+  }
+  if (filter === "cancelled") {
+    return items.filter((b) => b.status === "CANCELLED");
+  }
+  return items;
+}
+
+function parseFilter(value: string | null): FilterKey {
+  if (
+    value === "today" ||
+    value === "upcoming" ||
+    value === "finished" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  return "all";
+}
+
 export function ClientBookingsPanel() {
   const t = UI_TEXT.clientCabinet;
   const viewerTimeZone = useViewerTimeZoneContext();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [items, setItems] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<BookingItem | null>(null);
-  const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null);
   const [reviewStateMap, setReviewStateMap] = useState<Record<string, BookingReviewState>>({});
   const [chatOpenMap, setChatOpenMap] = useState<Record<string, boolean>>({});
   const [chatUnreadMap, setChatUnreadMap] = useState<Record<string, number>>({});
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(() =>
+    parseFilter(searchParams.get("filter"))
+  );
   const chatQueryHandledRef = useRef(false);
   const chatScrollHandledRef = useRef(false);
+
+  const changeFilter = useCallback(
+    (filter: FilterKey) => {
+      setActiveFilter(filter);
+      const params = new URLSearchParams(searchParams.toString());
+      if (filter === "all") {
+        params.delete("filter");
+      } else {
+        params.set("filter", filter);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    },
+    [router, searchParams]
+  );
 
   const loadCanLeave = useCallback(async (bookings: BookingItem[]) => {
     const entries = await Promise.all(
@@ -137,10 +200,7 @@ export function ClientBookingsPanel() {
             | ApiResponse<{ canLeave: boolean; reviewId: string | null; canDelete: boolean }>
             | null;
           if (!res.ok || !json || !json.ok) {
-            return [
-              booking.id,
-              { canLeave: false, reviewId: null, canDelete: false },
-            ] as const;
+            return [booking.id, { canLeave: false, reviewId: null, canDelete: false }] as const;
           }
           return [
             booking.id,
@@ -151,14 +211,10 @@ export function ClientBookingsPanel() {
             },
           ] as const;
         } catch {
-          return [
-            booking.id,
-            { canLeave: false, reviewId: null, canDelete: false },
-          ] as const;
+          return [booking.id, { canLeave: false, reviewId: null, canDelete: false }] as const;
         }
       })
     );
-
     setReviewStateMap(Object.fromEntries(entries));
   }, []);
 
@@ -205,6 +261,15 @@ export function ClientBookingsPanel() {
   }, [items.length, searchParams]);
 
   const sortedItems = useMemo(() => sortBookings(items), [items]);
+  const filteredItems = useMemo(
+    () => filterBookings(sortedItems, activeFilter, viewerTimeZone),
+    [sortedItems, activeFilter, viewerTimeZone]
+  );
+
+  const countFor = useCallback(
+    (filter: FilterKey) => filterBookings(sortedItems, filter, viewerTimeZone).length,
+    [sortedItems, viewerTimeZone]
+  );
 
   const cancelBooking = async (id: string) => {
     setActionId(id);
@@ -279,6 +344,13 @@ export function ClientBookingsPanel() {
     }
   };
 
+  const handleReviewSubmitted = useCallback((bookingId: string, review: ReviewDto) => {
+    setReviewStateMap((prev) => ({
+      ...prev,
+      [bookingId]: { canLeave: false, reviewId: review.id, canDelete: true },
+    }));
+  }, []);
+
   const toggleChat = (id: string) => {
     setChatOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -286,6 +358,14 @@ export function ClientBookingsPanel() {
   const handleUnreadChange = (id: string, count: number) => {
     setChatUnreadMap((prev) => (prev[id] === count ? prev : { ...prev, [id]: count }));
   };
+
+  const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: "all", label: t.bookingsPanel.filterAll },
+    { key: "today", label: t.bookingsPanel.filterToday },
+    { key: "upcoming", label: t.bookingsPanel.filterUpcoming },
+    { key: "finished", label: t.bookingsPanel.filterFinished },
+    { key: "cancelled", label: t.bookingsPanel.filterCancelled },
+  ];
 
   if (loading) {
     return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">{t.bookingsPanel.loading}</div>;
@@ -305,100 +385,138 @@ export function ClientBookingsPanel() {
 
   return (
     <>
-      <div className="space-y-3">
-        {sortedItems.map((b) => {
-          const waitsMasterDecision =
-            b.status === "CHANGE_REQUESTED" && b.actionRequiredBy === "MASTER";
-          const studioName = b.provider.type === "STUDIO" ? b.provider.name : null;
-          const masterName =
-            b.masterProvider?.name ?? (b.provider.type === "MASTER" ? b.provider.name : null);
-          const masterTarget =
-            b.masterProvider ?? (b.provider.type === "MASTER" ? b.provider : null);
-          const masterLink = masterTarget
-            ? providerPublicUrl(
-                { id: masterTarget.id, publicUsername: masterTarget.publicUsername },
-                "client-bookings-master"
-              )
-            : null;
-          const studioLink =
-            b.provider.type === "STUDIO"
-              ? providerPublicUrl(
-                  { id: b.provider.id, publicUsername: b.provider.publicUsername },
-                  "client-bookings-studio"
-                )
-              : null;
-          const addressLine = [b.provider.district, b.provider.address].filter(Boolean).join(" / ");
-          const slotLabel = UI_FMT.dateTimeShort(b.startAtUtc ?? "", { timeZone: viewerTimeZone });
-
+      {/* Filter chips */}
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+        {FILTERS.map(({ key, label }) => {
+          const count = key === "all" ? sortedItems.length : countFor(key);
+          const isActive = activeFilter === key;
           return (
-            <div
-              key={b.id}
-              id={`booking-${b.id}`}
-              onClick={(event) => {
-                const target = event.target as HTMLElement;
-                if (target.closest("[data-ignore-drawer]")) return;
-                setSelectedBooking(b);
-              }}
-              className="lux-card rounded-[22px] p-4 cursor-pointer transition-all hover:ring-1 hover:ring-border-subtle"
+            <button
+              key={key}
+              type="button"
+              onClick={() => changeFilter(key)}
+              className={cn(
+                "flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-all",
+                isActive
+                  ? "bg-primary text-white"
+                  : "bg-bg-input text-text-sec hover:bg-bg-elevated hover:text-text-main"
+              )}
             >
-              <div className="flex items-center justify-between gap-4">
-                <div className="font-medium">{b.provider.name}</div>
-                <div className="text-sm text-text-sec">{statusLabel(b.status)}</div>
-              </div>
-              <div className="mt-1 text-sm text-text-main">
-                {slotLabel} / {b.service.name}
-              </div>
-              {masterName ? <div className="mt-1 text-sm text-text-sec">{t.booking.masterLabel}: {masterName}</div> : null}
-              {studioName ? <div className="mt-1 text-sm text-text-sec">{t.booking.studioLabel}: {studioName}</div> : null}
-              {addressLine ? <div className="mt-1 text-sm text-text-sec">{addressLine}</div> : null}
-              {b.comment ? <div className="mt-2 text-sm text-text-sec">{b.comment}</div> : null}
-              {waitsMasterDecision ? (
-                <div className="mt-2 text-xs text-text-sec">{t.booking.waitsMaster}</div>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2" data-ignore-drawer>
-                {masterLink ? (
-                  <Button asChild type="button" variant="secondary" size="sm">
-                    <Link href={masterLink} onClick={(event) => event.stopPropagation()}>
-                      {t.booking.goToMaster}
-                    </Link>
-                  </Button>
-                ) : null}
-                {studioLink ? (
-                  <Button asChild type="button" variant="secondary" size="sm">
-                    <Link href={studioLink} onClick={(event) => event.stopPropagation()}>
-                      {t.booking.goToStudio}
-                    </Link>
-                  </Button>
-                ) : null}
-              </div>
-              <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3" data-ignore-drawer>
-                <Button
-                  variant="wrapper"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleChat(b.id);
-                  }}
-                  className="flex w-full items-center justify-between text-sm font-medium"
-                >
-                  <span>{t.booking.chatToggle}</span>
-                  {chatUnreadMap[b.id] ? (
-                    <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[b.id]}</Badge>
-                  ) : null}
-                </Button>
-                {chatOpenMap[b.id] ? (
-                  <div className="mt-3">
-                    <BookingChat
-                      bookingId={b.id}
-                      currentRole="CLIENT"
-                      onUnreadCountChange={(count) => handleUnreadChange(b.id, count)}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </div>
+              {label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
+                  isActive ? "bg-white/20 text-white" : "bg-bg-card text-text-sec"
+                )}
+              >
+                {count}
+              </span>
+            </button>
           );
         })}
       </div>
+
+      {/* List */}
+      {filteredItems.length === 0 ? (
+        <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">
+          {t.bookingsPanel.emptyFiltered}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredItems.map((b) => {
+            const waitsMasterDecision =
+              b.status === "CHANGE_REQUESTED" && b.actionRequiredBy === "MASTER";
+            const studioName = b.provider.type === "STUDIO" ? b.provider.name : null;
+            const masterName =
+              b.masterProvider?.name ?? (b.provider.type === "MASTER" ? b.provider.name : null);
+            const masterTarget =
+              b.masterProvider ?? (b.provider.type === "MASTER" ? b.provider : null);
+            const masterLink = masterTarget
+              ? providerPublicUrl(
+                  { id: masterTarget.id, publicUsername: masterTarget.publicUsername },
+                  "client-bookings-master"
+                )
+              : null;
+            const studioLink =
+              b.provider.type === "STUDIO"
+                ? providerPublicUrl(
+                    { id: b.provider.id, publicUsername: b.provider.publicUsername },
+                    "client-bookings-studio"
+                  )
+                : null;
+            const addressLine = [b.provider.district, b.provider.address].filter(Boolean).join(" / ");
+            const slotLabel = UI_FMT.dateTimeShort(b.startAtUtc ?? "", { timeZone: viewerTimeZone });
+
+            return (
+              <div
+                key={b.id}
+                id={`booking-${b.id}`}
+                onClick={(event) => {
+                  const target = event.target as HTMLElement;
+                  if (target.closest("[data-ignore-drawer]")) return;
+                  setSelectedBooking(b);
+                }}
+                className="lux-card rounded-[22px] p-4 cursor-pointer transition-all hover:ring-1 hover:ring-border-subtle"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="font-medium">{b.provider.name}</div>
+                  <div className="text-sm text-text-sec">{statusLabel(b.status)}</div>
+                </div>
+                <div className="mt-1 text-sm text-text-main">
+                  {slotLabel} / {b.service.name}
+                </div>
+                {masterName ? <div className="mt-1 text-sm text-text-sec">{t.booking.masterLabel}: {masterName}</div> : null}
+                {studioName ? <div className="mt-1 text-sm text-text-sec">{t.booking.studioLabel}: {studioName}</div> : null}
+                {addressLine ? <div className="mt-1 text-sm text-text-sec">{addressLine}</div> : null}
+                {b.comment ? <div className="mt-2 text-sm text-text-sec">{b.comment}</div> : null}
+                {waitsMasterDecision ? (
+                  <div className="mt-2 text-xs text-text-sec">{t.booking.waitsMaster}</div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2" data-ignore-drawer>
+                  {masterLink ? (
+                    <Button asChild type="button" variant="secondary" size="sm">
+                      <Link href={masterLink} onClick={(event) => event.stopPropagation()}>
+                        {t.booking.goToMaster}
+                      </Link>
+                    </Button>
+                  ) : null}
+                  {studioLink ? (
+                    <Button asChild type="button" variant="secondary" size="sm">
+                      <Link href={studioLink} onClick={(event) => event.stopPropagation()}>
+                        {t.booking.goToStudio}
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-3" data-ignore-drawer>
+                  <Button
+                    variant="wrapper"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleChat(b.id);
+                    }}
+                    className="flex w-full items-center justify-between text-sm font-medium"
+                  >
+                    <span>{t.booking.chatToggle}</span>
+                    {chatUnreadMap[b.id] ? (
+                      <Badge className="px-2 py-0.5 text-[11px]">{chatUnreadMap[b.id]}</Badge>
+                    ) : null}
+                  </Button>
+                  {chatOpenMap[b.id] ? (
+                    <div className="mt-3">
+                      <BookingChat
+                        bookingId={b.id}
+                        currentRole="CLIENT"
+                        onUnreadCountChange={(count) => handleUnreadChange(b.id, count)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {selectedBooking ? (
         <BookingDetailDrawer
@@ -409,7 +527,7 @@ export function ClientBookingsPanel() {
           onCancel={cancelBooking}
           onConfirm={confirmBookingAction}
           onReschedule={setRescheduleBooking}
-          onLeaveReview={setReviewBookingId}
+          onReviewSubmitted={(review) => handleReviewSubmitted(selectedBooking.id, review)}
           onDeleteReview={deleteReviewAction}
           onActionSuccess={load}
         />
@@ -435,26 +553,6 @@ export function ClientBookingsPanel() {
             void load();
           }}
         />
-      ) : null}
-
-      {reviewBookingId ? (
-        <div className="mt-4">
-          <ReviewForm
-            bookingId={reviewBookingId}
-            onCancel={() => setReviewBookingId(null)}
-            onSubmitted={(review) => {
-              setReviewStateMap((prev) => ({
-                ...prev,
-                [reviewBookingId]: {
-                  canLeave: false,
-                  reviewId: review.id,
-                  canDelete: true,
-                },
-              }));
-              setReviewBookingId(null);
-            }}
-          />
-        </div>
       ) : null}
     </>
   );

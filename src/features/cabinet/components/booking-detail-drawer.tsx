@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ReactDOM from "react-dom";
+import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
@@ -11,6 +12,8 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { BookingItem, BookingReviewState } from "@/features/cabinet/components/client-bookings-panel";
 import { FocalImage } from "@/components/ui/focal-image";
+import { ReviewForm } from "@/features/reviews/components/review-form";
+import type { ReviewDto } from "@/lib/reviews/types";
 
 type BusyAction = "cancel" | "confirm" | "deleteReview" | null;
 
@@ -22,7 +25,7 @@ interface BookingDetailDrawerProps {
   onCancel: (id: string) => Promise<void>;
   onConfirm: (id: string) => Promise<void>;
   onReschedule: (b: BookingItem) => void;
-  onLeaveReview: (id: string) => void;
+  onReviewSubmitted: (review: ReviewDto) => void;
   onDeleteReview: (bookingId: string, reviewId: string) => Promise<void>;
   onActionSuccess: () => void | Promise<void>;
 }
@@ -81,12 +84,9 @@ function canCancelByClient(booking: BookingItem): boolean {
 
 function buildRebookUrl(booking: BookingItem): string | null {
   const target = booking.masterProvider ?? booking.provider;
-  if (!target.publicUsername) {
-    return null;
-  }
-  const url = `/u/${target.publicUsername}`;
+  if (!target.publicUsername) return null;
   const params = new URLSearchParams({ serviceId: booking.service.id });
-  return `${url}?${params.toString()}`;
+  return `/u/${target.publicUsername}?${params.toString()}`;
 }
 
 function ActionSpinner() {
@@ -106,7 +106,7 @@ export function BookingDetailDrawer({
   onCancel,
   onConfirm,
   onReschedule,
-  onLeaveReview,
+  onReviewSubmitted,
   onDeleteReview,
   onActionSuccess,
 }: BookingDetailDrawerProps) {
@@ -115,6 +115,7 @@ export function BookingDetailDrawer({
   const [mounted, setMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
   const canReschedule = useMemo(() => canRescheduleByClient(booking), [booking]);
   const canCancel = useMemo(() => canCancelByClient(booking), [booking]);
   const cancellationDeadlineLabel = useMemo(() => {
@@ -146,6 +147,11 @@ export function BookingDetailDrawer({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Reset review form when booking changes
+  useEffect(() => {
+    setShowReviewForm(false);
+  }, [booking.id]);
+
   const rebookUrl = useMemo(() => buildRebookUrl(booking), [booking]);
   const slotLabel = UI_FMT.dateTimeShort(booking.startAtUtc ?? "", { timeZone: viewerTimeZone });
   const priceLabel = booking.service.price === 0 ? "Уточнить у мастера" : UI_FMT.priceLabel(booking.service.price);
@@ -157,6 +163,7 @@ export function BookingDetailDrawer({
   const canManage = canReschedule || canCancel;
   const isBusy = actionId === booking.id || busyAction !== null;
   const reviewId = reviewState?.reviewId ?? null;
+  const reviewSubmitted = !reviewState?.canLeave && reviewId !== null;
 
   if (!mounted) return null;
 
@@ -172,6 +179,7 @@ export function BookingDetailDrawer({
           isVisible ? "translate-x-0" : "translate-x-full"
         }`}
       >
+        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border-subtle px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 overflow-hidden rounded-full border border-border-subtle bg-bg-input">
@@ -208,6 +216,7 @@ export function BookingDetailDrawer({
         </div>
 
         <div className="space-y-5 px-5 py-4">
+          {/* Booking details */}
           <section className="space-y-4">
             <div>
               <div className="text-xs text-text-sec">Дата и время</div>
@@ -235,6 +244,7 @@ export function BookingDetailDrawer({
             </div>
           </section>
 
+          {/* Master (for studio bookings) */}
           {booking.masterProvider ? (
             <section className="rounded-2xl border border-border-subtle bg-bg-input/40 p-4">
               <div className="text-xs text-text-sec">Мастер</div>
@@ -273,12 +283,14 @@ export function BookingDetailDrawer({
             </section>
           ) : null}
 
+          {/* Rebook */}
           {booking.status === "FINISHED" && rebookUrl ? (
             <Button asChild size="lg" className="w-full">
               <Link href={rebookUrl}>Записаться снова</Link>
             </Button>
           ) : null}
 
+          {/* Actions */}
           <section className="space-y-3">
             {canManage ? (
               <div className="flex flex-wrap gap-2">
@@ -366,10 +378,16 @@ export function BookingDetailDrawer({
               </div>
             ) : null}
 
-            {reviewState?.canLeave ? (
+            {/* Review section */}
+            {reviewSubmitted ? (
+              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                {t.bookingsPanel.reviewSubmitted}
+              </div>
+            ) : reviewState?.canLeave && !showReviewForm ? (
               <Button
                 type="button"
-                onClick={() => onLeaveReview(booking.id)}
+                onClick={() => setShowReviewForm(true)}
                 variant="secondary"
                 size="sm"
                 disabled={isBusy}
@@ -378,7 +396,18 @@ export function BookingDetailDrawer({
               </Button>
             ) : null}
 
-            {reviewState?.canDelete && reviewId ? (
+            {showReviewForm ? (
+              <ReviewForm
+                bookingId={booking.id}
+                onCancel={() => setShowReviewForm(false)}
+                onSubmitted={(review) => {
+                  setShowReviewForm(false);
+                  onReviewSubmitted(review);
+                }}
+              />
+            ) : null}
+
+            {reviewState?.canDelete && reviewId && !showReviewForm ? (
               <Button
                 type="button"
                 onClick={async () => {

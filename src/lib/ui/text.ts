@@ -2241,6 +2241,7 @@ export const UI_TEXT = {
     bookingsPanel: {
       loading: "Загружаем записи",
       empty: "Записей пока нет — самое время найти мастера.",
+      emptyFiltered: "Нет записей по выбранному фильтру.",
       apiErrorPrefix: "Ошибка API:",
       unknownError: "Неизвестная ошибка",
       failedToLoad: "Не удалось загрузить записи",
@@ -2248,6 +2249,12 @@ export const UI_TEXT = {
       reschedule: "Перенести",
       cancelBooking: "Отменить запись",
       leaveReview: "Оставить отзыв",
+      reviewSubmitted: "Отзыв оставлен",
+      filterAll: "Все",
+      filterToday: "Сегодня",
+      filterUpcoming: "Предстоящие",
+      filterFinished: "Завершённые",
+      filterCancelled: "Отменённые",
     },
     reviewForm: {
       title: "Оставить отзыв",

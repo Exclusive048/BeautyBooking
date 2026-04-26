@@ -25,6 +25,7 @@
     "seed:sql": "bash prisma/seed.sh",
     "seed:billing": "npx tsx scripts/seed-billing-plans.ts",
     "seed:plans": "npx tsx scripts/seed-billing-plans.ts",
+    "seed:review-tags": "npx tsx scripts/seed-review-tags.ts",
     "migrate:billing": "npx tsx scripts/migrate-billing-plans.ts",
     "generate:icons": "node scripts/generate-icons.mjs",
     "lighthouse": "npx tsx scripts/lighthouse-audit.ts",
