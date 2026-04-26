@@ -23,6 +23,12 @@ export const UI_TEXT = {
   brand: {
     name: "МастерРядом",
   },
+  cookieConsent: {
+    text: "Мы используем файлы cookie для работы сайта и улучшения вашего опыта",
+    privacyLink: "Политика конфиденциальности",
+    accept: "Принять",
+    reject: "Отклонить",
+  },
   meta: {
     title: "МастерРядом — запись к мастерам красоты онлайн",
     description:
