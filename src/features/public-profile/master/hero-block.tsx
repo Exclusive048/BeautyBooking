@@ -22,18 +22,32 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
 
   async function onShare() {
     const url = typeof window !== "undefined" ? window.location.href : "";
+    const shareData = { title: provider.name, url };
+
     try {
-      if (navigator.share) {
-        await navigator.share({ title: provider.name, url });
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        await navigator.share(shareData);
+        // User completed sharing — show success
+        setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
       } else {
+        // Share API unavailable — copy to clipboard
         await navigator.clipboard.writeText(url);
+        setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
       }
-      setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
-      window.setTimeout(() => setShareMessage(null), 2000);
-    } catch {
-      setShareMessage(UI_TEXT.publicProfile.hero.shareFailed);
-      window.setTimeout(() => setShareMessage(null), 2000);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // User dismissed the share sheet — not an error, do nothing
+        return;
+      }
+      // Share failed — try clipboard fallback
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
+      } catch {
+        setShareMessage(UI_TEXT.publicProfile.hero.shareFailed);
+      }
     }
+    window.setTimeout(() => setShareMessage(null), 2500);
   }
 
   const mapsHref = buildYandexMapsUrl({
