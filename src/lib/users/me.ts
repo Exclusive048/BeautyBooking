@@ -8,6 +8,7 @@ export type MeIdentity = {
   phone: string | null;
   email: string | null;
   externalPhotoUrl: string | null;
+  emailNotificationsEnabled: boolean;
 };
 
 export const ME_CACHE_TTL_SECONDS = 30;
@@ -38,6 +39,7 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
       phone: true,
       email: true,
       externalPhotoUrl: true,
+      emailNotificationsEnabled: true,
       isDeleted: true,
     },
   });
@@ -50,5 +52,6 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
     phone: profile.phone,
     email: profile.email,
     externalPhotoUrl: profile.externalPhotoUrl,
+    emailNotificationsEnabled: profile.emailNotificationsEnabled,
   };
 }

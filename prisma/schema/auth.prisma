@@ -87,6 +87,8 @@ model UserProfile {
 
   updatedAt DateTime @updatedAt
 
+  emailNotificationsEnabled Boolean @default(false)
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 }

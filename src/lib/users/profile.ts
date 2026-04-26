@@ -91,6 +91,9 @@ export async function updateMeProfile(
       lastName: input.lastName,
       middleName: input.middleName,
       address: input.address,
+      ...(input.emailNotificationsEnabled !== undefined
+        ? { emailNotificationsEnabled: input.emailNotificationsEnabled }
+        : {}),
       ...(birthDate !== undefined ? { birthDate } : {}),
     },
     select: {
