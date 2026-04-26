@@ -64,8 +64,6 @@ type BillingPageProps = {
   scope: SubscriptionScope;
 };
 
-const PERIODS: PeriodMonths[] = [1, 12];
-
 function getPrice(plan: BillingPlan, periodMonths: PeriodMonths): PlanPrice | null {
   return plan.prices.find((price) => price.periodMonths === periodMonths) ?? null;
 }
@@ -75,42 +73,55 @@ function getBaseMonthlyPriceKopeks(plan: BillingPlan): number | null {
 }
 
 function getDisplayMonthlyPriceKopeks(plan: BillingPlan, periodMonths: PeriodMonths): number | null {
+  const price = getPrice(plan, periodMonths);
+  if (price) return Math.floor(price.priceKopeks / periodMonths);
+  // Fallback: monthly price with yearly discount for 12 months
   const monthly = getBaseMonthlyPriceKopeks(plan);
   if (monthly === null) return null;
-  if (periodMonths === 12) {
-    return Math.floor(monthly * (1 - BILLING_YEARLY_DISCOUNT));
-  }
+  if (periodMonths === 12) return Math.floor(monthly * (1 - BILLING_YEARLY_DISCOUNT));
   return monthly;
 }
 
 function getCheckoutAmountKopeks(plan: BillingPlan, periodMonths: PeriodMonths): number | null {
+  const price = getPrice(plan, periodMonths);
+  if (price) return price.priceKopeks;
   const monthly = getBaseMonthlyPriceKopeks(plan);
-  if (monthly === null) {
-    return getPrice(plan, periodMonths)?.priceKopeks ?? null;
-  }
-  if (periodMonths === 12) {
-    return Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT));
-  }
-  if (periodMonths === 1) return monthly;
-  return getPrice(plan, periodMonths)?.priceKopeks ?? monthly * periodMonths;
+  if (monthly === null) return null;
+  if (periodMonths === 12) return Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT));
+  return monthly * periodMonths;
 }
 
-function getYearlySavingsKopeks(plan: BillingPlan): number {
+function getSavingsPct(plan: BillingPlan, periodMonths: PeriodMonths): number {
+  if (periodMonths === 1) return 0;
   const monthly = getBaseMonthlyPriceKopeks(plan);
-  if (monthly === null) return 0;
-  const fullYear = monthly * 12;
-  const discountedYear = Math.floor(fullYear * (1 - BILLING_YEARLY_DISCOUNT));
-  return Math.max(0, fullYear - discountedYear);
+  if (monthly === null || monthly === 0) return 0;
+  const total = getCheckoutAmountKopeks(plan, periodMonths);
+  if (total === null) return 0;
+  return Math.max(0, Math.round((1 - total / (monthly * periodMonths)) * 100));
 }
 
 function formatPeriodLabel(periodMonths: PeriodMonths) {
   if (periodMonths === 1) return UI_TEXT.billing.period.month;
-  if (periodMonths === 12) return UI_TEXT.billing.period.year;
-  return `${periodMonths} мес.`;
+  if (periodMonths === 3) return UI_TEXT.billing.period.months3;
+  if (periodMonths === 6) return UI_TEXT.billing.period.months6;
+  return UI_TEXT.billing.period.year;
 }
 
 function buildDefaultPeriods() {
   return { MASTER: 1, STUDIO: 1 } as Record<SubscriptionScope, PeriodMonths>;
+}
+
+function getAvailablePeriods(plans: BillingPlan[]): PeriodMonths[] {
+  const periodsSet = new Set<PeriodMonths>();
+  for (const plan of plans) {
+    for (const p of plan.prices) {
+      if (p.periodMonths === 1 || p.periodMonths === 3 || p.periodMonths === 6 || p.periodMonths === 12) {
+        periodsSet.add(p.periodMonths as PeriodMonths);
+      }
+    }
+  }
+  const sorted = Array.from(periodsSet).sort((a, b) => a - b);
+  return sorted.length > 0 ? sorted : [1, 12];
 }
 
 // ── Active Features Panel ─────────────────────────────────────────────────────
@@ -323,22 +334,34 @@ export function BillingPage({ scope }: BillingPageProps) {
     }
   };
 
-  const handleCancel = async (selectedScope: SubscriptionScope) => {
+  const handleToggleAutoRenew = async (selectedScope: SubscriptionScope, nextValue: boolean) => {
     setBusyScope(selectedScope);
     setError(null);
     try {
-      const res = await fetch("/api/billing/cancel", {
-        method: "POST",
+      const res = await fetch("/api/billing/auto-renew", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: selectedScope }),
+        body: JSON.stringify({ scope: selectedScope, autoRenew: nextValue }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ ok: true }> | null;
+      const json = (await res.json().catch(() => null)) as ApiResponse<{ autoRenew: boolean }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : "Не удалось отменить автопродление.");
+        throw new Error(
+          json && !json.ok
+            ? json.error.message
+            : nextValue
+              ? UI_TEXT.billing.autoRenew.enableFailed
+              : UI_TEXT.billing.autoRenew.disableFailed
+        );
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отменить автопродление.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : nextValue
+            ? UI_TEXT.billing.autoRenew.enableFailed
+            : UI_TEXT.billing.autoRenew.disableFailed
+      );
     } finally {
       setBusyScope(null);
     }
@@ -369,6 +392,9 @@ export function BillingPage({ scope }: BillingPageProps) {
   const subscription = status?.subscriptions[scope] ?? null;
   const isBusy = busyScope === scope;
   const autoRenewEnabled = Boolean(subscription?.autoRenew && !subscription?.cancelAtPeriodEnd);
+  const isFreePlan = !subscription || subscription.plan.tier === "FREE";
+  const isActiveSub = subscription?.status === "ACTIVE" || subscription?.status === "PAST_DUE";
+  const availablePeriods = getAvailablePeriods(scopePlans);
 
   return (
     <section className="space-y-8">
@@ -423,62 +449,63 @@ export function BillingPage({ scope }: BillingPageProps) {
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-xs text-text-sec">
             <div>
-              <div className="text-[11px]">Автопродление</div>
-              <div className="text-[11px]">{autoRenewEnabled ? "Включено" : "Отключено"}</div>
+              <div className="text-[11px]">{UI_TEXT.billing.autoRenew.label}</div>
+              <div className="text-[11px]">
+                {isFreePlan
+                  ? UI_TEXT.billing.autoRenew.notAvailableForFree
+                  : autoRenewEnabled
+                    ? UI_TEXT.billing.autoRenew.enabled
+                    : UI_TEXT.billing.autoRenew.disabled}
+              </div>
             </div>
             <Switch
               checked={autoRenewEnabled}
-              disabled={!autoRenewEnabled || isBusy}
-              onCheckedChange={(value) => {
-                if (!value) {
-                  void handleCancel(scope);
-                }
-              }}
+              disabled={isFreePlan || !isActiveSub || isBusy}
+              onCheckedChange={(value) => void handleToggleAutoRenew(scope, value)}
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-text-sec">
-          {PERIODS.map((periodMonths) => (
-            <Button
-              key={periodMonths}
-              variant={selectedPeriod[scope] === periodMonths ? "primary" : "secondary"}
-              size="none"
-              onClick={() =>
-                setSelectedPeriod((current) => ({
-                  ...current,
-                  [scope]: periodMonths,
-                }))
-              }
-              className="rounded-xl px-4 py-2 text-sm font-semibold"
-            >
-              {periodMonths === 12 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {availablePeriods.map((periodMonths) => {
+            const isSelected = selectedPeriod[scope] === periodMonths;
+            const refPlan = activePlan ?? scopePlans[0];
+            const savings = refPlan ? getSavingsPct(refPlan, periodMonths) : 0;
+            return (
+              <Button
+                key={periodMonths}
+                variant={isSelected ? "primary" : "secondary"}
+                size="none"
+                onClick={() =>
+                  setSelectedPeriod((current) => ({ ...current, [scope]: periodMonths }))
+                }
+                className="rounded-xl px-4 py-2 text-sm font-semibold"
+              >
                 <span className="flex items-center gap-1.5">
                   <span>{formatPeriodLabel(periodMonths)}</span>
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                      selectedPeriod[scope] === periodMonths
-                        ? "bg-white/20 text-white"
-                        : "bg-primary/20 text-primary"
-                    )}
-                  >
-                    {UI_TEXT.billing.period.yearDiscount}
-                  </span>
+                  {savings > 0 ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                        isSelected ? "bg-white/20 text-white" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      )}
+                    >
+                      {UI_TEXT.billing.period.savingsBadge(savings)}
+                    </span>
+                  ) : null}
                 </span>
-              ) : (
-                <span>{formatPeriodLabel(periodMonths)}</span>
-              )}
-            </Button>
-          ))}
+              </Button>
+            );
+          })}
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           {scopePlans.map((plan) => {
-            const displayMonthlyPriceKopeks = getDisplayMonthlyPriceKopeks(plan, selectedPeriod[scope]);
-            const checkoutAmountKopeks = getCheckoutAmountKopeks(plan, selectedPeriod[scope]);
+            const curPeriod = selectedPeriod[scope];
+            const displayMonthlyPriceKopeks = getDisplayMonthlyPriceKopeks(plan, curPeriod);
+            const checkoutAmountKopeks = getCheckoutAmountKopeks(plan, curPeriod);
             const baseMonthlyPriceKopeks = getBaseMonthlyPriceKopeks(plan);
-            const yearlySavingsKopeks = selectedPeriod[scope] === 12 ? getYearlySavingsKopeks(plan) : 0;
+            const savingsPct = getSavingsPct(plan, curPeriod);
             const isCurrent =
               subscription?.plan.id === plan.id &&
               (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE");
@@ -502,15 +529,17 @@ export function BillingPage({ scope }: BillingPageProps) {
                     <div className="text-right">
                       <div className="flex items-baseline justify-end gap-1">
                         <span className="text-2xl font-bold text-text-main">{displayPriceLabel}</span>
-                        <span className="text-sm text-text-sec">/мес</span>
+                        {displayMonthlyPriceKopeks !== null && displayMonthlyPriceKopeks > 0 ? (
+                          <span className="text-sm text-text-sec">{UI_TEXT.billing.period.perMonth}</span>
+                        ) : null}
                       </div>
-                      {selectedPeriod[scope] === 12 && baseMonthlyPriceKopeks !== null ? (
+                      {savingsPct > 0 && baseMonthlyPriceKopeks !== null ? (
                         <div className="mt-1 flex items-center justify-end gap-2">
                           <span className="text-sm text-text-sec line-through">
                             {moneyRUBFromKopeks(baseMonthlyPriceKopeks)}
                           </span>
-                          <span className="text-xs text-emerald-500">
-                            {UI_TEXT.billing.period.yearSavings(Math.floor(yearlySavingsKopeks / 100))}
+                          <span className="text-xs font-semibold text-emerald-500">
+                            {UI_TEXT.billing.period.savingsBadge(savingsPct)}
                           </span>
                         </div>
                       ) : null}
@@ -518,7 +547,7 @@ export function BillingPage({ scope }: BillingPageProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between gap-4">
-                  <div className="text-xs text-text-sec">Период: {formatPeriodLabel(selectedPeriod[scope])}</div>
+                  <div className="text-xs text-text-sec">Период: {formatPeriodLabel(curPeriod)}</div>
                   <Button
                     disabled={isBusy || isCurrent || checkoutAmountKopeks === null}
                     onClick={() => void handleCheckout(scope, plan)}
