@@ -13,6 +13,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import type { BookingItem, BookingReviewState } from "@/features/cabinet/components/client-bookings-panel";
 import { FocalImage } from "@/components/ui/focal-image";
 import { ReviewForm } from "@/features/reviews/components/review-form";
+import { RescheduleSection } from "@/features/cabinet/components/reschedule-section";
 import type { ReviewDto } from "@/lib/reviews/types";
 
 type BusyAction = "cancel" | "confirm" | "deleteReview" | null;
@@ -24,7 +25,6 @@ interface BookingDetailDrawerProps {
   onClose: () => void;
   onCancel: (id: string) => Promise<void>;
   onConfirm: (id: string) => Promise<void>;
-  onReschedule: (b: BookingItem) => void;
   onReviewSubmitted: (review: ReviewDto) => void;
   onDeleteReview: (bookingId: string, reviewId: string) => Promise<void>;
   onActionSuccess: () => void | Promise<void>;
@@ -105,7 +105,6 @@ export function BookingDetailDrawer({
   onClose,
   onCancel,
   onConfirm,
-  onReschedule,
   onReviewSubmitted,
   onDeleteReview,
   onActionSuccess,
@@ -116,6 +115,7 @@ export function BookingDetailDrawer({
   const [isVisible, setIsVisible] = useState(false);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showRescheduleForm, setShowRescheduleForm] = useState(false);
   const canReschedule = useMemo(() => canRescheduleByClient(booking), [booking]);
   const canCancel = useMemo(() => canCancelByClient(booking), [booking]);
   const cancellationDeadlineLabel = useMemo(() => {
@@ -147,9 +147,10 @@ export function BookingDetailDrawer({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // Reset review form when booking changes
+  // Reset inline forms when booking changes
   useEffect(() => {
     setShowReviewForm(false);
+    setShowRescheduleForm(false);
   }, [booking.id]);
 
   const rebookUrl = useMemo(() => buildRebookUrl(booking), [booking]);
@@ -292,12 +293,12 @@ export function BookingDetailDrawer({
 
           {/* Actions */}
           <section className="space-y-3">
-            {canManage ? (
+            {canManage && !showRescheduleForm ? (
               <div className="flex flex-wrap gap-2">
                 {canReschedule ? (
                   <Button
                     type="button"
-                    onClick={() => onReschedule(booking)}
+                    onClick={() => setShowRescheduleForm(true)}
                     disabled={isBusy}
                     variant="secondary"
                     size="sm"
@@ -431,6 +432,31 @@ export function BookingDetailDrawer({
               </Button>
             ) : null}
           </section>
+
+          {/* Inline reschedule form */}
+          {showRescheduleForm ? (
+            <RescheduleSection
+              booking={{
+                id: booking.id,
+                providerId: booking.providerId,
+                masterProviderId: booking.masterProviderId,
+                serviceId: booking.service.id,
+                slotLabel: booking.slotLabel,
+                status: booking.status,
+                silentMode: booking.silentMode,
+                startAtUtc: booking.startAtUtc,
+                actionRequiredBy: booking.actionRequiredBy,
+                clientChangeRequestsCount: booking.clientChangeRequestsCount,
+                masterChangeRequestsCount: booking.masterChangeRequestsCount,
+              }}
+              onCancel={() => setShowRescheduleForm(false)}
+              onSuccess={async () => {
+                setShowRescheduleForm(false);
+                await onActionSuccess();
+                onClose();
+              }}
+            />
+          ) : null}
         </div>
       </div>
     </div>

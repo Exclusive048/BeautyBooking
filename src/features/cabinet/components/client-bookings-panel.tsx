@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { ApiResponse } from "@/lib/types/api";
-import { RescheduleModal } from "@/features/cabinet/components/reschedule-modal";
 import { BookingDetailDrawer } from "@/features/cabinet/components/booking-detail-drawer";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -163,7 +162,6 @@ export function ClientBookingsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
-  const [rescheduleBooking, setRescheduleBooking] = useState<BookingItem | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null);
   const [reviewStateMap, setReviewStateMap] = useState<Record<string, BookingReviewState>>({});
   const [chatOpenMap, setChatOpenMap] = useState<Record<string, boolean>>({});
@@ -526,34 +524,12 @@ export function ClientBookingsPanel() {
           onClose={() => setSelectedBooking(null)}
           onCancel={cancelBooking}
           onConfirm={confirmBookingAction}
-          onReschedule={setRescheduleBooking}
           onReviewSubmitted={(review) => handleReviewSubmitted(selectedBooking.id, review)}
           onDeleteReview={deleteReviewAction}
           onActionSuccess={load}
         />
       ) : null}
 
-      {rescheduleBooking ? (
-        <RescheduleModal
-          booking={{
-            id: rescheduleBooking.id,
-            providerId: rescheduleBooking.providerId,
-            masterProviderId: rescheduleBooking.masterProviderId,
-            serviceId: rescheduleBooking.service.id,
-            slotLabel: rescheduleBooking.slotLabel,
-            status: rescheduleBooking.status,
-            silentMode: rescheduleBooking.silentMode,
-            startAtUtc: rescheduleBooking.startAtUtc,
-            actionRequiredBy: rescheduleBooking.actionRequiredBy,
-            clientChangeRequestsCount: rescheduleBooking.clientChangeRequestsCount,
-            masterChangeRequestsCount: rescheduleBooking.masterChangeRequestsCount,
-          }}
-          onClose={() => setRescheduleBooking(null)}
-          onSuccess={() => {
-            void load();
-          }}
-        />
-      ) : null}
     </>
   );
 }

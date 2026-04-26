@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Switch } from "@/components/ui/switch";
-import { ModalSurface } from "@/components/ui/modal-surface";
 import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
@@ -50,16 +49,8 @@ type BookingInfo = {
 
 type Props = {
   booking: BookingInfo;
-  onClose: () => void;
-  onSuccess: (next?: {
-    slotLabel: string;
-    silentMode?: boolean;
-    status: BookingInfo["status"];
-    actionRequiredBy: BookingInfo["actionRequiredBy"];
-    requestedBy: "CLIENT" | "MASTER" | null;
-    proposedStartAtUtc: string | null;
-    proposedEndAtUtc: string | null;
-  }) => void;
+  onSuccess: () => void | Promise<void>;
+  onCancel: () => void;
 };
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
@@ -73,16 +64,12 @@ function toDateKey(d: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDateLabel(dateKey: string, timeZone: string) {
+function formatDateLabel(dateKey: string) {
   const [y, m, d] = dateKey.split("-").map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  return dt.toLocaleDateString("ru-RU", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    timeZone,
-  });
+  const dt = new Date(y!, (m ?? 1) - 1, d ?? 1);
+  return dt.toLocaleDateString("ru-RU", { weekday: "short", day: "2-digit", month: "short" });
 }
+
 function buildDateRange(days: number) {
   const start = new Date();
   const items: string[] = [];
@@ -94,11 +81,11 @@ function buildDateRange(days: number) {
   return items;
 }
 
-
-export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
+export function RescheduleSection({ booking, onSuccess, onCancel }: Props) {
   const t = UI_TEXT.clientCabinet;
   const viewerTimeZone = useViewerTimeZoneContext();
-  const [selectedDate, setSelectedDate] = useState<string>(() => buildDateRange(7)[0] ?? "");
+  const dateOptions = useMemo(() => buildDateRange(60), []);
+  const [selectedDate, setSelectedDate] = useState<string>(() => dateOptions[0] ?? "");
   const [slots, setSlots] = useState<ApiSlot[]>([]);
   const [slotLabel, setSlotLabel] = useState<string>(booking.slotLabel);
   const [silentMode, setSilentMode] = useState<boolean>(booking.silentMode);
@@ -106,13 +93,16 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dateOptions = useMemo(() => buildDateRange(7), []);
   const masterId = booking.masterProviderId ?? booking.providerId;
+  const canEditSilentMode = booking.status === "PENDING";
+
+  useEffect(() => {
+    setSilentMode(booking.silentMode);
+  }, [booking.silentMode, booking.id]);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadSlots() {
+    const loadSlots = async () => {
       if (!masterId || !booking.serviceId || !selectedDate) return;
       setLoadingSlots(true);
       setError(null);
@@ -121,18 +111,14 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
         url.searchParams.set("serviceId", booking.serviceId);
         url.searchParams.set("from", selectedDate);
         url.searchParams.set("limit", "1");
-
         const res = await fetch(url.toString(), { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
           | ApiResponse<{ slots: ApiSlot[]; meta: { toDateExclusive: string } }>
           | null;
         if (!res.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
         if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.loadSlotsFailed));
-
         if (!cancelled) {
           setSlots(json.data.slots ?? []);
-          const next = json.data.slots?.[0]?.label ?? "";
-          if (next) setSlotLabel(next);
         }
       } catch (e) {
         if (!cancelled) {
@@ -142,19 +128,10 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
       } finally {
         if (!cancelled) setLoadingSlots(false);
       }
-    }
-
-    void loadSlots();
-    return () => {
-      cancelled = true;
     };
-  }, [
-    booking.serviceId,
-    masterId,
-    selectedDate,
-    t.booking.loadSlotsFailed,
-    t.bookingsPanel.unknownError,
-  ]);
+    void loadSlots();
+    return () => { cancelled = true; };
+  }, [booking.serviceId, masterId, selectedDate, t.booking.loadSlotsFailed, t.bookingsPanel.unknownError]);
 
   const slotItemsForDate = useMemo<SlotPickerItem[]>(
     () =>
@@ -168,22 +145,17 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
     [selectedDate, slots, viewerTimeZone]
   );
   const slotGroups = useMemo(
-    () => groupSlotsByTimeOfDay(slotItemsForDate).filter((group) => group.items.length > 0),
+    () => groupSlotsByTimeOfDay(slotItemsForDate).filter((g) => g.items.length > 0),
     [slotItemsForDate]
   );
   const slotByLabel = useMemo(() => new Map(slots.map((s) => [s.label, s])), [slots]);
-  const canEditSilentMode = booking.status === "PENDING";
+
   const canRescheduleNow = useMemo(() => {
     if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") return false;
     if (!booking.startAtUtc) return true;
-    const minutesLeft =
-      (new Date(booking.startAtUtc).getTime() - Date.now()) / 60000;
+    const minutesLeft = (new Date(booking.startAtUtc).getTime() - Date.now()) / 60000;
     return Number.isFinite(minutesLeft) && minutesLeft >= BOOKING_ACTION_WINDOW_MINUTES;
   }, [booking.startAtUtc, booking.status]);
-
-  useEffect(() => {
-    setSilentMode(booking.silentMode);
-  }, [booking.silentMode, booking.id]);
 
   const submit = async () => {
     setError(null);
@@ -200,7 +172,6 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
       setError(t.booking.chooseCorrectSlot);
       return;
     }
-
     setLoading(true);
     try {
       const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
@@ -213,34 +184,10 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
           ...(canEditSilentMode ? { silentMode } : {}),
         }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{
-            booking: {
-              slotLabel: string;
-              silentMode: boolean;
-              status: BookingInfo["status"];
-              actionRequiredBy: BookingInfo["actionRequiredBy"];
-              requestedBy: "CLIENT" | "MASTER" | null;
-              proposedStartAtUtc: string | null;
-              proposedEndAtUtc: string | null;
-            };
-          }>
-        | null;
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
       if (!json || !json.ok) throw new Error(getErrorMessage(json, t.booking.submitFailed));
-
-      onSuccess({
-        slotLabel: json.data.booking.slotLabel,
-        status: json.data.booking.status,
-        actionRequiredBy: json.data.booking.actionRequiredBy,
-        requestedBy: json.data.booking.requestedBy,
-        proposedStartAtUtc: json.data.booking.proposedStartAtUtc,
-        proposedEndAtUtc: json.data.booking.proposedEndAtUtc,
-        ...(typeof json.data.booking.silentMode === "boolean"
-          ? { silentMode: json.data.booking.silentMode }
-          : {}),
-      });
-      onClose();
+      await onSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.bookingsPanel.unknownError);
     } finally {
@@ -249,91 +196,76 @@ export function RescheduleModal({ booking, onClose, onSuccess }: Props) {
   };
 
   return (
-    <ModalSurface open onClose={onClose}>
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold">{t.booking.moveBooking}</div>
-            <div className="text-sm text-text-sec">{t.booking.moveBookingHint}</div>
-          </div>
-          <Button onClick={onClose} variant="icon" size="icon" aria-label={UI_TEXT.common.close}>
-            ×
-          </Button>
+    <div className="space-y-4 rounded-2xl border border-border-subtle bg-bg-input/40 p-4">
+      <div className="text-sm font-semibold text-text-main">{t.booking.moveBooking}</div>
+
+      {error ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          {error}
         </div>
+      ) : null}
 
-        {error ? (
-          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
-            {error}
-          </div>
-        ) : null}
-
-        <div>
-          <div className="text-sm font-medium">{t.booking.chooseDate}</div>
-          <div className="mt-2 flex gap-2 overflow-x-auto">
-            {dateOptions.map((date) => {
-              const active = date === selectedDate;
-              return (
-                <Chip
-                  key={date}
-                  type="button"
-                  onClick={() => setSelectedDate(date)}
-                  variant={active ? "active" : "default"}
-                  className="whitespace-nowrap"
-                >
-                  {formatDateLabel(date, viewerTimeZone)}
-                </Chip>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-sm font-medium">{t.booking.chooseTime}</div>
-          {loadingSlots ? (
-            <div className="mt-2 text-sm text-text-sec">{UI_TEXT.common.loading}</div>
-          ) : slotGroups.length === 0 ? (
-            <div className="mt-2 text-sm text-text-sec">{t.booking.noSlots}</div>
-          ) : (
-            <div className="mt-3">
-              <SlotPickerOptimized groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
-            </div>
-          )}
-        </div>
-
-        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border-subtle bg-bg-input p-3">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-text-main">Хочу помолчать 🤫</div>
-            <div className="mt-0.5 text-xs text-text-sec">
-              Мастер поздоровается, уточнит детали и дальше будет работать без разговоров.
-            </div>
-          </div>
-          <Switch
-            checked={silentMode}
-            onCheckedChange={setSilentMode}
-            disabled={!canEditSilentMode}
-            className="shrink-0"
-          />
-        </label>
-
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            onClick={onClose}
-            variant="secondary"
-            className="flex-1"
-          >
-            {UI_TEXT.common.cancel}
-          </Button>
-          <Button
-            type="button"
-            onClick={submit}
-            disabled={loading || loadingSlots || !canRescheduleNow}
-            className="flex-1"
-          >
-            {loading ? t.booking.moving : t.booking.moveConfirm}
-          </Button>
+      {/* Date chips — 60-day scrollable */}
+      <div>
+        <div className="mb-2 text-xs font-medium text-text-sec">{t.booking.chooseDate}</div>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {dateOptions.map((date) => (
+            <Chip
+              key={date}
+              type="button"
+              onClick={() => setSelectedDate(date)}
+              variant={date === selectedDate ? "active" : "default"}
+              className="whitespace-nowrap text-xs"
+            >
+              {formatDateLabel(date)}
+            </Chip>
+          ))}
         </div>
       </div>
-    </ModalSurface>
+
+      {/* Slot picker */}
+      <div>
+        <div className="mb-2 text-xs font-medium text-text-sec">{t.booking.chooseTime}</div>
+        {loadingSlots ? (
+          <div className="text-sm text-text-sec">{UI_TEXT.common.loading}</div>
+        ) : slotGroups.length === 0 ? (
+          <div className="text-sm text-text-sec">{t.booking.noSlots}</div>
+        ) : (
+          <SlotPickerOptimized groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
+        )}
+      </div>
+
+      {/* Silent mode */}
+      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border-subtle bg-bg-card p-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-text-main">Хочу помолчать 🤫</p>
+          <p className="mt-0.5 text-xs text-text-sec">
+            Мастер поздоровается и дальше будет работать без разговоров.
+          </p>
+        </div>
+        <Switch
+          checked={silentMode}
+          onCheckedChange={setSilentMode}
+          disabled={!canEditSilentMode}
+          className="shrink-0"
+        />
+      </label>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button type="button" onClick={onCancel} variant="secondary" size="sm" className="flex-1" disabled={loading}>
+          {UI_TEXT.common.cancel}
+        </Button>
+        <Button
+          type="button"
+          onClick={submit}
+          size="sm"
+          className="flex-1"
+          disabled={loading || loadingSlots || !canRescheduleNow}
+        >
+          {loading ? t.booking.moving : t.booking.moveConfirm}
+        </Button>
+      </div>
+    </div>
   );
 }
