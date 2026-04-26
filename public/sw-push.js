@@ -12,7 +12,22 @@
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url));
+  const url = event.notification.data?.url ?? "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Focus existing window if already open
+      for (const client of windowClients) {
+        if ("focus" in client) {
+          void client.focus();
+          if ("navigate" in client) {
+            return client.navigate(url);
+          }
+          return;
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
 });
 
 self.addEventListener("activate", (event) => {

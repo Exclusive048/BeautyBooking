@@ -10,6 +10,7 @@ import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { DevServiceWorkerReset } from "@/components/pwa/dev-sw-reset";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { CookieConsent } from "@/components/layout/cookie-consent";
+import { PushManager } from "@/components/pwa/push-manager";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
@@ -174,6 +175,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <AppShell>{children}</AppShell>
             <BottomNav />
             <CookieConsent />
+            <PushManager />
           </ViewerTimeZoneProvider>
         </ThemeProvider>
       </body>

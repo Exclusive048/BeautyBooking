@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { webpush, isPushEnabled } from "@/lib/notifications/push/vapid";
 
 type PushPayload = {
@@ -35,6 +35,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
           },
           body
         );
+        logInfo("Push sent", { userId, subscriptionId: sub.id });
       } catch (error) {
         const statusCode = getStatusCode(error);
         if (statusCode === 410) {
