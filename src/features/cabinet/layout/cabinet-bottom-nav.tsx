@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, User, Settings } from "lucide-react";
+import { LayoutDashboard, Calendar, User, Briefcase } from "lucide-react";
 import { motion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -10,7 +10,7 @@ const TABS = [
   { label: UI_TEXT.clientCabinet.nav.home, href: "/cabinet", icon: LayoutDashboard, exact: true },
   { label: UI_TEXT.clientCabinet.nav.bookings, href: "/cabinet/bookings", icon: Calendar },
   { label: UI_TEXT.clientCabinet.nav.profile, href: "/cabinet/profile", icon: User },
-  { label: UI_TEXT.clientCabinet.nav.settings, href: "/cabinet/settings", icon: Settings },
+  { label: UI_TEXT.clientCabinet.nav.roles, href: "/cabinet/roles", icon: Briefcase },
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean) {
