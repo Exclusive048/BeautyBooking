@@ -9,6 +9,12 @@ import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 
+/**
+ * @deprecated Use GET /api/feed/portfolio instead. Kept until the next
+ *   cleanup pass — the auth home grid (`<HomeFeed>`) no longer calls this
+ *   endpoint. Other consumers (filtered home feed, category chips) may still
+ *   rely on it; remove together with `/api/home/stories` when 04-STORIES ships.
+ */
 export async function GET(req: Request) {
   try {
     const query = parseQuery(new URL(req.url), homeFeedQuerySchema);
