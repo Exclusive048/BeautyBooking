@@ -12,7 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoriesViewer, type ViewerState } from "@/features/home/stories-viewer-context";
@@ -51,6 +51,7 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
   const [isPaused, setIsPaused] = useState(false);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const progressControls = useAnimationControls();
 
   const T = UI_TEXT.homeFeed.stories.viewer;
 
@@ -129,7 +130,27 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
     }
   }, []);
 
-  // Hold-to-pause (centre tap zone).
+  // Drive the current photo's progress bar via animation controls.
+  // Reset to 0 → animate to 100 over STORY_DURATION_MS whenever (master, item)
+  // changes; pause/resume on isPaused; stay full when reduced-motion is on.
+  useEffect(() => {
+    if (reduceMotion) {
+      progressControls.set({ width: "100%" });
+      return;
+    }
+    if (isPaused) {
+      progressControls.stop();
+      return;
+    }
+    progressControls.set({ width: "0%" });
+    void progressControls.start({
+      width: "100%",
+      transition: { duration: STORY_DURATION_MS / 1000, ease: "linear" },
+    });
+  }, [state.activeMasterIdx, state.activeItemIdx, isPaused, reduceMotion, progressControls]);
+
+  // Hold-to-pause (centre tap zone). Pointer capture guarantees pointerup fires
+  // even if the finger drifts off the zone — so we don't need onPointerLeave.
   const handleHoldStart = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsPaused(true);
@@ -152,11 +173,6 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
   const handleAvatarClick = () => {
     onClose();
     router.push(profileHref);
-  };
-
-  const handleProgressComplete = (idx: number) => {
-    if (idx !== state.activeItemIdx || isPaused || reduceMotion) return;
-    onNext();
   };
 
   return (
@@ -258,18 +274,34 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
                   />
                 ) : (
                   <motion.div
+                    // Unique key per (master, item, position) — when the active
+                    // item changes, React unmounts the old motion.div and mounts
+                    // a fresh one, ensuring the animation truly restarts and
+                    // doesn't carry stale width state from the previous render.
+                    key={`${state.activeMasterIdx}-${state.activeItemIdx}-${idx}`}
                     className="h-full bg-white"
-                    initial={false}
-                    animate={{
-                      width: isPast ? "100%" : isCurrent ? "100%" : "0%",
-                    }}
-                    transition={
-                      isCurrent && !isPast
-                        ? { duration: STORY_DURATION_MS / 1000, ease: "linear" }
-                        : { duration: 0 }
+                    initial={{ width: isPast ? "100%" : "0%" }}
+                    animate={
+                      isCurrent
+                        ? progressControls
+                        : { width: isPast ? "100%" : "0%" }
                     }
-                    style={isPaused && isCurrent ? { animationPlayState: "paused" } : undefined}
-                    onAnimationComplete={() => handleProgressComplete(idx)}
+                    onAnimationComplete={(definition) => {
+                      // Fire only when the CURRENT bar finished its 0→100 fill.
+                      // Stops triggered by `progressControls.stop()` (pause) or
+                      // by other branches don't pass this filter.
+                      if (
+                        !isCurrent ||
+                        isPaused ||
+                        reduceMotion ||
+                        typeof definition !== "object" ||
+                        !("width" in definition) ||
+                        definition.width !== "100%"
+                      ) {
+                        return;
+                      }
+                      onNext();
+                    }}
                   />
                 )}
               </div>
@@ -346,7 +378,6 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
               onPointerDown={handleHoldStart}
               onPointerUp={handleHoldEnd}
               onPointerCancel={handleHoldEnd}
-              onPointerLeave={handleHoldEnd}
               aria-hidden
             />
           </>
