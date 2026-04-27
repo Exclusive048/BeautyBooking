@@ -274,18 +274,20 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
                   />
                 ) : (
                   <motion.div
-                    // Unique key per (master, item, position) — when the active
-                    // item changes, React unmounts the old motion.div and mounts
-                    // a fresh one, ensuring the animation truly restarts and
-                    // doesn't carry stale width state from the previous render.
-                    key={`${state.activeMasterIdx}-${state.activeItemIdx}-${idx}`}
+                    // No unique key — we WANT React to reuse the same motion.div
+                    // across photo changes. The effect's `progressControls.set({
+                    // width: "0%" })` already cancels any in-flight animation
+                    // and resets width synchronously before `start()`. An outer
+                    // key would unmount/remount and detach from the controls
+                    // instance, breaking auto-progress on photo changes.
                     className="h-full bg-white"
-                    initial={{ width: isPast ? "100%" : "0%" }}
+                    initial={false}
                     animate={
                       isCurrent
                         ? progressControls
                         : { width: isPast ? "100%" : "0%" }
                     }
+                    transition={isCurrent ? undefined : { duration: 0 }}
                     onAnimationComplete={(definition) => {
                       // Fire only when the CURRENT bar finished its 0→100 fill.
                       // Stops triggered by `progressControls.stop()` (pause) or
