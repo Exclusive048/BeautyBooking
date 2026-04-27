@@ -118,7 +118,7 @@ function OtpInput({ value, onChange, onComplete, disabled, autoFocus = true }: O
 
   return (
     <div
-      className="flex gap-2"
+      className="flex w-full gap-2"
       role="group"
       aria-label={UI_TEXT.auth.loginPage.codeLabel}
     >
