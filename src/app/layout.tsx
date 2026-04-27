@@ -1,6 +1,15 @@
 import "@/lib/startup";
 import type { Metadata, Viewport } from "next";
+import { Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+const playfair = Playfair_Display({
+  subsets: ["cyrillic", "latin"],
+  display: "swap",
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+});
 import { AppShell } from "@/components/layout/app-shell";
 import { ViewerTimeZoneProvider } from "@/components/providers/viewer-timezone-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -157,7 +166,7 @@ const SITE_JSON_LD = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = await getNonce();
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" className={playfair.variable} suppressHydrationWarning>
       <head>
         <meta property="csp-nonce" content={nonce} />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: LOCAL_SW_RESET_SCRIPT }} />

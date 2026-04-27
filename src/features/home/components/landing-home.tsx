@@ -3,25 +3,17 @@
 import dynamic from "next/dynamic";
 import { HeroSection } from "@/features/home/components/hero-section";
 import { HowItWorksSection } from "@/features/home/components/how-it-works-section";
+import { FAQSection } from "@/features/home/components/faq-section";
 import type { PublicStats } from "@/lib/stats/public-stats";
+import type { ReactNode } from "react";
 
 const PopularCategoriesSection = dynamic(
   () => import("@/features/home/components/popular-categories-section").then((m) => m.PopularCategoriesSection),
   { ssr: false, loading: () => <div className="h-40" /> }
 );
 
-const PortfolioStoriesBar = dynamic(
-  () => import("@/features/home/components/portfolio-stories-bar").then((m) => m.PortfolioStoriesBar),
-  { ssr: false, loading: () => <div className="h-28" /> }
-);
-
 const HotSlotsPreview = dynamic(
   () => import("@/features/home/components/hot-slots-preview").then((m) => m.HotSlotsPreview),
-  { ssr: false, loading: () => <div className="h-40" /> }
-);
-
-const TrustSection = dynamic(
-  () => import("@/features/home/components/trust-section").then((m) => m.TrustSection),
   { ssr: false, loading: () => <div className="h-40" /> }
 );
 
@@ -32,18 +24,19 @@ const BecomeMasterBanner = dynamic(
 
 type Props = {
   stats: PublicStats | null;
+  topMastersSlot?: ReactNode;
 };
 
-export function LandingHome({ stats }: Props) {
+export function LandingHome({ stats, topMastersSlot }: Props) {
   return (
-    <div className="space-y-12 sm:space-y-16">
+    <div className="space-y-2">
       <HeroSection stats={stats} />
+      <HotSlotsPreview />
       <HowItWorksSection />
       <PopularCategoriesSection />
-      <PortfolioStoriesBar />
-      <HotSlotsPreview />
-      <TrustSection />
+      {topMastersSlot}
       <BecomeMasterBanner />
+      <FAQSection />
     </div>
   );
 }

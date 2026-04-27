@@ -56,6 +56,9 @@ module.exports = {
         "brand-gradient":
           "linear-gradient(135deg, rgb(var(--brand-from)) 0%, rgb(var(--brand-via)) 55%, rgb(var(--brand-deep)) 100%)",
       },
+      fontFamily: {
+        display: ["var(--font-display)", "Georgia", "serif"],
+      },
       boxShadow: {
         soft: "var(--shadow)",
         sm: "var(--shadow-sm)",
