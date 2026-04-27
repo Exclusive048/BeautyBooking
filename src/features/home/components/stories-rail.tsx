@@ -2,47 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
+import { useStoriesViewer } from "@/features/home/stories-viewer-context";
+import {
+  getViewedItemIds,
+  isMasterFullyViewed,
+} from "@/features/home/stories-viewed-storage";
+import type { StoriesGroup, StoriesPayload } from "@/features/home/types/stories";
 import { fetchJson } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
-
-type StoryItem = { id: string; mediaUrl: string; createdAt: string };
-type StoriesGroup = {
-  masterId: string;
-  providerName: string;
-  providerType: "MASTER" | "STUDIO";
-  username: string | null;
-  avatarUrl: string | null;
-  items: StoryItem[];
-};
-type StoriesPayload = { groups: StoriesGroup[]; cachedAt: string };
-
-const STORIES_VIEWED_KEY = "mr-stories-viewed";
-const VIEWED_LIMIT = 200;
-
-function readViewedIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(STORIES_VIEWED_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? new Set(arr.filter((x): x is string => typeof x === "string")) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function writeViewedIds(set: Set<string>): void {
-  if (typeof window === "undefined") return;
-  try {
-    const arr = Array.from(set).slice(-VIEWED_LIMIT);
-    window.localStorage.setItem(STORIES_VIEWED_KEY, JSON.stringify(arr));
-  } catch {
-    // localStorage may be disabled — no-op
-  }
-}
 
 const fetcher = (url: string) => fetchJson<StoriesPayload>(url);
 
@@ -141,7 +110,7 @@ function RailSkeleton() {
 }
 
 export function StoriesRail() {
-  const router = useRouter();
+  const { open, viewedRevision } = useStoriesViewer();
   const { data, isLoading, error } = useSWR<StoriesPayload>(
     "/api/feed/stories",
     fetcher,
@@ -150,25 +119,20 @@ export function StoriesRail() {
       dedupingInterval: 60_000,
     },
   );
-  const [viewed, setViewed] = useState<Set<string>>(() => new Set());
+  const [viewedItemIds, setViewedItemIds] = useState<Set<string>>(() => new Set());
 
-  // Hydrate viewed ids from localStorage after mount (avoid SSR mismatch)
+  // Hydrate viewed ids from localStorage after mount (avoid SSR mismatch).
+  // Re-read whenever viewer marks a new item viewed (viewedRevision bumps).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setViewed(readViewedIds());
-  }, []);
+    setViewedItemIds(getViewedItemIds());
+  }, [viewedRevision]);
+
+  const groups = data?.groups ?? [];
 
   const onSelect = (group: StoriesGroup) => {
-    setViewed((prev) => {
-      const next = new Set(prev);
-      next.add(group.masterId);
-      writeViewedIds(next);
-      return next;
-    });
-    // Fallback to /providers/{id} if the master has no public username yet —
-    // visible action beats a silently-dead click.
-    const url = group.username ? `/u/${group.username}` : `/providers/${group.masterId}`;
-    router.push(url);
+    const idx = groups.findIndex((g) => g.masterId === group.masterId);
+    if (idx >= 0) open(groups, idx);
   };
 
   // Loading: skeleton with reserved height, no layout-jump when groups load
@@ -181,7 +145,7 @@ export function StoriesRail() {
   }
 
   // Error or empty → render nothing (per prompt: do not show empty state)
-  if (error || !data || data.groups.length === 0) {
+  if (error || groups.length === 0) {
     return null;
   }
 
@@ -199,11 +163,11 @@ export function StoriesRail() {
         animate="visible"
         className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 pt-1 sm:gap-4 sm:px-6"
       >
-        {data.groups.map((group) => (
+        {groups.map((group) => (
           <StoryRing
             key={group.masterId}
             group={group}
-            isViewed={viewed.has(group.masterId)}
+            isViewed={isMasterFullyViewed(group, viewedItemIds)}
             onSelect={onSelect}
           />
         ))}

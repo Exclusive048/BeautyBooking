@@ -972,6 +972,22 @@ export const UI_TEXT = {
     stories: {
       cardLabel: "Открыть профиль",
       newWorksSr: "новые работы",
+      viewer: {
+        title: "Просмотр сторис",
+        close: "Закрыть",
+        previous: "Предыдущее",
+        next: "Следующее",
+        paused: "Пауза",
+        counter: "{current} / {total}",
+        openProfile: "Открыть профиль",
+      },
+      relativeTime: {
+        justNow: "только что",
+        minutesAgo: "{n} мин назад",
+        hoursAgo: "{n} ч назад",
+        yesterday: "вчера",
+        daysAgo: "{n} дн назад",
+      },
     },
   },
   home: {
