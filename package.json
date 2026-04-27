@@ -29,7 +29,9 @@
     "migrate:billing": "npx tsx scripts/migrate-billing-plans.ts",
     "generate:icons": "node scripts/generate-icons.mjs",
     "lighthouse": "npx tsx scripts/lighthouse-audit.ts",
-    "analyze": "cross-env ANALYZE=true npm run build"
+    "analyze": "cross-env ANALYZE=true npm run build",
+    "media:audit": "npx tsx scripts/audit-media-assets.ts",
+    "media:cleanup": "npx tsx scripts/cleanup-orphan-media.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs",

@@ -86,15 +86,33 @@ function buildStorageKey(input: UploadMediaInput): string {
   return `${input.entityType.toLowerCase()}/${input.entityId}/${input.kind.toLowerCase()}-${stamp}-${token}.${ext}`;
 }
 
-async function deleteAssetById(assetId: string): Promise<void> {
+// Exported for unit tests only — call sites use deleteMediaAsset / cleanup helpers.
+export async function deleteAssetById(assetId: string): Promise<void> {
   const asset = await prisma.mediaAsset.findUnique({ where: { id: assetId } });
   if (!asset || asset.deletedAt) return;
-  const storage = getStorageProvider();
-  await storage.deleteObject(asset.storageKey);
+
+  // 1. Mark deleted in DB FIRST so the route stops serving the asset
+  //    immediately. If step 2 fails, the worst case is an orphan FILE in S3
+  //    (small disk leak, cleaned by future cron) — not an orphan RECORD
+  //    that would surface as 404 to users.
   await prisma.mediaAsset.update({
     where: { id: asset.id },
     data: { deletedAt: new Date() },
   });
+
+  // 2. Best-effort delete from storage. Swallow errors — a transient S3 outage
+  //    must not surface to the user when the logical delete already succeeded.
+  //    TODO: weekly cron to sweep S3 for files without a live MediaAsset row.
+  try {
+    const storage = getStorageProvider();
+    await storage.deleteObject(asset.storageKey);
+  } catch (error) {
+    logError("Failed to delete media object from storage (record already soft-deleted)", {
+      assetId: asset.id,
+      storageKey: asset.storageKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 async function resolvePortfolioLimit(input: {
