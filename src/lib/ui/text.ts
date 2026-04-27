@@ -162,6 +162,15 @@ export const UI_TEXT = {
     myBookingsShort: "Записи",
     myProfile: "Мой профиль",
     myCabinet: "Мой кабинет",
+    roleClient: "Клиент",
+    roleMaster: "Мастер",
+    roleStudio: "Студия",
+    switchRole: "Сменить роль",
+    activeRole: "Активная роль",
+    roleSwitcherTitle: "Кабинет",
+    becomeMasterCta: "Стать мастером",
+    createStudioCta: "Создать студию",
+    more: "Ещё",
   },
   footer: {
     aria: {
