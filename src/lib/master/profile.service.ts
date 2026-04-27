@@ -142,6 +142,7 @@ export type MasterProfileData = {
     isSolo: boolean;
     ratingAvg: number;
     ratingCount: number;
+    autoPublishStoriesEnabled: boolean;
   };
   services: MasterProfileServiceItem[];
   portfolio: MasterPortfolioItem[];
@@ -190,6 +191,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         isSolo: true,
         ratingAvg: context.ratingAvg,
         ratingCount: context.ratingCount,
+        autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
       },
       services: services.map((service) => ({
         serviceId: service.id,
@@ -266,6 +268,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       isSolo: false,
       ratingAvg: context.ratingAvg,
       ratingCount: context.ratingCount,
+      autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
     },
     services: services.map((service) => {
       const override = overrideByService.get(service.id);

@@ -199,3 +199,13 @@
   body { -webkit-overflow-scrolling: touch; }
   a, button { -webkit-user-select: none; user-select: none; }
 }
+
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

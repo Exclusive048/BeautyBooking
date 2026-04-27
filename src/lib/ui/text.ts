@@ -969,6 +969,10 @@ export const UI_TEXT = {
       priceFrom: "от",
       ratingLabel: "рейтинг",
     },
+    stories: {
+      cardLabel: "Открыть профиль",
+      newWorksSr: "новые работы",
+    },
   },
   home: {
     accountDeleted: "Ваш аккаунт удалён",
@@ -1756,6 +1760,16 @@ export const UI_TEXT = {
       },
       status: {
         savedChanges: "✓ Изменения сохранены",
+      },
+      autoPublishStories: {
+        title: "Автопубликация сторис",
+        description:
+          "Новые фото из портфолио автоматически появляются в сторис на главной (на 24 часа)",
+        saving: "Сохраняем…",
+        saved: "Сохранено",
+        error: "Не удалось сохранить",
+        retry: "Повторить",
+        ariaLabel: "Автопубликация сторис",
       },
       leaveStudio: {
         bannerTitle: "Вы работаете в составе студии",

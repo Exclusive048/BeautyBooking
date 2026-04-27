@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { FocalImage } from "@/components/ui/focal-image";
+import { AutoPublishStoriesToggle } from "@/features/master/components/auto-publish-stories-toggle";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
@@ -89,6 +90,7 @@ type MasterProfileData = {
     isSolo: boolean;
     ratingAvg: number;
     ratingCount: number;
+    autoPublishStoriesEnabled: boolean;
   };
   services: MasterServiceItem[];
   portfolio: PortfolioItem[];
@@ -2206,6 +2208,12 @@ export function MasterProfilePage() {
                       {profileSaveStatus === "saving" ? UI_TEXT.status.saving : UI_TEXT.actions.save}
                     </Button>
                   </div>
+                </div>
+
+                <div className="rounded-2xl bg-bg-card/90 p-4">
+                  <AutoPublishStoriesToggle
+                    initialEnabled={data.master.autoPublishStoriesEnabled}
+                  />
                 </div>
               </div>
 

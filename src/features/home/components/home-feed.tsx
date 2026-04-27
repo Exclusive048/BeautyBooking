@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FeedCard } from "@/features/home/components/feed-card";
 import { FeedSkeleton, FeedSkeletonGrid } from "@/features/home/components/feed-skeleton";
 import { RecentMastersSection } from "@/features/home/components/recent-masters-section";
+import { StoriesRail } from "@/features/home/components/stories-rail";
 import { fetchJson } from "@/lib/http/client";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -97,8 +98,7 @@ export function HomeFeed(props: HomeFeedProps) {
 
   return (
     <div className="space-y-8">
-      {/* TODO(04-STORIES): заменить на <StoriesRail /> */}
-      <div className="h-[120px]" aria-hidden />
+      <StoriesRail />
 
       <RecentMastersSection />
 
