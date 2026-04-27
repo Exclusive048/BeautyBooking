@@ -48,6 +48,13 @@ module.exports = {
         "accent-hover": "rgb(var(--accent-hover) / <alpha-value>)",
         "surface-hover": "rgb(var(--surface-hover) / <alpha-value>)",
         ring: "rgb(var(--ring) / <alpha-value>)",
+        "brand-from": "rgb(var(--brand-from) / <alpha-value>)",
+        "brand-via": "rgb(var(--brand-via) / <alpha-value>)",
+        "brand-deep": "rgb(var(--brand-deep) / <alpha-value>)",
+      },
+      backgroundImage: {
+        "brand-gradient":
+          "linear-gradient(135deg, rgb(var(--brand-from)) 0%, rgb(var(--brand-via)) 55%, rgb(var(--brand-deep)) 100%)",
       },
       boxShadow: {
         soft: "var(--shadow)",

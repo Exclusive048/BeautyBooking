@@ -113,6 +113,8 @@ export const UI_TEXT = {
       changeEmail: "Изменить email",
       codeFromEmail: "Код из письма",
       emailNotConfigured: "Вход по email временно недоступен",
+      brandSubtitle: "BEAUTY MARKETPLACE",
+      heroTitleAccent: "30 секунд",
     },
     telegram: {
       loginButton: "Войти через Telegram",
