@@ -78,9 +78,17 @@ export function Footer() {
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,3fr)]">
           {/* Brand column */}
           <div className="space-y-5">
-            <Link href="/" className="inline-block">
-              <span className="text-lg font-bold bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
-                {UI_TEXT.brand.name}
+            <Link href="/" className="inline-flex items-center gap-2.5">
+              <span
+                aria-hidden
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
+              >
+                <span className="font-display text-lg font-semibold italic leading-none text-white">
+                  М
+                </span>
+              </span>
+              <span className="font-display text-base font-medium text-text-main">
+                Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
               </span>
             </Link>
             <p className="text-sm leading-relaxed text-text-sec">{UI_TEXT.footer.brandDescription}</p>
