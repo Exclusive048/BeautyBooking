@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import type { ButtonSize, ButtonVariant } from "@/components/ui/button";
@@ -13,7 +12,6 @@ type LogoutButtonProps = {
 };
 
 export function LogoutButton({ variant, size, className }: LogoutButtonProps) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   return (
@@ -27,8 +25,10 @@ export function LogoutButton({ variant, size, className }: LogoutButtonProps) {
           try {
             await fetch("/logout", { method: "GET", cache: "no-store" });
           } finally {
-            router.replace("/");
-            router.refresh();
+            // Full page reload — clears SWR cache, React state, and all client-side data.
+            // router.replace() leaves the SWR in-memory cache intact, causing stale user
+            // data (phone, name) to remain visible in the navbar until the next revalidation.
+            window.location.href = "/";
           }
         });
       }}
