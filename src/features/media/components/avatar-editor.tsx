@@ -145,8 +145,6 @@ export function AvatarEditor({
     <FocalImage
       src={imageUrl}
       alt=""
-      focalX={activeAsset?.focalX ?? null}
-      focalY={activeAsset?.focalY ?? null}
       cropX={activeAsset?.cropX ?? null}
       cropY={activeAsset?.cropY ?? null}
       cropWidth={activeAsset?.cropWidth ?? null}
@@ -173,8 +171,6 @@ export function AvatarEditor({
               <FocalImage
                 src={imageUrl}
                 alt=""
-                focalX={activeAsset?.focalX ?? null}
-                focalY={activeAsset?.focalY ?? null}
                 cropX={activeAsset?.cropX ?? null}
                 cropY={activeAsset?.cropY ?? null}
                 cropWidth={activeAsset?.cropWidth ?? null}

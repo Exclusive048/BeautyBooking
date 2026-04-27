@@ -17,8 +17,6 @@ type HotSlotItem = {
     publicUsername: string;
     name: string;
     avatarUrl: string | null;
-    avatarFocalX: number | null;
-    avatarFocalY: number | null;
     address: string;
     district: string;
     ratingAvg: number;
@@ -170,8 +168,6 @@ export function HotSlotsPageClient() {
                         <FocalImage
                           src={item.provider.avatarUrl}
                           alt={item.provider.name}
-                          focalX={item.provider.avatarFocalX}
-                          focalY={item.provider.avatarFocalY}
                           width={48}
                           height={48}
                           className="rounded-full object-cover"

@@ -20,8 +20,6 @@ type StudioHeroData = {
 
 type HeroImageItem = {
   url: string;
-  focalX: number | null;
-  focalY: number | null;
 };
 
 type Props = {
@@ -58,8 +56,6 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
             <FocalImage
               src={primary.url}
               alt={studio.name}
-              focalX={primary.focalX}
-              focalY={primary.focalY}
               sizes="(max-width: 768px) 100vw, 66vw"
               priority
               className="object-cover"
@@ -79,8 +75,6 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
                   <FocalImage
                     src={item.url}
                     alt=""
-                    focalX={item.focalX}
-                    focalY={item.focalY}
                     sizes="(max-width: 768px) 50vw, 17vw"
                     className="object-cover"
                   />

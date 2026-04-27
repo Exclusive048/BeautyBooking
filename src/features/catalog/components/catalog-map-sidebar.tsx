@@ -11,8 +11,6 @@ type MapSidebarItem = {
   title: string;
   type: "master" | "studio";
   avatarUrl: string | null;
-  avatarFocalX: number | null;
-  avatarFocalY: number | null;
   ratingAvg: number;
   priceFrom: number | null;
   href: string | null;
@@ -65,8 +63,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                   <FocalImage
                     src={item.avatarUrl}
                     alt={item.title}
-                    focalX={item.avatarFocalX}
-                    focalY={item.avatarFocalY}
+
                     width={40}
                     height={40}
                     className={`object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}
@@ -127,8 +124,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                   <FocalImage
                     src={item.avatarUrl}
                     alt={item.title}
-                    focalX={item.avatarFocalX}
-                    focalY={item.avatarFocalY}
+
                     width={40}
                     height={40}
                     className={`object-cover ring-1 ring-border-subtle ${item.type === "master" ? "rounded-full" : "rounded-xl"}`}

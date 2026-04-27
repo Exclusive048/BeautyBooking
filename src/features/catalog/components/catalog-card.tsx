@@ -17,8 +17,6 @@ type CatalogCardItem = {
   title: string;
   tagline: string | null;
   avatarUrl: string | null;
-  avatarFocalX: number | null;
-  avatarFocalY: number | null;
   ratingAvg: number;
   reviewsCount: number;
   photos: string[];
@@ -110,8 +108,6 @@ export function CatalogCard({ item, serviceQuery }: CatalogCardProps) {
               <FocalImage
                 src={item.avatarUrl}
                 alt={item.title}
-                focalX={item.avatarFocalX}
-                focalY={item.avatarFocalY}
                 width={40}
                 height={40}
                 loading="lazy"

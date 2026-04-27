@@ -9,8 +9,6 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   bannerUrl?: string | null;
-  bannerFocalX?: number | null;
-  bannerFocalY?: number | null;
   avatar: ReactNode;
   studioName: string;
   subtitle: string;
@@ -24,8 +22,6 @@ type Props = {
 
 export function StudioProfileHero({
   bannerUrl,
-  bannerFocalX,
-  bannerFocalY,
   avatar,
   studioName,
   subtitle,
@@ -52,8 +48,6 @@ export function StudioProfileHero({
             <FocalImage
               src={bannerUrl}
               alt=""
-              focalX={bannerFocalX}
-              focalY={bannerFocalY}
               sizes="(max-width: 768px) 100vw, 960px"
               className="object-cover"
             />

@@ -16,8 +16,6 @@ model UserProfile {
   telegramUsername String?
 
   externalPhotoUrl String?
-  avatarFocalX     Float?
-  avatarFocalY     Float?
 
   telegramLink TelegramLink?
 

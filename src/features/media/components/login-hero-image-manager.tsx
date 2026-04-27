@@ -122,8 +122,6 @@ export function LoginHeroImageManager() {
           <FocalImage
             src={asset.url}
             alt={t.loginHeroTitle}
-            focalX={asset.focalX}
-            focalY={asset.focalY}
             cropX={asset.cropX}
             cropY={asset.cropY}
             cropWidth={asset.cropWidth}

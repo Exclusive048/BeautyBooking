@@ -38,13 +38,9 @@ type StudioProfileData = {
     contactEmail: string | null;
     description: string | null;
     avatarUrl: string | null;
-    avatarFocalX: number | null;
-    avatarFocalY: number | null;
     isPublished: boolean;
     bannerAssetId: string | null;
     bannerUrl: string | null;
-    bannerFocalX: number | null;
-    bannerFocalY: number | null;
     cancellationDeadlineHours: number | null;
     remindersEnabled: boolean;
   };
@@ -127,8 +123,6 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
 
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerAssetId, setBannerAssetId] = useState<string | null>(null);
-  const [bannerFocalX, setBannerFocalX] = useState<number | null>(null);
-  const [bannerFocalY, setBannerFocalY] = useState<number | null>(null);
   const [pickingBannerFocal, setPickingBannerFocal] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const savedTimeoutRef = useRef<number | null>(null);
@@ -171,8 +165,6 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       setIsPublished(studio.isPublished);
       setBannerUrl(studio.bannerUrl);
       setBannerAssetId(studio.bannerAssetId ?? null);
-      setBannerFocalX(studio.bannerFocalX ?? null);
-      setBannerFocalY(studio.bannerFocalY ?? null);
       const deadlineValue = studio.cancellationDeadlineHours ?? null;
       setCancellationDeadlineHours(deadlineValue);
       setCancellationDeadlineInput(deadlineValue === null ? "" : String(deadlineValue));
@@ -374,8 +366,6 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
       }
       setBannerUrl(saveJson.data.studio.bannerUrl);
       setBannerAssetId(saveJson.data.studio.bannerAssetId ?? null);
-      setBannerFocalX(saveJson.data.studio.bannerFocalX ?? null);
-      setBannerFocalY(saveJson.data.studio.bannerFocalY ?? null);
       setPickingBannerFocal(true);
       markSaved();
     } catch (err) {
@@ -408,8 +398,6 @@ export function StudioProfilePage({ providerId, studioId }: Props) {
 
       <StudioProfileHero
         bannerUrl={bannerUrl}
-        bannerFocalX={bannerFocalX}
-        bannerFocalY={bannerFocalY}
         avatar={avatarNode}
         studioName={name}
         subtitle={UI_TEXT.studio.profile.subtitle}

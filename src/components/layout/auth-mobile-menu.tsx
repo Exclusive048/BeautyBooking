@@ -14,8 +14,6 @@ type WorkspaceMenuLink = {
   label: string;
   ariaLabel: string;
   avatarUrl: string | null;
-  avatarFocalX?: number | null;
-  avatarFocalY?: number | null;
   fallbackIcon: string;
 };
 
@@ -48,8 +46,6 @@ function WorkspaceMenuItem({
           <FocalImage
             src={item.avatarUrl}
             alt=""
-            focalX={item.avatarFocalX}
-            focalY={item.avatarFocalY}
             width={32}
             height={32}
             className="rounded-full object-cover"

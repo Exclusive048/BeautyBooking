@@ -12,8 +12,6 @@ export type AvailabilityProviderItem = {
   publicUsername: string;
   name: string;
   avatarUrl: string | null;
-  avatarFocalX: number | null;
-  avatarFocalY: number | null;
   ratingAvg: number;
   reviewsCount: number;
   priceFrom: number | null;

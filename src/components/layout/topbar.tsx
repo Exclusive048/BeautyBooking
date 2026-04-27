@@ -22,8 +22,6 @@ type WorkspaceLink = {
   label: string;
   ariaLabel: string;
   avatarUrl: string | null;
-  avatarFocalX?: number | null;
-  avatarFocalY?: number | null;
   fallbackIcon: string;
 };
 
@@ -36,8 +34,6 @@ function WorkspaceShortcutLink({ item, isStudio }: { item: WorkspaceLink; isStud
             <FocalImage
               src={item.avatarUrl}
               alt=""
-              focalX={item.avatarFocalX}
-              focalY={item.avatarFocalY}
               width={32}
               height={32}
               className="rounded-full object-cover"
@@ -66,7 +62,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
     hasMaster
       ? prisma.masterProfile.findUnique({
           where: { userId },
-          select: { provider: { select: { avatarUrl: true, avatarFocalX: true, avatarFocalY: true } } },
+          select: { provider: { select: { avatarUrl: true } } },
         })
       : Promise.resolve(null),
     hasStudio
@@ -74,7 +70,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           where: {
             OR: [{ ownerUserId: userId }, { provider: { ownerUserId: userId } }],
           },
-          select: { provider: { select: { avatarUrl: true, avatarFocalX: true, avatarFocalY: true } } },
+          select: { provider: { select: { avatarUrl: true } } },
         })
       : Promise.resolve(null),
     hasStudio
@@ -86,7 +82,7 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           },
           select: {
             studio: {
-              select: { provider: { select: { avatarUrl: true, avatarFocalX: true, avatarFocalY: true } } },
+              select: { provider: { select: { avatarUrl: true } } },
             },
           },
         })
@@ -102,8 +98,6 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           label: UI_TEXT.nav.masterWorkspace,
           ariaLabel: UI_TEXT.nav.openMasterWorkspace,
           avatarUrl: masterProfile?.provider.avatarUrl ?? null,
-          avatarFocalX: masterProfile?.provider.avatarFocalX ?? null,
-          avatarFocalY: masterProfile?.provider.avatarFocalY ?? null,
           fallbackIcon: UI_TEXT.nav.masterWorkspaceFallback,
         }
       : null,
@@ -113,8 +107,6 @@ async function loadWorkspaceLinks(userId: string): Promise<{
           label: UI_TEXT.nav.studioWorkspace,
           ariaLabel: UI_TEXT.nav.openStudioWorkspace,
           avatarUrl: studioProvider?.avatarUrl ?? null,
-          avatarFocalX: studioProvider?.avatarFocalX ?? null,
-          avatarFocalY: studioProvider?.avatarFocalY ?? null,
           fallbackIcon: UI_TEXT.nav.studioWorkspaceFallback,
         }
       : null,
@@ -155,8 +147,6 @@ export async function Topbar() {
             <FocalImage
               src={siteLogo.url}
               alt={UI_TEXT.nav.siteLogoAlt}
-              focalX={siteLogo.focalX}
-              focalY={siteLogo.focalY}
               width={36}
               height={36}
               className="rounded-xl object-cover"

@@ -107,8 +107,6 @@ export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButt
                     <FocalImage
                       src={provider.avatarUrl}
                       alt={provider.name}
-                      focalX={provider.avatarFocalX}
-                      focalY={provider.avatarFocalY}
                       width={120}
                       height={120}
                       priority

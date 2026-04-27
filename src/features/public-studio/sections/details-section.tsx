@@ -49,8 +49,6 @@ export async function StudioDetailsSection({ studioId }: Props) {
             <FocalImage
               src={studio.avatarUrl}
               alt=""
-              focalX={studio.avatarFocalX}
-              focalY={studio.avatarFocalY}
               width={80}
               height={80}
               className="rounded-2xl object-cover"

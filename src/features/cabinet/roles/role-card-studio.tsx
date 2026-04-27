@@ -10,8 +10,6 @@ import { UI_TEXT } from "@/lib/ui/text";
 type StudioActiveData = {
   name: string;
   logoUrl?: string | null;
-  logoFocalX?: number | null;
-  logoFocalY?: number | null;
   metrics?: string[];
   actionLabel?: string;
   actionHref?: string;
@@ -124,8 +122,6 @@ export function RoleCardStudio(props: Props) {
               <FocalImage
                 src={data.logoUrl}
                 alt={data.name}
-                focalX={data.logoFocalX}
-                focalY={data.logoFocalY}
                 width={60}
                 height={60}
                 className="object-cover"

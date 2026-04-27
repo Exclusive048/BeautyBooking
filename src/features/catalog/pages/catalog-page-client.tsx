@@ -33,8 +33,6 @@ type CatalogSearchItem = {
   title: string;
   tagline: string | null;
   avatarUrl: string | null;
-  avatarFocalX: number | null;
-  avatarFocalY: number | null;
   ratingAvg: number;
   reviewsCount: number;
   photos: string[];
@@ -69,8 +67,6 @@ type MapSidebarItem = {
   title: string;
   type: "master" | "studio";
   avatarUrl: string | null;
-  avatarFocalX: number | null;
-  avatarFocalY: number | null;
   ratingAvg: number;
   priceFrom: number | null;
   href: string | null;
@@ -123,8 +119,6 @@ function toMapPoint(
       title: item.name,
       type: item.providerType === "STUDIO" ? "studio" : "master",
       avatarUrl: item.avatarUrl,
-      avatarFocalX: item.avatarFocalX,
-      avatarFocalY: item.avatarFocalY,
       ratingAvg: item.ratingAvg,
       priceFrom: item.priceFrom,
       publicUsername: item.publicUsername ?? null,
@@ -139,8 +133,6 @@ function toMapPoint(
     title: item.title,
     type: item.type,
     avatarUrl: item.avatarUrl,
-    avatarFocalX: item.avatarFocalX,
-    avatarFocalY: item.avatarFocalY,
     ratingAvg: item.ratingAvg,
     priceFrom: item.minPrice,
     publicUsername: item.publicUsername ?? null,
@@ -155,8 +147,6 @@ function toSidebarItem(point: CatalogMapPoint): MapSidebarItem {
     title: point.title,
     type: point.type,
     avatarUrl: point.avatarUrl,
-    avatarFocalX: point.avatarFocalX ?? null,
-    avatarFocalY: point.avatarFocalY ?? null,
     ratingAvg: point.ratingAvg,
     priceFrom: point.priceFrom,
     href: providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map-sidebar"),

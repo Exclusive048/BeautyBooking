@@ -55,11 +55,9 @@ export async function StudioHeroSection({ studioId }: Props) {
 
   const portfolioItems = portfolio.map((item) => ({
     url: item.url,
-    focalX: item.focalX ?? null,
-    focalY: item.focalY ?? null,
   }));
   const bannerItem = studio.bannerUrl
-    ? { url: studio.bannerUrl, focalX: studio.bannerFocalX ?? null, focalY: studio.bannerFocalY ?? null }
+    ? { url: studio.bannerUrl }
     : null;
   const imageItems = bannerItem
     ? [bannerItem, ...portfolioItems.filter((item) => item.url !== studio.bannerUrl)]

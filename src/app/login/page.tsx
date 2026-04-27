@@ -23,8 +23,6 @@ export default async function LoginPage() {
     <Suspense fallback={<div className="min-h-[70vh]" />}>
       <LoginClient
         heroImageUrl={heroImage?.url ?? null}
-        heroImageFocalX={heroImage?.focalX ?? null}
-        heroImageFocalY={heroImage?.focalY ?? null}
         emailEnabled={isEmailConfigured()}
       />
     </Suspense>

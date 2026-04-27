@@ -27,8 +27,6 @@ export type MediaAssetDto = {
   sizeBytes: number;
   originalFilename: string;
   url: string;
-  focalX: number | null;
-  focalY: number | null;
   cropX: number | null;
   cropY: number | null;
   cropWidth: number | null;
@@ -46,8 +44,6 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     sizeBytes: asset.sizeBytes,
     originalFilename: asset.originalFilename,
     url: `/api/media/file/${asset.id}`,
-    focalX: asset.focalX ?? null,
-    focalY: asset.focalY ?? null,
     cropX: asset.cropX ?? null,
     cropY: asset.cropY ?? null,
     cropWidth: asset.cropWidth ?? null,

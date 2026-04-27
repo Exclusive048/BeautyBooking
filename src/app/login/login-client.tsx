@@ -21,8 +21,6 @@ type LoginMode = "phone" | "email";
 
 type LoginClientProps = {
   heroImageUrl: string | null;
-  heroImageFocalX: number | null;
-  heroImageFocalY: number | null;
   emailEnabled?: boolean;
 };
 
@@ -186,7 +184,7 @@ const stepVariants = {
 
 // ---------- Main component ----------
 
-export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFocalY, emailEnabled = false }: LoginClientProps) {
+export default function LoginClient({ heroImageUrl, emailEnabled = false }: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
 
@@ -425,8 +423,6 @@ export default function LoginClient({ heroImageUrl, heroImageFocalX, heroImageFo
             <FocalImage
               src={heroImageUrl}
               alt=""
-              focalX={heroImageFocalX}
-              focalY={heroImageFocalY}
               sizes="(max-width: 1200px) 50vw, 500px"
               className="object-cover opacity-20"
             />

@@ -53,11 +53,7 @@ model Provider {
 
   description String?
 
-  avatarUrl    String?
-  avatarFocalX Float?
-  avatarFocalY Float?
-  bannerFocalX Float?
-  bannerFocalY Float?
+  avatarUrl String?
 
   geoLat Float?
 

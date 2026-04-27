@@ -17,8 +17,6 @@ type MasterActiveData = {
   isPublished?: boolean | null;
   statusLabel?: string | null;
   avatarUrl?: string | null;
-  avatarFocalX?: number | null;
-  avatarFocalY?: number | null;
   coverUrl?: string | null;
   actionLabel?: string;
   actionHref?: string;
@@ -27,8 +25,6 @@ type MasterActiveData = {
 type StudioActiveData = {
   name: string;
   logoUrl?: string | null;
-  logoFocalX?: number | null;
-  logoFocalY?: number | null;
   metrics?: string[];
   actionLabel?: string;
   actionHref?: string;

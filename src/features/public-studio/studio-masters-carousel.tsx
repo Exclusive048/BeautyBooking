@@ -22,8 +22,6 @@ type PortfolioFeedItem = {
 
 type MasterExtra = {
   avatarUrl: string | null;
-  avatarFocalX: number | null;
-  avatarFocalY: number | null;
   specialization: string | null;
   grade: string;
   portfolioThumbs: string[];
@@ -69,8 +67,6 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
 
           const value: MasterExtra = {
             avatarUrl: provider?.avatarUrl ?? null,
-            avatarFocalX: provider?.avatarFocalX ?? null,
-            avatarFocalY: provider?.avatarFocalY ?? null,
             specialization: provider?.tagline?.trim() || null,
             grade: gradeLabel(provider?.rating ?? 0, provider?.reviews ?? 0),
             portfolioThumbs: portfolio.slice(0, 3).map((item) => item.mediaUrl),
@@ -98,8 +94,6 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
         return {
           ...master,
           avatarUrl: extra?.avatarUrl ?? null,
-          avatarFocalX: extra?.avatarFocalX ?? null,
-          avatarFocalY: extra?.avatarFocalY ?? null,
           specialization: extra?.specialization ?? null,
           grade: extra?.grade ?? UI_TEXT.publicStudio.gradeNew,
           thumbs: extra?.portfolioThumbs ?? [],
@@ -133,8 +127,6 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
                   <FocalImage
                     src={master.avatarUrl}
                     alt={master.name}
-                    focalX={master.avatarFocalX}
-                    focalY={master.avatarFocalY}
                     sizes="288px"
                     className="object-cover transition group-hover:scale-[1.03]"
                   />

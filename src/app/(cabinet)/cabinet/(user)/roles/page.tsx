@@ -27,8 +27,6 @@ export default async function RolesPage() {
             select: {
               name: true,
               avatarUrl: true,
-              avatarFocalX: true,
-              avatarFocalY: true,
               tagline: true,
               categories: true,
               ratingAvg: true,
@@ -46,8 +44,6 @@ export default async function RolesPage() {
         select: {
           name: true,
           avatarUrl: true,
-          avatarFocalX: true,
-          avatarFocalY: true,
           ratingAvg: true,
           ratingCount: true,
           isPublished: true,
@@ -69,8 +65,6 @@ export default async function RolesPage() {
             ? UI_TEXT.cabinetRolesPage.masterPublished
             : UI_TEXT.cabinetRolesPage.masterDraft,
           avatarUrl: masterProvider.avatarUrl,
-          avatarFocalX: masterProvider.avatarFocalX ?? null,
-          avatarFocalY: masterProvider.avatarFocalY ?? null,
           actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: masterCabinetHref,
         }
@@ -105,8 +99,6 @@ export default async function RolesPage() {
       ? {
           name: studioProvider.name,
           logoUrl: studioProvider.avatarUrl,
-          logoFocalX: studioProvider.avatarFocalX ?? null,
-          logoFocalY: studioProvider.avatarFocalY ?? null,
           metrics: studioMetrics,
           actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: studioCabinetHref,

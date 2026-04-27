@@ -16,8 +16,6 @@ type MasterActiveData = {
   isPublished?: boolean | null;
   statusLabel?: string | null;
   avatarUrl?: string | null;
-  avatarFocalX?: number | null;
-  avatarFocalY?: number | null;
   coverUrl?: string | null;
   actionLabel?: string;
   actionHref?: string;
@@ -101,8 +99,6 @@ export function RoleCardMaster(props: Props) {
               <FocalImage
                 src={data.avatarUrl}
                 alt={data.name}
-                focalX={data.avatarFocalX}
-                focalY={data.avatarFocalY}
                 width={60}
                 height={60}
                 className="object-cover"

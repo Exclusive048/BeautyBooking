@@ -103,8 +103,6 @@ export async function deleteUserAccount(userId: string): Promise<void> {
         telegramId: null,
         telegramUsername: null,
         externalPhotoUrl: null,
-        avatarFocalX: null,
-        avatarFocalY: null,
         firstName: null,
         lastName: null,
         middleName: null,

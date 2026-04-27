@@ -63,32 +63,8 @@ function studioBannerSettingKey(studioProviderId: string): string {
   return `studioBannerAssetId:${studioProviderId}`;
 }
 
-async function updateSystemConfigFocal(key: string, focalX: number, focalY: number): Promise<void> {
-  await prisma.systemConfig.upsert({
-    where: { key },
-    update: { value: { x: focalX, y: focalY } },
-    create: { key, value: { x: focalX, y: focalY } },
-  });
-}
-
 async function clearSystemConfigFocal(key: string): Promise<void> {
   await prisma.systemConfig.deleteMany({ where: { key } });
-}
-
-async function isSiteAssetCurrent(settingKey: string, assetId: string): Promise<boolean> {
-  const setting = await prisma.appSetting.findUnique({
-    where: { key: settingKey },
-    select: { value: true },
-  });
-  return setting?.value === assetId;
-}
-
-async function isStudioBannerAsset(studioProviderId: string, assetId: string): Promise<boolean> {
-  const setting = await prisma.appSetting.findUnique({
-    where: { key: studioBannerSettingKey(studioProviderId) },
-    select: { value: true },
-  });
-  return setting?.value === assetId;
 }
 
 function validateUploadBasics(input: UploadMediaInput): void {
@@ -202,50 +178,6 @@ async function enforcePortfolioLimit(
       throw createLimitReachedError(limitKey, limit, count);
     }
     throw new AppError("Portfolio limit reached", 409, "MEDIA_PORTFOLIO_LIMIT_REACHED");
-  }
-}
-
-async function syncFocalPointToEntity(asset: MediaAsset, focalX: number, focalY: number): Promise<void> {
-  if (
-    asset.kind === MediaKind.AVATAR &&
-    (asset.entityType === MediaEntityType.MASTER || asset.entityType === MediaEntityType.STUDIO)
-  ) {
-    await prisma.provider.updateMany({
-      where: { id: asset.entityId },
-      data: { avatarFocalX: focalX, avatarFocalY: focalY },
-    });
-    return;
-  }
-
-  if (asset.entityType === MediaEntityType.STUDIO && asset.kind === MediaKind.PORTFOLIO) {
-    const isBanner = await isStudioBannerAsset(asset.entityId, asset.id);
-    if (isBanner) {
-      await prisma.provider.updateMany({
-        where: { id: asset.entityId },
-        data: { bannerFocalX: focalX, bannerFocalY: focalY },
-      });
-    }
-    return;
-  }
-
-  if (asset.entityType === MediaEntityType.USER && asset.kind === MediaKind.AVATAR) {
-    await prisma.userProfile.updateMany({
-      where: { id: asset.entityId },
-      data: { avatarFocalX: focalX, avatarFocalY: focalY },
-    });
-    return;
-  }
-
-  if (asset.entityType === MediaEntityType.SITE && asset.entityId === "site") {
-    if (asset.kind === MediaKind.AVATAR && (await isSiteAssetCurrent(SITE_LOGO_SETTING_KEY, asset.id))) {
-      await updateSystemConfigFocal(SITE_LOGO_FOCAL_SETTING_KEY, focalX, focalY);
-    }
-    if (
-      asset.kind === MediaKind.PORTFOLIO &&
-      (await isSiteAssetCurrent(SITE_LOGIN_HERO_SETTING_KEY, asset.id))
-    ) {
-      await updateSystemConfigFocal(SITE_LOGIN_HERO_FOCAL_SETTING_KEY, focalX, focalY);
-    }
   }
 }
 
@@ -379,16 +311,10 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
   ) {
     await prisma.provider.update({
       where: { id: entityId },
-      data: { avatarUrl: `/api/media/file/${readyAsset.id}`, avatarFocalX: null, avatarFocalY: null },
+      data: { avatarUrl: `/api/media/file/${readyAsset.id}` },
     });
   }
 
-  if (input.kind === MediaKind.AVATAR && input.entityType === MediaEntityType.USER) {
-    await prisma.userProfile.updateMany({
-      where: { id: entityId },
-      data: { avatarFocalX: null, avatarFocalY: null },
-    });
-  }
 
   if (
     input.entityType === MediaEntityType.MASTER &&
@@ -537,14 +463,12 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
         status: MediaAssetStatus.READY,
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true, focalX: true, focalY: true },
+      select: { id: true },
     });
     await prisma.provider.update({
       where: { id: asset.entityId },
       data: {
         avatarUrl: nextAvatar ? `/api/media/file/${nextAvatar.id}` : null,
-        avatarFocalX: nextAvatar?.focalX ?? null,
-        avatarFocalY: nextAvatar?.focalY ?? null,
       },
     });
   }
@@ -559,29 +483,6 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
   return { id: asset.id };
 }
 
-export async function updateMediaFocalPoint(
-  user: UserProfile,
-  assetId: string,
-  input: { focalX: number; focalY: number }
-): Promise<MediaAssetDto> {
-  const asset = await prisma.mediaAsset.findUnique({
-    where: { id: assetId },
-  });
-  if (!asset || asset.deletedAt) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
-  }
-
-  await ensureCanManageMedia(user, asset.entityType, asset.entityId, asset.kind);
-
-  const updated = await prisma.mediaAsset.update({
-    where: { id: asset.id },
-    data: { focalX: input.focalX, focalY: input.focalY },
-  });
-
-  await syncFocalPointToEntity(updated, input.focalX, input.focalY);
-
-  return toMediaAssetDto(updated);
-}
 
 export async function updateMediaCrop(
   user: UserProfile,

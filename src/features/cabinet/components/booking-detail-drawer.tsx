@@ -188,8 +188,6 @@ export function BookingDetailDrawer({
                 <FocalImage
                   src={booking.provider.avatarUrl}
                   alt=""
-                  focalX={booking.provider.avatarFocalX}
-                  focalY={booking.provider.avatarFocalY}
                   width={48}
                   height={48}
                   className="rounded-full object-cover"
@@ -255,8 +253,6 @@ export function BookingDetailDrawer({
                     <FocalImage
                       src={booking.masterProvider.avatarUrl}
                       alt=""
-                      focalX={booking.masterProvider.avatarFocalX}
-                      focalY={booking.masterProvider.avatarFocalY}
                       width={40}
                       height={40}
                       className="rounded-full object-cover"

@@ -36,8 +36,6 @@ export function ProviderResultCard({ item }: Props) {
             <FocalImage
               src={item.avatarUrl}
               alt={item.name}
-              focalX={item.avatarFocalX}
-              focalY={item.avatarFocalY}
               width={40}
               height={40}
               loading="lazy"

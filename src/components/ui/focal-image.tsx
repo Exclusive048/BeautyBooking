@@ -1,10 +1,10 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { focalPointToObjectPosition } from "@/lib/media/focal-point";
 
 type FocalImageProps = {
   src: string;
   alt: string;
+  // Legacy focal point props — kept for call-site compatibility but ignored
   focalX?: number | null;
   focalY?: number | null;
   cropX?: number | null;
@@ -28,24 +28,24 @@ function buildObjectPosition(
   cropY: number | null | undefined,
   cropWidth: number | null | undefined,
   cropHeight: number | null | undefined,
-  focalX: number | null | undefined,
-  focalY: number | null | undefined,
 ): string {
-  // Crop data takes priority: position the focal center of the crop area
   if (cropX != null && cropY != null && cropWidth != null && cropHeight != null) {
     const cx = Math.round((cropX + cropWidth / 2) * 100);
     const cy = Math.round((cropY + cropHeight / 2) * 100);
     return `${cx}% ${cy}%`;
   }
-  // Fall back to legacy focal point
-  return focalPointToObjectPosition(focalX, focalY);
+  return "center";
+}
+
+// Internal media API URLs must bypass Next.js Image Optimization —
+// the optimizer makes a session-less server request, causing 403 for auth-gated assets.
+function needsUnoptimized(src: string): boolean {
+  return src.startsWith("/api/media/");
 }
 
 export function FocalImage({
   src,
   alt,
-  focalX,
-  focalY,
   cropX,
   cropY,
   cropWidth,
@@ -58,8 +58,9 @@ export function FocalImage({
   className,
   style,
 }: FocalImageProps) {
-  const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight, focalX, focalY);
+  const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight);
   const combinedStyle: CSSProperties = { ...style, objectPosition };
+  const unoptimized = needsUnoptimized(src);
 
   if (width && height) {
     return (
@@ -73,6 +74,7 @@ export function FocalImage({
         loading={loading}
         className={className}
         style={combinedStyle}
+        unoptimized={unoptimized}
       />
     );
   }
@@ -87,6 +89,7 @@ export function FocalImage({
       loading={loading}
       className={className}
       style={combinedStyle}
+      unoptimized={unoptimized}
     />
   );
 }

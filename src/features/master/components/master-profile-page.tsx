@@ -408,8 +408,6 @@ export function MasterProfilePage() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarAssetId, setAvatarAssetId] = useState<string | null>(null);
-  const [avatarFocalX, setAvatarFocalX] = useState<number | null>(null);
-  const [avatarFocalY, setAvatarFocalY] = useState<number | null>(null);
   const [servicesDraft, setServicesDraft] = useState<Record<string, MasterServiceItem>>({});
 
   const [newSoloServiceTitle, setNewSoloServiceTitle] = useState("");
@@ -533,12 +531,8 @@ export function MasterProfilePage() {
       if (avatarRes.ok && avatarJson && avatarJson.ok) {
         const avatarAsset = avatarJson.data.assets[0] ?? null;
         setAvatarAssetId(avatarAsset?.id ?? null);
-        setAvatarFocalX(avatarAsset?.focalX ?? null);
-        setAvatarFocalY(avatarAsset?.focalY ?? null);
       } else {
         setAvatarAssetId(null);
-        setAvatarFocalX(null);
-        setAvatarFocalY(null);
       }
 
       const portfolioJson = (await portfolioRes.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
@@ -1455,8 +1449,6 @@ export function MasterProfilePage() {
       });
       setAvatarAssetId(asset.id);
       setAvatarUrl(asset.url);
-      setAvatarFocalX(asset.focalX ?? null);
-      setAvatarFocalY(asset.focalY ?? null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.loadAvatar);
@@ -1477,8 +1469,6 @@ export function MasterProfilePage() {
       }
       setAvatarAssetId(null);
       setAvatarUrl("");
-      setAvatarFocalX(null);
-      setAvatarFocalY(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.deleteAvatar);
@@ -1767,8 +1757,6 @@ export function MasterProfilePage() {
     <FocalImage
       src={avatarUrl}
       alt={UI_TEXT.media.avatar.alt}
-      focalX={avatarFocalX}
-      focalY={avatarFocalY}
       width={64}
       height={64}
       className="rounded-2xl object-cover"
@@ -2020,8 +2008,6 @@ export function MasterProfilePage() {
                             <FocalImage
                               src={avatarUrl}
                               alt={UI_TEXT.media.avatar.alt}
-                              focalX={avatarFocalX}
-                              focalY={avatarFocalY}
                               sizes="(max-width: 768px) 30vw, 200px"
                               className="rounded-2xl object-cover"
                             />

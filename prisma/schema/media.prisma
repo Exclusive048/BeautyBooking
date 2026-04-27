@@ -18,8 +18,6 @@ model MediaAsset {
   sizeBytes Int
 
   originalFilename    String
-  focalX              Float?
-  focalY              Float?
   cropX               Float?
   cropY               Float?
   cropWidth           Float?

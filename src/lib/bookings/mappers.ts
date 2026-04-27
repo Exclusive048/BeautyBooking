@@ -51,8 +51,6 @@ type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
         type: true;
         publicUsername: true;
         avatarUrl: true;
-        avatarFocalX: true;
-        avatarFocalY: true;
         cancellationDeadlineHours: true;
       };
     };
@@ -65,8 +63,6 @@ type BookingWithServiceProviderModel = Prisma.BookingGetPayload<{
         type: true;
         publicUsername: true;
         avatarUrl: true;
-        avatarFocalX: true;
-        avatarFocalY: true;
         cancellationDeadlineHours: true;
       };
     };
@@ -131,8 +127,6 @@ export function toClientBookingDto(model: BookingWithServiceProviderModel): Book
       type: model.provider.type,
       publicUsername: model.provider.publicUsername ?? null,
       avatarUrl: model.provider.avatarUrl ?? null,
-      avatarFocalX: model.provider.avatarFocalX ?? null,
-      avatarFocalY: model.provider.avatarFocalY ?? null,
       cancellationDeadlineHours: model.provider.cancellationDeadlineHours ?? null,
     },
     masterProvider: model.masterProvider
@@ -144,8 +138,6 @@ export function toClientBookingDto(model: BookingWithServiceProviderModel): Book
           type: model.masterProvider.type,
           publicUsername: model.masterProvider.publicUsername ?? null,
           avatarUrl: model.masterProvider.avatarUrl ?? null,
-          avatarFocalX: model.masterProvider.avatarFocalX ?? null,
-          avatarFocalY: model.masterProvider.avatarFocalY ?? null,
           cancellationDeadlineHours: model.masterProvider.cancellationDeadlineHours ?? null,
         }
       : null,

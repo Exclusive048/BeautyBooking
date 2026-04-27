@@ -28,8 +28,6 @@ type FeedItem = {
     publicUsername: string;
     name: string;
     avatarUrl: string | null;
-    avatarFocalX: number | null;
-    avatarFocalY: number | null;
     address: string;
     district: string;
     ratingAvg: number;
@@ -98,8 +96,6 @@ export async function GET(req: Request) {
             publicUsername: true,
             name: true,
             avatarUrl: true,
-            avatarFocalX: true,
-            avatarFocalY: true,
             address: true,
             district: true,
             ratingAvg: true,
@@ -161,8 +157,6 @@ export async function GET(req: Request) {
               publicUsername: rule.provider.publicUsername,
               name: rule.provider.name,
               avatarUrl: rule.provider.avatarUrl,
-              avatarFocalX: rule.provider.avatarFocalX ?? null,
-              avatarFocalY: rule.provider.avatarFocalY ?? null,
               address: rule.provider.address,
               district: rule.provider.district,
               ratingAvg: rule.provider.ratingAvg,
