@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Clock, Users, MoreHorizontal, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Sparkles, Clock, Users, MoreHorizontal, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -15,7 +15,7 @@ type TabItem = {
 
 const TABS: TabItem[] = [
   { href: "/cabinet/master/dashboard", label: UI_TEXT.master.topbar.nav.home, icon: LayoutDashboard, exact: true },
-  { href: "/cabinet/master/dashboard", label: UI_TEXT.master.topbar.nav.bookings, icon: Calendar },
+  { href: "/cabinet/master/model-offers", label: UI_TEXT.master.topbar.nav.models, icon: Sparkles },
   { href: "/cabinet/master/schedule", label: UI_TEXT.master.topbar.nav.schedule, icon: Clock },
   { href: "/cabinet/master/clients", label: UI_TEXT.master.topbar.nav.clients, icon: Users },
 ];
@@ -27,7 +27,7 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
 }
 
 function isMoreActive(pathname: string): boolean {
-  const morePaths = ["/cabinet/master/reviews", "/cabinet/master/model-offers", "/cabinet/master/analytics", "/cabinet/master/profile", "/cabinet/master/billing"];
+  const morePaths = ["/cabinet/master/reviews", "/cabinet/master/analytics", "/cabinet/master/profile", "/cabinet/master/billing"];
   return morePaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
