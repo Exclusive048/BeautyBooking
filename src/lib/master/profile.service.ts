@@ -4,6 +4,7 @@ import { createLimitReachedError } from "@/lib/billing/guards";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { invalidateStoriesCache } from "@/lib/feed/stories.service";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
 
 export type MasterContext = {
@@ -22,6 +23,7 @@ export type MasterContext = {
   isPublished: boolean;
   ratingAvg: number;
   ratingCount: number;
+  autoPublishStoriesEnabled: boolean;
 };
 
 export async function getMasterContext(masterId: string): Promise<MasterContext> {
@@ -42,6 +44,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       isPublished: true,
       ratingAvg: true,
       ratingCount: true,
+      autoPublishStoriesEnabled: true,
     },
   });
   if (!master || master.type !== "MASTER") {
@@ -65,6 +68,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       isPublished: master.isPublished,
       ratingAvg: master.ratingAvg,
       ratingCount: master.ratingCount,
+      autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
     };
   }
 
@@ -92,6 +96,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     isPublished: master.isPublished,
     ratingAvg: master.ratingAvg,
     ratingCount: master.ratingCount,
+    autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
   };
 }
 
@@ -815,6 +820,13 @@ export async function createMasterPortfolioItem(
   });
 
   await invalidateAdvisorCache(masterId);
+
+  // Fire-and-forget: invalidate stories cache when master has autopublish on.
+  // Don't block the API response — Redis failure should never break a successful create.
+  if (context.autoPublishStoriesEnabled) {
+    void invalidateStoriesCache();
+  }
+
   return { id: created.id };
 }
 

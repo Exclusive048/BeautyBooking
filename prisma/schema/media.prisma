@@ -119,6 +119,7 @@ model PortfolioItem {
   @@index([masterId, createdAt])
   @@index([studioId, createdAt])
   @@index([globalCategoryId, inSearch])
+  @@index([isPublic, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model PortfolioItemService {

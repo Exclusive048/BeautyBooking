@@ -5,6 +5,10 @@ import { listStoriesMasters } from "@/lib/feed/stories.service";
 
 export const runtime = "nodejs";
 
+/**
+ * @deprecated Use GET /api/feed/stories instead. Kept until UI migrates off
+ *   the old `{ masters }` shape and `listStoriesMasters()` is no longer used.
+ */
 export async function GET(req: Request) {
   try {
     const masters = await listStoriesMasters();

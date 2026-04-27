@@ -32,6 +32,7 @@ model Provider {
   bufferBetweenBookingsMin Int @default(0)
 
   autoConfirmBookings       Boolean      @default(false)
+  autoPublishStoriesEnabled Boolean      @default(true)
   cancellationDeadlineHours Int?
   remindersEnabled          Boolean      @default(true)
   scheduleMode              ScheduleMode @default(FLEXIBLE)
@@ -120,6 +121,7 @@ model Provider {
   @@index([isPublished, ratingAvg(sort: Desc), reviews(sort: Desc), createdAt(sort: Desc)])
   @@index([studioId, type, isPublished, createdAt])
   @@index([type, isPublished, address])
+  @@index([isPublished, autoPublishStoriesEnabled])
 }
 
 model MasterProfile {
