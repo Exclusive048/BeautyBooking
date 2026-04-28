@@ -4,6 +4,7 @@ import { createLimitReachedError } from "@/lib/billing/guards";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
 
@@ -24,6 +25,7 @@ export type MasterContext = {
   ratingAvg: number;
   ratingCount: number;
   autoPublishStoriesEnabled: boolean;
+  cityId: string | null;
 };
 
 export async function getMasterContext(masterId: string): Promise<MasterContext> {
@@ -45,6 +47,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       ratingAvg: true,
       ratingCount: true,
       autoPublishStoriesEnabled: true,
+      cityId: true,
     },
   });
   if (!master || master.type !== "MASTER") {
@@ -69,6 +72,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       ratingAvg: master.ratingAvg,
       ratingCount: master.ratingCount,
       autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
+      cityId: master.cityId,
     };
   }
 
@@ -97,6 +101,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     ratingAvg: master.ratingAvg,
     ratingCount: master.ratingCount,
     autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
+    cityId: master.cityId,
   };
 }
 
@@ -143,6 +148,7 @@ export type MasterProfileData = {
     ratingAvg: number;
     ratingCount: number;
     autoPublishStoriesEnabled: boolean;
+    cityId: string | null;
   };
   services: MasterProfileServiceItem[];
   portfolio: MasterPortfolioItem[];
@@ -192,6 +198,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         ratingAvg: context.ratingAvg,
         ratingCount: context.ratingCount,
         autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
+        cityId: context.cityId,
       },
       services: services.map((service) => ({
         serviceId: service.id,
@@ -269,6 +276,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       ratingAvg: context.ratingAvg,
       ratingCount: context.ratingCount,
       autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
+      cityId: context.cityId,
     },
     services: services.map((service) => {
       const override = overrideByService.get(service.id);
@@ -322,22 +330,85 @@ export async function updateMasterProfile(
     isPublished?: boolean;
   }
 ): Promise<{ id: string }> {
-  await getMasterContext(masterId);
+  const context = await getMasterContext(masterId);
+
+  // 1. Apply non-publication fields first. We split publication out because
+  //    it depends on cityId being set, and cityId may be (re-)derived here
+  //    from a fresh address.
+  const trimmedAddress =
+    typeof input.address === "string" ? input.address.trim() : undefined;
+
   await prisma.provider.update({
     where: { id: masterId },
     data: {
       ...(input.displayName ? { name: input.displayName.trim() } : {}),
       ...(typeof input.tagline === "string" ? { tagline: input.tagline.trim() } : {}),
-      ...(typeof input.address === "string" ? { address: input.address.trim() } : {}),
+      ...(trimmedAddress !== undefined ? { address: trimmedAddress } : {}),
       ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
       ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
       ...(input.bio !== undefined
         ? { description: typeof input.bio === "string" ? input.bio.trim() || null : null }
         : {}),
       ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl?.trim() || null } : {}),
-      ...(typeof input.isPublished === "boolean" ? { isPublished: input.isPublished } : {}),
     },
   });
+
+  // 2. If address changed, run server-side geocode + city detection. The
+  //    server geocoder is authoritative — it overwrites any client-supplied
+  //    geo and writes cityId. On failure we explicitly null cityId so the
+  //    publish gate below blocks (and the master sees the address banner).
+  let resolvedCityId: string | null = context.cityId;
+  if (trimmedAddress !== undefined) {
+    if (!trimmedAddress) {
+      // Address cleared — drop the city link.
+      await prisma.provider.update({
+        where: { id: masterId },
+        data: { cityId: null },
+      });
+      resolvedCityId = null;
+    } else {
+      const detection = await detectCityFromAddress(trimmedAddress);
+      if (detection.ok) {
+        await prisma.provider.update({
+          where: { id: masterId },
+          data: {
+            cityId: detection.cityId,
+            geoLat: detection.geoLat,
+            geoLng: detection.geoLng,
+          },
+        });
+        resolvedCityId = detection.cityId;
+      } else {
+        await prisma.provider.update({
+          where: { id: masterId },
+          data: { cityId: null },
+        });
+        resolvedCityId = null;
+      }
+    }
+  }
+
+  // 3. Publication gate: requires both a non-empty address AND a resolved cityId.
+  //    Read-back the canonical address from the row in case input.address was
+  //    omitted but we're still asked to publish.
+  if (typeof input.isPublished === "boolean") {
+    if (input.isPublished) {
+      const canonicalAddress =
+        trimmedAddress !== undefined ? trimmedAddress : context.address;
+      if (!canonicalAddress || !resolvedCityId) {
+        throw new AppError(
+          "Заполните адрес, чтобы опубликовать профиль",
+          400,
+          "ADDRESS_REQUIRED",
+        );
+      }
+    }
+    await prisma.provider.update({
+      where: { id: masterId },
+      data: { isPublished: input.isPublished },
+    });
+  }
+
   return { id: masterId };
 }
 

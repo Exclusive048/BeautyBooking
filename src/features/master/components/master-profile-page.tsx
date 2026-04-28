@@ -91,6 +91,7 @@ type MasterProfileData = {
     ratingAvg: number;
     ratingCount: number;
     autoPublishStoriesEnabled: boolean;
+    cityId: string | null;
   };
   services: MasterServiceItem[];
   portfolio: PortfolioItem[];
@@ -1918,6 +1919,30 @@ export function MasterProfilePage() {
 
       {error ? <div className="rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
 
+      {!data.master.cityId ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <p className="font-semibold">{UI_TEXT.master.profile.addressRequired.title}</p>
+          <p className="mt-1 text-xs opacity-80">{UI_TEXT.master.profile.addressRequired.description}</p>
+          <div className="mt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const el = document.getElementById("master-profile-address");
+                el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                (el as HTMLTextAreaElement | null)?.focus({ preventScroll: true });
+              }}
+              className="text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            >
+              {UI_TEXT.master.profile.addressRequired.cta}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {pendingInvites.length > 0 ? (
         <div className="rounded-2xl bg-amber-500/10 p-4">
           <h3 className="text-sm font-semibold text-amber-200">{UI_TEXT.master.profile.invite.title}</h3>
@@ -2100,6 +2125,7 @@ export function MasterProfilePage() {
                       <label className="text-xs text-text-sec">
                         {UI_TEXT.master.profile.form.addressLabel}
                         <Textarea
+                          id="master-profile-address"
                           ref={addressInputRef}
                           className={inputBaseClass}
                           value={addressText ?? ""}

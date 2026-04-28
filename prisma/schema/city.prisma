@@ -1,0 +1,44 @@
+// === DOMAIN: City ===
+// Multi-city auto-grow model. Cities are created automatically when a master
+// saves an address whose locality is not yet in the DB. Admins can verify,
+// deactivate, or merge auto-created entries via /admin/cities (see 09-MULTI-CITY).
+
+model City {
+  id String @id @default(cuid())
+
+  // URL-friendly identifier: "moskva", "voronezh", "krasnodar"
+  slug String @unique
+
+  // Russian display name: "Москва", "Воронеж", "Краснодар"
+  name String
+
+  // Genitive case for UI ("в Москве", "из Москвы"). nullable — admins fill
+  // for auto-created entries; UI falls back to `name` when null.
+  nameGenitive String?
+
+  // Center coordinates (used as default map center when this city is selected)
+  latitude  Float
+  longitude Float
+
+  // IANA timezone. Default Europe/Moscow covers ~95% of European Russia.
+  // Yandex Geocoder doesn't return timezone — admins correct edge cases.
+  timezone String @default("Europe/Moscow")
+
+  // Soft visibility flag: admins can hide a city without deleting it.
+  isActive Boolean @default(true)
+
+  // Display order in the city selector. Lower = higher in list.
+  // Defaults to 100; admins promote major cities (Москва=1, Питер=2, ...).
+  sortOrder Int @default(100)
+
+  // KEY auto-grow flag: true when created by detect-city flow,
+  // false when admin manually verifies / creates via /admin/cities.
+  autoCreated Boolean @default(true)
+
+  providers Provider[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}

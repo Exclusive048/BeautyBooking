@@ -23,6 +23,12 @@ model Provider {
 
   district String
 
+  // City link — populated automatically by detect-city when address is saved.
+  // null while no address has been geocoded; required for `isPublished: true`
+  // (gated in setProviderPublished).
+  cityId String?
+  city   City?   @relation(fields: [cityId], references: [id], onDelete: Restrict)
+
   categories String[] @default([])
 
   availableToday Boolean @default(false)
@@ -122,6 +128,7 @@ model Provider {
   @@index([studioId, type, isPublished, createdAt])
   @@index([type, isPublished, address])
   @@index([isPublished, autoPublishStoriesEnabled])
+  @@index([cityId, isPublished])
 }
 
 model MasterProfile {

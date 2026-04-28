@@ -31,7 +31,9 @@
     "lighthouse": "npx tsx scripts/lighthouse-audit.ts",
     "analyze": "cross-env ANALYZE=true npm run build",
     "media:audit": "npx tsx scripts/audit-media-assets.ts",
-    "media:cleanup": "npx tsx scripts/cleanup-orphan-media.ts"
+    "media:cleanup": "npx tsx scripts/cleanup-orphan-media.ts",
+    "cities:unpublish-no-address": "npx tsx scripts/unpublish-providers-without-address.ts",
+    "cities:backfill": "npx tsx scripts/backfill-cities-from-addresses.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs",
