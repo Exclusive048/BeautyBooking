@@ -21,7 +21,6 @@ function hasPage(route: string): boolean {
 function buildFooterLinks() {
   const showBlog = hasPage("blog");
   const showCareers = hasPage("careers");
-  const showGiftCards = hasPage("gift-cards");
   const hasSupportPage = hasPage("support");
 
   const about: FooterLinkItem[] = [
@@ -37,7 +36,6 @@ function buildFooterLinks() {
     { label: UI_TEXT.footer.links.popularServices, href: "/catalog?sort=popular" },
     { label: UI_TEXT.footer.links.mastersNearby, href: "/catalog?available=today" },
     { label: UI_TEXT.footer.links.offersForModels, href: "/models" },
-    ...(showGiftCards ? [{ label: UI_TEXT.footer.links.giftCards, href: "/gift-cards" }] : []),
   ];
 
   const masters: FooterLinkItem[] = [
