@@ -5,6 +5,7 @@ import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
 import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 import { NavLink } from "@/components/layout/nav-link";
 import { TopbarShell } from "@/components/layout/topbar-shell";
+import { CitySelector } from "@/features/cities/components/city-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
@@ -147,31 +148,54 @@ export async function Topbar() {
 
   return (
     <TopbarShell>
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 lg:h-16 lg:px-6">
-        {/* Logo */}
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
-          {siteLogo?.url ? (
-            <FocalImage
-              src={siteLogo.url}
-              alt={UI_TEXT.nav.siteLogoAlt}
-              width={36}
-              height={36}
-              className="rounded-xl object-cover"
-            />
-          ) : (
-            <span
-              aria-hidden
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
-            >
-              <span className="font-display text-lg font-semibold italic leading-none text-white">
-                М
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 lg:h-16 lg:px-6">
+        {/* Brand block: glyph · CitySelector · textmark.
+            Glyph and textmark each link to "/", selector is a self-contained
+            dropdown between them. On narrow screens (<sm) the textmark hides;
+            below ~380px the selector itself can wrap if needed. */}
+        <div className="flex min-w-0 shrink items-center gap-2.5">
+          <Link
+            href="/"
+            aria-label={UI_TEXT.nav.siteLogoAlt}
+            className="shrink-0"
+          >
+            {siteLogo?.url ? (
+              <FocalImage
+                src={siteLogo.url}
+                alt={UI_TEXT.nav.siteLogoAlt}
+                width={36}
+                height={36}
+                className="rounded-xl object-cover"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
+              >
+                <span className="font-display text-lg font-semibold italic leading-none text-white">
+                  М
+                </span>
               </span>
-            </span>
-          )}
-          <span className="hidden truncate font-display text-base font-medium text-text-main sm:inline">
-            Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
+            )}
+          </Link>
+
+          <span aria-hidden className="hidden select-none text-text-sec/40 sm:inline">
+            {UI_TEXT.cities.selector.separator}
           </span>
-        </Link>
+
+          <CitySelector />
+
+          <span aria-hidden className="hidden select-none text-text-sec/40 lg:inline">
+            {UI_TEXT.cities.selector.separator}
+          </span>
+
+          <Link
+            href="/"
+            className="hidden truncate font-display text-base font-medium text-text-main lg:inline"
+          >
+            Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
+          </Link>
+        </div>
 
         {/* Center nav (desktop) */}
         <nav
