@@ -209,3 +209,52 @@
     display: none;
   }
 }
+
+/* Legal documents (Terms, Privacy) — body in system font for readability,
+   Playfair only on h2. Narrow measure ~70ch. Plain prose, no cards. */
+.legal-prose {
+  color: rgb(var(--text-main));
+  line-height: 1.7;
+  font-size: 15px;
+  max-width: 70ch;
+}
+.legal-prose h2 {
+  font-family: var(--font-display, "Playfair Display", serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 2.75rem;
+  margin-bottom: 1rem;
+  scroll-margin-top: 6rem;
+  color: rgb(var(--text-main));
+}
+.legal-prose h2:first-child { margin-top: 0; }
+.legal-prose h3 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.625rem;
+  color: rgb(var(--text-main));
+}
+.legal-prose p { margin-bottom: 1rem; }
+.legal-prose ul, .legal-prose ol {
+  margin: 0.75rem 0 1rem;
+  padding-left: 1.5rem;
+}
+.legal-prose li { margin-bottom: 0.5rem; }
+.legal-prose li::marker { color: rgb(var(--text-sec)); }
+.legal-prose a {
+  color: rgb(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-prose a:hover { text-decoration: none; }
+.legal-prose strong { color: rgb(var(--text-main)); font-weight: 600; }
+.legal-prose .placeholder {
+  background-color: rgb(var(--warning) / 0.15);
+  border: 1px dashed rgb(var(--warning) / 0.55);
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.875em;
+  color: rgb(var(--text-main));
+}
