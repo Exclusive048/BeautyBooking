@@ -19,14 +19,12 @@ function hasPage(route: string): boolean {
 }
 
 function buildFooterLinks() {
-  const showBlog = hasPage("blog");
   const showCareers = hasPage("careers");
   const hasSupportPage = hasPage("support");
 
   const about: FooterLinkItem[] = [
     { label: UI_TEXT.footer.links.about, href: "/about" },
     { label: UI_TEXT.footer.links.howItWorks, href: "/how-it-works" },
-    ...(showBlog ? [{ label: UI_TEXT.footer.links.blog, href: "/blog" }] : []),
     { label: UI_TEXT.footer.links.partners, href: "/partners" },
     ...(showCareers ? [{ label: UI_TEXT.footer.links.careers, href: "/careers" }] : []),
   ];
@@ -50,7 +48,6 @@ function buildFooterLinks() {
     hasSupportPage
       ? { label: UI_TEXT.footer.links.contact, href: "/support" }
       : { label: UI_TEXT.footer.links.contact, href: "mailto:support@мастеррядом.online", external: true },
-    { label: UI_TEXT.footer.links.telegramSupport, href: "https://t.me/masterryadom_support_bot", external: true },
     { label: UI_TEXT.footer.links.terms, href: "/terms" },
     { label: UI_TEXT.footer.links.privacy, href: "/privacy" },
   ];

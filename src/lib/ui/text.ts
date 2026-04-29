@@ -102,6 +102,36 @@ export const UI_TEXT = {
     pricing: { eyebrow: "Тарифы" },
     approach: { eyebrow: "Подход" },
   },
+  support: {
+    hero: {
+      eyebrow: "Поддержка",
+      titleBefore: "Расскажите",
+      titleItalic: "что случилось",
+      description: "Опишите ситуацию — мы разберёмся и ответим в течение дня.",
+    },
+    quickLinks: {
+      description: "Возможно ответ уже есть — это сэкономит вам время:",
+      faq: {
+        title: "Вопросы и ответы",
+        description: "Готовые ответы на частые вопросы",
+      },
+    },
+    form: {
+      sectionTitle: "Опишите ситуацию",
+      sectionDescription: "Чем подробнее — тем быстрее разберёмся.",
+      consent: {
+        before: "Я согласен на обработку персональных данных в соответствии с ",
+        link: "Политикой конфиденциальности",
+        after: ".",
+        error: "Необходимо согласие",
+      },
+    },
+    alternativeContact: {
+      description: "Другие способы связаться:",
+      email: "support@мастеррядом.online",
+      emailHref: "mailto:support@мастеррядом.online",
+    },
+  },
   partners: {
     hero: { eyebrow: "Сотрудничество" },
     formats: {
@@ -163,16 +193,23 @@ export const UI_TEXT = {
       success: {
         title: "Заявка отправлена",
         description:
-          "Мы получили ваше сообщение и ответим в течение 3 рабочих дней. Если вопрос срочный — напишите на partners@мастеррядом.online или в Telegram.",
+          "Мы получили ваше сообщение и ответим в течение 3 рабочих дней. Если вопрос срочный — напишите на partners@мастеррядом.online.",
       },
     },
     alternativeContact: {
       description: "Если ваше обращение срочное или вы предпочитаете прямой контакт:",
       email: "partners@мастеррядом.online",
       emailHref: "mailto:partners@мастеррядом.online",
-      telegramLabel: "Telegram",
-      telegramHref: "https://t.me/masterryadom_support_bot",
     },
+  },
+  careers: {
+    eyebrow: "Карьера",
+    title: "Вакансии откроются позже",
+    paragraph1:
+      "Сейчас МастерРядом — небольшая команда, и мы сосредоточены на запуске платформы. Реальных открытых вакансий пока нет.",
+    paragraph2:
+      "После запуска нам обязательно понадобятся энтузиасты — разработчики, дизайнеры, продуктовые специалисты, поддержка. Мы откроем вакансии когда будем готовы. Если вам интересно сотрудничество с нами — напишите через раздел «Сотрудничество».",
+    backHome: "Вернуться на главную",
   },
   models: {
     hero: { eyebrow: "Для моделей" },
@@ -222,7 +259,6 @@ export const UI_TEXT = {
       title: "Не нашли ответ?",
       description: "Напишите в поддержку — обычно отвечаем в течение нескольких часов.",
       supportButton: "Связаться с поддержкой",
-      telegramButton: "Telegram",
     },
   },
   meta: {
@@ -390,7 +426,6 @@ export const UI_TEXT = {
     links: {
       about: "О нас",
       howItWorks: "Как это работает",
-      blog: "Блог",
       partners: "Партнёрам",
       careers: "Вакансии",
       howToBook: "Как забронировать",
@@ -403,7 +438,6 @@ export const UI_TEXT = {
       affiliateProgram: "Партнёрская программа",
       faq: "FAQ",
       contact: "Написать нам",
-      telegramSupport: "Telegram поддержка",
       terms: "Пользовательское соглашение",
       privacy: "Политика конфиденциальности",
     },
@@ -3433,18 +3467,9 @@ export const UI_TEXT = {
       filterChipAriaLabel: "Фильтр по категории",
     },
     support: {
-      navLabel: "Поддержка",
-      title: "Поддержка — МастерРядом",
-      description:
-        "Создайте обращение в поддержку МастерРядом: сообщите об ошибке или предложите улучшение.",
-      heroBadge: "Поддержка",
-      heroTitle: "Напишите нам",
-      heroSubtitle: "Нашли ошибку или есть идея? Расскажите — разберёмся и ответим.",
-      faqTitle: "FAQ",
-      faqDescription: "Ответы на частые вопросы",
-      telegramTitle: "Telegram",
-      telegramDescription: "Быстрый ответ в чате",
-      formTitle: "Новое обращение",
+      // Page-level keys removed — see top-level UI_TEXT.support.* for new wrapper UI.
+      // pages.support.form.* keys below stay untouched: they're consumed inside
+      // <SupportPageClient> (production-ready form, not redesigned in this commit).
       form: {
         contactLabel: "Как с вами связаться",
         contactPlaceholder: "Номер телефона / почта / Telegram ID",
@@ -3479,10 +3504,6 @@ export const UI_TEXT = {
         attachmentReplace: "Нажмите чтобы заменить",
         attachmentEmptyTitle: "Скриншот или запись экрана",
         attachmentEmptySubtitle: "PNG, JPG, GIF, MP4 — до 10 МБ",
-        attachmentNote: "Файл пока не отправляется — передадим только имя.",
-        privacyNote:
-          "📌 При отправке обращения мы получим ваши контактные данные из профиля (имя и email или Telegram). Они используются только для ответа на ваш запрос.",
-        responseNote: "Ответ придет по email.",
         submitSending: "Отправляем…",
         submit: "Отправить обращение",
       },
@@ -3711,42 +3732,6 @@ export const UI_TEXT = {
       ],
       footerText: "Хотите узнать первыми о запуске?",
       footerCta: "Подпишитесь на Telegram-канал →",
-    },
-    careers: {
-      navLabel: "Вакансии",
-      title: "Вакансии — МастерРядом",
-      description: "Открытые вакансии в МастерРядом. Строим лучший маркетплейс для мастеров красоты.",
-      heroBadge: "Вакансии",
-      heroTitle: "Строим вместе",
-      heroSubtitle:
-        "МастерРядом — небольшая команда, которая делает большой продукт. Нам важны люди, которые думают о пользователях и умеют работать в условиях неопределённости.",
-      emptyTitle: "Открытых вакансий пока нет",
-      emptySubtitle:
-        "Но мы всегда рады талантливым людям. Если вы чувствуете, что можете быть полезны — напишите нам напрямую с рассказом о себе.",
-      emptyCta: "Написать в команду →",
-      cultureTitle: "Как мы работаем",
-      cultureItems: [
-        [
-          "Globe",
-          "Удалённо",
-          "Работаем из любой точки мира. Асинхронная коммуникация по умолчанию.",
-        ],
-        [
-          "Rocket",
-          "Быстрые итерации",
-          "Маленькие задачи, короткие циклы. Видите результат своей работы каждую неделю.",
-        ],
-        [
-          "MessageCircle",
-          "Открытость",
-          "Решения обсуждаются в команде. Ваше мнение имеет значение независимо от должности.",
-        ],
-        [
-          "TrendingUp",
-          "Рост вместе с продуктом",
-          "Ранняя команда — это опционы, история и влияние на продукт.",
-        ],
-      ],
     },
     helpMasters: {
       navLabel: "База знаний",

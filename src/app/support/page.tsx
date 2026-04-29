@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HelpCircle, MessageCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import SupportPageClient from "./support-client";
+import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { getSessionUser } from "@/lib/auth/session";
 import { logError } from "@/lib/logging/logger";
 import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import type { SupportContactOption } from "@/lib/support/contact-shared";
 import { UI_TEXT } from "@/lib/ui/text";
-import { InfoPageLayout } from "@/components/layout/info-page-layout";
 
 export const metadata: Metadata = {
-  title: UI_TEXT.pages.support.title,
-  description: UI_TEXT.pages.support.description,
+  title: "Поддержка — МастерРядом",
+  description:
+    "Сообщите об ошибке или предложите улучшение МастерРядом. Мы ответим в течение дня.",
   alternates: { canonical: "/support" },
 };
+
+const T = UI_TEXT.support;
 
 export default async function SupportPage() {
   let contactOptions: SupportContactOption[] = [];
@@ -28,7 +31,7 @@ export default async function SupportPage() {
             phone: user.phone ?? null,
             telegramId: user.telegramId ?? null,
           }
-        : null
+        : null,
     );
     contactOptions = resolved.options;
   } catch (error) {
@@ -39,55 +42,80 @@ export default async function SupportPage() {
   }
 
   return (
-    <main className="mx-auto max-w-[680px] px-4 py-12 md:py-20 space-y-10">
-      <InfoPageLayout breadcrumb={UI_TEXT.pages.support.navLabel}>
+    <MarketingLayout>
+      {/* Hero — minimal inline like /faq, not the heavy <HeroSection>.
+          This is a utility page; tone is supportive, not marketing. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/8 blur-3xl dark:bg-primary/12"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-primary-magenta/8 blur-3xl dark:bg-primary-magenta/12"
+        />
 
-        {/* Hero */}
-        <section className="space-y-3 pt-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-            {UI_TEXT.pages.support.heroBadge}
-          </div>
-          <h1 className="text-4xl font-bold text-text-main tracking-tight">
-            {UI_TEXT.pages.support.heroTitle}
-          </h1>
-          <p className="text-text-sec">
-            {UI_TEXT.pages.support.heroSubtitle}
+        <div className="relative mx-auto max-w-3xl px-4 py-12 text-center lg:py-16">
+          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+            {T.hero.eyebrow}
           </p>
-        </section>
-
-        {/* Quick links */}
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            href="/faq"
-            className="lux-card rounded-[16px] bg-bg-card p-4 flex items-start gap-3 hover:ring-1 hover:ring-border-subtle transition-all"
-          >
-            <HelpCircle className="h-5 w-5 text-text-sec shrink-0 mt-0.5" aria-hidden />
-            <div>
-              <p className="text-sm font-medium text-text-main">{UI_TEXT.pages.support.faqTitle}</p>
-              <p className="text-xs text-text-sec mt-0.5">{UI_TEXT.pages.support.faqDescription}</p>
-            </div>
-          </Link>
-          <a
-            href="https://t.me/МастерРядом_support"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lux-card rounded-[16px] bg-bg-card p-4 flex items-start gap-3 hover:ring-1 hover:ring-border-subtle transition-all"
-          >
-            <MessageCircle className="h-5 w-5 text-text-sec shrink-0 mt-0.5" aria-hidden />
-            <div>
-              <p className="text-sm font-medium text-text-main">{UI_TEXT.pages.support.telegramTitle}</p>
-              <p className="text-xs text-text-sec mt-0.5">{UI_TEXT.pages.support.telegramDescription}</p>
-            </div>
-          </a>
+          <h1 className="mb-4 font-display text-3xl leading-[1.1] text-text-main lg:text-4xl">
+            {T.hero.titleBefore}{" "}
+            <em className="font-display font-normal italic text-primary">{T.hero.titleItalic}</em>
+          </h1>
+          <p className="mx-auto max-w-xl text-base leading-relaxed text-text-sec">
+            {T.hero.description}
+          </p>
         </div>
+      </section>
 
-        {/* Form */}
-        <div className="lux-card rounded-[24px] bg-bg-card p-7">
-          <h2 className="text-lg font-semibold text-text-main mb-6">{UI_TEXT.pages.support.formTitle}</h2>
+      {/* Quick links — before the form, so a self-serve answer takes priority.
+          Single FAQ card centered (Telegram bot removed as a support channel). */}
+      <section className="pb-8">
+        <div className="mx-auto max-w-3xl px-4">
+          <p className="mb-6 text-center text-sm text-text-sec">{T.quickLinks.description}</p>
+          <div className="mx-auto max-w-md">
+            <Link
+              href="/faq"
+              className="group flex items-center justify-between gap-3 rounded-xl border border-border-subtle bg-bg-card/50 p-5 transition-colors hover:border-primary/30"
+            >
+              <div className="min-w-0">
+                <p className="mb-0.5 font-medium text-text-main">{T.quickLinks.faq.title}</p>
+                <p className="text-sm text-text-sec">{T.quickLinks.faq.description}</p>
+              </div>
+              <ArrowRight
+                className="h-5 w-5 shrink-0 text-text-sec transition-colors group-hover:text-primary"
+                aria-hidden
+              />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Form — production-ready <SupportPageClient> rendered 1:1, no edits.
+          Server-side contactOptions prop chain is preserved exactly. */}
+      <section className="py-8">
+        <div className="mx-auto max-w-3xl px-4">
+          <div className="mb-6">
+            <h2 className="mb-2 font-display text-2xl text-text-main lg:text-3xl">
+              {T.form.sectionTitle}
+            </h2>
+            <p className="leading-relaxed text-text-sec">{T.form.sectionDescription}</p>
+          </div>
           <SupportPageClient contactOptions={contactOptions} />
         </div>
+      </section>
 
-      </InfoPageLayout>
-    </main>
+      {/* Alternative contact — email only. */}
+      <section className="mx-auto max-w-3xl px-4 pb-20 text-center">
+        <p className="mb-3 text-sm text-text-sec">{T.alternativeContact.description}</p>
+        <a
+          href={T.alternativeContact.emailHref}
+          className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+        >
+          {T.alternativeContact.email}
+        </a>
+      </section>
+    </MarketingLayout>
   );
 }

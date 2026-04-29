@@ -34,7 +34,7 @@ export default function GiftCardsPage() {
           <p className="text-sm text-text-sec">
             {UI_TEXT.pages.giftCards.footerText}{" "}
             <a
-              href="https://t.me/МастерРядом_news"
+              href="https://t.me/masterryadom_news"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"

@@ -5,8 +5,6 @@ import { FAQItem } from "@/features/faq/components/faq-item";
 import { FAQ_DATA } from "@/features/faq/content/faq-content";
 import { UI_TEXT } from "@/lib/ui/text";
 
-const SUPPORT_TELEGRAM_URL = "https://t.me/masterryadom_support_bot";
-
 export const metadata: Metadata = {
   title: "Часто спрашивают — МастерРядом",
   description:
@@ -83,16 +81,9 @@ export default function FaqPage() {
       <section className="mx-auto max-w-3xl px-4 pb-20 text-center">
         <h2 className="mb-3 font-display text-2xl text-text-main">{T.cta.title}</h2>
         <p className="mb-6 leading-relaxed text-text-sec">{T.cta.description}</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button asChild variant="primary">
-            <Link href="/support">{T.cta.supportButton}</Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <a href={SUPPORT_TELEGRAM_URL} target="_blank" rel="noopener noreferrer">
-              {T.cta.telegramButton}
-            </a>
-          </Button>
-        </div>
+        <Button asChild variant="primary">
+          <Link href="/support">{T.cta.supportButton}</Link>
+        </Button>
       </section>
     </main>
   );
