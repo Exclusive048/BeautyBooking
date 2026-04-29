@@ -1,124 +1,230 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
+import { HeroSection } from "@/features/marketing/sections/hero-section";
+import { TextWithImage } from "@/features/marketing/sections/text-with-image";
+import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
+import { StepsSection } from "@/features/marketing/sections/steps-section";
+import { PricingTeaser } from "@/features/marketing/sections/pricing-teaser";
+import { CTABlock } from "@/features/marketing/sections/cta-block";
 import { UI_TEXT } from "@/lib/ui/text";
-import { InfoPageLayout } from "@/components/layout/info-page-layout";
-import { DynamicIcon } from "@/components/ui/dynamic-icon";
-import type { DynamicIconName } from "@/components/ui/dynamic-icon";
 
 export const metadata: Metadata = {
-  title: UI_TEXT.pages.becomeMaster.title,
-  description: UI_TEXT.pages.becomeMaster.description,
+  title: "Стать мастером — МастерРядом",
+  description:
+    "Подключите кабинет на МастерРядом — без комиссий с услуг. CRM, расписание, аналитика и поток клиентов из каталога.",
   alternates: { canonical: "/become-master" },
 };
 
-const ADVANTAGES = UI_TEXT.pages.becomeMaster.advantages;
-const HOW_TO_START = UI_TEXT.pages.becomeMaster.startSteps;
+const T = UI_TEXT.becomeMaster;
+
+// /login is the unified entry point. Role onboarding happens after sign-in via
+// resolveCabinetRedirect — there's no `?role=master` query param in this app,
+// so don't invent one.
+const REGISTER_URL = "/login";
+const PRICING_URL = "/pricing";
 
 export default function BecomeMasterPage() {
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-12 md:py-20 space-y-20">
-      <InfoPageLayout breadcrumb={UI_TEXT.pages.becomeMaster.navLabel}>
+    <MarketingLayout>
+      <HeroSection
+        eyebrow={T.hero.eyebrow}
+        title={
+          <>
+            Кабинет, который{" "}
+            <em className="font-display font-normal italic text-primary">работает за вас</em>
+          </>
+        }
+        description="Подключите расписание к МастерРядом и забудьте про переписки в Telegram. Клиенты записываются сами, напоминания работают, CRM ведёт историю. Без комиссий с услуг — только подписка за платформу."
+        cta={{
+          primary: { label: "Зарегистрироваться", href: REGISTER_URL },
+          secondary: { label: "Посмотреть тарифы", href: PRICING_URL },
+        }}
+      />
 
-        {/* Hero */}
-        <section className="text-center space-y-5 pt-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-            {UI_TEXT.pages.becomeMaster.heroBadge}
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-text-main leading-tight tracking-tight">
-            {UI_TEXT.pages.becomeMaster.heroTitleMain}{" "}
-            <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-              {UI_TEXT.pages.becomeMaster.heroTitleHighlight}
-            </span>
-          </h1>
-          <p className="text-text-sec text-lg max-w-[540px] mx-auto">
-            {UI_TEXT.pages.becomeMaster.heroSubtitle}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link
-              href="/login"
-              className="inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-8 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
-            >
-              {UI_TEXT.pages.becomeMaster.ctaPrimary}
-            </Link>
-            <Link
-              href="/pricing"
-              className="inline-flex h-12 items-center justify-center rounded-xl border border-border-subtle bg-bg-card px-6 text-sm font-semibold text-text-main hover:bg-bg-input transition-colors"
-            >
-              {UI_TEXT.pages.becomeMaster.ctaSecondary}
-            </Link>
-          </div>
-          <p className="text-xs text-text-sec">{UI_TEXT.pages.becomeMaster.heroNote}</p>
-        </section>
+      <TextWithImage
+        eyebrow={T.pain.eyebrow}
+        title={
+          <>
+            Расписание в скриншотах,{" "}
+            <em className="font-display font-normal italic text-primary">клиенты в Telegram</em>
+          </>
+        }
+        paragraphs={[
+          "Половина рабочего времени уходит не на услуги, а на администрирование. Уточнить свободное окно. Принять отмену. Напомнить за день. Перенести на следующую неделю. Часть клиентов теряется потому что не дошли в переписке.",
+          "Эта работа не оплачивается. Она съедает вечера, уничтожает планирование, создаёт постоянное чувство «надо ответить». А с каждым новым клиентом нагрузка растёт.",
+          "МастерРядом перекладывает всю эту работу на платформу. Расписание ведёт себя само, напоминания приходят автоматически, отмены и переносы — в один тап. У вас остаётся только сама работа.",
+        ]}
+      />
 
-        {/* Advantages */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-text-main text-center">
-            {UI_TEXT.pages.becomeMaster.advantagesTitle}
-          </h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {ADVANTAGES.map((a) => (
-              <div key={a.title} className="lux-card rounded-[20px] bg-bg-card p-6 space-y-3">
-                <DynamicIcon name={a.icon as DynamicIconName} className="h-6 w-6 text-primary" aria-hidden />
-                <p className="font-semibold text-text-main text-sm">{a.title}</p>
-                <p className="text-xs text-text-sec leading-relaxed">{a.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+      <FeatureGrid
+        eyebrow={T.features.eyebrow}
+        title="Полный кабинет, не CRM-калькулятор"
+        description="Не «инструмент для записи». Полная инфраструктура работы с клиентами."
+        features={[
+          {
+            iconName: "calendar-days",
+            title: "Гибкое расписание",
+            description:
+              "Шаблоны рабочих дней, разовые переопределения, перерывы, выходные. Можно вести фиксированную сетку слотов или свободные окна — на ваш выбор.",
+          },
+          {
+            iconName: "users",
+            title: "CRM без бумаги",
+            description:
+              "История каждого клиента: визиты, заметки, теги, фотографии работ. Доступ только у вас. Платформа — обработчик данных, вы — оператор.",
+          },
+          {
+            iconName: "wallet",
+            title: "Без комиссий с услуг",
+            description:
+              "Платформа берёт месячную подписку — это всё. Каждый рубль от клиента приходит вам без посредников.",
+          },
+          {
+            iconName: "bar-chart",
+            title: "Аналитика что работает",
+            description:
+              "Какие услуги приносят больше, в какие часы загрузка плотнее, кто из клиентов возвращается, а кто пришёл и пропал. Не угадывайте — смотрите.",
+          },
+          {
+            iconName: "bell-ring",
+            title: "Уведомления без админа",
+            description:
+              "Клиенты не забывают приходить — приходит напоминание за 24 часа и за 2 часа. Вы не забываете подтверждать — приходит push когда есть новая бронь.",
+          },
+          {
+            iconName: "image",
+            title: "Портфолио и отзывы",
+            description:
+              "Ваши работы видят все клиенты в каталоге. Отзывы только от тех, кто реально записывался — никаких ботов и фейков.",
+          },
+        ]}
+      />
 
-        {/* How to start */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.becomeMaster.startTitle}</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {HOW_TO_START.map((s) => (
-              <div key={s.step} className="lux-card rounded-[20px] bg-bg-card p-6 flex gap-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary-magenta flex items-center justify-center text-white text-sm font-bold shrink-0">
-                  {s.step}
-                </div>
-                <div>
-                  <p className="font-semibold text-text-main text-sm">{s.title}</p>
-                  <p className="text-xs text-text-sec leading-relaxed mt-1">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+      <StepsSection
+        eyebrow={T.steps.eyebrow}
+        title={
+          <>
+            От регистрации до публикации —{" "}
+            <em className="font-display font-normal italic text-primary">за 30 минут</em>
+          </>
+        }
+        description="Не нужны интеграции, не нужны разработчики. Регистрация и публикация — простой процесс."
+        steps={[
+          {
+            title: "Зарегистрируйтесь",
+            description:
+              "Введите номер телефона и подтвердите код. Или войдите через Telegram — быстрее.",
+          },
+          {
+            title: "Заполните профиль",
+            description:
+              "Адрес работы, услуги с ценами, портфолио, описание. Геокодер сам определит ваш город по адресу.",
+          },
+          {
+            title: "Настройте расписание",
+            description:
+              "Выберите рабочие дни и часы. Можно использовать готовые шаблоны или построить свой.",
+          },
+          {
+            title: "Публикуйте профиль",
+            description:
+              "После публикации профиль появляется в каталоге, и клиенты могут вас найти и записаться.",
+          },
+        ]}
+      />
 
-        {/* Pricing teaser */}
-        <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.becomeMaster.pricingTitle}</h2>
-            <p className="text-text-sec text-sm max-w-[400px]">
-              {UI_TEXT.pages.becomeMaster.pricingText}
-            </p>
-          </div>
-          <Link
-            href="/pricing"
-            className="shrink-0 inline-flex h-10 items-center justify-center rounded-xl border border-border-subtle bg-bg-input px-6 text-sm font-semibold text-text-main hover:bg-bg-card transition-colors"
-          >
-            {UI_TEXT.pages.becomeMaster.pricingCta}
-          </Link>
-        </section>
+      <PricingTeaser
+        eyebrow={T.pricing.eyebrow}
+        title={
+          <>
+            Подписка вместо{" "}
+            <em className="font-display font-normal italic text-primary">комиссий</em>
+          </>
+        }
+        description="Выберите план под вашу нагрузку. Сменить можно в любой момент."
+        plans={[
+          {
+            tier: "FREE",
+            name: "Старт",
+            price: "0 ₽",
+            priceNote: "навсегда",
+            description: "Чтобы попробовать платформу",
+            features: [
+              "Профиль в каталоге",
+              "До 15 фото в портфолио",
+              "Онлайн-запись и расписание",
+              "Push-уведомления в браузере",
+            ],
+          },
+          {
+            // TODO: подставить реальную цену из BillingPlan когда админ настроит
+            tier: "PRO",
+            name: "Профи",
+            price: "[Уточняется]",
+            priceNote: "в месяц",
+            description: "Для активной практики",
+            highlighted: true,
+            features: [
+              "Всё из Старта",
+              "Безлимит фото в портфолио",
+              "CRM: заметки, теги, история визитов",
+              "Аналитика загрузки и выручки",
+              "Горящие слоты со скидкой",
+              "Онлайн-оплата через ЮКассу",
+              "Уведомления в Telegram и ВКонтакте",
+            ],
+          },
+          {
+            // TODO: подставить реальную цену из BillingPlan когда админ настроит
+            tier: "PREMIUM",
+            name: "Студия",
+            price: "[Уточняется]",
+            priceNote: "в месяц",
+            description: "Для команды мастеров",
+            features: [
+              "Всё из Профи",
+              "Студийный режим — несколько мастеров",
+              "Общий календарь и роли",
+              "Аналитика по каждому мастеру",
+              "Финансовая отчётность",
+              "Приоритетная поддержка",
+            ],
+          },
+        ]}
+        ctaHref={REGISTER_URL}
+        ctaLabel="Начать бесплатно"
+        fullPricingHref={PRICING_URL}
+        fullPricingLabel="Все условия и сравнение"
+      />
 
-        {/* Studio section */}
-        <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 space-y-4">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-6 w-6 text-text-sec shrink-0" aria-hidden />
-            <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.becomeMaster.studioTitle}</h2>
-          </div>
-          <p className="text-text-sec text-sm leading-relaxed">
-            {UI_TEXT.pages.becomeMaster.studioText}
-          </p>
-          <Link
-            href="/help/masters"
-            className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
-          >
-            {UI_TEXT.pages.becomeMaster.studioCta}
-          </Link>
-        </section>
+      <TextWithImage
+        eyebrow={T.approach.eyebrow}
+        title={
+          <>
+            Платформа, которую строят{" "}
+            <em className="font-display font-normal italic text-primary">для долгого использования</em>
+          </>
+        }
+        paragraphs={[
+          "У МастерРядом нет венчурных денег и срочного «нужен exit за 18 месяцев». Это меняет всё. Мы не запускаем фичи в спешке, не ломаем рабочие процессы ради метрик роста, не повышаем подписку чтобы понравиться инвесторам.",
+          "Каждое решение проверяется на тех, кто будет им пользоваться. Если что-то неудобно — мы это знаем первыми, потому что сами записываемся к мастерам через свою платформу.",
+        ]}
+        imagePosition="left"
+      />
 
-      </InfoPageLayout>
-    </main>
+      <CTABlock
+        title={
+          <>
+            Готовы{" "}
+            <em className="font-display font-normal italic text-white">подключиться</em>?
+          </>
+        }
+        description="Регистрация бесплатна. Базовый тариф работает навсегда без оплаты. Карта при регистрации не нужна."
+        cta={{
+          primary: { label: "Зарегистрироваться", href: REGISTER_URL },
+          secondary: { label: "Посмотреть тарифы", href: PRICING_URL },
+        }}
+      />
+    </MarketingLayout>
   );
 }
