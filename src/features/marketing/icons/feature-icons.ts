@@ -13,6 +13,7 @@ import {
   Shield,
   Sparkles,
   Star,
+  Tag,
   Users,
   Wallet,
   Zap,
@@ -48,7 +49,9 @@ export type FeatureIconName =
   | "wallet"
   | "bar-chart"
   | "bell-ring"
-  | "image";
+  | "image"
+  // /models
+  | "tag";
 
 export const FEATURE_ICONS: Record<FeatureIconName, LucideIcon> = {
   heart: Heart,
@@ -68,4 +71,5 @@ export const FEATURE_ICONS: Record<FeatureIconName, LucideIcon> = {
   "bar-chart": BarChart3,
   "bell-ring": BellRing,
   image: ImageIcon,
+  tag: Tag,
 };

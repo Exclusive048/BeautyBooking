@@ -102,6 +102,44 @@ export const UI_TEXT = {
     pricing: { eyebrow: "Тарифы" },
     approach: { eyebrow: "Подход" },
   },
+  models: {
+    hero: { eyebrow: "Для моделей" },
+    compactHero: { learnMore: "Что такое модель?" },
+    howItWorks: { eyebrow: "Как это работает" },
+    expectations: { eyebrow: "Прежде чем откликнуться" },
+    list: {
+      titleWithCity: "Предложения в {city}",
+      titleAllCities: "Все предложения",
+      countLabelOne: "{count} оффер",
+      countLabelFew: "{count} оффера",
+      countLabelMany: "{count} офферов",
+      categoryAll: "Все услуги",
+    },
+    card: {
+      durationServiceLabel: "Услуга",
+      durationContentLabel: "Контент и фото",
+      durationTotalLabel: "Всего времени",
+      dateLabel: "Дата",
+      priceFreeForModel: "Бесплатно для модели",
+      reviewsLabel: "отзывов",
+      detailsCta: "Подробнее",
+    },
+    empty: {
+      titleWithCity: "Пока нет предложений в {city}",
+      titleNoCity: "Пока нет активных предложений",
+      description:
+        "Мастера регулярно публикуют новые офферы — особенно в выходные и перед сезоном съёмок. Загляните позже или попробуйте другой город.",
+      changeCityHint: "Сменить город можно в шапке сайта",
+      fallbackPrompt: "Ищете обычного мастера, не для практики?",
+      fallbackLink: "Перейти в каталог",
+    },
+    forMasters: {
+      title: "Вы мастер?",
+      description:
+        "Опубликуйте оффер для модели — клиенты подадут заявку, вы выберете подходящего и согласуете время. Без переписок в директе.",
+      cta: "Опубликовать оффер",
+    },
+  },
   faq: {
     hero: {
       eyebrow: "Вопросы и ответы",
@@ -3312,8 +3350,8 @@ export const UI_TEXT = {
       emptyCta: "Перейти в каталог",
       cityFallback: "Город не указан",
       categoryFallback: "Категория",
-      priceFree: "Бесплатно",
-      badgeFree: "Бесплатно",
+      priceFree: "Бесплатно для модели",
+      badgeFree: "Бесплатно для модели",
       badgeDiscount: "Скидка",
       applyAction: "Откликнуться",
       applyActionArrow: "Откликнуться →",
