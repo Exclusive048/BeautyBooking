@@ -14,17 +14,22 @@ type Props = {
   title: ReactNode;
   description?: string;
   steps: ReadonlyArray<Step>;
+  /** Override desktop column count. Auto-detected from steps.length when omitted (5 → 5 cols, else 4). */
+  columns?: 4 | 5;
 };
 
 const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-export function StepsSection({ eyebrow, title, description, steps }: Props) {
+export function StepsSection({ eyebrow, title, description, steps, columns }: Props) {
   const reduce = useReducedMotion();
+  const cols = columns ?? (steps.length === 5 ? 5 : 4);
+  // Both class strings are static literals so Tailwind JIT picks them up.
+  const gridClass = cols === 5 ? "lg:grid-cols-5" : "lg:grid-cols-4";
   return (
     <section className="bg-bg-card/50 py-16 lg:py-24">
       <div className="mx-auto max-w-[1280px] px-4">
         <SectionHeader eyebrow={eyebrow} title={title} description={description} />
-        <ol className="mt-12 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+        <ol className={`mt-12 grid gap-10 md:grid-cols-2 ${gridClass}`}>
           {steps.map((step, idx) => {
             const initial = reduce ? undefined : { opacity: 0, y: 18 };
             const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
