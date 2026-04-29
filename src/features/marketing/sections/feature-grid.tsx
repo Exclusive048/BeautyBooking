@@ -1,12 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { SectionHeader } from "@/features/marketing/sections/section-header";
+import {
+  FEATURE_ICONS,
+  type FeatureIconName,
+} from "@/features/marketing/icons/feature-icons";
 
 export type Feature = {
-  icon: LucideIcon;
+  /** Looked up against FEATURE_ICONS — keeps the prop serializable across the RSC boundary. */
+  iconName: FeatureIconName;
   title: string;
   description: string;
 };
@@ -44,12 +48,13 @@ export function FeatureGrid({ eyebrow, title, description, features, columns = 3
 }
 
 function FeatureCard({
-  icon: Icon,
+  iconName,
   title,
   description,
   index,
   reduce,
 }: Feature & { index: number; reduce: boolean | null }) {
+  const Icon = FEATURE_ICONS[iconName];
   const initial = reduce ? undefined : { opacity: 0, y: 20 };
   const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
   const transition = reduce

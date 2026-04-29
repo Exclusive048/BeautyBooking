@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Heart, Sparkles, Users, Zap, Shield, Globe } from "lucide-react";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
@@ -62,37 +61,37 @@ export default function AboutPage() {
         description="Принципы, по которым строим платформу — и не отступаем от них в спешке."
         features={[
           {
-            icon: Heart,
+            iconName: "heart",
             title: "Уважение к клиенту",
             description:
               "Никаких тёмных паттернов, скрытых платежей, навязчивых уведомлений. Если что-то не нужно — это можно выключить.",
           },
           {
-            icon: Sparkles,
+            iconName: "sparkles",
             title: "Качество интерфейса",
             description:
               "Каждый экран продуман: типографика, ритм, скорость загрузки. Красота индустрии — в деталях продукта.",
           },
           {
-            icon: Users,
+            iconName: "users",
             title: "Поддержка мастеров",
             description:
               "Мы не берём комиссию с услуг. Платформа — это подписка, а заработок мастера — целиком его. Так честнее.",
           },
           {
-            icon: Zap,
+            iconName: "zap",
             title: "Скорость и стабильность",
             description:
               "Запись должна работать всегда. Расписание не ломается, уведомления приходят вовремя, страница открывается за секунду.",
           },
           {
-            icon: Shield,
+            iconName: "shield",
             title: "Прозрачность",
             description:
               "Открытые цены, честные отзывы, правила без мелкого шрифта. Мы не прячем условия в трёхэтажных оффертах.",
           },
           {
-            icon: Globe,
+            iconName: "globe",
             title: "Доступность",
             description:
               "Не только Москва. Платформа растёт там, где появляются мастера — мы не ограничиваем географию whitelist'ом.",

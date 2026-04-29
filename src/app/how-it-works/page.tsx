@@ -1,18 +1,4 @@
 import type { Metadata } from "next";
-import {
-  BarChart3,
-  Bell,
-  BellRing,
-  CalendarDays,
-  Clock,
-  CreditCard,
-  Flame,
-  Image as ImageIcon,
-  Search,
-  Star,
-  Users,
-  Wallet,
-} from "lucide-react";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
@@ -67,37 +53,37 @@ export default function HowItWorksPage() {
         title="Возможности для клиентов"
         features={[
           {
-            icon: Search,
+            iconName: "search",
             title: "Каталог в реальном времени",
             description:
               "Расписание мастера всегда актуально. Никаких устаревших слотов и «ой, я уже не работаю в этот день».",
           },
           {
-            icon: Clock,
+            iconName: "clock",
             title: "Поиск по свободному времени",
             description:
               "Фильтр «утро / день / вечер» плюс дата. Находим только тех, кто свободен и принимает.",
           },
           {
-            icon: Flame,
+            iconName: "flame",
             title: "Горячие слоты",
             description:
               "Мастера публикуют скидочные окна в последний момент. Подпишись на любимых — не пропустишь.",
           },
           {
-            icon: CreditCard,
+            iconName: "credit-card",
             title: "Безопасные платежи",
             description:
               "Через ЮКассу. Можно оплатить онлайн или на месте у мастера — выбираешь сам.",
           },
           {
-            icon: Star,
+            iconName: "star",
             title: "Прозрачные отзывы",
             description:
               "Рейтинги и комментарии только от тех, кто реально записывался. Никаких покупных или ботов.",
           },
           {
-            icon: Bell,
+            iconName: "bell",
             title: "Уведомления, как удобно",
             description:
               "Telegram, push в браузер или email. Выбираешь любимый канал — мы не лезем туда, куда не просили.",
@@ -127,37 +113,37 @@ export default function HowItWorksPage() {
         title="Возможности для мастеров"
         features={[
           {
-            icon: CalendarDays,
+            iconName: "calendar-days",
             title: "Гибкое расписание",
             description:
               "Шаблоны рабочих дней, разовые переопределения, перерывы, выходные. Без переписывания всей сетки на каждое изменение.",
           },
           {
-            icon: Users,
+            iconName: "users",
             title: "CRM по клиентам",
             description:
               "Заметки, теги, история бронирований, фото работ — всё в одном месте. Доступ только у тебя.",
           },
           {
-            icon: Wallet,
+            iconName: "wallet",
             title: "Подписка вместо комиссии",
             description:
               "Мы не берём процент с услуг. Только месячная подписка за платформу — твой заработок целиком твой.",
           },
           {
-            icon: BarChart3,
+            iconName: "bar-chart",
             title: "Аналитика",
             description:
               "Выручка по услугам, рекуррентные клиенты, загрузка по часам. Понятно что работает, а что нет.",
           },
           {
-            icon: BellRing,
+            iconName: "bell-ring",
             title: "Уведомления и напоминания",
             description:
               "Клиенты не забывают приходить. Ты не забываешь подтверждать брони. Все на связи без админа.",
           },
           {
-            icon: ImageIcon,
+            iconName: "image",
             title: "Портфолио и отзывы",
             description:
               "Твои работы видят все клиенты. Отзывы — только от тех, кто действительно записывался.",
