@@ -4,17 +4,23 @@ import {
   BellRing,
   CalendarDays,
   Clock,
+  Code,
   CreditCard,
   Flame,
   Globe,
+  GraduationCap,
+  Handshake,
   Heart,
   Image as ImageIcon,
+  Megaphone,
+  Package,
   Search,
   Shield,
   Sparkles,
   Star,
   Tag,
   Users,
+  UsersRound,
   Wallet,
   Zap,
   type LucideIcon,
@@ -51,7 +57,14 @@ export type FeatureIconName =
   | "bell-ring"
   | "image"
   // /models
-  | "tag";
+  | "tag"
+  // /partners — partnership categories
+  | "graduation-cap"
+  | "package"
+  | "megaphone"
+  | "users-round"
+  | "code"
+  | "handshake";
 
 export const FEATURE_ICONS: Record<FeatureIconName, LucideIcon> = {
   heart: Heart,
@@ -72,4 +85,10 @@ export const FEATURE_ICONS: Record<FeatureIconName, LucideIcon> = {
   "bell-ring": BellRing,
   image: ImageIcon,
   tag: Tag,
+  "graduation-cap": GraduationCap,
+  package: Package,
+  megaphone: Megaphone,
+  "users-round": UsersRound,
+  code: Code,
+  handshake: Handshake,
 };
