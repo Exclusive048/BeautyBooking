@@ -1,137 +1,197 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { User, Scissors, Building2 } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  BellRing,
+  CalendarDays,
+  Clock,
+  CreditCard,
+  Flame,
+  Image as ImageIcon,
+  Search,
+  Star,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
+import { HeroSection } from "@/features/marketing/sections/hero-section";
+import { TextWithImage } from "@/features/marketing/sections/text-with-image";
+import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
+import { CTABlock } from "@/features/marketing/sections/cta-block";
 import { UI_TEXT } from "@/lib/ui/text";
-import { InfoPageLayout } from "@/components/layout/info-page-layout";
-import { DynamicIcon } from "@/components/ui/dynamic-icon";
-import type { DynamicIconName } from "@/components/ui/dynamic-icon";
 
 export const metadata: Metadata = {
-  title: UI_TEXT.pages.howItWorks.title,
-  description: UI_TEXT.pages.howItWorks.description,
+  title: "Как работает — МастерРядом",
+  description:
+    "Маркетплейс для записи к мастерам красоты — без звонков и хаоса в мессенджерах. Каталог в реальном времени, кабинет для мастера, общая система уведомлений.",
   alternates: { canonical: "/how-it-works" },
 };
 
-const CLIENT_STEPS = UI_TEXT.pages.howItWorks.clientSteps;
-const MASTER_STEPS = UI_TEXT.pages.howItWorks.masterSteps;
-const KILLER_FEATURES = UI_TEXT.pages.howItWorks.features;
+const T = UI_TEXT.howItWorks;
 
 export default function HowItWorksPage() {
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-12 md:py-20 space-y-20">
-      <InfoPageLayout breadcrumb={UI_TEXT.pages.howItWorks.navLabel}>
+    <MarketingLayout>
+      <HeroSection
+        eyebrow={T.hero.eyebrow}
+        title={
+          <>
+            Маркетплейс для красоты —{" "}
+            <em className="font-display font-normal italic text-primary">без хаоса</em>
+          </>
+        }
+        description="Каталог для клиента, кабинет для мастера, общая система уведомлений. Все действия с одной стороны моментально отражаются на другой."
+        cta={{
+          primary: { label: "Найти мастера", href: "/catalog" },
+          secondary: { label: "Стать мастером", href: "/become-master" },
+        }}
+      />
 
-        {/* Hero */}
-        <section className="text-center space-y-4 pt-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-            {UI_TEXT.pages.howItWorks.heroBadge}
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-text-main leading-tight tracking-tight">
-            {UI_TEXT.pages.howItWorks.heroTitleMain}{" "}
-            <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-              {UI_TEXT.pages.howItWorks.heroTitleHighlight}
-            </span>
-          </h1>
-          <p className="text-text-sec text-lg max-w-[540px] mx-auto">
-            {UI_TEXT.pages.howItWorks.heroSubtitle}
-          </p>
-        </section>
+      <TextWithImage
+        eyebrow={T.client.eyebrow}
+        title={
+          <>
+            Записаться к мастеру за{" "}
+            <em className="font-display font-normal italic text-primary">минуту</em>
+          </>
+        }
+        paragraphs={[
+          "Открываешь каталог, фильтруешь по городу, услуге, цене или ближайшему свободному окну. Никаких звонков администратору — расписание видно в реальном времени.",
+          "Выбираешь мастера, смотришь портфолио, отзывы, действующие цены. Записываешься в один тап. Получаешь подтверждение в Telegram, push или email — что удобнее.",
+          "За 24 часа и за 2 часа до записи — напоминание. Если планы меняются — отменяешь в одно действие, мастеру приходит уведомление, его расписание обновляется.",
+        ]}
+      />
 
-        {/* Client flow */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <User className="h-6 w-6 text-text-sec shrink-0" aria-hidden />
-            <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.howItWorks.clientTitle}</h2>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            {CLIENT_STEPS.map((s) => (
-              <div key={s.step} className="lux-card rounded-[20px] bg-bg-card p-6 flex gap-4">
-                <div className="text-3xl font-black text-primary/20 leading-none shrink-0 select-none">
-                  {s.step}
-                </div>
-                <div>
-                  <p className="font-semibold text-text-main mb-1">{s.title}</p>
-                  <p className="text-sm text-text-sec leading-relaxed">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-center">
-            <Link
-              href="/catalog"
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
-            >
-              {UI_TEXT.pages.howItWorks.clientCta}
-            </Link>
-          </div>
-        </section>
+      <FeatureGrid
+        eyebrow={T.clientFeatures.eyebrow}
+        title="Возможности для клиентов"
+        features={[
+          {
+            icon: Search,
+            title: "Каталог в реальном времени",
+            description:
+              "Расписание мастера всегда актуально. Никаких устаревших слотов и «ой, я уже не работаю в этот день».",
+          },
+          {
+            icon: Clock,
+            title: "Поиск по свободному времени",
+            description:
+              "Фильтр «утро / день / вечер» плюс дата. Находим только тех, кто свободен и принимает.",
+          },
+          {
+            icon: Flame,
+            title: "Горячие слоты",
+            description:
+              "Мастера публикуют скидочные окна в последний момент. Подпишись на любимых — не пропустишь.",
+          },
+          {
+            icon: CreditCard,
+            title: "Безопасные платежи",
+            description:
+              "Через ЮКассу. Можно оплатить онлайн или на месте у мастера — выбираешь сам.",
+          },
+          {
+            icon: Star,
+            title: "Прозрачные отзывы",
+            description:
+              "Рейтинги и комментарии только от тех, кто реально записывался. Никаких покупных или ботов.",
+          },
+          {
+            icon: Bell,
+            title: "Уведомления, как удобно",
+            description:
+              "Telegram, push в браузер или email. Выбираешь любимый канал — мы не лезем туда, куда не просили.",
+          },
+        ]}
+      />
 
-        {/* Master flow */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <Scissors className="h-6 w-6 text-text-sec shrink-0" aria-hidden />
-            <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.howItWorks.masterTitle}</h2>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            {MASTER_STEPS.map((s) => (
-              <div key={s.step} className="lux-card rounded-[20px] bg-bg-card p-6 flex gap-4">
-                <div className="text-3xl font-black text-primary/20 leading-none shrink-0 select-none">
-                  {s.step}
-                </div>
-                <div>
-                  <p className="font-semibold text-text-main mb-1">{s.title}</p>
-                  <p className="text-sm text-text-sec leading-relaxed">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-center">
-            <Link
-              href="/become-master"
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
-            >
-              {UI_TEXT.pages.howItWorks.masterCta}
-            </Link>
-          </div>
-        </section>
+      <TextWithImage
+        eyebrow={T.master.eyebrow}
+        title={
+          <>
+            Кабинет, который{" "}
+            <em className="font-display font-normal italic text-primary">думает за вас</em>
+          </>
+        }
+        paragraphs={[
+          "Расписание ведёшь сам или используешь готовые шаблоны (понедельник-пятница 10-19, любые перерывы и выходные). Можно делать переопределения на конкретные дни без переписывания всей сетки.",
+          "Брони приходят сразу с уведомлением в Telegram. Если работаешь сам — настрой автоподтверждение. Если работаешь в студии — заявка идёт через администратора студии.",
+          "CRM показывает историю каждого клиента: сколько раз был, на какие услуги ходил, что писал в комментариях. Можно вести заметки, теги, фотографии работ для себя.",
+          "Аналитика рассказывает что приносит деньги, а что нет. Какие услуги популярны, в какие часы загрузка плотнее, кто из клиентов возвращается, а кто пришёл и пропал.",
+        ]}
+        imagePosition="left"
+      />
 
-        {/* Killer features */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.howItWorks.featuresTitle}</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {KILLER_FEATURES.map((f) => (
-              <div key={f.title} className="lux-card rounded-[20px] bg-bg-card p-6 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <DynamicIcon name={f.icon as DynamicIconName} className="h-6 w-6 text-primary shrink-0" aria-hidden />
-                  <span className="rounded-full border border-border-subtle px-3 py-0.5 text-xs text-text-sec">
-                    {f.badge}
-                  </span>
-                </div>
-                <p className="font-semibold text-text-main">{f.title}</p>
-                <p className="text-sm text-text-sec leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+      <FeatureGrid
+        eyebrow={T.masterFeatures.eyebrow}
+        title="Возможности для мастеров"
+        features={[
+          {
+            icon: CalendarDays,
+            title: "Гибкое расписание",
+            description:
+              "Шаблоны рабочих дней, разовые переопределения, перерывы, выходные. Без переписывания всей сетки на каждое изменение.",
+          },
+          {
+            icon: Users,
+            title: "CRM по клиентам",
+            description:
+              "Заметки, теги, история бронирований, фото работ — всё в одном месте. Доступ только у тебя.",
+          },
+          {
+            icon: Wallet,
+            title: "Подписка вместо комиссии",
+            description:
+              "Мы не берём процент с услуг. Только месячная подписка за платформу — твой заработок целиком твой.",
+          },
+          {
+            icon: BarChart3,
+            title: "Аналитика",
+            description:
+              "Выручка по услугам, рекуррентные клиенты, загрузка по часам. Понятно что работает, а что нет.",
+          },
+          {
+            icon: BellRing,
+            title: "Уведомления и напоминания",
+            description:
+              "Клиенты не забывают приходить. Ты не забываешь подтверждать брони. Все на связи без админа.",
+          },
+          {
+            icon: ImageIcon,
+            title: "Портфолио и отзывы",
+            description:
+              "Твои работы видят все клиенты. Отзывы — только от тех, кто действительно записывался.",
+          },
+        ]}
+      />
 
-        {/* Studio block */}
-        <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 space-y-4">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-6 w-6 text-text-sec shrink-0" aria-hidden />
-            <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.pages.howItWorks.studioTitle}</h2>
-          </div>
-          <p className="text-text-sec text-sm leading-relaxed">
-            {UI_TEXT.pages.howItWorks.studioText}
-          </p>
-          <Link
-            href="/become-master"
-            className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
-          >
-            {UI_TEXT.pages.howItWorks.studioCta}
-          </Link>
-        </section>
+      <TextWithImage
+        eyebrow={T.connection.eyebrow}
+        title={
+          <>
+            Одна платформа —{" "}
+            <em className="font-display font-normal italic text-primary">две стороны</em>
+          </>
+        }
+        paragraphs={[
+          "Когда клиент записывается, мастер моментально получает уведомление. Когда мастер подтверждает бронь, клиент видит статус. Когда мастер открывает новый горячий слот — подписанные клиенты получают push.",
+          "Это не два независимых интерфейса, а единая система: каждое действие с одной стороны мгновенно отражается на другой. Никто никого не теряет.",
+        ]}
+      />
 
-      </InfoPageLayout>
-    </main>
+      <CTABlock
+        title={
+          <>
+            Готов{" "}
+            <em className="font-display font-normal italic text-white">попробовать</em>?
+          </>
+        }
+        description="Регистрация бесплатна. Никаких звонков, никаких карт — пока не запишешься."
+        cta={{
+          primary: { label: "Найти мастера", href: "/catalog" },
+          secondary: { label: "Стать мастером", href: "/become-master" },
+        }}
+      />
+    </MarketingLayout>
   );
 }
