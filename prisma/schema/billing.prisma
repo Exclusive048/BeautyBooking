@@ -82,6 +82,18 @@ model UserSubscription {
 
   lastPaymentAt DateTime?
 
+  // Trial PREMIUM: 30-day onboarding gift for first-time master/studio profile.
+  // Cron at /api/billing/renew/run downgrades the row in-place to FREE on expiry
+  // (the @@unique([userId, scope]) constraint prevents creating a separate FREE
+  // row alongside, so we mutate planId/isTrial/trialEndsAt and write to
+  // BillingAuditLog for historical record).
+  isTrial     Boolean   @default(false)
+  trialEndsAt DateTime?
+
+  // Set when the cron sends BILLING_TRIAL_ENDING_SOON notification, so we
+  // never re-warn the same trial twice across cron runs.
+  trialEndingNotificationSentAt DateTime?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -95,6 +107,9 @@ model UserSubscription {
   @@unique([userId, scope])
   @@index([status, autoRenew, nextBillingAt])
   @@index([status, graceUntil])
+  // Partial index on active trial rows only — cron needs fast lookup of
+  // expiring/expired trials without scanning the whole subscriptions table.
+  @@index([isTrial, trialEndsAt])
 }
 
 model BillingPayment {

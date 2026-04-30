@@ -1,3 +1,4 @@
+import { SubscriptionScope } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
@@ -6,6 +7,13 @@ import { serverApiFetch } from "@/lib/api/server-fetch";
 import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
 import { StudioSidebar } from "@/features/studio-cabinet/components/studio-sidebar";
 import { StudioBottomNav } from "@/features/studio-cabinet/components/studio-bottom-nav";
+import { TrialEndingBanner } from "@/features/cabinet/components/trial-ending-banner";
+import { TrialStatusBadge } from "@/features/cabinet/components/trial-status-badge";
+import {
+  getCurrentSubscriptionRow,
+  isActiveTrial,
+  trialDaysLeft,
+} from "@/lib/billing/get-current-subscription-row";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -40,8 +48,16 @@ export default async function StudioCabinetLayout({
     ? null
     : UI_TEXT.studioCabinet.layout.publicUsernameHint;
 
+  // Trial status — read once at layout level; React.cache shares the row.
+  const subscription = await getCurrentSubscriptionRow(user.id, SubscriptionScope.STUDIO);
+  const trialActive = isActiveTrial(subscription);
+  const daysLeft = trialActive ? trialDaysLeft(subscription.trialEndsAt) : 0;
+  const showBanner = trialActive && daysLeft > 0 && daysLeft <= 3;
+
   return (
-    <div className="flex min-h-screen bg-bg-base">
+    <>
+      {showBanner ? <TrialEndingBanner daysLeft={daysLeft} /> : null}
+      <div className="flex min-h-screen bg-bg-base">
       {/* Desktop sidebar */}
       <div className="hidden lg:block lg:shrink-0 border-r border-border-subtle">
         <div className="sticky top-0 h-screen overflow-y-auto">
@@ -58,6 +74,11 @@ export default async function StudioCabinetLayout({
 
         <main className="min-w-0 flex-1 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
           <div className="mx-auto w-full max-w-6xl">
+            {trialActive && daysLeft > 0 ? (
+              <div className="mb-4 flex justify-end">
+                <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />
+              </div>
+            ) : null}
             {children}
           </div>
         </main>
@@ -66,5 +87,6 @@ export default async function StudioCabinetLayout({
       {/* Mobile bottom nav */}
       <StudioBottomNav />
     </div>
+    </>
   );
 }

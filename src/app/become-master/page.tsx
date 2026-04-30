@@ -4,8 +4,15 @@ import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
 import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
 import { StepsSection } from "@/features/marketing/sections/steps-section";
-import { PricingTeaser } from "@/features/marketing/sections/pricing-teaser";
+import {
+  PricingTeaser,
+  type PricingPlan,
+} from "@/features/marketing/sections/pricing-teaser";
 import { CTABlock } from "@/features/marketing/sections/cta-block";
+import {
+  getMarketingPricing,
+  type MarketingPlan,
+} from "@/lib/billing/marketing-pricing";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -23,7 +30,39 @@ const T = UI_TEXT.becomeMaster;
 const REGISTER_URL = "/login";
 const PRICING_URL = "/pricing";
 
-export default function BecomeMasterPage() {
+const PRICING_PLACEHOLDER = UI_TEXT.pricing.periods.placeholder;
+
+function formatRubFromKopeks(kopeks: number): string {
+  const rub = Math.round(kopeks / 100);
+  return `${new Intl.NumberFormat("ru-RU").format(rub)} ₽`;
+}
+
+/**
+ * Builds the teaser-shaped plan from a real BillingPlan (or a placeholder
+ * stub when the admin hasn't configured the tier yet). Feature lists stay
+ * curated here — the teaser shows a marketing-friendly subset, not the full
+ * comparison table.
+ */
+function teaserPlanFromMarket(
+  plan: MarketingPlan | null,
+  curated: Omit<PricingPlan, "price" | "priceNote">,
+): PricingPlan {
+  // FREE — flat 0 ₽ навсегда regardless of admin config.
+  if (curated.tier === "FREE") {
+    return { ...curated, price: "0 ₽", priceNote: UI_TEXT.pricing.periods.free };
+  }
+
+  // Paid tier with no monthly price configured → graceful placeholder.
+  const monthly = plan?.prices.find((p) => p.periodMonths === 1);
+  if (!monthly) {
+    return { ...curated, price: PRICING_PLACEHOLDER, priceNote: "в месяц" };
+  }
+  return { ...curated, price: formatRubFromKopeks(monthly.priceKopeks), priceNote: "в месяц" };
+}
+
+export default async function BecomeMasterPage() {
+  const pricing = await getMarketingPricing();
+
   return (
     <MarketingLayout>
       <HeroSection
@@ -143,11 +182,9 @@ export default function BecomeMasterPage() {
         }
         description="Выберите план под вашу нагрузку. Сменить можно в любой момент."
         plans={[
-          {
+          teaserPlanFromMarket(pricing.master.free, {
             tier: "FREE",
             name: "Старт",
-            price: "0 ₽",
-            priceNote: "навсегда",
             description: "Чтобы попробовать платформу",
             features: [
               "Профиль в каталоге",
@@ -155,13 +192,10 @@ export default function BecomeMasterPage() {
               "Онлайн-запись и расписание",
               "Push-уведомления в браузере",
             ],
-          },
-          {
-            // TODO: подставить реальную цену из BillingPlan когда админ настроит
+          }),
+          teaserPlanFromMarket(pricing.master.pro, {
             tier: "PRO",
             name: "Профи",
-            price: "[Уточняется]",
-            priceNote: "в месяц",
             description: "Для активной практики",
             highlighted: true,
             features: [
@@ -173,23 +207,19 @@ export default function BecomeMasterPage() {
               "Онлайн-оплата через ЮКассу",
               "Уведомления в Telegram и ВКонтакте",
             ],
-          },
-          {
-            // TODO: подставить реальную цену из BillingPlan когда админ настроит
+          }),
+          teaserPlanFromMarket(pricing.master.premium, {
             tier: "PREMIUM",
-            name: "Студия",
-            price: "[Уточняется]",
-            priceNote: "в месяц",
-            description: "Для команды мастеров",
+            name: "Расширенный",
+            description: "С максимумом возможностей",
             features: [
               "Всё из Профи",
-              "Студийный режим — несколько мастеров",
-              "Общий календарь и роли",
-              "Аналитика по каждому мастеру",
+              "Расширенная аналитика",
+              "Приоритет в каталоге",
               "Финансовая отчётность",
               "Приоритетная поддержка",
             ],
-          },
+          }),
         ]}
         ctaHref={REGISTER_URL}
         ctaLabel="Начать бесплатно"
