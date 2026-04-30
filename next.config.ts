@@ -91,6 +91,18 @@ const nextConfig = {
     root: path.resolve(__dirname),
   },
   allowedDevOrigins: ["https://beautyhub.art", "https://www.beautyhub.art"],
+  async redirects() {
+    return [
+      // /help/masters was the original master-only knowledge base. The page has
+      // been merged into /help with master/studio tabs; preserve the URL via
+      // 308 permanent redirect so external links and search engine cache update.
+      {
+        source: "/help/masters",
+        destination: "/help?tab=master",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     const headers = [
       { key: "X-Frame-Options", value: "DENY" },

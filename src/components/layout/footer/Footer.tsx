@@ -39,7 +39,7 @@ function buildFooterLinks() {
   const masters: FooterLinkItem[] = [
     { label: UI_TEXT.footer.links.becomeMaster, href: "/become-master" },
     { label: UI_TEXT.footer.links.pricing, href: "/pricing" },
-    { label: UI_TEXT.footer.links.knowledgeBase, href: "/help/masters" },
+    { label: UI_TEXT.footer.links.knowledgeBase, href: "/help" },
     { label: UI_TEXT.footer.links.affiliateProgram, href: "/partners" },
   ];
 
