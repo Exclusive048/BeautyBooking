@@ -8,14 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
 import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
+import { CategoryPills } from "@/features/catalog/components/category-pills";
+import { CatalogPagination } from "@/features/catalog/components/catalog-pagination";
+import { SortMenu } from "@/features/catalog/components/sort-menu";
 import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-drawer";
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
+import { CitySelector } from "@/features/cities/components/city-selector";
 import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
+import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
+import type { CatalogSort } from "@/lib/catalog/schemas";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -51,6 +57,10 @@ type CatalogSearchItem = {
 type CatalogSearchData = {
   items: CatalogSearchItem[];
   nextCursor: string | null;
+  priceDistribution?: CatalogPriceBucket[];
+  totalCount?: number;
+  totalPages?: number;
+  page?: number;
 };
 
 type AvailabilitySearchData = AvailabilitySearchResponse;
@@ -102,11 +112,32 @@ function parseTimePreset(value: string | null): TimePresetValue | null {
   return null;
 }
 
-function mergeUnique(prev: CatalogSearchItem[], next: CatalogSearchItem[]): CatalogSearchItem[] {
-  const map = new Map<string, CatalogSearchItem>();
-  for (const item of prev) map.set(item.id, item);
-  for (const item of next) map.set(item.id, item);
-  return Array.from(map.values());
+function parseSort(value: string | null): CatalogSort {
+  if (
+    value === "rating" ||
+    value === "price-asc" ||
+    value === "price-desc" ||
+    value === "distance" ||
+    value === "popular"
+  ) {
+    return value;
+  }
+  return "relevance";
+}
+
+function parsePage(value: string | null): number {
+  const n = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+/** Russian-style noun pluralization for «мастер / мастера / мастеров». */
+function pluralizeMasters(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return UI_TEXT.catalog2.resultsHeader.pluralOne;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+    return UI_TEXT.catalog2.resultsHeader.pluralFew;
+  return UI_TEXT.catalog2.resultsHeader.pluralMany;
 }
 
 function toMapPoint(
@@ -196,6 +227,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const smartTag = parseSmartTag(searchParams.get("smartTag"));
   const entityType = parseEntityType(searchParams.get("entityType"));
   const view = parseViewMode(searchParams.get("view"));
+  const sort = parseSort(searchParams.get("sort"));
+  const page = parsePage(searchParams.get("page"));
   const todayIso = new Date().toISOString().slice(0, 10);
   const isTodaySelected = date === todayIso;
   const effectiveAvailableToday = availableToday || isTodaySelected;
@@ -224,10 +257,13 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
 
   const [draftServiceQuery, setDraftServiceQuery] = useState(serviceQuery);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [data, setData] = useState<CatalogSearchData>({ items: [], nextCursor: null });
+  // slug→id map of approved top-level GlobalCategories. Used to translate
+  // between the static CategoryPills IDs ("nails", "hair", …) and the live
+  // database `globalCategoryId` that the search backend filters on. Falls
+  // back to "all" when no pill slug matches the current globalCategoryId.
+  const [categorySlugToId, setCategorySlugToId] = useState<Map<string, string>>(new Map());
   const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
   const [mapSearchApplied, setMapSearchApplied] = useState(false);
   const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
@@ -282,6 +318,41 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     setDraftServiceQuery(serviceQuery);
   }, [serviceQuery]);
 
+  // One-shot fetch of approved top-level categories so the static
+  // CategoryPills slugs can be translated to real `globalCategoryId`s.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as
+          | ApiResponse<{ categories: Array<{ id: string; slug: string; parentId: string | null }> }>
+          | null;
+        if (!res.ok || !json || !json.ok || cancelled) return;
+        const map = new Map<string, string>();
+        for (const c of json.data.categories) {
+          if (c.parentId === null) map.set(c.slug, c.id);
+        }
+        setCategorySlugToId(map);
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activePillId = useMemo(() => {
+    if (!globalCategoryId) return "all" as const;
+    for (const [slug, id] of categorySlugToId.entries()) {
+      if (id === globalCategoryId && (slug === "nails" || slug === "hair" || slug === "brows" || slug === "skin")) {
+        return slug;
+      }
+    }
+    return "all" as const;
+  }, [globalCategoryId, categorySlugToId]);
+
   const onSubmit = useCallback(() => {
     updateParams({ serviceQuery: draftServiceQuery, district, date });
   }, [date, district, draftServiceQuery, updateParams]);
@@ -297,10 +368,12 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   );
 
   const requestCatalog = useCallback(
-    async (cursor?: string, overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
+    async (overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
       const params = new URLSearchParams();
       const activeMapSearch = overrideMapSearch ?? mapSearch;
       params.set("limit", "20");
+      params.set("page", String(page));
+      if (sort && sort !== "relevance") params.set("sort", sort);
       if (serviceQuery) params.set("serviceQuery", serviceQuery);
       if (district) params.set("district", district);
       if (date) params.set("date", date);
@@ -312,7 +385,6 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       if (hot) params.set("hot", "true");
       if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
-      if (cursor) params.set("cursor", cursor);
       if (activeMapSearch) {
         params.set("lat", String(activeMapSearch.center.lat));
         params.set("lng", String(activeMapSearch.center.lng));
@@ -334,11 +406,13 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       hot,
       globalCategoryId,
       mapSearch,
+      page,
       priceMax,
       priceMin,
       ratingMin,
       serviceQuery,
       smartTag,
+      sort,
     ]
   );
 
@@ -394,9 +468,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       setMapSearchApplied(source === "manual");
       setLoading(true);
       setError(null);
-      setLoadMoreError(null);
       try {
-        const next = await requestCatalog(undefined, nextMapSearch);
+        const next = await requestCatalog(nextMapSearch);
         setData(next);
       } catch (e) {
         setError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
@@ -411,7 +484,6 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setLoadMoreError(null);
     try {
       const next = await requestCatalog();
       setData(next);
@@ -447,22 +519,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     }
   }, [requestAvailability]);
 
-  const loadMore = useCallback(async () => {
-    if (loadingMore || data.nextCursor === null) return;
-    setLoadingMore(true);
-    setLoadMoreError(null);
-    try {
-      const next = await requestCatalog(data.nextCursor);
-      setData((prev) => ({
-        items: mergeUnique(prev.items, next.items),
-        nextCursor: next.nextCursor,
-      }));
-    } catch (e) {
-      setLoadMoreError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [data.nextCursor, loadingMore, requestCatalog]);
+  // Numbered pagination replaced cursor-based "load more" for default mode.
+  // Time-search keeps its own data source and isn't paginated.
 
   useEffect(() => {
     let cancelled = false;
@@ -556,36 +614,87 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     onToggleAvailableToday: () => updateParams({ availableToday: availableToday ? null : "true" }),
     onReset: resetFilters,
     activeCount: activeFilterCount,
+    priceDistribution: data.priceDistribution,
   };
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      {/* Search bar — full width */}
-      <div className="mb-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
-        <DateTimeFilterBar
-          serviceQuery={draftServiceQuery}
-          serviceId={serviceId}
-          date={date}
-          timePreset={timePreset}
-          timeFrom={effectiveTimeFrom}
-          timeTo={effectiveTimeTo}
-          onServiceQueryChange={onServiceQueryInput}
-          onServiceSelect={(service) => {
-            setDraftServiceQuery(service.title);
-            updateParams({ serviceQuery: service.title, serviceId: service.id });
+      {/* Sticky search section — under the global navbar (top-16 ≈ 64 px).
+          Wraps DateTimeFilterBar (existing time-search UX), CitySelector,
+          category pills and smart-tag pills. The two pill rows carry an
+          explicit `groupLabel` so users can tell category filters from
+          mood-based ranking. */}
+      <div className="sticky top-16 z-20 -mx-4 mb-6 border-b border-border-subtle bg-bg-page/95 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="mb-3 flex items-center gap-3">
+          <CitySelector />
+          <div className="flex-1 min-w-0">
+            <DateTimeFilterBar
+              serviceQuery={draftServiceQuery}
+              serviceId={serviceId}
+              date={date}
+              timePreset={timePreset}
+              timeFrom={effectiveTimeFrom}
+              timeTo={effectiveTimeTo}
+              onServiceQueryChange={onServiceQueryInput}
+              onServiceSelect={(service) => {
+                setDraftServiceQuery(service.title);
+                updateParams({ serviceQuery: service.title, serviceId: service.id });
+              }}
+              onDateChange={(value) => updateParams({ date: value })}
+              onPresetChange={(preset, from, to) =>
+                updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
+              }
+              onCustomTimeChange={(from, to) => updateParams({ timePreset: null, timeFrom: from, timeTo: to })}
+              onClearTime={() => updateParams({ timePreset: null, timeFrom: null, timeTo: null })}
+              showPhotoSearch={visualSearchEnabled}
+              onOpenPhotoSearch={() => {
+                if (visualSearchEnabled) setVisualSearchOpen(true);
+              }}
+              onSubmit={onSubmit}
+            />
+          </div>
+        </div>
+
+        {/* Categories pills — visual segmented row, mapped to a system slug
+            on the backend via the existing globalCategoryId. Empty category
+            list resolves to `null` (Все). */}
+        <CategoryPills
+          groupLabel={UI_TEXT.catalog2.searchBar.categoriesGroupLabel}
+          value={activePillId}
+          onChange={(next) => {
+            const id = next === "all" ? null : categorySlugToId.get(next) ?? null;
+            updateParams({ globalCategoryId: id, page: null });
           }}
-          onDateChange={(value) => updateParams({ date: value })}
-          onPresetChange={(preset, from, to) =>
-            updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
-          }
-          onCustomTimeChange={(from, to) => updateParams({ timePreset: null, timeFrom: from, timeTo: to })}
-          onClearTime={() => updateParams({ timePreset: null, timeFrom: null, timeTo: null })}
-          showPhotoSearch={visualSearchEnabled}
-          onOpenPhotoSearch={() => {
-            if (visualSearchEnabled) setVisualSearchOpen(true);
-          }}
-          onSubmit={onSubmit}
         />
+
+        {/* Smart tags — independent ranking dimension. Disambiguated from
+            category filtering via the «По настроению» group label. */}
+        <div className="mt-3 flex items-start gap-3">
+          <span className="mt-1.5 shrink-0 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-sec">
+            {UI_TEXT.catalog2.searchBar.moodGroupLabel}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {(["rush", "relax", "design", "safe", "silent"] as const).map((tag) => {
+              const active = smartTag === tag;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    updateParams({ smartTag: active ? null : tag, page: null })
+                  }
+                  className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors ${
+                    active
+                      ? "border-transparent bg-brand-gradient text-white"
+                      : "border-border-subtle bg-bg-card text-text-main hover:bg-bg-input"
+                  }`}
+                >
+                  {UI_TEXT.catalog2.smartTags[tag]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Mobile filter button row */}
@@ -638,32 +747,55 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
 
         {/* Content area */}
         <div className="min-w-0 flex-1">
-          {/* Results bar — desktop view toggle */}
-          <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/80 px-4 py-3">
-            <div className="text-sm text-muted-foreground">
-              {UI_TEXT.catalog.resultsCount}:{" "}
-              <span className="font-semibold text-foreground">{resultCount}</span>
+          {/* Editorial header — eyebrow + display title + sort + view toggle.
+              Title pluralization respects Russian noun forms. Total count
+              comes from the page-mode response (`totalCount`); for
+              time-search and cursor-mode we fall back to the visible item
+              count. */}
+          <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="mb-1.5 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+                {UI_TEXT.catalog2.resultsHeader.eyebrowNoCategory.replace("{city}", "")}
+              </p>
+              <h1 className="font-display text-3xl leading-[1.1] text-text-main sm:text-4xl lg:text-5xl">
+                {(data.totalCount ?? resultCount).toLocaleString("ru-RU")}{" "}
+                {pluralizeMasters(data.totalCount ?? resultCount)} рядом
+              </h1>
+              <p className="mt-1 text-sm text-text-sec">
+                {UI_TEXT.catalog2.resultsHeader.subtitleAvailable}
+              </p>
             </div>
-            {/* View toggle — desktop only */}
-            <div className="hidden lg:inline-flex rounded-full border border-border bg-card p-1">
-              <Button
-                onClick={() => updateParams({ view: "list" })}
-                variant={view === "list" ? "primary" : "ghost"}
-                size="sm"
-                className="rounded-full"
-              >
-                {UI_TEXT.catalog.viewList}
-              </Button>
-              <Button
-                onClick={() => updateParams({ view: "map" })}
-                variant={view === "map" ? "primary" : "ghost"}
-                size="sm"
-                className="rounded-full"
-              >
-                {UI_TEXT.catalog.viewMap}
-              </Button>
+            <div className="flex items-center gap-3">
+              <SortMenu
+                value={sort}
+                onChange={(next) =>
+                  updateParams({
+                    sort: next === "relevance" ? null : next,
+                    page: null,
+                  })
+                }
+              />
+              {/* View toggle — desktop only (mobile lives in the filter row above) */}
+              <div className="hidden lg:inline-flex rounded-full border border-border-subtle bg-bg-card p-1">
+                <Button
+                  onClick={() => updateParams({ view: "list" })}
+                  variant={view === "list" ? "primary" : "ghost"}
+                  size="sm"
+                  className="rounded-full"
+                >
+                  {UI_TEXT.catalog2.view.grid}
+                </Button>
+                <Button
+                  onClick={() => updateParams({ view: "map" })}
+                  variant={view === "map" ? "primary" : "ghost"}
+                  size="sm"
+                  className="rounded-full"
+                >
+                  {UI_TEXT.catalog2.view.map}
+                </Button>
+              </div>
             </div>
-          </div>
+          </header>
 
           {needsService || needsDate ? (
             <div role="status" className="mb-4 rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
@@ -755,20 +887,18 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
             </div>
           ) : null}
 
-          {!timeModeActive && !loading && !error && data.nextCursor !== null && view === "list" ? (
-            <div className="space-y-2 pt-4 text-center">
-              <Button
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                variant="secondary"
-                size="md"
-                className="rounded-full"
-              >
-                {loadingMore ? UI_TEXT.common.loading : UI_TEXT.catalog.loadMore}
-              </Button>
-              {loadMoreError ? (
-                <div className="text-xs text-red-600 dark:text-red-400">{loadMoreError}</div>
-              ) : null}
+          {!timeModeActive && !loading && !error && view === "list" && (data.totalPages ?? 1) > 1 ? (
+            <div className="pt-8">
+              <CatalogPagination
+                current={data.page ?? page}
+                total={data.totalPages ?? 1}
+                onChange={(next) => {
+                  updateParams({ page: next > 1 ? String(next) : null });
+                  if (typeof window !== "undefined") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+              />
             </div>
           ) : null}
         </div>

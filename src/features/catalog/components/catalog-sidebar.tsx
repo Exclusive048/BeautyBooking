@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Input } from "@/components/ui/input";
 import { DistrictSuggestInput } from "@/features/catalog/components/district-suggest-input";
+import { HistogramSlider } from "@/features/catalog/components/histogram-slider";
+import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -38,7 +39,12 @@ type Props = CatalogFilters & {
   onReset: () => void;
   activeCount: number;
   showHeader?: boolean;
+  /** Server-supplied price distribution for the histogram backdrop. When undefined or empty, the slider falls back to a flat track. */
+  priceDistribution?: ReadonlyArray<CatalogPriceBucket>;
 };
+
+const PRICE_FALLBACK_MIN = 0;
+const PRICE_FALLBACK_MAX = 20000;
 
 const RATING_STEPS = [0, 3, 3.5, 4, 4.5, 5];
 
@@ -61,14 +67,22 @@ export function CatalogSidebar({
   onReset,
   activeCount,
   showHeader = true,
+  priceDistribution,
 }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [draftPriceMin, setDraftPriceMin] = useState(priceMin);
-  const [draftPriceMax, setDraftPriceMax] = useState(priceMax);
 
-  // Sync external price resets
-  useEffect(() => { setDraftPriceMin(priceMin); }, [priceMin]);
-  useEffect(() => { setDraftPriceMax(priceMax); }, [priceMax]);
+  // Slider domain — derived from server-supplied distribution when present,
+  // otherwise a sensible 0..20k fallback so the widget is interactive even
+  // before the first result-set comes in.
+  const sliderMin = priceDistribution && priceDistribution.length > 0
+    ? priceDistribution[0]!.from
+    : PRICE_FALLBACK_MIN;
+  const sliderMax = priceDistribution && priceDistribution.length > 0
+    ? priceDistribution[priceDistribution.length - 1]!.to
+    : PRICE_FALLBACK_MAX;
+
+  const parsedLow = priceMin ? Math.max(sliderMin, Number(priceMin) || sliderMin) : sliderMin;
+  const parsedHigh = priceMax ? Math.min(sliderMax, Number(priceMax) || sliderMax) : sliderMax;
 
   useEffect(() => {
     let cancelled = false;
@@ -97,10 +111,10 @@ export function CatalogSidebar({
   const ratingValue = parseFloat(ratingMin) || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {showHeader ? (
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">
+          <h2 className="font-display text-lg text-text-main">
             {UI_TEXT.catalog.sidebar.title}
           </h2>
           {activeCount > 0 ? (
@@ -114,7 +128,7 @@ export function CatalogSidebar({
       {/* Categories */}
       {topCategories.length > 0 ? (
         <section>
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-sec">
             {UI_TEXT.catalog.sidebar.categories}
           </div>
           <div className="space-y-1">
@@ -148,40 +162,34 @@ export function CatalogSidebar({
         <DistrictSuggestInput value={district} onChange={onDistrictChange} />
       </section>
 
-      {/* Price */}
+      {/* Price — histogram slider replaces the legacy min/max number inputs.
+          The values shown on the thumb chips are the user's actual selection;
+          ranges that match the slider domain endpoints are emitted as empty
+          strings so the URL stays clean (no priceMin=0). */}
       <section>
-        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-sec">
           {UI_TEXT.catalog.chips.price}
         </div>
-        <div className="flex gap-2">
-          <Input
-            value={draftPriceMin}
-            onChange={(e) => setDraftPriceMin(e.target.value.replace(/[^0-9]/g, ""))}
-            onBlur={() => onPriceChange(draftPriceMin, draftPriceMax)}
-            placeholder={UI_TEXT.catalog.chips.priceMinPlaceholder}
-            className="h-9 rounded-xl text-sm"
-            inputMode="numeric"
-            aria-label={UI_TEXT.catalog.chips.priceMinPlaceholder}
-          />
-          <Input
-            value={draftPriceMax}
-            onChange={(e) => setDraftPriceMax(e.target.value.replace(/[^0-9]/g, ""))}
-            onBlur={() => onPriceChange(draftPriceMin, draftPriceMax)}
-            placeholder={UI_TEXT.catalog.chips.priceMaxPlaceholder}
-            className="h-9 rounded-xl text-sm"
-            inputMode="numeric"
-            aria-label={UI_TEXT.catalog.chips.priceMaxPlaceholder}
-          />
-        </div>
+        <HistogramSlider
+          min={sliderMin}
+          max={sliderMax}
+          value={[parsedLow, parsedHigh]}
+          distribution={priceDistribution ?? []}
+          onChange={([nextLow, nextHigh]) => {
+            const minStr = nextLow > sliderMin ? String(Math.round(nextLow)) : "";
+            const maxStr = nextHigh < sliderMax ? String(Math.round(nextHigh)) : "";
+            onPriceChange(minStr, maxStr);
+          }}
+        />
       </section>
 
       {/* Rating */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-sec">
             {UI_TEXT.catalog.sidebar.rating}
           </div>
-          <span className="text-sm font-medium text-foreground">
+          <span className="font-mono text-sm tabular-nums text-text-main">
             {ratingValue === 0
               ? UI_TEXT.catalog.sidebar.ratingAny
               : `${ratingValue}+`}
