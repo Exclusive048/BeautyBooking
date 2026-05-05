@@ -15,6 +15,7 @@ import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
 import { CitySelector } from "@/features/cities/components/city-selector";
+import { LoginRequiredModal } from "@/features/auth/components/login-required-modal";
 import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
@@ -204,9 +205,17 @@ function CatalogSkeletonGrid() {
 
 type CatalogPageClientProps = {
   visualSearchEnabled: boolean;
+  /** Whether the visitor has an active session — gates the favorites toggle. */
+  isAuthenticated: boolean;
+  /** Provider IDs the current user has favorited. Empty for anonymous visitors. */
+  favoriteIds: string[];
 };
 
-export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageClientProps) {
+export default function CatalogPageClient({
+  visualSearchEnabled,
+  isAuthenticated,
+  favoriteIds,
+}: CatalogPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -259,6 +268,11 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CatalogSearchData>({ items: [], nextCursor: null });
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  // O(1) lookup for `initialFavorited` per card. Memoized from the server-
+  // supplied array; the catalog page is fully re-rendered on auth change so
+  // we don't try to keep this set in sync after mount.
+  const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
   // slug→id map of approved top-level GlobalCategories. Used to translate
   // between the static CategoryPills IDs ("nails", "hair", …) and the live
   // database `globalCategoryId` that the search backend filters on. Falls
@@ -854,7 +868,13 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
                       key={item.id}
                       variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
                     >
-                      <CatalogCard item={item} serviceQuery={serviceQuery} />
+                      <CatalogCard
+                        item={item}
+                        serviceQuery={serviceQuery}
+                        isAuthenticated={isAuthenticated}
+                        initialFavorited={favoriteSet.has(item.id)}
+                        onLoginRequired={() => setLoginModalOpen(true)}
+                      />
                     </motion.div>
                   ))}
             </motion.div>
@@ -915,6 +935,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       {visualSearchEnabled ? (
         <VisualSearchModal open={visualSearchOpen} onClose={() => setVisualSearchOpen(false)} />
       ) : null}
+
+      <LoginRequiredModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </div>
   );
 }

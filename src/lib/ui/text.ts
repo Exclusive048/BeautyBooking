@@ -306,6 +306,19 @@ export const UI_TEXT = {
       safe: "Стерильно",
       silent: "Тихо",
     },
+    favoriteToggle: {
+      addAria: "Добавить в избранное",
+      removeAria: "Убрать из избранного",
+      errorRateLimited: "Слишком частые запросы. Подождите немного.",
+      errorGeneric: "Не удалось обновить избранное",
+    },
+    loginRequired: {
+      title: "Войдите, чтобы сохранять мастеров",
+      description:
+        "Сохранённые мастера будут доступны в личном кабинете — чтобы быстро найти их позже.",
+      loginCta: "Войти",
+      closeCta: "Закрыть",
+    },
   },
   pricing: {
     hero: {
@@ -3060,7 +3073,23 @@ export const UI_TEXT = {
       settings: "Настройки",
       roles: "Роли",
       modelApplications: "Заявки на модель",
+      favorites: "Избранное",
       more: "Ещё",
+    },
+    favorites: {
+      eyebrow: "Личное",
+      title: "Избранные мастера",
+      descriptionEmpty: "Здесь будут мастера, которых вы сохраните.",
+      descriptionTemplate: "Сохранено: {count}",
+      empty: {
+        title: "Список пока пустой",
+        description:
+          "Сохраняйте мастеров в каталоге — они появятся здесь, чтобы вы могли быстро найти их в будущем.",
+        cta: "В каталог",
+      },
+      // TODO (follow-up commit): enrich saved-list cards with `nextSlot` and
+      // `todaySlotsCount` so they match the catalog's UX. Today we render a
+      // minimal mapping (no slot indicator, no portfolio carousel).
     },
     dashboard: {
       greeting: (name: string) => `Здравствуйте, ${name}!`,

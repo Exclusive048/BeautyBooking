@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Heart, Star } from "lucide-react";
 import { FocalImage } from "@/components/ui/focal-image";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -10,6 +11,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
+import type { ApiResponse } from "@/lib/types/api";
 
 type CatalogCardItem = {
   type: "master" | "studio";
@@ -35,6 +37,12 @@ type CatalogCardItem = {
 type Props = {
   item: CatalogCardItem;
   serviceQuery: string;
+  /** Initial heart state (server-resolved per session). Defaults to false for anonymous users. */
+  initialFavorited?: boolean;
+  /** When true, clicks call the toggle endpoint. When false, clicks bubble up via `onLoginRequired`. */
+  isAuthenticated?: boolean;
+  /** Called when an anonymous user attempts to favorite — orchestrator decides UX (modal, toast, redirect). */
+  onLoginRequired?: () => void;
 };
 
 const TC = UI_TEXT.catalog2.card;
@@ -51,9 +59,64 @@ const TC = UI_TEXT.catalog2.card;
  * Hue placeholder is deterministic via `hueFromId(item.id)` — masters without
  * portfolio still get a stable, distinctive card colour across renders.
  */
-export function CatalogCard({ item, serviceQuery }: Props) {
+export function CatalogCard({
+  item,
+  serviceQuery,
+  initialFavorited = false,
+  isAuthenticated = false,
+  onLoginRequired,
+}: Props) {
   const router = useRouter();
   const viewerTimeZone = useViewerTimeZoneContext();
+  const [favorited, setFavorited] = useState(initialFavorited);
+  const [favoritePending, setFavoritePending] = useState(false);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+
+  async function handleFavoriteToggle(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    setFavoriteError(null);
+
+    if (!isAuthenticated) {
+      onLoginRequired?.();
+      return;
+    }
+    if (favoritePending) return;
+
+    // Optimistic flip — orchestrator sees the new state immediately, network
+    // happens after. Roll back on any non-2xx (the surface message comes
+    // from UI_TEXT, never the API body, to keep wording consistent).
+    const next = !favorited;
+    setFavorited(next);
+    setFavoritePending(true);
+    try {
+      const res = await fetch("/api/favorites/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerId: item.id }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ApiResponse<{ favorited: boolean }>
+        | null;
+
+      if (!res.ok || !json || !json.ok) {
+        setFavorited(!next);
+        if (res.status === 429) {
+          setFavoriteError(UI_TEXT.catalog2.favoriteToggle.errorRateLimited);
+        } else {
+          setFavoriteError(UI_TEXT.catalog2.favoriteToggle.errorGeneric);
+        }
+        return;
+      }
+      // Reconcile with the server's view in case of a race.
+      setFavorited(json.data.favorited);
+    } catch {
+      setFavorited(!next);
+      setFavoriteError(UI_TEXT.catalog2.favoriteToggle.errorGeneric);
+    } finally {
+      setFavoritePending(false);
+    }
+  }
   const href = providerPublicUrl({ id: item.id, publicUsername: item.publicUsername }, "catalog-card") ?? "#";
   const bookingHref = item.publicUsername ? `/u/${item.publicUsername}/booking` : "#";
 
@@ -112,15 +175,25 @@ export function CatalogCard({ item, serviceQuery }: Props) {
 
         <button
           type="button"
-          aria-label={TC.saveAria}
-          title={TC.saveTooltip}
-          onClick={(e) => {
-            e.stopPropagation();
-            // Intentional no-op until favorites land in 22b.
-          }}
-          className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-bg-card/80 text-text-sec backdrop-blur-sm transition-colors hover:bg-bg-card hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
+          aria-label={
+            favorited
+              ? UI_TEXT.catalog2.favoriteToggle.removeAria
+              : UI_TEXT.catalog2.favoriteToggle.addAria
+          }
+          aria-pressed={favorited}
+          title={favoriteError ?? TC.saveTooltip}
+          disabled={favoritePending}
+          onClick={handleFavoriteToggle}
+          className={`absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-bg-card/80 backdrop-blur-sm transition-colors hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40 ${
+            favorited
+              ? "text-rose-500 hover:text-rose-600"
+              : "text-text-sec hover:text-rose-500"
+          } ${favoritePending ? "opacity-60" : ""}`}
         >
-          <Heart className="h-4 w-4" aria-hidden />
+          <Heart
+            className={`h-4 w-4 ${favorited ? "fill-current" : ""}`}
+            aria-hidden
+          />
         </button>
 
         {/* Booking CTA — appears on hover over the photo */}

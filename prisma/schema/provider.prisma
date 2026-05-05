@@ -98,6 +98,7 @@ model Provider {
 
   hotSlots             HotSlot[]
   hotSlotSubscriptions HotSlotSubscription[]
+  favoritedBy          UserFavorite[]
 
   studioProfile Studio? @relation("StudioProvider")
 
