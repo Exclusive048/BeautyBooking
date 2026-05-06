@@ -216,8 +216,13 @@ async function resolveCategoryFilterIds(
     return [root.id];
   }
 
+  // Children query intentionally does NOT filter by `isSystem` — seed-managed
+  // categories run with isSystem=true, while user-proposed ones are
+  // isSystem=false. Filtering one side dropped seeded sub-categories, so
+  // `nails` no longer expanded to `manicure`/`pedicure` and the catalog
+  // returned empty results for parent picks.
   const rows = await prisma.globalCategory.findMany({
-    where: { status: "APPROVED", isSystem: false },
+    where: { status: "APPROVED" },
     select: { id: true, parentId: true },
   });
 

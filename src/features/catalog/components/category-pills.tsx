@@ -22,11 +22,14 @@ type Props = {
 };
 
 /**
+ * @deprecated Removed from /catalog in 22a-fix-1 — categories now live
+ * exclusively in the sidebar (single-radio top-level + backend expansion).
+ * Kept here for potential future surfaces (homepage hero, focused-category
+ * landings). Delete the component if no usage appears within the next sprint.
+ *
  * Segmented pill row for top-level service categories — matches the reference
- * design language. Lives next to (not replacing) the existing smart-tag chips:
- * categories answer "what service?", smart-tags answer "what mood?". The
- * `groupLabel` prop lets callers caption the row when the disambiguation
- * helps users — e.g. "Категория" above pills vs "По настроению" above tags.
+ * design language. The `groupLabel` prop captions the row when disambiguation
+ * helps users.
  */
 export function CategoryPills({ value, onChange, groupLabel }: Props) {
   return (
@@ -38,7 +41,7 @@ export function CategoryPills({ value, onChange, groupLabel }: Props) {
       ) : null}
       <div
         role="tablist"
-        aria-label={UI_TEXT.catalog2.searchBar.categoriesGroupLabel}
+        aria-label={groupLabel}
         className="inline-flex rounded-full bg-muted/40 p-1"
       >
         {ITEMS.map((item) => {

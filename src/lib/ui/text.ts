@@ -207,13 +207,14 @@ export const UI_TEXT = {
     // Coexists with the legacy `catalog` namespace (used by existing card/sidebar
     // strings) until the integration commit moves all keys over and removes legacy.
     searchBar: {
-      locationLabel: "Город",
-      searchPlaceholder: "Услуга, мастер или район",
+      searchPlaceholder: "Услуга или имя мастера",
       findCta: "Найти",
       filtersLabel: "Фильтры",
       todayLabel: "Сегодня",
-      categoriesGroupLabel: "Категория",
-      moodGroupLabel: "По настроению",
+      whenLabel: "Когда",
+      todayChip: "Сегодня",
+      tomorrowChip: "Завтра",
+      calendarChip: "Календарь",
     },
     categories: {
       all: "Все",
@@ -265,6 +266,14 @@ export const UI_TEXT = {
       districtSearchPlaceholder: "Поиск метро или района",
       ratingAny: "Любой",
       ratingFromTemplate: "От {value} ★",
+      categoriesShowAll: "Показать все ({count})",
+      categoriesCollapse: "Свернуть",
+    },
+    searchAutocomplete: {
+      loading: "Ищем…",
+      empty: "Ничего не найдено по запросу «{query}»",
+      categoriesGroup: "Категории",
+      providersGroup: "Мастера",
     },
     when: {
       today: "Сегодня",
@@ -298,13 +307,6 @@ export const UI_TEXT = {
     pagination: {
       nextAria: "Следующая страница",
       prevAria: "Предыдущая страница",
-    },
-    smartTags: {
-      rush: "В спешке",
-      relax: "Расслабиться",
-      design: "Дизайн",
-      safe: "Стерильно",
-      silent: "Тихо",
     },
     favoriteToggle: {
       addAria: "Добавить в избранное",

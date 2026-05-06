@@ -7,30 +7,29 @@ import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
+import { CatalogSearchBar } from "@/features/catalog/components/catalog-search-bar";
+import type { AutocompleteCategory } from "@/features/catalog/components/service-search-input";
 import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
-import { CategoryPills } from "@/features/catalog/components/category-pills";
 import { CatalogPagination } from "@/features/catalog/components/catalog-pagination";
 import { SortMenu } from "@/features/catalog/components/sort-menu";
 import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-drawer";
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
-import { CitySelector } from "@/features/cities/components/city-selector";
 import { LoginRequiredModal } from "@/features/auth/components/login-required-modal";
 import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
-import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import type { CatalogSort } from "@/lib/catalog/schemas";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
+import { getCurrentCitySlug } from "@/lib/cities/client-city";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
 type EntityType = "all" | "master" | "studio";
 type ViewMode = "list" | "map";
-type SmartTagPreset = "rush" | "relax" | "design" | "safe" | "silent";
 type TimePresetValue = "morning" | "day" | "evening";
 
 type CatalogSearchItem = {
@@ -99,13 +98,6 @@ function parseEntityType(value: string | null): EntityType {
 
 function parseViewMode(value: string | null): ViewMode {
   return value === "map" ? "map" : "list";
-}
-
-function parseSmartTag(value: string | null): SmartTagPreset | null {
-  if (value === "rush" || value === "relax" || value === "design" || value === "safe" || value === "silent") {
-    return value;
-  }
-  return null;
 }
 
 function parseTimePreset(value: string | null): TimePresetValue | null {
@@ -233,7 +225,6 @@ export default function CatalogPageClient({
   const availableToday = searchParams.get("availableToday") === "true";
   const ratingMin = searchParams.get("ratingMin") ?? "";
   const hot = searchParams.get("hot") === "true";
-  const smartTag = parseSmartTag(searchParams.get("smartTag"));
   const entityType = parseEntityType(searchParams.get("entityType"));
   const view = parseViewMode(searchParams.get("view"));
   const sort = parseSort(searchParams.get("sort"));
@@ -273,11 +264,6 @@ export default function CatalogPageClient({
   // supplied array; the catalog page is fully re-rendered on auth change so
   // we don't try to keep this set in sync after mount.
   const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
-  // slug→id map of approved top-level GlobalCategories. Used to translate
-  // between the static CategoryPills IDs ("nails", "hair", …) and the live
-  // database `globalCategoryId` that the search backend filters on. Falls
-  // back to "all" when no pill slug matches the current globalCategoryId.
-  const [categorySlugToId, setCategorySlugToId] = useState<Map<string, string>>(new Map());
   const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
   const [mapSearchApplied, setMapSearchApplied] = useState(false);
   const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
@@ -332,41 +318,6 @@ export default function CatalogPageClient({
     setDraftServiceQuery(serviceQuery);
   }, [serviceQuery]);
 
-  // One-shot fetch of approved top-level categories so the static
-  // CategoryPills slugs can be translated to real `globalCategoryId`s.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: Array<{ id: string; slug: string; parentId: string | null }> }>
-          | null;
-        if (!res.ok || !json || !json.ok || cancelled) return;
-        const map = new Map<string, string>();
-        for (const c of json.data.categories) {
-          if (c.parentId === null) map.set(c.slug, c.id);
-        }
-        setCategorySlugToId(map);
-      } catch {
-        /* silent */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const activePillId = useMemo(() => {
-    if (!globalCategoryId) return "all" as const;
-    for (const [slug, id] of categorySlugToId.entries()) {
-      if (id === globalCategoryId && (slug === "nails" || slug === "hair" || slug === "brows" || slug === "skin")) {
-        return slug;
-      }
-    }
-    return "all" as const;
-  }, [globalCategoryId, categorySlugToId]);
-
   const onSubmit = useCallback(() => {
     updateParams({ serviceQuery: draftServiceQuery, district, date });
   }, [date, district, draftServiceQuery, updateParams]);
@@ -397,7 +348,6 @@ export default function CatalogPageClient({
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (ratingMin) params.set("ratingMin", ratingMin);
       if (hot) params.set("hot", "true");
-      if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
       if (activeMapSearch) {
         params.set("lat", String(activeMapSearch.center.lat));
@@ -425,7 +375,6 @@ export default function CatalogPageClient({
       priceMin,
       ratingMin,
       serviceQuery,
-      smartTag,
       sort,
     ]
   );
@@ -445,7 +394,6 @@ export default function CatalogPageClient({
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (ratingMin) params.set("ratingMin", ratingMin);
       if (hot) params.set("hot", "true");
-      if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
 
       const res = await fetch(`/api/search/availability?${params.toString()}`, {
@@ -471,7 +419,6 @@ export default function CatalogPageClient({
       priceMin,
       ratingMin,
       serviceId,
-      smartTag,
     ]
   );
 
@@ -605,6 +552,17 @@ export default function CatalogPageClient({
     }
   }, [closeMapSidebar, view]);
 
+  // Single-source-of-truth rule (22a-fix-3): touching any sidebar filter
+  // clears the search input. The text query and the sidebar filters are
+  // distinct interaction modes — search-input drives the autocomplete
+  // dropdown / free-text submit, while the sidebar drives faceted browse.
+  // Mixing them confuses results, so we wipe the input as the user steps
+  // into "browse" mode.
+  const clearSearchInput = useCallback(() => {
+    setDraftServiceQuery("");
+    updateParams({ serviceQuery: null, serviceId: null });
+  }, [updateParams]);
+
   // Shared filter props for sidebar and drawer
   const filterProps = {
     globalCategoryId: globalCategoryId || null,
@@ -615,100 +573,102 @@ export default function CatalogPageClient({
     hot,
     entityType,
     availableToday,
-    onGlobalCategoryChange: (value: string | null) => updateParams({ globalCategoryId: value }),
-    onDistrictChange: (value: string) => updateParams({ district: value || null }),
-    onRatingMinChange: (value: string) => updateParams({ ratingMin: value || null }),
-    onPriceChange: (min: string, max: string) =>
+    onGlobalCategoryChange: (value: string | null) => {
+      clearSearchInput();
+      updateParams({ globalCategoryId: value });
+    },
+    onDistrictChange: (value: string) => {
+      clearSearchInput();
+      updateParams({ district: value || null });
+    },
+    onRatingMinChange: (value: string) => {
+      clearSearchInput();
+      updateParams({ ratingMin: value || null });
+    },
+    onPriceChange: (min: string, max: string) => {
+      clearSearchInput();
       updateParams({
         priceMin: min.length > 0 ? min : null,
         priceMax: max.length > 0 ? max : null,
-      }),
-    onToggleHot: () => updateParams({ hot: hot ? null : "true" }),
-    onEntityTypeChange: (value: EntityType) => updateParams({ entityType: value === "all" ? null : value }),
-    onToggleAvailableToday: () => updateParams({ availableToday: availableToday ? null : "true" }),
-    onReset: resetFilters,
+      });
+    },
+    onToggleHot: () => {
+      clearSearchInput();
+      updateParams({ hot: hot ? null : "true" });
+    },
+    onEntityTypeChange: (value: EntityType) => {
+      clearSearchInput();
+      updateParams({ entityType: value === "all" ? null : value });
+    },
+    onToggleAvailableToday: () => {
+      clearSearchInput();
+      updateParams({ availableToday: availableToday ? null : "true" });
+    },
+    onReset: () => {
+      clearSearchInput();
+      resetFilters();
+    },
     activeCount: activeFilterCount,
     priceDistribution: data.priceDistribution,
   };
 
+  // Selecting a category from the autocomplete dropdown — clear input AND
+  // apply the filter. Same end-state as a sidebar click, but bypasses the
+  // wrapper helper so we don't double-fire updateParams calls.
+  const handleCategorySelectFromSearch = useCallback(
+    (category: AutocompleteCategory) => {
+      setDraftServiceQuery("");
+      updateParams({
+        serviceQuery: null,
+        serviceId: null,
+        globalCategoryId: category.id,
+        page: null,
+      });
+    },
+    [updateParams],
+  );
+
+  // City slug for autocomplete scoping — pulled from the same client-city
+  // store the navbar <CitySelector> writes to. Hydrates after mount, so
+  // the first auto-complete request after a hard nav may not include city
+  // — acceptable trade-off (results just aren't pre-narrowed).
+  const [citySlug, setCitySlug] = useState<string | null>(null);
+  useEffect(() => {
+    setCitySlug(getCurrentCitySlug());
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      {/* Sticky search section — under the global navbar (top-16 ≈ 64 px).
-          Wraps DateTimeFilterBar (existing time-search UX), CitySelector,
-          category pills and smart-tag pills. The two pill rows carry an
-          explicit `groupLabel` so users can tell category filters from
-          mood-based ranking. */}
-      <div className="sticky top-16 z-20 -mx-4 mb-6 border-b border-border-subtle bg-bg-page/95 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="mb-3 flex items-center gap-3">
-          <CitySelector />
-          <div className="flex-1 min-w-0">
-            <DateTimeFilterBar
-              serviceQuery={draftServiceQuery}
-              serviceId={serviceId}
-              date={date}
-              timePreset={timePreset}
-              timeFrom={effectiveTimeFrom}
-              timeTo={effectiveTimeTo}
-              onServiceQueryChange={onServiceQueryInput}
-              onServiceSelect={(service) => {
-                setDraftServiceQuery(service.title);
-                updateParams({ serviceQuery: service.title, serviceId: service.id });
-              }}
-              onDateChange={(value) => updateParams({ date: value })}
-              onPresetChange={(preset, from, to) =>
-                updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
-              }
-              onCustomTimeChange={(from, to) => updateParams({ timePreset: null, timeFrom: from, timeTo: to })}
-              onClearTime={() => updateParams({ timePreset: null, timeFrom: null, timeTo: null })}
-              showPhotoSearch={visualSearchEnabled}
-              onOpenPhotoSearch={() => {
-                if (visualSearchEnabled) setVisualSearchOpen(true);
-              }}
-              onSubmit={onSubmit}
-            />
-          </div>
-        </div>
-
-        {/* Categories pills — visual segmented row, mapped to a system slug
-            on the backend via the existing globalCategoryId. Empty category
-            list resolves to `null` (Все). */}
-        <CategoryPills
-          groupLabel={UI_TEXT.catalog2.searchBar.categoriesGroupLabel}
-          value={activePillId}
-          onChange={(next) => {
-            const id = next === "all" ? null : categorySlugToId.get(next) ?? null;
-            updateParams({ globalCategoryId: id, page: null });
+      {/* Sticky search section — full-bleed sticky wrapper that hugs the
+          global navbar (top-16 ≈ 64px). The unified <CatalogSearchBar> card
+          owns its own background and chrome; the wrapper just supplies the
+          translucent backdrop blur so content scrolls cleanly underneath. */}
+      <div className="sticky top-16 z-20 -mx-4 mb-6 bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <CatalogSearchBar
+          serviceQuery={draftServiceQuery}
+          date={date}
+          timePreset={timePreset}
+          timeFrom={effectiveTimeFrom}
+          timeTo={effectiveTimeTo}
+          citySlug={citySlug}
+          onServiceQueryChange={onServiceQueryInput}
+          onCategorySelectFromSearch={handleCategorySelectFromSearch}
+          onDateChange={(value) => updateParams({ date: value || null })}
+          onTimePresetChange={(preset, from, to) =>
+            updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
+          }
+          onCustomTimeChange={(from, to) =>
+            updateParams({ timePreset: null, timeFrom: from, timeTo: to })
+          }
+          onClearTime={() =>
+            updateParams({ timePreset: null, timeFrom: null, timeTo: null })
+          }
+          onSubmit={onSubmit}
+          showPhotoSearch={visualSearchEnabled}
+          onOpenPhotoSearch={() => {
+            if (visualSearchEnabled) setVisualSearchOpen(true);
           }}
         />
-
-        {/* Smart tags — independent ranking dimension. Disambiguated from
-            category filtering via the «По настроению» group label. */}
-        <div className="mt-3 flex items-start gap-3">
-          <span className="mt-1.5 shrink-0 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-sec">
-            {UI_TEXT.catalog2.searchBar.moodGroupLabel}
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {(["rush", "relax", "design", "safe", "silent"] as const).map((tag) => {
-              const active = smartTag === tag;
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() =>
-                    updateParams({ smartTag: active ? null : tag, page: null })
-                  }
-                  className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors ${
-                    active
-                      ? "border-transparent bg-brand-gradient text-white"
-                      : "border-border-subtle bg-bg-card text-text-main hover:bg-bg-input"
-                  }`}
-                >
-                  {UI_TEXT.catalog2.smartTags[tag]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       {/* Mobile filter button row */}
