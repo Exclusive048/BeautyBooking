@@ -41,6 +41,7 @@ export function ManualBookingModal({ services, isSolo }: Props) {
   const [, startTransition] = useTransition();
 
   const isOpen = searchParams.get("manual") === "1";
+  const prefillTime = searchParams.get("prefillTime");
 
   const [startAt, setStartAt] = useState(`${todayDateKey()}T10:00`);
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
@@ -57,6 +58,21 @@ export function ManualBookingModal({ services, isSolo }: Props) {
       setServiceId(services[0].id);
     }
   }, [isOpen, serviceId, services]);
+
+  // Seed `startAt` from `?prefillTime=ISO` (set by the schedule's empty-cell
+  // overlay). Runs only when the modal toggles open or the param value
+  // changes — keeps user edits intact mid-session.
+  useEffect(() => {
+    if (!isOpen || !prefillTime) return;
+    const parsed = new Date(prefillTime);
+    if (Number.isNaN(parsed.getTime())) return;
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+    const d = String(parsed.getDate()).padStart(2, "0");
+    const hh = String(parsed.getHours()).padStart(2, "0");
+    const mm = String(parsed.getMinutes()).padStart(2, "0");
+    setStartAt(`${y}-${m}-${d}T${hh}:${mm}`);
+  }, [isOpen, prefillTime]);
 
   // ESC-to-close mirrors the LoginRequiredModal pattern.
   useEffect(() => {
@@ -83,6 +99,7 @@ export function ManualBookingModal({ services, isSolo }: Props) {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("manual");
     next.delete("date");
+    next.delete("prefillTime");
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
