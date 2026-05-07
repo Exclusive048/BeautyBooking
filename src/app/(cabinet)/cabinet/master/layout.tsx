@@ -49,7 +49,7 @@ export default async function MasterCabinetLayout({
   ] = await Promise.all([
     getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
     getPendingBookingsCountForMaster(master.id),
-    getUnreadBadgeCount({ userId, phone: sessionUser?.phone ?? null }),
+    getUnreadBadgeCount({ userId, phone: sessionUser?.phone ?? null, context: "master" }),
     getUnansweredReviewsCountForMaster(master.id),
   ]);
 

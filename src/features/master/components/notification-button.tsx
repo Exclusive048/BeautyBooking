@@ -16,7 +16,7 @@ const T = UI_TEXT.cabinetMaster.pageHeader;
  * The pure-link form keeps it server-renderable; no client interactivity
  * needed.
  */
-export function NotificationButton({ count, href = "/cabinet/notifications" }: Props) {
+export function NotificationButton({ count, href = "/cabinet/master/notifications" }: Props) {
   const showBadge = count > 0;
   return (
     <Link

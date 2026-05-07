@@ -48,7 +48,7 @@ const T = UI_TEXT.cabinetMaster;
 const HREF = {
   home: "/cabinet/master/dashboard",
   bookings: "/cabinet/master/bookings",
-  notifications: "/cabinet/notifications",
+  notifications: "/cabinet/master/notifications",
   schedule: "/cabinet/master/schedule",
   scheduleSettings: "/cabinet/master/schedule/settings",
   clients: "/cabinet/master/clients",

@@ -49,7 +49,13 @@ export function useNotificationsBell(options: Options = {}) {
     inFlightRef.current = true;
 
     try {
-      const res = await fetch("/api/notifications/unread-count", { cache: "no-store" });
+      // Bell sits in the global navbar — only personal-stream events
+      // (account, billing, studio invites, client-side bookings) belong
+      // here. Master operational events live in the master sidebar badge,
+      // counted separately by the cabinet layout.
+      const res = await fetch("/api/notifications/unread-count?context=personal", {
+        cache: "no-store",
+      });
       const json = (await res.json().catch(() => null)) as ApiResponse<UnreadResponse> | null;
       if (!res.ok || !json || !json.ok) return;
       setUnreadCount(json.data.count);

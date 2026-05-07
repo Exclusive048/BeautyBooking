@@ -35,7 +35,7 @@ export type NotificationCenterData = {
   hasPhone: boolean;
 };
 
-function classifyNotificationChannel(input: {
+export function classifyNotificationChannel(input: {
   userId: string;
   studioIds: Set<string>;
   booking: {
@@ -126,7 +126,7 @@ function resolveChatOpenHref(type: NotificationCenterNotificationItem["type"], p
   return `/cabinet/bookings?${params.toString()}`;
 }
 
-function resolveModelChannel(type: NotificationCenterNotificationItem["type"]): NotificationChannel | null {
+export function resolveModelChannel(type: NotificationCenterNotificationItem["type"]): NotificationChannel | null {
   if (
     type === "MODEL_NEW_APPLICATION" ||
     type === "MODEL_APPLICATION_RECEIVED" ||

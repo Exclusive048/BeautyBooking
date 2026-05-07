@@ -46,7 +46,7 @@ export async function MasterDashboardPage() {
   // surface the same number the sidebar shows.
   const [data, unreadBadge] = await Promise.all([
     getMasterDashboardData({ masterId }),
-    getUnreadBadgeCount({ userId, phone: sessionUser.phone ?? null }),
+    getUnreadBadgeCount({ userId, phone: sessionUser.phone ?? null, context: "master" }),
   ]);
 
   const firstName =
