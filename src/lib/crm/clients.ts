@@ -31,6 +31,10 @@ export type ClientAggregate = {
   displayName: string;
   lastBookingAt: Date;
   lastVisitAt: Date | null;
+  /** Earliest FINISHED visit. Null when the client has only upcoming or
+   * non-completed bookings. Used by 27a's classifier to mark recent
+   * arrivals as "Новые". */
+  firstVisitAt: Date | null;
   lastServiceName: string;
   visitsCount: number;
   totalAmount: number;
@@ -89,6 +93,7 @@ export function groupBookings(bookings: BookingClientRow[]): Map<string, ClientA
         displayName,
         lastBookingAt: visitDate,
         lastVisitAt: isCompleted ? visitDate : null,
+        firstVisitAt: isCompleted ? visitDate : null,
         lastServiceName: serviceTitle,
         visitsCount: isCompleted ? 1 : 0,
         totalAmount: isCompleted ? bookingAmount : 0,
@@ -108,6 +113,9 @@ export function groupBookings(bookings: BookingClientRow[]): Map<string, ClientA
       current.totalAmount += bookingAmount;
       if (!current.lastVisitAt || visitDate.getTime() > current.lastVisitAt.getTime()) {
         current.lastVisitAt = visitDate;
+      }
+      if (!current.firstVisitAt || visitDate.getTime() < current.firstVisitAt.getTime()) {
+        current.firstVisitAt = visitDate;
       }
     }
   }
