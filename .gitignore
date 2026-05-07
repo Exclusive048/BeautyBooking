@@ -50,3 +50,4 @@ prisma/seed-test.sql
 prisma/seed.sql
 prisma/seed.sh
 docs
+BACKLOG.md
