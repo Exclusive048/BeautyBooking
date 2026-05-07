@@ -44,6 +44,22 @@ model Provider {
   scheduleMode              ScheduleMode @default(FLEXIBLE)
   fixedSlotTimes            String[]     @default([])
 
+  // Booking-rules & visibility settings (25-SETTINGS-B). Surfaced in the
+  // master cabinet under Settings → "Правила" / "Видимость"; persisted via
+  // the same PATCH endpoint as the week schedule. `lateCancelAction` is
+  // stored but not yet enforced — payment-side fines aren't wired.
+  // `slotPrecision` controls how slots are surfaced on the public profile.
+  minBookingHoursAhead Int     @default(2)
+  maxBookingDaysAhead  Int     @default(90)
+  lateCancelAction     String  @default("none")
+  slotPrecision        String  @default("exact")
+  visibleSlotDays      Int     @default(30)
+  acceptNewClients     Boolean @default(true)
+  // Booking grid quantum (15 / 30 / 60 min). Surfaced in Settings → "Часы";
+  // persisted via PATCH /api/cabinet/master/schedule. Existing rows get 15
+  // by default — matches the prior implicit behaviour.
+  slotStepMin               Int          @default(15)
+
   studioId String?
 
   studio Provider? @relation("StudioMasters", fields: [studioId], references: [id], onDelete: SetNull)

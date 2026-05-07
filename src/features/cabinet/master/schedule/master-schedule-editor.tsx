@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * @deprecated Legacy 1488-line schedule editor. The master cabinet
+ * (/cabinet/master/schedule/settings) was rebuilt in 25-SETTINGS-A on top
+ * of the new tabs shell + auto-save flow under
+ * `src/features/master/components/schedule-settings/`. This file lives on
+ * solely because the studio cabinet calendar
+ * (`src/features/studio/components/studio-calendar-page.tsx`) still mounts
+ * it. Slated for deletion once the studio flow gets its own rebuild — do
+ * not extend it for new functionality.
+ */
+
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Pencil, X } from "lucide-react";
