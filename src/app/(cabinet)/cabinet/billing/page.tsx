@@ -1,7 +1,6 @@
 import { AccountType } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { BillingPage } from "@/features/billing/components/billing-page";
-import { MasterCabinetTopbar } from "@/features/master/components/master-cabinet-topbar";
 import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
 import { hasMasterProfile } from "@/lib/auth/roles";
 import { getSessionUser } from "@/lib/auth/session";
@@ -53,30 +52,14 @@ export default async function Page({ searchParams }: PageProps) {
     const masterContext = await getCurrentMasterProviderContext(user.id);
     const master = await prisma.provider.findUnique({
       where: { id: masterContext.id },
-      select: { ratingAvg: true, rating: true, studioId: true },
+      select: { studioId: true },
     });
     if (!master) {
       redirect("/403");
     }
 
-    const rating = master.ratingAvg > 0 ? master.ratingAvg : master.rating;
-    const ratingLabel = rating.toFixed(1);
-    const studioName = master.studioId
-      ? (
-          await prisma.provider.findUnique({
-            where: { id: master.studioId },
-            select: { name: true },
-          })
-        )?.name ?? null
-      : null;
-
     return (
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
-        <MasterCabinetTopbar
-          ratingLabel={ratingLabel}
-          studioName={studioName}
-          isStudioMember={Boolean(master.studioId)}
-        />
         <main className="min-w-0">
           {master.studioId ? (
             <section className="space-y-4">

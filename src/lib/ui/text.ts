@@ -1722,6 +1722,156 @@ export const UI_TEXT = {
       leadTime: "Глубина записи",
     },
   },
+  cabinetMaster: {
+    brand: {
+      title: "МастерРядом",
+      subtitle: "Кабинет мастера",
+    },
+    nav: {
+      groups: {
+        work: "Работа",
+        clients: "Клиенты",
+        business: "Бизнес",
+        account: "Аккаунт",
+      },
+      items: {
+        home: "Главная",
+        bookings: "Записи",
+        notifications: "Уведомления",
+        schedule: "Расписание",
+        scheduleSettings: "Настройки расписания",
+        clients: "Клиенты",
+        reviews: "Отзывы",
+        analytics: "Аналитика",
+        profile: "Мой профиль",
+        accountSettings: "Настройки аккаунта",
+        publicPage: "Публичная страница",
+      },
+      ariaLabel: "Навигация кабинета мастера",
+    },
+    topbar: {
+      breadcrumbHome: "Кабинет",
+      newBookingCta: "Новая запись",
+    },
+    pageHeader: {
+      breadcrumbHome: "Кабинет",
+      notificationsAria: "Уведомления",
+      newBookingCta: "Новая запись",
+    },
+    userChip: {
+      trialStatusTemplate: "Премиум · {days}д",
+      planLabels: {
+        free: "Free",
+        pro: "PRO",
+        premium: "Premium",
+      },
+    },
+    dashboard: {
+      hero: {
+        nextClientLabel: "Следующий клиент",
+        nextClientIn: "через",
+        minutesShort: "мин",
+        noNextClient: "Сегодня записей больше нет",
+      },
+      kpi: {
+        todayRevenue: "Выручка сегодня",
+        todayRevenueSub: "vs прошлая суббота",
+        todayBookings: "Записей сегодня",
+        todayBookingsSub: "загрузка дня",
+        todayBookingsValueTemplate: "{count} из {capacity}ч",
+        weekRevenue: "Выручка за неделю",
+        weekRevenueSub: "vs прошлая неделя",
+        newClients: "Новые клиенты",
+        newClientsValueTemplate: "{count} за 7д",
+        returningClientsTemplate: "повторных: {count}",
+      },
+      bookings: {
+        title: "Ближайшие записи",
+        subtitleTemplate: "Сегодня · ещё {count} {plural}",
+        seeAll: "Все записи",
+        emptyTitle: "На сегодня записей нет",
+        emptyDescription: "Можно подкрутить расписание или добавить запись вручную.",
+        pendingBadge: "Ожидает",
+        confirmAction: "Подтвердить",
+        declineAction: "Отклонить",
+        chatAction: "Чат",
+        moreAction: "Действия",
+      },
+      attention: {
+        title: "Требуют внимания",
+        subtitleTemplate: "{count} {plural}",
+        sortLabel: "Сортировка: важность",
+        emptyTitle: "Всё под контролем",
+        emptyDescription:
+          "Нет срочных задач. Можно сосредоточиться на работе с клиентами.",
+        confirmBookingTitle: "Подтвердить запись",
+        confirmBookingCta: "Открыть",
+        unansweredReviewTitle: "Ответить на отзыв",
+        unansweredReviewCta: "Ответить",
+        freeSlotTitle: "Свободное окно {from}–{to}",
+        freeSlotDescription: "{minutes} мин простоя сегодня. Запустить горящий слот?",
+        freeSlotCta: "Создать",
+      },
+      quickActions: {
+        title: "Быстрые действия",
+        subtitle: "В одно касание",
+        addBooking: "Добавить запись",
+        addBookingSub: "Вручную в расписание",
+        blockTime: "Заблокировать время",
+        blockTimeSub: "Перерыв или выходной",
+        sharePublic: "Поделиться профилем",
+        sharePublicSub: "Ссылка для соцсетей",
+        invitePeople: "Пригласить клиента",
+        invitePeopleSub: "По телефону или ссылке",
+        addPortfolio: "Добавить в портфолио",
+        addPortfolioSub: "Свежая работа",
+      },
+      announcements: {
+        title: "Анонсы и советы",
+        from: "от МастерРядом",
+      },
+      manualBooking: {
+        title: "Новая запись",
+        chooseService: "Выберите услугу",
+        clientNamePlaceholder: "Имя клиента",
+        phonePlaceholder: "Телефон",
+        commentPlaceholder: "Комментарий",
+        cancel: "Отмена",
+        create: "Создать запись",
+        saving: "Сохраняем...",
+        notSoloHint: "Эта функция доступна только мастерам без студии.",
+      },
+      bookingActions: {
+        confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
+        declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
+        declineReasonPrompt:
+          "Укажите причину отказа — она будет отправлена клиенту:",
+      },
+    },
+    /**
+     * Title / subtitle copy for each master cabinet page. Currently only
+     * `home` is consumed (by the dashboard's `<MasterPageHeader>`); the
+     * rest are reserved for the follow-up commits that migrate the
+     * remaining pages (Schedule, Analytics, Model-offers, Billing,
+     * Bookings, Notifications) to the new per-page header pattern. Don't
+     * delete as "unused" — they're future surfaces.
+     */
+    pageTitles: {
+      home: { title: "Главная", subtitle: "Сводка дня и быстрые действия" },
+      bookings: { title: "Записи", subtitle: "Все клиенты, ожидающие подтверждения и подтверждённые" },
+      notifications: { title: "Уведомления", subtitle: "Новости платформы и события по вашим записям" },
+      schedule: { title: "Расписание", subtitle: "Свободные окна и план дня" },
+      scheduleSettings: { title: "Настройки расписания", subtitle: "Часы работы, перерывы, исключения" },
+      clients: { title: "Клиенты", subtitle: "База клиентов и история обращений" },
+      reviews: { title: "Отзывы", subtitle: "Оценки и обратная связь от клиентов" },
+      analytics: { title: "Аналитика", subtitle: "Динамика выручки и поведение клиентов" },
+      profile: { title: "Мой профиль", subtitle: "Имя, услуги, портфолио и публичная страница" },
+      accountSettings: { title: "Настройки аккаунта", subtitle: "Безопасность, уведомления, биллинг" },
+      modelOffers: { title: "Модели", subtitle: "Поиск и заявки на бесплатные сессии" },
+      billing: { title: "Подписка", subtitle: "Тариф и история платежей" },
+      fallback: { title: "Кабинет мастера", subtitle: "" },
+    },
+  },
   master: {
     topbar: {
       brand: "МастерРядом",

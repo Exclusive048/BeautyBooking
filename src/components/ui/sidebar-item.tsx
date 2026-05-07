@@ -12,6 +12,8 @@ type Props = {
   badge?: number;
   /** A11y label for the badge (e.g. "3 элемента в избранном"). Falls back to a generic count phrase. */
   badgeAriaLabel?: string;
+  /** Open the link in a new tab. Adds `rel="noopener noreferrer"` automatically when set to `_blank`. */
+  target?: "_blank" | "_self";
 };
 
 export function SidebarItem({
@@ -22,11 +24,14 @@ export function SidebarItem({
   icon: Icon,
   badge,
   badgeAriaLabel,
+  target,
 }: Props) {
   const hasBadge = typeof badge === "number" && badge > 0;
   return (
     <Link
       href={href}
+      target={target}
+      rel={target === "_blank" ? "noopener noreferrer" : undefined}
       className={cn(
         "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
         active

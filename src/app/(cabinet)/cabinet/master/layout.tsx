@@ -1,16 +1,17 @@
 import { ProviderType, SubscriptionScope } from "@prisma/client";
 import { redirect } from "next/navigation";
-import { MasterCabinetTopbar } from "@/features/master/components/master-cabinet-topbar";
 import { MasterSidebar } from "@/features/master/components/master-sidebar";
 import { MasterBottomNav } from "@/features/master/components/master-bottom-nav";
 import { TrialEndingBanner } from "@/features/cabinet/components/trial-ending-banner";
-import { TrialStatusBadge } from "@/features/cabinet/components/trial-status-badge";
-import { getSessionUserId } from "@/lib/auth/session";
+import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
 import {
   getCurrentSubscriptionRow,
   isActiveTrial,
   trialDaysLeft,
 } from "@/lib/billing/get-current-subscription-row";
+import { getPendingBookingsCountForMaster } from "@/lib/bookings/counts";
+import { getUnreadBadgeCount } from "@/lib/notifications/badge";
+import { getUnansweredReviewsCountForMaster } from "@/lib/reviews/counts";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -22,75 +23,83 @@ export default async function MasterCabinetLayout({
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const master = await prisma.provider.findFirst({
-    where: { ownerUserId: userId, type: ProviderType.MASTER },
-    select: {
-      ratingAvg: true,
-      rating: true,
-      studioId: true,
-      masterProfile: { select: { id: true } },
-      studio: { select: { name: true } },
-      publicUsername: true,
-    },
-  });
+  const [sessionUser, master] = await Promise.all([
+    getSessionUser(),
+    prisma.provider.findFirst({
+      where: { ownerUserId: userId, type: ProviderType.MASTER },
+      select: {
+        id: true,
+        avatarUrl: true,
+        name: true,
+        publicUsername: true,
+        masterProfile: { select: { id: true } },
+      },
+    }),
+  ]);
   if (!master || !master.masterProfile) redirect("/403");
 
-  const rating = master.ratingAvg > 0 ? master.ratingAvg : master.rating;
-  const ratingLabel =
-    rating > 0
-      ? `${UI_TEXT.master.sidebar.ratingLabel} ${rating.toFixed(1)}`
-      : UI_TEXT.master.sidebar.noRating;
-  const studioName = master.studio?.name ?? null;
+  // Resolve every counter and trial state in one round-trip. React.cache on
+  // each helper means downstream RSCs can call them again for free during
+  // this render.
+  const [
+    subscription,
+    pendingBookings,
+    unreadBadge,
+    unansweredReviews,
+  ] = await Promise.all([
+    getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
+    getPendingBookingsCountForMaster(master.id),
+    getUnreadBadgeCount({ userId, phone: sessionUser?.phone ?? null }),
+    getUnansweredReviewsCountForMaster(master.id),
+  ]);
 
-  // Trial status — read once at layout level; React.cache shares the row with
-  // anything else on this RSC render that needs it.
-  const subscription = await getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER);
   const trialActive = isActiveTrial(subscription);
   const daysLeft = trialActive ? trialDaysLeft(subscription.trialEndsAt) : 0;
   const showBanner = trialActive && daysLeft > 0 && daysLeft <= 3;
 
+  const userName =
+    sessionUser?.displayName?.trim() ||
+    sessionUser?.firstName?.trim() ||
+    master.name ||
+    UI_TEXT.brand.name;
+
   return (
     <>
       {showBanner ? <TrialEndingBanner daysLeft={daysLeft} /> : null}
-      <div className="flex min-h-screen bg-bg-base">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block lg:shrink-0 border-r border-border-subtle">
-        {/* h-screen on sticky so sidebar fills viewport height;
-            the aside inside uses h-full to pin "Моя страница" to the bottom. */}
-        <div className="sticky top-0 h-screen overflow-y-auto">
-          <MasterSidebar
-            ratingLabel={ratingLabel}
-            publicUsername={master.publicUsername}
-          />
-        </div>
-      </div>
-
-      {/* Main content column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Topbar — visible only on mobile/tablet (lg:hidden) */}
-        <div className="lg:hidden">
-          <MasterCabinetTopbar
-            ratingLabel={ratingLabel}
-            studioName={studioName}
-            isStudioMember={Boolean(master.studioId)}
-          />
-        </div>
-
-        <main className="min-w-0 flex-1 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
-          <div className="mx-auto w-full max-w-6xl">
-            {trialActive && daysLeft > 0 ? (
-              <div className="mb-4 flex justify-end">
-                <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />
-              </div>
-            ) : null}
-            {children}
+      {/* Full-width cabinet shell. Layout owns three concerns only:
+            1. Desktop sidebar column
+            2. Main content slot (no padding, no max-width — pages decide)
+            3. Mobile bottom-nav (with pb-24 padding here so layout-level)
+          The per-page header lives inside each page as `<MasterPageHeader>`,
+          giving every screen control over its own breadcrumb / title /
+          actions instead of a one-size-fits-all topbar. */}
+      <div className="flex min-h-screen bg-bg-page">
+        <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
+          <div className="sticky top-0 h-screen overflow-y-auto">
+            <MasterSidebar
+              counts={{
+                pendingBookings,
+                unreadNotifications: unreadBadge.count,
+                unansweredReviews,
+              }}
+              user={{
+                name: userName,
+                avatarUrl: master.avatarUrl,
+              }}
+              trial={{
+                isTrial: trialActive,
+                daysLeft,
+              }}
+              planTier={subscription?.planTier ?? "FREE"}
+              publicUsername={master.publicUsername}
+            />
           </div>
-        </main>
-      </div>
+        </div>
 
-      {/* Mobile bottom nav */}
-      <MasterBottomNav />
-    </div>
+        <main className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
+
+        <MasterBottomNav pendingBookingsCount={pendingBookings} />
+      </div>
     </>
   );
 }
