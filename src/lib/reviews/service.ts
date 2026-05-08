@@ -489,6 +489,53 @@ export async function replyToReview(input: {
   return toReviewDto(updated, { includePrivateTags: true });
 }
 
+/**
+ * Edits the master's existing reply on a review. Distinct from
+ * `replyToReview` — that one creates a fresh reply and refuses if one
+ * already exists (409). Edit requires a reply to be present (404 when
+ * empty) and bumps `repliedAt` so the audit trail tracks the latest
+ * version. Master access is enforced via `ensureMasterReviewAccess`.
+ */
+export async function editReviewReply(input: {
+  reviewId: string;
+  currentUserId: string;
+  text: string;
+  nowUtc?: Date;
+}): Promise<ReviewDto> {
+  const review = await prisma.review.findUnique({
+    where: { id: input.reviewId },
+    select: {
+      id: true,
+      targetType: true,
+      targetId: true,
+      replyText: true,
+      repliedAt: true,
+    },
+  });
+
+  if (!review) {
+    throw new AppError("Review not found", 404, "NOT_FOUND");
+  }
+
+  await ensureMasterReviewAccess(review, input.currentUserId);
+
+  if (!review.replyText && !review.repliedAt) {
+    // No prior reply — caller should POST instead.
+    throw new AppError("Reply not found", 404, "NOT_FOUND");
+  }
+
+  const updated = await prisma.review.update({
+    where: { id: review.id },
+    data: {
+      replyText: input.text.trim(),
+      repliedAt: input.nowUtc ?? new Date(),
+    },
+    include: reviewInclude,
+  });
+
+  return toReviewDto(updated, { includePrivateTags: true });
+}
+
 export async function reportReview(input: {
   reviewId: string;
   currentUserId: string;
