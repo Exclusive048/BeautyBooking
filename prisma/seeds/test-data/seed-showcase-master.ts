@@ -39,6 +39,8 @@ import {
   BookingStatus,
   DiscountApplyMode,
   DiscountType,
+  ModelApplicationStatus,
+  ModelOfferStatus,
   NotificationType,
   PlanTier,
   Prisma,
@@ -912,6 +914,196 @@ async function ensurePushSubscription(userId: string) {
   });
 }
 
+/**
+ * 3 model offers + 5 applications for the showcase master, used by the
+ * 29a Model Offers cabinet surface. Idempotent: deletes existing
+ * showcase offers/applications first (they're nameless so we identify
+ * them by deterministic id prefix), then re-creates.
+ *
+ * Layout:
+ *   Offer #1  +5 days  Manicure         no discount       2 PENDING
+ *   Offer #2  +12 days Pedicure         30% off           1 PENDING + 1 APPROVED_WAITING_CLIENT
+ *   Offer #3  -3 days  Brows           50% off           1 CONFIRMED + 1 REJECTED
+ */
+async function ensureModelOffers(args: {
+  providerId: string;
+  clients: UserProfile[];
+  services: Map<string, Service>;
+}): Promise<{ offers: number; applications: number }> {
+  const offerIdPrefix = "seed-mo-anna-";
+
+  // Wipe previous showcase offers (and their applications via cascade).
+  await prisma.modelOffer.deleteMany({
+    where: { masterId: args.providerId, id: { startsWith: offerIdPrefix } },
+  });
+
+  type ApplicationSeed = {
+    suffix: string;
+    clientIndex: number;
+    status: ModelApplicationStatus;
+    clientNote: string | null;
+    consentToShoot: boolean;
+    daysAgo: number;
+  };
+
+  type OfferSeed = {
+    suffix: string;
+    serviceKey: string;
+    offsetDays: number;
+    timeStart: string;
+    timeEnd: string;
+    discountPct: number; // 0 means no discount → offerPrice = regularPrice
+    requirements: string[];
+    extraBusyMin: number;
+    status: ModelOfferStatus;
+    applications: ApplicationSeed[];
+  };
+
+  const offerSeeds: OfferSeed[] = [
+    {
+      suffix: "01",
+      serviceKey: "manicure",
+      offsetDays: 5,
+      timeStart: "11:00",
+      timeEnd: "13:00",
+      discountPct: 0,
+      requirements: ["Натуральные ногти", "Без покрытия"],
+      extraBusyMin: 30,
+      status: ModelOfferStatus.ACTIVE,
+      applications: [
+        {
+          suffix: "01-a",
+          clientIndex: 1,
+          status: ModelApplicationStatus.PENDING,
+          clientNote: "Очень хочу попробовать новый формат — никогда не делала.",
+          consentToShoot: true,
+          daysAgo: 1,
+        },
+        {
+          suffix: "01-b",
+          clientIndex: 2,
+          status: ModelApplicationStatus.PENDING,
+          clientNote: "Готова приехать в любое время указанного интервала.",
+          consentToShoot: true,
+          daysAgo: 0,
+        },
+      ],
+    },
+    {
+      suffix: "02",
+      serviceKey: "pedicure",
+      offsetDays: 12,
+      timeStart: "14:00",
+      timeEnd: "16:30",
+      discountPct: 30,
+      requirements: ["Без грибка", "Свежий душ"],
+      extraBusyMin: 0,
+      status: ModelOfferStatus.ACTIVE,
+      applications: [
+        {
+          suffix: "02-a",
+          clientIndex: 3,
+          status: ModelApplicationStatus.PENDING,
+          clientNote: "Беру скидку, спасибо!",
+          consentToShoot: false,
+          daysAgo: 2,
+        },
+        {
+          suffix: "02-b",
+          clientIndex: 4,
+          status: ModelApplicationStatus.APPROVED_WAITING_CLIENT,
+          clientNote: "Удобно после 14:30.",
+          consentToShoot: true,
+          daysAgo: 3,
+        },
+      ],
+    },
+    {
+      suffix: "03",
+      serviceKey: "brows",
+      offsetDays: -3,
+      timeStart: "10:00",
+      timeEnd: "11:30",
+      discountPct: 50,
+      requirements: ["Без татуажа"],
+      extraBusyMin: 15,
+      status: ModelOfferStatus.CLOSED,
+      applications: [
+        {
+          suffix: "03-a",
+          clientIndex: 0,
+          status: ModelApplicationStatus.CONFIRMED,
+          clientNote: "Спасибо за приглашение!",
+          consentToShoot: true,
+          daysAgo: 8,
+        },
+        {
+          suffix: "03-b",
+          clientIndex: 5,
+          status: ModelApplicationStatus.REJECTED,
+          clientNote: null,
+          consentToShoot: true,
+          daysAgo: 9,
+        },
+      ],
+    },
+  ];
+
+  let offerCount = 0;
+  let applicationCount = 0;
+
+  for (const offerSeed of offerSeeds) {
+    const service = args.services.get(offerSeed.serviceKey);
+    if (!service) continue;
+
+    const offerPriceKopeks = offerSeed.discountPct > 0
+      ? Math.round(service.price * (1 - offerSeed.discountPct / 100))
+      : service.price;
+
+    const dateBase = new Date();
+    dateBase.setUTCDate(dateBase.getUTCDate() + offerSeed.offsetDays);
+    const dateLocal = `${dateBase.getUTCFullYear()}-${String(dateBase.getUTCMonth() + 1).padStart(2, "0")}-${String(dateBase.getUTCDate()).padStart(2, "0")}`;
+
+    const offer = await prisma.modelOffer.create({
+      data: {
+        id: `${offerIdPrefix}${offerSeed.suffix}`,
+        masterId: args.providerId,
+        serviceId: service.id,
+        masterServiceId: null,
+        serviceIds: [service.id],
+        dateLocal,
+        timeRangeStartLocal: offerSeed.timeStart,
+        timeRangeEndLocal: offerSeed.timeEnd,
+        price: new Prisma.Decimal(offerPriceKopeks),
+        requirements: offerSeed.requirements,
+        extraBusyMin: offerSeed.extraBusyMin,
+        status: offerSeed.status,
+      },
+    });
+    offerCount += 1;
+
+    for (const appSeed of offerSeed.applications) {
+      const client = args.clients[appSeed.clientIndex % args.clients.length];
+      if (!client) continue;
+      const createdAt = new Date(Date.now() - appSeed.daysAgo * DAY_MS);
+      await prisma.modelApplication.create({
+        data: {
+          id: `seed-ma-anna-${appSeed.suffix}`,
+          offerId: offer.id,
+          clientUserId: client.id,
+          status: appSeed.status,
+          clientNote: appSeed.clientNote,
+          consentToShoot: appSeed.consentToShoot,
+          createdAt,
+        },
+      });
+      applicationCount += 1;
+    }
+  }
+
+  return { offers: offerCount, applications: applicationCount };
+}
+
 async function ensureClientCards(args: {
   providerId: string;
   clients: UserProfile[];
@@ -1005,6 +1197,13 @@ export async function seedShowcaseMaster(input: Input): Promise<void> {
 
   await ensureClientCards({ providerId: provider.id, clients: input.clients });
   logSeed.step("Клиентские карточки (3)");
+
+  const offerStats = await ensureModelOffers({
+    providerId: provider.id,
+    clients: input.clients,
+    services,
+  });
+  logSeed.step(`Офферы для моделей (${offerStats.offers}, заявок: ${offerStats.applications})`);
 
   logSeed.ok(
     `Готово. Login: phone ${PHONE} → /cabinet/master/dashboard. Public: /u/${PUBLIC_USERNAME}`

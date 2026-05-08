@@ -23,7 +23,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const applicationId = params.applicationId;
     if (!applicationId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
 
-    await parseBody(req, rejectApplicationSchema);
+    const body = await parseBody(req, rejectApplicationSchema);
 
     const application = await prisma.modelApplication.findUnique({
       where: { id: applicationId },
@@ -63,7 +63,7 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     const fullApplication = await loadApplicationWithRelations(updated.id);
     if (fullApplication) {
-      await notifyModelApplicationRejected(fullApplication);
+      await notifyModelApplicationRejected(fullApplication, body.reason ?? null);
     }
 
     return jsonOk({ application: { id: updated.id, status: updated.status } });

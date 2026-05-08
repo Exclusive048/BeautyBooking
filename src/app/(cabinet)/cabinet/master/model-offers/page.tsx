@@ -1,11 +1,16 @@
-import { redirect } from "next/navigation";
-import { ModelOffersPage } from "@/features/model-offers/components/model-offers-page";
-import { getSessionUser } from "@/lib/auth/session";
+import { MasterModelOffersPage } from "@/features/master/components/model-offers/master-model-offers-page";
 
-export default async function MasterModelOffersRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  // Master profile guard is handled by the parent layout.
+type SearchParams = Record<string, string | string[] | undefined>;
 
-  return <ModelOffersPage />;
+/**
+ * `/cabinet/master/model-offers` — read-only model offers surface for
+ * masters (29a). Reads `?filterOffer=` for the pending applications
+ * filter; everything else is server-rendered.
+ */
+export default async function MasterModelOffersRoute({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
+  return <MasterModelOffersPage searchParams={searchParams} />;
 }

@@ -96,13 +96,17 @@ export async function notifyModelTimeProposed(
 }
 
 export async function notifyModelApplicationRejected(
-  application: ApplicationWithRelations
+  application: ApplicationWithRelations,
+  reason?: string | null
 ): Promise<void> {
   const clientUserId = application.clientUserId;
   if (!clientUserId) return;
 
   const title = "Заявка отклонена";
-  const body = "Мастер отклонил вашу заявку на модельное предложение.";
+  const trimmedReason = reason?.trim();
+  const body = trimmedReason
+    ? `Мастер отклонил вашу заявку. Причина: ${trimmedReason}.`
+    : "Мастер отклонил вашу заявку на модельное предложение.";
 
   await deliverNotification({
     userId: clientUserId,
@@ -112,6 +116,7 @@ export async function notifyModelApplicationRejected(
     payloadJson: {
       offerId: application.offer.id,
       applicationId: application.id,
+      reason: trimmedReason ?? null,
     },
     pushUrl: `/cabinet/model-applications?applicationId=${application.id}`,
     telegramText: buildTelegramText(title, body),
