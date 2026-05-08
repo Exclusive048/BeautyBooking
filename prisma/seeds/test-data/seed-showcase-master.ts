@@ -529,6 +529,15 @@ const BOOKING_PLANS: BookingPlan[] = [
   { index: 22, status: BookingStatus.NO_SHOW, clientIndex: 4, serviceKey: "manicure", offsetDays: -2, hour: 11 },
   // 1 REJECTED
   { index: 23, status: BookingStatus.REJECTED, clientIndex: 5, serviceKey: "manicure", offsetDays: 1, hour: 10 },
+  // Prior period FINISHED rows (-40..-60 days) — added in 30a so the
+  // master analytics comparison overlay has data on both sides of the
+  // window. Spread across services so heatmap diversity stays visible.
+  { index: 24, status: BookingStatus.FINISHED, clientIndex: 0, serviceKey: "manicure-gel", offsetDays: -40, hour: 13 },
+  { index: 25, status: BookingStatus.FINISHED, clientIndex: 1, serviceKey: "pedicure", offsetDays: -43, hour: 16 },
+  { index: 26, status: BookingStatus.FINISHED, clientIndex: 2, serviceKey: "brows", offsetDays: -47, hour: 12 },
+  { index: 27, status: BookingStatus.FINISHED, clientIndex: 4, serviceKey: "manicure", offsetDays: -52, hour: 11 },
+  { index: 28, status: BookingStatus.FINISHED, clientIndex: 6, serviceKey: "combo", offsetDays: -56, hour: 10 },
+  { index: 29, status: BookingStatus.FINISHED, clientIndex: 0, serviceKey: "manicure", offsetDays: -59, hour: 15 },
 ];
 
 function buildSlotLabel(start: Date, durationMin: number): string {

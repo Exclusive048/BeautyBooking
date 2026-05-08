@@ -2432,6 +2432,101 @@ export const UI_TEXT = {
           "Под выбранный фильтр заявок пока нет. Попробуйте сбросить фильтр или посмотреть другие офферы.",
       },
     },
+    analytics: {
+      breadcrumb: "Аналитика",
+      title: "Аналитика",
+      subtitle: "Тренды бизнеса и инсайты для роста",
+      period: {
+        chips: {
+          d7: "7 дней",
+          d30: "30 дней",
+          d90: "Квартал",
+          year: "Год",
+          custom: "Свой период",
+        },
+        customSoon: "Свой период доступен скоро",
+        comparisonLabel: "Сравнивать с прошлым периодом",
+        periodLabel: "Период",
+        exportExcel: "Excel",
+        exportPdf: "PDF-отчёт",
+        exportSoon: "Доступно скоро",
+      },
+      kpi: {
+        revenueLabel: "Выручка",
+        bookingsLabel: "Записей",
+        avgCheckLabel: "Средний чек",
+        utilizationLabel: "Загрузка",
+        prevTemplate: "было {value}",
+        prevNoData: "нет данных за прошлый период",
+        ppShort: "п.п.",
+        ofMaxHint: "относительно пика за период",
+      },
+      revenue: {
+        heading: "Динамика выручки",
+        legendCurrent: "Текущий период",
+        legendPrevious: "Прошлый",
+        vsTemplate: "vs {value}",
+        emptyTitle: "Пока нет выручки",
+        emptyBody: "Когда появятся завершённые записи — здесь будет график.",
+      },
+      heatmap: {
+        heading: "Загрузка по дням и часам",
+        subtitle: "Видно когда у вас пик и где дыры",
+        labelHint: "Относительно пика за период",
+        legendLow: "0%",
+        legendHigh: "100%",
+        insightTemplate:
+          "Свободные слоты в {weekday} {hour} стабильно пустуют. Запустить акцию?",
+        emptyTitle: "Нет данных",
+        emptyBody: "Когда появятся записи — здесь будет тепловая карта.",
+      },
+      topServices: {
+        heading: "Топ услуг по выручке",
+        subtitleTemplate: "За {period}",
+        bookingsLabel: "записей",
+        emptyTitle: "Нет данных",
+        emptyBody: "За выбранный период не было завершённых записей.",
+      },
+      lock: {
+        title: "Доступно в PRO",
+        body: "Получите расширенную аналитику — выручка, услуги, тепловая карта.",
+        cta: "Перейти на PRO",
+      },
+      funnel: {
+        heading: "Воронка клиента",
+        subtitleTemplate: "От первой записи до постоянного клиента · {period}",
+        stages: {
+          booked: "Записались",
+          finished: "Пришли (1-й визит)",
+          returned: "Вернулись (2-й визит)",
+          regular: "Стали постоянными",
+        },
+        fromPreviousTemplate: "{value}% от пред.",
+        emptyTitle: "Нет данных",
+        emptyBody: "За выбранный период не было новых записей.",
+      },
+      insights: {
+        heading: "Что говорят данные",
+        periodTemplate: "· {period}",
+        rules: {
+          heatmap_gap_title: "Свободные слоты",
+          heatmap_gap_body:
+            "{weekday} {hour} — стабильно пустует. Запустить акцию или горячий слот?",
+          top_service_growing_title: "Топ-услуга растёт",
+          top_service_growing_body:
+            "«{name}» приносит {share}% выручки, +{growthPct}% к прошлому периоду. Можно поднять цену.",
+          retention_drop_title: "Возвращаемость просела",
+          retention_drop_body:
+            "Только {currentPct}% клиентов возвращаются на 2-й визит. Раньше было {prevPct}%. Проверьте опыт после 1-го визита.",
+          avg_check_decline_title: "Средний чек снижается",
+          avg_check_decline_body:
+            "Средний чек упал на {declinePct}% к прошлому периоду. Возможно, активны скидки или дешёвые услуги.",
+          cancellation_high_title: "Много отмен",
+          cancellation_high_body:
+            "{cancelPct}% записей отменено за период. Подумайте про окно отмены или предоплату.",
+        },
+      },
+    },
     schedule: {
       breadcrumb: "Расписание",
       title: "Расписание",
