@@ -129,7 +129,11 @@ export type MasterPortfolioItem = {
   serviceIds: string[];
   globalCategoryId: string | null;
   categorySource: string | null;
+  /** Visual-search-indexed flag (orthogonal to `isPublic`). */
   inSearch: boolean;
+  /** Public-catalog visibility. The master toggles this from the
+   * portfolio management page (31b). */
+  isPublic: boolean;
   createdAt: string;
 };
 
@@ -226,6 +230,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         globalCategoryId: item.globalCategoryId ?? null,
         categorySource: item.categorySource ?? null,
         inSearch: item.inSearch,
+        isPublic: item.isPublic,
         createdAt: item.createdAt.toISOString(),
       })),
     };
@@ -312,6 +317,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       globalCategoryId: item.globalCategoryId ?? null,
       categorySource: item.categorySource ?? null,
       inSearch: item.inSearch,
+      isPublic: item.isPublic,
       createdAt: item.createdAt.toISOString(),
     })),
   };
@@ -328,6 +334,7 @@ export async function updateMasterProfile(
     bio?: string | null;
     avatarUrl?: string | null;
     isPublished?: boolean;
+    district?: string;
   }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
@@ -337,6 +344,8 @@ export async function updateMasterProfile(
   //    from a fresh address.
   const trimmedAddress =
     typeof input.address === "string" ? input.address.trim() : undefined;
+  const trimmedDistrict =
+    typeof input.district === "string" ? input.district.trim() : undefined;
 
   await prisma.provider.update({
     where: { id: masterId },
@@ -344,6 +353,7 @@ export async function updateMasterProfile(
       ...(input.displayName ? { name: input.displayName.trim() } : {}),
       ...(typeof input.tagline === "string" ? { tagline: input.tagline.trim() } : {}),
       ...(trimmedAddress !== undefined ? { address: trimmedAddress } : {}),
+      ...(trimmedDistrict !== undefined ? { district: trimmedDistrict } : {}),
       ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
       ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
       ...(input.bio !== undefined
@@ -626,7 +636,17 @@ export async function upsertMasterServices(
 
 export async function createSoloMasterService(
   masterId: string,
-  input: { title: string; price: number; durationMin: number; globalCategoryId?: string; description?: string }
+  input: {
+    title: string;
+    price: number;
+    durationMin: number;
+    globalCategoryId?: string;
+    description?: string;
+    /** 31c: optional flags. Default to existing behaviour
+     * (`isEnabled: true`, `onlinePaymentEnabled: false`) when omitted. */
+    isEnabled?: boolean;
+    onlinePaymentEnabled?: boolean;
+  }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
   if (!context.isSolo) {
@@ -694,9 +714,9 @@ export async function createSoloMasterService(
           price: input.price,
           durationMin: input.durationMin,
           globalCategoryId,
-          isEnabled: true,
+          isEnabled: input.isEnabled ?? true,
           isActive: true,
-          onlinePaymentEnabled: false,
+          onlinePaymentEnabled: input.onlinePaymentEnabled ?? false,
           sortOrder: (last?.sortOrder ?? -1) + 1,
         },
         select: { id: true },
@@ -740,6 +760,7 @@ export async function listMasterPortfolio(masterId: string): Promise<{ items: Ma
       globalCategoryId: item.globalCategoryId ?? null,
       categorySource: item.categorySource ?? null,
       inSearch: item.inSearch,
+      isPublic: item.isPublic,
       createdAt: item.createdAt.toISOString(),
     })),
   };

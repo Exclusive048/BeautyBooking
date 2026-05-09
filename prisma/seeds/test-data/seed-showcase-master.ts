@@ -1113,6 +1113,154 @@ async function ensureModelOffers(args: {
   return { offers: offerCount, applications: applicationCount };
 }
 
+/**
+ * 6 portfolio items for the 31b management page demo. Distribution:
+ *   - 2 manicure · 2 pedicure · 2 brows (matches seeded categories)
+ *   - 5 isPublic + 1 hidden (so the master can validate the hidden-badge UX)
+ *   - sortOrder 0..5 — explicit so reorder testing has a known starting state
+ *
+ * Idempotent: deletes any seed-prefixed portfolio rows for this master
+ * first, then re-creates. Public photos use a stable picsum seed so the
+ * URLs survive reruns. Categories looked up by slug; gracefully no-ops
+ * if the category seed hasn't run yet.
+ */
+/**
+ * 2 service packages (bundles) for the showcase master, used by 31c
+ * services management page demo. Distribution:
+ *   - "Манипедикюр" — gel-manicure + pedicure, 15% discount
+ *   - "Уход за руками" — manicure + brows, 10% discount
+ *
+ * Idempotent via deterministic id prefix (`seed-pkg-anna-`).
+ */
+async function ensurePackages(args: {
+  providerId: string;
+  services: Map<string, Service>;
+}): Promise<{ count: number }> {
+  const idPrefix = "seed-pkg-anna-";
+
+  await prisma.servicePackage.deleteMany({
+    where: { masterId: args.providerId, id: { startsWith: idPrefix } },
+  });
+
+  type Seed = {
+    suffix: string;
+    name: string;
+    serviceKeys: string[];
+    discountType: DiscountType;
+    discountValue: number;
+    sortOrder: number;
+  };
+
+  const seeds: Seed[] = [
+    {
+      suffix: "01",
+      name: "Манипедикюр",
+      serviceKeys: ["manicure-gel", "pedicure"],
+      discountType: DiscountType.PERCENT,
+      discountValue: 15,
+      sortOrder: 0,
+    },
+    {
+      suffix: "02",
+      name: "Уход за руками",
+      serviceKeys: ["manicure", "brows"],
+      discountType: DiscountType.PERCENT,
+      discountValue: 10,
+      sortOrder: 1,
+    },
+  ];
+
+  let count = 0;
+  for (const seed of seeds) {
+    const serviceIds = seed.serviceKeys
+      .map((key) => args.services.get(key)?.id)
+      .filter((id): id is string => Boolean(id));
+    if (serviceIds.length < 2) continue;
+    await prisma.servicePackage.create({
+      data: {
+        id: `${idPrefix}${seed.suffix}`,
+        masterId: args.providerId,
+        name: seed.name,
+        discountType: seed.discountType,
+        discountValue: seed.discountValue,
+        isEnabled: true,
+        sortOrder: seed.sortOrder,
+        items: {
+          create: serviceIds.map((serviceId) => ({ serviceId })),
+        },
+      },
+    });
+    count += 1;
+  }
+  return { count };
+}
+
+async function ensurePortfolio(args: {
+  providerId: string;
+  services: Map<string, Service>;
+}): Promise<{ count: number; hidden: number }> {
+  const idPrefix = "seed-pf-anna-";
+
+  await prisma.portfolioItem.deleteMany({
+    where: { masterId: args.providerId, id: { startsWith: idPrefix } },
+  });
+
+  const categoriesBySlug = new Map<string, string>();
+  const categoryRows = await prisma.globalCategory.findMany({
+    where: { slug: { in: ["manicure", "pedicure", "brows"] } },
+    select: { id: true, slug: true },
+  });
+  for (const row of categoryRows) {
+    categoriesBySlug.set(row.slug, row.id);
+  }
+
+  type Seed = {
+    suffix: string;
+    categorySlug: "manicure" | "pedicure" | "brows";
+    serviceKey: string;
+    seed: string;
+    isPublic: boolean;
+    sortOrder: number;
+  };
+
+  const seeds: Seed[] = [
+    { suffix: "01", categorySlug: "manicure", serviceKey: "manicure-gel", seed: "anna-mn-01", isPublic: true, sortOrder: 0 },
+    { suffix: "02", categorySlug: "manicure", serviceKey: "manicure", seed: "anna-mn-02", isPublic: true, sortOrder: 1 },
+    { suffix: "03", categorySlug: "pedicure", serviceKey: "pedicure", seed: "anna-pd-01", isPublic: true, sortOrder: 2 },
+    { suffix: "04", categorySlug: "pedicure", serviceKey: "pedicure", seed: "anna-pd-02", isPublic: false, sortOrder: 3 },
+    { suffix: "05", categorySlug: "brows", serviceKey: "brows", seed: "anna-br-01", isPublic: true, sortOrder: 4 },
+    { suffix: "06", categorySlug: "brows", serviceKey: "brows", seed: "anna-br-02", isPublic: true, sortOrder: 5 },
+  ];
+
+  let count = 0;
+  let hidden = 0;
+  for (const seed of seeds) {
+    const service = args.services.get(seed.serviceKey);
+    if (!service) continue;
+    const categoryId = categoriesBySlug.get(seed.categorySlug) ?? null;
+    const created = await prisma.portfolioItem.create({
+      data: {
+        id: `${idPrefix}${seed.suffix}`,
+        masterId: args.providerId,
+        mediaUrl: `https://picsum.photos/seed/${seed.seed}/640/640`,
+        caption: null,
+        globalCategoryId: categoryId,
+        categorySource: categoryId ? "user" : null,
+        inSearch: Boolean(categoryId),
+        isPublic: seed.isPublic,
+        sortOrder: seed.sortOrder,
+      },
+      select: { id: true },
+    });
+    await prisma.portfolioItemService.create({
+      data: { portfolioItemId: created.id, serviceId: service.id },
+    });
+    count += 1;
+    if (!seed.isPublic) hidden += 1;
+  }
+  return { count, hidden };
+}
+
 async function ensureClientCards(args: {
   providerId: string;
   clients: UserProfile[];
@@ -1203,6 +1351,12 @@ export async function seedShowcaseMaster(input: Input): Promise<void> {
 
   await ensurePushSubscription(user.id);
   logSeed.step("Push subscription (Push KPI «Включены»)");
+
+  const portfolioStats = await ensurePortfolio({ providerId: provider.id, services });
+  logSeed.step(`Портфолио (${portfolioStats.count}, скрытых: ${portfolioStats.hidden})`);
+
+  const packageStats = await ensurePackages({ providerId: provider.id, services });
+  logSeed.step(`Пакеты (${packageStats.count})`);
 
   await ensureClientCards({ providerId: provider.id, clients: input.clients });
   logSeed.step("Клиентские карточки (3)");

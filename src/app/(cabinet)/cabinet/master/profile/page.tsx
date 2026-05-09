@@ -1,21 +1,11 @@
-import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
-import MasterProfileClient from "./MasterProfileClient";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MasterProfilePage } from "@/features/master/components/profile/master-profile-page";
 
+/**
+ * `/cabinet/master/profile` — redesigned (31a). The legacy 3224-line
+ * client component (and its dynamic-import wrapper) was removed in this
+ * commit; portfolio + services management now live behind dedicated
+ * routes (31b backlog).
+ */
 export default async function MasterProfileRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  await getCurrentMasterProviderId(user.id);
-
-  return (
-    <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.master.profile.headerTitle}</h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.master.profile.headerSubtitle}</p>
-      </header>
-      <MasterProfileClient />
-    </section>
-  );
+  return <MasterProfilePage />;
 }

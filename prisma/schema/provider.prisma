@@ -96,6 +96,8 @@ model Provider {
 
   masterServices MasterService[] @relation("MasterServices")
 
+  servicePackages ServicePackage[] @relation("MasterServicePackages")
+
   bookings Booking[]
 
   masterBookings Booking[] @relation("BookingMaster")

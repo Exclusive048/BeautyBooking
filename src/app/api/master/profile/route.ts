@@ -76,6 +76,7 @@ export async function PATCH(req: Request) {
       ...(body.geoLng !== undefined ? { geoLng: body.geoLng } : {}),
       ...(body.bio !== undefined ? { bio: body.bio } : {}),
       ...(body.avatarUrl !== undefined ? { avatarUrl: body.avatarUrl } : {}),
+      ...(body.district !== undefined ? { district: body.district } : {}),
     });
     return jsonProfileOk(data);
   } catch (error) {
