@@ -4,17 +4,20 @@ import type { DayPlan } from "@/lib/schedule/types";
 
 export const PUBLISH_HORIZON_WEEKS = 6;
 
+/**
+ * Rolling 42-day publish horizon anchored to **now**, not last schedule edit.
+ *
+ * `changeAtUtc` remains in the signature because callers thread it through
+ * `scheduleVersion` for cache invalidation — but the horizon itself rolls
+ * forward with the clock. Otherwise a master who set a schedule once and
+ * stopped touching it would silently lose slots 42 days later.
+ */
 export function resolvePublishedUntilLocal(input: {
   changeAtUtc: Date | null;
   nowUtc: Date;
   timeZone: string;
 }): string {
-  if (!input.changeAtUtc) {
-    const baseLocalDateKey = toLocalDateKey(input.nowUtc, input.timeZone);
-    return addDaysToDateKey(baseLocalDateKey, PUBLISH_HORIZON_WEEKS * 7);
-  }
-
-  const baseKey = toLocalDateKey(input.changeAtUtc, input.timeZone);
+  const baseKey = toLocalDateKey(input.nowUtc, input.timeZone);
   return addDaysToDateKey(baseKey, PUBLISH_HORIZON_WEEKS * 7);
 }
 
