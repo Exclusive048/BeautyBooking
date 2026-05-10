@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Home,
   LineChart,
+  MessageSquare,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -49,6 +50,7 @@ const HREF = {
   home: "/cabinet/master/dashboard",
   bookings: "/cabinet/master/bookings",
   notifications: "/cabinet/master/notifications",
+  messages: "/cabinet/master/messages",
   schedule: "/cabinet/master/schedule",
   scheduleSettings: "/cabinet/master/schedule/settings",
   clients: "/cabinet/master/clients",
@@ -161,6 +163,11 @@ export function MasterSidebar({
             label: T.nav.items.notifications,
             icon: Bell,
             badge: counts.unreadNotifications,
+          })}
+          {renderItem({
+            href: HREF.messages,
+            label: T.nav.items.messages,
+            icon: MessageSquare,
           })}
           {renderItem({
             href: HREF.schedule,
