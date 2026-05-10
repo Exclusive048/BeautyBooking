@@ -208,6 +208,37 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Aurora — soft brand-tinted background mesh for hero/feature surfaces.
+     Decorative orbs blur into the page; opacity tuned per theme below. */
+  .aurora-bg {
+    position: relative;
+    isolation: isolate;
+  }
+  .aurora-bg::before,
+  .aurora-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+  }
+  .aurora-bg::before {
+    background-image:
+      radial-gradient(40% 60% at 15% 25%, rgb(var(--brand-from) / 0.28), transparent 60%),
+      radial-gradient(50% 70% at 85% 18%, rgb(var(--brand-via) / 0.22), transparent 65%);
+  }
+  .aurora-bg::after {
+    background-image:
+      radial-gradient(45% 60% at 60% 95%, rgb(var(--brand-deep) / 0.18), transparent 65%),
+      radial-gradient(35% 55% at 10% 90%, rgb(var(--primary-magenta) / 0.16), transparent 60%);
+  }
+  [data-theme="dark"] .aurora-bg::before,
+  [data-theme="dark"] .aurora-bg::after {
+    opacity: 0.85;
+  }
 }
 
 /* Legal documents (Terms, Privacy) — body in system font for readability,

@@ -55,6 +55,8 @@ module.exports = {
       backgroundImage: {
         "brand-gradient":
           "linear-gradient(135deg, rgb(var(--brand-from)) 0%, rgb(var(--brand-via)) 55%, rgb(var(--brand-deep)) 100%)",
+        "brand-gradient-soft":
+          "linear-gradient(135deg, rgb(var(--brand-from) / 0.06) 0%, rgb(var(--brand-via) / 0.06) 55%, rgb(var(--brand-deep) / 0.04) 100%)",
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
