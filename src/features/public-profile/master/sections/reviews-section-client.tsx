@@ -13,6 +13,9 @@ type Props = {
   initialReviews: ReviewDto[];
   canReviewBookingId: string | null;
   currentUserId?: string | null;
+  /** Whether the AI «Резюме» button should render at all. False ↔
+   * feature flag off / OpenAI key missing in env. */
+  aiSummaryEnabled: boolean;
 };
 
 export function ReviewsSectionClient({
@@ -22,6 +25,7 @@ export function ReviewsSectionClient({
   initialReviews,
   canReviewBookingId,
   currentUserId = null,
+  aiSummaryEnabled,
 }: Props) {
   const [rating, setRating] = useState(initialRating);
   const [reviewsCount, setReviewsCount] = useState(initialReviewsCount);
@@ -43,6 +47,7 @@ export function ReviewsSectionClient({
       canReviewBookingId={canReviewBookingId}
       onRatingRefresh={handleRatingRefresh}
       currentUserId={currentUserId}
+      aiSummaryEnabled={aiSummaryEnabled}
     />
   );
 }

@@ -23,6 +23,9 @@ type Props = {
   canReviewBookingId: string | null;
   onRatingRefresh?: () => Promise<void>;
   currentUserId?: string | null;
+  /** fix-03: when false, the «Резюме» button hides entirely instead
+   * of showing a confusing 503 error to the visitor. */
+  aiSummaryEnabled?: boolean;
 };
 
 const reviewCardText = UI_TEXT.publicProfile.reviews;
@@ -91,6 +94,7 @@ export function ReviewsPreview({
   canReviewBookingId,
   onRatingRefresh,
   currentUserId = null,
+  aiSummaryEnabled = false,
 }: Props) {
   const t = UI_TEXT.publicProfile.reviews;
 
@@ -172,7 +176,11 @@ export function ReviewsPreview({
             <div className="mt-1 text-xs text-text-sec">{ratingLabel}</div>
           </div>
           <div className="flex items-center gap-2">
-            {reviewsCount >= 3 ? (
+            {/* fix-03: AI summary button hidden when feature flag is
+                off — previously clicking it returned 503 and showed
+                a generic «Не удалось сформировать резюме» which
+                looked broken. The flag is server-resolved upstream. */}
+            {aiSummaryEnabled && reviewsCount >= 3 ? (
               <Button
                 type="button"
                 onClick={() => void toggleSummary()}

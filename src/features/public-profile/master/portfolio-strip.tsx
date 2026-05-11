@@ -115,6 +115,7 @@ export function PortfolioStrip({ items }: Props) {
                     alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
                     fill
                     sizes="(max-width: 640px) 50vw, 33vw"
+                    quality={90}
                     className="object-cover transition duration-300 group-hover:scale-[1.03]"
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/25 group-hover:opacity-100">
@@ -183,6 +184,7 @@ export function PortfolioStrip({ items }: Props) {
                         }
                         fill
                         sizes="(max-width: 1024px) 90vw, 50vw"
+                        quality={90}
                         className="rounded-2xl object-contain"
                       />
                     </div>
