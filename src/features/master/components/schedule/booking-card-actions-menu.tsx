@@ -3,11 +3,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -33,14 +35,15 @@ type Props = {
 type ActionId = "confirm" | "decline" | "reschedule" | "cancel";
 
 /**
- * 3-dots popover menu attached to each booking card in the week grid. The
- * available actions depend on the booking's runtime status; menu items
- * either (a) PATCH `/api/master/bookings/[id]/status` for confirm/decline/
- * cancel, or (b) open the reschedule modal which POSTs to its own endpoint.
+ * 3-dots popover menu on each week-grid booking card.
  *
- * Implemented as an inline relative+absolute popover with outside-click and
- * ESC handling — same pattern as `<DatePresetChips>`. No shared popover
- * primitive in the codebase yet.
+ * fix-02: the popover used to live inside the booking card's
+ * `overflow-hidden` container, which clipped it whenever the menu
+ * extended past the card edge. It now renders through `createPortal`
+ * to `document.body` with a computed `position: fixed` placement, so
+ * it floats above everything regardless of the parent's stacking /
+ * clipping context. Position is recomputed on open + on scroll /
+ * resize while open.
  */
 export function BookingCardActionsMenu({
   bookingId,
@@ -54,27 +57,62 @@ export function BookingCardActionsMenu({
   const [error, setError] = useState<string | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [, startTransition] = useTransition();
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const reposition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const MENU_WIDTH = 192; // matches w-48
+    // Prefer aligning the menu's right edge with the trigger's right edge.
+    let left = rect.right - MENU_WIDTH;
+    if (left < 8) left = 8;
+    const right = left + MENU_WIDTH;
+    if (right > window.innerWidth - 8) {
+      left = window.innerWidth - 8 - MENU_WIDTH;
+    }
+    setCoords({
+      top: rect.bottom + 4,
+      left,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    reposition();
+  }, [open, reposition]);
 
   useEffect(() => {
     if (!open) return;
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target;
-      if (!containerRef.current) return;
-      if (target instanceof Node && !containerRef.current.contains(target)) {
-        setOpen(false);
-      }
+      if (!(target instanceof Node)) return;
+      if (triggerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
+    const onResize = () => reposition();
     document.addEventListener("mousedown", onMouseDown);
     window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
     return () => {
       document.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
     };
-  }, [open]);
+  }, [open, reposition]);
 
   const patchStatus = useCallback(
     async (action: ActionId, status: "CONFIRMED" | "REJECTED" | "CANCELLED", comment?: string) => {
@@ -122,10 +160,53 @@ export function BookingCardActionsMenu({
   const isPending = rawStatus === "PENDING" || rawStatus === "CHANGE_REQUESTED";
   const isConfirmed = rawStatus === "CONFIRMED" || rawStatus === "PREPAID";
 
+  const menuContent =
+    open && coords ? (
+      <div
+        ref={menuRef}
+        role="menu"
+        className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
+        style={{ top: coords.top, left: coords.left }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {isPending ? (
+          <>
+            <MenuItem icon={Check} onClick={handleConfirm} disabled={busy !== null}>
+              {T.confirm}
+            </MenuItem>
+            <MenuItem icon={X} onClick={handleDecline} disabled={busy !== null}>
+              {T.decline}
+            </MenuItem>
+          </>
+        ) : null}
+        {isPending || isConfirmed ? (
+          <MenuItem icon={Calendar} onClick={handleReschedule} disabled={busy !== null}>
+            {T.reschedule}
+          </MenuItem>
+        ) : null}
+        {isConfirmed ? (
+          <MenuItem
+            icon={X}
+            onClick={handleCancel}
+            disabled={busy !== null}
+            variant="danger"
+          >
+            {T.cancel}
+          </MenuItem>
+        ) : null}
+        {error ? (
+          <p className="border-t border-border-subtle px-3 py-2 text-[11px] text-red-600">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    ) : null;
+
   return (
     <>
-      <div ref={containerRef} className="absolute right-1 top-1">
+      <div className="absolute right-1 top-1">
         <button
+          ref={triggerRef}
           type="button"
           aria-label={T.actionsAria}
           onClick={(event) => {
@@ -137,45 +218,9 @@ export function BookingCardActionsMenu({
         >
           <MoreVertical className="h-3.5 w-3.5" aria-hidden />
         </button>
-        {open ? (
-          <div
-            role="menu"
-            className="absolute right-0 top-7 z-30 w-48 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {isPending ? (
-              <>
-                <MenuItem icon={Check} onClick={handleConfirm} disabled={busy !== null}>
-                  {T.confirm}
-                </MenuItem>
-                <MenuItem icon={X} onClick={handleDecline} disabled={busy !== null}>
-                  {T.decline}
-                </MenuItem>
-              </>
-            ) : null}
-            {(isPending || isConfirmed) ? (
-              <MenuItem icon={Calendar} onClick={handleReschedule} disabled={busy !== null}>
-                {T.reschedule}
-              </MenuItem>
-            ) : null}
-            {isConfirmed ? (
-              <MenuItem
-                icon={X}
-                onClick={handleCancel}
-                disabled={busy !== null}
-                variant="danger"
-              >
-                {T.cancel}
-              </MenuItem>
-            ) : null}
-            {error ? (
-              <p className="border-t border-border-subtle px-3 py-2 text-[11px] text-red-600">
-                {error}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
       </div>
+
+      {mounted && menuContent ? createPortal(menuContent, document.body) : null}
 
       <RescheduleModal
         open={rescheduleOpen}

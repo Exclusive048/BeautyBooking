@@ -93,14 +93,9 @@ export function WindowHeader({
             </Link>
           </Button>
         ) : null}
-        {perspective === "master" && partner.bookingUrl ? (
-          <Button asChild variant="ghost" size="sm" className="gap-1.5">
-            <Link href={partner.bookingUrl}>
-              <Calendar className="h-4 w-4" aria-hidden strokeWidth={1.6} />
-              <span className="hidden sm:inline">{T.header.openBookingCta}</span>
-            </Link>
-          </Button>
-        ) : null}
+        {/* fix-02: master-side «Открыть запись» button removed — it
+            linked to a kanban page без context. Re-add once a real
+            booking-detail page ships (backlog). */}
         {partner.phone ? (
           <Button
             asChild

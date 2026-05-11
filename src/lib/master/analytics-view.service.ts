@@ -128,7 +128,9 @@ const WEEKDAY_LABEL_FULL = [
 
 export async function getMasterAnalyticsView(input: {
   userId: string;
-  period: Exclude<MasterAnalyticsPeriodId, "custom">;
+  period: MasterAnalyticsPeriodId;
+  /** Required when `period === "custom"`. Inclusive [fromKey, toKey]. */
+  customRange?: { fromKey: string; toKey: string } | null;
   comparison: boolean;
   features: MasterAnalyticsFeatureFlags;
 }): Promise<MasterAnalyticsViewData> {
@@ -137,7 +139,16 @@ export async function getMasterAnalyticsView(input: {
     scope: "MASTER",
   });
 
-  const range = computeRollingRange(input.period, context.timeZone);
+  // fix-02: custom period uses caller-supplied range; presets continue
+  // to use the rolling helper. Granularity adapts to range length so
+  // long custom ranges roll up to weeks/months automatically.
+  const range =
+    input.period === "custom" && input.customRange
+      ? input.customRange
+      : computeRollingRange(
+          input.period === "custom" ? "30d" : input.period,
+          context.timeZone,
+        );
   const prevRange = input.comparison ? computePreviousRange(range) : null;
 
   const { range: currentRange, prevRange: prevAnalyticsRange } = resolveRangeWithCompare({
@@ -148,7 +159,7 @@ export async function getMasterAnalyticsView(input: {
     compare: input.comparison,
   });
 
-  const granularity = pickGranularity(input.period);
+  const granularity = pickGranularity(input.period, range);
 
   // KPI: existing helper handles current+previous in a single bookings
   // query when prevRange is provided.
@@ -334,11 +345,25 @@ function buildInsightsText(): InsightsText {
 }
 
 function pickGranularity(
-  period: Exclude<MasterAnalyticsPeriodId, "custom">
+  period: MasterAnalyticsPeriodId,
+  range?: { fromKey: string; toKey: string },
 ): "day" | "week" | "month" {
+  if (period === "custom" && range) {
+    const days = diffInclusiveDaysQuick(range.fromKey, range.toKey);
+    if (days <= 31) return "day";
+    if (days <= 120) return "week";
+    return "month";
+  }
   if (period === "7d" || period === "30d") return "day";
   if (period === "90d") return "week";
   return "month";
+}
+
+function diffInclusiveDaysQuick(fromKey: string, toKey: string): number {
+  const from = new Date(`${fromKey}T00:00:00Z`);
+  const to = new Date(`${toKey}T00:00:00Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 30;
+  return Math.max(1, Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1);
 }
 
 function kpiToTrend(metric: {

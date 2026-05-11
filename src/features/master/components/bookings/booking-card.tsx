@@ -2,6 +2,7 @@ import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FocalImage } from "@/components/ui/focal-image";
 import { BookingCardActions } from "@/features/master/components/bookings/booking-card-actions";
+import { BookingManageActions } from "@/features/master/components/bookings/booking-manage-actions";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -90,6 +91,21 @@ export function BookingCard({ booking, column }: Props) {
 
       {column === "pending" ? (
         <BookingCardActions bookingId={booking.id} />
+      ) : null}
+
+      {(column === "confirmed" || column === "today") &&
+      booking.startAtUtc &&
+      booking.endAtUtc ? (
+        <BookingManageActions
+          bookingId={booking.id}
+          startAtUtc={booking.startAtUtc.toISOString()}
+          durationMin={Math.max(
+            15,
+            Math.round(
+              (booking.endAtUtc.getTime() - booking.startAtUtc.getTime()) / 60_000,
+            ),
+          )}
+        />
       ) : null}
 
       {column === "done" && booking.reviewRating !== null ? (

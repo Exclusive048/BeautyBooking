@@ -21,18 +21,20 @@ type Props = {
 };
 
 /**
- * Per-type action row attached to each `<NotificationCard>`. Renders a
- * different button set depending on `type`:
+ * Per-type action row attached to each `<NotificationCard>`.
  *
- * - `BOOKING_REQUEST` / `BOOKING_CREATED` — Confirm + Decline (calls
- *   `PATCH /api/master/bookings/:id/status`) plus optional "К клиенту".
- * - `REVIEW_LEFT` — Reply link → reviews page focused on this review.
- * - Reminders / chat / reschedule / cancellation — single nav button.
- * - System types — null (no action row).
- *
- * Confirm/decline auto-marks the notification as read on success and
- * `router.refresh()` rebuilds the page from the server so KPI cards,
- * tab counts and the booking list all stay in sync.
+ * fix-02 changes:
+ * - BOOKING_REQUEST / BOOKING_CREATED: confirm/decline now hide when
+ *   `payload.bookingStatus` reflects a terminal state (CONFIRMED /
+ *   REJECTED / etc.). The fresh status is merged into the payload
+ *   server-side by `mergeBookingPayload` (center.ts), so we get it
+ *   without an extra fetch. Removes the race where the master tapped
+ *   "Confirm" in the kanban and the notification offered a 2nd
+ *   confirm.
+ * - "К клиенту" jump-to-card buttons removed across all notification
+ *   types. The client-name link in the notification body / the
+ *   client list nav are sufficient — 4 redundant chips were UI
+ *   clutter.
  */
 export function NotificationActions({ notificationId, type, payload }: Props) {
   const router = useRouter();
@@ -45,7 +47,7 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
   const updateBookingStatus = async (
     action: "confirm" | "decline",
     nextStatus: "CONFIRMED" | "REJECTED",
-    comment?: string
+    comment?: string,
   ) => {
     if (!payload.bookingId || busy) return;
     setBusy(action);
@@ -60,14 +62,14 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
             status: nextStatus,
             ...(comment ? { comment } : {}),
           }),
-        }
+        },
       );
       const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!response.ok || !json || !json.ok) {
         throw new Error(json && !json.ok ? json.error.message : `API ${response.status}`);
       }
       await fetch(`/api/notifications/${notificationId}/read`, { method: "POST" }).catch(
-        () => null
+        () => null,
       );
       refresh();
     } catch {
@@ -85,6 +87,11 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
   };
 
   if (type === NotificationType.BOOKING_REQUEST || type === NotificationType.BOOKING_CREATED) {
+    const status = payload.bookingStatus;
+    const isPending = status === null || status === "PENDING" || status === "NEW";
+    if (!isPending) {
+      return <StatusBadge status={status} />;
+    }
     return (
       <ActionRow error={error}>
         <Button
@@ -109,11 +116,6 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
           <X className="mr-1 h-3.5 w-3.5" aria-hidden />
           {T.decline}
         </Button>
-        {payload.clientUserId ? (
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link href={`/cabinet/master/clients/${payload.clientUserId}`}>{T.toClient}</Link>
-          </Button>
-        ) : null}
       </ActionRow>
     );
   }
@@ -133,11 +135,6 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
             {T.reply}
           </Link>
         </Button>
-        {payload.authorId ? (
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link href={`/cabinet/master/clients/${payload.authorId}`}>{T.toClient}</Link>
-          </Button>
-        ) : null}
       </ActionRow>
     );
   }
@@ -163,16 +160,12 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
   if (type === NotificationType.CHAT_MESSAGE_RECEIVED) {
     return (
       <ActionRow>
-        {payload.bookingId ? (
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link
-              href={`/cabinet/master/dashboard?bookingId=${payload.bookingId}&chat=open`}
-            >
-              <MessageSquare className="mr-1 h-3.5 w-3.5" aria-hidden />
-              {T.reply}
-            </Link>
-          </Button>
-        ) : null}
+        <Button asChild variant="ghost" size="sm" className="rounded-lg">
+          <Link href="/cabinet/master/messages">
+            <MessageSquare className="mr-1 h-3.5 w-3.5" aria-hidden />
+            {T.reply}
+          </Link>
+        </Button>
       </ActionRow>
     );
   }
@@ -197,22 +190,46 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
     );
   }
 
-  if (
-    type === NotificationType.BOOKING_CANCELLED_BY_CLIENT ||
-    type === NotificationType.BOOKING_NO_SHOW
-  ) {
-    return (
-      <ActionRow>
-        {payload.clientUserId ? (
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link href={`/cabinet/master/clients/${payload.clientUserId}`}>{T.toClient}</Link>
-          </Button>
-        ) : null}
-      </ActionRow>
-    );
-  }
-
+  // BOOKING_CANCELLED_BY_CLIENT / BOOKING_NO_SHOW: pure-informational
+  // after fix-02. The client-name link in the notification body still
+  // jumps to the client card when needed.
   return null;
+}
+
+function StatusBadge({ status }: { status: string | null }) {
+  const label = (() => {
+    switch (status) {
+      case "CONFIRMED":
+      case "PREPAID":
+        return T.statusConfirmed;
+      case "REJECTED":
+        return T.statusRejected;
+      case "CANCELLED":
+        return T.statusCancelled;
+      case "FINISHED":
+        return T.statusFinished;
+      case "NO_SHOW":
+        return T.statusNoShow;
+      case "IN_PROGRESS":
+      case "STARTED":
+        return T.statusInProgress;
+      default:
+        return T.statusHandled;
+    }
+  })();
+  const tone =
+    status === "CONFIRMED" || status === "PREPAID" || status === "FINISHED"
+      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+      : "bg-bg-input text-text-sec";
+  return (
+    <div className="mt-3">
+      <span
+        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${tone}`}
+      >
+        {label}
+      </span>
+    </div>
+  );
 }
 
 function ActionRow({

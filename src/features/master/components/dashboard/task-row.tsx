@@ -1,6 +1,5 @@
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import type { ReactNode } from "react";
 
 export type TaskUrgency = "high" | "medium";
 
@@ -8,17 +7,18 @@ type Props = {
   icon: LucideIcon;
   title: string;
   description: string;
-  ctaLabel: string;
-  ctaHref: string;
+  /** Trailing action — `<Link>` button OR a client island. */
+  cta: ReactNode;
   urgency: TaskUrgency;
 };
 
 /**
- * One row inside the "Требуют внимания" panel. Server-renderable — every
- * action goes to a Link href, so no client interactivity needed at the
- * row level.
+ * One row inside the "Требуют внимания" panel. Server-renderable, the
+ * trailing action slot accepts either a server-rendered Link or a
+ * client island (e.g. inline confirm/decline) — keeps the row
+ * presentation-only.
  */
-export function TaskRow({ icon: Icon, title, description, ctaLabel, ctaHref, urgency }: Props) {
+export function TaskRow({ icon: Icon, title, description, cta, urgency }: Props) {
   const iconColor =
     urgency === "high"
       ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
@@ -36,9 +36,7 @@ export function TaskRow({ icon: Icon, title, description, ctaLabel, ctaHref, urg
         <p className="text-sm font-medium text-text-main">{title}</p>
         <p className="mt-0.5 line-clamp-2 text-xs text-text-sec">{description}</p>
       </div>
-      <Button asChild variant="secondary" size="sm" className="shrink-0">
-        <Link href={ctaHref}>{ctaLabel}</Link>
-      </Button>
+      <div className="shrink-0">{cta}</div>
     </div>
   );
 }

@@ -1,4 +1,8 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { AlertCircle, Calendar, Sparkles, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ConfirmBookingAction } from "@/features/master/components/dashboard/confirm-booking-action";
 import { TaskRow, type TaskUrgency } from "@/features/master/components/dashboard/task-row";
 import type { DashboardData } from "@/lib/master/dashboard.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -24,8 +28,7 @@ type TaskItem = {
   icon: typeof AlertCircle;
   title: string;
   description: string;
-  ctaLabel: string;
-  ctaHref: string;
+  cta: ReactNode;
   urgency: TaskUrgency;
 };
 
@@ -41,8 +44,10 @@ function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredRev
       description: when
         ? `${pb.clientName}, ${when} — ${pb.serviceTitle}`
         : `${pb.clientName} — ${pb.serviceTitle}`,
-      ctaLabel: T.confirmBookingCta,
-      ctaHref: `/cabinet/master/bookings/${pb.id}`,
+      // fix-02: replace the broken `/bookings/[id]` link with an inline
+      // confirm action — same PATCH endpoint the kanban uses, no
+      // navigation away from the dashboard.
+      cta: <ConfirmBookingAction bookingId={pb.id} />,
       urgency: "high",
     });
   }
@@ -56,14 +61,16 @@ function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredRev
       description: teaser
         ? `${r.authorName} · ${r.rating}★ — ${teaser}`
         : `${r.authorName} · ${r.rating}★`,
-      ctaLabel: T.unansweredReviewCta,
-      ctaHref: `/cabinet/master/reviews`,
+      cta: (
+        <Button asChild variant="secondary" size="sm">
+          <Link href="/cabinet/master/reviews">{T.unansweredReviewCta}</Link>
+        </Button>
+      ),
       urgency: "medium",
     });
   }
 
   if (data.freeSlot) {
-    const fromIso = data.freeSlot.startAtUtc.toISOString();
     tasks.push({
       key: "free-slot",
       icon: Calendar,
@@ -74,8 +81,16 @@ function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredRev
         "{minutes}",
         String(data.freeSlot.durationMin),
       ),
-      ctaLabel: T.freeSlotCta,
-      ctaHref: `/cabinet/master/schedule?from=${encodeURIComponent(fromIso)}`,
+      // fix-02: there's no "launch a single hot slot from a free
+      // window" flow — hot slots auto-publish via DiscountRule. Link
+      // to the rules tab so the master can configure it instead.
+      cta: (
+        <Button asChild variant="secondary" size="sm">
+          <Link href="/cabinet/master/schedule/settings?tab=rules">
+            {T.freeSlotCta}
+          </Link>
+        </Button>
+      ),
       urgency: "medium",
     });
   }
@@ -130,8 +145,7 @@ export function AttentionSection({
               icon={task.icon}
               title={task.title}
               description={task.description}
-              ctaLabel={task.ctaLabel}
-              ctaHref={task.ctaHref}
+              cta={task.cta}
               urgency={task.urgency}
             />
           ))}

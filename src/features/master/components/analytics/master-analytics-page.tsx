@@ -5,8 +5,8 @@ import { getMasterAnalyticsFeatures } from "@/lib/master/analytics-features";
 import {
   parseAnalyticsPeriod,
   parseComparisonFlag,
-  type MasterAnalyticsPeriodId,
 } from "@/lib/master/analytics-period";
+import { isDateKey } from "@/lib/schedule/dateKey";
 import { getMasterAnalyticsView } from "@/lib/master/analytics-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { AnalyticsKpiCards } from "./analytics-kpi-cards";
@@ -33,14 +33,17 @@ function readString(value: string | string[] | undefined): string | null {
 }
 
 /**
- * Server orchestrator for `/cabinet/master/analytics` (30a).
+ * Server orchestrator for `/cabinet/master/analytics` (30a · fix-02).
  *
  * URL-driven state:
  *   - `?period=` (7d / 30d / 90d / year / custom) — defaults to 30d
+ *   - `?from=YYYY-MM-DD&to=YYYY-MM-DD` — required when `period=custom`
  *   - `?compare=off` — disables the prev-period overlay (default: on)
  *
- * `custom` is a placeholder in 30a — falls back to 30d server-side
- * while the chip surfaces an alert. 30b ships the picker.
+ * fix-02: `custom` is wired up — the picker submits `from`/`to`, and
+ * the view service consumes the explicit range. If `custom` is in the
+ * URL without a valid `from`/`to` pair we fall back to 30d server-side
+ * so the page never errors.
  */
 export async function MasterAnalyticsPage({ searchParams }: Props) {
   const user = await getSessionUser();
@@ -50,19 +53,31 @@ export async function MasterAnalyticsPage({ searchParams }: Props) {
   const periodId = parseAnalyticsPeriod(readString(params.period));
   const comparison = parseComparisonFlag(readString(params.compare));
 
-  // Custom isn't shipped yet — fall back to 30d if the URL holds it.
-  const effectivePeriod: Exclude<MasterAnalyticsPeriodId, "custom"> =
-    periodId === "custom" ? "30d" : periodId;
+  const fromKey = readString(params.from);
+  const toKey = readString(params.to);
+  const validCustomRange =
+    periodId === "custom" &&
+    fromKey &&
+    toKey &&
+    isDateKey(fromKey) &&
+    isDateKey(toKey) &&
+    fromKey <= toKey
+      ? { fromKey, toKey }
+      : null;
+  const effectivePeriod = periodId === "custom" && !validCustomRange ? "30d" : periodId;
 
   const features = await getMasterAnalyticsFeatures(user.id);
   const data = await getMasterAnalyticsView({
     userId: user.id,
     period: effectivePeriod,
+    customRange: validCustomRange,
     comparison,
     features,
   });
 
-  const periodLabel = periodLabelFor(effectivePeriod);
+  const periodLabel = periodLabelFor(
+    effectivePeriod === "custom" ? "30d" : effectivePeriod,
+  );
 
   return (
     <>
@@ -81,6 +96,8 @@ export async function MasterAnalyticsPage({ searchParams }: Props) {
           comparison={comparison}
           periodDisplay={data.periodDisplay}
           customPeriodAvailable={features.customPeriod}
+          rangeFromKey={validCustomRange?.fromKey ?? data.range.fromKey}
+          rangeToKey={validCustomRange?.toKey ?? data.range.toKey}
         />
 
         <FeatureGate available={features.dashboard}>

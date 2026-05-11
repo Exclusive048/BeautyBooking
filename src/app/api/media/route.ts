@@ -84,15 +84,21 @@ export async function POST(req: Request) {
     let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
     let outputBuffer: Buffer;
 
+    // fix-02: quality 90 → 95. q90 introduced visible artefacts on
+    // high-detail beauty shots (nails, makeup close-ups). At q95 the
+    // re-encode is visually transparent on the master-facing
+    // surfaces, at the cost of ~30% larger files (storage is cheap).
+    // Visual search runs against an in-memory resize of the **stored
+    // original**, so embedding quality is unaffected by this bump.
     if (detected.mime === "image/png") {
       outputMime = "image/webp";
-      outputBuffer = await sharp(rawBuffer).webp({ quality: 90 }).toBuffer();
+      outputBuffer = await sharp(rawBuffer).webp({ quality: 95 }).toBuffer();
     } else if (detected.mime === "image/jpeg") {
       outputMime = "image/jpeg";
-      outputBuffer = await sharp(rawBuffer).jpeg({ quality: 90 }).toBuffer();
+      outputBuffer = await sharp(rawBuffer).jpeg({ quality: 95 }).toBuffer();
     } else {
       outputMime = "image/webp";
-      outputBuffer = await sharp(rawBuffer).webp({ quality: 90 }).toBuffer();
+      outputBuffer = await sharp(rawBuffer).webp({ quality: 95 }).toBuffer();
     }
 
     if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {

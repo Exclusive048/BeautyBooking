@@ -1,8 +1,8 @@
-import Link from "next/link";
-import { AtSign, BadgeCheck, Phone, Send, User } from "lucide-react";
+import { BadgeCheck, Phone, Send, User } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ProfileContacts } from "@/lib/master/profile-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
+import { EditableFieldRow } from "../editable/editable-field-row";
 import { SectionShell } from "./section-shell";
 
 const T = UI_TEXT.cabinetMaster.profile.contacts;
@@ -12,27 +12,40 @@ type Props = {
 };
 
 /**
- * Read-only mirror of identity fields. Phone/email/Telegram/VK live on
- * UserProfile and need secure flows to change (OTP, OAuth) — surfacing
- * editing here would create duplicate paths. The footnote points to the
- * dedicated account-settings surface (`/cabinet/master/account`),
- * pre-anchored to the security tab.
+ * Contacts section — phone + email are inline-editable (autosave via
+ * `PATCH /api/me`). Telegram + VK stay read-only because they sync
+ * from the social-login provider on link.
  *
- * Instagram is intentionally absent — Provider/UserProfile schemas have
- * no field for it; backlog for after schema migration.
+ * fix-02: phone + email moved from read-only chips to
+ * `<EditableFieldRow>`. Phone changes still ship **without** OTP
+ * verification — pre-launch blocker tracked in BACKLOG. The footnote
+ * documents the SMS-pending state.
  */
 export function ContactsSection({ data }: Props) {
   return (
     <SectionShell anchor="contacts" icon={Phone} title={T.title} subtitle={T.subtitle}>
       <ul className="divide-y divide-border-subtle">
-        <ContactRow
-          icon={Phone}
-          label={T.phoneLabel}
-          value={data.phone}
-          verified={Boolean(data.phone)}
-        />
-        <ContactRow icon={AtSign} label={T.emailLabel} value={data.email} verified={false} />
-        <ContactRow
+        <li>
+          <EditableFieldRow
+            label={T.phoneLabel}
+            value={data.phone ?? ""}
+            fieldKey="phone"
+            apiPath="/api/me"
+            placeholder={T.phonePlaceholder}
+            maxLength={40}
+          />
+        </li>
+        <li>
+          <EditableFieldRow
+            label={T.emailLabel}
+            value={data.email ?? ""}
+            fieldKey="email"
+            apiPath="/api/me"
+            placeholder={T.emailPlaceholder}
+            maxLength={120}
+          />
+        </li>
+        <ReadonlyRow
           icon={Send}
           label={T.telegramLabel}
           value={
@@ -44,27 +57,19 @@ export function ContactsSection({ data }: Props) {
           }
           verified={data.telegramConnected}
         />
-        <ContactRow
+        <ReadonlyRow
           icon={User}
           label={T.vkLabel}
           value={data.vkConnected ? `id${data.vkUserId ?? ""}`.trim() : null}
           verified={data.vkConnected}
         />
       </ul>
-      <p className="mt-3 text-xs text-text-sec">
-        {T.accountFootnoteText}{" "}
-        <Link
-          href="/cabinet/master/account?tab=security"
-          className="text-primary underline-offset-2 hover:underline"
-        >
-          {T.accountFootnoteCta}
-        </Link>
-      </p>
+      <p className="mt-3 text-xs text-text-sec">{T.phoneVerifyHint}</p>
     </SectionShell>
   );
 }
 
-function ContactRow({
+function ReadonlyRow({
   icon: Icon,
   label,
   value,
@@ -86,7 +91,7 @@ function ContactRow({
         <p
           className={cn(
             "mt-0.5 text-sm",
-            isEmpty ? "italic text-text-sec" : "text-text-main"
+            isEmpty ? "italic text-text-sec" : "text-text-main",
           )}
         >
           {isEmpty ? T.notSetLabel : value}
