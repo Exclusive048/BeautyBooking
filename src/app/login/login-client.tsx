@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FocalImage } from "@/components/ui/focal-image";
@@ -449,20 +450,23 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
             animate="visible"
             className="relative flex h-full flex-col justify-between p-10"
           >
-            {/* Brand block */}
-            <motion.div variants={panelItemVariants} className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-xl font-bold tracking-tight backdrop-blur-md"
-                aria-hidden
-              >
-                М
-              </div>
-              <div>
-                <div className="text-base font-bold tracking-tight">{UI_TEXT.brand.name}</div>
-                <div className="mt-0.5 font-mono text-[10px] tracking-[0.08em] text-white/70">
-                  {T.brandSubtitle}
-                </div>
-              </div>
+            {/* Brand block — gradient iconmark + white wordmark over the
+                dark hero. `textClassName="text-white"` overrides the
+                gradient bg-clip on the wordmark so it stays readable
+                on the burgundy backdrop; the iconmark itself keeps
+                its gradient for brand identity. Tagline sits under
+                the row as a separate <p>, matching the sidebar
+                pattern. */}
+            <motion.div variants={panelItemVariants}>
+              <BrandLogo
+                variant="full"
+                size="md"
+                href={null}
+                textClassName="text-white"
+              />
+              <p className="mt-1.5 font-mono text-[10px] tracking-[0.08em] text-white/70">
+                {UI_TEXT.brand.tagline}
+              </p>
             </motion.div>
 
             {/* Headline + sub */}
@@ -514,20 +518,15 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
         <main className="flex h-full min-h-0 items-center justify-center">
           <div className="w-full max-w-[400px]">
 
-            {/* Mobile brand hint */}
-            <div className="mb-6 flex items-center gap-2.5 lg:hidden">
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gradient text-base font-bold text-white"
-                aria-hidden
-              >
-                М
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-text-main">{UI_TEXT.brand.name}</p>
-                <p className="truncate font-mono text-[10px] tracking-[0.08em] text-text-sec">
-                  {T.brandSubtitle}
-                </p>
-              </div>
+            {/* Mobile brand hint — compact full BrandLogo + tagline.
+                On the light mobile surface the gradient-clipped
+                wordmark from BrandLogo is the intended treatment, so
+                no `textClassName` override here. */}
+            <div className="mb-6 lg:hidden">
+              <BrandLogo variant="full" size="sm" href={null} />
+              <p className="mt-1 font-mono text-[10px] tracking-[0.08em] text-text-sec">
+                {UI_TEXT.brand.tagline}
+              </p>
             </div>
 
             {/* Header */}

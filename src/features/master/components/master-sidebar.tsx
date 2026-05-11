@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { LockBadge } from "@/components/billing/PaywallCard";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { MasterUserChip } from "@/features/master/components/master-user-chip";
 import { NavGroup } from "@/features/master/components/nav-group";
@@ -126,22 +127,19 @@ export function MasterSidebar({
       className="flex h-full w-64 shrink-0 flex-col"
       aria-label={T.nav.ariaLabel}
     >
-      {/* Brand block — square monogram + display title + mono subtitle. */}
-      <div className="flex items-center gap-3 border-b border-border-subtle px-5 py-5">
-        <span
-          aria-hidden
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient font-display text-base font-semibold text-white shadow-sm"
-        >
-          М
-        </span>
-        <div className="min-w-0">
-          <p className="truncate font-display text-sm font-semibold text-text-main">
-            {T.brand.title}
-          </p>
-          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-            {T.brand.subtitle}
-          </p>
-        </div>
+      {/* Brand block — iconmark + wordmark via <BrandLogo> with the
+          page-context subtitle as an adjacent <p>. Replaces the
+          legacy CSS «М» monogram with the SVG mark from the brand
+          kit (`/brand/logo.svg`). */}
+      <div className="border-b border-border-subtle px-5 py-5">
+        <BrandLogo
+          variant="full"
+          size="sm"
+          href="/cabinet/master/dashboard"
+        />
+        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          {T.brand.subtitle}
+        </p>
       </div>
 
       <nav className="px-3 py-4">

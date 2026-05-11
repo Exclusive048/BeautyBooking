@@ -66,9 +66,11 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  // brand-kit: mobile browser chrome tint matches the brand palette
+  // — `#720808` (brand-deep) in light, `#a10728` (brand-core) in dark.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#720808" },
+    { media: "(prefers-color-scheme: dark)", color: "#a10728" },
   ],
 };
 
@@ -95,22 +97,29 @@ export const metadata: Metadata = {
     siteName: UI_TEXT.brand.name,
     title: UI_TEXT.meta.title,
     description: UI_TEXT.meta.description,
-    images: [{ url: "/icons/icon-512.png", width: 512, height: 512, alt: UI_TEXT.brand.name }],
+    images: [{ url: "/brand/icon-512.png", width: 512, height: 512, alt: UI_TEXT.brand.name }],
   },
   twitter: {
     card: "summary_large_image",
     title: UI_TEXT.meta.title,
     description: UI_TEXT.meta.description,
   },
-  manifest: "/manifest.json",
+  // brand-kit: PWA manifest + icons now served from `/brand/`. Legacy
+  // `/manifest.json` and `/icons/*` files remain in `public/` (the
+  // service worker may still cache them on existing installs);
+  // they're orphaned references at this point and tracked for
+  // cleanup in BACKLOG.
+  manifest: "/brand/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/icons/icon-16.png", sizes: "16x16", type: "image/png" },
-      { url: "/icons/icon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/icon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/icons/icon-180.png", sizes: "180x180", type: "image/png" },
+      { url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
   appleWebApp: {

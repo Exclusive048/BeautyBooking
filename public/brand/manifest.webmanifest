@@ -17,55 +17,55 @@
   ],
   "icons": [
     {
-      "src": "brand/icon-48.png",
+      "src": "/brand/icon-48.png",
       "sizes": "48x48",
       "type": "image/png"
     },
     {
-      "src": "brand/icon-64.png",
+      "src": "/brand/icon-64.png",
       "sizes": "64x64",
       "type": "image/png"
     },
     {
-      "src": "brand/icon-96.png",
+      "src": "/brand/icon-96.png",
       "sizes": "96x96",
       "type": "image/png"
     },
     {
-      "src": "brand/icon-128.png",
+      "src": "/brand/icon-128.png",
       "sizes": "128x128",
       "type": "image/png"
     },
     {
-      "src": "brand/icon-192.png",
+      "src": "/brand/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "brand/icon-256.png",
+      "src": "/brand/icon-256.png",
       "sizes": "256x256",
       "type": "image/png"
     },
     {
-      "src": "brand/icon-384.png",
+      "src": "/brand/icon-384.png",
       "sizes": "384x384",
       "type": "image/png"
     },
     {
-      "src": "brand/icon-512.png",
+      "src": "/brand/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "brand/icon-192-maskable.png",
+      "src": "/brand/icon-192-maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "brand/icon-512-maskable.png",
+      "src": "/brand/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -79,7 +79,7 @@
       "url": "/?action=master-cabinet",
       "icons": [
         {
-          "src": "brand/icon-96.png",
+          "src": "/brand/icon-96.png",
           "sizes": "96x96",
           "type": "image/png"
         }
@@ -92,7 +92,7 @@
       "url": "/?action=studio-cabinet",
       "icons": [
         {
-          "src": "brand/icon-96.png",
+          "src": "/brand/icon-96.png",
           "sizes": "96x96",
           "type": "image/png"
         }
@@ -105,7 +105,7 @@
       "url": "/?action=bookings",
       "icons": [
         {
-          "src": "brand/icon-96.png",
+          "src": "/brand/icon-96.png",
           "sizes": "96x96",
           "type": "image/png"
         }
@@ -118,7 +118,7 @@
       "url": "/?action=catalog",
       "icons": [
         {
-          "src": "brand/icon-96.png",
+          "src": "/brand/icon-96.png",
           "sizes": "96x96",
           "type": "image/png"
         }

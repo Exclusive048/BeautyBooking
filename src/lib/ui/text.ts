@@ -22,6 +22,8 @@ export const UI_TEXT = {
   },
   brand: {
     name: "МастерРядом",
+    tagline: "Маркетплейс мастеров красоты",
+    domain: "мастеррядом.online",
   },
   cookieConsent: {
     text: "Мы используем файлы cookie для работы сайта и улучшения вашего опыта",
