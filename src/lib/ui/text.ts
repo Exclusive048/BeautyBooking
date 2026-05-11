@@ -470,7 +470,7 @@ export const UI_TEXT = {
     howItWorks: { eyebrow: "Как это работает" },
     expectations: { eyebrow: "Прежде чем откликнуться" },
     list: {
-      titleWithCity: "Предложения в {city}",
+      titleWithCity: "Предложения в городе {city}",
       titleAllCities: "Все предложения",
       countLabelOne: "{count} оффер",
       countLabelFew: "{count} оффера",
@@ -1052,7 +1052,7 @@ export const UI_TEXT = {
     },
     hotSlots: {
       title: "Горящие окошки",
-      description: "Автоскидки на ближайшие свободные слоты.",
+      description: "Автоскидки на ближайшие свободные окошки.",
       hint: "Предлагай скидку на свободные окна и заполняй расписание",
       configure: "Настроить",
       whenToApply: "Когда применять",
@@ -1075,7 +1075,7 @@ export const UI_TEXT = {
       saveFailed: "Не удалось сохранить правило.",
       smartPrice: {
         label: "Умная цена",
-        hint: "Автоматически публиковать горящие слоты за выбранное время",
+        hint: "Автоматически публиковать горящие окошки за выбранное время",
         enabled: "Включена",
         disabled: "Выключена",
       },
@@ -1162,8 +1162,8 @@ export const UI_TEXT = {
       bannerFocusTitle: "Точка фокуса",
     },
     settingsPanel: {
-      settingsSubtitle: "Правила записи, уведомления и горящие слоты для всей студии.",
-      hotSlotsTitle: "Горящие слоты",
+      settingsSubtitle: "Правила записи, уведомления и горящие окошки для всей студии.",
+      hotSlotsTitle: "Горящие окошки",
       hotSlotsDescription:
         "Автоскидки на свободные окна по правилам студии.",
       cancellationTitle: "Политика отмены",
@@ -1386,10 +1386,10 @@ export const UI_TEXT = {
     statsRating: "средний рейтинг",
     statsBookings: "завершённых записей",
     hotSlots: {
-      title: "Горячие слоты",
+      title: "Горящие окошки",
       titleAccent: "сегодня",
       subtitle: "Скидки до 30% на освободившиеся места",
-      seeAll: "Все горящие слоты",
+      seeAll: "Все горящие окошки",
     },
     howItWorks: {
       title: "Как это",
@@ -1580,7 +1580,7 @@ export const UI_TEXT = {
       step1Title: "Найдите мастера",
       step1Desc: "Смотрите портфолио, читайте отзывы и выбирайте по стилю",
       step2Title: "Выберите время",
-      step2Desc: "Бронируйте любой удобный слот прямо в приложении",
+      step2Desc: "Бронируйте любое удобное окошко прямо в приложении",
       step3Title: "Готово",
       step3Desc: "Получите подтверждение и напоминание о визите",
     },
@@ -1593,10 +1593,10 @@ export const UI_TEXT = {
       title: "Горящие окошки",
       subtitle: "Скидки до конца дня — свободные окна прямо сейчас",
       book: "Записаться",
-      showAll: "Все слоты",
+      showAll: "Все окошки",
       discountPercent: (v: number) => `-${v}%`,
       discountFixed: (v: number) => `-${v} ₽`,
-      loadFailed: "Не удалось загрузить слоты",
+      loadFailed: "Не удалось загрузить окошки",
       empty: "Сейчас нет горящих окошек",
     },
     trust: {
@@ -1682,7 +1682,7 @@ export const UI_TEXT = {
     priceAllIncluded: "всё включено",
     priceOnRequest: "Цена по запросу",
     noSlots: "Нет мест",
-    nextSlotLabel: "Ближайший слот",
+    nextSlotLabel: "Ближайшее окошко",
     todaySlotsLabel: "Окна сегодня",
     reviewsLabel: "отзывов",
     newLabel: "Новый",
@@ -1783,11 +1783,11 @@ export const UI_TEXT = {
         sectionTitle: "Режим",
         flexibleLabel: "Гибкий",
         flexibleHint: "Клиент выбирает любое время в рабочем интервале",
-        fixedLabel: "Фиксированные слоты",
+        fixedLabel: "Фиксированные окошки",
         fixedHint: "Клиент выбирает только из заранее заданных времён",
       },
       slotStep: {
-        sectionTitle: "Сетка слотов",
+        sectionTitle: "Сетка окошек",
         hint: "Шаг расписания — на какие интервалы делятся свободные окна",
         options: {
           "15": "15 мин",
@@ -1851,7 +1851,7 @@ export const UI_TEXT = {
         bookingWindow: {
           title: "Когда можно записаться",
           minTitle: "Минимум за",
-          minSubtitle: "Раньше этого окна слот скрывается",
+          minSubtitle: "Раньше этого окна окошко скрывается",
           maxTitle: "Максимум вперёд",
           maxSubtitle: "Жёсткий лимит. После этого окна записаться нельзя даже по прямой ссылке",
           minOptions: {
@@ -1895,14 +1895,14 @@ export const UI_TEXT = {
           },
         },
         hotSlots: {
-          badge: "Горячие окошки",
-          title: "Снижайте цену для близких слотов",
+          badge: "Горящие окошки",
+          title: "Снижайте цену для близких окошек",
           body:
             "Если до окна осталось мало времени — автоматически предложите скидку. Клиенты подтянутся, окошко не пропадёт.",
           locked: "Доступно в PRO и выше",
           lockedCta: "Обновить тариф",
           triggerTitle: "Скидка включается",
-          triggerSubtitle: "За сколько до начала слот считается «горячим»",
+          triggerSubtitle: "За сколько до начала окошко считается «горящим»",
           discountTitle: "Размер скидки",
           discountSubtitle: "Сколько клиент сэкономит",
           triggerOptions: {
@@ -1917,12 +1917,12 @@ export const UI_TEXT = {
             "20": "−20%",
             "30": "−30%",
           },
-          gateError: "Горячие окошки доступны на PRO и выше. Обновите тариф, чтобы включить.",
+          gateError: "Горящие окошки доступны на PRO и выше. Обновите тариф, чтобы включить.",
         },
       },
       visibility: {
         slot: {
-          title: "Как клиенты видят слоты",
+          title: "Как клиенты видят окошки",
           publishedTitle: "Показывать в каталоге",
           publishedSubtitle: "Профиль участвует в поиске и фильтрах",
           publishedOptions: {
@@ -1936,7 +1936,7 @@ export const UI_TEXT = {
             today_free: "«сегодня свободно»",
             date_only: "только дата",
           },
-          daysTitle: "Сколько слотов вперёд",
+          daysTitle: "Сколько окошек вперёд",
           daysSubtitle: "Сколько дней показывать в каталоге и карточке мастера. Может быть меньше «Максимум вперёд»",
           daysOptions: {
             "3": "3",
@@ -1991,7 +1991,7 @@ export const UI_TEXT = {
         buffer: {
           title: "Буфер между записями",
           subtitle:
-            "Автоматический отступ на уборку и подготовку — клиенты не смогут забронировать слот вплотную.",
+            "Автоматический отступ на уборку и подготовку — клиенты не смогут забронировать окошко вплотную.",
           options: {
             "0": "нет",
             "5": "5 мин",
@@ -2025,13 +2025,13 @@ export const UI_TEXT = {
           cancel: "Отмена",
         },
         footerHint: {
-          title: "Кликните в календаре, чтобы заблокировать одиночный слот",
+          title: "Кликните в календаре, чтобы заблокировать одиночное окошко",
           body: "Разовые паузы между клиентами проще ставить прямо в расписании — не нужно создавать правило.",
         },
       },
       errors: {
         save: "Не удалось сохранить расписание. Попробуйте ещё раз.",
-        hotSlotsLocked: "Горячие окошки доступны на PRO и выше.",
+        hotSlotsLocked: "Горящие окошки доступны на PRO и выше.",
       },
     },
     notifications: {
@@ -2407,10 +2407,10 @@ export const UI_TEXT = {
           subtitleTemplate: "Клиент {name} получит уведомление о предложении.",
           offerLabel: "Окно",
           offerLineTemplate: "{date} · {start}–{end}",
-          slotsLabel: "Свободные слоты (30 мин)",
+          slotsLabel: "Свободные окошки (30 мин)",
           slotsLoading: "Загрузка…",
           slotsEmpty:
-            "Нет свободных слотов в этом диапазоне. Закройте оффер или измените окно.",
+            "Нет свободных окошек в этом диапазоне. Закройте оффер или измените окно.",
           footnote:
             "После предложения клиент сможет подтвердить и автоматически создаст запись.",
           submit: "Предложить время",
@@ -2477,7 +2477,7 @@ export const UI_TEXT = {
         legendLow: "0%",
         legendHigh: "100%",
         insightTemplate:
-          "Свободные слоты в {weekday} {hour} стабильно пустуют. Запустить акцию?",
+          "Свободные окошки в {weekday} {hour} стабильно пустуют. Запустить акцию?",
         emptyTitle: "Нет данных",
         emptyBody: "Когда появятся записи — здесь будет тепловая карта.",
       },
@@ -2510,9 +2510,9 @@ export const UI_TEXT = {
         heading: "Что говорят данные",
         periodTemplate: "· {period}",
         rules: {
-          heatmap_gap_title: "Свободные слоты",
+          heatmap_gap_title: "Свободные окошки",
           heatmap_gap_body:
-            "{weekday} {hour} — стабильно пустует. Запустить акцию или горячий слот?",
+            "{weekday} {hour} — стабильно пустует. Запустить акцию или горящее окошко?",
           top_service_growing_title: "Топ-услуга растёт",
           top_service_growing_body:
             "«{name}» приносит {share}% выручки, +{growthPct}% к прошлому периоду. Можно поднять цену.",
@@ -2775,7 +2775,7 @@ export const UI_TEXT = {
         planAutoRenewOn: "Автопродление включено",
         planAutoRenewOff: "Автопродление выключено",
         planFreeBody:
-          "Вы используете бесплатный тариф. Перейдите на PRO для расширенной аналитики, горячих окошек и онлайн-оплаты.",
+          "Вы используете бесплатный тариф. Перейдите на PRO для расширенной аналитики, горящих окошек и онлайн-оплаты.",
         manageBillingCta: "Управлять подпиской",
         rolesHeading: "Роли",
         rolesActiveLabel: "Активные роли",
@@ -2934,9 +2934,9 @@ export const UI_TEXT = {
         load: "Загрузка",
         loadHoursTemplate: "из {hours} ч",
         freeToday: "Свободно сегодня",
-        freeTodaySlotOne: "слот",
-        freeTodaySlotFew: "слота",
-        freeTodaySlotMany: "слотов",
+        freeTodaySlotOne: "окошко",
+        freeTodaySlotFew: "окошка",
+        freeTodaySlotMany: "окошек",
         freeTodayAfterTemplate: "после {time}",
         freeTodayNone: "нет окон",
       },
@@ -3062,7 +3062,7 @@ export const UI_TEXT = {
         unansweredReviewTitle: "Ответить на отзыв",
         unansweredReviewCta: "Ответить",
         freeSlotTitle: "Свободное окно {from}–{to}",
-        freeSlotDescription: "{minutes} мин простоя сегодня. Запустить горящий слот?",
+        freeSlotDescription: "{minutes} мин простоя сегодня. Запустить горящее окошко?",
         freeSlotCta: "Создать",
       },
       quickActions: {
@@ -3250,7 +3250,7 @@ export const UI_TEXT = {
       answerPrefix: "•",
       errors: {
         loadDay: "Не удалось загрузить данные дня",
-        loadSlots: "Не удалось загрузить свободные слоты",
+        loadSlots: "Не удалось загрузить свободные окошки",
         commentRequired: "Комментарий обязателен",
         updateStatus: "Не удалось обновить статус",
         createBooking: "Не удалось создать запись",
@@ -3266,7 +3266,7 @@ export const UI_TEXT = {
         clientComment: "Комментарий для клиента",
       },
       labels: {
-        noSlots: "Свободных слотов нет",
+        noSlots: "Свободных окошек нет",
         dayTitle: "Мой день",
         newBookings: "Новые",
         addBooking: "Добавить запись",
@@ -3285,11 +3285,11 @@ export const UI_TEXT = {
         balanceToggleAria: "Скрыть или показать баланс",
         hideBalance: "Скрыть",
         showBalance: "Показать",
-        nextSlotsTitle: "Ближайшие свободные слоты",
+        nextSlotsTitle: "Ближайшие свободные окошки",
         refresh: "Обновить",
-        refreshSlotsAria: "Обновить слоты",
+        refreshSlotsAria: "Обновить окошки",
         publishStories: "Опубликовать в Stories",
-        slotsLoading: "Загрузка слотов...",
+        slotsLoading: "Загрузка окошек...",
         notificationsTitle: "Уведомления (новые отзывы)",
         noReviews: "Пока отзывов нет.",
         slotsOnDate: "Окна на {date}",
@@ -3306,7 +3306,7 @@ export const UI_TEXT = {
       },
       stories: {
         brand: "МастерРядом",
-        slotsTitle: "Свободные слоты · {date}",
+        slotsTitle: "Свободные окошки · {date}",
         cardTitle: "Карточка {index}/{total}",
         saveToMedia: "Сохранить в медиа",
         download: "Скачать PNG",
@@ -3319,7 +3319,7 @@ export const UI_TEXT = {
         bgDark: "Тёмный",
         slotsOnCanvas: "Свободные окошки",
         moreSlots: "и ещё {n} окошек",
-        noSlots: "Нет свободных слотов",
+        noSlots: "Нет свободных окошек",
         today: "Сегодня",
         generating: "Генерируем...",
       },
@@ -4378,15 +4378,15 @@ export const UI_TEXT = {
       confirmFailed: "Не удалось подтвердить запись. Попробуйте ещё раз.",
       chooseDate: "Выберите дату",
       chooseTime: "Выберите время",
-      noSlots: "Нет доступных слотов",
-      loadSlotsFailed: "Не удалось загрузить слоты",
+      noSlots: "Нет доступных окошек",
+      loadSlotsFailed: "Не удалось загрузить окошки",
       submitFailed: "Не удалось отправить запись",
-      chooseCorrectSlot: "Выберите корректный слот",
+      chooseCorrectSlot: "Выберите корректное окошко",
       morning: "Утро",
       day: "День",
       evening: "Вечер",
       moveBooking: "Перенести запись",
-      moveBookingHint: "Выберите новую дату и слот.",
+      moveBookingHint: "Выберите новую дату и окошко.",
       moveConfirm: "Подтвердить перенос",
       moving: "Переносим...",
     },
@@ -4623,7 +4623,7 @@ export const UI_TEXT = {
     booking: {
       title: "Запись",
       emptyTitle: "Выберите услугу, чтобы записаться",
-      emptyDesc: "Добавьте хотя бы одну услугу, и мы покажем итог и ближайшие слоты.",
+      emptyDesc: "Добавьте хотя бы одну услугу, и мы покажем итог и ближайшие окошки.",
       chooseTime: "Выбрать время",
       backToCart: "Назад к корзине",
       continueToConfirm: "Продолжить",
@@ -4655,7 +4655,7 @@ export const UI_TEXT = {
       duration: "Время",
     },
     slots: {
-      loadingSlots: "Загружаем слоты...",
+      loadingSlots: "Загружаем окошки...",
       noSlots: "На ближайшие дни свободных мест нет — попробуйте другую дату.",
       refresh: "Обновить",
       showMoreWeek: "Показать ещё неделю",
@@ -4716,7 +4716,7 @@ export const UI_TEXT = {
         "ноября",
         "декабря",
       ] as string[],
-      slotsLoading: "Загружаем слоты...",
+      slotsLoading: "Загружаем окошки...",
       noSlotsForDay: "На этот день нет свободных окон",
       slotsLoadFailed: "Не удалось загрузить свободные окна. Попробуйте ещё раз.",
       summarySelectDateTime: "Выберите дату и время",
@@ -4767,7 +4767,7 @@ export const UI_TEXT = {
       successGoToCabinet: "В личный кабинет",
       successCancelAuth: "Отменить запись",
       successCancelGuest: "Отменить — войдите в аккаунт",
-      conflictHeading: "Слот уже занят",
+      conflictHeading: "Окошко уже занято",
       conflictBody:
         "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
       conflictRetry: "Выбрать другое время",

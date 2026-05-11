@@ -38,7 +38,7 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
                   <div className="text-sm font-medium text-text-main">{service.name}</div>
                   <div className="mt-1 text-sm text-text-sec">
                     {service.price > 0
-                      ? `${new Intl.NumberFormat("ru-RU").format(service.price)} ₽ • ${UI_FMT.durationLabel(service.durationMin)}`
+                      ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
                       : UI_TEXT.publicProfile.services.priceOnRequest}
                   </div>
                 </div>

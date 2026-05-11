@@ -31,7 +31,7 @@ type Props = {
 };
 
 /**
- * "Как клиенты видят слоты" — public catalog inclusion + slot precision +
+ * "Как клиенты видят окошки" — public catalog inclusion + slot precision +
  * visible horizon. `isPublished = false` removes the provider from the
  * catalog (existing public-catalog behaviour).
  */

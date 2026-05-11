@@ -1,5 +1,6 @@
 import { ProviderType, SubscriptionScope } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { ManualBookingProvider } from "@/features/master/components/manual-booking/manual-booking-provider";
 import { MasterSidebar } from "@/features/master/components/master-sidebar";
 import { MasterBottomNav } from "@/features/master/components/master-bottom-nav";
 import { TrialEndingBanner } from "@/features/cabinet/components/trial-ending-banner";
@@ -10,6 +11,7 @@ import {
   trialDaysLeft,
 } from "@/lib/billing/get-current-subscription-row";
 import { getPendingBookingsCountForMaster } from "@/lib/bookings/counts";
+import { getMasterManualBookingData } from "@/lib/master/manual-booking-data.service";
 import { getUnreadBadgeCount } from "@/lib/notifications/badge";
 import { getUnansweredReviewsCountForMaster } from "@/lib/reviews/counts";
 import { prisma } from "@/lib/prisma";
@@ -46,11 +48,13 @@ export default async function MasterCabinetLayout({
     pendingBookings,
     unreadBadge,
     unansweredReviews,
+    manualBookingData,
   ] = await Promise.all([
     getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
     getPendingBookingsCountForMaster(master.id),
     getUnreadBadgeCount({ userId, phone: sessionUser?.phone ?? null, context: "master" }),
     getUnansweredReviewsCountForMaster(master.id),
+    getMasterManualBookingData(userId),
   ]);
 
   const trialActive = isActiveTrial(subscription);
@@ -64,7 +68,7 @@ export default async function MasterCabinetLayout({
     UI_TEXT.brand.name;
 
   return (
-    <>
+    <ManualBookingProvider data={manualBookingData}>
       {showBanner ? <TrialEndingBanner daysLeft={daysLeft} /> : null}
       {/* Full-width cabinet shell. Layout owns three concerns only:
             1. Desktop sidebar column
@@ -100,6 +104,6 @@ export default async function MasterCabinetLayout({
 
         <MasterBottomNav pendingBookingsCount={pendingBookings} />
       </div>
-    </>
+    </ManualBookingProvider>
   );
 }

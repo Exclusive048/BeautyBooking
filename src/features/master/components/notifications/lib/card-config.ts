@@ -105,7 +105,7 @@ const CONFIG_MAP: Partial<Record<NotificationType, CardConfig>> = {
   [NotificationType.MODEL_APPLICATION_RECEIVED]: { icon: ImageIcon, ...AMBER, label: "Заявка модели" },
   [NotificationType.MODEL_BOOKING_CREATED]: { icon: UserCheck, ...EMERALD, label: "Модель записалась" },
   [NotificationType.MODEL_TIME_CONFIRMED]: { icon: UserCheck, ...EMERALD, label: "Время подтверждено" },
-  [NotificationType.HOT_SLOT_PUBLISHED]: { icon: Zap, ...AMBER, label: "Горячее окошко" },
+  [NotificationType.HOT_SLOT_PUBLISHED]: { icon: Zap, ...AMBER, label: "Горящее окошко" },
   [NotificationType.HOT_SLOT_BOOKED]: { icon: Sparkles, ...EMERALD, label: "Окошко забронировано" },
   [NotificationType.HOT_SLOT_EXPIRING]: { icon: Zap, ...AMBER, label: "Окошко истекает" },
   [NotificationType.MASTER_WEEKLY_STATS]: { icon: TrendingUp, ...SLATE, label: "Сводка недели" },

@@ -1,14 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { AnnouncementsSection } from "@/features/master/components/dashboard/announcements-section";
 import { AttentionSection } from "@/features/master/components/dashboard/attention-section";
 import { GreetingHero } from "@/features/master/components/dashboard/greeting-hero";
 import { KpiCardsGrid } from "@/features/master/components/dashboard/kpi-cards-grid";
-import { ManualBookingModal } from "@/features/master/components/dashboard/manual-booking-modal";
 import { QuickActionsSection } from "@/features/master/components/dashboard/quick-actions-section";
 import { UpcomingBookingsSection } from "@/features/master/components/dashboard/upcoming-bookings-section";
+import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { NotificationButton } from "@/features/master/components/notification-button";
 import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
@@ -96,12 +93,7 @@ export async function MasterDashboardPage() {
         actions={
           <>
             <NotificationButton count={unreadBadge.count} />
-            <Button asChild variant="primary" size="md" className="rounded-xl">
-              <Link href="/cabinet/master/dashboard?manual=1">
-                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                {HEADER.newBookingCta}
-              </Link>
-            </Button>
+            <NewBookingButton label={HEADER.newBookingCta} className="rounded-xl" />
           </>
         }
       />
@@ -141,7 +133,6 @@ export async function MasterDashboardPage() {
         </div>
       </div>
 
-      <ManualBookingModal services={data.services} isSolo={data.isSolo} />
     </>
   );
 }

@@ -2,15 +2,12 @@ import { MessageSquare, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BookingActionButtons } from "@/features/master/components/dashboard/booking-action-buttons";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 function formatHm(date: Date): string {
   const h = String(date.getUTCHours()).padStart(2, "0");

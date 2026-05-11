@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const SLOT_MIN = 30;
@@ -25,9 +25,9 @@ type Props = {
  * pointer-events-auto buttons. The wrapper itself has
  * `pointer-events-none` so booking cards above stay interactive.
  *
- * Clicking a slot pushes the user to the dashboard's manual-booking modal
- * with a `prefillTime` query param that the modal reads and seeds into
- * its date+time fields.
+ * Clicking a slot opens the manual-booking modal **inline on the current
+ * route** (fix-01) — previously navigated to /dashboard. `prefillTime`
+ * pre-fills the modal's date+time fields.
  */
 export function EmptyCellsOverlay({
   iso,
@@ -37,7 +37,7 @@ export function EmptyCellsOverlay({
   workingIntervals,
   occupied,
 }: Props) {
-  const router = useRouter();
+  const { open: openManualBooking } = useManualBooking();
   const pxPerMin = hourPx / 60;
 
   const slots = useMemo(() => {
@@ -57,11 +57,7 @@ export function EmptyCellsOverlay({
     const [y, m, d] = iso.split("-").map((p) => Number.parseInt(p, 10));
     if (!y || !m || !d) return;
     const startsAt = new Date(y, m - 1, d, Math.floor(startMin / 60), startMin % 60, 0, 0);
-    const params = new URLSearchParams({
-      manual: "1",
-      prefillTime: startsAt.toISOString(),
-    });
-    router.push(`/cabinet/master/dashboard?${params.toString()}`);
+    openManualBooking({ prefillTime: startsAt.toISOString() });
   };
 
   return (

@@ -1,14 +1,12 @@
 import { Calendar, LineChart, Sparkles, Wallet } from "lucide-react";
 import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
 import type { ScheduleKpi } from "@/lib/master/schedule.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.kpi;
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 function pluralizeSlots(n: number): string {
   const mod10 = n % 10;

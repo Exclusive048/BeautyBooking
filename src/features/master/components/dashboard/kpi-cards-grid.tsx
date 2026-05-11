@@ -1,12 +1,9 @@
 import { Calendar, LineChart, Users, Wallet } from "lucide-react";
 import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 type Props = {
   todayRevenue: number;

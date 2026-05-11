@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { BookingsToolbar } from "@/features/master/components/bookings/bookings-toolbar";
 import { KanbanBoard } from "@/features/master/components/bookings/kanban-board";
+import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
@@ -57,14 +55,7 @@ export async function MasterBookingsPage({ searchParams }: Props) {
         ]}
         title={T.bookings.title}
         subtitle={T.bookings.subtitle}
-        actions={
-          <Button asChild variant="primary" size="md" className="rounded-xl">
-            <Link href="/cabinet/master/dashboard?manual=1">
-              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-              {T.pageHeader.newBookingCta}
-            </Link>
-          </Button>
-        }
+        actions={<NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" />}
       />
 
       <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">

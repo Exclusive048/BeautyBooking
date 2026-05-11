@@ -28,7 +28,7 @@ export const publicBookingCreateSchema = z
     hotSlotId: z.string().trim().min(1).nullable().optional(),
     startAtUtc: isoDateString,
     endAtUtc: isoDateString,
-    slotLabel: z.string().trim().min(1, "Не указан слот.").max(120),
+    slotLabel: z.string().trim().min(1, "Не указано окошко.").max(120),
     clientName: z.string().trim().min(1, "Укажите имя.").max(120),
     clientPhone: z.string().trim().min(5, "Проверьте номер телефона.").max(40),
     comment: z.string().trim().max(500).nullable().optional(),

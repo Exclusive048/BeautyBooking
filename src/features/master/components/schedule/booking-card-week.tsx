@@ -3,14 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { BookingCardActionsMenu } from "@/features/master/components/schedule/booking-card-actions-menu";
 import { formatHm } from "@/lib/master/schedule-utils";
 import type { ScheduleBookingItem } from "@/lib/master/schedule.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.bookingCard;
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 type Props = {
   booking: ScheduleBookingItem;

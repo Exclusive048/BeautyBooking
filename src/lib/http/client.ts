@@ -26,8 +26,8 @@ export function getErrorMessageByCode(code?: ErrorCode): string | null {
     VALIDATION_ERROR: "Проверьте заполненные поля.",
     UNAUTHORIZED: "Сначала нужно войти.",
     FORBIDDEN: "У вас нет доступа к этому действию.",
-    BOOKING_CONFLICT: "Этот слот уже занят.",
-    SLOT_CONFLICT: "Этот слот уже занят.",
+    BOOKING_CONFLICT: "Это окошко уже занято.",
+    SLOT_CONFLICT: "Это окошко уже занято.",
     SERVICE_DISABLED: "Эта услуга сейчас недоступна.",
     CANCELLATION_DEADLINE_PASSED: "Отмена недоступна: срок отмены истёк.",
   };

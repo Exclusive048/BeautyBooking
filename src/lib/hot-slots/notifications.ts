@@ -34,9 +34,9 @@ function buildNotificationBody(input: HotSlotNotificationInput, slotLabel: strin
     parts.push(`Услуга: ${input.serviceTitle}`);
   }
   parts.push(`Скидка: ${formatDiscount(input.discountType, input.discountValue)}`);
-  parts.push(`Ближайший слот: ${slotLabel}`);
+  parts.push(`Ближайшее окошко: ${slotLabel}`);
   if (input.slots.length > 1) {
-    parts.push(`Всего слотов: ${input.slots.length}`);
+    parts.push(`Всего окошек: ${input.slots.length}`);
   }
   return parts.join(" · ");
 }
@@ -48,9 +48,9 @@ function buildTelegramText(input: HotSlotNotificationInput, slotLabel: string, l
     lines.push(`Услуга: ${input.serviceTitle}`);
   }
   lines.push(`Скидка: ${formatDiscount(input.discountType, input.discountValue)}`);
-  lines.push(`Ближайший слот: ${slotLabel}`);
+  lines.push(`Ближайшее окошко: ${slotLabel}`);
   if (input.slots.length > 1) {
-    lines.push(`Всего слотов: ${input.slots.length}`);
+    lines.push(`Всего окошек: ${input.slots.length}`);
   }
   if (linkUrl) {
     lines.push(`Ссылка: ${linkUrl}`);

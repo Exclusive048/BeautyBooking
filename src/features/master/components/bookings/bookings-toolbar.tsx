@@ -5,15 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Tabs } from "@/components/ui/tabs";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.toolbar;
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 type Props = {
   initialSearch: string;

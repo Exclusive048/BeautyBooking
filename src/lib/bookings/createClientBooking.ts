@@ -26,7 +26,7 @@ function mapPrismaBookingConflict(error: unknown): AppError | null {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002" || error.code === "P2034") {
       return new AppError(
-        "Это время уже занято. Пожалуйста, выберите другой слот.",
+        "Это время уже занято. Пожалуйста, выберите другое окошко.",
         409,
         "BOOKING_CONFLICT"
       );

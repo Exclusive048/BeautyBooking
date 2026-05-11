@@ -3,15 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { FocalImage } from "@/components/ui/focal-image";
 import { BookingCardActions } from "@/features/master/components/bookings/booking-card-actions";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.card;
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/);

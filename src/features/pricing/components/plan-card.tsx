@@ -6,6 +6,7 @@ import {
   calcSavingsPercent,
   type MarketingPlan,
 } from "@/lib/billing/marketing-pricing";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.pricing;
@@ -18,11 +19,6 @@ type Props = {
   fallbackCode: string;
   highlighted?: boolean;
 };
-
-function formatRubFromKopeks(kopeks: number): string {
-  const rub = Math.round(kopeks / 100);
-  return new Intl.NumberFormat("ru-RU").format(rub);
-}
 
 function periodLabel(months: number): string {
   if (months === 1) return T.periods["1"];
@@ -127,7 +123,7 @@ export function PlanCard({ plan, fallbackCode, highlighted = false }: Props) {
                 <dt className={subTextClass}>{periodLabel(months)}</dt>
                 <dd className="text-right">
                   <span className={`font-display text-base tabular-nums ${headingClass}`}>
-                    {formatRubFromKopeks(entry.priceKopeks)} ₽
+                    {UI_FMT.priceLabel(entry.priceKopeks)}
                   </span>
                   {savings !== null ? (
                     <span className={`ml-2 text-xs ${subTextClass}`}>

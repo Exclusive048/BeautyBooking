@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { ImagePlus, Lock, Plus, Share2, UserPlus } from "lucide-react";
 import { QuickActionTile } from "@/features/master/components/dashboard/quick-action-tile";
+import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.quickActions;
@@ -15,14 +15,15 @@ type Props = {
 /**
  * 5-tile quick-action panel. The headline tile spans the full row and uses
  * the brand gradient; the rest are secondary tiles in a 2-up grid below.
- * "Добавить запись" routes to `?manual=1` so the existing modal opens
- * (works from any page in the cabinet).
+ * "Добавить запись" opens the manual-booking modal inline on the current
+ * route (fix-01: previously navigated to /dashboard regardless of
+ * caller).
  */
 export function QuickActionsSection({ publicProfileUrl }: Props) {
-  const router = useRouter();
+  const { open: openManualBooking } = useManualBooking();
 
   const handleAddBooking = () => {
-    router.push("/cabinet/master/dashboard?manual=1");
+    openManualBooking();
   };
 
   const handleShareProfile = async () => {

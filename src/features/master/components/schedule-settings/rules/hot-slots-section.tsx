@@ -39,7 +39,7 @@ type Props = {
 };
 
 /**
- * "Горячие окошки" — toggle + sub-controls.
+ * "Горящие окошки" — toggle + sub-controls.
  *
  * Toggle on (`hotSlots: HotSlotsDto`) → DiscountRule.isEnabled = true on save.
  * Toggle off (`hotSlots: null`) → DiscountRule.isEnabled = false (row preserved).

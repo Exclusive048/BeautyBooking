@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
 import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.manualBooking;
@@ -17,11 +18,7 @@ type Props = {
   isSolo: boolean;
 };
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 function todayDateKey(): string {
   return new Date().toISOString().slice(0, 10);

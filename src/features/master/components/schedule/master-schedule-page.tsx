@@ -1,13 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { FooterHint } from "@/features/master/components/schedule/footer-hint";
 import { RefreshButton } from "@/features/master/components/schedule/refresh-button";
 import { ScheduleControls } from "@/features/master/components/schedule/schedule-controls";
 import { ScheduleKpiCards } from "@/features/master/components/schedule/schedule-kpi-cards";
 import { ScheduleLegend } from "@/features/master/components/schedule/schedule-legend";
 import { WeekGrid } from "@/features/master/components/schedule/week-grid";
+import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
@@ -17,14 +15,12 @@ import {
   parseWeekStart,
   toIsoDateKey,
 } from "@/lib/master/schedule-utils";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 function pluralizeBookings(n: number): string {
   const mod10 = n % 10;
@@ -74,12 +70,7 @@ export async function MasterSchedulePage({ searchParams }: Props) {
         actions={
           <>
             <RefreshButton />
-            <Button asChild variant="primary" size="md" className="rounded-xl">
-              <Link href="/cabinet/master/dashboard?manual=1">
-                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                {T.pageHeader.newBookingCta}
-              </Link>
-            </Button>
+            <NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" />
           </>
         }
       />

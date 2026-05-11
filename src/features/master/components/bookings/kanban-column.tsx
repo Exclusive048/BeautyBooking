@@ -1,12 +1,9 @@
 import { BookingCard } from "@/features/master/components/bookings/booking-card";
 import { EmptyColumn } from "@/features/master/components/bookings/empty-column";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 
-const moneyFmt = new Intl.NumberFormat("ru-RU");
-
-function formatRub(value: number): string {
-  return `${moneyFmt.format(Math.round(value))} ₽`;
-}
+const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 const ACCENT_DOT: Record<ColumnId, string> = {
   pending: "bg-amber-500",
