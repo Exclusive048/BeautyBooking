@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CatalogSidebar, type CatalogFilters } from "@/features/catalog/components/catalog-sidebar";
+import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = CatalogFilters & {
@@ -20,6 +21,7 @@ type Props = CatalogFilters & {
   onToggleAvailableToday: () => void;
   onReset: () => void;
   onApply: () => void;
+  priceDistribution?: ReadonlyArray<CatalogPriceBucket>;
 };
 
 export function MobileFilterDrawer({

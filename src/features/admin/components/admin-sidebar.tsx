@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CreditCard, FolderTree, LayoutDashboard, Menu, Settings, Star, Users, X } from "lucide-react";
+import { CreditCard, FolderTree, LayoutDashboard, MapPin, Menu, Settings, Star, Users, X } from "lucide-react";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -16,6 +16,7 @@ type NavItem = {
 const ITEMS: NavItem[] = [
   { href: "/admin", label: UI_TEXT.admin.nav.dashboard, icon: LayoutDashboard, exact: true },
   { href: "/admin/catalog", label: UI_TEXT.admin.nav.catalog, icon: FolderTree },
+  { href: "/admin/cities", label: UI_TEXT.admin.nav.cities, icon: MapPin },
   { href: "/admin/users", label: UI_TEXT.admin.nav.users, icon: Users },
   { href: "/admin/billing", label: UI_TEXT.admin.nav.billing, icon: CreditCard },
   { href: "/admin/reviews", label: UI_TEXT.admin.nav.reviews, icon: Star },

@@ -3,6 +3,9 @@ import { MembershipStatus, StudioRole } from "@prisma/client";
 import { Scissors, Building2 } from "lucide-react";
 import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
 import { AuthUserMenu } from "@/components/layout/auth-user-menu";
+import { NavLink } from "@/components/layout/nav-link";
+import { TopbarShell } from "@/components/layout/topbar-shell";
+import { CitySelector } from "@/features/cities/components/city-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
@@ -113,9 +116,14 @@ async function loadWorkspaceLinks(userId: string): Promise<{
   };
 }
 
-const NAV_LINKS = [
+// Single source of truth for the desktop top-bar menu.
+// "Горящие окошки" intentionally removed from the menu — see 07-NAVBAR-FOOTER.
+// Page /hot and the /api/hot-slots API stay live; only the menu entry is hidden.
+//
+// Mobile drawer (auth-mobile-menu.tsx) has its OWN list because it surfaces
+// /pricing too — kept separate intentionally. If they ever match, consolidate.
+export const NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/catalog", label: UI_TEXT.nav.catalog },
-  { href: "/hot", label: UI_TEXT.nav.hotSlots },
   { href: "/models", label: UI_TEXT.nav.forModels },
   { href: "/cabinet/bookings", label: UI_TEXT.nav.myBookings },
 ];
@@ -139,54 +147,68 @@ export async function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30">
-      <div className="mx-auto mt-3 flex h-[var(--topbar-h)] w-full max-w-6xl min-w-0 items-center justify-between rounded-[26px] border border-border-subtle/80 bg-bg-card/80 px-4 shadow-card backdrop-blur-md">
-        {/* Logo */}
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
-          {siteLogo?.url ? (
-            <FocalImage
-              src={siteLogo.url}
-              alt={UI_TEXT.nav.siteLogoAlt}
-              width={36}
-              height={36}
-              className="rounded-xl object-cover"
-            />
-          ) : (
-            <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500" />
-          )}
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-bold bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
-              {UI_TEXT.brand.name}
-            </div>
-            <div className="hidden xs:block truncate text-xs text-text-sec">{UI_TEXT.nav.bookingToMasters}</div>
-          </div>
-        </Link>
+    <TopbarShell>
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 lg:h-16 lg:px-6">
+        {/* Brand block: glyph · CitySelector · textmark.
+            Glyph and textmark each link to "/", selector is a self-contained
+            dropdown between them. On narrow screens (<sm) the textmark hides;
+            below ~380px the selector itself can wrap if needed. */}
+        <div className="flex min-w-0 shrink items-center gap-2.5">
+          <Link
+            href="/"
+            aria-label={UI_TEXT.nav.siteLogoAlt}
+            className="shrink-0"
+          >
+            {siteLogo?.url ? (
+              <FocalImage
+                src={siteLogo.url}
+                alt={UI_TEXT.nav.siteLogoAlt}
+                width={36}
+                height={36}
+                className="rounded-xl object-cover"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
+              >
+                <span className="font-display text-lg font-semibold italic leading-none text-white">
+                  М
+                </span>
+              </span>
+            )}
+          </Link>
+
+          <span aria-hidden className="hidden select-none text-text-sec/40 sm:inline">
+            {UI_TEXT.cities.selector.separator}
+          </span>
+
+          <CitySelector />
+
+          <span aria-hidden className="hidden select-none text-text-sec/40 lg:inline">
+            {UI_TEXT.cities.selector.separator}
+          </span>
+
+          <Link
+            href="/"
+            className="hidden truncate font-display text-base font-medium text-text-main lg:inline"
+          >
+            Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
+          </Link>
+        </div>
 
         {/* Center nav (desktop) */}
-        <nav className="hidden lg:flex items-center gap-1" aria-label="Основная навигация">
+        <nav
+          className="hidden min-w-0 flex-1 items-center justify-center gap-1 lg:flex"
+          aria-label="Основная навигация"
+        >
           {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-xl px-3 py-1.5 text-sm text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
-            >
-              {link.label}
-            </Link>
+            <NavLink key={link.href} href={link.href} label={link.label} />
           ))}
         </nav>
 
         {/* Right side */}
-        <nav className="flex items-center gap-2 shrink-0">
-          {/* Compact nav for medium screens */}
-          <div className="hidden sm:flex lg:hidden items-center gap-1.5">
-            <Button asChild variant="secondary" size="sm">
-              <Link href="/catalog">{UI_TEXT.nav.catalog}</Link>
-            </Button>
-            <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
-              <Link href="/catalog?hot=true">{UI_TEXT.nav.hotSlots}</Link>
-            </Button>
-          </div>
-
+        <nav className="flex shrink-0 items-center gap-2">
           {user ? (
             <>
               <NotificationsBell ariaLabel={UI_TEXT.nav.notifications} />
@@ -222,6 +244,6 @@ export async function Topbar() {
           )}
         </nav>
       </div>
-    </header>
+    </TopbarShell>
   );
 }

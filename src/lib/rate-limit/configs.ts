@@ -21,4 +21,8 @@ export const RATE_LIMITS = {
 
   // General public API
   publicApi: { windowSeconds: 60, maxRequests: 120 },
+
+  // Feed
+  feedPortfolio: { windowSeconds: 60, maxRequests: 60 },
+  feedStories: { windowSeconds: 60, maxRequests: 30 },
 } satisfies Record<string, RateLimitConfig>;

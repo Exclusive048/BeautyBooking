@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { addRoleToUser } from "@/lib/auth/roles";
 import { ensureUniqueUsername, generateDefaultUsername } from "@/lib/publicUsername";
 import { ensureFreeSubscription } from "@/lib/billing/ensure-free-subscription";
+import { ensureFreeOrTrialSubscription } from "@/lib/billing/trial";
 import { logError, logInfo } from "@/lib/logging/logger";
 
 type MasterProfileCreateResult =
@@ -27,6 +28,37 @@ function ensureFreeSubscriptionNonBlocking(userId: string, scope: SubscriptionSc
     })
     .catch((error) => {
       logError("ensureFreeSubscription failed", {
+        userId,
+        scope,
+        source,
+        mode: "background",
+        error: error instanceof Error ? error.stack : error,
+      });
+    });
+}
+
+// Trial-aware variant of ensureFreeSubscriptionNonBlocking — used only on the
+// "newly created" branch of profile creation, where the user is becoming a
+// master/studio for the first time and is eligible for the 30-day PREMIUM trial.
+function ensureFreeOrTrialSubscriptionNonBlocking(
+  userId: string,
+  scope: SubscriptionScope,
+  source: string,
+): void {
+  const t0 = Date.now();
+  void ensureFreeOrTrialSubscription(userId, scope, source)
+    .then((result) => {
+      logInfo("ensureFreeOrTrialSubscription completed", {
+        userId,
+        scope,
+        source,
+        ms: Date.now() - t0,
+        mode: "background",
+        outcome: result.mode,
+      });
+    })
+    .catch((error) => {
+      logError("ensureFreeOrTrialSubscription failed", {
         userId,
         scope,
         source,
@@ -129,15 +161,23 @@ export async function createMasterProfile(
   });
   logInfo("createMasterProfile: masterProfile.create", { userId: input.userId, ms: Date.now() - profileCreateStartedAt });
 
+  // First-time master profile → eligible for 30-day PREMIUM trial.
+  // ensureFreeOrTrialSubscription falls back to FREE if the user already had
+  // PREMIUM history or if the PREMIUM plan isn't configured.
   if (mode === "background") {
-    ensureFreeSubscriptionNonBlocking(input.userId, SubscriptionScope.MASTER, "createMasterProfile:created");
+    ensureFreeOrTrialSubscriptionNonBlocking(input.userId, SubscriptionScope.MASTER, "createMasterProfile:created");
   } else {
     const t0 = Date.now();
-    await ensureFreeSubscription(input.userId, SubscriptionScope.MASTER);
-    logInfo("createMasterProfile: ensureFreeSubscription", {
+    const result = await ensureFreeOrTrialSubscription(
+      input.userId,
+      SubscriptionScope.MASTER,
+      "createMasterProfile:created",
+    );
+    logInfo("createMasterProfile: ensureFreeOrTrialSubscription", {
       userId: input.userId,
       mode: "sync",
       path: "created",
+      outcome: result.mode,
       ms: Date.now() - t0,
     });
   }
@@ -237,7 +277,17 @@ export async function createStudioProfile(
     });
   }
 
-  await ensureFreeSubscription(input.userId, SubscriptionScope.STUDIO);
+  // First-time studio profile → eligible for 30-day PREMIUM trial on the
+  // STUDIO scope. Independent from any MASTER trial the user may already have.
+  const trialResult = await ensureFreeOrTrialSubscription(
+    input.userId,
+    SubscriptionScope.STUDIO,
+    "createStudioProfile:created",
+  );
+  logInfo("createStudioProfile: ensureFreeOrTrialSubscription", {
+    userId: input.userId,
+    outcome: trialResult.mode,
+  });
 
   return { status: "created", studioId: studio.id, providerId: provider.id };
 }

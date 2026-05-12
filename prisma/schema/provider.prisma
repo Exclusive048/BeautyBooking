@@ -23,6 +23,12 @@ model Provider {
 
   district String
 
+  // City link — populated automatically by detect-city when address is saved.
+  // null while no address has been geocoded; required for `isPublished: true`
+  // (gated in setProviderPublished).
+  cityId String?
+  city   City?   @relation(fields: [cityId], references: [id], onDelete: Restrict)
+
   categories String[] @default([])
 
   availableToday Boolean @default(false)
@@ -32,10 +38,27 @@ model Provider {
   bufferBetweenBookingsMin Int @default(0)
 
   autoConfirmBookings       Boolean      @default(false)
+  autoPublishStoriesEnabled Boolean      @default(true)
   cancellationDeadlineHours Int?
   remindersEnabled          Boolean      @default(true)
   scheduleMode              ScheduleMode @default(FLEXIBLE)
   fixedSlotTimes            String[]     @default([])
+
+  // Booking-rules & visibility settings (25-SETTINGS-B). Surfaced in the
+  // master cabinet under Settings → "Правила" / "Видимость"; persisted via
+  // the same PATCH endpoint as the week schedule. `lateCancelAction` is
+  // stored but not yet enforced — payment-side fines aren't wired.
+  // `slotPrecision` controls how slots are surfaced on the public profile.
+  minBookingHoursAhead Int     @default(2)
+  maxBookingDaysAhead  Int     @default(90)
+  lateCancelAction     String  @default("none")
+  slotPrecision        String  @default("exact")
+  visibleSlotDays      Int     @default(30)
+  acceptNewClients     Boolean @default(true)
+  // Booking grid quantum (15 / 30 / 60 min). Surfaced in Settings → "Часы";
+  // persisted via PATCH /api/cabinet/master/schedule. Existing rows get 15
+  // by default — matches the prior implicit behaviour.
+  slotStepMin               Int          @default(15)
 
   studioId String?
 
@@ -73,6 +96,8 @@ model Provider {
 
   masterServices MasterService[] @relation("MasterServices")
 
+  servicePackages ServicePackage[] @relation("MasterServicePackages")
+
   bookings Booking[]
 
   masterBookings Booking[] @relation("BookingMaster")
@@ -91,6 +116,7 @@ model Provider {
 
   hotSlots             HotSlot[]
   hotSlotSubscriptions HotSlotSubscription[]
+  favoritedBy          UserFavorite[]
 
   studioProfile Studio? @relation("StudioProvider")
 
@@ -120,6 +146,8 @@ model Provider {
   @@index([isPublished, ratingAvg(sort: Desc), reviews(sort: Desc), createdAt(sort: Desc)])
   @@index([studioId, type, isPublished, createdAt])
   @@index([type, isPublished, address])
+  @@index([isPublished, autoPublishStoriesEnabled])
+  @@index([cityId, isPublished])
 }
 
 model MasterProfile {

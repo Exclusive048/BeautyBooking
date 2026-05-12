@@ -1,111 +1,160 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
+import { HeroSection } from "@/features/marketing/sections/hero-section";
+import { TextWithImage } from "@/features/marketing/sections/text-with-image";
+import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
+import { StepsSection } from "@/features/marketing/sections/steps-section";
+import { CTABlock } from "@/features/marketing/sections/cta-block";
 import { UI_TEXT } from "@/lib/ui/text";
-import { InfoPageLayout } from "@/components/layout/info-page-layout";
-import { DynamicIcon } from "@/components/ui/dynamic-icon";
-import type { DynamicIconName } from "@/components/ui/dynamic-icon";
 
 export const metadata: Metadata = {
-  title: UI_TEXT.pages.about.title,
-  description: UI_TEXT.pages.about.description,
+  title: "О компании — МастерРядом",
+  description:
+    "Маркетплейс мастеров красоты — от записи до отзыва без звонков и хаоса в мессенджерах.",
   alternates: { canonical: "/about" },
 };
 
-const STATS = UI_TEXT.pages.about.stats;
-const VALUES = UI_TEXT.pages.about.values;
+const T = UI_TEXT.about;
 
 export default function AboutPage() {
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-12 md:py-20 space-y-20">
-      <InfoPageLayout breadcrumb={UI_TEXT.pages.about.navLabel}>
+    <MarketingLayout>
+      <HeroSection
+        eyebrow={T.hero.eyebrow}
+        title={
+          <>
+            Маркетплейс мастеров красоты —{" "}
+            <em className="font-display font-normal italic text-primary">
+              просто, прозрачно, рядом
+            </em>
+          </>
+        }
+        description="Мы строим платформу, где клиент находит мастера, видит свободное окно и записывается за минуту — без звонков, скриншотов и переписки в мессенджерах. А мастер получает удобную CRM, расписание и инструменты для роста."
+        cta={{
+          primary: { label: "Найти мастера", href: "/catalog" },
+          secondary: { label: "Стать мастером", href: "/become-master" },
+        }}
+      />
 
-        {/* Hero */}
-        <section className="text-center space-y-5 pt-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-            {UI_TEXT.pages.about.heroBadge}
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-text-main leading-tight tracking-tight">
-            {UI_TEXT.pages.about.heroTitleMain}{" "}
-            <span className="bg-gradient-to-r from-primary to-primary-magenta bg-clip-text text-transparent">
-              {UI_TEXT.pages.about.heroTitleHighlight}
-            </span>
-          </h1>
-          <p className="text-lg text-text-sec max-w-[600px] mx-auto leading-relaxed">
-            {UI_TEXT.pages.about.heroDescription}
-          </p>
-        </section>
+      <TextWithImage
+        eyebrow={T.story.eyebrow}
+        title={
+          <>
+            Почему мы это{" "}
+            <em className="font-display font-normal italic text-primary">делаем</em>
+          </>
+        }
+        paragraphs={[
+          "Индустрия красоты в России живёт в Telegram. Расписание — в скриншотах. Запись — переписка с администратором. Отмена — ловишь час свободного времени, чтобы написать «не получится». Половина мастеров теряют клиентов из-за пропущенных сообщений.",
+          "Мы строим МастерРядом, чтобы было иначе. Каталог, где видно расписание в реальном времени. Запись в один тап. Напоминания. Понятная история. И никакой административной нагрузки на мастера — система всё делает сама.",
+        ]}
+      />
 
-        {/* Problem */}
-        <section className="lux-card rounded-[24px] bg-bg-card p-8 md:p-10 space-y-4">
-          <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.about.problemTitle}</h2>
-          <div className="grid md:grid-cols-2 gap-6 text-text-sec text-sm leading-relaxed">
-            <div className="space-y-2">
-              <p className="font-medium text-text-main">{UI_TEXT.pages.about.problemClientTitle}</p>
-              <p>{UI_TEXT.pages.about.problemClientText}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="font-medium text-text-main">{UI_TEXT.pages.about.problemMasterTitle}</p>
-              <p>{UI_TEXT.pages.about.problemMasterText}</p>
-            </div>
-          </div>
-          <p className="text-text-sec text-sm leading-relaxed pt-2 border-t border-border-subtle">
-            {UI_TEXT.pages.about.problemSummary}
-          </p>
-        </section>
+      <FeatureGrid
+        eyebrow={T.values.eyebrow}
+        title={
+          <>
+            Что для нас{" "}
+            <em className="font-display font-normal italic text-primary">важно</em>
+          </>
+        }
+        description="Принципы, по которым строим платформу — и не отступаем от них в спешке."
+        features={[
+          {
+            iconName: "heart",
+            title: "Уважение к клиенту",
+            description:
+              "Никаких тёмных паттернов, скрытых платежей, навязчивых уведомлений. Если что-то не нужно — это можно выключить.",
+          },
+          {
+            iconName: "sparkles",
+            title: "Качество интерфейса",
+            description:
+              "Каждый экран продуман: типографика, ритм, скорость загрузки. Красота индустрии — в деталях продукта.",
+          },
+          {
+            iconName: "users",
+            title: "Поддержка мастеров",
+            description:
+              "Мы не берём комиссию с услуг. Платформа — это подписка, а заработок мастера — целиком его. Так честнее.",
+          },
+          {
+            iconName: "zap",
+            title: "Скорость и стабильность",
+            description:
+              "Запись должна работать всегда. Расписание не ломается, уведомления приходят вовремя, страница открывается за секунду.",
+          },
+          {
+            iconName: "shield",
+            title: "Прозрачность",
+            description:
+              "Открытые цены, честные отзывы, правила без мелкого шрифта. Мы не прячем условия в трёхэтажных оффертах.",
+          },
+          {
+            iconName: "globe",
+            title: "Доступность",
+            description:
+              "Не только Москва. Платформа растёт там, где появляются мастера — мы не ограничиваем географию whitelist'ом.",
+          },
+        ]}
+      />
 
-        {/* Stats */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {STATS.map((s) => (
-            <div
-              key={s.value}
-              className="lux-card rounded-[20px] bg-bg-card p-6 text-center space-y-1"
-            >
-              <div className="text-3xl font-bold text-text-main">{s.value}</div>
-              <div className="text-sm text-text-sec">{s.label}</div>
-            </div>
-          ))}
-        </section>
+      <StepsSection
+        eyebrow={T.howWeWork.eyebrow}
+        title={
+          <>
+            Как мы{" "}
+            <em className="font-display font-normal italic text-primary">работаем</em>
+          </>
+        }
+        description="Не венчурный спринт, а планомерное строительство платформы, которой можно пользоваться годами."
+        steps={[
+          {
+            title: "Слушаем мастеров",
+            description:
+              "Каждое решение проверяется на тех, кто будет им пользоваться. Не делаем по интуиции — делаем по запросу индустрии.",
+          },
+          {
+            title: "Тестируем на себе",
+            description:
+              "Команда сама записывается через платформу к реальным мастерам. Если что-то неудобно — мы это знаем первыми.",
+          },
+          {
+            title: "Релизим осторожно",
+            description:
+              "Большие изменения сначала идут в beta. Лучше отложить запуск на неделю, чем сломать чьё-то расписание.",
+          },
+          {
+            title: "Слушаем снова",
+            description:
+              "Каждая фича — итерация. Релиз — это начало улучшения, а не конец работы над функционалом.",
+          },
+        ]}
+      />
 
-        {/* Values */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.about.valuesTitle}</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {VALUES.map((v) => (
-              <div
-                key={v.title}
-                className="lux-card rounded-[20px] bg-bg-card p-6 flex gap-4"
-              >
-                <DynamicIcon name={v.icon as DynamicIconName} className="h-6 w-6 shrink-0 text-primary mt-0.5" />
-                <div>
-                  <p className="font-semibold text-text-main mb-1">{v.title}</p>
-                  <p className="text-sm text-text-sec leading-relaxed">{v.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+      <TextWithImage
+        eyebrow={T.team.eyebrow}
+        title="Команда"
+        paragraphs={[
+          "Мы небольшая команда без венчурных денег и пресс-релизов. Бэкенд, фронтенд, продуктовая аналитика, поддержка — всё пишут люди, которые сами годами записывались к мастерам красоты и понимают, что в этом было не так.",
+          "Мы строим продукт долго и осознанно. Не для exit'а. Для того чтобы индустрия красоты в России наконец получила инструмент, которого заслуживает.",
+        ]}
+        imagePosition="left"
+      />
 
-        {/* CTA */}
-        <section className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-text-main">{UI_TEXT.pages.about.ctaTitle}</h2>
-          <p className="text-text-sec text-sm">{UI_TEXT.pages.about.ctaText}</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/catalog"
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
-            >
-              {UI_TEXT.pages.about.ctaFindMaster}
-            </Link>
-            <Link
-              href="/become-master"
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-border-subtle bg-bg-card px-6 text-sm font-semibold text-text-main hover:bg-bg-input transition-colors"
-            >
-              {UI_TEXT.pages.about.ctaBecomeMaster}
-            </Link>
-          </div>
-        </section>
-
-      </InfoPageLayout>
-    </main>
+      <CTABlock
+        title={
+          <>
+            Попробуйте — это{" "}
+            <em className="font-display font-normal italic text-white">бесплатно</em>
+          </>
+        }
+        description="Регистрация занимает 30 секунд. Никакой карты не нужно — ни клиенту, ни мастеру."
+        cta={{
+          primary: { label: "Начать", href: "/login" },
+          secondary: { label: "Узнать о тарифах", href: "/pricing" },
+        }}
+      />
+    </MarketingLayout>
   );
 }

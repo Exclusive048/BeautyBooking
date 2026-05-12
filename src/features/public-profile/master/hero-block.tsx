@@ -1,195 +1,241 @@
 "use client";
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { buildYandexMapsUrl } from "@/lib/maps/yandex";
-import type { ProviderProfileDto } from "@/lib/providers/dto";
-import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
-import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
+import { ChevronRight, MapPin, Share2, Star } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
 import { FocalImage } from "@/components/ui/focal-image";
+import { Button } from "@/components/ui/button";
+import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
+import { AvailabilityHint } from "@/features/public-profile/master/components/availability-hint";
+import { PremiumRing } from "@/features/public-profile/master/components/premium-ring";
+import type {
+  AvailabilityHint as AvailabilityHintData,
+  MasterPublicProfileView,
+} from "@/lib/master/public-profile-view.service";
+import { buildYandexMapsUrl } from "@/lib/maps/yandex";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
-  provider: ProviderProfileDto;
-  coverUrl: string | null;
-  specialization?: string | null;
-  showFavoriteButton?: boolean;
+  view: MasterPublicProfileView;
 };
 
-export function HeroBlock({ provider, coverUrl, specialization, showFavoriteButton = false }: Props) {
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
+const T = UI_TEXT.publicProfile.hero;
 
-  async function onShare() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const shareData = { title: provider.name, url };
+function pluralizeYear(n: number): string {
+  const rules = new Intl.PluralRules("ru-RU");
+  const form = rules.select(n);
+  if (form === "one") return T.yearUnitOne;
+  if (form === "few") return T.yearUnitFew;
+  return T.yearUnitMany;
+}
 
-    try {
-      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
-        await navigator.share(shareData);
-        // User completed sharing — show success
-        setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
-      } else {
-        // Share API unavailable — copy to clipboard
-        await navigator.clipboard.writeText(url);
-        setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        // User dismissed the share sheet — not an error, do nothing
-        return;
-      }
-      // Share failed — try clipboard fallback
-      try {
-        await navigator.clipboard.writeText(url);
-        setShareMessage(UI_TEXT.publicProfile.hero.shareSuccess);
-      } catch {
-        setShareMessage(UI_TEXT.publicProfile.hero.shareFailed);
-      }
-    }
-    window.setTimeout(() => setShareMessage(null), 2500);
+function formatExperience(months: number | null): string | null {
+  if (months === null) return null;
+  if (months < 12) {
+    return T.experienceTemplate.replace(
+      "{value}",
+      T.experienceMonthsTemplate.replace("{count}", String(Math.max(1, months))),
+    );
   }
+  const years = Math.floor(months / 12);
+  return T.experienceTemplate.replace(
+    "{value}",
+    T.experienceYearsTemplate
+      .replace("{count}", String(years))
+      .replace("{unit}", pluralizeYear(years)),
+  );
+}
 
+export function HeroBlock({ view }: Props) {
+  const { provider, planTier, experienceMonths, availability } = view;
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const isPremium = planTier === "PREMIUM";
   const mapsHref = buildYandexMapsUrl({
     address: provider.address,
     lat: provider.geoLat,
     lon: provider.geoLng,
   });
+  const experienceLabel = formatExperience(experienceMonths);
+
+  async function onShare() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const shareData = { title: provider.name, url };
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+      setShareMessage(T.shareSuccess);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareMessage(T.shareSuccess);
+      } catch {
+        setShareMessage(T.shareFailed);
+      }
+    }
+    window.setTimeout(() => setShareMessage(null), 2200);
+  }
 
   return (
-    <section className="relative overflow-hidden rounded-[32px] border border-border-subtle/70 bg-bg-card shadow-hover">
-      <div className="relative h-[280px] md:h-[340px]">
-        {coverUrl ? (
-          <FocalImage src={coverUrl} alt="" sizes="(max-width: 768px) 100vw, 960px" priority className="object-cover" />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-bg-card via-bg-input to-muted" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
-        <div className="pointer-events-none absolute -left-16 -top-20 h-60 w-60 rounded-full bg-primary/25 blur-3xl" />
-        <div className="pointer-events-none absolute -right-12 top-8 h-56 w-56 rounded-full bg-primary-magenta/18 blur-3xl" />
+    <section className="aurora-bg relative overflow-hidden rounded-[28px] border border-border-subtle/70 bg-bg-card">
+      <div className="relative px-5 py-6 md:px-8 md:py-8">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-5 flex items-center gap-1.5 text-xs text-text-sec"
+        >
+          <Link href="/catalog" className="transition hover:text-text-main">
+            {T.breadcrumbCatalog}
+          </Link>
+          <ChevronRight className="h-3 w-3 opacity-50" aria-hidden />
+          <span className="text-text-main">{provider.name}</span>
+        </nav>
 
-        <div className="absolute right-4 top-4 flex items-center gap-2">
-          <HotSlotsSubscribeButton
-            providerId={provider.id}
-            enabled={provider.type === "MASTER" && provider.hotSlotsEnabled}
-          />
-          <Button
-            onClick={onShare}
-            aria-label={UI_TEXT.publicProfile.hero.share}
-            variant="ghost"
-            size="sm"
-            className="frost-panel text-white hover:bg-black/55"
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="shrink-0"
           >
-            {UI_TEXT.publicProfile.hero.share}
-          </Button>
-          {showFavoriteButton ? (
+            <PremiumRing active={isPremium}>
+              {provider.avatarUrl ? (
+                <FocalImage
+                  src={provider.avatarUrl}
+                  alt={provider.name}
+                  width={132}
+                  height={132}
+                  priority
+                  className="h-[120px] w-[120px] rounded-full object-cover md:h-[132px] md:w-[132px]"
+                />
+              ) : (
+                <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-bg-input text-3xl text-text-sec md:h-[132px] md:w-[132px]">
+                  {provider.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </PremiumRing>
+          </motion.div>
+
+          <div className="min-w-0 flex-1">
+            <motion.h1
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="font-display text-3xl leading-tight text-text-main md:text-[40px]"
+            >
+              {provider.name}
+            </motion.h1>
+
+            {(provider.tagline || experienceLabel) && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-2 flex flex-wrap items-center gap-x-2 text-base text-text-sec"
+              >
+                {provider.tagline ? <span>{provider.tagline}</span> : null}
+                {provider.tagline && experienceLabel ? (
+                  <span aria-hidden className="text-text-sec/40">
+                    ·
+                  </span>
+                ) : null}
+                {experienceLabel ? <span>{experienceLabel}</span> : null}
+              </motion.div>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+            >
+              <span className="inline-flex items-center gap-1.5 text-text-main">
+                <Star
+                  className="h-4 w-4 fill-amber-500 text-amber-500"
+                  aria-hidden
+                  strokeWidth={1.5}
+                />
+                <strong className="font-semibold">{provider.rating.toFixed(1)}</strong>
+                <span className="text-text-sec">· {provider.reviews}</span>
+              </span>
+
+              {provider.address ? (
+                <a
+                  href={mapsHref ?? "#"}
+                  target={mapsHref ? "_blank" : undefined}
+                  rel={mapsHref ? "noreferrer" : undefined}
+                  className="inline-flex items-center gap-1.5 text-text-sec transition hover:text-text-main"
+                >
+                  <MapPin className="h-4 w-4" aria-hidden strokeWidth={1.6} />
+                  <span>{provider.address}</span>
+                </a>
+              ) : null}
+
+              <AvailabilityHintWrapper
+                hint={availability}
+                timezone={provider.timezone}
+              />
+            </motion.div>
+
+            {provider.categories.length > 0 ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+                className="mt-4 flex flex-wrap gap-1.5"
+              >
+                {provider.categories.slice(0, 6).map((category) => (
+                  <span
+                    key={category}
+                    className="rounded-full border border-border-subtle bg-bg-card px-2.5 py-1 text-xs text-text-main"
+                  >
+                    {category}
+                  </span>
+                ))}
+              </motion.div>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2 self-start">
+            <HotSlotsSubscribeButton
+              providerId={provider.id}
+              enabled={provider.hotSlotsEnabled}
+            />
             <Button
-              aria-label={UI_TEXT.publicProfile.hero.favorite}
               variant="ghost"
               size="sm"
-              className="frost-panel text-white hover:bg-black/55"
+              onClick={onShare}
+              aria-label={T.share}
+              className="gap-1.5"
             >
-              {UI_TEXT.publicProfile.hero.favorite}
+              <Share2 className="h-4 w-4" aria-hidden strokeWidth={1.6} />
+              <span className="hidden sm:inline">{T.share}</span>
             </Button>
-          ) : null}
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 md:px-6 md:pb-6">
-          <div className="frost-panel rounded-2xl p-4 md:p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div className="flex items-end gap-4">
-                <motion.div
-                  initial={{ scale: 0.88, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                >
-                  {provider.avatarUrl ? (
-                    <FocalImage
-                      src={provider.avatarUrl}
-                      alt={provider.name}
-                      width={120}
-                      height={120}
-                      priority
-                      className="rounded-full border-4 border-white/65 object-cover shadow-card"
-                    />
-                  ) : (
-                    <div className="h-[120px] w-[120px] rounded-full border-4 border-white/55 bg-white/20" />
-                  )}
-                </motion.div>
-
-                <div className="pb-1 text-white">
-                  <motion.h1
-                    className="text-2xl font-semibold md:text-3xl"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                  >
-                    {provider.name}
-                  </motion.h1>
-                  {specialization ? (
-                    <motion.div
-                      className="mt-1 text-sm text-white/85"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: 0.18, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                    >
-                      {specialization}
-                    </motion.div>
-                  ) : null}
-                  <motion.div
-                    className="mt-2 text-sm"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.24, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                  >
-                    {UI_FMT.ratingLabel(provider.rating, provider.reviews)}
-                  </motion.div>
-                  {provider.superpowerBadges.length > 0 ? (
-                    <motion.div
-                      className="mt-2 flex flex-wrap gap-1.5"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3, delay: 0.3 }}
-                    >
-                      {provider.superpowerBadges.map((badge) => (
-                        <span
-                          key={badge.code}
-                          className="rounded-full border border-white/35 bg-black/25 px-2 py-1 text-[11px] text-white"
-                          title={`${badge.subtitle} · ${badge.count}`}
-                        >
-                          {badge.icon} {badge.title}
-                        </span>
-                      ))}
-                    </motion.div>
-                  ) : null}
-                </div>
-              </div>
-
-              {mapsHref ? (
-                <motion.a
-                  href={mapsHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`${UI_TEXT.publicProfile.hero.address}: ${provider.address}`}
-                  className="frost-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition hover:bg-black/55"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.32, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                >
-                  <MapPin className="h-4 w-4 shrink-0" aria-hidden />
-                  <span>{provider.address}</span>
-                </motion.a>
-              ) : null}
-            </div>
           </div>
         </div>
       </div>
 
       {shareMessage ? (
-        <div className="border-t border-border-subtle/70 px-4 py-2 text-xs text-text-sec md:px-6">
+        <div
+          role="status"
+          aria-live="polite"
+          className="border-t border-border-subtle/70 px-5 py-2 text-xs text-text-sec md:px-8"
+        >
           {shareMessage}
         </div>
       ) : null}
     </section>
   );
+}
+
+function AvailabilityHintWrapper({
+  hint,
+  timezone,
+}: {
+  hint: AvailabilityHintData;
+  timezone: string;
+}) {
+  return <AvailabilityHint hint={hint} timezone={timezone} />;
 }

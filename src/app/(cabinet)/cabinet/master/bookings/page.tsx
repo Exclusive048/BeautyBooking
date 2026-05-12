@@ -1,12 +1,26 @@
-import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth/session";
-import { MasterBookingsPage } from "@/features/master/components/master-bookings-page";
+import { MasterBookingsPage } from "@/features/master/components/bookings/master-bookings-page";
 
 export const runtime = "nodejs";
 
-export default async function MasterBookingsRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+type RouteProps = {
+  searchParams?:
+    | Promise<Record<string, string | string[] | undefined>>
+    | Record<string, string | string[] | undefined>;
+};
 
-  return <MasterBookingsPage />;
+function pickString(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function MasterBookingsRoute({ searchParams }: RouteProps) {
+  const params = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
+  return (
+    <MasterBookingsPage
+      searchParams={{
+        q: pickString(params.q),
+        tab: pickString(params.tab),
+      }}
+    />
+  );
 }

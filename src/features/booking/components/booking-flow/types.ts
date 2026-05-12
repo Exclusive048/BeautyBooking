@@ -1,4 +1,5 @@
-export type BookingFlowStep = "date" | "time" | "contacts" | "confirm" | "success";
+/** Widget phase — high-level state of the 4-phase flow (32b). */
+export type BookingFlowPhase = "selection" | "form" | "success" | "conflict";
 
 export type BookingFlowSlot = {
   id: string;
@@ -17,23 +18,42 @@ export type BookingFlowSlot = {
   discountPercent?: number | null;
 };
 
-export type BookingFlowState = {
-  step: BookingFlowStep;
-  direction: 1 | -1;
+/**
+ * Confirmation payload — what we render in the success phase. Source
+ * is either (a) the POST response on first submit, or (b) the
+ * `/api/public/bookings/[id]` refresh GET when the URL contains
+ * `?bookingId=`.
+ */
+export type ConfirmedBooking = {
+  id: string;
+  status: string;
+  startAtUtc: string;
+  endAtUtc: string | null;
+  serviceName: string;
+  servicePrice: number;
+  providerName: string;
+  providerAddress: string | null;
+  timezone: string;
+  /** Already-masked for display, e.g. "+7 ••• ••• 56 78". */
+  clientPhoneMasked: string | null;
+  /** True for users who came in via session; controls cancel CTA. */
+  isAuthenticatedUser: boolean;
+};
 
-  // Pre-selected service (passed in from parent)
+export type BookingFlowState = {
+  phase: BookingFlowPhase;
+
+  // Static service context (passed in from parent — provider profile).
   serviceId: string;
   serviceName: string;
   servicePrice: number;
   serviceDurationMin: number;
 
-  // Date step
+  // Selection phase
   selectedDateKey: string | null;
-
-  // Time step
   selectedSlot: BookingFlowSlot | null;
 
-  // Contacts step
+  // Form phase
   clientName: string;
   clientPhone: string;
   comment: string;
@@ -41,12 +61,6 @@ export type BookingFlowState = {
   referencePhotoAssetId: string | null;
   bookingAnswers: Record<string, string>;
 
-  // Result
-  bookingId: string | null;
-};
-
-export type StepMeta = {
-  id: BookingFlowStep;
-  label: string;
-  index: number;
+  // Final phase
+  confirmedBooking: ConfirmedBooking | null;
 };

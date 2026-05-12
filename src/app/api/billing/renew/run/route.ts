@@ -8,6 +8,7 @@ import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError } from "@/lib/logging/logger";
 import { NotificationType } from "@prisma/client";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
+import { processTrialExpirations } from "@/lib/billing/trial-cron";
 
 export const runtime = "nodejs";
 
@@ -446,5 +447,16 @@ export async function POST(req: Request) {
     });
   }
 
-  return ok({ ok: true, renewed: candidates.length });
+  // Trial expirations — warn 3 days before, downgrade to FREE on expiry.
+  // Wrapped so any failure in trial logic doesn't kill the rest of the cron run.
+  let trialExpirations = { warned: 0, warnErrors: 0, downgraded: 0, downgradeErrors: 0 };
+  try {
+    trialExpirations = await processTrialExpirations(now);
+  } catch (error) {
+    logError("processTrialExpirations failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return ok({ ok: true, renewed: candidates.length, trialExpirations });
 }

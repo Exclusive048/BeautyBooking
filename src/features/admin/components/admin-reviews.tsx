@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -48,6 +49,7 @@ function stars(rating: number) {
 
 export function AdminReviews() {
   const viewerTimeZone = useViewerTimeZoneContext();
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -104,7 +106,11 @@ export function AdminReviews() {
   }, [toast]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t.confirmDelete)) return;
+    const ok = await confirm({
+      message: t.confirmDelete,
+      variant: "danger",
+    });
+    if (!ok) return;
     setDeletingId(id);
     setError(null);
     try {
@@ -287,6 +293,7 @@ export function AdminReviews() {
           ) : null}
         </div>
       )}
+      {confirmModal}
     </section>
   );
 }

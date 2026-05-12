@@ -7,23 +7,29 @@ import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
+import { CatalogSearchBar } from "@/features/catalog/components/catalog-search-bar";
+import type { AutocompleteCategory } from "@/features/catalog/components/service-search-input";
 import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
+import { CatalogPagination } from "@/features/catalog/components/catalog-pagination";
+import { SortMenu } from "@/features/catalog/components/sort-menu";
 import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-drawer";
 import { CatalogMap } from "@/features/catalog/components/catalog-map";
 import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
+import { LoginRequiredModal } from "@/features/auth/components/login-required-modal";
 import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
-import { DateTimeFilterBar } from "@/features/search-by-time/components/date-time-filter-bar";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
+import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
+import type { CatalogSort } from "@/lib/catalog/schemas";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
+import { getCurrentCitySlug } from "@/lib/cities/client-city";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
 type EntityType = "all" | "master" | "studio";
 type ViewMode = "list" | "map";
-type SmartTagPreset = "rush" | "relax" | "design" | "safe" | "silent";
 type TimePresetValue = "morning" | "day" | "evening";
 
 type CatalogSearchItem = {
@@ -51,6 +57,10 @@ type CatalogSearchItem = {
 type CatalogSearchData = {
   items: CatalogSearchItem[];
   nextCursor: string | null;
+  priceDistribution?: CatalogPriceBucket[];
+  totalCount?: number;
+  totalPages?: number;
+  page?: number;
 };
 
 type AvailabilitySearchData = AvailabilitySearchResponse;
@@ -90,23 +100,37 @@ function parseViewMode(value: string | null): ViewMode {
   return value === "map" ? "map" : "list";
 }
 
-function parseSmartTag(value: string | null): SmartTagPreset | null {
-  if (value === "rush" || value === "relax" || value === "design" || value === "safe" || value === "silent") {
-    return value;
-  }
-  return null;
-}
-
 function parseTimePreset(value: string | null): TimePresetValue | null {
   if (value === "morning" || value === "day" || value === "evening") return value;
   return null;
 }
 
-function mergeUnique(prev: CatalogSearchItem[], next: CatalogSearchItem[]): CatalogSearchItem[] {
-  const map = new Map<string, CatalogSearchItem>();
-  for (const item of prev) map.set(item.id, item);
-  for (const item of next) map.set(item.id, item);
-  return Array.from(map.values());
+function parseSort(value: string | null): CatalogSort {
+  if (
+    value === "rating" ||
+    value === "price-asc" ||
+    value === "price-desc" ||
+    value === "distance" ||
+    value === "popular"
+  ) {
+    return value;
+  }
+  return "relevance";
+}
+
+function parsePage(value: string | null): number {
+  const n = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+/** Russian-style noun pluralization for «мастер / мастера / мастеров». */
+function pluralizeMasters(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return UI_TEXT.catalog2.resultsHeader.pluralOne;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+    return UI_TEXT.catalog2.resultsHeader.pluralFew;
+  return UI_TEXT.catalog2.resultsHeader.pluralMany;
 }
 
 function toMapPoint(
@@ -173,9 +197,17 @@ function CatalogSkeletonGrid() {
 
 type CatalogPageClientProps = {
   visualSearchEnabled: boolean;
+  /** Whether the visitor has an active session — gates the favorites toggle. */
+  isAuthenticated: boolean;
+  /** Provider IDs the current user has favorited. Empty for anonymous visitors. */
+  favoriteIds: string[];
 };
 
-export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageClientProps) {
+export default function CatalogPageClient({
+  visualSearchEnabled,
+  isAuthenticated,
+  favoriteIds,
+}: CatalogPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -193,9 +225,10 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const availableToday = searchParams.get("availableToday") === "true";
   const ratingMin = searchParams.get("ratingMin") ?? "";
   const hot = searchParams.get("hot") === "true";
-  const smartTag = parseSmartTag(searchParams.get("smartTag"));
   const entityType = parseEntityType(searchParams.get("entityType"));
   const view = parseViewMode(searchParams.get("view"));
+  const sort = parseSort(searchParams.get("sort"));
+  const page = parsePage(searchParams.get("page"));
   const todayIso = new Date().toISOString().slice(0, 10);
   const isTodaySelected = date === todayIso;
   const effectiveAvailableToday = availableToday || isTodaySelected;
@@ -224,10 +257,13 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
 
   const [draftServiceQuery, setDraftServiceQuery] = useState(serviceQuery);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [data, setData] = useState<CatalogSearchData>({ items: [], nextCursor: null });
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  // O(1) lookup for `initialFavorited` per card. Memoized from the server-
+  // supplied array; the catalog page is fully re-rendered on auth change so
+  // we don't try to keep this set in sync after mount.
+  const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
   const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
   const [mapSearchApplied, setMapSearchApplied] = useState(false);
   const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
@@ -297,10 +333,12 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   );
 
   const requestCatalog = useCallback(
-    async (cursor?: string, overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
+    async (overrideMapSearch?: MapSearchState): Promise<CatalogSearchData> => {
       const params = new URLSearchParams();
       const activeMapSearch = overrideMapSearch ?? mapSearch;
       params.set("limit", "20");
+      params.set("page", String(page));
+      if (sort && sort !== "relevance") params.set("sort", sort);
       if (serviceQuery) params.set("serviceQuery", serviceQuery);
       if (district) params.set("district", district);
       if (date) params.set("date", date);
@@ -310,9 +348,7 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (ratingMin) params.set("ratingMin", ratingMin);
       if (hot) params.set("hot", "true");
-      if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
-      if (cursor) params.set("cursor", cursor);
       if (activeMapSearch) {
         params.set("lat", String(activeMapSearch.center.lat));
         params.set("lng", String(activeMapSearch.center.lng));
@@ -334,11 +370,12 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       hot,
       globalCategoryId,
       mapSearch,
+      page,
       priceMax,
       priceMin,
       ratingMin,
       serviceQuery,
-      smartTag,
+      sort,
     ]
   );
 
@@ -357,7 +394,6 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       if (effectiveAvailableToday) params.set("availableToday", "true");
       if (ratingMin) params.set("ratingMin", ratingMin);
       if (hot) params.set("hot", "true");
-      if (smartTag) params.set("smartTag", smartTag);
       if (entityType !== "all") params.set("entityType", entityType);
 
       const res = await fetch(`/api/search/availability?${params.toString()}`, {
@@ -383,7 +419,6 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       priceMin,
       ratingMin,
       serviceId,
-      smartTag,
     ]
   );
 
@@ -394,9 +429,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       setMapSearchApplied(source === "manual");
       setLoading(true);
       setError(null);
-      setLoadMoreError(null);
       try {
-        const next = await requestCatalog(undefined, nextMapSearch);
+        const next = await requestCatalog(nextMapSearch);
         setData(next);
       } catch (e) {
         setError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
@@ -411,7 +445,6 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setLoadMoreError(null);
     try {
       const next = await requestCatalog();
       setData(next);
@@ -447,22 +480,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     }
   }, [requestAvailability]);
 
-  const loadMore = useCallback(async () => {
-    if (loadingMore || data.nextCursor === null) return;
-    setLoadingMore(true);
-    setLoadMoreError(null);
-    try {
-      const next = await requestCatalog(data.nextCursor);
-      setData((prev) => ({
-        items: mergeUnique(prev.items, next.items),
-        nextCursor: next.nextCursor,
-      }));
-    } catch (e) {
-      setLoadMoreError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [data.nextCursor, loadingMore, requestCatalog]);
+  // Numbered pagination replaced cursor-based "load more" for default mode.
+  // Time-search keeps its own data source and isn't paginated.
 
   useEffect(() => {
     let cancelled = false;
@@ -533,6 +552,17 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     }
   }, [closeMapSidebar, view]);
 
+  // Single-source-of-truth rule (22a-fix-3): touching any sidebar filter
+  // clears the search input. The text query and the sidebar filters are
+  // distinct interaction modes — search-input drives the autocomplete
+  // dropdown / free-text submit, while the sidebar drives faceted browse.
+  // Mixing them confuses results, so we wipe the input as the user steps
+  // into "browse" mode.
+  const clearSearchInput = useCallback(() => {
+    setDraftServiceQuery("");
+    updateParams({ serviceQuery: null, serviceId: null });
+  }, [updateParams]);
+
   // Shared filter props for sidebar and drawer
   const filterProps = {
     globalCategoryId: globalCategoryId || null,
@@ -543,48 +573,101 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
     hot,
     entityType,
     availableToday,
-    onGlobalCategoryChange: (value: string | null) => updateParams({ globalCategoryId: value }),
-    onDistrictChange: (value: string) => updateParams({ district: value || null }),
-    onRatingMinChange: (value: string) => updateParams({ ratingMin: value || null }),
-    onPriceChange: (min: string, max: string) =>
+    onGlobalCategoryChange: (value: string | null) => {
+      clearSearchInput();
+      updateParams({ globalCategoryId: value });
+    },
+    onDistrictChange: (value: string) => {
+      clearSearchInput();
+      updateParams({ district: value || null });
+    },
+    onRatingMinChange: (value: string) => {
+      clearSearchInput();
+      updateParams({ ratingMin: value || null });
+    },
+    onPriceChange: (min: string, max: string) => {
+      clearSearchInput();
       updateParams({
         priceMin: min.length > 0 ? min : null,
         priceMax: max.length > 0 ? max : null,
-      }),
-    onToggleHot: () => updateParams({ hot: hot ? null : "true" }),
-    onEntityTypeChange: (value: EntityType) => updateParams({ entityType: value === "all" ? null : value }),
-    onToggleAvailableToday: () => updateParams({ availableToday: availableToday ? null : "true" }),
-    onReset: resetFilters,
+      });
+    },
+    onToggleHot: () => {
+      clearSearchInput();
+      updateParams({ hot: hot ? null : "true" });
+    },
+    onEntityTypeChange: (value: EntityType) => {
+      clearSearchInput();
+      updateParams({ entityType: value === "all" ? null : value });
+    },
+    onToggleAvailableToday: () => {
+      clearSearchInput();
+      updateParams({ availableToday: availableToday ? null : "true" });
+    },
+    onReset: () => {
+      clearSearchInput();
+      resetFilters();
+    },
     activeCount: activeFilterCount,
+    priceDistribution: data.priceDistribution,
   };
+
+  // Selecting a category from the autocomplete dropdown — clear input AND
+  // apply the filter. Same end-state as a sidebar click, but bypasses the
+  // wrapper helper so we don't double-fire updateParams calls.
+  const handleCategorySelectFromSearch = useCallback(
+    (category: AutocompleteCategory) => {
+      setDraftServiceQuery("");
+      updateParams({
+        serviceQuery: null,
+        serviceId: null,
+        globalCategoryId: category.id,
+        page: null,
+      });
+    },
+    [updateParams],
+  );
+
+  // City slug for autocomplete scoping — pulled from the same client-city
+  // store the navbar <CitySelector> writes to. Hydrates after mount, so
+  // the first auto-complete request after a hard nav may not include city
+  // — acceptable trade-off (results just aren't pre-narrowed).
+  const [citySlug, setCitySlug] = useState<string | null>(null);
+  useEffect(() => {
+    setCitySlug(getCurrentCitySlug());
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      {/* Search bar — full width */}
-      <div className="mb-4 rounded-2xl border border-border bg-background/95 p-4 backdrop-blur">
-        <DateTimeFilterBar
+      {/* Sticky search section — full-bleed sticky wrapper that hugs the
+          global navbar (top-16 ≈ 64px). The unified <CatalogSearchBar> card
+          owns its own background and chrome; the wrapper just supplies the
+          translucent backdrop blur so content scrolls cleanly underneath. */}
+      <div className="sticky top-16 z-20 -mx-4 mb-6 bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <CatalogSearchBar
           serviceQuery={draftServiceQuery}
-          serviceId={serviceId}
           date={date}
           timePreset={timePreset}
           timeFrom={effectiveTimeFrom}
           timeTo={effectiveTimeTo}
+          citySlug={citySlug}
           onServiceQueryChange={onServiceQueryInput}
-          onServiceSelect={(service) => {
-            setDraftServiceQuery(service.title);
-            updateParams({ serviceQuery: service.title, serviceId: service.id });
-          }}
-          onDateChange={(value) => updateParams({ date: value })}
-          onPresetChange={(preset, from, to) =>
+          onCategorySelectFromSearch={handleCategorySelectFromSearch}
+          onDateChange={(value) => updateParams({ date: value || null })}
+          onTimePresetChange={(preset, from, to) =>
             updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
           }
-          onCustomTimeChange={(from, to) => updateParams({ timePreset: null, timeFrom: from, timeTo: to })}
-          onClearTime={() => updateParams({ timePreset: null, timeFrom: null, timeTo: null })}
+          onCustomTimeChange={(from, to) =>
+            updateParams({ timePreset: null, timeFrom: from, timeTo: to })
+          }
+          onClearTime={() =>
+            updateParams({ timePreset: null, timeFrom: null, timeTo: null })
+          }
+          onSubmit={onSubmit}
           showPhotoSearch={visualSearchEnabled}
           onOpenPhotoSearch={() => {
             if (visualSearchEnabled) setVisualSearchOpen(true);
           }}
-          onSubmit={onSubmit}
         />
       </div>
 
@@ -638,32 +721,55 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
 
         {/* Content area */}
         <div className="min-w-0 flex-1">
-          {/* Results bar — desktop view toggle */}
-          <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/80 px-4 py-3">
-            <div className="text-sm text-muted-foreground">
-              {UI_TEXT.catalog.resultsCount}:{" "}
-              <span className="font-semibold text-foreground">{resultCount}</span>
+          {/* Editorial header — eyebrow + display title + sort + view toggle.
+              Title pluralization respects Russian noun forms. Total count
+              comes from the page-mode response (`totalCount`); for
+              time-search and cursor-mode we fall back to the visible item
+              count. */}
+          <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="mb-1.5 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+                {UI_TEXT.catalog2.resultsHeader.eyebrowNoCategory.replace("{city}", "")}
+              </p>
+              <h1 className="font-display text-3xl leading-[1.1] text-text-main sm:text-4xl lg:text-5xl">
+                {(data.totalCount ?? resultCount).toLocaleString("ru-RU")}{" "}
+                {pluralizeMasters(data.totalCount ?? resultCount)} рядом
+              </h1>
+              <p className="mt-1 text-sm text-text-sec">
+                {UI_TEXT.catalog2.resultsHeader.subtitleAvailable}
+              </p>
             </div>
-            {/* View toggle — desktop only */}
-            <div className="hidden lg:inline-flex rounded-full border border-border bg-card p-1">
-              <Button
-                onClick={() => updateParams({ view: "list" })}
-                variant={view === "list" ? "primary" : "ghost"}
-                size="sm"
-                className="rounded-full"
-              >
-                {UI_TEXT.catalog.viewList}
-              </Button>
-              <Button
-                onClick={() => updateParams({ view: "map" })}
-                variant={view === "map" ? "primary" : "ghost"}
-                size="sm"
-                className="rounded-full"
-              >
-                {UI_TEXT.catalog.viewMap}
-              </Button>
+            <div className="flex items-center gap-3">
+              <SortMenu
+                value={sort}
+                onChange={(next) =>
+                  updateParams({
+                    sort: next === "relevance" ? null : next,
+                    page: null,
+                  })
+                }
+              />
+              {/* View toggle — desktop only (mobile lives in the filter row above) */}
+              <div className="hidden lg:inline-flex rounded-full border border-border-subtle bg-bg-card p-1">
+                <Button
+                  onClick={() => updateParams({ view: "list" })}
+                  variant={view === "list" ? "primary" : "ghost"}
+                  size="sm"
+                  className="rounded-full"
+                >
+                  {UI_TEXT.catalog2.view.grid}
+                </Button>
+                <Button
+                  onClick={() => updateParams({ view: "map" })}
+                  variant={view === "map" ? "primary" : "ghost"}
+                  size="sm"
+                  className="rounded-full"
+                >
+                  {UI_TEXT.catalog2.view.map}
+                </Button>
+              </div>
             </div>
-          </div>
+          </header>
 
           {needsService || needsDate ? (
             <div role="status" className="mb-4 rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
@@ -722,7 +828,13 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
                       key={item.id}
                       variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
                     >
-                      <CatalogCard item={item} serviceQuery={serviceQuery} />
+                      <CatalogCard
+                        item={item}
+                        serviceQuery={serviceQuery}
+                        isAuthenticated={isAuthenticated}
+                        initialFavorited={favoriteSet.has(item.id)}
+                        onLoginRequired={() => setLoginModalOpen(true)}
+                      />
                     </motion.div>
                   ))}
             </motion.div>
@@ -755,20 +867,18 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
             </div>
           ) : null}
 
-          {!timeModeActive && !loading && !error && data.nextCursor !== null && view === "list" ? (
-            <div className="space-y-2 pt-4 text-center">
-              <Button
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                variant="secondary"
-                size="md"
-                className="rounded-full"
-              >
-                {loadingMore ? UI_TEXT.common.loading : UI_TEXT.catalog.loadMore}
-              </Button>
-              {loadMoreError ? (
-                <div className="text-xs text-red-600 dark:text-red-400">{loadMoreError}</div>
-              ) : null}
+          {!timeModeActive && !loading && !error && view === "list" && (data.totalPages ?? 1) > 1 ? (
+            <div className="pt-8">
+              <CatalogPagination
+                current={data.page ?? page}
+                total={data.totalPages ?? 1}
+                onChange={(next) => {
+                  updateParams({ page: next > 1 ? String(next) : null });
+                  if (typeof window !== "undefined") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+              />
             </div>
           ) : null}
         </div>
@@ -785,6 +895,8 @@ export default function CatalogPageClient({ visualSearchEnabled }: CatalogPageCl
       {visualSearchEnabled ? (
         <VisualSearchModal open={visualSearchOpen} onClose={() => setVisualSearchOpen(false)} />
       ) : null}
+
+      <LoginRequiredModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </div>
   );
 }

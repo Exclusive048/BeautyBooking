@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import Link from "next/link";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -37,11 +38,13 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
   const [manualContact, setManualContact] = useState("");
   const [showManualContact, setShowManualContact] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const consentId = useId();
   const fileName = file?.name ?? null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,6 +82,10 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
     }
     if (!trimmedDescription || trimmedDescription.length < 20) {
       setError(UI_TEXT.pages.support.form.errorDescriptionRequired);
+      return;
+    }
+    if (!consent) {
+      setError(UI_TEXT.support.form.consent.error);
       return;
     }
 
@@ -353,13 +360,31 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
           className="hidden"
           onChange={handleFileChange}
         />
-        <p className="text-xs text-text-sec">{UI_TEXT.pages.support.form.attachmentNote}</p>
       </div>
 
-      <div className="rounded-xl border border-border-subtle bg-bg-input px-4 py-3 text-xs leading-relaxed text-text-sec">
-        {UI_TEXT.pages.support.form.privacyNote}
-      </div>
-      <div className="text-xs text-text-sec">{UI_TEXT.pages.support.form.responseNote}</div>
+      <label
+        htmlFor={consentId}
+        className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-text-sec"
+      >
+        <input
+          id={consentId}
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+          required
+        />
+        <span>
+          {UI_TEXT.support.form.consent.before}
+          <Link
+            href="/privacy"
+            className="text-primary underline-offset-2 hover:underline"
+          >
+            {UI_TEXT.support.form.consent.link}
+          </Link>
+          {UI_TEXT.support.form.consent.after}
+        </span>
+      </label>
 
       {error ? (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
@@ -367,7 +392,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
 
       <Button
         type="submit"
-        disabled={sending}
+        disabled={sending || !consent}
         size="lg"
         className="w-full"
       >

@@ -77,6 +77,13 @@ model ScheduleTemplateBreak {
 
   sortOrder Int @default(0)
 
+  // Optional human-friendly label ("Обед", "Кофе-пауза"). Surfaced in
+  // the master cabinet's Breaks tab where the same break can repeat across
+  // several weekdays. Null is permitted — Hours-tab edits leave it null,
+  // Breaks-tab adds usually carry one. UI falls back to a generic label
+  // when null.
+  title String?
+
   @@index([templateId])
 }
 

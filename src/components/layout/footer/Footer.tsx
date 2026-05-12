@@ -19,15 +19,12 @@ function hasPage(route: string): boolean {
 }
 
 function buildFooterLinks() {
-  const showBlog = hasPage("blog");
   const showCareers = hasPage("careers");
-  const showGiftCards = hasPage("gift-cards");
   const hasSupportPage = hasPage("support");
 
   const about: FooterLinkItem[] = [
     { label: UI_TEXT.footer.links.about, href: "/about" },
     { label: UI_TEXT.footer.links.howItWorks, href: "/how-it-works" },
-    ...(showBlog ? [{ label: UI_TEXT.footer.links.blog, href: "/blog" }] : []),
     { label: UI_TEXT.footer.links.partners, href: "/partners" },
     ...(showCareers ? [{ label: UI_TEXT.footer.links.careers, href: "/careers" }] : []),
   ];
@@ -37,13 +34,12 @@ function buildFooterLinks() {
     { label: UI_TEXT.footer.links.popularServices, href: "/catalog?sort=popular" },
     { label: UI_TEXT.footer.links.mastersNearby, href: "/catalog?available=today" },
     { label: UI_TEXT.footer.links.offersForModels, href: "/models" },
-    ...(showGiftCards ? [{ label: UI_TEXT.footer.links.giftCards, href: "/gift-cards" }] : []),
   ];
 
   const masters: FooterLinkItem[] = [
     { label: UI_TEXT.footer.links.becomeMaster, href: "/become-master" },
     { label: UI_TEXT.footer.links.pricing, href: "/pricing" },
-    { label: UI_TEXT.footer.links.knowledgeBase, href: "/help/masters" },
+    { label: UI_TEXT.footer.links.knowledgeBase, href: "/help" },
     { label: UI_TEXT.footer.links.affiliateProgram, href: "/partners" },
   ];
 
@@ -52,7 +48,6 @@ function buildFooterLinks() {
     hasSupportPage
       ? { label: UI_TEXT.footer.links.contact, href: "/support" }
       : { label: UI_TEXT.footer.links.contact, href: "mailto:support@мастеррядом.online", external: true },
-    { label: UI_TEXT.footer.links.telegramSupport, href: "https://t.me/masterryadom_support_bot", external: true },
     { label: UI_TEXT.footer.links.terms, href: "/terms" },
     { label: UI_TEXT.footer.links.privacy, href: "/privacy" },
   ];
@@ -78,9 +73,17 @@ export function Footer() {
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,3fr)]">
           {/* Brand column */}
           <div className="space-y-5">
-            <Link href="/" className="inline-block">
-              <span className="text-lg font-bold bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
-                {UI_TEXT.brand.name}
+            <Link href="/" className="inline-flex items-center gap-2.5">
+              <span
+                aria-hidden
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
+              >
+                <span className="font-display text-lg font-semibold italic leading-none text-white">
+                  М
+                </span>
+              </span>
+              <span className="font-display text-base font-medium text-text-main">
+                Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
               </span>
             </Link>
             <p className="text-sm leading-relaxed text-text-sec">{UI_TEXT.footer.brandDescription}</p>

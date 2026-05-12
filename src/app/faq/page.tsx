@@ -1,81 +1,90 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { FAQItem } from "@/features/faq/components/faq-item";
+import { FAQ_DATA } from "@/features/faq/content/faq-content";
 import { UI_TEXT } from "@/lib/ui/text";
-import { InfoPageLayout } from "@/components/layout/info-page-layout";
-import { FAQAccordion } from "@/components/ui/faq-accordion";
 
 export const metadata: Metadata = {
-  title: UI_TEXT.pages.faq.title,
-  description: UI_TEXT.pages.faq.description,
+  title: "Часто спрашивают — МастерРядом",
+  description:
+    "Ответы на популярные вопросы о МастерРядом: регистрация, отмена записи, тарифы для мастеров, работа в студии, горящие окошки.",
   alternates: { canonical: "/faq" },
 };
-
-const FAQS = UI_TEXT.pages.faq.groups;
 
 const FAQ_JSON_LD = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  mainEntity: FAQS.flatMap((group) =>
-    group.items.map((item) => ({
+  mainEntity: FAQ_DATA.flatMap((cat) =>
+    cat.questions.map((item) => ({
       "@type": "Question",
-      name: item.q,
-      acceptedAnswer: { "@type": "Answer", text: item.a },
-    }))
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
   ),
 };
 
+const T = UI_TEXT.faq;
+
 export default function FaqPage() {
   return (
-    <main className="mx-auto max-w-[820px] px-4 py-12 md:py-20 space-y-14">
+    <main className="bg-bg-page">
+      {/* JSON-LD FAQPage schema for Rich Snippets in Google/Yandex search */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
       />
-      <InfoPageLayout breadcrumb={UI_TEXT.pages.faq.navLabel}>
 
-        {/* Hero */}
-        <section className="space-y-3 pt-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-4 py-1.5 text-sm text-text-sec">
-            {UI_TEXT.pages.faq.heroBadge}
-          </div>
-          <h1 className="text-4xl font-bold text-text-main tracking-tight">
-            {UI_TEXT.pages.faq.heroTitle}
-          </h1>
-          <p className="text-text-sec text-lg">
-            {UI_TEXT.pages.faq.heroSubtitlePrefix}{" "}
-            <Link href="/support" className="text-primary hover:underline">
-              {UI_TEXT.pages.faq.heroSubtitleLink}
-            </Link>
-            .
-          </p>
-        </section>
+      {/* Hero — utilitarian, much smaller than /about or /how-it-works */}
+      <section className="mx-auto max-w-3xl px-4 pb-8 pt-12 lg:pt-16">
+        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          {T.hero.eyebrow}
+        </p>
+        <h1 className="font-display text-3xl text-text-main lg:text-4xl">
+          Часто{" "}
+          <em className="font-display font-normal italic text-primary">спрашивают</em>
+        </h1>
+        <p className="mt-3 leading-relaxed text-text-sec">
+          {T.hero.descriptionPrefix}{" "}
+          <Link href="/support" className="text-primary underline-offset-2 hover:underline">
+            {T.hero.descriptionLink}
+          </Link>
+          .
+        </p>
+      </section>
 
-        {/* FAQ groups */}
-        <FAQAccordion groups={FAQS} />
-
-        {/* Contact */}
-        <section className="lux-card rounded-[20px] bg-bg-card p-7 text-center space-y-3">
-          <p className="font-semibold text-text-main">{UI_TEXT.pages.faq.contactTitle}</p>
-          <p className="text-sm text-text-sec">{UI_TEXT.pages.faq.contactSubtitle}</p>
-          <div className="flex gap-3 justify-center">
-            <Link
-              href="/support"
-              className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-5 text-sm font-semibold text-white shadow-card hover:brightness-105 transition-all"
+      {/* Categories */}
+      <div className="mx-auto max-w-3xl space-y-14 px-4 pb-16">
+        {FAQ_DATA.map((category) => (
+          <section key={category.id} aria-labelledby={`faq-cat-${category.id}`}>
+            <h2
+              id={`faq-cat-${category.id}`}
+              className="mb-5 scroll-mt-20 font-display text-2xl text-text-main"
             >
-              {UI_TEXT.pages.faq.contactPrimary}
-            </Link>
-            <a
-              href="https://t.me/masterryadom_support_bot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-10 items-center rounded-xl border border-border-subtle bg-bg-input px-5 text-sm font-medium text-text-main hover:bg-bg-card transition-colors"
-            >
-              {UI_TEXT.pages.faq.contactTelegram}
-            </a>
-          </div>
-        </section>
+              {category.title}
+            </h2>
+            <div className="space-y-3">
+              {category.questions.map((item) => (
+                <FAQItem
+                  key={item.id}
+                  id={item.id}
+                  question={item.question}
+                  answer={item.answer}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
 
-      </InfoPageLayout>
+      {/* Final CTA — calm, no brand-gradient (utilitarian page) */}
+      <section className="mx-auto max-w-3xl px-4 pb-20 text-center">
+        <h2 className="mb-3 font-display text-2xl text-text-main">{T.cta.title}</h2>
+        <p className="mb-6 leading-relaxed text-text-sec">{T.cta.description}</p>
+        <Button asChild variant="primary">
+          <Link href="/support">{T.cta.supportButton}</Link>
+        </Button>
+      </section>
     </main>
   );
 }

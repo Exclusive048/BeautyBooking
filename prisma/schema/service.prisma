@@ -57,6 +57,8 @@ model Service {
 
   hotSlots HotSlot[]
 
+  packageItems ServicePackageItem[]
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -208,4 +210,52 @@ model Tag {
 
   @@index([isFeatured, usageCount])
   @@index([relatedCategoryId])
+}
+
+/// Bundle of master services with a discount (31c). Master combines
+/// e.g. manicure + pedicure into "Манипедикюр" with -15%. Final price
+/// is computed on the fly from the contained services' prices, so we
+/// don't denormalize it here.
+model ServicePackage {
+  id String @id @default(cuid())
+
+  masterId String
+
+  master Provider @relation("MasterServicePackages", fields: [masterId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// Reuses the existing `DiscountType` enum (PERCENT | FIXED). FIXED
+  /// values are stored in kopeks (consistent with Service.price).
+  discountType DiscountType @default(PERCENT)
+
+  discountValue Int @default(0)
+
+  isEnabled Boolean @default(true)
+
+  sortOrder Int @default(0)
+
+  items ServicePackageItem[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([masterId, sortOrder])
+  @@index([masterId, isEnabled])
+}
+
+model ServicePackageItem {
+  packageId String
+
+  package ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  serviceId String
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([packageId, serviceId])
+  @@index([serviceId])
 }

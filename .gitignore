@@ -49,4 +49,5 @@ docs/QUALITY-GATES.md
 prisma/seed-test.sql
 prisma/seed.sql
 prisma/seed.sh
-docs/design-references
+docs
+BACKLOG.md

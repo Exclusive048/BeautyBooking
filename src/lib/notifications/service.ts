@@ -8,6 +8,10 @@ import {
 import { AppError } from "@/lib/api/errors";
 import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
+import {
+  MASTER_NOTIFICATION_TYPES,
+  type NotificationContext,
+} from "@/lib/notifications/groups";
 import { notificationsNotifier } from "@/lib/notifications/notifier";
 import type { NotificationEvent } from "@/lib/notifications/types";
 
@@ -664,9 +668,17 @@ export async function createBookingNotifications(
   );
 }
 
-export async function markAllNotificationsRead(userId: string): Promise<void> {
+export async function markAllNotificationsRead(
+  userId: string,
+  context?: NotificationContext
+): Promise<void> {
+  const typeFilter = buildTypeFilter(context);
   await prisma.notification.updateMany({
-    where: { userId, isRead: false },
+    where: {
+      userId,
+      isRead: false,
+      ...(typeFilter ? { type: typeFilter } : {}),
+    },
     data: { isRead: true, readAt: new Date() },
   });
 }
@@ -695,12 +707,22 @@ export async function listNotifications(input: {
   userId: string;
   cursor?: string | null;
   limit?: number;
+  /** Cabinet split filter (26-NOTIF-A). `master` keeps only types in
+   * `MASTER_NOTIFICATION_TYPES`; `personal` keeps the complement; `all`
+   * (default) preserves legacy behaviour. The SQL allowlist is coarse for
+   * ambiguous types — precise per-notification filtering for the master
+   * surface lives in `getNotificationCenterData`. */
+  context?: NotificationContext;
 }): Promise<{ items: NotificationRecord[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
   const cursorId = input.cursor?.trim();
+  const typeFilter = buildTypeFilter(input.context);
 
   const items = await prisma.notification.findMany({
-    where: { userId: input.userId },
+    where: {
+      userId: input.userId,
+      ...(typeFilter ? { type: typeFilter } : {}),
+    },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     take: limit,
     ...(cursorId
@@ -716,6 +738,24 @@ export async function listNotifications(input: {
   return { items, nextCursor };
 }
 
-export async function getUnreadCount(userId: string): Promise<number> {
-  return prisma.notification.count({ where: { userId, isRead: false } });
+export async function getUnreadCount(
+  userId: string,
+  context?: NotificationContext
+): Promise<number> {
+  const typeFilter = buildTypeFilter(context);
+  return prisma.notification.count({
+    where: {
+      userId,
+      isRead: false,
+      ...(typeFilter ? { type: typeFilter } : {}),
+    },
+  });
+}
+
+function buildTypeFilter(
+  context: NotificationContext | undefined
+): { in: NotificationType[] } | { notIn: NotificationType[] } | null {
+  if (!context || context === "all") return null;
+  if (context === "master") return { in: MASTER_NOTIFICATION_TYPES };
+  return { notIn: MASTER_NOTIFICATION_TYPES };
 }

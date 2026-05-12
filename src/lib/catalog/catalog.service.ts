@@ -1,6 +1,10 @@
 import { Prisma, ProviderType, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { CatalogEntityType, CatalogSmartTagPreset } from "@/lib/catalog/schemas";
+import type {
+  CatalogEntityType,
+  CatalogSmartTagPreset,
+  CatalogSort,
+} from "@/lib/catalog/schemas";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
 
 /** Encode an internal row ID as an opaque, URL-safe cursor token. */
@@ -72,9 +76,19 @@ export type CatalogModelOfferItem = {
 
 export type CatalogSearchItem = CatalogProviderItem | CatalogModelOfferItem;
 
+export type CatalogPriceBucket = { from: number; to: number; count: number };
+
 export type CatalogSearchResult = {
   items: CatalogSearchItem[];
   nextCursor: string | null;
+  /** 15 equal-width buckets covering the active result-set price range. Empty when no priced services. */
+  priceDistribution?: CatalogPriceBucket[];
+  /** Total provider count matching the current filter set — present only when `page` was provided. */
+  totalCount?: number;
+  /** Total page count derived from totalCount/limit — present only when `page` was provided. */
+  totalPages?: number;
+  /** Echoes the requested 1-indexed page when `page` was provided. */
+  page?: number;
 };
 
 type CatalogSearchInput = {
@@ -91,12 +105,18 @@ type CatalogSearchInput = {
   smartTag?: CatalogSmartTagPreset;
   entityType?: CatalogEntityType;
   modelOffers?: boolean;
+  sort?: CatalogSort;
   limit: number;
   cursor?: string;
+  /** When present, takes precedence over `cursor` and switches the service into offset-based pagination. */
+  page?: number;
   lat?: number;
   lng?: number;
   bbox?: string;
 };
+
+const PREMIUM_BOOST = 0.5;
+const HISTOGRAM_BUCKETS = 15;
 
 const SMART_TAG_TO_REVIEW_CODE: Record<CatalogSmartTagPreset, string> = {
   rush: "FAST",
@@ -196,8 +216,13 @@ async function resolveCategoryFilterIds(
     return [root.id];
   }
 
+  // Children query intentionally does NOT filter by `isSystem` — seed-managed
+  // categories run with isSystem=true, while user-proposed ones are
+  // isSystem=false. Filtering one side dropped seeded sub-categories, so
+  // `nails` no longer expanded to `manicure`/`pedicure` and the catalog
+  // returned empty results for parent picks.
   const rows = await prisma.globalCategory.findMany({
-    where: { status: "APPROVED", isSystem: false },
+    where: { status: "APPROVED" },
     select: { id: true, parentId: true },
   });
 
@@ -520,12 +545,20 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   );
   const cursorId = input.cursor ? decodeCursor(input.cursor) : null;
   const take = Math.min(Math.max(input.limit, 1), 40);
+  // Page-mode (numbered pagination) wins over cursor-mode. We compute total
+  // count in parallel so the UI can render `‹ 1 2 3 … N ›`. Cursor stays the
+  // legacy / time-search path — see CatalogSearchResult for what we return.
+  const pageMode = typeof input.page === "number" && input.page >= 1;
+  const pageOffset = pageMode ? (input.page! - 1) * take : 0;
+  const totalCount = pageMode ? await prisma.provider.count({ where }) : undefined;
 
   const providers = await prisma.provider.findMany({
     where,
     orderBy: [{ ratingAvg: "desc" }, { reviews: "desc" }, { createdAt: "desc" }, { id: "asc" }],
     take: take + 1,
-    ...(cursorId
+    ...(pageMode
+      ? { skip: pageOffset }
+      : cursorId
       ? {
           skip: 1,
           cursor: { id: cursorId },
@@ -601,22 +634,54 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   const providerTypeMap = new Map(rows.map((p) => [p.ownerUserId ?? "", p.type]));
   const highlightedUserIds = await loadHighlightedUserIds(ownerUserIds, providerTypeMap);
 
-  const rankedRows = input.smartTag
-    ? [...rows]
-        .map((provider, index) => ({
-          provider,
-          index,
-          smartCount: smartTagCounts.get(provider.id) ?? 0,
-        }))
-        .sort((a, b) => {
-          const aBoost = a.smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
-          const bBoost = b.smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
-          if (aBoost !== bBoost) return bBoost - aBoost;
-          if (a.smartCount !== b.smartCount) return b.smartCount - a.smartCount;
-          return a.index - b.index;
-        })
-        .map((entry) => entry.provider)
-    : rows;
+  const isPremium = (provider: { ownerUserId: string | null }) =>
+    Boolean(provider.ownerUserId && highlightedUserIds.has(provider.ownerUserId));
+
+  // Sorting strategy:
+  //   - "rating", "price-asc", "price-desc", "popular" → explicit user choice; Premium boost not applied (user asked for a specific order)
+  //   - "distance"  → handled at query layer if/when geo distance is available; falls back to default order
+  //   - "relevance" (default) → ratingAvg-driven order from Prisma + smart-tag re-rank if active + Premium boost (+0.5)
+  const explicitSort = input.sort && input.sort !== "relevance" && input.sort !== "distance";
+
+  const rankedRows = (() => {
+    if (explicitSort) {
+      const arr = [...rows];
+      if (input.sort === "rating") {
+        arr.sort((a, b) => b.ratingAvg - a.ratingAvg || b.reviews - a.reviews);
+      } else if (input.sort === "popular") {
+        arr.sort((a, b) => b.reviews - a.reviews || b.ratingAvg - a.ratingAvg);
+      } else if (input.sort === "price-asc" || input.sort === "price-desc") {
+        const pickPrice = (p: (typeof rows)[number]) => {
+          const services = [
+            ...p.services.map((s) => s.price),
+            ...p.masterServices.map((m) => m.service.price),
+          ].filter((v): v is number => typeof v === "number" && v > 0);
+          return services.length > 0 ? Math.min(...services) : p.priceFrom > 0 ? p.priceFrom : Number.POSITIVE_INFINITY;
+        };
+        const dir = input.sort === "price-asc" ? 1 : -1;
+        arr.sort((a, b) => (pickPrice(a) - pickPrice(b)) * dir);
+      }
+      return arr;
+    }
+
+    // Relevance path — ratingAvg from query is base, plus optional smart-tag boost, plus Premium +0.5.
+    return [...rows]
+      .map((provider, index) => {
+        const smartCount = smartTagCounts.get(provider.id) ?? 0;
+        const smartBoost = input.smartTag && smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
+        const premium = isPremium(provider) ? PREMIUM_BOOST : 0;
+        // Score combines Prisma's ratingAvg/reviews ordering with smart-tag and premium nudges.
+        // Higher score wins; ties broken by original Prisma index (stable).
+        const score = provider.ratingAvg + smartBoost + premium;
+        return { provider, index, score, smartCount };
+      })
+      .sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.smartCount !== b.smartCount) return b.smartCount - a.smartCount;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.provider);
+  })();
 
   const items: CatalogProviderItem[] = rankedRows.map((provider) => {
     const directServices = provider.services.map(toServiceLite);
@@ -661,10 +726,54 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     };
   });
 
+  // Compute price distribution histogram from minPrice values across the
+  // current ranked result set. 15 equal-width buckets — UI snaps the active
+  // range slider to these visual cells. Empty when no priced services found.
+  const minPrices = items
+    .map((it) => it.minPrice)
+    .filter((p): p is number => typeof p === "number" && p > 0);
+
+  const priceDistribution: CatalogPriceBucket[] = computePriceDistribution(minPrices);
+
+  // In page-mode `nextCursor` is irrelevant — UI uses page numbers — but we
+  // keep it null rather than encoding an offset to avoid two paths reading
+  // the same field with different semantics.
+  if (pageMode) {
+    return {
+      items,
+      nextCursor: null,
+      priceDistribution,
+      totalCount: totalCount ?? 0,
+      totalPages: Math.max(1, Math.ceil((totalCount ?? 0) / take)),
+      page: input.page,
+    };
+  }
+
   return {
     items,
     nextCursor: hasMore ? encodeCursor(rows[rows.length - 1]!.id) : null,
+    priceDistribution,
   };
+}
+
+function computePriceDistribution(prices: number[]): CatalogPriceBucket[] {
+  if (prices.length === 0) return [];
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = Math.max(max - min, 1);
+  const step = Math.max(1, Math.round(range / HISTOGRAM_BUCKETS));
+
+  const buckets: CatalogPriceBucket[] = Array.from({ length: HISTOGRAM_BUCKETS }, (_, i) => ({
+    from: min + step * i,
+    to: i === HISTOGRAM_BUCKETS - 1 ? max : min + step * (i + 1),
+    count: 0,
+  }));
+
+  for (const p of prices) {
+    const idx = Math.min(HISTOGRAM_BUCKETS - 1, Math.floor((p - min) / step));
+    buckets[idx]!.count += 1;
+  }
+  return buckets;
 }
 
 function resolveOfferDuration(input: {

@@ -88,6 +88,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
   SUPPORT_TO: z.string().optional(),
+  // Partnership inquiries from /partners. Falls back to SUPPORT_TO when unset.
+  SUPPORT_TO_PARTNERSHIP: z.string().optional(),
 
   // ── Monitoring ────────────────────────────────────────────────────────────
   MONITORING_TELEGRAM_BOT_TOKEN: z.string().optional(),

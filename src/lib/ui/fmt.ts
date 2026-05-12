@@ -103,18 +103,38 @@ export const UI_FMT = {
     const rounded = Math.max(0, Math.min(5, Math.round(rating)));
     return "*".repeat(rounded) + "-".repeat(5 - rounded);
   },
-  totalLabel(sum: number): string {
-    return `Итого: ${new Intl.NumberFormat("ru-RU").format(sum)} ₽`;
+  /**
+   * Format a sum line as «Итого: X XXX ₽».
+   * @param sumKopeks — sum in **kopeks** (DB convention).
+   */
+  totalLabel(sumKopeks: number): string {
+    if (!Number.isFinite(sumKopeks) || sumKopeks <= 0) {
+      return `Итого: 0 ₽`;
+    }
+    return `Итого: ${new Intl.NumberFormat("ru-RU").format(Math.round(sumKopeks / 100))} ₽`;
   },
   durationLabel(minutes: number): string {
     if (minutes <= 0) return "0 мин";
     if (minutes % 60 === 0) return `${minutes / 60} ч`;
     return `${minutes} мин`;
   },
-  priceLabel(price: number): string {
-    return `${new Intl.NumberFormat("ru-RU").format(price)} ₽`;
+  /**
+   * Format price as «X XXX ₽».
+   * @param priceKopeks — value in **kopeks** (DB convention — `Service.price`,
+   *   `BookingServiceItem.priceSnapshot`, `BillingPlan.priceKopeks`, …).
+   *   Marketing pages that hard-code ruble literals must multiply by 100
+   *   before passing, OR keep their own inline formatter.
+   */
+  priceLabel(priceKopeks: number): string {
+    if (!Number.isFinite(priceKopeks) || priceKopeks <= 0) return "0 ₽";
+    return `${new Intl.NumberFormat("ru-RU").format(Math.round(priceKopeks / 100))} ₽`;
   },
-  priceDurationLabel(price: number, minutes: number): string {
-    return `${UI_FMT.priceLabel(price)} • ${UI_FMT.durationLabel(minutes)}`;
+  /**
+   * Format «X XXX ₽ • N мин».
+   * @param priceKopeks — value in **kopeks** (see `priceLabel`).
+   * @param minutes — duration in minutes (raw).
+   */
+  priceDurationLabel(priceKopeks: number, minutes: number): string {
+    return `${UI_FMT.priceLabel(priceKopeks)} • ${UI_FMT.durationLabel(minutes)}`;
   },
 } as const;

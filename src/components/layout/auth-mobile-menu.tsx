@@ -61,9 +61,10 @@ function WorkspaceMenuItem({
   );
 }
 
+// "Горящие окошки" intentionally removed from the menu — see 07-NAVBAR-FOOTER.
+// Page /hot and the /api/hot-slots API stay live; only the menu entry is hidden.
 const NAV_LINKS = [
   { href: "/catalog", label: UI_TEXT.nav.catalog },
-  { href: "/hot", label: UI_TEXT.nav.hotSlots },
   { href: "/models", label: UI_TEXT.nav.forModels },
   { href: "/cabinet/bookings", label: UI_TEXT.nav.myBookings },
   { href: "/pricing", label: UI_TEXT.nav.pricing },

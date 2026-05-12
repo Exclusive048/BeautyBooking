@@ -12,6 +12,9 @@ export type PublicModelOfferService = {
   title: string;
   description: string | null;
   durationMin: number;
+  /** Master's price for this service (after MasterService.priceOverride). The
+   *  pre-discount price the offer.price is compared against. */
+  originalPrice: number | null;
   category: PublicModelOfferCategory | null;
 };
 
@@ -31,6 +34,8 @@ export type PublicModelOfferItem = {
   timeRangeStartLocal: string;
   timeRangeEndLocal: string;
   price: number | null;
+  /** Extra time the master needs after the service for content/photos. */
+  extraBusyMin: number;
   requirements: string[];
   service: PublicModelOfferService;
   master: PublicModelOfferMaster;
@@ -38,6 +43,9 @@ export type PublicModelOfferItem = {
 
 export type PublicModelOffersQuery = {
   categoryId?: string;
+  /** Filter to providers in this city (preferred — uses Provider.cityId index). */
+  cityId?: string;
+  /** Legacy: substring match against provider.address. Kept for the detail page until it migrates. */
   city?: string;
   page: number;
   limit: number;
@@ -91,51 +99,42 @@ function cityFromAddress(address: string): string | null {
   return null;
 }
 
+type ResolvedService = {
+  id: string;
+  name: string;
+  title: string | null;
+  description: string | null;
+  durationMin: number;
+  baseDurationMin: number | null;
+  price: number;
+  globalCategory: { id: string; name: string; slug: string | null } | null;
+};
+
+type ResolvedMasterService = {
+  durationOverrideMin: number | null;
+  priceOverride: number | null;
+  service: ResolvedService;
+};
+
 function resolveOfferService(input: {
-  masterService: {
-    durationOverrideMin: number | null;
-    service: {
-      id: string;
-      name: string;
-      title: string | null;
-      description: string | null;
-      durationMin: number;
-      baseDurationMin: number | null;
-      globalCategory: { id: string; name: string; slug: string | null } | null;
-    };
-  } | null;
-  service: {
-    id: string;
-    name: string;
-    title: string | null;
-    description: string | null;
-    durationMin: number;
-    baseDurationMin: number | null;
-    globalCategory: { id: string; name: string; slug: string | null } | null;
-  } | null;
-}):
-  | {
-      durationOverrideMin: number | null;
-      service: {
-        id: string;
-        name: string;
-        title: string | null;
-        description: string | null;
-        durationMin: number;
-        baseDurationMin: number | null;
-        globalCategory: { id: string; name: string; slug: string | null } | null;
-      };
-    }
-  | null {
+  masterService: ResolvedMasterService | null;
+  service: ResolvedService | null;
+}): {
+  durationOverrideMin: number | null;
+  priceOverride: number | null;
+  service: ResolvedService;
+} | null {
   if (input.masterService) {
     return {
       durationOverrideMin: input.masterService.durationOverrideMin ?? null,
+      priceOverride: input.masterService.priceOverride ?? null,
       service: input.masterService.service,
     };
   }
   if (input.service) {
     return {
       durationOverrideMin: null,
+      priceOverride: null,
       service: input.service,
     };
   }
@@ -149,6 +148,7 @@ function toPublicItem(input: {
   timeRangeStartLocal: string;
   timeRangeEndLocal: string;
   price: Prisma.Decimal | null;
+  extraBusyMin: number;
   requirements: string[];
   master: {
     id: string;
@@ -160,27 +160,8 @@ function toPublicItem(input: {
     address: string;
     district: string;
   };
-  masterService: {
-    durationOverrideMin: number | null;
-    service: {
-      id: string;
-      name: string;
-      title: string | null;
-      description: string | null;
-      durationMin: number;
-      baseDurationMin: number | null;
-      globalCategory: { id: string; name: string; slug: string | null } | null;
-    };
-  } | null;
-  service: {
-    id: string;
-    name: string;
-    title: string | null;
-    description: string | null;
-    durationMin: number;
-    baseDurationMin: number | null;
-    globalCategory: { id: string; name: string; slug: string | null } | null;
-  } | null;
+  masterService: ResolvedMasterService | null;
+  service: ResolvedService | null;
 }): PublicModelOfferItem | null {
   const offerService = resolveOfferService({
     masterService: input.masterService,
@@ -189,12 +170,14 @@ function toPublicItem(input: {
   if (!offerService) return null;
 
   const service = offerService.service;
+  const originalPrice = offerService.priceOverride ?? service.price;
   return {
     publicCode: input.publicCode,
     dateLocal: input.dateLocal,
     timeRangeStartLocal: input.timeRangeStartLocal,
     timeRangeEndLocal: input.timeRangeEndLocal,
     price: toPriceNumber(input.price),
+    extraBusyMin: input.extraBusyMin ?? 0,
     requirements: input.requirements ?? [],
     service: {
       id: service.id,
@@ -205,6 +188,7 @@ function toPublicItem(input: {
         baseDurationMin: service.baseDurationMin ?? null,
         durationMin: service.durationMin,
       }),
+      originalPrice: Number.isFinite(originalPrice) ? originalPrice : null,
       category: service.globalCategory
         ? {
             id: service.globalCategory.id,
@@ -230,7 +214,9 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
     isPublished: true,
     type: ProviderType.MASTER,
   };
-  if (input.city) {
+  if (input.cityId) {
+    masterWhere.cityId = input.cityId;
+  } else if (input.city) {
     masterWhere.address = { contains: input.city, mode: "insensitive" };
   }
 
@@ -264,6 +250,7 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
       timeRangeStartLocal: true,
       timeRangeEndLocal: true,
       price: true,
+      extraBusyMin: true,
       requirements: true,
       master: {
         select: {
@@ -280,6 +267,7 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
       masterService: {
         select: {
           durationOverrideMin: true,
+          priceOverride: true,
           service: {
             select: {
               id: true,
@@ -288,6 +276,7 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
               description: true,
               durationMin: true,
               baseDurationMin: true,
+              price: true,
               globalCategory: { select: { id: true, name: true, slug: true } },
             },
           },
@@ -301,6 +290,7 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
           description: true,
           durationMin: true,
           baseDurationMin: true,
+          price: true,
           globalCategory: { select: { id: true, name: true, slug: true } },
         },
       },
@@ -353,6 +343,7 @@ export async function getPublicModelOffer(code: string): Promise<PublicModelOffe
       timeRangeStartLocal: true,
       timeRangeEndLocal: true,
       price: true,
+      extraBusyMin: true,
       requirements: true,
       master: {
         select: {
@@ -369,6 +360,7 @@ export async function getPublicModelOffer(code: string): Promise<PublicModelOffe
       masterService: {
         select: {
           durationOverrideMin: true,
+          priceOverride: true,
           service: {
             select: {
               id: true,
@@ -377,6 +369,7 @@ export async function getPublicModelOffer(code: string): Promise<PublicModelOffe
               description: true,
               durationMin: true,
               baseDurationMin: true,
+              price: true,
               globalCategory: { select: { id: true, name: true, slug: true } },
             },
           },
@@ -390,6 +383,7 @@ export async function getPublicModelOffer(code: string): Promise<PublicModelOffe
           description: true,
           durationMin: true,
           baseDurationMin: true,
+          price: true,
           globalCategory: { select: { id: true, name: true, slug: true } },
         },
       },

@@ -48,7 +48,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     weight: 7,
     check: (data) => data.hasDeadTimeSlots,
     title: "Есть пустующее время",
-    message: () => "Заполняемость слотов за 60 дней ниже 20%. Проверьте расписание и цены.",
+    message: () => "Заполняемость окошек за 60 дней ниже 20%. Проверьте расписание и цены.",
     action: { label: "Настроить расписание", href: "/cabinet/master/schedule" },
   },
   {
@@ -85,7 +85,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     check: (data) => data.workingDaysPerWeek < 3,
     title: "Мало рабочих дней",
     message: (data) =>
-      `Рабочих дней в неделю: ${data.workingDaysPerWeek}. Добавьте слоты, если хотите больше записей.`,
+      `Рабочих дней в неделю: ${data.workingDaysPerWeek}. Добавьте окошки, если хотите больше записей.`,
     action: { label: "Настроить расписание", href: "/cabinet/master/schedule" },
   },
   {

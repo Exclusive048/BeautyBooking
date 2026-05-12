@@ -1,0 +1,128 @@
+{
+  "name": "МастерРядом — мастера красоты рядом",
+  "short_name": "МастерРядом",
+  "description": "Маркетплейс мастеров красоты. Запись онлайн без звонков.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbeef0",
+  "theme_color": "#720808",
+  "categories": [
+    "lifestyle",
+    "beauty",
+    "shopping"
+  ],
+  "icons": [
+    {
+      "src": "/brand/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/brand/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Кабинет мастера",
+      "short_name": "Мастер",
+      "description": "Расписание, записи и клиенты мастера",
+      "url": "/?action=master-cabinet",
+      "icons": [
+        {
+          "src": "/brand/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Кабинет студии",
+      "short_name": "Студия",
+      "description": "Управление студией, мастерами и кассой",
+      "url": "/?action=studio-cabinet",
+      "icons": [
+        {
+          "src": "/brand/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Мои записи",
+      "short_name": "Записи",
+      "description": "Предстоящие и прошедшие записи",
+      "url": "/?action=bookings",
+      "icons": [
+        {
+          "src": "/brand/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Каталог",
+      "short_name": "Каталог",
+      "description": "Найти мастера или студию рядом",
+      "url": "/?action=catalog",
+      "icons": [
+        {
+          "src": "/brand/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

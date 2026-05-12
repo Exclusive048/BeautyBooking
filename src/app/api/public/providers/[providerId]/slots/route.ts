@@ -61,7 +61,7 @@ function mapSlotsError(code?: string): string {
     case "SERVICE_DISABLED":
       return "Услуга недоступна.";
     default:
-      return "Не удалось загрузить слоты.";
+      return "Не удалось загрузить окошки.";
   }
 }
 

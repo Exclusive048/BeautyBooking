@@ -141,16 +141,16 @@ export async function fetchMasterAvailability(
   if (!res.ok) {
     return {
       ok: false,
-      error: "Не удалось загрузить слоты",
+      error: "Не удалось загрузить окошки",
     };
   }
 
   if (!json) {
-    return { ok: false, error: "Не удалось загрузить слоты" };
+    return { ok: false, error: "Не удалось загрузить окошки" };
   }
 
   if (json.ok !== true) {
-    return { ok: false, error: json.error.message ?? "Не удалось загрузить слоты", code: json.error?.code };
+    return { ok: false, error: json.error.message ?? "Не удалось загрузить окошки", code: json.error?.code };
   }
 
   return { ok: true, slots: json.data.slots ?? [] };

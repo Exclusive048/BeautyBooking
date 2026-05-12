@@ -90,7 +90,7 @@ export const FEATURE_CATALOG = {
   analytics_clients: {
     kind: "boolean",
     title: "Аналитика: Клиенты",
-    description: "Сегменты клиентов, LTV и удержание.",
+    description: "Сегменты клиентов, выручка и удержание.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 76,

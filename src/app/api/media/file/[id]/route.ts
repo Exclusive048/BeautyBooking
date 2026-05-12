@@ -70,22 +70,49 @@ export async function GET(req: Request, ctx: RouteContext) {
 
     if (PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType)) {
       const storage = getStorageProvider();
-      const publicUrl = storage.getPublicUrl?.(asset.storageKey);
-      if (publicUrl) {
+      const publicFile = await storage.getObject(asset.storageKey, asset.mimeType);
+      if (!publicFile) {
+        // Asset record exists in DB but bytes are missing in storage —
+        // mark the row as BROKEN so the audit script can clean it up later.
+        await prisma.mediaAsset
+          .updateMany({
+            where: { id: asset.id, deletedAt: null },
+            data: { status: MediaAssetStatus.BROKEN },
+          })
+          .catch(() => undefined);
+
         void recordSurfaceEvent({
           surface: "media",
-          outcome: "success",
-          operation: "public-redirect",
+          outcome: "failure",
+          operation: "public-stream",
+          code: "STORAGE_MISSING",
         });
-        const location = new URL(publicUrl, req.url).toString();
-        return new NextResponse(null, {
-          status: 302,
-          headers: {
-            Location: location,
-            "Cache-Control": "public, max-age=86400",
-          },
+        logError("media.stream.s3_404", {
+          requestId: getRequestId(req),
+          assetId: asset.id,
+          storageKey: asset.storageKey,
         });
+        return NextResponse.json(
+          { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
+          { status: 404 }
+        );
       }
+
+      void recordSurfaceEvent({
+        surface: "media",
+        outcome: "success",
+        operation: "public-stream",
+      });
+      return new NextResponse(Readable.toWeb(publicFile.stream) as ReadableStream, {
+        status: 200,
+        headers: {
+          "Content-Type": publicFile.contentType,
+          "Content-Length": String(publicFile.sizeBytes),
+          // Public, immutable assets — agressive cache. Asset id is unique per upload,
+          // so changing the file means changing the URL.
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
     }
 
     const mediaToken = new URL(req.url).searchParams.get(PRIVATE_MEDIA_TOKEN_QUERY_PARAM);

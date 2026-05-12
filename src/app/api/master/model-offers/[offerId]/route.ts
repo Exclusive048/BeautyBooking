@@ -2,6 +2,7 @@ import { AccountType, Prisma } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import { closeOfferWithCascade } from "@/lib/master/model-offers-mutations";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
 import { normalizePrice, normalizeRequirements, updateModelOfferSchema } from "@/lib/model-offers/schemas";
 import { prisma } from "@/lib/prisma";
@@ -61,19 +62,39 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     await resolveMasterAccess(offer.masterId, user.id);
 
-    const hasConfirmed = await prisma.modelApplication.findFirst({
-      where: {
-        offerId: offer.id,
-        OR: [{ status: "CONFIRMED" }, { bookingId: { not: null } }],
-      },
-      select: { id: true },
-    });
-    if (hasConfirmed) {
-      return jsonFail(409, "Offer is locked", "CONFLICT");
-    }
-
     if (body.status && body.status !== "CLOSED" && body.status !== "ARCHIVED") {
       return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    }
+
+    // Distinguish "status-only" updates from full edits. Status changes
+    // (close / archive) are always allowed; field edits are blocked the
+    // moment any application exists for this offer (29b: clean break — if
+    // a master needs to change a published window, they close + create
+    // anew so existing applicants get a clear notification).
+    const fieldKeys = Object.keys(body).filter((key) => key !== "status");
+    const hasFieldEdits = fieldKeys.length > 0;
+
+    if (hasFieldEdits) {
+      const anyApplication = await prisma.modelApplication.findFirst({
+        where: { offerId: offer.id },
+        select: { id: true },
+      });
+      if (anyApplication) {
+        return jsonFail(409, "Offer is locked", "CONFLICT");
+      }
+    } else {
+      // Status-only updates retain the original guard against changing
+      // an offer that already has a confirmed booking.
+      const hasConfirmed = await prisma.modelApplication.findFirst({
+        where: {
+          offerId: offer.id,
+          OR: [{ status: "CONFIRMED" }, { bookingId: { not: null } }],
+        },
+        select: { id: true },
+      });
+      if (hasConfirmed) {
+        return jsonFail(409, "Offer is locked", "CONFLICT");
+      }
     }
 
     const nextStart = body.timeRangeStartLocal ?? offer.timeRangeStartLocal;
@@ -82,13 +103,20 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       return jsonFail(400, "Validation error", "TIME_RANGE_INVALID");
     }
 
+    // status: CLOSED triggers cascade-reject of pending/approved-waiting
+    // applications. Funnels through the shared `closeOfferWithCascade`
+    // helper so the dedicated POST /close route shares behaviour.
+    if (body.status === "CLOSED" && offer.status !== "CLOSED") {
+      await closeOfferWithCascade({ offerId: offer.id, userId: user.id });
+    }
+
     const requirements = body.requirements ? normalizeRequirements(body.requirements) : undefined;
     const priceValue = body.price !== undefined ? normalizePrice(body.price) : undefined;
 
     const updated = await prisma.modelOffer.update({
       where: { id: offer.id },
       data: {
-        ...(body.status ? { status: body.status } : {}),
+        ...(body.status && body.status !== "CLOSED" ? { status: body.status } : {}),
         ...(body.timeRangeStartLocal ? { timeRangeStartLocal: body.timeRangeStartLocal } : {}),
         ...(body.timeRangeEndLocal ? { timeRangeEndLocal: body.timeRangeEndLocal } : {}),
         ...(requirements ? { requirements } : {}),

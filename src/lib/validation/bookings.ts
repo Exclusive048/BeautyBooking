@@ -20,7 +20,7 @@ export const bookingCreateSchema = z
     masterProviderId: z.string().trim().min(1).optional(),
     startAtUtc: dateString.optional(),
     endAtUtc: dateString.optional(),
-    slotLabel: z.string().trim().min(1, "Не указан слот.").max(120),
+    slotLabel: z.string().trim().min(1, "Не указано окошко.").max(120),
     clientName: z.string().trim().min(1, "Не указано имя клиента.").max(120),
     clientPhone: z.string().trim().min(1, "Не указан телефон клиента.").max(40),
     comment: z.string().trim().max(500).nullable().optional(),

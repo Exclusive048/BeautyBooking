@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
 import { ReviewsSectionClient } from "@/features/public-profile/master/sections/reviews-section-client";
+import { isAiFeaturesEnabled } from "@/lib/env";
 import { serverApiFetch } from "@/lib/api/server-fetch";
 import type { ClientBooking } from "@/lib/bookings/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
@@ -98,6 +99,11 @@ export async function ReviewsSection({ providerId }: Props) {
     );
   }
 
+  // fix-03: AI summary button only renders when the feature flag is
+  // on. Sync env check — `getAiFeaturesEnabled()` (which also reads
+  // the SystemConfig override) would add a DB round-trip per public
+  // profile request. The runtime override is admin-flippable and
+  // rarely toggled mid-session; env is the right signal here.
   return (
     <div className="fade-in-up">
       <ReviewsSectionClient
@@ -107,6 +113,7 @@ export async function ReviewsSection({ providerId }: Props) {
         initialReviews={reviews}
         canReviewBookingId={canReviewBookingId}
         currentUserId={currentUserId}
+        aiSummaryEnabled={isAiFeaturesEnabled}
       />
     </div>
   );

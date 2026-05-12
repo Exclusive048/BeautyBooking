@@ -131,7 +131,7 @@ export async function ensureNoConflicts(
 
   if (conflict) {
     throw new AppError(
-      "Слот уже занят. Обновите расписание и выберите другое время.",
+      "Окошко уже занято. Обновите расписание и выберите другое время.",
       409,
       "SLOT_CONFLICT"
     );
@@ -156,7 +156,7 @@ function mapAvailabilityError(code?: string): { message: string; status: number 
     case "SERVICE_INVALID":
       return { message: "Услуга недоступна для мастера.", status: 409 };
     default:
-      return { message: "Не удалось проверить доступность слота.", status: 500 };
+      return { message: "Не удалось проверить доступность окошка.", status: 500 };
   }
 }
 
@@ -319,7 +319,7 @@ export async function resolveBookingCore(input: {
   });
   if (!hasSlot) {
     throw new AppError(
-      "Слот уже занят. Обновите расписание и выберите другое время.",
+      "Окошко уже занято. Обновите расписание и выберите другое время.",
       409,
       "SLOT_CONFLICT"
     );

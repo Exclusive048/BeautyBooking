@@ -1,20 +1,16 @@
-import { redirect } from "next/navigation";
-import { MasterClientsPage } from "@/features/master/components/master-clients-page";
-import { getSessionUser } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MasterClientsPage } from "@/features/master/components/clients/master-clients-page";
 
-export default async function MasterClientsRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+type SearchParams = Record<string, string | string[] | undefined>;
 
-  await getCurrentMasterProviderId(user.id);
-
-  return (
-    <section className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-main">{UI_TEXT.master.clients.title}</h1>
-      <p className="text-sm text-text-sec">{UI_TEXT.master.clients.subtitle}</p>
-      <MasterClientsPage />
-    </section>
-  );
+/**
+ * `/cabinet/master/clients` — CRM landing for the master cabinet
+ * (27a read-only). Mutation flows (add client, edit notes, custom tags)
+ * land in 27b on top of this scaffolding.
+ */
+export default async function MasterClientsRoute({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
+  return <MasterClientsPage searchParams={searchParams} />;
 }

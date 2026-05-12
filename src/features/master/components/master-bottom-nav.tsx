@@ -46,7 +46,7 @@ const MORE_ITEMS = [
   { href: "/cabinet/master/reviews", label: t.menuReviews, icon: Star },
   { href: "/cabinet/master/analytics", label: t.menuAnalytics, icon: BarChart3 },
   { href: "/cabinet/master/billing", label: t.menuBilling, icon: CreditCard },
-  { href: "/cabinet/master/settings", label: t.menuSettings, icon: Settings },
+  { href: "/cabinet/master/account", label: t.menuSettings, icon: Settings },
 ];
 
 const MORE_PATHS = MORE_ITEMS.map((item) => item.href);
@@ -61,7 +61,12 @@ function isMoreActive(pathname: string): boolean {
   return MORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export function MasterBottomNav() {
+type Props = {
+  /** Optional badge count rendered on the Bookings tab — pending master actions. */
+  pendingBookingsCount?: number;
+};
+
+export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
   const pathname = usePathname();
   const moreActive = isMoreActive(pathname);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -149,14 +154,26 @@ export function MasterBottomNav() {
             {TABS.map((tab) => {
               const active = isActive(pathname, tab.href, tab.exact);
               const Icon = tab.icon;
+              const isBookings = tab.href === "/cabinet/master/bookings";
+              const showBadge = isBookings && pendingBookingsCount > 0;
               return (
                 <li key={tab.href} className="flex-1">
                   <Link
                     href={tab.href}
-                    className="flex flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
+                    className="relative flex flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
                     aria-current={active ? "page" : undefined}
                   >
-                    <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-text-sec")} aria-hidden />
+                    <span className="relative">
+                      <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-text-sec")} aria-hidden />
+                      {showBadge ? (
+                        <span
+                          aria-label={`${pendingBookingsCount}`}
+                          className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] font-medium text-white tabular-nums"
+                        >
+                          {pendingBookingsCount}
+                        </span>
+                      ) : null}
+                    </span>
                     <span className={cn("text-[10px] font-medium", active ? "text-primary" : "text-text-sec")}>
                       {tab.label}
                     </span>

@@ -37,12 +37,29 @@ function buildObjectPosition(
   return "center";
 }
 
-// Internal media API URLs must bypass Next.js Image Optimization —
-// the optimizer makes a session-less server request, causing 403 for auth-gated assets.
+/**
+ * Returns false unconditionally — kept as a stub for call-site compatibility.
+ *
+ * Historically this returned `true` for /api/media/* URLs because the route
+ * issued a 302 redirect to S3, which Next.js Image Optimizer doesn't handle
+ * reliably (received-null errors). Since 06-MEDIA-PIPELINE the route streams
+ * bytes directly with proper Content-Type and Cache-Control, so the optimizer
+ * works as expected and `unoptimized={true}` is no longer needed.
+ *
+ * Component preserved for backward-compat with ~45 call sites — migrate to
+ * <Image> from next/image directly when touching them.
+ */
 function needsUnoptimized(src: string): boolean {
-  return src.startsWith("/api/media/");
+  // Returns false since /api/media/file/{id} now streams properly (was 302).
+  // Component preserved for backward-compat with 45 usages — migrate to <Image> directly.
+  void src;
+  return false;
 }
 
+/**
+ * @deprecated Use <Image> from next/image directly. This wrapper exists only
+ *   to keep the legacy call sites compiling — it no longer adds any value.
+ */
 export function FocalImage({
   src,
   alt,

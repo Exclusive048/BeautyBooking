@@ -1,7 +1,15 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, User, Settings, Briefcase, Sparkles } from "lucide-react";
+import {
+  LayoutDashboard,
+  Calendar,
+  User,
+  Settings,
+  Briefcase,
+  Sparkles,
+  Heart,
+} from "lucide-react";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -9,6 +17,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 const NAV_ITEMS = [
   { label: UI_TEXT.clientCabinet.nav.home, href: "/cabinet", icon: LayoutDashboard, exact: true },
   { label: UI_TEXT.clientCabinet.nav.bookings, href: "/cabinet/bookings", icon: Calendar },
+  { label: UI_TEXT.clientCabinet.nav.favorites, href: "/cabinet/favorites", icon: Heart },
   { label: UI_TEXT.clientCabinet.nav.profile, href: "/cabinet/profile", icon: User },
   { label: UI_TEXT.clientCabinet.nav.modelApplications, href: "/cabinet/model-applications", icon: Sparkles },
   { label: UI_TEXT.clientCabinet.nav.roles, href: "/cabinet/roles", icon: Briefcase },
@@ -17,6 +26,8 @@ const NAV_ITEMS = [
 
 type Props = {
   userLabel?: string | null;
+  /** Server-supplied count for the favorites badge. Hidden when 0/undefined. */
+  favoritesCount?: number;
 };
 
 function isActivePath(pathname: string, href: string, exact?: boolean) {
@@ -25,7 +36,7 @@ function isActivePath(pathname: string, href: string, exact?: boolean) {
   return pathname.startsWith(`${href}/`);
 }
 
-export function CabinetSidebar({ userLabel }: Props) {
+export function CabinetSidebar({ userLabel, favoritesCount = 0 }: Props) {
   const pathname = usePathname();
   const label = userLabel?.trim() || UI_TEXT.brand.name;
 
@@ -43,6 +54,7 @@ export function CabinetSidebar({ userLabel }: Props) {
           <nav className="space-y-1">
             {NAV_ITEMS.map((item) => {
               const active = isActivePath(pathname, item.href, item.exact);
+              const isFavorites = item.href === "/cabinet/favorites";
               return (
                 <SidebarItem
                   key={item.href}
@@ -50,6 +62,7 @@ export function CabinetSidebar({ userLabel }: Props) {
                   label={item.label}
                   active={active}
                   icon={item.icon}
+                  badge={isFavorites ? favoritesCount : undefined}
                 />
               );
             })}

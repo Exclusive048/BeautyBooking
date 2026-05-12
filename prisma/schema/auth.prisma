@@ -74,6 +74,10 @@ model UserProfile {
 
   favorites Favorite[]
 
+  // Saved providers (catalog hearts) — separate from `favorites` which holds
+  // portfolio-item bookmarks. See UserFavorite in favorite.prisma.
+  providerFavorites UserFavorite[]
+
   modelApplications ModelApplication[]
 
   clientNotes ClientNote[] @relation("ClientNotesForClient")

@@ -8,12 +8,30 @@ type Props = {
   active?: boolean;
   className?: string;
   icon?: ElementType;
+  /** Optional unread / item count rendered as a small pill on the right. Hidden when 0 or undefined. */
+  badge?: number;
+  /** A11y label for the badge (e.g. "3 элемента в избранном"). Falls back to a generic count phrase. */
+  badgeAriaLabel?: string;
+  /** Open the link in a new tab. Adds `rel="noopener noreferrer"` automatically when set to `_blank`. */
+  target?: "_blank" | "_self";
 };
 
-export function SidebarItem({ href, label, active = false, className, icon: Icon }: Props) {
+export function SidebarItem({
+  href,
+  label,
+  active = false,
+  className,
+  icon: Icon,
+  badge,
+  badgeAriaLabel,
+  target,
+}: Props) {
+  const hasBadge = typeof badge === "number" && badge > 0;
   return (
     <Link
       href={href}
+      target={target}
+      rel={target === "_blank" ? "noopener noreferrer" : undefined}
       className={cn(
         "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
         active
@@ -30,7 +48,20 @@ export function SidebarItem({ href, label, active = false, className, icon: Icon
           )}
         />
       ) : null}
-      {label}
+      <span className="flex-1 truncate">{label}</span>
+      {hasBadge ? (
+        <span
+          aria-label={badgeAriaLabel ?? `${badge}`}
+          className={cn(
+            "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-mono font-medium tabular-nums",
+            active
+              ? "bg-primary text-white"
+              : "bg-bg-input text-text-sec"
+          )}
+        >
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }

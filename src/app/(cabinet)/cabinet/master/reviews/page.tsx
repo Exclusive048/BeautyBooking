@@ -1,22 +1,16 @@
-import { redirect } from "next/navigation";
-import { MasterReviewsPage } from "@/features/master/components/master-reviews-page";
-import { getSessionUser } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MasterReviewsPage } from "@/features/master/components/reviews/master-reviews-page";
 
-export default async function MasterReviewsRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+type SearchParams = Record<string, string | string[] | undefined>;
 
-  const masterId = await getCurrentMasterProviderId(user.id);
-
-  return (
-    <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold">{UI_TEXT.master.reviews.title}</h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.master.reviews.subtitle}</p>
-      </header>
-      <MasterReviewsPage masterId={masterId} />
-    </section>
-  );
+/**
+ * `/cabinet/master/reviews` — reviews surface for masters (28a). Reads
+ * `?filter=` for chip selection; everything else is server-rendered with
+ * a small client island per card for the reply form + report modal.
+ */
+export default async function MasterReviewsRoute({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
+  return <MasterReviewsPage searchParams={searchParams} />;
 }

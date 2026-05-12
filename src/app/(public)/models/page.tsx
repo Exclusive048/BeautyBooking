@@ -1,27 +1,32 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { listModelOfferFilters, listPublicModelOffers } from "@/lib/model-offers/public.service";
-import { ModelsHero } from "@/features/model-offers/components/models-hero";
-import { ModelsFilterChips } from "@/features/model-offers/components/models-filter-chips";
-import { ModelOfferCard } from "@/features/model-offers/components/model-offer-card";
-import { ModelsEmptyState } from "@/features/model-offers/components/models-empty-state";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
+import { CategoryFilter } from "@/features/model-offers/components/category-filter";
+import { EducationalSections } from "@/features/model-offers/components/educational-sections";
+import { EmptyState } from "@/features/model-offers/components/empty-state";
+import { ModelsTopBlock } from "@/features/model-offers/components/models-top-block";
+import { OfferCard } from "@/features/model-offers/components/offer-card";
+import { listModelOfferFilters, listPublicModelOffers } from "@/lib/model-offers/public.service";
+import { getServerCity } from "@/lib/cities/server-city";
+import { getModelOfferUserState } from "@/lib/model-offers/user-state";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: UI_TEXT.pages.models.title,
-  description: UI_TEXT.pages.models.description,
+  title: "Для моделей — МастерРядом",
+  description:
+    "Услуги со скидкой за участие в практике мастера. Каждый оффер показывает время услуги, время на контент и фото.",
   alternates: { canonical: "/models" },
 };
 
 type PageProps = {
   searchParams: Promise<{
     categoryId?: string;
-    city?: string;
     page?: string;
   }>;
 };
+
+const T = UI_TEXT.models;
 
 function parsePage(value: string | undefined): number {
   if (!value) return 1;
@@ -30,14 +35,19 @@ function parsePage(value: string | undefined): number {
   return parsed;
 }
 
-function buildPageHref(input: {
-  page: number;
-  categoryId?: string;
-  city?: string;
-}): string {
+function formatCount(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return T.list.countLabelOne.replace("{count}", String(count));
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return T.list.countLabelFew.replace("{count}", String(count));
+  }
+  return T.list.countLabelMany.replace("{count}", String(count));
+}
+
+function buildPageHref(input: { page: number; categoryId?: string }): string {
   const params = new URLSearchParams();
   if (input.categoryId) params.set("categoryId", input.categoryId);
-  if (input.city) params.set("city", input.city);
   if (input.page > 1) params.set("page", String(input.page));
   const query = params.toString();
   return query ? `/models?${query}` : "/models";
@@ -46,98 +56,86 @@ function buildPageHref(input: {
 export default async function ModelsPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;
   const categoryId = resolvedParams?.categoryId?.trim() || undefined;
-  const city = resolvedParams?.city?.trim() || undefined;
   const page = parsePage(resolvedParams?.page);
   const limit = 12;
 
-  const [{ categories, citySuggestions }, offers] = await Promise.all([
+  const currentCity = await getServerCity();
+
+  const [{ categories }, offers, userState] = await Promise.all([
     listModelOfferFilters(),
-    listPublicModelOffers({ categoryId, city, page, limit }),
+    listPublicModelOffers({
+      categoryId,
+      cityId: currentCity?.id,
+      page,
+      limit,
+    }),
+    getModelOfferUserState(),
   ]);
 
-  const isFiltered = Boolean(categoryId || city);
+  const cityName = currentCity?.name ?? null;
+  const listTitle = cityName
+    ? T.list.titleWithCity.replace("{city}", cityName)
+    : T.list.titleAllCities;
 
   return (
-    <div className="min-h-dvh bg-background">
-      {/* Hero */}
-      <ModelsHero />
+    <MarketingLayout>
+      <ModelsTopBlock userState={userState}>
+        <EducationalSections />
+      </ModelsTopBlock>
 
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16">
-        {/* City search form */}
-        <form
-          method="get"
-          action="/models"
-          className="mb-6 flex items-end gap-3 rounded-2xl border border-border bg-card/80 p-4"
-        >
-          <label className="flex-1 text-xs font-medium text-muted-foreground">
-            <span className="mb-1.5 block">{UI_TEXT.pages.models.cityLabel}</span>
-            <Input
-              name="city"
-              list="model-offer-city-options"
-              defaultValue={city ?? ""}
-              placeholder={UI_TEXT.pages.models.cityPlaceholder}
-            />
-            <datalist id="model-offer-city-options">
-              {citySuggestions.map((cityOption) => (
-                <option key={cityOption} value={cityOption} />
-              ))}
-            </datalist>
-          </label>
-          {/* Preserve categoryId on city submit */}
-          {categoryId ? (
-            <input type="hidden" name="categoryId" value={categoryId} />
+      <section id="offers" className="mx-auto max-w-[1280px] scroll-mt-20 px-4 py-12 lg:py-16">
+        <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="font-display text-2xl text-text-main lg:text-3xl">{listTitle}</h2>
+          {offers.items.length > 0 ? (
+            <p className="text-sm text-text-sec tabular-nums">{formatCount(offers.items.length)}</p>
           ) : null}
-          <Button type="submit" variant="primary" className="shrink-0">
-            {UI_TEXT.pages.models.submit}
-          </Button>
-        </form>
+        </div>
 
-        {/* Category filter chips */}
         {categories.length > 0 ? (
           <div className="mb-8">
-            <ModelsFilterChips
-              categories={categories}
-              activeCategoryId={categoryId}
-              city={city}
-            />
+            <CategoryFilter categories={categories} activeCategoryId={categoryId} />
           </div>
         ) : null}
 
-        {/* Offer grid */}
         {offers.items.length === 0 ? (
-          <ModelsEmptyState isFiltered={isFiltered} />
+          <EmptyState cityName={cityName} />
         ) : (
           <>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {offers.items.map((offer, i) => (
-                <ModelOfferCard key={offer.publicCode} offer={offer} index={i} />
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {offers.items.map((offer) => (
+                <OfferCard key={offer.publicCode} offer={offer} />
               ))}
             </div>
 
-            {/* Pagination */}
-            {(page > 1 || offers.nextPage) ? (
-              <div className="mt-10 flex items-center justify-center gap-3">
+            {page > 1 || offers.nextPage ? (
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                 {page > 1 ? (
-                  <Link
-                    href={buildPageHref({ page: page - 1, categoryId, city })}
-                    className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    {UI_TEXT.pages.models.paginationPrev}
-                  </Link>
+                  <Button asChild variant="secondary">
+                    <Link href={buildPageHref({ page: page - 1, categoryId })}>← Назад</Link>
+                  </Button>
                 ) : null}
                 {offers.nextPage ? (
-                  <Link
-                    href={buildPageHref({ page: offers.nextPage, categoryId, city })}
-                    className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    {UI_TEXT.pages.models.paginationNext}
-                  </Link>
+                  <Button asChild variant="secondary">
+                    <Link href={buildPageHref({ page: offers.nextPage, categoryId })}>Вперёд →</Link>
+                  </Button>
                 ) : null}
               </div>
             ) : null}
           </>
         )}
-      </div>
-    </div>
+      </section>
+
+      <section className="bg-bg-card/50 py-16 lg:py-20">
+        <div className="mx-auto max-w-3xl px-4 text-center">
+          <h2 className="mb-3 font-display text-2xl text-text-main">{T.forMasters.title}</h2>
+          <p className="mx-auto mb-6 max-w-xl leading-relaxed text-text-sec">
+            {T.forMasters.description}
+          </p>
+          <Button asChild variant="primary" size="lg">
+            <Link href="/cabinet/master/model-offers">{T.forMasters.cta}</Link>
+          </Button>
+        </div>
+      </section>
+    </MarketingLayout>
   );
 }

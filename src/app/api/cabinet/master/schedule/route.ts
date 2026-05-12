@@ -1,7 +1,9 @@
-import { StudioRole } from "@prisma/client";
+import { StudioRole, SubscriptionScope } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { createFeatureGateError } from "@/lib/billing/guards";
 import { cancelBooking } from "@/lib/bookings/cancelBooking";
 import { resolveBookingRuntimeStatus, type BookingRuntimeStatus } from "@/lib/bookings/flow";
 import { getRequestId, logError } from "@/lib/logging/logger";
@@ -15,13 +17,20 @@ import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import {
   applyScheduleSnapshot,
   buildScheduleSnapshot,
+  normalizeBookingRules,
   normalizeExceptionInput,
+  normalizeHotSlots,
+  normalizeSlotStepMin,
+  normalizeVisibility,
   normalizeWeekScheduleInput,
   serializeScheduleState,
   toScheduleEditorRequestPayload,
+  type BookingRulesDto,
   type DayScheduleDto,
   type EditorExceptionInput,
+  type HotSlotsDto,
   type ScheduleEditorSnapshot,
+  type VisibilityDto,
 } from "@/lib/schedule/editor";
 import { ensureStudioRole } from "@/lib/studio/access";
 import {
@@ -34,9 +43,24 @@ export const runtime = "nodejs";
 
 type PatchBody = {
   weekSchedule?: unknown;
+  /** Single-row exception path used by the legacy editor (studio cabinet). */
   exception?: unknown;
   deleteException?: unknown;
   dayOffConflictResolution?: unknown;
+  slotStepMin?: unknown;
+  bookingRules?: unknown;
+  visibility?: unknown;
+  /** `null` = toggle off, object = toggle on + values, omitted = no change. */
+  hotSlots?: unknown;
+  /** Full-list exception replacement used by the new Exceptions tab. */
+  bookingExceptions?: unknown;
+  bufferBetweenBookingsMin?: unknown;
+};
+
+type SettingsPatch = {
+  bookingRules: BookingRulesDto | undefined;
+  visibility: VisibilityDto | undefined;
+  hotSlots: HotSlotsDto | null | undefined;
 };
 
 type DayOffConflictResolution = {
@@ -304,9 +328,39 @@ function buildNormalizedState(input: {
         endTime: item.endTime,
         breaks: item.breaks,
         fixedSlotTimes: item.fixedSlotTimes,
+        note: item.note ?? null,
       }))
       .sort((left, right) => left.date.localeCompare(right.date)),
   };
+}
+
+function readSettingsPatch(snapshot: ScheduleEditorSnapshot, body: PatchBody): SettingsPatch {
+  const bookingRules =
+    body.bookingRules !== undefined
+      ? normalizeBookingRules(body.bookingRules, snapshot.bookingRules)
+      : undefined;
+  const visibility =
+    body.visibility !== undefined ? normalizeVisibility(body.visibility, snapshot.visibility) : undefined;
+  let hotSlots: HotSlotsDto | null | undefined;
+  if (body.hotSlots === null) {
+    hotSlots = null;
+  } else if (body.hotSlots !== undefined) {
+    hotSlots = normalizeHotSlots(body.hotSlots);
+  }
+  return { bookingRules, visibility, hotSlots };
+}
+
+function settingsChanged(snapshot: ScheduleEditorSnapshot, patch: SettingsPatch): boolean {
+  if (patch.bookingRules && JSON.stringify(patch.bookingRules) !== JSON.stringify(snapshot.bookingRules)) {
+    return true;
+  }
+  if (patch.visibility && JSON.stringify(patch.visibility) !== JSON.stringify(snapshot.visibility)) {
+    return true;
+  }
+  if (patch.hotSlots !== undefined && JSON.stringify(patch.hotSlots) !== JSON.stringify(snapshot.hotSlots)) {
+    return true;
+  }
+  return false;
 }
 
 function applyPatchToState(
@@ -315,13 +369,31 @@ function applyPatchToState(
 ): {
   weekSchedule: DayScheduleDto[];
   exceptions: EditorExceptionInput[];
+  slotStepMin: number;
+  bufferBetweenBookingsMin: number;
 } {
   const current = buildCurrentState(snapshot);
   let nextWeek = current.weekSchedule;
   let nextExceptions = [...current.exceptions];
+  let nextSlotStep = snapshot.slotStepMin;
+  let nextBuffer = snapshot.bufferBetweenBookingsMin;
 
   if (body.weekSchedule !== undefined) {
     nextWeek = normalizeWeekScheduleInput(body.weekSchedule);
+  }
+
+  // Full-list replacement (new path used by Exceptions tab). Keys earlier
+  // legacy single-row mutations are applied on top of this.
+  if (body.bookingExceptions !== undefined) {
+    if (!Array.isArray(body.bookingExceptions)) {
+      throw new AppError("Invalid body", 400, "INVALID_BODY");
+    }
+    nextExceptions = body.bookingExceptions.map((raw) => {
+      const normalized = normalizeExceptionInput(raw);
+      // The new path doesn't carry stable IDs from the client; matching by
+      // date is sufficient because date is unique per provider.
+      return { ...normalized, id: undefined };
+    });
   }
 
   if (body.exception !== undefined) {
@@ -341,10 +413,22 @@ function applyPatchToState(
     nextExceptions = nextExceptions.filter((item) => item.id !== deleteId);
   }
 
-  return buildNormalizedState({
-    weekSchedule: nextWeek,
-    exceptions: nextExceptions,
-  });
+  if (body.slotStepMin !== undefined) {
+    nextSlotStep = normalizeSlotStepMin(body.slotStepMin);
+  }
+
+  if (body.bufferBetweenBookingsMin !== undefined) {
+    if (typeof body.bufferBetweenBookingsMin !== "number") {
+      throw new AppError("Invalid body", 400, "INVALID_BODY");
+    }
+    nextBuffer = body.bufferBetweenBookingsMin;
+  }
+
+  return {
+    ...buildNormalizedState({ weekSchedule: nextWeek, exceptions: nextExceptions }),
+    slotStepMin: nextSlotStep,
+    bufferBetweenBookingsMin: nextBuffer,
+  };
 }
 
 async function loadStudioMasterStatus(providerId: string): Promise<{
@@ -477,7 +561,32 @@ export async function PATCH(req: Request) {
     const currentSnapshot = await buildScheduleSnapshot(actor.providerId);
     const currentState = buildNormalizedState(buildCurrentState(currentSnapshot));
     const nextState = applyPatchToState(currentSnapshot, body);
-    const hasChanges = serializeScheduleState(currentState) !== serializeScheduleState(nextState);
+    const slotStepChanged = nextState.slotStepMin !== currentSnapshot.slotStepMin;
+    const bufferChanged =
+      nextState.bufferBetweenBookingsMin !== currentSnapshot.bufferBetweenBookingsMin;
+    const settingsPatch = readSettingsPatch(currentSnapshot, body);
+    const settingsChangedNow = settingsChanged(currentSnapshot, settingsPatch);
+    const hasChanges =
+      serializeScheduleState(currentState) !== serializeScheduleState(nextState) ||
+      slotStepChanged ||
+      bufferChanged ||
+      settingsChangedNow;
+
+    // Hot Slots are PRO+ only. Frontend hides the toggle for non-PRO plans
+    // but the backend re-checks here in case the request was crafted by
+    // hand. STUDIO_MASTER never reaches this branch (their flow uses the
+    // change-request payload, which doesn't carry hotSlots).
+    const hotSlotsTouched =
+      settingsPatch.hotSlots !== undefined &&
+      JSON.stringify(settingsPatch.hotSlots) !== JSON.stringify(currentSnapshot.hotSlots);
+    if (hotSlotsTouched && actor.mode !== "STUDIO_MASTER") {
+      const scope =
+        actor.mode === "STUDIO_ADMIN" ? SubscriptionScope.STUDIO : SubscriptionScope.MASTER;
+      const plan = await getCurrentPlan(user.id, scope);
+      if (!plan.features.hotSlots) {
+        throw createFeatureGateError("hotSlots", "PRO");
+      }
+    }
 
     if (!hasChanges) {
       const data = await buildResponse({
@@ -536,7 +645,15 @@ export async function PATCH(req: Request) {
       return jsonOk(data);
     }
 
-    await applyScheduleSnapshot(actor.providerId, nextState);
+    await applyScheduleSnapshot(actor.providerId, {
+      weekSchedule: nextState.weekSchedule,
+      exceptions: nextState.exceptions,
+      slotStepMin: nextState.slotStepMin,
+      bufferBetweenBookingsMin: nextState.bufferBetweenBookingsMin,
+      bookingRules: settingsPatch.bookingRules,
+      visibility: settingsPatch.visibility,
+      hotSlots: settingsPatch.hotSlots,
+    });
 
     if (actor.mode === "STUDIO_ADMIN" && actor.studioProviderId) {
       try {

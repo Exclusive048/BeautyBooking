@@ -118,7 +118,7 @@ export function HotSlotsPageClient() {
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-text-main">Скидки на завтра</h1>
         <p className="text-sm text-text-sec">
-          Выбирайте ближайшие свободные слоты с автоматической скидкой.
+          Выбирайте ближайшие свободные окошки с автоматической скидкой.
         </p>
       </div>
 

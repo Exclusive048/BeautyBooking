@@ -1,357 +1,56 @@
-import { ScheduleMode } from "@prisma/client";
+import { ScheduleMode, type Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
-import { parseDateKeyParts } from "@/lib/schedule/dateKey";
+import {
+  AUTO_TEMPLATE_PREFIX,
+  buildDefaultWeekSchedule,
+  mapTemplateForDay,
+  normalizeBufferMin,
+  normalizeExceptionInput,
+  normalizeFixedSlotTimes,
+  normalizeSlotStepMin,
+  normalizeWeekScheduleInput,
+  parseDateKeyToUtcStart,
+  signatureHash,
+  WEEK_TEMPLATE_OPTIONS,
+  type BookingRulesDto,
+  type BreakDto,
+  type DayScheduleDto,
+  type EditorExceptionInput,
+  type HotSlotApplyMode,
+  type HotSlotsDto,
+  type LateCancelAction,
+  type ScheduleEditorSnapshot,
+  type ScheduleExceptionDto,
+  type SlotPrecision,
+  type VisibilityDto,
+} from "@/lib/schedule/editor-shared";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
-export type BreakDto = {
-  start: string;
-  end: string;
-};
+/**
+ * Server-only orchestration for schedule edits. The pure types/helpers
+ * live in `./editor-shared` (client-safe); this module adds the Prisma
+ * reads/writes and Redis cache invalidation. Anything that runs in a
+ * client bundle MUST import from `./editor-shared` instead — otherwise
+ * the import chain drags `@redis/client` (Node `net`) into the browser
+ * build. See [editor-shared.ts](./editor-shared.ts) header for context.
+ *
+ * For backwards compatibility every public symbol from `editor-shared`
+ * is re-exported below so existing server callers (API routes, legacy
+ * studio editor) keep their `import { ... } from "@/lib/schedule/editor"`
+ * paths working unchanged.
+ */
+export * from "@/lib/schedule/editor-shared";
 
-export type DayScheduleDto = {
-  dayOfWeek: number; // 0=Mon ... 6=Sun
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  startTime: string;
-  endTime: string;
-  breaks: BreakDto[];
-  fixedSlotTimes: string[];
-};
+// Private to the snapshot builder — kept local since they're tiny.
+const LATE_CANCEL_ACTIONS: readonly LateCancelAction[] = ["none", "reminder", "fine"];
+const SLOT_PRECISIONS: readonly SlotPrecision[] = ["exact", "today_free", "date_only"];
 
-export type ScheduleExceptionDto = {
-  id: string;
-  date: string; // YYYY-MM-DD
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  startTime: string | null;
-  endTime: string | null;
-  breaks: BreakDto[];
-  fixedSlotTimes: string[];
-};
-
-export type WeekTemplateDto = {
-  id: "standard" | "2x2";
-  label: string;
-};
-
-export type ScheduleEditorSnapshot = {
-  timezone: string;
-  weekSchedule: DayScheduleDto[];
-  exceptions: ScheduleExceptionDto[];
-  templates: WeekTemplateDto[];
-};
-
-export type ScheduleEditorRequestPayload = {
-  format: "EDITOR_V1";
-  weekSchedule: DayScheduleDto[];
-  exceptions: EditorExceptionInput[];
-};
-
-export type NormalizedScheduleState = {
-  weekSchedule: DayScheduleDto[];
-  exceptions: EditorExceptionInput[];
-};
-
-export type EditorExceptionInput = {
-  date: string;
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  startTime: string | null;
-  endTime: string | null;
-  breaks: BreakDto[];
-  fixedSlotTimes: string[];
-};
-
-const AUTO_TEMPLATE_PREFIX = "__editor_auto_";
-const DEFAULT_FLEX_START = "09:00";
-const DEFAULT_FLEX_END = "20:00";
-export const FIXED_RANGE_START = "00:00";
-export const FIXED_RANGE_END = "23:55";
-
-export const WEEK_TEMPLATE_OPTIONS: WeekTemplateDto[] = [
-  { id: "standard", label: "Стандартная пятидневка" },
-  { id: "2x2", label: "2 через 2" },
-];
-
-function normalizeTime(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(trimmed);
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
-    return null;
-  }
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function timeToMinutes(value: string): number {
-  const [hourRaw, minuteRaw] = value.split(":");
-  return Number(hourRaw) * 60 + Number(minuteRaw);
-}
-
-function normalizeFixedSlotTimes(values: unknown): string[] {
-  if (!Array.isArray(values)) return [];
-  const unique = new Set<string>();
-  for (const value of values) {
-    const normalized = normalizeTime(value);
-    if (normalized) unique.add(normalized);
-  }
-  return Array.from(unique).sort((left, right) => left.localeCompare(right));
-}
-
-function normalizeBreaks(values: unknown, startTime: string, endTime: string): BreakDto[] {
-  if (!Array.isArray(values)) return [];
-  const startLimit = timeToMinutes(startTime);
-  const endLimit = timeToMinutes(endTime);
-  const rows = values
-    .map((value) => {
-      if (!value || typeof value !== "object") return null;
-      const row = value as Record<string, unknown>;
-      const start = normalizeTime(row.start);
-      const end = normalizeTime(row.end);
-      if (!start || !end) return null;
-      const startMinutes = timeToMinutes(start);
-      const endMinutes = timeToMinutes(end);
-      if (startMinutes >= endMinutes) return null;
-      if (startMinutes <= startLimit || endMinutes >= endLimit) return null;
-      return { start, end, startMinutes, endMinutes };
-    })
-    .filter((value): value is { start: string; end: string; startMinutes: number; endMinutes: number } =>
-      Boolean(value)
-    )
-    .sort((left, right) => left.startMinutes - right.startMinutes);
-
-  for (let index = 1; index < rows.length; index += 1) {
-    if (rows[index].startMinutes < rows[index - 1].endMinutes) {
-      throw new AppError("Breaks overlap", 400, "BREAK_OVERLAP");
-    }
-  }
-  return rows.map((row) => ({ start: row.start, end: row.end }));
-}
-
-function parseDateKeyToUtcStart(dateKey: string): Date {
-  const parts = parseDateKeyParts(dateKey);
-  if (!parts) {
-    throw new AppError("Invalid date", 400, "DATE_INVALID");
-  }
-  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0));
-}
-
-function parseScheduleMode(value: unknown): "FLEXIBLE" | "FIXED" {
-  return value === "FIXED" ? "FIXED" : "FLEXIBLE";
-}
-
-export function buildDefaultWeekSchedule(): DayScheduleDto[] {
-  return Array.from({ length: 7 }, (_, dayOfWeek) => ({
-    dayOfWeek,
-    isWorkday: dayOfWeek <= 4,
-    scheduleMode: "FLEXIBLE" as const,
-    startTime: DEFAULT_FLEX_START,
-    endTime: DEFAULT_FLEX_END,
-    breaks: [],
-    fixedSlotTimes: [],
-  }));
-}
-
-export function normalizeWeekScheduleInput(value: unknown): DayScheduleDto[] {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new AppError("Invalid body", 400, "INVALID_BODY");
-  }
-
-  const byDay = new Map<number, DayScheduleDto>();
-  for (const row of value) {
-    if (!row || typeof row !== "object") {
-      throw new AppError("Invalid body", 400, "INVALID_BODY");
-    }
-
-    const record = row as Record<string, unknown>;
-    const dayOfWeekRaw = record.dayOfWeek;
-    if (typeof dayOfWeekRaw !== "number" || !Number.isInteger(dayOfWeekRaw) || dayOfWeekRaw < 0 || dayOfWeekRaw > 6) {
-      throw new AppError("Invalid day of week", 400, "DAY_INVALID");
-    }
-    const dayOfWeek = dayOfWeekRaw as number;
-    if (byDay.has(dayOfWeek)) {
-      throw new AppError("Duplicate day", 400, "VALIDATION_ERROR");
-    }
-
-    const scheduleMode = parseScheduleMode(record.scheduleMode);
-    const isWorkday = Boolean(record.isWorkday);
-    const fixedSlotTimes = normalizeFixedSlotTimes(record.fixedSlotTimes);
-    const fallbackStart = scheduleMode === "FIXED" ? FIXED_RANGE_START : DEFAULT_FLEX_START;
-    const fallbackEnd = scheduleMode === "FIXED" ? FIXED_RANGE_END : DEFAULT_FLEX_END;
-    const startTime = normalizeTime(record.startTime) ?? fallbackStart;
-    const endTime = normalizeTime(record.endTime) ?? fallbackEnd;
-    if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-      throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
-    }
-    const breaks =
-      isWorkday && scheduleMode === "FLEXIBLE"
-        ? normalizeBreaks(record.breaks, startTime, endTime)
-        : [];
-
-    byDay.set(dayOfWeek, {
-      dayOfWeek,
-      isWorkday,
-      scheduleMode,
-      startTime,
-      endTime,
-      breaks,
-      fixedSlotTimes,
-    });
-  }
-
-  if (byDay.size !== 7) {
-    throw new AppError("Week schedule must contain 7 days", 400, "VALIDATION_ERROR");
-  }
-
-  return Array.from({ length: 7 }, (_, dayOfWeek) => {
-    const day = byDay.get(dayOfWeek);
-    if (!day) {
-      throw new AppError("Week schedule must contain 7 days", 400, "VALIDATION_ERROR");
-    }
-    return day;
-  });
-}
-
-export function normalizeExceptionInput(value: unknown): EditorExceptionInput {
-  if (!value || typeof value !== "object") {
-    throw new AppError("Invalid body", 400, "INVALID_BODY");
-  }
-  const record = value as Record<string, unknown>;
-  if (typeof record.date !== "string") {
-    throw new AppError("Invalid date", 400, "DATE_INVALID");
-  }
-
-  const scheduleMode = parseScheduleMode(record.scheduleMode);
-  const isWorkday = Boolean(record.isWorkday);
-  const fixedSlotTimes = normalizeFixedSlotTimes(record.fixedSlotTimes);
-  const startTime = normalizeTime(record.startTime);
-  const endTime = normalizeTime(record.endTime);
-
-  if (isWorkday && scheduleMode === "FLEXIBLE") {
-    if (!startTime || !endTime || timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-      throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
-    }
-  }
-
-  const normalizedStart = scheduleMode === "FIXED" ? FIXED_RANGE_START : startTime;
-  const normalizedEnd = scheduleMode === "FIXED" ? FIXED_RANGE_END : endTime;
-
-  return {
-    date: record.date,
-    isWorkday,
-    scheduleMode,
-    startTime: normalizedStart,
-    endTime: normalizedEnd,
-    breaks:
-      isWorkday && scheduleMode === "FLEXIBLE" && normalizedStart && normalizedEnd
-        ? normalizeBreaks(record.breaks, normalizedStart, normalizedEnd)
-        : [],
-    fixedSlotTimes,
-  };
-}
-
-function normalizeExceptionList(values: unknown): EditorExceptionInput[] {
-  if (!Array.isArray(values)) return [];
-  const byDate = new Map<string, EditorExceptionInput>();
-  for (const item of values) {
-    const normalized = normalizeExceptionInput(item);
-    byDate.set(normalized.date, normalized);
-  }
-  return Array.from(byDate.values()).sort((left, right) => left.date.localeCompare(right.date));
-}
-
-export function normalizeScheduleState(input: {
-  weekSchedule: unknown;
-  exceptions: unknown;
-}): NormalizedScheduleState {
-  return {
-    weekSchedule: normalizeWeekScheduleInput(input.weekSchedule),
-    exceptions: normalizeExceptionList(input.exceptions),
-  };
-}
-
-export function serializeScheduleState(state: NormalizedScheduleState): string {
-  const weekSchedule = state.weekSchedule.map((day) => ({
-    dayOfWeek: day.dayOfWeek,
-    isWorkday: day.isWorkday,
-    scheduleMode: day.scheduleMode,
-    startTime: day.startTime,
-    endTime: day.endTime,
-    breaks: day.breaks
-      .map((entry) => ({ start: entry.start, end: entry.end }))
-      .sort((left, right) => left.start.localeCompare(right.start)),
-    fixedSlotTimes: normalizeFixedSlotTimes(day.fixedSlotTimes),
-  }));
-
-  const exceptions = state.exceptions
-    .map((item) => ({
-      date: item.date,
-      isWorkday: item.isWorkday,
-      scheduleMode: item.scheduleMode,
-      startTime: item.startTime,
-      endTime: item.endTime,
-      breaks: item.breaks
-        .map((entry) => ({ start: entry.start, end: entry.end }))
-        .sort((left, right) => left.start.localeCompare(right.start)),
-      fixedSlotTimes: normalizeFixedSlotTimes(item.fixedSlotTimes),
-    }))
-    .sort((left, right) => left.date.localeCompare(right.date));
-
-  return JSON.stringify({ weekSchedule, exceptions });
-}
-
-export function toScheduleEditorRequestPayload(state: NormalizedScheduleState): ScheduleEditorRequestPayload {
-  return {
-    format: "EDITOR_V1",
-    weekSchedule: state.weekSchedule,
-    exceptions: state.exceptions,
-  };
-}
-
-export function isScheduleEditorRequestPayload(value: unknown): value is ScheduleEditorRequestPayload {
-  if (!value || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
-  return record.format === "EDITOR_V1" && Array.isArray(record.weekSchedule) && Array.isArray(record.exceptions);
-}
-
-export function normalizeScheduleEditorRequestPayload(value: unknown): NormalizedScheduleState {
-  if (!isScheduleEditorRequestPayload(value)) {
-    throw new AppError("Invalid schedule payload", 400, "INVALID_BODY");
-  }
-  return normalizeScheduleState({
-    weekSchedule: value.weekSchedule,
-    exceptions: value.exceptions,
-  });
-}
-
-function mapTemplateForDay(record: {
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  startTime: string;
-  endTime: string;
-  breaks: BreakDto[];
-}) {
-  const startLocal = record.scheduleMode === "FIXED" ? FIXED_RANGE_START : record.startTime;
-  const endLocal = record.scheduleMode === "FIXED" ? FIXED_RANGE_END : record.endTime;
-  const breaks = record.scheduleMode === "FIXED" ? [] : record.breaks;
-  return { startLocal, endLocal, breaks };
-}
-
-function signatureHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash >>> 0).toString(36);
-}
-
-async function saveWeekSchedule(providerId: string, weekSchedule: DayScheduleDto[]): Promise<void> {
+async function saveWeekSchedule(
+  providerId: string,
+  weekSchedule: DayScheduleDto[]
+): Promise<void> {
   const config = await prisma.weeklyScheduleConfig.upsert({
     where: { providerId },
     update: {},
@@ -359,12 +58,23 @@ async function saveWeekSchedule(providerId: string, weekSchedule: DayScheduleDto
     select: { id: true },
   });
 
-  const signatures = new Map<string, { name: string; startLocal: string; endLocal: string; breaks: BreakDto[] }>();
+  const signatures = new Map<
+    string,
+    { name: string; startLocal: string; endLocal: string; breaks: BreakDto[] }
+  >();
   const signatureOrder: string[] = [];
   for (const day of weekSchedule) {
     if (!day.isWorkday) continue;
     const mapped = mapTemplateForDay(day);
-    const signature = `${mapped.startLocal}|${mapped.endLocal}|${JSON.stringify(mapped.breaks)}`;
+    // Title is part of the signature so two days with the same time but
+    // different break titles ("Обед" vs "Перерыв") get distinct templates
+    // — matches user intent of distinguishing recurring breaks by label.
+    const signatureBreaks = mapped.breaks.map((entry) => ({
+      start: entry.start,
+      end: entry.end,
+      title: entry.title ?? null,
+    }));
+    const signature = `${mapped.startLocal}|${mapped.endLocal}|${JSON.stringify(signatureBreaks)}`;
     if (signatures.has(signature)) continue;
     signatures.set(signature, {
       name: `${AUTO_TEMPLATE_PREFIX}${signatureHash(signature)}`,
@@ -400,6 +110,7 @@ async function saveWeekSchedule(providerId: string, weekSchedule: DayScheduleDto
           startLocal: entry.start,
           endLocal: entry.end,
           sortOrder: index,
+          title: entry.title ?? null,
         })),
       });
     }
@@ -424,7 +135,12 @@ async function saveWeekSchedule(providerId: string, weekSchedule: DayScheduleDto
       };
     }
     const mapped = mapTemplateForDay(day);
-    const signature = `${mapped.startLocal}|${mapped.endLocal}|${JSON.stringify(mapped.breaks)}`;
+    const signatureBreaks = mapped.breaks.map((entry) => ({
+      start: entry.start,
+      end: entry.end,
+      title: entry.title ?? null,
+    }));
+    const signature = `${mapped.startLocal}|${mapped.endLocal}|${JSON.stringify(signatureBreaks)}`;
     const templateId = templateIdBySignature.get(signature) ?? null;
     return {
       configId: config.id,
@@ -475,6 +191,7 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
         isActive: null,
         scheduleMode: input.scheduleMode,
         fixedSlotTimes: input.scheduleMode === "FIXED" ? input.fixedSlotTimes : [],
+        note: input.note,
       },
     });
   } else {
@@ -489,6 +206,7 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
         endLocal: input.isWorkday ? input.endTime : null,
         scheduleMode: input.scheduleMode,
         fixedSlotTimes: input.scheduleMode === "FIXED" ? input.fixedSlotTimes : [],
+        note: input.note,
       },
     });
   }
@@ -516,11 +234,36 @@ async function removeExceptionByDate(providerId: string, dateKey: string): Promi
 export async function buildScheduleSnapshot(providerId: string): Promise<ScheduleEditorSnapshot> {
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
-    select: { id: true, timezone: true },
+    select: {
+      id: true,
+      timezone: true,
+      slotStepMin: true,
+      autoConfirmBookings: true,
+      cancellationDeadlineHours: true,
+      minBookingHoursAhead: true,
+      maxBookingDaysAhead: true,
+      lateCancelAction: true,
+      slotPrecision: true,
+      visibleSlotDays: true,
+      acceptNewClients: true,
+      isPublished: true,
+      bufferBetweenBookingsMin: true,
+    },
   });
   if (!provider) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
   }
+
+  const discountRule = await prisma.discountRule.findUnique({
+    where: { providerId },
+    select: {
+      isEnabled: true,
+      triggerHours: true,
+      discountType: true,
+      discountValue: true,
+      applyMode: true,
+    },
+  });
 
   const [config, overrides, overrideBreaks] = await Promise.all([
     prisma.weeklyScheduleConfig.findUnique({
@@ -537,7 +280,9 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
               select: {
                 startLocal: true,
                 endLocal: true,
-                breaks: { select: { startLocal: true, endLocal: true, sortOrder: true } },
+                breaks: {
+                  select: { startLocal: true, endLocal: true, sortOrder: true, title: true },
+                },
               },
             },
           },
@@ -557,11 +302,14 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
         endLocal: true,
         scheduleMode: true,
         fixedSlotTimes: true,
+        note: true,
         template: {
           select: {
             startLocal: true,
             endLocal: true,
-            breaks: { select: { startLocal: true, endLocal: true, sortOrder: true } },
+            breaks: {
+              select: { startLocal: true, endLocal: true, sortOrder: true, title: true },
+            },
           },
         },
       },
@@ -581,7 +329,11 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
       day.template?.breaks
         .slice()
         .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map((item) => ({ start: item.startLocal, end: item.endLocal })) ?? [];
+        .map((item) => ({
+          start: item.startLocal,
+          end: item.endLocal,
+          title: item.title ?? null,
+        })) ?? [];
     weekSchedule[index] = {
       dayOfWeek: index,
       isWorkday: Boolean(day.isActive && day.template),
@@ -598,7 +350,7 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
     if (!row.date) continue;
     const key = toLocalDateKey(row.date, provider.timezone);
     const list = overrideBreaksByDate.get(key) ?? [];
-    list.push({ start: row.startLocal, end: row.endLocal });
+    list.push({ start: row.startLocal, end: row.endLocal, title: null });
     overrideBreaksByDate.set(key, list);
   }
 
@@ -606,16 +358,22 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
     const dateKey = toLocalDateKey(row.date, provider.timezone);
     const isWorkday = row.isWorkday ?? !row.isDayOff;
     const scheduleMode =
-      row.scheduleMode ?? (normalizeFixedSlotTimes(row.fixedSlotTimes).length > 0 ? "FIXED" : "FLEXIBLE");
+      row.scheduleMode ??
+      (normalizeFixedSlotTimes(row.fixedSlotTimes).length > 0 ? "FIXED" : "FLEXIBLE");
     const templateBreaks =
       row.template?.breaks
         .slice()
         .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map((item) => ({ start: item.startLocal, end: item.endLocal })) ?? [];
+        .map((item) => ({
+          start: item.startLocal,
+          end: item.endLocal,
+          title: item.title ?? null,
+        })) ?? [];
     const breaks = row.kind === "TEMPLATE" ? templateBreaks : overrideBreaksByDate.get(dateKey) ?? [];
 
     return {
       id: row.id,
+      note: row.note ?? null,
       date: dateKey,
       isWorkday,
       scheduleMode,
@@ -626,12 +384,144 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
     };
   });
 
+  const lateCancelAction: LateCancelAction = LATE_CANCEL_ACTIONS.includes(
+    provider.lateCancelAction as LateCancelAction
+  )
+    ? (provider.lateCancelAction as LateCancelAction)
+    : "none";
+
+  const slotPrecision: SlotPrecision = SLOT_PRECISIONS.includes(
+    provider.slotPrecision as SlotPrecision
+  )
+    ? (provider.slotPrecision as SlotPrecision)
+    : "exact";
+
+  const bookingRules: BookingRulesDto = {
+    minHoursAhead: provider.minBookingHoursAhead,
+    maxDaysAhead: provider.maxBookingDaysAhead,
+    autoConfirm: provider.autoConfirmBookings,
+    freeCancelHours: provider.cancellationDeadlineHours ?? null,
+    lateCancelAction,
+  };
+
+  const visibility: VisibilityDto = {
+    isPublished: provider.isPublished,
+    slotPrecision,
+    visibleSlotDays: provider.visibleSlotDays,
+    acceptNewClients: provider.acceptNewClients,
+  };
+
+  const hotSlots: HotSlotsDto | null =
+    discountRule && discountRule.isEnabled
+      ? {
+          triggerHours: discountRule.triggerHours,
+          discountValue: discountRule.discountValue,
+          applyMode: discountRule.applyMode as HotSlotApplyMode,
+        }
+      : null;
+
   return {
     timezone: provider.timezone,
+    slotStepMin: normalizeSlotStepMin(provider.slotStepMin),
+    bufferBetweenBookingsMin: normalizeBufferMin(provider.bufferBetweenBookingsMin),
     weekSchedule,
     exceptions,
     templates: WEEK_TEMPLATE_OPTIONS,
+    bookingRules,
+    visibility,
+    hotSlots,
   };
+}
+
+/**
+ * Atomically writes Provider settings + DiscountRule for hot slots. Runs
+ * inside `prisma.$transaction` so a half-applied state is impossible —
+ * either both Provider and DiscountRule write, or neither.
+ *
+ * Hot-slot semantics: input.hotSlots === null → toggle off (DiscountRule
+ * stays in DB but `isEnabled = false`, preserving previous tuning).
+ * input.hotSlots = object → toggle on + write values; preserves the
+ * detailed page's `minPriceFrom` / `serviceIds` if a row already exists.
+ */
+async function applyProviderAndDiscountRule(
+  providerId: string,
+  input: {
+    slotStepMin?: number;
+    bufferBetweenBookingsMin?: number;
+    bookingRules?: BookingRulesDto;
+    visibility?: VisibilityDto;
+    hotSlots?: HotSlotsDto | null;
+  }
+): Promise<void> {
+  const providerData: Prisma.ProviderUpdateInput = {};
+  if (input.slotStepMin !== undefined) {
+    providerData.slotStepMin = normalizeSlotStepMin(input.slotStepMin);
+  }
+  if (input.bufferBetweenBookingsMin !== undefined) {
+    providerData.bufferBetweenBookingsMin = normalizeBufferMin(input.bufferBetweenBookingsMin);
+  }
+  if (input.bookingRules) {
+    const rules = input.bookingRules;
+    providerData.minBookingHoursAhead = rules.minHoursAhead;
+    providerData.maxBookingDaysAhead = rules.maxDaysAhead;
+    providerData.autoConfirmBookings = rules.autoConfirm;
+    providerData.cancellationDeadlineHours = rules.freeCancelHours;
+    providerData.lateCancelAction = rules.lateCancelAction;
+  }
+  if (input.visibility) {
+    providerData.isPublished = input.visibility.isPublished;
+    providerData.slotPrecision = input.visibility.slotPrecision;
+    providerData.visibleSlotDays = input.visibility.visibleSlotDays;
+    providerData.acceptNewClients = input.visibility.acceptNewClients;
+  }
+
+  const hasProviderUpdate = Object.keys(providerData).length > 0;
+  const hasHotSlotInput = input.hotSlots !== undefined;
+
+  if (!hasProviderUpdate && !hasHotSlotInput) return;
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (hasProviderUpdate) {
+      await tx.provider.update({ where: { id: providerId }, data: providerData });
+    }
+
+    if (input.hotSlots === undefined) return;
+    const rule = input.hotSlots;
+
+    if (rule === null) {
+      const existing = await tx.discountRule.findUnique({ where: { providerId } });
+      if (existing && existing.isEnabled) {
+        await tx.discountRule.update({
+          where: { providerId },
+          data: { isEnabled: false },
+        });
+      }
+      return;
+    }
+
+    await tx.discountRule.upsert({
+      where: { providerId },
+      create: {
+        providerId,
+        isEnabled: true,
+        smartPriceEnabled: false,
+        triggerHours: rule.triggerHours,
+        discountType: "PERCENT",
+        discountValue: rule.discountValue,
+        applyMode: rule.applyMode,
+        minPriceFrom: null,
+        serviceIds: [],
+      },
+      update: {
+        isEnabled: true,
+        triggerHours: rule.triggerHours,
+        discountValue: rule.discountValue,
+        applyMode: rule.applyMode,
+        // discountType / smartPriceEnabled / minPriceFrom / serviceIds are
+        // preserved — the detailed hot-slots page owns those.
+      },
+    });
+  });
 }
 
 export async function applyScheduleSnapshot(
@@ -639,12 +529,20 @@ export async function applyScheduleSnapshot(
   input: {
     weekSchedule: DayScheduleDto[];
     exceptions: Array<Omit<ScheduleExceptionDto, "id">>;
+    slotStepMin?: number;
+    bufferBetweenBookingsMin?: number;
+    bookingRules?: BookingRulesDto;
+    visibility?: VisibilityDto;
+    /** Pass `null` to disable, an object to enable + write values. Omit to leave alone. */
+    hotSlots?: HotSlotsDto | null;
   }
 ): Promise<void> {
   const weekSchedule = normalizeWeekScheduleInput(input.weekSchedule as unknown);
   const normalizedExceptions = input.exceptions
     .map((item) => normalizeExceptionInput(item))
     .sort((left, right) => left.date.localeCompare(right.date));
+
+  await applyProviderAndDiscountRule(providerId, input);
 
   await saveWeekSchedule(providerId, weekSchedule);
 

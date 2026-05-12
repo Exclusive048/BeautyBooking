@@ -1,98 +1,73 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { BecomeMasterBanner } from "@/features/home/components/become-master-banner";
-import { HeroSection } from "@/features/home/components/hero-section";
-import { HomeFilters } from "@/features/home/components/home-filters";
-import { PortfolioGrid } from "@/features/home/components/portfolio-grid";
-import { PortfolioPreviewModal } from "@/features/home/components/portfolio-preview-modal";
-import { PortfolioStoriesBar } from "@/features/home/components/portfolio-stories-bar";
+import useSWRInfinite from "swr/infinite";
+import { Button } from "@/components/ui/button";
+import { FeedCard } from "@/features/home/components/feed-card";
+import { FeedSkeleton, FeedSkeletonGrid } from "@/features/home/components/feed-skeleton";
 import { RecentMastersSection } from "@/features/home/components/recent-masters-section";
+import { StoriesRail } from "@/features/home/components/stories-rail";
+import { StoriesViewerOverlay } from "@/features/home/components/stories-viewer-overlay";
+import { StoriesViewerProvider } from "@/features/home/stories-viewer-context";
+import { fetchJson } from "@/lib/http/client";
+import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
+import { UI_TEXT } from "@/lib/ui/text";
 
-type HomeCategory = {
-  id: string;
-  name: string;
-  slug: string;
-  icon: string | null;
-  usageCount: number;
-  parentId: string | null;
-};
-
-type CatalogCategory = {
-  id: string;
-  title: string;
-  slug: string | null;
-  icon: string | null;
-  parentId: string | null;
-  usageCount: number;
-};
-
-type HomeFeedResponse = {
+type FeedPage = {
   items: PortfolioFeedItem[];
   nextCursor: string | null;
 };
 
-const FEED_LIMIT = 24;
-const CATEGORY_CHIPS_LIMIT = 8;
-
-function buildFeedUrl(params: {
-  cursor?: string | null;
-  globalCategoryId?: string | null;
-}) {
-  const query = new URLSearchParams();
-  query.set("limit", String(FEED_LIMIT));
-  if (params.cursor) query.set("cursor", params.cursor);
-  if (params.globalCategoryId) query.set("globalCategoryId", params.globalCategoryId);
-  return `/api/home/feed?${query.toString()}`;
-}
-
 type HomeFeedProps = {
+  // Both props are accepted for compatibility with <HomePage>, but the
+  // authenticated grid does not render auth-specific content (greeting was
+  // intentionally removed). The parent already gates rendering by auth state.
   isAuthenticated: boolean;
   userName?: string | null;
 };
 
-export function HomeFeed({ isAuthenticated, userName }: HomeFeedProps) {
+const FEED_LIMIT = 24;
+
+const getKey = (pageIndex: number, previousPageData: FeedPage | null) => {
+  if (previousPageData && !previousPageData.nextCursor) return null;
+  if (pageIndex === 0) return `/api/feed/portfolio?limit=${FEED_LIMIT}`;
+  return `/api/feed/portfolio?limit=${FEED_LIMIT}&cursor=${previousPageData!.nextCursor}`;
+};
+
+const fetcher = (url: string) => fetchJson<FeedPage>(url);
+
+export function HomeFeed(props: HomeFeedProps) {
+  void props; // accepted for backward compat; see HomeFeedProps comment above
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [categories, setCategories] = useState<HomeCategory[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string | null>(
-    () => searchParams.get("category")
-  );
-  const [items, setItems] = useState<PortfolioFeedItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchFeed = useCallback(
-    async (cursor?: string | null) => {
-      const res = await fetch(
-        buildFeedUrl({
-          cursor,
-          globalCategoryId: activeCategory,
-        }),
-        { cache: "no-store" }
-      );
-      const json = (await res.json().catch(() => null)) as ApiResponse<HomeFeedResponse> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.home.loadFailed);
-      }
-      return json.data;
+  const { data, size, setSize, isLoading, error, mutate } = useSWRInfinite<FeedPage>(
+    getKey,
+    fetcher,
+    {
+      revalidateFirstPage: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      keepPreviousData: true,
     },
-    [activeCategory]
   );
 
+  const items = data?.flatMap((p) => p.items) ?? [];
+  const lastPage = data && data.length > 0 ? data[data.length - 1] : null;
+  const isReachingEnd = Boolean(lastPage && lastPage.nextCursor === null);
+  const isLoadingMore =
+    Boolean(isLoading) ||
+    (size > 0 && data !== undefined && typeof data[size - 1] === "undefined");
+
+  // Toast about deletion → strip ?deleted=1 once shown
   useEffect(() => {
     const deleted = searchParams.get("deleted");
     if (deleted !== "1") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setToast(UI_TEXT.home.accountDeleted);
     const timer = window.setTimeout(() => setToast(null), 2400);
     const next = new URLSearchParams(searchParams.toString());
@@ -102,137 +77,34 @@ export function HomeFeed({ isAuthenticated, userName }: HomeFeedProps) {
     return () => window.clearTimeout(timer);
   }, [router, searchParams]);
 
+  // Infinite scroll
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: CatalogCategory[] } | CatalogCategory[]>
-          | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : UI_TEXT.home.loadFailed);
-        }
-        const payload = Array.isArray(json.data) ? json.data : (json.data?.categories ?? []);
-        if (!cancelled) {
-          setCategories(
-            payload
-              .filter((item) => item.parentId === null)
-              .slice(0, CATEGORY_CHIPS_LIMIT)
-              .map((item) => ({
-                id: item.id,
-                name: item.title,
-                slug: item.slug ?? item.id,
-                icon: item.icon,
-                usageCount: item.usageCount,
-                parentId: item.parentId,
-              }))
-          );
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : UI_TEXT.home.loadFailed);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setItems([]);
-    setNextCursor(null);
-
-    (async () => {
-      try {
-        const data = await fetchFeed(null);
-        if (!cancelled) {
-          setItems(data.items);
-          setNextCursor(data.nextCursor);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : UI_TEXT.home.loadFailed);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchFeed]);
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const data = await fetchFeed(nextCursor);
-      setItems((prev) => [...prev, ...data.items]);
-      setNextCursor(data.nextCursor);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : UI_TEXT.home.loadFailed);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [fetchFeed, loadingMore, nextCursor]);
-
-  useEffect(() => {
-    if (!loadMoreRef.current || loading || !nextCursor) return;
-    const node = loadMoreRef.current;
+    if (!sentinelRef.current || isReachingEnd) return;
+    const node = sentinelRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          void loadMore();
+        if (entries[0]?.isIntersecting && !isLoadingMore) {
+          void setSize((prev) => prev + 1);
         }
       },
-      { rootMargin: "400px" }
+      { rootMargin: "400px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadMore, loading, nextCursor]);
+  }, [isLoadingMore, isReachingEnd, setSize]);
+
+  const isInitialLoading = isLoading && !data;
+  const isEmpty = !isInitialLoading && !error && items.length === 0;
+
+  const T = UI_TEXT.homeFeed;
 
   return (
-    <div className="space-y-6">
-      {isAuthenticated ? (
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-text-main sm:text-2xl">
-            {userName
-              ? `${UI_TEXT.home.greeting.hello}, ${userName}`
-              : UI_TEXT.home.greeting.yourFeed}
-          </h1>
-        </div>
-      ) : (
-        <HeroSection stats={null} />
-      )}
-
-      <PortfolioStoriesBar />
+    <StoriesViewerProvider>
+    <div className="space-y-8">
+      <StoriesRail />
+      <StoriesViewerOverlay />
 
       <RecentMastersSection />
-
-      <HomeFilters
-        categories={categories}
-        selectedCategoryId={activeCategory}
-        onSelectCategory={(next) => {
-          setActiveCategory(next);
-          const params = new URLSearchParams(searchParams.toString());
-          if (next) {
-            params.set("category", next);
-          } else {
-            params.delete("category");
-          }
-          const qs = params.toString();
-          router.replace(qs ? `/?${qs}` : "/", { scroll: false });
-        }}
-      />
 
       {toast ? (
         <div
@@ -243,60 +115,64 @@ export function HomeFeed({ isAuthenticated, userName }: HomeFeedProps) {
         </div>
       ) : null}
 
-      {loading ? (
-        <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="mb-4 break-inside-avoid overflow-hidden rounded-[30px] border border-border-subtle/80 bg-bg-card/95 shadow-card">
-              <div className="aspect-[3/4] w-full animate-pulse bg-muted" />
-              <div className="space-y-2 p-4">
-                <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-                <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
-              </div>
-            </div>
+      {error && !isInitialLoading ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <div>
+            <p className="font-medium">{T.error.title}</p>
+            <p className="mt-0.5 text-xs opacity-80">{T.error.description}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => void mutate()}>
+            {T.error.retry}
+          </Button>
+        </div>
+      ) : null}
+
+      {isInitialLoading ? <FeedSkeletonGrid count={9} /> : null}
+
+      {isEmpty ? (
+        <div className="mx-auto max-w-md py-20 text-center">
+          <h3 className="font-display text-2xl text-text-main">{T.empty.title}</h3>
+          <p className="mt-2 text-sm text-text-sec">{T.empty.subtitle}</p>
+          <div className="mt-6">
+            <Button asChild variant="primary" size="lg">
+              <Link href="/catalog">{T.empty.cta}</Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {!isInitialLoading && items.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5">
+          {items.map((item, index) => (
+            <FeedCard key={item.id} item={item} index={index} />
           ))}
         </div>
       ) : null}
-      {error ? (
-        <div
-          role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
-        >
-          {error}
-        </div>
-      ) : null}
-      {!loading && !error && items.length === 0 ? (
-        <div className="lux-card rounded-[24px] p-8 text-center">
-          <div className="text-base font-semibold text-text-main">{UI_TEXT.home.empty}</div>
+
+      {/* Loading next page — three skeletons in a row */}
+      {!isInitialLoading && isLoadingMore && !isReachingEnd ? (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <FeedSkeleton key={`more-${i}`} />
+          ))}
         </div>
       ) : null}
 
-      <AnimatePresence mode="wait">
-        {!loading && items.length > 0 ? (
-          <motion.div
-            key={activeCategory ?? "__all__"}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
-            <PortfolioGrid items={items} onSelect={(id) => setSelectedItemId(id)} />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {nextCursor ? (
-        <div className="flex justify-center pb-6">
-          <div ref={loadMoreRef} className="h-8 w-8" />
-        </div>
+      {/* Sentinel — only when there's more to load */}
+      {!isReachingEnd && !isInitialLoading ? (
+        <div ref={sentinelRef} className="h-1 w-full" aria-hidden />
       ) : null}
 
-      {!isAuthenticated && !loading ? <BecomeMasterBanner /> : null}
-
-      <PortfolioPreviewModal
-        itemId={selectedItemId}
-        open={Boolean(selectedItemId)}
-        onClose={() => setSelectedItemId(null)}
-      />
+      {/* End of feed */}
+      {isReachingEnd && items.length > 0 ? (
+        <p className="py-12 text-center font-display text-lg italic text-text-sec">
+          {T.end}
+        </p>
+      ) : null}
     </div>
+    </StoriesViewerProvider>
   );
 }

@@ -1,126 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
-import { calculateDiscountedPrice } from "@/lib/hot-slots/pricing";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import {
   fetchPublicServiceBookingConfig,
   uploadBookingReference,
   type ServiceBookingConfig,
 } from "@/features/booking/lib/booking-config";
-import { DateStep } from "@/features/booking/components/booking-flow/steps/date-step";
-import { TimeStep } from "@/features/booking/components/booking-flow/steps/time-step";
-import { ContactsStep } from "@/features/booking/components/booking-flow/steps/contacts-step";
-import { ConfirmStep } from "@/features/booking/components/booking-flow/steps/confirm-step";
-import { SuccessStep } from "@/features/booking/components/booking-flow/steps/success-step";
-import { BookingSummary } from "@/features/booking/components/booking-flow/booking-summary";
+import { UI_TEXT } from "@/lib/ui/text";
+import { SelectionPhase } from "@/features/booking/components/booking-flow/phases/selection-phase";
+import { FormPhase } from "@/features/booking/components/booking-flow/phases/form-phase";
+import { SuccessPhase } from "@/features/booking/components/booking-flow/phases/success-phase";
+import { ConflictPhase } from "@/features/booking/components/booking-flow/phases/conflict-phase";
+import {
+  bookingFlowReducer,
+  createInitialState,
+} from "@/features/booking/components/booking-flow/lib/flow-reducer";
+import {
+  clearBookingIdFromUrl,
+  readBookingIdFromUrl,
+  writeBookingIdToUrl,
+} from "@/features/booking/components/booking-flow/lib/url-state";
+import { toCanonicalPhone, maskRussianPhone } from "@/features/booking/components/booking-flow/lib/format-phone";
 import type {
-  BookingFlowSlot,
-  BookingFlowState,
-  BookingFlowStep,
+  ConfirmedBooking,
 } from "@/features/booking/components/booking-flow/types";
 
-const t = UI_TEXT.publicProfile.bookingFlow;
-
-const STEP_ORDER: BookingFlowStep[] = ["date", "time", "contacts", "confirm", "success"];
-
-const STEP_LABELS: Record<BookingFlowStep, string> = {
-  date: t.stepDate,
-  time: t.stepTime,
-  contacts: t.stepContacts,
-  confirm: t.stepConfirm,
-  success: "",
-};
-
-const stepVariants = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? 48 : -48,
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      duration: 0.22,
-      ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number],
-    },
-  },
-  exit: (direction: number) => ({
-    x: direction > 0 ? -48 : 48,
-    opacity: 0,
-    transition: {
-      duration: 0.16,
-      ease: [0.55, 0, 1, 0.45] as [number, number, number, number],
-    },
-  }),
-};
-
-type MeUser = { displayName: string | null; phone: string | null };
-
-function StepDot({
-  index,
-  active,
-  completed,
-  label,
-}: {
-  index: number;
-  active: boolean;
-  completed: boolean;
-  label: string;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div
-        className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition-all duration-200",
-          active
-            ? "border-primary bg-gradient-to-br from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))] shadow-sm shadow-primary/30"
-            : completed
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border-subtle bg-bg-input text-text-muted"
-        )}
-      >
-        {completed && !active ? (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path
-              d="M2 6l3 3 5-5"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : (
-          index + 1
-        )}
-      </div>
-      <span
-        className={cn(
-          "hidden text-[10px] sm:block",
-          active ? "font-semibold text-text-main" : "text-text-muted"
-        )}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function StepConnector({ completed }: { completed: boolean }) {
-  return (
-    <div
-      className={cn(
-        "mt-3.5 h-px flex-1 transition-colors duration-300",
-        completed ? "bg-primary/40" : "bg-border-subtle"
-      )}
-    />
-  );
-}
+const T = UI_TEXT.publicProfile.bookingWidget;
 
 type Props = {
   providerId: string;
@@ -130,9 +37,60 @@ type Props = {
   serviceDurationMin: number;
   providerTimezone: string;
   initialSlotStartAt?: string | null;
+  /** Optional: hint for the master-profile-back link in legacy callers (currently unused). */
   masterProfileUrl?: string;
 };
 
+type SessionUser = { displayName: string | null; phone: string | null };
+
+type RemoteBookingResponse = {
+  id: string;
+  status: string;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  clientName: string | null;
+  clientPhoneMasked: string | null;
+  service: { id: string; name: string; price: number } | null;
+  provider: {
+    id: string;
+    name: string;
+    publicUsername: string | null;
+    address: string | null;
+    timezone: string;
+  };
+};
+
+function asConfirmedBooking(
+  remote: RemoteBookingResponse,
+  isAuthenticatedUser: boolean,
+  fallback?: { serviceName: string; servicePrice: number; providerTimezone: string },
+): ConfirmedBooking | null {
+  if (!remote.startAtUtc) return null;
+  return {
+    id: remote.id,
+    status: remote.status,
+    startAtUtc: remote.startAtUtc,
+    endAtUtc: remote.endAtUtc,
+    serviceName: remote.service?.name ?? fallback?.serviceName ?? "",
+    servicePrice: remote.service?.price ?? fallback?.servicePrice ?? 0,
+    providerName: remote.provider.name,
+    providerAddress: remote.provider.address ?? null,
+    timezone: remote.provider.timezone ?? fallback?.providerTimezone ?? "UTC",
+    clientPhoneMasked: remote.clientPhoneMasked ?? null,
+    isAuthenticatedUser,
+  };
+}
+
+/**
+ * Booking widget — 4-phase flow (32b):
+ *   selection → form → success
+ *           └→ conflict ─→ selection
+ *
+ * Renames itself "BookingFlowStepper" only for import-stability with
+ * the existing 32a public profile (booking-section-client imports
+ * this symbol). Internally there's no stepper anymore — phases are a
+ * pure state machine with framer-motion crossfade between them.
+ */
 export function BookingFlowStepper({
   providerId,
   serviceId,
@@ -141,39 +99,34 @@ export function BookingFlowStepper({
   serviceDurationMin,
   providerTimezone,
   initialSlotStartAt,
-  masterProfileUrl,
 }: Props) {
-  const [state, setState] = useState<BookingFlowState>(() => {
-    let initialDateKey: string | null = null;
-    let initialStep: BookingFlowStep = "date";
-    if (initialSlotStartAt) {
-      try {
-        initialDateKey = toLocalDateKey(initialSlotStartAt, providerTimezone);
-        initialStep = "time";
-      } catch {
-        // fallback to date step
-      }
-    }
-    return {
-      step: initialStep,
-      direction: 1,
+  const idempotencyKeyRef = useRef<string>(
+    typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`,
+  );
+
+  const [state, dispatch] = useReducer(
+    bookingFlowReducer,
+    {
       serviceId,
       serviceName,
       servicePrice,
       serviceDurationMin,
-      selectedDateKey: initialDateKey,
-      selectedSlot: null,
-      clientName: "",
-      clientPhone: "",
-      comment: "",
-      silentMode: false,
-      referencePhotoAssetId: null,
-      bookingAnswers: {},
-      bookingId: null,
-    };
-  });
+      initialDateKey: initialSlotStartAt
+        ? (() => {
+            try {
+              return toLocalDateKey(initialSlotStartAt, providerTimezone);
+            } catch {
+              return null;
+            }
+          })()
+        : null,
+      prefillPhone: "",
+      prefillName: "",
+    },
+    createInitialState,
+  );
 
-  const [me, setMe] = useState<MeUser | null>(null);
+  const [me, setMe] = useState<SessionUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [bookingConfig, setBookingConfig] = useState<ServiceBookingConfig | null>(null);
   const [bookingConfigLoading, setBookingConfigLoading] = useState(false);
@@ -184,12 +137,18 @@ export function BookingFlowStepper({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Stable idempotency key for this booking session
-  const idempotencyKeyRef = useRef<string>(
-    typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`
-  );
+  // Service change in the parent — reset selection
+  const lastServiceIdRef = useRef(serviceId);
+  useEffect(() => {
+    if (lastServiceIdRef.current === serviceId) return;
+    lastServiceIdRef.current = serviceId;
+    dispatch({
+      type: "resetService",
+      serviceContext: { serviceId, serviceName, servicePrice, serviceDurationMin },
+    });
+  }, [serviceId, serviceName, servicePrice, serviceDurationMin]);
 
-  // Fetch current user
+  // Auth session — pre-fill phone + name when available
   useEffect(() => {
     let cancelled = false;
     setMeLoading(true);
@@ -197,158 +156,164 @@ export function BookingFlowStepper({
       try {
         const res = await fetch("/api/me", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as
-          | { ok: true; data: { user: MeUser | null } }
+          | { ok: true; data: { user: SessionUser | null } }
           | { ok: false }
           | null;
-        if (!cancelled) {
-          const user = json?.ok ? (json.data.user ?? null) : null;
-          setMe(user);
-          if (user?.phone) {
-            setState((prev) => ({ ...prev, clientPhone: user.phone ?? "" }));
-          }
+        if (cancelled) return;
+        const user = json?.ok ? (json.data.user ?? null) : null;
+        setMe(user);
+        if (user?.phone) {
+          dispatch({ type: "setPhone", value: user.phone.replace(/\D/g, "") });
+        }
+        if (user?.displayName?.trim()) {
+          dispatch({ type: "setName", value: user.displayName.trim() });
         }
       } finally {
         if (!cancelled) setMeLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Fetch booking config for the service
+  // ServiceBookingConfig — preserved feature (photos + custom questions)
   useEffect(() => {
-    if (!serviceId) return;
     let cancelled = false;
     setBookingConfigLoading(true);
     setBookingConfigError(null);
+    setBookingConfig(null);
+    dispatch({ type: "setReferencePhoto", assetId: null });
+    setReferencePreviewUrl(null);
+    setReferenceUploadError(null);
+
     (async () => {
       try {
         const config = await fetchPublicServiceBookingConfig(serviceId);
         if (!cancelled) setBookingConfig(config);
       } catch {
-        if (!cancelled) setBookingConfigError(UI_TEXT.publicProfile.booking.bookingConfigLoadFailed);
+        if (!cancelled) {
+          setBookingConfigError(UI_TEXT.publicProfile.booking.bookingConfigLoadFailed);
+        }
       } finally {
         if (!cancelled) setBookingConfigLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [serviceId]);
 
-  // Revoke preview URL on unmount
+  // URL `?bookingId=` hydration — show success card on refresh / share
+  useEffect(() => {
+    const id = readBookingIdFromUrl();
+    if (!id || state.phase === "success") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/public/bookings/${encodeURIComponent(id)}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          clearBookingIdFromUrl();
+          return;
+        }
+        const json = (await res.json().catch(() => null)) as
+          | { ok: true; data: { booking: RemoteBookingResponse } }
+          | { ok: false }
+          | null;
+        if (cancelled || !json?.ok) return;
+        const booking = asConfirmedBooking(json.data.booking, Boolean(me));
+        if (booking) {
+          dispatch({ type: "loadConfirmedBooking", booking });
+        }
+      } catch {
+        // Silently — user can still re-create a booking.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
+  // Revoke local preview URL on unmount
   useEffect(() => {
     return () => {
       if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl);
     };
   }, [referencePreviewUrl]);
 
-  const currentStepIdx = STEP_ORDER.indexOf(state.step);
-  const visibleSteps = STEP_ORDER.filter((s) => s !== "success");
-  const isSuccess = state.step === "success";
-
-  const goTo = useCallback((step: BookingFlowStep) => {
-    setState((prev) => {
-      const prevIdx = STEP_ORDER.indexOf(prev.step);
-      const nextIdx = STEP_ORDER.indexOf(step);
-      return { ...prev, step, direction: nextIdx >= prevIdx ? 1 : -1 };
-    });
-  }, []);
-
-  const goNext = useCallback(() => {
-    const next = STEP_ORDER[currentStepIdx + 1];
-    if (next) goTo(next);
-  }, [currentStepIdx, goTo]);
-
-  const goBack = useCallback(() => {
-    const prev = STEP_ORDER[currentStepIdx - 1];
-    if (prev) goTo(prev);
-  }, [currentStepIdx, goTo]);
-
-  const handleSelectDate = useCallback((dateKey: string) => {
-    setState((prev) => ({
-      ...prev,
-      selectedDateKey: dateKey,
-      selectedSlot: prev.selectedDateKey !== dateKey ? null : prev.selectedSlot,
-    }));
-  }, []);
-
-  const handleSelectSlot = useCallback((slot: BookingFlowSlot) => {
-    setState((prev) => ({ ...prev, selectedSlot: slot }));
-  }, []);
-
-  const handleReferenceUpload = useCallback(async (file: File) => {
-    setReferenceUploadError(null);
-    setReferenceUploading(true);
-    setState((prev) => ({ ...prev, referencePhotoAssetId: null }));
-    setReferencePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-    const result = await uploadBookingReference(file);
-    if (!result.ok) {
-      setReferenceUploadError(result.error);
-    } else {
-      setState((prev) => ({ ...prev, referencePhotoAssetId: result.assetId }));
-    }
-    setReferenceUploading(false);
-  }, []);
+  const handleReferenceUpload = useCallback(
+    async (file: File) => {
+      setReferenceUploadError(null);
+      setReferenceUploading(true);
+      dispatch({ type: "setReferencePhoto", assetId: null });
+      setReferencePreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
+      const result = await uploadBookingReference(file);
+      if (!result.ok) {
+        setReferenceUploadError(result.error);
+      } else {
+        dispatch({ type: "setReferencePhoto", assetId: result.assetId });
+      }
+      setReferenceUploading(false);
+    },
+    [],
+  );
 
   const handleSubmit = useCallback(async () => {
-    if (!state.selectedSlot || !serviceId) return;
-
+    if (!state.selectedSlot) return;
     setSubmitLoading(true);
     setSubmitError(null);
 
-    try {
-      // Validate reference photo
-      if (bookingConfig?.requiresReferencePhoto && !state.referencePhotoAssetId) {
-        setSubmitError(UI_TEXT.publicProfile.booking.referencePhotoRequired);
+    // Photo / questions validation — preserved from the legacy flow.
+    if (bookingConfig?.requiresReferencePhoto && !state.referencePhotoAssetId) {
+      setSubmitError(UI_TEXT.publicProfile.booking.referencePhotoRequired);
+      setSubmitLoading(false);
+      return;
+    }
+    if (bookingConfig?.questions?.length) {
+      const missing = bookingConfig.questions.some(
+        (q) => q.required && !state.bookingAnswers[q.id]?.trim(),
+      );
+      if (missing) {
+        setSubmitError(UI_TEXT.publicProfile.booking.requiredQuestions);
         setSubmitLoading(false);
         return;
       }
-      // Validate required questions
-      if (bookingConfig?.questions?.length) {
-        const missing = bookingConfig.questions.some(
-          (q) => q.required && !state.bookingAnswers[q.id]?.trim()
-        );
-        if (missing) {
-          setSubmitError(UI_TEXT.publicProfile.booking.requiredQuestions);
-          setSubmitLoading(false);
-          return;
-        }
-      }
+    }
 
-      const clientPhone = me?.phone?.trim() || state.clientPhone.trim();
-      if (!clientPhone) {
-        setSubmitError(UI_TEXT.publicProfile.booking.authRequiredHint);
-        setSubmitLoading(false);
-        return;
-      }
+    const sessionPhone = me?.phone?.trim();
+    const submitPhone = sessionPhone ? sessionPhone : toCanonicalPhone(state.clientPhone);
+    if (!submitPhone || submitPhone.replace(/\D/g, "").length < 10) {
+      setSubmitError(T.errorPhoneInvalid);
+      setSubmitLoading(false);
+      return;
+    }
+    const submitName =
+      state.clientName.trim() ||
+      me?.displayName?.trim() ||
+      UI_TEXT.publicProfile.booking.clientFallbackName;
+    if (!submitName) {
+      setSubmitError(T.errorNameRequired);
+      setSubmitLoading(false);
+      return;
+    }
 
-      const clientName =
-        me?.displayName?.trim() || UI_TEXT.publicProfile.booking.clientFallbackName;
-
-      const answersPayload = bookingConfig?.questions
+    const answersPayload =
+      bookingConfig?.questions
         ?.map((q) => {
-          const val = state.bookingAnswers[q.id]?.trim() ?? "";
-          if (!val) return null;
-          return { questionId: q.id, questionText: q.text, answer: val };
+          const value = state.bookingAnswers[q.id]?.trim() ?? "";
+          if (!value) return null;
+          return { questionId: q.id, questionText: q.text, answer: value };
         })
-        .filter((x): x is { questionId: string; questionText: string; answer: string } => x !== null) ?? null;
+        .filter((x): x is { questionId: string; questionText: string; answer: string } => x !== null) ?? undefined;
 
-      // Resolve price: use discounted price for hot slots
-      const effectivePrice =
-        state.selectedSlot.isHot &&
-        typeof state.selectedSlot.discountType !== "undefined" &&
-        typeof state.selectedSlot.discountValue === "number" &&
-        servicePrice > 0
-          ? calculateDiscountedPrice(
-              state.selectedSlot.discountType!,
-              state.selectedSlot.discountValue,
-              state.selectedSlot.originalPrice ?? servicePrice
-            )
-          : null;
-      void effectivePrice; // price determined server-side; included for UX clarity
-
-      const res = await fetch("/api/bookings", {
+    try {
+      const res = await fetch("/api/public/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -361,8 +326,8 @@ export function BookingFlowStepper({
           startAtUtc: state.selectedSlot.startAtUtc,
           endAtUtc: state.selectedSlot.endAtUtc,
           slotLabel: state.selectedSlot.label,
-          clientName,
-          clientPhone,
+          clientName: submitName,
+          clientPhone: submitPhone,
           comment: state.comment.trim() || null,
           silentMode: state.silentMode,
           referencePhotoAssetId: state.referencePhotoAssetId,
@@ -370,27 +335,80 @@ export function BookingFlowStepper({
         }),
       });
 
+      if (res.status === 409) {
+        dispatch({ type: "submitConflict" });
+        // Rotate idempotency key so the retry isn't treated as a duplicate.
+        idempotencyKeyRef.current =
+          typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`;
+        return;
+      }
+
       const json = (await res.json().catch(() => null)) as
         | { ok: true; data: { booking: { id: string } } }
-        | { ok: false; error: { message: string } }
+        | { ok: false; error: { code: string; message: string } }
         | null;
 
       if (!res.ok || !json || !json.ok) {
-        throw new Error(
-          json?.ok === false ? json.error.message : UI_TEXT.publicProfile.booking.submitFailed
-        );
+        const message =
+          json && !json.ok
+            ? json.error.message
+            : UI_TEXT.publicProfile.booking.submitFailed;
+        setSubmitError(message);
+        return;
       }
 
-      setState((prev) => ({
-        ...prev,
-        step: "success",
-        direction: 1,
-        bookingId: json.data.booking.id,
-      }));
-    } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : UI_TEXT.publicProfile.booking.submitFailed
-      );
+      // Hydrate the success card with the data we already have locally —
+      // saves a roundtrip on first submit. The URL refresh path will fetch
+      // /api/public/bookings/[id] for the masked phone etc.
+      const fallbackConfirmation: ConfirmedBooking = {
+        id: json.data.booking.id,
+        status: "PENDING",
+        startAtUtc: state.selectedSlot.startAtUtc,
+        endAtUtc: state.selectedSlot.endAtUtc,
+        serviceName,
+        servicePrice:
+          state.selectedSlot.isHot && typeof state.selectedSlot.discountedPrice === "number"
+            ? state.selectedSlot.discountedPrice
+            : servicePrice,
+        providerName: "", // populated by URL refresh fetch below
+        providerAddress: null,
+        timezone: providerTimezone,
+        clientPhoneMasked: maskRussianPhone(submitPhone),
+        isAuthenticatedUser: Boolean(me),
+      };
+
+      writeBookingIdToUrl(json.data.booking.id);
+      dispatch({ type: "submitSuccess", booking: fallbackConfirmation });
+
+      // Quietly fetch the safe DTO so the success card gets the
+      // provider address and proper name. Best-effort — failure leaves
+      // the fallback card intact.
+      void (async () => {
+        try {
+          const detailRes = await fetch(
+            `/api/public/bookings/${encodeURIComponent(json.data.booking.id)}`,
+            { cache: "no-store" },
+          );
+          const detail = (await detailRes.json().catch(() => null)) as
+            | { ok: true; data: { booking: RemoteBookingResponse } }
+            | { ok: false }
+            | null;
+          if (detail?.ok) {
+            const enriched = asConfirmedBooking(detail.data.booking, Boolean(me), {
+              serviceName,
+              servicePrice,
+              providerTimezone,
+            });
+            if (enriched) {
+              dispatch({ type: "loadConfirmedBooking", booking: enriched });
+            }
+          }
+        } catch {
+          /* keep fallback */
+        }
+      })();
+    } catch {
+      setSubmitError(T.errorNetwork);
     } finally {
       setSubmitLoading(false);
     }
@@ -398,203 +416,109 @@ export function BookingFlowStepper({
     bookingConfig,
     me,
     providerId,
+    providerTimezone,
     serviceId,
+    serviceName,
     servicePrice,
     state,
   ]);
 
-  // Whether "Next" is enabled for the current step
-  const canAdvance =
-    state.step === "date"
-      ? !!state.selectedDateKey
-      : state.step === "time"
-        ? !!state.selectedSlot
-        : state.step === "contacts"
-          ? !!(me?.phone || state.clientPhone.trim())
-          : state.step === "confirm"
-            ? true
-            : false;
-
-  const isFirstStep = currentStepIdx === 0;
+  const handleCancelAuthBooking = useCallback(async () => {
+    if (!state.confirmedBooking) return;
+    try {
+      const res = await fetch(
+        `/api/bookings/${encodeURIComponent(state.confirmedBooking.id)}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      if (res.ok) {
+        // After successful cancel — clear URL state and return to selection
+        // for a fresh attempt. The widget stays mounted.
+        clearBookingIdFromUrl();
+        dispatch({ type: "retryFromConflict" });
+      }
+    } catch {
+      /* surface failure quietly — user still sees their booking */
+    }
+  }, [state.confirmedBooking]);
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* ── Desktop booking summary (above steps) ── */}
-      {!isSuccess && (
-        <BookingSummary
-          step={state.step}
-          serviceName={serviceName}
-          servicePrice={servicePrice}
-          serviceDurationMin={serviceDurationMin}
-          selectedDateKey={state.selectedDateKey}
-          selectedSlot={state.selectedSlot}
-          variant="sidebar"
-          className="hidden lg:block"
-        />
-      )}
+    <div className="overflow-hidden rounded-[20px] border border-border-subtle bg-bg-card">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={state.phase}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {state.phase === "selection" ? (
+            <SelectionPhase
+              providerId={providerId}
+              providerTimezone={providerTimezone}
+              serviceId={serviceId}
+              serviceName={serviceName}
+              servicePrice={servicePrice}
+              serviceDurationMin={serviceDurationMin}
+              selectedDateKey={state.selectedDateKey}
+              selectedSlot={state.selectedSlot}
+              onSelectDate={(dateKey) => dispatch({ type: "selectDate", dateKey })}
+              onSelectSlot={(slot) => dispatch({ type: "selectSlot", slot })}
+              onContinue={() => dispatch({ type: "continueToForm" })}
+            />
+          ) : null}
 
-      {/* ── Step content ── */}
-      <div className="min-w-0 flex-1">
-        {/* Step indicator (hidden on success) */}
-        {!isSuccess && (
-          <div className="mb-5 flex items-center gap-0">
-            {visibleSteps.map((step, idx) => (
-              <div key={step} className="flex flex-1 items-center">
-                <StepDot
-                  index={idx}
-                  active={state.step === step}
-                  completed={currentStepIdx > idx}
-                  label={STEP_LABELS[step]}
-                />
-                {idx < visibleSteps.length - 1 && (
-                  <StepConnector completed={currentStepIdx > idx} />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+          {state.phase === "form" ? (
+            <FormPhase
+              me={me}
+              meLoading={meLoading}
+              serviceName={serviceName}
+              servicePrice={servicePrice}
+              serviceDurationMin={serviceDurationMin}
+              providerTimezone={providerTimezone}
+              selectedDateKey={state.selectedDateKey}
+              selectedSlot={state.selectedSlot}
+              clientName={state.clientName}
+              clientPhone={state.clientPhone}
+              comment={state.comment}
+              silentMode={state.silentMode}
+              bookingAnswers={state.bookingAnswers}
+              onChangeName={(value) => dispatch({ type: "setName", value })}
+              onChangePhone={(value) => dispatch({ type: "setPhone", value })}
+              onChangeComment={(value) => dispatch({ type: "setComment", value })}
+              onChangeSilentMode={(value) => dispatch({ type: "setSilentMode", value })}
+              onChangeAnswer={(questionId, value) =>
+                dispatch({ type: "setAnswer", questionId, value })
+              }
+              bookingConfig={bookingConfig}
+              bookingConfigLoading={bookingConfigLoading}
+              bookingConfigError={bookingConfigError}
+              referencePreviewUrl={referencePreviewUrl}
+              referenceUploading={referenceUploading}
+              referenceUploadError={referenceUploadError}
+              onReferenceUpload={handleReferenceUpload}
+              submitLoading={submitLoading}
+              submitError={submitError}
+              onBack={() => dispatch({ type: "backToSelection" })}
+              onSubmit={() => void handleSubmit()}
+            />
+          ) : null}
 
-        {/* Step panel */}
-        <div className={cn(
-          "relative overflow-hidden rounded-[20px] border border-border-subtle bg-bg-card p-4",
-          isSuccess && "border-none bg-transparent p-0"
-        )}>
-          <AnimatePresence initial={false} mode="wait" custom={state.direction}>
-            <motion.div
-              key={state.step}
-              custom={state.direction}
-              variants={stepVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-            >
-              {state.step === "date" && (
-                <DateStep
-                  providerId={providerId}
-                  selectedDateKey={state.selectedDateKey}
-                  onSelectDate={handleSelectDate}
-                />
-              )}
+          {state.phase === "success" && state.confirmedBooking ? (
+            <SuccessPhase
+              booking={state.confirmedBooking}
+              onCancel={handleCancelAuthBooking}
+            />
+          ) : null}
 
-              {state.step === "time" && state.selectedDateKey && (
-                <TimeStep
-                  providerId={providerId}
-                  serviceId={serviceId}
-                  providerTimezone={providerTimezone}
-                  selectedDateKey={state.selectedDateKey}
-                  selectedSlot={state.selectedSlot}
-                  onSelectSlot={handleSelectSlot}
-                />
-              )}
-
-              {state.step === "contacts" && (
-                <ContactsStep
-                  me={me}
-                  meLoading={meLoading}
-                  clientPhone={state.clientPhone}
-                  comment={state.comment}
-                  silentMode={state.silentMode}
-                  bookingAnswers={state.bookingAnswers}
-                  referencePreviewUrl={referencePreviewUrl}
-                  referenceUploading={referenceUploading}
-                  referenceUploadError={referenceUploadError}
-                  bookingConfig={bookingConfig}
-                  bookingConfigLoading={bookingConfigLoading}
-                  bookingConfigError={bookingConfigError}
-                  onChangePhone={(v) => setState((prev) => ({ ...prev, clientPhone: v }))}
-                  onChangeComment={(v) => setState((prev) => ({ ...prev, comment: v }))}
-                  onChangeSilentMode={(v) => setState((prev) => ({ ...prev, silentMode: v }))}
-                  onChangeAnswer={(qId, v) =>
-                    setState((prev) => ({
-                      ...prev,
-                      bookingAnswers: { ...prev.bookingAnswers, [qId]: v },
-                    }))
-                  }
-                  onReferenceUpload={handleReferenceUpload}
-                />
-              )}
-
-              {state.step === "confirm" && state.selectedSlot && (
-                <ConfirmStep
-                  serviceName={serviceName}
-                  servicePrice={servicePrice}
-                  selectedSlot={state.selectedSlot}
-                  clientPhone={me?.phone ?? state.clientPhone}
-                  comment={state.comment}
-                  silentMode={state.silentMode}
-                  submitError={submitError}
-                />
-              )}
-
-              {state.step === "success" && state.selectedSlot && (
-                <SuccessStep
-                  serviceName={serviceName}
-                  servicePrice={servicePrice}
-                  selectedSlot={state.selectedSlot}
-                  masterProfileUrl={masterProfileUrl}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Navigation */}
-        {!isSuccess && (
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={goBack}
-              disabled={isFirstStep || submitLoading}
-              className={cn(
-                "rounded-xl gap-1",
-                isFirstStep && "invisible pointer-events-none"
-              )}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              {t.back}
-            </Button>
-
-            {state.step !== "confirm" ? (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={goNext}
-                disabled={!canAdvance}
-                className="min-w-[90px] rounded-xl"
-              >
-                {t.next}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!canAdvance || submitLoading || referenceUploading}
-                onClick={() => void handleSubmit()}
-                className="min-w-[130px] rounded-xl gap-2"
-              >
-                {submitLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {t.bookCta}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Mobile summary strip */}
-        {!isSuccess && (
-          <BookingSummary
-            step={state.step}
-            serviceName={serviceName}
-            servicePrice={servicePrice}
-            serviceDurationMin={serviceDurationMin}
-            selectedDateKey={state.selectedDateKey}
-            selectedSlot={state.selectedSlot}
-            variant="sticky"
-            className="mt-4 lg:hidden"
-          />
-        )}
-      </div>
-
+          {state.phase === "conflict" ? (
+            <ConflictPhase onRetry={() => dispatch({ type: "retryFromConflict" })} />
+          ) : null}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

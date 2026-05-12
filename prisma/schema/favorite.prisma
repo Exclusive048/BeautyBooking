@@ -1,0 +1,18 @@
+// User favorites — clients save providers (masters / studios) to revisit.
+// Cascade on both sides intentionally: when a UserProfile is hard-deleted
+// or a Provider row is physically removed, dangling favorites are pointless
+// and must be cleaned up. A provider going `isPublished=false` is NOT a
+// delete and does not touch favorites — the catalog & favorites page filter
+// by `isPublished` at read time so a paused master keeps the user's heart.
+model UserFavorite {
+  id         String   @id @default(cuid())
+  userId     String
+  providerId String
+  createdAt  DateTime @default(now())
+
+  user     UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider Provider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerId])
+  @@index([userId, createdAt(sort: Desc)])
+}
