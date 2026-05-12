@@ -65,7 +65,12 @@ const HREF = {
   // profile instead of the real account page. The proper page has
   // always lived at `/cabinet/master/account` (now split into
   // notifications / security / account sub-routes).
-  settings: "/cabinet/master/account",
+  //
+  // hotfix-master-cabinet-closure: link straight to the default
+  // sub-page so the URL doesn't flicker through an intermediate
+  // 302 from `/account` → `/account/notifications`. The /account
+  // index redirect remains as a fallback for old bookmarks.
+  settings: "/cabinet/master/account/notifications",
 } as const;
 
 function isActive(pathname: string, href: string, exact = false): boolean {
@@ -83,6 +88,11 @@ type NavItem = {
   target?: "_blank";
   /** Optional billing feature that gates this entry — falls back to lock badge when missing. */
   featureKey?: "analytics_dashboard";
+  /** Override the path used for the «active» highlight match. Useful
+   * when `href` deep-links into a default sub-page (e.g. `/account/
+   * notifications`) but the highlight should stay on regardless of
+   * which sibling sub-page is open (`/security`, `/account`). */
+  activeMatch?: string;
 };
 
 /**
@@ -103,7 +113,7 @@ export function MasterSidebar({
   const plan = usePlanFeatures("MASTER");
 
   const renderItem = (item: NavItem) => {
-    const active = isActive(pathname, item.href, item.exact);
+    const active = isActive(pathname, item.activeMatch ?? item.href, item.exact);
     const locked = item.featureKey
       ? !plan.can(item.featureKey) && !plan.loading
       : false;
@@ -223,6 +233,9 @@ export function MasterSidebar({
             href: HREF.settings,
             label: T.nav.items.accountSettings,
             icon: Cog,
+            // Keep highlight when on any /account/* sub-page even
+            // though we navigate to /notifications by default.
+            activeMatch: "/cabinet/master/account",
           })}
           {publicUsername
             ? renderItem({

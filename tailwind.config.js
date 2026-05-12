@@ -51,6 +51,7 @@ module.exports = {
         "brand-from": "rgb(var(--brand-from) / <alpha-value>)",
         "brand-via": "rgb(var(--brand-via) / <alpha-value>)",
         "brand-deep": "rgb(var(--brand-deep) / <alpha-value>)",
+        "brand-accent": "rgb(var(--brand-accent) / <alpha-value>)",
       },
       backgroundImage: {
         "brand-gradient":
