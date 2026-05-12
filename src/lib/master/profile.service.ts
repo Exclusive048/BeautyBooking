@@ -640,8 +640,11 @@ export async function createSoloMasterService(
     title: string;
     price: number;
     durationMin: number;
-    globalCategoryId?: string;
-    description?: string;
+    /** Accepts both `null` (modal sends `categoryId || null` when
+     * the master leaves «— Без категории —») and `undefined`. The
+     * body already collapses both to `null` via the `|| null` below. */
+    globalCategoryId?: string | null;
+    description?: string | null;
     /** 31c: optional flags. Default to existing behaviour
      * (`isEnabled: true`, `onlinePaymentEnabled: false`) when omitted. */
     isEnabled?: boolean;

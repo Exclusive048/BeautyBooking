@@ -59,8 +59,13 @@ export const createMasterServiceSchema = z.object({
   title: z.string().trim().min(1).max(240),
   price: z.number().int().min(0),
   durationMin: z.number().int().min(15).max(12 * 60),
-  globalCategoryId: z.string().trim().min(1).optional(),
-  description: z.string().trim().max(2000).optional(),
+  // services-category-creation-restore: accept null in addition to
+  // undefined — the service modal sends `categoryId || null` and
+  // `description.trim() || null`, which previously surfaced as a
+  // generic 400 with no fieldErrors. Matches `updateMasterServiceSchema`
+  // below (which already does `.nullable().optional()`).
+  globalCategoryId: z.string().trim().min(1).nullable().optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
   // 31c: optional toggles. Default to current behaviour when absent.
   isEnabled: z.boolean().optional(),
   onlinePaymentEnabled: z.boolean().optional(),
