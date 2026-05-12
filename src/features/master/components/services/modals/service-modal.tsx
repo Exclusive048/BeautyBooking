@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import type {
   ServiceCategoryOption,
   ServiceItemView,
 } from "@/lib/master/services-view.service";
+import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatDuration } from "../lib/format";
 
@@ -68,6 +69,21 @@ export function ServiceModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { confirm, modal: confirmModal } = useConfirm();
+
+  // services-category-creation-restore: local copy of the categories
+  // prop so newly-proposed categories can appear in the dropdown
+  // without waiting for the parent server component to re-fetch.
+  // After the modal closes the parent's `router.refresh()` (on
+  // submit) reseeds this from the source of truth.
+  const [categoryList, setCategoryList] = useState<ServiceCategoryOption[]>(categories);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [categorySubmitting, setCategorySubmitting] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categoryToast, setCategoryToast] = useState<string | null>(null);
+
+  const trimmedCategoryDraft = categoryDraft.trim();
+  const canSubmitCategory = trimmedCategoryDraft.length > 0 && !categorySubmitting;
 
   const trimmedName = name.trim();
   const priceKopeks = (() => {
@@ -133,6 +149,59 @@ export function ServiceModal({
     }
   };
 
+  const cancelCreateCategory = () => {
+    setCreatingCategory(false);
+    setCategoryDraft("");
+    setCategoryError(null);
+  };
+
+  const submitCreateCategory = async () => {
+    if (!canSubmitCategory) {
+      setCategoryError(T.categoryCreateEmpty);
+      return;
+    }
+    setCategorySubmitting(true);
+    setCategoryError(null);
+    setCategoryToast(null);
+    try {
+      const response = await fetch("/api/categories/propose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmedCategoryDraft }),
+      });
+      const json = (await response.json().catch(() => null)) as
+        | ApiResponse<{ id: string; title: string; status: "PENDING" | "APPROVED" | "REJECTED" }>
+        | null;
+      if (!response.ok || !json || !json.ok) {
+        const message =
+          json && !json.ok && json.error.message ? json.error.message : T.categoryCreateFailed;
+        setCategoryError(message);
+        return;
+      }
+      // Insert into the local list, alphabetic-sort, auto-select the
+      // freshly proposed entry. The server marks it PENDING with
+      // visibleToAll:false; the master can use it right away because
+      // `listAvailableGlobalCategories` already includes their own
+      // proposed rows.
+      const newCategory: ServiceCategoryOption = {
+        id: json.data.id,
+        name: json.data.title,
+        status: json.data.status,
+      };
+      setCategoryList((prev) =>
+        [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name, "ru")),
+      );
+      setCategoryId(newCategory.id);
+      setCategoryToast(T.categoryCreatedToast);
+      setCreatingCategory(false);
+      setCategoryDraft("");
+    } catch {
+      setCategoryError(T.categoryCreateFailed);
+    } finally {
+      setCategorySubmitting(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (mode !== "edit" || !service) return;
     if (saving) return;
@@ -187,12 +256,70 @@ export function ServiceModal({
             className="block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <option value="">{T.categoryNone}</option>
-            {categories.map((category) => (
+            {categoryList.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.status === "PENDING"
+                  ? `${category.name} ${T.categoryPendingSuffix}`
+                  : category.name}
               </option>
             ))}
           </select>
+
+          {creatingCategory ? (
+            <div className="mt-2 flex flex-col gap-2 rounded-xl border border-border-subtle bg-bg-input/40 p-2.5">
+              <Input
+                value={categoryDraft}
+                onChange={(event) => setCategoryDraft(event.target.value)}
+                placeholder={T.categoryCreatePlaceholder}
+                maxLength={60}
+                autoFocus
+                className="h-10 rounded-lg px-3 text-sm"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancelCreateCategory}
+                  disabled={categorySubmitting}
+                >
+                  {T.categoryCreateCancel}
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void submitCreateCategory()}
+                  disabled={!canSubmitCategory}
+                >
+                  {categorySubmitting ? T.categoryCreateSubmitting : T.categoryCreateSubmit}
+                </Button>
+              </div>
+              {categoryError ? (
+                <p className="text-xs text-red-600" role="alert">
+                  {categoryError}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setCreatingCategory(true);
+                setCategoryToast(null);
+              }}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:underline"
+            >
+              <Plus className="h-3 w-3" aria-hidden />
+              {T.categoryCreateCta}
+            </button>
+          )}
+
+          {categoryToast ? (
+            <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
+              {categoryToast}
+            </p>
+          ) : null}
         </Field>
 
         <div className="grid grid-cols-2 gap-3">

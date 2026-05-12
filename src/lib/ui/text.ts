@@ -2904,6 +2904,17 @@ export const UI_TEXT = {
         namePlaceholder: "Например: маникюр аппаратный",
         categoryLabel: "Категория",
         categoryNone: "— Без категории —",
+        categoryPendingSuffix: "(на одобрении)",
+        categoryCreateCta: "Создать новую категорию",
+        categoryCreatePlaceholder: "Например: эпиляция воском",
+        categoryCreateSubmit: "Добавить",
+        categoryCreateCancel: "Отмена",
+        categoryCreateSubmitting: "Отправляем…",
+        categoryCreatedToast:
+          "Категория отправлена на одобрение. Вы можете использовать её сразу.",
+        categoryCreateFailed:
+          "Не удалось создать категорию. Попробуйте ещё раз.",
+        categoryCreateEmpty: "Введите название категории.",
         durationLabel: "Длительность",
         priceLabel: "Цена, ₽",
         pricePlaceholder: "1500",

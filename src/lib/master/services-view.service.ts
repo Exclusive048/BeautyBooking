@@ -32,6 +32,12 @@ export function parseServicesFilter(value: string | null | undefined): ServicesF
 export type ServiceCategoryOption = {
   id: string;
   name: string;
+  /** Approval state — passed to the UI so the master's own pending
+   * proposals can carry a «(на одобрении)» suffix instead of looking
+   * indistinguishable from approved ones. APPROVED categories load
+   * cleanly; PENDING / REJECTED only appear when the master is the
+   * proposer (filter is in `listAvailableGlobalCategories`). */
+  status: CategoryStatus;
 };
 
 export type ServiceItemView = {
@@ -307,8 +313,8 @@ async function listAvailableGlobalCategories(
           : []),
       ],
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, status: true },
     orderBy: { name: "asc" },
   });
-  return rows.map((row) => ({ id: row.id, name: row.name }));
+  return rows.map((row) => ({ id: row.id, name: row.name, status: row.status }));
 }

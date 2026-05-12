@@ -1,38 +1,34 @@
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
-import { getSessionUser } from "@/lib/auth/session";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
-import { CategoryStatus, type Prisma } from "@prisma/client";
+import { CategoryStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-function parseStatus(value: string | null): CategoryStatus | null {
-  if (value === CategoryStatus.PENDING) return CategoryStatus.PENDING;
-  if (value === CategoryStatus.APPROVED) return CategoryStatus.APPROVED;
-  if (value === CategoryStatus.REJECTED) return CategoryStatus.REJECTED;
-  return null;
-}
-
-export async function GET(req: Request) {
+/**
+ * Public catalog filter feed. Returns ONLY `APPROVED` +
+ * `visibleToAll` categories — same answer for anonymous and logged-
+ * in users.
+ *
+ * services-category-creation-restore: the previous branch added the
+ * caller's own `createdByUserId` rows to the `OR` clause for logged-
+ * in users. That meant a master who proposed «тестовая категория»
+ * saw it in their own catalog filter (even before admin approval),
+ * which the user reported as «какие то непонятные» — drafts leaking
+ * into the public surface. Personal-scope categories belong only
+ * in surfaces that ask for them (e.g. the master's own service
+ * modal via `listAvailableGlobalCategories`), not in this endpoint.
+ *
+ * The `?status=` query parameter is no longer honoured — all four
+ * call sites already pass `status=APPROVED`. Requesting PENDING or
+ * REJECTED via this public route was a footgun; admins use a
+ * separate `/api/admin/catalog/global-categories` route for that.
+ */
+export async function GET() {
   try {
-    const url = new URL(req.url);
-    const sessionUser = await getSessionUser();
-    const status = parseStatus(url.searchParams.get("status")) ?? CategoryStatus.APPROVED;
-    const where: Prisma.GlobalCategoryWhereInput = sessionUser
-      ? {
-          OR: [
-            { status: CategoryStatus.APPROVED, visibleToAll: true },
-            { createdByUserId: sessionUser.id },
-          ],
-        }
-      : {
-          status,
-          visibleToAll: true,
-        };
-
     const categories = await prisma.globalCategory.findMany({
-      where,
+      where: { status: CategoryStatus.APPROVED, visibleToAll: true },
       orderBy: { name: "asc" },
       select: {
         id: true,
