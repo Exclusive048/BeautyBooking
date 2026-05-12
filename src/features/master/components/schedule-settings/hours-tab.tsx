@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cn } from "@/lib/cn";
+import { Clock, Grid3x3, Info } from "lucide-react";
 import {
   SLOT_STEP_OPTIONS,
   type DayScheduleDto,
@@ -10,6 +10,15 @@ import {
 } from "@/lib/schedule/editor-shared";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { ChipGroup } from "./components/chip-group";
+import { ModeCard } from "./components/mode-card";
+import { SettingRow } from "./components/setting-row";
+import { WeeklyDaysList } from "./hours/weekly-days-list";
+import {
+  clearDay as clearDayPure,
+  copyDayToAll,
+  copyDayToWorkdays,
+} from "./hours/lib/day-copy";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
 import { WeekPreview } from "./week-preview";
@@ -28,14 +37,20 @@ type Props = {
 
 /**
  * Hours tab — edits week schedule + slot step + global schedule mode.
- * Single client component owning the draft, auto-saving on debounce.
  *
- * Mode toggle (FLEXIBLE / FIXED) is currently a global hint that flips
- * every workday's `scheduleMode`; per-day fine control belongs to a future
- * iteration. Slot step is a top-level Provider field.
+ * schedule-hours-redesign: now built from the shared cabinet
+ * primitives (`<ModeCard>`, `<SettingRow>`, `<ChipGroup>`) plus a
+ * new compact `<WeeklyDaysList>` container — each weekday becomes
+ * a single dense row rather than its own card. Per-day action menu
+ * adds copy-to-workdays / copy-to-all / clear-day shortcuts.
  *
- * Multiple intervals per day are NOT supported by the backend — the
- * "split day" use-case is solved by adding a break in the middle.
+ * Mode toggle (FLEXIBLE / FIXED) remains a **global hint** that
+ * flips every workday's `scheduleMode` — per-day fine control is on
+ * the backlog (the database supports it via
+ * `WeeklyScheduleDay.scheduleMode`, the UI doesn't yet). Slot step
+ * is a top-level Provider field. Multiple intervals per day are NOT
+ * supported by the backend — the "split day" use-case is solved by
+ * adding a break in the middle.
  */
 export function HoursTab({ initialSnapshot }: Props) {
   const [draft, setDraft] = useState<Draft>(() => ({
@@ -83,7 +98,7 @@ export function HoursTab({ initialSnapshot }: Props) {
     setDraft((prev) => ({
       ...prev,
       weekSchedule: prev.weekSchedule.map((day) =>
-        day.dayOfWeek === next.dayOfWeek ? next : day
+        day.dayOfWeek === next.dayOfWeek ? next : day,
       ),
     }));
   };
@@ -99,135 +114,86 @@ export function HoursTab({ initialSnapshot }: Props) {
     setDraft((prev) => ({ ...prev, slotStepMin: step }));
   };
 
+  const handleCopyToWorkdays = (sourceDayOfWeek: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      weekSchedule: copyDayToWorkdays(prev.weekSchedule, sourceDayOfWeek),
+    }));
+  };
+
+  const handleCopyToAll = (sourceDayOfWeek: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      weekSchedule: copyDayToAll(prev.weekSchedule, sourceDayOfWeek),
+    }));
+  };
+
+  const handleClearDay = (targetDayOfWeek: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      weekSchedule: clearDayPure(prev.weekSchedule, targetDayOfWeek),
+    }));
+  };
+
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_22rem]">
-      <div className="space-y-6">
-        <Section title={T.mode.sectionTitle}>
-          <ModeToggle value={globalMode} onChange={setMode} />
-        </Section>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <ModeCard
+            active={globalMode === "FLEXIBLE"}
+            icon={Clock}
+            title={T.mode.flexibleLabel}
+            description={T.mode.flexibleHint}
+            onClick={() => setMode("FLEXIBLE")}
+          />
+          <ModeCard
+            active={globalMode === "FIXED"}
+            icon={Grid3x3}
+            title={T.mode.fixedLabel}
+            description={T.mode.fixedHint}
+            onClick={() => setMode("FIXED")}
+          />
+        </div>
 
-        <Section title={T.slotStep.sectionTitle} hint={T.slotStep.hint}>
-          <SlotStepSelector value={draft.slotStepMin} onChange={setSlotStep} />
-        </Section>
+        <div className="rounded-2xl border border-border-subtle bg-bg-card px-4">
+          <SettingRow
+            title={T.slotStep.sectionTitle}
+            subtitle={T.slotStep.hint}
+            control={
+              <ChipGroup<SlotStepMin>
+                value={draft.slotStepMin}
+                onChange={setSlotStep}
+                options={SLOT_STEP_OPTIONS.map((option) => ({
+                  value: option,
+                  label: T.slotStep.options[String(option) as keyof typeof T.slotStep.options],
+                }))}
+              />
+            }
+          />
+        </div>
 
-        <Section title={T.week.sectionTitle} hint={T.week.hint}>
-          <div className="space-y-2">
-            {draft.weekSchedule.map((day) => (
-              <WeekdayRow key={day.dayOfWeek} day={day} onChange={updateDay} />
-            ))}
-          </div>
-        </Section>
+        <WeeklyDaysList>
+          {draft.weekSchedule.map((day) => (
+            <WeekdayRow
+              key={day.dayOfWeek}
+              day={day}
+              onChange={updateDay}
+              onCopyToWorkdays={() => handleCopyToWorkdays(day.dayOfWeek)}
+              onCopyToAll={() => handleCopyToAll(day.dayOfWeek)}
+              onClear={() => handleClearDay(day.dayOfWeek)}
+            />
+          ))}
+        </WeeklyDaysList>
+
+        <div className="flex items-start gap-2 rounded-2xl border border-border-subtle bg-bg-input/30 px-4 py-3 text-xs text-text-sec">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <p>{T.week.footerDisclaimer}</p>
+        </div>
       </div>
 
       <div className="xl:sticky xl:top-[calc(var(--topbar-h)+5rem)] xl:self-start">
         <WeekPreview weekSchedule={draft.weekSchedule} />
       </div>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <header className="mb-3">
-        <h2 className="font-display text-lg text-text-main">{title}</h2>
-        {hint ? <p className="mt-1 text-sm text-text-sec">{hint}</p> : null}
-      </header>
-      {children}
-    </section>
-  );
-}
-
-function ModeToggle({
-  value,
-  onChange,
-}: {
-  value: "FLEXIBLE" | "FIXED";
-  onChange: (next: "FLEXIBLE" | "FIXED") => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <ModeCard
-        active={value === "FLEXIBLE"}
-        title={T.mode.flexibleLabel}
-        hint={T.mode.flexibleHint}
-        onClick={() => onChange("FLEXIBLE")}
-      />
-      <ModeCard
-        active={value === "FIXED"}
-        title={T.mode.fixedLabel}
-        hint={T.mode.fixedHint}
-        onClick={() => onChange("FIXED")}
-      />
-    </div>
-  );
-}
-
-function ModeCard({
-  active,
-  title,
-  hint,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-2xl border p-4 text-left transition-colors",
-        active
-          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-          : "border-border-subtle bg-bg-card hover:border-primary/40"
-      )}
-    >
-      <div className="font-medium text-text-main">{title}</div>
-      <div className="mt-1 text-xs text-text-sec">{hint}</div>
-    </button>
-  );
-}
-
-function SlotStepSelector({
-  value,
-  onChange,
-}: {
-  value: SlotStepMin;
-  onChange: (next: SlotStepMin) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-2xl border border-border-subtle bg-bg-input p-1">
-      {SLOT_STEP_OPTIONS.map((option) => {
-        const active = option === value;
-        const label = T.slotStep.options[String(option) as keyof typeof T.slotStep.options];
-        return (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onChange(option)}
-            className={cn(
-              "rounded-xl px-3.5 py-1.5 text-sm font-medium transition-colors",
-              active
-                ? "bg-bg-card text-text-main shadow-card"
-                : "text-text-sec hover:text-text-main"
-            )}
-            aria-pressed={active}
-          >
-            {label}
-          </button>
-        );
-      })}
     </div>
   );
 }

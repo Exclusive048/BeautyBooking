@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import type { BreakDto, DayScheduleDto } from "@/lib/schedule/editor-shared";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DayActionMenu } from "./hours/day-action-menu";
+import { computeNetHours } from "./hours/lib/compute-hours";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.week;
 
@@ -24,26 +26,40 @@ const DAY_LABELS: Record<number, string> = {
 type Props = {
   day: DayScheduleDto;
   onChange: (next: DayScheduleDto) => void;
+  /** Copy this day's shape onto every other workday. */
+  onCopyToWorkdays: () => void;
+  /** Copy this day's shape onto every other day (off-days included). */
+  onCopyToAll: () => void;
+  /** Reset day to off + clear breaks/fixed times. */
+  onClear: () => void;
 };
 
 /**
  * Single weekday row inside the Hours tab.
  *
- * fix-02: FLEXIBLE breaks now render as compact inline tags
- * (`13:00–14:00 ✕`) right after the work-time inputs. Clicking a
- * tag expands it inline into 2 time inputs for editing. Default
- * state stays compact on a single row; only the currently-edited
- * break expands. The old "each break on its own row" layout broke
- * the eye-flow on schedules with several breaks per day.
+ * schedule-hours-redesign: the row went from a per-card layout
+ * (`rounded-2xl border bg-bg-card p-4`) to a compact list row inside
+ * the shared `<WeeklyDaysList>` container — sibling rows are
+ * separated by `divide-y`. The flex line carries: toggle → day badge
+ * → start/end (FLEXIBLE) or chip list (FIXED) → net-hours pill →
+ * inline break tags → "+ Перерыв" / "+ Окно" → action menu.
  *
- * - FLEXIBLE mode: start/end interval + optional list of breaks
- *   (inline tags). Per backend constraint there is exactly one
- *   interval per day — to split the day, the master adds a break.
+ * - FLEXIBLE mode: start/end interval + optional list of breaks.
+ *   Inline break tags expand into 2 time inputs on click (one at a
+ *   time). The net-hours pill ("10 ч") sits between the end input
+ *   and the break tags so the master can see the effect of adding a
+ *   lunch break at a glance.
  * - FIXED mode: list of explicit start times (chips). Each chip is
- *   an editable `<TimeField>` with a remove button; "+ Добавить
- *   окошко" appends a new time.
+ *   an editable `<TimeField>` with a remove button; "+ Окно"
+ *   appends a new time.
  */
-export function WeekdayRow({ day, onChange }: Props) {
+export function WeekdayRow({
+  day,
+  onChange,
+  onCopyToWorkdays,
+  onCopyToAll,
+  onClear,
+}: Props) {
   const isFixed = day.scheduleMode === "FIXED";
   const [editingBreakIndex, setEditingBreakIndex] = useState<number | null>(null);
 
@@ -85,139 +101,145 @@ export function WeekdayRow({ day, onChange }: Props) {
   const updateFixedTime = (index: number, value: string) =>
     setFixedTimes(day.fixedSlotTimes.map((time, idx) => (idx === index ? value : time)));
 
+  const netHours = !isFixed && day.isWorkday
+    ? computeNetHours(day.startTime, day.endTime, day.breaks)
+    : null;
+
   return (
-    <div
+    <li
       className={cn(
-        "rounded-2xl border border-border-subtle bg-bg-card p-4 transition-colors",
-        !day.isWorkday && "opacity-70",
+        "flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-bg-input/20",
+        !day.isWorkday && "text-text-sec",
       )}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex w-10 shrink-0 items-center justify-center rounded-xl bg-bg-input py-2 text-sm font-medium text-text-main">
-          {DAY_LABELS[day.dayOfWeek]}
-        </div>
+      <Switch
+        size="sm"
+        checked={day.isWorkday}
+        onCheckedChange={setWorkday}
+        aria-label={day.isWorkday ? T.onLabel : T.offLabel}
+      />
 
-        <Switch
-          size="sm"
-          checked={day.isWorkday}
-          onCheckedChange={setWorkday}
-          aria-label={day.isWorkday ? T.onLabel : T.offLabel}
-        />
+      <div
+        className={cn(
+          "flex w-10 shrink-0 items-center justify-center rounded-lg py-1 font-mono text-xs font-semibold uppercase tracking-wider",
+          day.isWorkday ? "bg-bg-input text-text-main" : "bg-transparent text-text-sec",
+        )}
+      >
+        {DAY_LABELS[day.dayOfWeek]}
+      </div>
 
-        {day.isWorkday && !isFixed ? (
-          <>
-            <TimeField value={day.startTime} onChange={setStart} aria-label={T.startLabel} />
-            <span className="text-sm text-text-sec">—</span>
-            <TimeField value={day.endTime} onChange={setEnd} aria-label={T.endLabel} />
+      {day.isWorkday && !isFixed ? (
+        <>
+          <TimeField value={day.startTime} onChange={setStart} aria-label={T.startLabel} />
+          <span className="text-sm text-text-sec">—</span>
+          <TimeField value={day.endTime} onChange={setEnd} aria-label={T.endLabel} />
 
-            {/* Inline break tags; click a tag to expand the editor */}
-            {day.breaks.map((row, index) => {
-              const isEditing = editingBreakIndex === index;
-              if (isEditing) {
-                return (
-                  <span
-                    key={`break-${index}`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-primary/60 bg-bg-input/70 py-0.5 pl-1.5 pr-0.5"
-                  >
-                    <TimeField
-                      value={row.start}
-                      onChange={(next) => updateBreak(index, { start: next })}
-                      aria-label={`${T.breaksLabel} · ${T.startLabel}`}
-                      className="h-8 w-[5.5rem] rounded-md border-0 bg-transparent px-1 text-sm shadow-none focus:bg-bg-card"
-                    />
-                    <span className="text-sm text-text-sec">—</span>
-                    <TimeField
-                      value={row.end}
-                      onChange={(next) => updateBreak(index, { end: next })}
-                      aria-label={`${T.breaksLabel} · ${T.endLabel}`}
-                      className="h-8 w-[5.5rem] rounded-md border-0 bg-transparent px-1 text-sm shadow-none focus:bg-bg-card"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeBreak(index)}
-                      aria-label={T.removeBreakAria}
-                      className="h-7 w-7 rounded-md"
-                    >
-                      <X className="h-3 w-3" aria-hidden />
-                    </Button>
-                  </span>
-                );
-              }
+          {netHours !== null ? (
+            <span className="shrink-0 font-mono text-xs tabular-nums text-text-sec">
+              {netHours} {T.hoursLabel}
+            </span>
+          ) : null}
+
+          {/* Inline break tags; click a tag to expand the editor */}
+          {day.breaks.map((row, index) => {
+            const isEditing = editingBreakIndex === index;
+            if (isEditing) {
               return (
                 <span
                   key={`break-${index}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-input/70 px-2 py-1"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setEditingBreakIndex(index)}
-                    className="font-mono text-xs text-text-main transition hover:text-primary"
-                  >
-                    {row.start}–{row.end}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeBreak(index)}
-                    aria-label={T.removeBreakAria}
-                    className="inline-flex h-4 w-4 items-center justify-center rounded text-text-sec transition hover:bg-bg-page hover:text-text-main"
-                  >
-                    <X className="h-3 w-3" aria-hidden />
-                  </button>
-                </span>
-              );
-            })}
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={addBreak}
-              className="rounded-lg text-text-sec hover:text-text-main"
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
-              {T.addBreak}
-            </Button>
-          </>
-        ) : !day.isWorkday ? (
-          <span className="text-sm text-text-sec">{T.offLabel}</span>
-        ) : null}
-      </div>
-
-      {day.isWorkday && isFixed ? (
-        <div className="mt-3 space-y-2 pl-[3.25rem]">
-          <div className="text-xs uppercase tracking-wide text-text-sec">
-            {T.fixedTimesLabel}
-          </div>
-          {day.fixedSlotTimes.length === 0 ? (
-            <p className="text-xs italic text-text-sec/70">{T.fixedTimesEmpty}</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {day.fixedSlotTimes.map((time, index) => (
-                <div
-                  key={`${time}-${index}`}
-                  className="inline-flex items-center gap-0.5 rounded-lg border border-border-subtle bg-bg-page py-0.5 pl-1.5 pr-0.5"
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary/60 bg-bg-input/70 py-0.5 pl-1.5 pr-0.5"
                 >
                   <TimeField
-                    value={time}
-                    onChange={(next) => updateFixedTime(index, next)}
-                    aria-label={`${T.fixedTimesLabel} · ${time}`}
-                    className="h-8 w-[5.5rem] rounded-md border-0 bg-transparent px-1 text-sm shadow-none focus:bg-bg-input"
+                    value={row.start}
+                    onChange={(next) => updateBreak(index, { start: next })}
+                    aria-label={`${T.breaksLabel} · ${T.startLabel}`}
+                    className="h-8 w-[5.5rem] rounded-md border-0 bg-transparent px-1 text-sm shadow-none focus:bg-bg-card"
+                  />
+                  <span className="text-sm text-text-sec">—</span>
+                  <TimeField
+                    value={row.end}
+                    onChange={(next) => updateBreak(index, { end: next })}
+                    aria-label={`${T.breaksLabel} · ${T.endLabel}`}
+                    className="h-8 w-[5.5rem] rounded-md border-0 bg-transparent px-1 text-sm shadow-none focus:bg-bg-card"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() => removeFixedTime(index)}
-                    aria-label={`${T.removeFixedTimeAria} ${time}`}
+                    onClick={() => removeBreak(index)}
+                    aria-label={T.removeBreakAria}
                     className="h-7 w-7 rounded-md"
                   >
                     <X className="h-3 w-3" aria-hidden />
                   </Button>
-                </div>
-              ))}
-            </div>
+                </span>
+              );
+            }
+            return (
+              <span
+                key={`break-${index}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-input/70 px-2 py-1"
+              >
+                <button
+                  type="button"
+                  onClick={() => setEditingBreakIndex(index)}
+                  className="font-mono text-xs text-text-main transition hover:text-primary"
+                >
+                  {row.start}–{row.end}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeBreak(index)}
+                  aria-label={T.removeBreakAria}
+                  className="inline-flex h-4 w-4 items-center justify-center rounded text-text-sec transition hover:bg-bg-page hover:text-text-main"
+                >
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              </span>
+            );
+          })}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={addBreak}
+            className="rounded-lg text-text-sec hover:text-text-main"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+            {T.addBreak}
+          </Button>
+        </>
+      ) : null}
+
+      {day.isWorkday && isFixed ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {day.fixedSlotTimes.length === 0 ? (
+            <span className="text-xs italic text-text-sec/70">{T.fixedTimesEmpty}</span>
+          ) : (
+            day.fixedSlotTimes.map((time, index) => (
+              <div
+                key={`${time}-${index}`}
+                className="inline-flex items-center gap-0.5 rounded-lg border border-border-subtle bg-bg-input/70 py-0.5 pl-1.5 pr-0.5"
+              >
+                <TimeField
+                  value={time}
+                  onChange={(next) => updateFixedTime(index, next)}
+                  aria-label={`${T.fixedTimesLabel} · ${time}`}
+                  className="h-8 w-[5.5rem] rounded-md border-0 bg-transparent px-1 text-sm shadow-none focus:bg-bg-card"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeFixedTime(index)}
+                  aria-label={`${T.removeFixedTimeAria} ${time}`}
+                  className="h-7 w-7 rounded-md"
+                >
+                  <X className="h-3 w-3" aria-hidden />
+                </Button>
+              </div>
+            ))
           )}
           <Button
             type="button"
@@ -231,7 +253,19 @@ export function WeekdayRow({ day, onChange }: Props) {
           </Button>
         </div>
       ) : null}
-    </div>
+
+      {!day.isWorkday ? (
+        <span className="text-sm text-text-sec">{T.offLabel}</span>
+      ) : null}
+
+      <div className="ml-auto">
+        <DayActionMenu
+          onCopyToWorkdays={onCopyToWorkdays}
+          onCopyToAll={onCopyToAll}
+          onClear={onClear}
+        />
+      </div>
+    </li>
   );
 }
 
