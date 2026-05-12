@@ -79,7 +79,7 @@ export function ClientListItem({ client, selected, onSelect, now }: Props) {
         <p className="font-mono text-sm font-medium tabular-nums text-text-main">
           {formatNumberShort(client.totalAmount)}
         </p>
-        <p className="font-mono text-[10px] uppercase tracking-wider text-text-sec">LTV ₽</p>
+        <p className="font-mono text-[10px] uppercase tracking-wider text-text-sec">{T.rowRevenueLabel}</p>
       </div>
     </button>
   );

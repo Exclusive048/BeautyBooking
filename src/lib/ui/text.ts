@@ -1723,7 +1723,7 @@ export const UI_TEXT = {
   },
   analytics: {
     labels: {
-      ltv: "Ценность клиента (LTV)",
+      ltv: "Ценность клиента",
       leadTime: "Глубина записи",
     },
   },
@@ -2193,8 +2193,9 @@ export const UI_TEXT = {
         totalLabel: "Всего клиентов",
         totalSubtextTemplate: "+{count} за месяц",
         totalSubtextNone: "новых нет",
-        ltvLabel: "Суммарный LTV",
-        ltvSubtextTemplate: "средний {avg}",
+        ltvLabel: "Общая выручка",
+        ltvLabelTooltip: "Сумма всех завершённых записей всех клиентов",
+        ltvSubtextTemplate: "средняя {avg}",
         frequencyLabel: "Средняя частота",
         frequencySubtext: "визитов на клиента",
         retentionLabel: "Возвращаемость",
@@ -2211,7 +2212,7 @@ export const UI_TEXT = {
         label: "Сортировка",
         recent: "По недавним",
         alphabetical: "По алфавиту",
-        ltvDesc: "По LTV",
+        ltvDesc: "По выручке",
       },
       search: {
         placeholder: "Поиск по имени или телефону",
@@ -2228,6 +2229,7 @@ export const UI_TEXT = {
         visitWordOne: "визит",
         visitWordFew: "визита",
         visitWordMany: "визитов",
+        rowRevenueLabel: "Выручка ₽",
       },
       status: {
         new: "Новая",
@@ -2253,7 +2255,7 @@ export const UI_TEXT = {
         addTagLabel: "тег",
         stats: {
           visits: "Визитов",
-          ltv: "LTV",
+          ltv: "Выручка",
           avgCheck: "Средний чек",
           next: "Следующий",
         },
@@ -2582,8 +2584,19 @@ export const UI_TEXT = {
         taglinePlaceholder: "Например: мастер маникюра и педикюра",
         usernameLabel: "Никнейм (для ссылки)",
         usernamePrefix: "мастеррядом.рф/u/",
-        usernameSoonHint: "Изменение скоро",
         usernameNotSet: "Будет задан автоматически",
+        usernamePlaceholder: "anna-master",
+        usernameHint:
+          "От 3 до 32 символов: латиница, цифры и дефис. Без пробелов и подчёркиваний.",
+        usernameSaveCta: "Сохранить",
+        usernameCancelCta: "Отмена",
+        usernameUnchangedHint: "Новый никнейм совпадает с текущим.",
+        usernameConfirmTitle: "Изменить никнейм?",
+        usernameConfirmMessageTemplate:
+          "Новый адрес — мастеррядом.рф/u/{username}. Старая ссылка будет автоматически перенаправлять на новую. Платформа хранит до 10 прошлых вариантов; после этого самые старые могут перестать работать.",
+        usernameConfirmCta: "Изменить никнейм",
+        usernameErrorTaken: "Этот никнейм уже занят. Попробуйте другой.",
+        usernameErrorGeneric: "Не удалось сохранить никнейм. Попробуйте ещё раз.",
       },
       contacts: {
         title: "Контакты",

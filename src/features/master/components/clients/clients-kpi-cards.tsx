@@ -13,7 +13,11 @@ type Props = {
 /**
  * Top-of-page KPI strip. Four uniform tiles — same layout as the
  * notifications page so cabinets feel like a coherent set. Subtext slot
- * shows the secondary metric (e.g. average LTV under the total).
+ * shows the secondary metric (e.g. average revenue under the total).
+ *
+ * The «Общая выручка» tile carries a `labelTooltip` because the
+ * Russian phrase, while clearer than the old "LTV" abbreviation,
+ * still benefits from a one-line explanation of what's summed.
  */
 export function ClientsKpiCards({ stats }: Props) {
   return (
@@ -32,6 +36,7 @@ export function ClientsKpiCards({ stats }: Props) {
       <KpiTile
         icon={Wallet}
         label={T.ltvLabel}
+        labelTooltip={T.ltvLabelTooltip}
         value={formatRubles(stats.totalLtv)}
         subtext={T.ltvSubtextTemplate.replace("{avg}", formatRubles(stats.avgLtv))}
         accent="neutral"
@@ -57,12 +62,17 @@ export function ClientsKpiCards({ stats }: Props) {
 function KpiTile({
   icon: Icon,
   label,
+  labelTooltip,
   value,
   subtext,
   accent,
 }: {
   icon: typeof Users;
   label: string;
+  /** Optional explanatory text shown on hover/long-press. Used for
+   * tiles whose label is concise (e.g. «Общая выручка») but where a
+   * one-line definition aids first-time readers. */
+  labelTooltip?: string;
   value: string;
   subtext: string;
   accent: "primary" | "success" | "neutral";
@@ -76,7 +86,13 @@ function KpiTile({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p
+          title={labelTooltip}
+          className={cn(
+            "font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec",
+            labelTooltip && "cursor-help decoration-text-sec/30 decoration-dotted underline-offset-2 hover:underline",
+          )}
+        >
           {label}
         </p>
         <Icon className="h-3.5 w-3.5 shrink-0 text-text-sec/60" aria-hidden />
