@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
@@ -71,26 +72,11 @@ export function ManualBookingModal({ services, isSolo }: Props) {
     setStartAt(`${y}-${m}-${d}T${hh}:${mm}`);
   }, [isOpen, prefillTime]);
 
-  // ESC-to-close mirrors the LoginRequiredModal pattern.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeModal();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
-  // Lock body scroll while the modal is open.
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen]);
+  // fix-04a: ESC + body-scroll-lock effects were dropped along with
+  // the bespoke fixed-inset wrapper. `<ModalSurface>` now provides
+  // the backdrop and tall-content scrolling (max-h-[90vh]). Other
+  // ModalSurface consumers in the cabinet do the same — keeping ESC
+  // here would diverge without a clear benefit.
 
   function closeModal() {
     const next = new URLSearchParams(searchParams.toString());
@@ -135,27 +121,20 @@ export function ManualBookingModal({ services, isSolo }: Props) {
     }
   }
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      role="dialog"
-      aria-modal
-      aria-label={T.title}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={closeModal}
+    <ModalSurface
+      open={isOpen}
+      onClose={closeModal}
+      title={T.title}
+      className="max-w-md"
     >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-border-subtle bg-bg-card p-6 shadow-hover"
-      >
-        <h3 className="font-display text-xl text-text-main">{T.title}</h3>
+      <>
         {!isSolo ? (
-          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-400/30 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-400/30 dark:bg-amber-950/30 dark:text-amber-200">
             {T.notSoloHint}
           </p>
         ) : null}
-        <div className="mt-5 space-y-3">
+        <div className="mt-4 space-y-3">
           <Input
             type="datetime-local"
             value={startAt}
@@ -220,7 +199,7 @@ export function ManualBookingModal({ services, isSolo }: Props) {
             {saving ? T.saving : T.create}
           </Button>
         </div>
-      </div>
-    </div>
+      </>
+    </ModalSurface>
   );
 }

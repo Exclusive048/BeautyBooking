@@ -149,17 +149,14 @@ export async function rescheduleBooking(input: {
     return { ok: false, status: 409, message: "Booking cannot be rescheduled", code: "CONFLICT" };
   }
 
-  if (runtimeStatus === "CONFIRMED" && input.actor === "MASTER") {
-    const comment = input.comment?.trim() ?? "";
-    if (comment.length === 0) {
-      return {
-        ok: false,
-        status: 400,
-        message: "Comment is required for master reschedule request",
-        code: "VALIDATION_ERROR",
-      };
-    }
-  }
+  // fix-04a: the previous master-only required-comment guard was
+  // dropped. The Zod schema already marks `comment` as optional and
+  // the UI labels it "(необязательно)" — enforcing it on the server
+  // produced an API/UI contract violation where empty submits failed
+  // with an English "Comment is required" leaking to the dialog.
+  // When the master provides one it still flows into the
+  // notification payload below; when empty, the generic
+  // «Мастер перенёс запись...» body is used.
 
   if (typeof input.silentMode === "boolean") {
     if (input.actor !== "CLIENT" || !booking.clientUserId || booking.clientUserId !== input.actorUserId) {
@@ -210,14 +207,14 @@ export async function rescheduleBooking(input: {
     };
   }
 
-  if (input.actor === "MASTER" && runtimeStatus !== "CONFIRMED") {
-    return {
-      ok: false,
-      status: 409,
-      message: "Master can request reschedule only for confirmed bookings",
-      code: "CONFLICT",
-    };
-  }
+  // fix-04a: dropped the CONFIRMED-only restriction for masters.
+  // The earlier rule produced "Это время занято" in the schedule UI
+  // for every PENDING booking the master tried to reschedule —
+  // because the client modal mapped *every* 409 to that friendly
+  // message, swallowing the real "only for confirmed" reason. Masters
+  // legitimately need to nudge clients toward a workable time on
+  // pending bookings (the status validation up at line 148 still
+  // bounds the action to PENDING/CONFIRMED).
 
   const updated = await prisma.booking.update({
     where: { id: booking.id },

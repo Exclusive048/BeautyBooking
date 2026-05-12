@@ -1,6 +1,7 @@
 "use client";
 
 import { Minus, X } from "lucide-react";
+import { useConfirm } from "@/hooks/use-confirm";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatDaysOfWeek, type RecurringBreakGroup } from "../lib/format-helpers";
 
@@ -13,11 +14,20 @@ type Props = {
 
 /**
  * Compact row for one recurring-break group. Uses the existing day badge
- * (e.g. "Пн-Пт"), break title, and time range. Delete uses native confirm
- * to keep the list dense.
+ * (e.g. "Пн-Пт"), break title, and time range.
  */
 export function BreakCard({ group, onDelete }: Props) {
   const title = group.title?.trim() || T.fallbackTitle;
+  const { confirm, modal } = useConfirm();
+
+  async function handleClick() {
+    const ok = await confirm({
+      message: T.deleteConfirm,
+      variant: "danger",
+    });
+    if (ok) onDelete();
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
       <Minus className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
@@ -30,14 +40,13 @@ export function BreakCard({ group, onDelete }: Props) {
       </span>
       <button
         type="button"
-        onClick={() => {
-          if (window.confirm(T.deleteConfirm)) onDelete();
-        }}
+        onClick={() => void handleClick()}
         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-rose-600"
         aria-label={T.deleteAria}
       >
         <X className="h-4 w-4" aria-hidden />
       </button>
+      {modal}
     </div>
   );
 }

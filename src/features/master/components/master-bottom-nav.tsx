@@ -46,7 +46,7 @@ const MORE_ITEMS = [
   { href: "/cabinet/master/reviews", label: t.menuReviews, icon: Star },
   { href: "/cabinet/master/analytics", label: t.menuAnalytics, icon: BarChart3 },
   { href: "/cabinet/master/billing", label: t.menuBilling, icon: CreditCard },
-  { href: "/cabinet/master/settings", label: t.menuSettings, icon: Settings },
+  { href: "/cabinet/master/account", label: t.menuSettings, icon: Settings },
 ];
 
 const MORE_PATHS = MORE_ITEMS.map((item) => item.href);

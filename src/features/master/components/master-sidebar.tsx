@@ -59,7 +59,13 @@ const HREF = {
   analytics: "/cabinet/master/analytics",
   modelOffers: "/cabinet/master/model-offers",
   profile: "/cabinet/master/profile",
-  settings: "/cabinet/master/settings",
+  // fix-04a: was `/cabinet/master/settings`, which existed only as a
+  // `redirect("/cabinet/master/profile")` stub — the sidebar's
+  // "Настройки аккаунта" entry therefore bounced the master to their
+  // profile instead of the real account page. The proper page has
+  // always lived at `/cabinet/master/account` (now split into
+  // notifications / security / account sub-routes).
+  settings: "/cabinet/master/account",
 } as const;
 
 function isActive(pathname: string, href: string, exact = false): boolean {

@@ -3,6 +3,7 @@
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -25,6 +26,7 @@ type Props = {
  */
 export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
   const router = useRouter();
+  const { confirm, modal: confirmModal } = useConfirm();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -57,7 +59,11 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
   const remove = async () => {
     if (busy) return;
     setOpen(false);
-    if (!window.confirm(errorTexts.confirmDelete)) return;
+    const ok = await confirm({
+      message: errorTexts.confirmDelete,
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const response = await fetch(baseUrl, { method: "DELETE" });
@@ -118,6 +124,7 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
           </ul>
         </>
       ) : null}
+      {confirmModal}
     </div>
   );
 }

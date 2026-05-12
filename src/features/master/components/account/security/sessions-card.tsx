@@ -4,6 +4,7 @@ import { LogOut, Monitor } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { MasterAccountSessions } from "@/lib/master/account-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -37,6 +38,7 @@ type Props = {
  */
 export function SessionsCard({ sessions }: Props) {
   const router = useRouter();
+  const { confirm, modal: confirmModal } = useConfirm();
   const [revoking, setRevoking] = useState(false);
 
   const countLabel = pluralize(
@@ -52,7 +54,11 @@ export function SessionsCard({ sessions }: Props) {
       window.alert(T.revokeOthersOnlyCurrent);
       return;
     }
-    if (!window.confirm(T.revokeOthersConfirm)) return;
+    const ok = await confirm({
+      message: T.revokeOthersConfirm,
+      variant: "danger",
+    });
+    if (!ok) return;
     setRevoking(true);
     try {
       const response = await fetch("/api/master/account/sessions/revoke-others", {
@@ -95,6 +101,7 @@ export function SessionsCard({ sessions }: Props) {
           {T.revokeOthersCta}
         </Button>
       </div>
+      {confirmModal}
     </section>
   );
 }

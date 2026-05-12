@@ -4,6 +4,7 @@ import { Archive, Pencil, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/hooks/use-confirm";
 import type {
   ActiveOfferItem,
   AvailableServiceForOffer,
@@ -26,12 +27,13 @@ type Props = {
  *   CLOSED   → [Archive]
  *   ARCHIVED → nothing
  *
- * Close + archive use `window.confirm` — quick, native, mobile-friendly.
- * For close-with-applications the prompt warns that pending apps will
+ * Close + archive go through the branded confirm dialog. For
+ * close-with-applications the prompt warns that pending apps will
  * be cascade-rejected.
  */
 export function OfferActionsRow({ offer, services }: Props) {
   const router = useRouter();
+  const { confirm, modal: confirmModal } = useConfirm();
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -54,7 +56,11 @@ export function OfferActionsRow({ offer, services }: Props) {
           ) +
           ")"
         : T.confirmClose;
-    if (!window.confirm(promptText)) return;
+    const ok = await confirm({
+      message: promptText,
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const response = await fetch(`/api/master/model-offers/${offer.id}/close`, {
@@ -72,7 +78,10 @@ export function OfferActionsRow({ offer, services }: Props) {
 
   const archive = async () => {
     if (busy) return;
-    if (!window.confirm(T.confirmArchive)) return;
+    const ok = await confirm({
+      message: T.confirmArchive,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const response = await fetch(`/api/master/model-offers/${offer.id}`, {
@@ -142,6 +151,7 @@ export function OfferActionsRow({ offer, services }: Props) {
           services={services}
         />
       ) : null}
+      {confirmModal}
     </>
   );
 }

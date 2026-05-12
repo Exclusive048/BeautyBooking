@@ -19,6 +19,9 @@ export const UI_TEXT = {
     saved: "Сохранено",
     saving: "Сохраняем...",
     toggleTheme: "Переключить тему",
+    confirmDefaultTitle: "Подтвердите действие",
+    confirmDefaultLabel: "Подтвердить",
+    confirmPending: "Подождите...",
   },
   brand: {
     name: "МастерРядом",
@@ -3067,6 +3070,13 @@ export const UI_TEXT = {
         declineAction: "Отклонить",
         chatAction: "Чат",
         moreAction: "Действия",
+        rescheduleAction: "Перенести",
+        cancelAction: "Отменить",
+        cancelConfirmTitle: "Отменить запись?",
+        cancelConfirmMessage:
+          "Клиент получит уведомление об отмене. Действие нельзя отменить.",
+        cancelConfirmCta: "Отменить запись",
+        cancelFailed: "Не удалось отменить запись. Попробуйте ещё раз.",
       },
       attention: {
         title: "Требуют внимания",

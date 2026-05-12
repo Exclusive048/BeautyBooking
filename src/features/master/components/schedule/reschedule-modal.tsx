@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
 import { formatHm } from "@/lib/master/schedule-utils";
 import type { ApiResponse } from "@/lib/types/api";
@@ -82,20 +83,10 @@ export function RescheduleModal({
     setError(null);
   }, [open, startAtUtc]);
 
-  // Body scroll lock + ESC close — same shape as other modals in the app.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
+  // fix-04a: hand off backdrop + scroll cap to <ModalSurface>. The
+  // previous bespoke wrapper had no `max-h-[90vh]`, so on short
+  // laptop screens the dialog's top edge floated above the viewport
+  // and the date picker became unreachable.
 
   if (!open) return null;
 
@@ -126,13 +117,18 @@ export function RescheduleModal({
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        const status = res.status;
-        if (status === 409) {
+        // fix-04a: only `SLOT_CONFLICT` (true time overlap) gets the
+        // friendly «Это время занято» line. Other 409 codes (e.g.
+        // `CONFLICT` from change-request limits or status guards,
+        // `BOOKING_CANCELLED`, etc.) surface the server message so
+        // masters understand the real reason — previously the modal
+        // hid every 409 behind the slot-busy text.
+        const errorCode = json && !json.ok ? json.error.code : null;
+        const errorMessage = json && !json.ok ? json.error.message : null;
+        if (errorCode === "SLOT_CONFLICT") {
           throw new Error(T.conflictError);
         }
-        throw new Error(
-          (json && !json.ok && json.error.message) || T.genericError,
-        );
+        throw new Error(errorMessage || T.genericError);
       }
       onClose();
       startTransition(() => router.refresh());
@@ -144,20 +140,14 @@ export function RescheduleModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal
-      aria-label={T.modalTitle}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <ModalSurface
+      open={open}
+      onClose={onClose}
+      title={T.modalTitle}
+      className="max-w-md"
     >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-border-subtle bg-bg-card p-6 shadow-hover"
-      >
-        <h3 className="font-display text-xl text-text-main">{T.modalTitle}</h3>
-
-        <div className="mt-5 space-y-4">
+      <>
+        <div className="space-y-4">
           <div>
             <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
               {T.currentLabel}
@@ -226,7 +216,7 @@ export function RescheduleModal({
             {submitting ? T.submitting : T.submit}
           </Button>
         </div>
-      </div>
-    </div>
+      </>
+    </ModalSurface>
   );
 }

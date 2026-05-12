@@ -2,6 +2,7 @@
 
 import { Ban, Minus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatExceptionRange, type ExceptionGroup } from "../lib/format-helpers";
@@ -18,16 +19,21 @@ type Props = {
  * Single exception group. Rendered as a row with type badge + title +
  * date/time subtitle + edit/delete actions. Title falls back to a generic
  * "Выходной" / "Сокращённый день" when the underlying `note` is empty.
- *
- * Delete uses native `confirm()` — small footprint, prevents accidental
- * removal of multi-day blocks. Modal-based confirmation is overkill for a
- * single-item delete action in this dense list view.
  */
 export function ExceptionCard({ group, onEdit, onDelete }: Props) {
   const isOff = group.kind === "OFF";
   const Icon = isOff ? Ban : Minus;
   const title =
     group.note?.trim() || (isOff ? T.kind.offFallback : T.kind.shortFallback);
+  const { confirm, modal } = useConfirm();
+
+  async function handleDelete() {
+    const ok = await confirm({
+      message: T.deleteConfirm,
+      variant: "danger",
+    });
+    if (ok) onDelete();
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
@@ -57,15 +63,14 @@ export function ExceptionCard({ group, onEdit, onDelete }: Props) {
         </Button>
         <button
           type="button"
-          onClick={() => {
-            if (window.confirm(T.deleteConfirm)) onDelete();
-          }}
+          onClick={() => void handleDelete()}
           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-rose-600"
           aria-label={T.deleteAria}
         >
           <Trash2 className="h-4 w-4" aria-hidden />
         </button>
       </div>
+      {modal}
     </div>
   );
 }

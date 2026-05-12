@@ -5,6 +5,7 @@ import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import type {
   PortfolioCategoryOption,
@@ -46,6 +47,7 @@ export function PortfolioCard({
   masterTags,
 }: Props) {
   const router = useRouter();
+  const { confirm, modal: confirmModal } = useConfirm();
   const [editOpen, setEditOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -73,7 +75,11 @@ export function PortfolioCard({
   const handleDelete = async () => {
     if (busy) return;
     setMenuOpen(false);
-    if (!window.confirm(UI_TEXT.cabinetMaster.portfolioPage.edit.confirmDelete)) return;
+    const ok = await confirm({
+      message: UI_TEXT.cabinetMaster.portfolioPage.edit.confirmDelete,
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const response = await fetch(`/api/master/portfolio/${item.id}`, { method: "DELETE" });
@@ -194,6 +200,7 @@ export function PortfolioCard({
           masterTags={masterTags}
         />
       ) : null}
+      {confirmModal}
     </>
   );
 }

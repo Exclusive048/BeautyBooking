@@ -1,6 +1,6 @@
-import { MessageSquare, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BookingActionButtons } from "@/features/master/components/dashboard/booking-action-buttons";
+import { BookingRowActions } from "@/features/master/components/dashboard/booking-row-actions";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -24,14 +24,17 @@ function initialsOf(name: string): string {
 
 type Props = {
   booking: DashboardBooking;
+  /** Master's own provider id — needed by the action island to
+   * build the chat deep-link `?key=<providerId>:<clientUserId>`. */
+  providerId: string;
 };
 
 /**
  * One booking row in the "Ближайшие записи" list. Server-renderable except
- * the confirm/decline buttons which are wrapped into a client island
- * (`<BookingActionButtons>`).
+ * the action buttons (chat / reschedule / cancel) and the
+ * confirm/decline pending buttons, both wrapped into client islands.
  */
-export function BookingRow({ booking }: Props) {
+export function BookingRow({ booking, providerId }: Props) {
   return (
     <div className="flex gap-4 px-4 py-4">
       <div className="w-12 shrink-0 text-center">
@@ -84,22 +87,7 @@ export function BookingRow({ booking }: Props) {
         ) : null}
 
         <div className="mt-3 flex items-center justify-between gap-2">
-          <div className="flex gap-1">
-            <button
-              type="button"
-              aria-label={T.chatAction}
-              className="grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input/70 hover:text-text-main"
-            >
-              <MessageSquare className="h-3.5 w-3.5" aria-hidden />
-            </button>
-            <button
-              type="button"
-              aria-label={T.moreAction}
-              className="grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input/70 hover:text-text-main"
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          </div>
+          <BookingRowActions providerId={providerId} booking={booking} />
           {booking.isPending ? (
             <BookingActionButtons bookingId={booking.id} />
           ) : null}

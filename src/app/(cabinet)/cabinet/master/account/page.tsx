@@ -1,15 +1,11 @@
-import { MasterAccountPage } from "@/features/master/components/account/master-account-page";
-
-type SearchParams = Record<string, string | string[] | undefined>;
+import { redirect } from "next/navigation";
 
 /**
- * `/cabinet/master/account` — личные настройки master (31-final).
- * Reads `?tab=notifications|security|account`; default — notifications.
+ * fix-04a: `/account` itself has no content — it redirects to the
+ * default sub-page (notifications). The shared layout in
+ * `account/layout.tsx` renders the page header + nav for every
+ * sub-route.
  */
-export default async function MasterAccountRoute({
-  searchParams,
-}: {
-  searchParams?: Promise<SearchParams>;
-}) {
-  return <MasterAccountPage searchParams={searchParams} />;
+export default function MasterAccountIndexRoute() {
+  redirect("/cabinet/master/account/notifications");
 }

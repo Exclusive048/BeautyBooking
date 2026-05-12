@@ -9,6 +9,11 @@ export type DashboardBooking = {
   startAtUtc: Date;
   endAtUtc: Date;
   status: BookingStatus;
+  /** Client's user id when the booking is linked to a registered
+   * user — needed by the dashboard row to build the master-side chat
+   * deep-link `?key=<providerId>:<clientUserId>`. `null` for guest
+   * bookings (no chat thread). */
+  clientUserId: string | null;
   clientName: string;
   serviceTitle: string;
   durationMin: number;
@@ -281,6 +286,7 @@ export const getMasterDashboardData = cache(
           startAtUtc: row.startAtUtc,
           endAtUtc: row.endAtUtc,
           status: row.status,
+          clientUserId: row.clientUserId,
           clientName: row.clientName,
           serviceTitle: row.service.title?.trim() || row.service.name,
           durationMin: row.service.durationMin,

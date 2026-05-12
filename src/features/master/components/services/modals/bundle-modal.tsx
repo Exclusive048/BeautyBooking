@@ -7,6 +7,7 @@ import { DiscountType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import type {
   MasterServicesViewData,
@@ -54,6 +55,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
   const [isEnabled, setIsEnabled] = useState(bundle?.isEnabled ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const trimmedName = name.trim();
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -142,7 +144,11 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
   const handleDelete = async () => {
     if (mode !== "edit" || !bundle) return;
     if (saving) return;
-    if (!window.confirm(T.confirmDelete)) return;
+    const ok = await confirm({
+      message: T.confirmDelete,
+      variant: "danger",
+    });
+    if (!ok) return;
     setSaving(true);
     setError(null);
     try {
@@ -163,6 +169,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
   };
 
   return (
+    <>
     <ModalSurface
       open={open}
       onClose={close}
@@ -326,6 +333,8 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         </div>
       </div>
     </ModalSurface>
+    {confirmModal}
+    </>
   );
 }
 

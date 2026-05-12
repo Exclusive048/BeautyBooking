@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import type {
   PortfolioCategoryOption,
@@ -48,6 +49,7 @@ export function EditItemModal({
   const [isPublic, setIsPublic] = useState<boolean>(item.isPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, modal: confirmModal } = useConfirm();
   const [cropOpen, setCropOpen] = useState(false);
 
   // React 19 sync-to-props (compare during render). When the master
@@ -100,7 +102,11 @@ export function EditItemModal({
 
   const handleDelete = async () => {
     if (saving) return;
-    if (!window.confirm(T.confirmDelete)) return;
+    const ok = await confirm({
+      message: T.confirmDelete,
+      variant: "danger",
+    });
+    if (!ok) return;
     setSaving(true);
     setError(null);
     try {
@@ -272,6 +278,7 @@ export function EditItemModal({
           imageUrl={item.mediaUrl}
         />
       ) : null}
+      {confirmModal}
     </>
   );
 }

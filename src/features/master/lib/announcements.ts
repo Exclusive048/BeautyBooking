@@ -29,7 +29,7 @@ export const ANNOUNCEMENTS: ReadonlyArray<AnnouncementItem> = [
     label: "АНОНС",
     title: "Авто-напоминания клиентам по WhatsApp",
     description: "Включается в настройках. Бесплатно для Premium-аккаунтов.",
-    href: "/cabinet/master/settings",
+    href: "/cabinet/master/account",
   },
   {
     id: "training-checks",

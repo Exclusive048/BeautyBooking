@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
+import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import type {
   ServiceCategoryOption,
@@ -66,6 +67,7 @@ export function ServiceModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const trimmedName = name.trim();
   const priceKopeks = (() => {
@@ -134,7 +136,11 @@ export function ServiceModal({
   const handleDelete = async () => {
     if (mode !== "edit" || !service) return;
     if (saving) return;
-    if (!window.confirm(T.confirmDelete)) return;
+    const ok = await confirm({
+      message: T.confirmDelete,
+      variant: "danger",
+    });
+    if (!ok) return;
     setSaving(true);
     setError(null);
     try {
@@ -161,6 +167,7 @@ export function ServiceModal({
   };
 
   return (
+    <>
     <ModalSurface open={open} onClose={close} title={mode === "create" ? T.title.create : T.title.edit} className="max-w-xl">
       <div className="space-y-4">
         <Field label={T.nameLabel}>
@@ -277,6 +284,8 @@ export function ServiceModal({
         </div>
       </div>
     </ModalSurface>
+    {confirmModal}
+    </>
   );
 }
 
