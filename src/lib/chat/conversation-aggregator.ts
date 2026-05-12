@@ -2,9 +2,9 @@ import { ChatSenderType, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { OPEN_STATUSES } from "@/lib/chat/status";
 import {
-  serializeConversationKey,
+  getOrCreateConversationSlug,
   type ConversationKey,
-} from "@/lib/chat/conversation-key";
+} from "@/lib/chat/conversation-slug";
 import {
   injectDaySeparators,
   type ThreadItem,
@@ -12,7 +12,7 @@ import {
 import type { ConversationParticipant } from "@/lib/chat/conversation-access";
 
 /**
- * Per-pair conversation aggregator (33a).
+ * Per-pair conversation aggregator (33a, updated by chat-url-fix).
  *
  * The schema stores ChatMessage per BookingChat per Booking. The UI
  * wants per-person threads — one entry per (provider, client) pair,
@@ -23,8 +23,12 @@ import type { ConversationParticipant } from "@/lib/chat/conversation-access";
  *   - listConversations  → ConversationListItem[] (sidebar list)
  *   - getThread          → ThreadItem[] + meta (active chat window)
  *
- * Conversation identity = `${providerId}:${clientUserId}` — see
- * `conversation-key.ts`.
+ * Conversation identity used to be the serialised
+ * `${providerId}:${clientUserId}` key (leaked internal cuids). It is
+ * now an opaque 10-char base62 slug allocated lazily by
+ * `getOrCreateConversationSlug`. The slug is the public handle in
+ * URLs and notification payloads; routes resolve it back to the pair
+ * via `resolveConversationSlug` before calling the aggregator.
  */
 
 export type ConversationPartner = {
@@ -45,7 +49,9 @@ export type ConversationPartner = {
 };
 
 export type ConversationListItem = {
-  key: string;
+  /** Opaque public slug identifying the (provider, client) pair.
+   * Stable across all bookings between the same two parties. */
+  slug: string;
   partner: ConversationPartner;
   lastMessage: {
     body: string;
@@ -58,7 +64,8 @@ export type ConversationListItem = {
 };
 
 export type ConversationDetail = {
-  key: string;
+  /** Opaque public slug for the (provider, client) pair. */
+  slug: string;
   partner: ConversationPartner;
   thread: ThreadItem[];
   canSend: boolean;
@@ -185,7 +192,9 @@ export async function listConversations(input: {
       providerId: booking.providerId,
       clientUserId: booking.clientUserId,
     };
-    const keySerialized = serializeConversationKey(key);
+    // Group key — internal only, never leaves the aggregator. We
+    // resolve to an opaque public slug in the return mapping below.
+    const pairId = `${key.providerId}:${key.clientUserId}`;
 
     const lastRaw = chat.messages[0];
     const lastMessage = lastRaw
@@ -201,7 +210,7 @@ export async function listConversations(input: {
     const latestActivityAt = lastRaw?.createdAt ?? chat.createdAt;
     const isOpen = OPEN_STATUSES.includes(booking.status);
 
-    const existing = grouped.get(keySerialized);
+    const existing = grouped.get(pairId);
     if (!existing) {
       const partner = buildPartner({
         perspective,
@@ -209,7 +218,7 @@ export async function listConversations(input: {
         clientSrc: booking.clientUser,
         bookingId: booking.id,
       });
-      grouped.set(keySerialized, {
+      grouped.set(pairId, {
         key,
         partner,
         lastMessage,
@@ -228,16 +237,26 @@ export async function listConversations(input: {
     }
   }
 
-  return Array.from(grouped.values())
-    .sort((a, b) => b.latestActivityAt.getTime() - a.latestActivityAt.getTime())
-    .map((entry) => ({
-      key: serializeConversationKey(entry.key),
-      partner: entry.partner,
-      lastMessage: entry.lastMessage,
-      unreadCount: entry.unreadCount,
-      hasOpenBooking: entry.hasOpenBooking,
-      latestActivityAt: entry.latestActivityAt.toISOString(),
-    }));
+  const ordered = Array.from(grouped.values()).sort(
+    (a, b) => b.latestActivityAt.getTime() - a.latestActivityAt.getTime(),
+  );
+
+  // Resolve (or create) the opaque public slug per pair in parallel.
+  // Typical caller has ≤ a few dozen conversations — one round-trip
+  // each is acceptable; collisions are rare and handled inside
+  // `getOrCreateConversationSlug`.
+  const slugs = await Promise.all(
+    ordered.map((entry) => getOrCreateConversationSlug(entry.key)),
+  );
+
+  return ordered.map((entry, index) => ({
+    slug: slugs[index]!,
+    partner: entry.partner,
+    lastMessage: entry.lastMessage,
+    unreadCount: entry.unreadCount,
+    hasOpenBooking: entry.hasOpenBooking,
+    latestActivityAt: entry.latestActivityAt.toISOString(),
+  }));
 }
 
 type ProviderSrc = {
@@ -387,9 +406,10 @@ export async function getConversationThread(input: {
   });
 
   const thread = injectDaySeparators(flat, viewerTimezone);
+  const slug = await getOrCreateConversationSlug(key);
 
   return {
-    key: serializeConversationKey(key),
+    slug,
     partner,
     thread,
     canSend: Boolean(openBooking),

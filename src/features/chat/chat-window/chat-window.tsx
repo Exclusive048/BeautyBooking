@@ -12,26 +12,26 @@ const T = UI_TEXT.chat;
 
 type Props = {
   perspective: ChatPerspective;
-  conversationKey: string;
+  conversationSlug: string;
   viewerTimezone: string;
   onMobileBack?: () => void;
 };
 
 export function ChatWindow({
   perspective,
-  conversationKey,
+  conversationSlug,
   viewerTimezone,
   onMobileBack,
 }: Props) {
   const { detail, isLoading, error, refresh, markRead } = useConversationThread({
     perspective,
-    conversationKey,
+    conversationSlug,
   });
 
-  // Auto-mark read on mount + each time the key flips.
+  // Auto-mark read on mount + each time the slug flips.
   useEffect(() => {
     void markRead();
-  }, [markRead, conversationKey]);
+  }, [markRead, conversationSlug]);
 
   if (error) {
     return (
@@ -86,7 +86,7 @@ export function ChatWindow({
       <Thread items={detail.thread} perspective={perspective} viewerTimezone={viewerTimezone} />
       <Composer
         perspective={perspective}
-        conversationKey={conversationKey}
+        conversationSlug={conversationSlug}
         canSend={detail.canSend}
         disabledHint={disabledHint}
         onSent={() => void refresh()}

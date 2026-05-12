@@ -3,16 +3,16 @@ import { AccountType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/access";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
-import { parseConversationKey } from "@/lib/chat/conversation-key";
+import { resolveConversationSlug } from "@/lib/chat/conversation-slug";
 import { resolveConversationAccess } from "@/lib/chat/conversation-access";
-import { markConversationRead } from "@/lib/chat/conversation-aggregator";
+import { getConversationThread } from "@/lib/chat/conversation-aggregator";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
 
-type RouteParams = Promise<{ key: string }>;
+type RouteParams = Promise<{ slug: string }>;
 
-export async function POST(
+export async function GET(
   req: NextRequest,
   ctx: { params: RouteParams },
 ) {
@@ -21,9 +21,11 @@ export async function POST(
     const user = await getSessionUser(req);
     userId = user.userId;
     const params = await ctx.params;
-    const key = parseConversationKey(decodeURIComponent(params.key));
+    const slug = decodeURIComponent(params.slug);
+
+    const key = await resolveConversationSlug(slug);
     if (!key) {
-      return jsonFail(400, "Некорректная переписка.", "VALIDATION_ERROR");
+      return jsonFail(404, "Переписка не найдена.", "NOT_FOUND");
     }
 
     const url = new URL(req.url);
@@ -45,13 +47,32 @@ export async function POST(
       );
     }
 
-    const count = await markConversationRead({ key, perspective });
-    return jsonOk({ markedCount: count });
+    const tzHint = req.headers.get("x-tz") ?? undefined;
+
+    const detail = await getConversationThread({
+      key,
+      perspective,
+      viewerTimezone: tzHint || "Europe/Moscow",
+    });
+    if (!detail) {
+      return jsonFail(404, "Переписка не найдена.", "NOT_FOUND");
+    }
+
+    return jsonOk({
+      slug: detail.slug,
+      thread: detail.thread,
+      partner: detail.partner,
+      perspective,
+      canSend: access.canSend,
+      openBookingId: access.openBookingId,
+      readonlyOnly: access.readonlyOnly,
+      timezone: detail.timezone,
+    });
   } catch (error) {
     const appError = toAppError(error);
     const requestId = getRequestId(req);
     if (appError.status >= 500) {
-      logError("POST /api/chat/threads/[key]/read failed", {
+      logError("GET /api/chat/threads/[slug] failed", {
         requestId,
         userId,
         stack: error instanceof Error ? error.stack : undefined,

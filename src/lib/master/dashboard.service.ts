@@ -2,6 +2,7 @@ import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getPendingBookingsForMaster, type PendingBookingRow } from "@/lib/bookings/master-pending-list";
+import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { getUnansweredReviewsForMaster, type UnansweredReviewRow } from "@/lib/reviews/unanswered-list";
 
 export type DashboardBooking = {
@@ -10,10 +11,13 @@ export type DashboardBooking = {
   endAtUtc: Date;
   status: BookingStatus;
   /** Client's user id when the booking is linked to a registered
-   * user — needed by the dashboard row to build the master-side chat
-   * deep-link `?key=<providerId>:<clientUserId>`. `null` for guest
-   * bookings (no chat thread). */
+   * user. `null` for guest bookings (no chat thread). */
   clientUserId: string | null;
+  /** Opaque public slug for the master ↔ client chat thread.
+   * Server-resolved here so `<BookingRowActions>` can build the chat
+   * deep-link without exposing internal cuids. `null` for guest
+   * bookings (no clientUserId → no thread). chat-url-fix. */
+  chatSlug: string | null;
   clientName: string;
   serviceTitle: string;
   durationMin: number;
@@ -272,31 +276,47 @@ export const getMasterDashboardData = cache(
       resolveTodayWorkingWindow({ providerId: input.masterId, timezone: master.timezone, now }),
     ]);
 
-    const todayBookings: DashboardBooking[] = todayRows
-      .filter(
-        (row): row is typeof row & { startAtUtc: Date; endAtUtc: Date } =>
-          row.startAtUtc !== null && row.endAtUtc !== null,
-      )
-      .map((row) => {
-        const isPending =
-          row.status === BookingStatus.PENDING || row.status === BookingStatus.CHANGE_REQUESTED;
-        const isCurrent = now >= row.startAtUtc && now < row.endAtUtc;
-        return {
-          id: row.id,
-          startAtUtc: row.startAtUtc,
-          endAtUtc: row.endAtUtc,
-          status: row.status,
-          clientUserId: row.clientUserId,
-          clientName: row.clientName,
-          serviceTitle: row.service.title?.trim() || row.service.name,
-          durationMin: row.service.durationMin,
-          price: bookingPriceFromItems(row),
-          isPending,
-          isCurrent,
-          isNext: false,
-          changeComment: row.changeComment,
-        };
-      });
+    const validTodayRows = todayRows.filter(
+      (row): row is typeof row & { startAtUtc: Date; endAtUtc: Date } =>
+        row.startAtUtc !== null && row.endAtUtc !== null,
+    );
+
+    // Resolve chat slugs in parallel for bookings that have a
+    // clientUserId — keeps `<BookingRowActions>` free of cuids in the
+    // URL it builds. Guests (no clientUserId) get `null` and the
+    // action island hides the chat button. chat-url-fix.
+    const chatSlugs = await Promise.all(
+      validTodayRows.map((row) =>
+        row.clientUserId
+          ? getOrCreateConversationSlug({
+              providerId: input.masterId,
+              clientUserId: row.clientUserId,
+            })
+          : Promise.resolve(null),
+      ),
+    );
+
+    const todayBookings: DashboardBooking[] = validTodayRows.map((row, index) => {
+      const isPending =
+        row.status === BookingStatus.PENDING || row.status === BookingStatus.CHANGE_REQUESTED;
+      const isCurrent = now >= row.startAtUtc && now < row.endAtUtc;
+      return {
+        id: row.id,
+        startAtUtc: row.startAtUtc,
+        endAtUtc: row.endAtUtc,
+        status: row.status,
+        clientUserId: row.clientUserId,
+        chatSlug: chatSlugs[index] ?? null,
+        clientName: row.clientName,
+        serviceTitle: row.service.title?.trim() || row.service.name,
+        durationMin: row.service.durationMin,
+        price: bookingPriceFromItems(row),
+        isPending,
+        isCurrent,
+        isNext: false,
+        changeComment: row.changeComment,
+      };
+    });
 
     // Mark the next upcoming booking (first one ahead of `now`) so the hero
     // widget can render its countdown.

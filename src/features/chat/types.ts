@@ -13,7 +13,10 @@ export type ConversationPartnerDto = {
 };
 
 export type ConversationListItemDto = {
-  key: string;
+  /** Opaque public slug for the (provider, client) pair —
+   * chat-url-fix renamed `key` → `slug` so URLs no longer leak
+   * internal cuids. */
+  slug: string;
   partner: ConversationPartnerDto;
   lastMessage: {
     body: string;
@@ -45,6 +48,8 @@ export type ThreadDaySeparatorDto = {
 export type ThreadItemDto = ThreadMessageDto | ThreadDaySeparatorDto;
 
 export type ConversationThreadDto = {
+  /** Opaque public slug echoed back from the API for symmetry. */
+  slug: string;
   thread: ThreadItemDto[];
   partner: ConversationPartnerDto;
   perspective: "MASTER" | "CLIENT";

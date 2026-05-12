@@ -4,16 +4,17 @@ import { AppError } from "@/lib/api/errors";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { resolveConversationAccess } from "@/lib/chat/conversation-access";
 import {
-  parseConversationKey,
-  serializeConversationKey,
+  getOrCreateConversationSlug,
+  resolveConversationSlug,
   type ConversationKey,
-} from "@/lib/chat/conversation-key";
+} from "@/lib/chat/conversation-slug";
 import type { ConversationParticipant } from "@/lib/chat/conversation-access";
 
 const MAX_BODY_LENGTH = 1000;
 
 /**
- * Send a message in a conversation (33a).
+ * Send a message in a conversation (33a, slug-aware after
+ * chat-url-fix).
  *
  * Reuses the existing per-booking send semantics: we resolve the
  * conversation's open booking (CONFIRMED | PREPAID | STARTED |
@@ -23,9 +24,13 @@ const MAX_BODY_LENGTH = 1000;
  *
  * Notification delivery uses the existing CHAT_MESSAGE_RECEIVED
  * flow — so SSE/push/telegram all keep working without changes.
+ * Payload carries `conversationSlug` (was: `conversationKey`); the
+ * pushUrl uses the slug form `/cabinet/master/messages?c=<slug>` so
+ * neither URL nor notification leaks internal cuids.
  */
 export type SendMessageInput = {
-  rawKey: string;
+  /** Opaque conversation slug from the route param. */
+  slug: string;
   perspective: ConversationParticipant;
   userId: string;
   body: string;
@@ -41,7 +46,7 @@ export type SendMessageResult = {
     createdAt: string;
     bookingId: string;
   };
-  conversationKey: string;
+  conversationSlug: string;
 };
 
 function deriveSenderName(input: {
@@ -73,9 +78,9 @@ function previewBody(body: string): string {
 export async function sendConversationMessage(
   input: SendMessageInput,
 ): Promise<SendMessageResult> {
-  const key = parseConversationKey(input.rawKey);
+  const key = await resolveConversationSlug(input.slug);
   if (!key) {
-    throw new AppError("Некорректная переписка.", 400, "VALIDATION_ERROR");
+    throw new AppError("Переписка не найдена.", 404, "NOT_FOUND");
   }
 
   const body = input.body.trim();
@@ -169,16 +174,18 @@ export async function sendConversationMessage(
 
   // Notify the other side via the existing CHAT_MESSAGE_RECEIVED
   // path — SSE + push + telegram all still work. Conversation-aware
-  // routing: payload carries the conversationKey so receivers can
+  // routing: payload carries the conversationSlug so receivers can
   // open the right thread in the new chat surface, plus the
   // bookingId for the legacy <BookingChat> in booking detail.
   if (recipientUserId) {
-    const conversationKeyRaw = serializeConversationKey(key);
+    // Reuse the slug for the same pair when notifying the recipient —
+    // it's the same conversation regardless of perspective.
+    const conversationSlug = await getOrCreateConversationSlug(key);
     const preview = previewBody(message.body);
     const recipientPath: string =
       senderType === ChatSenderType.CLIENT
-        ? `/cabinet/master/messages?key=${encodeURIComponent(conversationKeyRaw)}`
-        : `/cabinet/messages?key=${encodeURIComponent(conversationKeyRaw)}`;
+        ? `/cabinet/master/messages?c=${encodeURIComponent(conversationSlug)}`
+        : `/cabinet/messages?c=${encodeURIComponent(conversationSlug)}`;
     await deliverNotification({
       userId: recipientUserId,
       type: NotificationType.CHAT_MESSAGE_RECEIVED,
@@ -188,7 +195,7 @@ export async function sendConversationMessage(
         bookingId: booking.id,
         chatId: chat.id,
         messageId: message.id,
-        conversationKey: conversationKeyRaw,
+        conversationSlug,
         senderType,
         senderName,
         bodyPreview: preview,
@@ -207,7 +214,7 @@ export async function sendConversationMessage(
       createdAt: message.createdAt.toISOString(),
       bookingId: booking.id,
     },
-    conversationKey: serializeConversationKey(key),
+    conversationSlug: input.slug,
   };
 }
 

@@ -24,17 +24,18 @@ function initialsOf(name: string): string {
 
 type Props = {
   booking: DashboardBooking;
-  /** Master's own provider id — needed by the action island to
-   * build the chat deep-link `?key=<providerId>:<clientUserId>`. */
-  providerId: string;
 };
 
 /**
  * One booking row in the "Ближайшие записи" list. Server-renderable except
  * the action buttons (chat / reschedule / cancel) and the
  * confirm/decline pending buttons, both wrapped into client islands.
+ *
+ * chat-url-fix: the chat deep-link is now driven by `booking.chatSlug`
+ * (server-resolved in `dashboard.service.ts`). The row no longer
+ * needs the master's own provider id.
  */
-export function BookingRow({ booking, providerId }: Props) {
+export function BookingRow({ booking }: Props) {
   return (
     <div className="flex gap-4 px-4 py-4">
       <div className="w-12 shrink-0 text-center">
@@ -87,7 +88,7 @@ export function BookingRow({ booking, providerId }: Props) {
         ) : null}
 
         <div className="mt-3 flex items-center justify-between gap-2">
-          <BookingRowActions providerId={providerId} booking={booking} />
+          <BookingRowActions booking={booking} />
           {booking.isPending ? (
             <BookingActionButtons bookingId={booking.id} />
           ) : null}

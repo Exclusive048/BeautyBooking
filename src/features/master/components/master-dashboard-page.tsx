@@ -119,7 +119,6 @@ export async function MasterDashboardPage() {
           <UpcomingBookingsSection
             upcoming={data.upcomingBookings}
             totalTodayCount={data.todayBookings.length}
-            providerId={data.master.id}
           />
           <AttentionSection
             pendingBookings={data.pendingBookings}

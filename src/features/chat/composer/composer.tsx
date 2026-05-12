@@ -13,7 +13,7 @@ const MAX_TEXTAREA_HEIGHT = 120;
 
 type Props = {
   perspective: ChatPerspective;
-  conversationKey: string;
+  conversationSlug: string;
   canSend: boolean;
   disabledHint: string | null;
   onSent: () => void;
@@ -21,7 +21,7 @@ type Props = {
 
 export function Composer({
   perspective,
-  conversationKey,
+  conversationSlug,
   canSend,
   disabledHint,
   onSent,
@@ -55,7 +55,7 @@ export function Composer({
   useEffect(() => {
     setDraft("");
     setErrorMessage(null);
-  }, [conversationKey]);
+  }, [conversationSlug]);
 
   async function handleSubmit(event?: FormEvent) {
     event?.preventDefault();
@@ -65,7 +65,7 @@ export function Composer({
     setErrorMessage(null);
     try {
       const res = await fetch(
-        `/api/chat/threads/${encodeURIComponent(conversationKey)}/messages?as=${perspective}`,
+        `/api/chat/threads/${encodeURIComponent(conversationSlug)}/messages?as=${perspective}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

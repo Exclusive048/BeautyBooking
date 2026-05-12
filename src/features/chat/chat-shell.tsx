@@ -30,7 +30,7 @@ type Props = {
 export function ChatShell({ perspective }: Props) {
   const searchParams = useSearchParams();
   const { conversations, isLoading } = useConversations(perspective);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [mobileWindowOpen, setMobileWindowOpen] = useState(false);
 
   const viewerTimezone = useMemo(() => {
@@ -41,24 +41,26 @@ export function ChatShell({ perspective }: Props) {
     }
   }, []);
 
-  // Honor `?key=<conversationKey>` from incoming notification click-throughs.
+  // Honor `?c=<slug>` from incoming notification click-throughs.
+  // chat-url-fix replaced the previous `?key=<providerId:clientUserId>`
+  // form so URLs no longer leak internal cuids.
   useEffect(() => {
-    const hinted = searchParams.get("key");
+    const hinted = searchParams.get("c");
     if (hinted) {
-      setActiveKey(hinted);
+      setActiveSlug(hinted);
       setMobileWindowOpen(true);
     }
   }, [searchParams]);
 
   // First-load auto-select: most recently active conversation.
   useEffect(() => {
-    if (activeKey) return;
+    if (activeSlug) return;
     if (conversations.length === 0) return;
-    setActiveKey(conversations[0]?.key ?? null);
-  }, [activeKey, conversations]);
+    setActiveSlug(conversations[0]?.slug ?? null);
+  }, [activeSlug, conversations]);
 
-  function handlePick(key: string) {
-    setActiveKey(key);
+  function handlePick(slug: string) {
+    setActiveSlug(slug);
     setMobileWindowOpen(true);
   }
 
@@ -72,7 +74,7 @@ export function ChatShell({ perspective }: Props) {
     <div className="flex h-[calc(100vh-var(--topbar-h,4rem)-6rem)] min-h-[560px] overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm">
       <ConversationList
         conversations={conversations}
-        activeKey={activeKey}
+        activeSlug={activeSlug}
         onPick={handlePick}
         perspective={perspective}
         isLoading={isLoading}
@@ -86,16 +88,16 @@ export function ChatShell({ perspective }: Props) {
       <div
         className={cn(
           "min-w-0 flex-1",
-          !activeKey && totalConversations === 0
+          !activeSlug && totalConversations === 0
             ? "flex items-center justify-center"
             : "flex flex-col",
           mobileWindowOpen ? "flex" : "hidden md:flex",
         )}
       >
-        {activeKey ? (
+        {activeSlug ? (
           <ChatWindow
             perspective={perspective}
-            conversationKey={activeKey}
+            conversationSlug={activeSlug}
             viewerTimezone={viewerTimezone}
             onMobileBack={handleMobileBack}
           />

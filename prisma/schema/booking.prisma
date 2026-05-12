@@ -177,3 +177,25 @@ model ChatMessage {
   @@index([chatId, createdAt])
   @@index([chatId, readAt])
 }
+
+// chat-url-fix: opaque public identifier for (provider, client) chat
+// pair. Replaces the prior `providerId:clientUserId` key that leaked
+// internal CUIDs into URLs and notification payloads. Slug is
+// generated lazily on first conversation access by
+// `getOrCreateConversationSlug` and stays stable for the pair's
+// lifetime. Access is still gated by `resolveConversationAccess`
+// (pair-ownership in Booking) — slug is identifier, not auth token.
+model ConversationSlug {
+  id String @id @default(cuid())
+
+  slug String @unique
+
+  providerId String
+
+  clientUserId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([providerId, clientUserId])
+  @@index([slug])
+}

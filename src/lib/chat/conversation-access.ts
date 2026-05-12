@@ -5,7 +5,7 @@ import {
   READONLY_WINDOW_HOURS,
   getChatAvailability,
 } from "@/lib/chat/status";
-import type { ConversationKey } from "@/lib/chat/conversation-key";
+import type { ConversationKey } from "@/lib/chat/conversation-slug";
 
 /**
  * Conversation-level access composed from existing per-booking

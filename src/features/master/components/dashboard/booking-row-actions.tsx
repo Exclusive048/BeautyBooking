@@ -6,14 +6,12 @@ import { useState, useTransition } from "react";
 import { MessageSquare, CalendarClock, X } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
-import { serializeConversationKey } from "@/lib/chat/conversation-key";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 
 type Props = {
-  providerId: string;
   booking: DashboardBooking;
 };
 
@@ -30,7 +28,7 @@ const TERMINAL_STATUSES = new Set([
 /**
  * 3 icon actions for the dashboard «Ближайшие записи» rows:
  *
- *   • Chat       — deep-link to /cabinet/master/messages?key=...
+ *   • Chat       — deep-link to /cabinet/master/messages?c=<slug>
  *   • Reschedule — opens the shared `<RescheduleModal>` from schedule
  *   • Cancel     — confirm dialog → PATCH master booking status
  *
@@ -39,9 +37,13 @@ const TERMINAL_STATUSES = new Set([
  * thread history remains accessible after a booking ends.
  *
  * Chat is also hidden when the booking is a guest one (no
- * `clientUserId`) since the conversation key requires both ids.
+ * `chatSlug`) since there is no registered client to message.
+ *
+ * chat-url-fix: the chat URL used to embed `<providerId:clientUserId>`
+ * which leaked internal cuids. The slug is now resolved server-side
+ * in `dashboard.service.ts` and arrives on the DTO as `chatSlug`.
  */
-export function BookingRowActions({ providerId, booking }: Props) {
+export function BookingRowActions({ booking }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const { confirm, modal } = useConfirm();
@@ -52,13 +54,8 @@ export function BookingRowActions({ providerId, booking }: Props) {
   const isTerminal = TERMINAL_STATUSES.has(
     booking.status as (typeof TERMINAL_STATUSES extends Set<infer V> ? V : never),
   );
-  const chatHref = booking.clientUserId
-    ? `/cabinet/master/messages?key=${encodeURIComponent(
-        serializeConversationKey({
-          providerId,
-          clientUserId: booking.clientUserId,
-        }),
-      )}`
+  const chatHref = booking.chatSlug
+    ? `/cabinet/master/messages?c=${encodeURIComponent(booking.chatSlug)}`
     : null;
 
   async function handleCancel() {

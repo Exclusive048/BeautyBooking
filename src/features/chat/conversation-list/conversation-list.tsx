@@ -11,8 +11,8 @@ const T = UI_TEXT.chat;
 
 type Props = {
   conversations: ConversationListItemDto[];
-  activeKey: string | null;
-  onPick: (key: string) => void;
+  activeSlug: string | null;
+  onPick: (slug: string) => void;
   perspective: ChatPerspective;
   isLoading: boolean;
   viewerTimezone: string;
@@ -21,7 +21,7 @@ type Props = {
 
 export function ConversationList({
   conversations,
-  activeKey,
+  activeSlug,
   onPick,
   perspective,
   isLoading,
@@ -71,10 +71,10 @@ export function ConversationList({
         ) : (
           filtered.map((conversation) => (
             <ConversationRow
-              key={conversation.key}
+              key={conversation.slug}
               conversation={conversation}
-              isActive={conversation.key === activeKey}
-              onClick={() => onPick(conversation.key)}
+              isActive={conversation.slug === activeSlug}
+              onClick={() => onPick(conversation.slug)}
               viewerTimezone={viewerTimezone}
             />
           ))

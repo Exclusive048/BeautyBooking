@@ -11,30 +11,30 @@ type State = {
 };
 
 /**
- * Thread loader (33a).
+ * Thread loader (33a, slug-aware after chat-url-fix).
  *
  * Refetches when:
- *   - the active conversation key changes
+ *   - the active conversation slug changes
  *   - a CHAT_MESSAGE_RECEIVED notification arrives whose payload
- *     references this conversationKey (other-side message) OR an
- *     unknown key (defensive: refresh anyway)
+ *     references this `conversationSlug` (other-side message) OR an
+ *     unknown slug (defensive: refresh anyway)
  */
 export function useConversationThread(input: {
   perspective: ChatPerspective;
-  conversationKey: string | null;
+  conversationSlug: string | null;
 }): State & {
   refresh: () => Promise<void>;
   markRead: () => Promise<void>;
 } {
-  const { perspective, conversationKey } = input;
+  const { perspective, conversationSlug } = input;
   const [state, setState] = useState<State>({
     detail: null,
-    isLoading: Boolean(conversationKey),
+    isLoading: Boolean(conversationSlug),
     error: null,
   });
 
   const fetchThread = useCallback(async () => {
-    if (!conversationKey) {
+    if (!conversationSlug) {
       setState({ detail: null, isLoading: false, error: null });
       return;
     }
@@ -45,7 +45,7 @@ export function useConversationThread(input: {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "Europe/Moscow";
       const res = await fetch(
-        `/api/chat/threads/${encodeURIComponent(conversationKey)}?as=${perspective}`,
+        `/api/chat/threads/${encodeURIComponent(conversationSlug)}?as=${perspective}`,
         {
           cache: "no-store",
           headers: { "x-tz": tz },
@@ -71,7 +71,7 @@ export function useConversationThread(input: {
         error: "Сетевая ошибка. Попробуйте позже.",
       });
     }
-  }, [conversationKey, perspective]);
+  }, [conversationSlug, perspective]);
 
   useEffect(() => {
     // fetchThread setState happens after await — async microtask, not
@@ -81,30 +81,30 @@ export function useConversationThread(input: {
   }, [fetchThread]);
 
   useEffect(() => {
-    if (!conversationKey) return;
+    if (!conversationSlug) return;
     return subscribeNotificationEvent((event) => {
       if (event.kind !== "incoming" || !event.notification) return;
       if (event.notification.type !== "CHAT_MESSAGE_RECEIVED") return;
-      const payload = event.notification.payloadJson as { conversationKey?: unknown } | null;
-      if (payload && typeof payload === "object" && "conversationKey" in payload) {
-        const incomingKey = (payload as { conversationKey?: unknown }).conversationKey;
-        if (typeof incomingKey === "string" && incomingKey !== conversationKey) return;
+      const payload = event.notification.payloadJson as { conversationSlug?: unknown } | null;
+      if (payload && typeof payload === "object" && "conversationSlug" in payload) {
+        const incomingSlug = (payload as { conversationSlug?: unknown }).conversationSlug;
+        if (typeof incomingSlug === "string" && incomingSlug !== conversationSlug) return;
       }
       void fetchThread();
     });
-  }, [conversationKey, fetchThread]);
+  }, [conversationSlug, fetchThread]);
 
   const markRead = useCallback(async () => {
-    if (!conversationKey) return;
+    if (!conversationSlug) return;
     try {
       await fetch(
-        `/api/chat/threads/${encodeURIComponent(conversationKey)}/read?as=${perspective}`,
+        `/api/chat/threads/${encodeURIComponent(conversationSlug)}/read?as=${perspective}`,
         { method: "POST" },
       );
     } catch {
       // Best-effort — UI re-fetches anyway on next focus.
     }
-  }, [conversationKey, perspective]);
+  }, [conversationSlug, perspective]);
 
   return { ...state, refresh: fetchThread, markRead };
 }

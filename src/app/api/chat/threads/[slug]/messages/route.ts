@@ -11,7 +11,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
 
-type RouteParams = Promise<{ key: string }>;
+type RouteParams = Promise<{ slug: string }>;
 
 const bodySchema = z.object({
   body: z.string().trim().min(1, "Сообщение пустое.").max(1000),
@@ -28,7 +28,7 @@ export async function POST(
     const user = await getSessionUser(req);
     userId = user.userId;
     const params = await ctx.params;
-    const rawKey = decodeURIComponent(params.key);
+    const slug = decodeURIComponent(params.slug);
 
     const url = new URL(req.url);
     const asParam = url.searchParams.get("as");
@@ -48,7 +48,7 @@ export async function POST(
     const body = await parseBody(req, bodySchema);
 
     const result = await sendConversationMessage({
-      rawKey,
+      slug,
       perspective,
       userId: user.userId,
       body: body.body,
@@ -58,7 +58,7 @@ export async function POST(
     const appError = toAppError(error);
     const requestId = getRequestId(req);
     if (appError.status >= 500) {
-      logError("POST /api/chat/threads/[key]/messages failed", {
+      logError("POST /api/chat/threads/[slug]/messages failed", {
         requestId,
         userId,
         stack: error instanceof Error ? error.stack : undefined,

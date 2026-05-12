@@ -19,13 +19,11 @@ type Props = {
   upcoming: DashboardBooking[];
   /** Total today count for the subtitle ("ещё 3 из 6"). */
   totalTodayCount: number;
-  /** Master's own provider id — forwarded to each row's actions island. */
-  providerId: string;
 };
 
 const VISIBLE_LIMIT = 3;
 
-export function UpcomingBookingsSection({ upcoming, totalTodayCount, providerId }: Props) {
+export function UpcomingBookingsSection({ upcoming, totalTodayCount }: Props) {
   const visible = upcoming.slice(0, VISIBLE_LIMIT);
   const subtitle = T.subtitleTemplate
     .replace("{count}", String(upcoming.length))
@@ -51,11 +49,7 @@ export function UpcomingBookingsSection({ upcoming, totalTodayCount, providerId 
       {visible.length > 0 ? (
         <div className="divide-y divide-border-subtle">
           {visible.map((booking) => (
-            <BookingRow
-              key={booking.id}
-              booking={booking}
-              providerId={providerId}
-            />
+            <BookingRow key={booking.id} booking={booking} />
           ))}
         </div>
       ) : (
