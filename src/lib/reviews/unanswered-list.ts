@@ -1,6 +1,7 @@
 import { ReviewTargetType } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 export type UnansweredReviewRow = {
   id: string;
@@ -23,6 +24,7 @@ export const getUnansweredReviewsForMaster = cache(
         targetId: masterProviderId,
         replyText: null,
         reportedAt: null,
+        ...ACTIVE_REVIEW_FILTER,
       },
       orderBy: { createdAt: "desc" },
       take: limit,

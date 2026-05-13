@@ -113,6 +113,15 @@ export const PERSONAL_ONLY_TYPES: NotificationType[] = [
   NotificationType.BILLING_SUBSCRIPTION_EXPIRED,
   NotificationType.BILLING_TRIAL_ENDING_SOON,
   NotificationType.BILLING_TRIAL_EXPIRED,
+  // Admin-initiated billing notifications — personal-only (live next to
+  // their regular `BILLING_*` siblings on the user's billing surface).
+  NotificationType.BILLING_PLAN_GRANTED_BY_ADMIN,
+  NotificationType.BILLING_PLAN_EDITED,
+  NotificationType.BILLING_SUBSCRIPTION_CANCELLED_BY_ADMIN,
+  NotificationType.BILLING_PAYMENT_REFUNDED,
+  NotificationType.SUBSCRIPTION_GRANTED_BY_ADMIN,
+  // Review removal notice — recipient is the review author (client side).
+  NotificationType.REVIEW_DELETED_BY_ADMIN,
 ];
 
 export type NotificationContext = "master" | "personal" | "all";

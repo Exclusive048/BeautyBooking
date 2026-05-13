@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
@@ -53,7 +55,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     const existing = await prisma.city.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, autoCreated: true },
     });
     if (!existing) return fail("Город не найден.", 404, "NOT_FOUND");
 
@@ -70,21 +72,58 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     if (parsed.data.isActive !== undefined) data.isActive = parsed.data.isActive;
     if (parsed.data.autoCreated !== undefined) data.autoCreated = parsed.data.autoCreated;
 
-    const updated = await prisma.city.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        nameGenitive: true,
-        latitude: true,
-        longitude: true,
-        timezone: true,
-        isActive: true,
-        sortOrder: true,
-        autoCreated: true,
-      },
+    const auditContext = getAdminAuditContext(req);
+    // CITY_VERIFIED fires when an autoCreated city flips to manually
+    // confirmed (`autoCreated: false`). It is logged in addition to —
+    // not instead of — the generic CITY_UPDATED entry, since the
+    // verification toggle has product meaning beyond a field edit.
+    const isVerifying =
+      parsed.data.autoCreated === false && existing.autoCreated === true;
+    const otherFieldsChanged = Object.keys(data).filter((k) => k !== "autoCreated");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.city.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          nameGenitive: true,
+          latitude: true,
+          longitude: true,
+          timezone: true,
+          isActive: true,
+          sortOrder: true,
+          autoCreated: true,
+        },
+      });
+
+      if (isVerifying) {
+        await createAdminAuditLog({
+          tx,
+          adminUserId: auth.user.id,
+          action: "CITY_VERIFIED",
+          targetType: "city",
+          targetId: id,
+          details: { citySlug: row.slug },
+          context: auditContext,
+        });
+      }
+
+      if (otherFieldsChanged.length > 0) {
+        await createAdminAuditLog({
+          tx,
+          adminUserId: auth.user.id,
+          action: "CITY_UPDATED",
+          targetType: "city",
+          targetId: id,
+          details: { citySlug: row.slug, fieldsChanged: otherFieldsChanged },
+          context: auditContext,
+        });
+      }
+
+      return row;
     });
 
     logInfo("admin.city.updated", {
@@ -100,7 +139,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: RouteContext) {
+export async function DELETE(req: Request, ctx: RouteContext) {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
@@ -128,7 +167,18 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
       );
     }
 
-    await prisma.city.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.city.delete({ where: { id } });
+      await createAdminAuditLog({
+        tx,
+        adminUserId: auth.user.id,
+        action: "CITY_DELETED",
+        targetType: "city",
+        targetId: id,
+        details: { citySlug: city.slug, name: city.name },
+        context: getAdminAuditContext(req),
+      });
+    });
 
     logInfo("admin.city.deleted", {
       adminId: auth.user.id,

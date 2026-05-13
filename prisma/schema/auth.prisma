@@ -97,6 +97,30 @@ model UserProfile {
 
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
+
+  /// Admin-imposed block. Behaviour gate (login refusal, mutation
+  /// rejection) lands in a follow-up commit; this commit only adds
+  /// the columns so we can reference them from `AdminAuditLog`.
+  blockedAt DateTime?
+
+  blockedByUserId String?
+
+  blockedBy UserProfile? @relation("UserBlockedBy", fields: [blockedByUserId], references: [id], onDelete: SetNull)
+
+  blockedUsers UserProfile[] @relation("UserBlockedBy")
+
+  blockedReason String?
+
+  /// Audit-log rows authored by this user when acting as admin. The
+  /// `onDelete: Restrict` on `AdminAuditLog.admin` means we cannot
+  /// fully drop an admin account until their trail is reassigned.
+  adminAuditLogs AdminAuditLog[] @relation("AdminAuditLogActor")
+
+  /// Reviews this user (acting as admin) soft-deleted. Backed by the
+  /// optional `Review.deletedBy` relation added in the same commit.
+  reviewsDeleted Review[] @relation("ReviewDeletedBy")
+
+  @@index([blockedAt])
 }
 
 model UserConsent {

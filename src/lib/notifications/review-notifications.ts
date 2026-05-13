@@ -1,6 +1,7 @@
 import { NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 const reviewInclude = {
   booking: { select: { id: true, clientUserId: true } },
@@ -29,8 +30,11 @@ function buildTelegramText(title: string, body: string): string {
 }
 
 export async function loadReviewWithRelations(reviewId: string): Promise<ReviewWithRelations | null> {
-  return prisma.review.findUnique({
-    where: { id: reviewId },
+  // `findUnique` can't take arbitrary `where` clauses, so we use
+  // `findFirst` with the unique id plus the active-only filter to
+  // defensively skip notifications about soft-deleted reviews.
+  return prisma.review.findFirst({
+    where: { id: reviewId, ...ACTIVE_REVIEW_FILTER },
     include: reviewInclude,
   });
 }

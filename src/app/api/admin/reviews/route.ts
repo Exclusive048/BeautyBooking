@@ -4,6 +4,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { parseQuery } from "@/lib/validation";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 const querySchema = z.object({
   cursor: z.string().trim().min(1).optional(),
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
 
     const rows = await prisma.review.findMany({
       where: {
+        ...ACTIVE_REVIEW_FILTER,
         ...(query.reported === true ? { reportedAt: { not: null } } : {}),
         ...(query.minRating !== undefined || query.maxRating !== undefined
           ? {

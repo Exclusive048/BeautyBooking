@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
@@ -73,6 +75,25 @@ export async function POST(req: Request, ctx: RouteContext) {
       });
 
       await tx.city.delete({ where: { id: sourceId } });
+
+      await createAdminAuditLog({
+        tx,
+        adminUserId: auth.user.id,
+        action: "CITY_MERGED",
+        // targetId is the surviving city; sourceCitySlug captured in
+        // details so the trail still names both sides after the source
+        // row is gone.
+        targetType: "city",
+        targetId: target.id,
+        details: {
+          sourceCitySlug: source.slug,
+          sourceName: source.name,
+          targetCitySlug: target.slug,
+          targetName: target.name,
+          transferredCount: updateResult.count,
+        },
+        context: getAdminAuditContext(req),
+      });
 
       return { movedProviders: updateResult.count };
     });

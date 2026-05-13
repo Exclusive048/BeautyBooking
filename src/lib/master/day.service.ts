@@ -3,6 +3,7 @@ import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBooking
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import type { BookingStatus } from "@prisma/client";
@@ -264,6 +265,7 @@ export async function getMasterDay(input: {
       where: {
         targetType: "provider",
         targetId: input.masterId,
+        ...ACTIVE_REVIEW_FILTER,
       },
       orderBy: { createdAt: "desc" },
       take: 3,

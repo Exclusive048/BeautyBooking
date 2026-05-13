@@ -30,6 +30,17 @@ export type SlotFreedPayload = {
 
 export type MediaCleanupPayload = Record<string, never>;
 
+export type MrrSnapshotDailyPayload = Record<string, never>;
+
+export type PlanEditedNotifyPayload = {
+  planId: string;
+  planCode: string;
+  /** Pre-rendered Russian summary built by `buildPlanEditedSummary`.
+   * Falls back to a generic copy if the original diff was too thin
+   * to summarise — the enqueuer should skip dispatch instead. */
+  summary: string;
+};
+
 export type YookassaWebhookPayload = {
   event?: string;
   type?: string;
@@ -93,13 +104,27 @@ export type MediaCleanupJob = {
   payload: MediaCleanupPayload;
 } & JobMeta;
 
+export type MrrSnapshotDailyJob = {
+  id: string;
+  type: "mrr.snapshot.daily";
+  payload: MrrSnapshotDailyPayload;
+} & JobMeta;
+
+export type PlanEditedNotifyJob = {
+  id: string;
+  type: "notification.billing.plan-edited.mass";
+  payload: PlanEditedNotifyPayload;
+} & JobMeta;
+
 export type Job =
   | TelegramSendJob
   | BookingReminderJob
   | VisualSearchIndexJob
   | SlotFreedJob
   | MediaCleanupJob
-  | YookassaWebhookJob;
+  | YookassaWebhookJob
+  | MrrSnapshotDailyJob
+  | PlanEditedNotifyJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
@@ -107,6 +132,8 @@ export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
 export const SLOT_FREED_JOB_TYPE = "slot.freed";
 export const MEDIA_CLEANUP_JOB_TYPE = "media.cleanup";
 export const YOOKASSA_WEBHOOK_JOB_TYPE = "yookassa.webhook";
+export const MRR_SNAPSHOT_DAILY_JOB_TYPE = "mrr.snapshot.daily";
+export const PLAN_EDITED_NOTIFY_JOB_TYPE = "notification.billing.plan-edited.mass";
 export const DEFAULT_JOB_MAX_ATTEMPTS = 5;
 
 export function normalizeJobMeta<T extends Job>(job: T): T {
@@ -156,6 +183,19 @@ function isSlotFreedPayload(value: unknown): value is SlotFreedPayload {
 
 function isMediaCleanupPayload(value: unknown): value is MediaCleanupPayload {
   return isRecord(value);
+}
+
+function isMrrSnapshotDailyPayload(value: unknown): value is MrrSnapshotDailyPayload {
+  return isRecord(value);
+}
+
+function isPlanEditedNotifyPayload(value: unknown): value is PlanEditedNotifyPayload {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.planId === "string" &&
+    typeof value.planCode === "string" &&
+    typeof value.summary === "string"
+  );
 }
 
 function isYookassaWebhookPayload(value: unknown): value is YookassaWebhookPayload {
@@ -208,6 +248,14 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === YOOKASSA_WEBHOOK_JOB_TYPE) {
     return isYookassaWebhookPayload(value.payload);
+  }
+
+  if (value.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
+    return isMrrSnapshotDailyPayload(value.payload);
+  }
+
+  if (value.type === PLAN_EDITED_NOTIFY_JOB_TYPE) {
+    return isPlanEditedNotifyPayload(value.payload);
   }
 
   return false;
@@ -330,6 +378,48 @@ export function createMediaCleanupJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: MEDIA_CLEANUP_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createMrrSnapshotDailyJob(
+  payload: MrrSnapshotDailyPayload = {},
+  input?: Partial<
+    Pick<
+      MrrSnapshotDailyJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): MrrSnapshotDailyJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: MRR_SNAPSHOT_DAILY_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createPlanEditedNotifyJob(
+  payload: PlanEditedNotifyPayload,
+  input?: Partial<
+    Pick<
+      PlanEditedNotifyJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): PlanEditedNotifyJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: PLAN_EDITED_NOTIFY_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

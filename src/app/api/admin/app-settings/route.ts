@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 
@@ -45,11 +47,32 @@ export async function PATCH(req: Request) {
 
     const { key, value } = parsed.data;
 
-    const setting = await prisma.appSetting.upsert({
+    const before = await prisma.appSetting.findUnique({
       where: { key },
-      create: { key, value },
-      update: { value },
-      select: { key: true, value: true, updatedAt: true },
+      select: { value: true },
+    });
+
+    const setting = await prisma.$transaction(async (tx) => {
+      const row = await tx.appSetting.upsert({
+        where: { key },
+        create: { key, value },
+        update: { value },
+        select: { key: true, value: true, updatedAt: true },
+      });
+
+      if (before?.value !== value) {
+        await createAdminAuditLog({
+          tx,
+          adminUserId: auth.user.id,
+          action: "SETTINGS_APP_SETTING_UPDATED",
+          targetType: "app_setting",
+          targetId: key,
+          details: { key, before: before?.value ?? null, after: value },
+          context: getAdminAuditContext(req),
+        });
+      }
+
+      return row;
     });
 
     return ok({

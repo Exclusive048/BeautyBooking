@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
@@ -58,6 +59,7 @@ async function findLowRatedService(masterId: string, timeZone: string): Promise<
       targetId: masterId,
       bookingId: { not: null },
       createdAt: { gte: range.fromUtc },
+      ...ACTIVE_REVIEW_FILTER,
     },
     select: {
       rating: true,
@@ -122,7 +124,9 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
     bookingsLast30Days,
   ] = await Promise.all([
     prisma.portfolioItem.count({ where: { masterId: provider.id } }),
-    prisma.review.count({ where: { targetType: "provider", targetId: provider.id } }),
+    prisma.review.count({
+      where: { targetType: "provider", targetId: provider.id, ...ACTIVE_REVIEW_FILTER },
+    }),
     prisma.weeklyScheduleDay.count({
       where: { isActive: true, config: { providerId: provider.id } },
     }),

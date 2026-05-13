@@ -2,6 +2,7 @@ import { BookingStatus, ReviewTargetType } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 export type ColumnId = "pending" | "confirmed" | "today" | "done" | "cancelled";
 
@@ -204,6 +205,7 @@ export const getMasterBookingsForKanban = cache(
             where: {
               bookingId: { in: bookingIds },
               targetType: ReviewTargetType.provider,
+              ...ACTIVE_REVIEW_FILTER,
             },
             select: { bookingId: true, rating: true },
           })

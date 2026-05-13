@@ -8,6 +8,7 @@ import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { isDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import type { CatalogSmartTagPreset } from "@/lib/catalog/schemas";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 const DEFAULT_SEARCH_TIMEZONE = env.DEFAULT_TIMEZONE;
 const MAX_SLOTS_PER_PROVIDER = 12;
@@ -165,6 +166,7 @@ async function loadSmartTagCounts(
     where: {
       targetType: "provider",
       targetId: { in: providerIds },
+      ...ACTIVE_REVIEW_FILTER,
       tags: {
         some: {
           tag: {

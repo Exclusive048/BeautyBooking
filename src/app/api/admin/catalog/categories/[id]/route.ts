@@ -2,6 +2,8 @@ import { CategoryStatus } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
@@ -110,27 +112,43 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     const shouldDisableInSearch =
       parsed.data.status === CategoryStatus.REJECTED || parsed.data.isSystem === true;
 
-    const updated = await prisma.globalCategory.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        icon: true,
-        parentId: true,
-        status: true,
-        usageCount: true,
-        createdAt: true,
-      },
-    });
+    const fieldsChanged = Object.keys(data);
 
-    if (shouldDisableInSearch) {
-      await prisma.portfolioItem.updateMany({
-        where: { globalCategoryId: id },
-        data: { inSearch: false },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.globalCategory.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          parentId: true,
+          status: true,
+          usageCount: true,
+          createdAt: true,
+        },
       });
-    }
+
+      if (shouldDisableInSearch) {
+        await tx.portfolioItem.updateMany({
+          where: { globalCategoryId: id },
+          data: { inSearch: false },
+        });
+      }
+
+      await createAdminAuditLog({
+        tx,
+        adminUserId: auth.user.id,
+        action: "CATEGORY_EDITED",
+        targetType: "category",
+        targetId: id,
+        details: { categorySlug: row.slug, fieldsChanged },
+        context: getAdminAuditContext(req),
+      });
+
+      return row;
+    });
 
     return ok({
       category: {

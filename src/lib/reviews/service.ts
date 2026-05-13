@@ -7,6 +7,7 @@ import {
   REVIEW_PUBLIC_TAGS_MAX,
   REVIEW_WINDOW_DAYS,
 } from "@/lib/reviews/constants";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { toReviewDto, type ReviewDto, type ReviewTagDto } from "@/lib/reviews/types";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
@@ -219,8 +220,11 @@ async function recalculateTargetRatings(
   targetType: ReviewTargetType,
   targetId: string
 ): Promise<void> {
+  // Soft-deleted reviews (REVIEW-SOFT-DELETE-A) are excluded from the
+  // aggregate. The standard `deletedAt: null` filter applies here too —
+  // a deleted review must not influence the target's public rating.
   const aggregate = await tx.review.aggregate({
-    where: { targetType, targetId },
+    where: { targetType, targetId, ...ACTIVE_REVIEW_FILTER },
     _avg: { rating: true },
     _count: { _all: true },
   });
@@ -317,11 +321,17 @@ export async function createReview(input: {
   const target = requireReviewTarget(booking);
   const existing = await prisma.review.findUnique({
     where: { bookingId: input.bookingId },
-    select: { id: true },
+    select: { id: true, deletedAt: true },
   });
-  if (existing) {
+  if (existing && existing.deletedAt === null) {
     throw new AppError("Review already exists", 409, "REVIEW_ALREADY_EXISTS");
   }
+  // A soft-deleted review for this booking is treated as if it doesn't
+  // exist — the unique constraint on `bookingId` still blocks insert
+  // though, so re-leaving a review for the same booking will fail at
+  // the DB layer. That's intentional for now (one review per booking,
+  // even across delete-recreate cycles); a future flow that wants to
+  // allow re-reviewing after admin removal would need a different shape.
 
   const validatedTags = await resolveValidatedReviewTags({
     publicTagIds: input.publicTagIds,
@@ -394,6 +404,7 @@ export async function listReviews(input: {
     where: {
       targetType: input.targetType,
       targetId: input.targetId,
+      ...ACTIVE_REVIEW_FILTER,
     },
     orderBy: { createdAt: "desc" },
     take: input.limit,
@@ -654,11 +665,19 @@ export async function deleteReview(input: {
       replyText: true,
       repliedAt: true,
       reportedAt: true,
+      deletedAt: true,
     },
   });
 
   if (!review) {
     throw new AppError("Review not found", 404, "NOT_FOUND");
+  }
+
+  // Idempotent: already soft-deleted reviews short-circuit instead of
+  // re-running rating recalc. Keeps user-initiated and admin-initiated
+  // delete paths symmetric (see delete-review.service.ts in admin-cabinet).
+  if (review.deletedAt) {
+    return { id: review.id };
   }
 
   const isAuthor = review.authorId === input.currentUser.id;
@@ -676,8 +695,19 @@ export async function deleteReview(input: {
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
 
+  // Soft delete: preserve the row for audit/compliance. `deletedByUserId`
+  // captures the actor — author for self-delete, admin for the legacy
+  // moderation path. Rating recalc excludes soft-deleted reviews via
+  // ACTIVE_REVIEW_FILTER in `recalculateTargetRatings`.
   await prisma.$transaction(async (tx) => {
-    await tx.review.delete({ where: { id: review.id } });
+    await tx.review.update({
+      where: { id: review.id },
+      data: {
+        deletedAt: new Date(),
+        deletedByUserId: input.currentUser.id,
+        deletedReason: null,
+      },
+    });
     await recalculateTargetRatings(tx, review.targetType, review.targetId);
   });
 
