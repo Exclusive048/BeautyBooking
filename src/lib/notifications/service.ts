@@ -677,6 +677,7 @@ export async function markAllNotificationsRead(
     where: {
       userId,
       isRead: false,
+      deletedAt: null,
       ...(typeFilter ? { type: typeFilter } : {}),
     },
     data: { isRead: true, readAt: new Date() },
@@ -689,9 +690,9 @@ export async function markNotificationRead(
 ): Promise<{ id: string }> {
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, deletedAt: true },
   });
-  if (!notification || notification.userId !== userId) {
+  if (!notification || notification.userId !== userId || notification.deletedAt) {
     throw new AppError("Notification not found", 404, "NOT_FOUND");
   }
 
@@ -721,6 +722,7 @@ export async function listNotifications(input: {
   const items = await prisma.notification.findMany({
     where: {
       userId: input.userId,
+      deletedAt: null,
       ...(typeFilter ? { type: typeFilter } : {}),
     },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
@@ -747,9 +749,50 @@ export async function getUnreadCount(
     where: {
       userId,
       isRead: false,
+      deletedAt: null,
       ...(typeFilter ? { type: typeFilter } : {}),
     },
   });
+}
+
+/**
+ * Soft-delete every read (or all) notification for a user. Returns how
+ * many rows we marked, so the UI can show «Очищено N». Idempotent — a
+ * second call with no eligible rows simply returns 0.
+ */
+export async function clearReadNotifications(userId: string): Promise<{ clearedCount: number }> {
+  const result = await prisma.notification.updateMany({
+    where: { userId, isRead: true, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+  return { clearedCount: result.count };
+}
+
+/**
+ * Per-row toggle. The existing one-way endpoint only marked unread →
+ * read; this lets a user flip back to unread (and forward) and is what
+ * the redesigned UI's right-side button calls.
+ */
+export async function setNotificationRead(
+  notificationId: string,
+  userId: string,
+  isRead: boolean,
+): Promise<{ id: string; isRead: boolean }> {
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+    select: { id: true, userId: true, deletedAt: true },
+  });
+  if (!notification || notification.userId !== userId || notification.deletedAt) {
+    throw new AppError("Notification not found", 404, "NOT_FOUND");
+  }
+  await prisma.notification.update({
+    where: { id: notificationId },
+    data: {
+      isRead,
+      readAt: isRead ? new Date() : null,
+    },
+  });
+  return { id: notificationId, isRead };
 }
 
 function buildTypeFilter(

@@ -1,24 +1,25 @@
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/auth/session";
-import { getMeProfile } from "@/lib/users/profile";
-import { ClientDashboard } from "@/features/cabinet/components/client-dashboard";
+import { AccountType } from "@prisma/client";
+import { getSessionUser } from "@/lib/auth/session";
 
-export default async function CabinetHomePage() {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
+export default async function CabinetRootRedirect() {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
 
-  const me = await getMeProfile(userId);
-  if (!me) redirect("/login");
+  const roles = user.roles ?? [];
 
-  const displayName =
-    me.displayName?.trim() ||
-    [me.firstName, me.lastName].filter(Boolean).join(" ").trim() ||
-    null;
+  // Master cabinet has its own redesigned shell; route owners to it.
+  // STUDIO/STUDIO_ADMIN take precedence over MASTER only when MASTER is absent,
+  // so masters-with-a-studio land in their primary workspace.
+  if (roles.includes(AccountType.MASTER)) {
+    redirect("/cabinet/master/dashboard");
+  }
+  if (
+    roles.includes(AccountType.STUDIO) ||
+    roles.includes(AccountType.STUDIO_ADMIN)
+  ) {
+    redirect("/cabinet/studio");
+  }
 
-  return (
-    <ClientDashboard
-      displayName={displayName}
-      avatarUrl={me.externalPhotoUrl ?? null}
-    />
-  );
+  redirect("/cabinet/bookings");
 }

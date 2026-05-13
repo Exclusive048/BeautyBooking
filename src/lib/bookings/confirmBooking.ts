@@ -4,6 +4,10 @@ import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import {
+  emitBookingConfirmedSystemMessage,
+  emitBookingRescheduledSystemMessage,
+} from "@/lib/chat/system-messages";
 import { logError } from "@/lib/logging/logger";
 
 function shiftMinutes(date: Date, minutes: number): Date {
@@ -196,6 +200,32 @@ export async function confirmBooking(
         startAtUtc,
         endAtUtc,
       },
+    });
+  }
+
+  // System messages in chat. Idempotent at DB level via unique constraint —
+  // safe across webhook retries. Failures are logged but don't break the
+  // confirm — chat decoration is a nice-to-have, not a transactional
+  // requirement.
+  try {
+    if (appliesRequestedChange) {
+      const provider = await prisma.provider.findUnique({
+        where: { id: booking.providerId },
+        select: { timezone: true },
+      });
+      await emitBookingRescheduledSystemMessage({
+        bookingId: booking.id,
+        oldStart: previousStartAtUtc,
+        newStart: startAtUtc,
+        timezone: provider?.timezone ?? "Europe/Moscow",
+      });
+    } else {
+      await emitBookingConfirmedSystemMessage(booking.id);
+    }
+  } catch (error) {
+    logError("Failed to emit booking system message (confirm)", {
+      bookingId: booking.id,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 

@@ -9,6 +9,8 @@ import {
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { emitBookingCancelledSystemMessage } from "@/lib/chat/system-messages";
+import { logError } from "@/lib/logging/logger";
 
 export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
   // AUDIT (отмена/отклонение):
@@ -104,6 +106,23 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
       startAtUtc: booking.startAtUtc,
       endAtUtc: booking.endAtUtc,
     });
+  }
+
+  // System message in chat. Skipped for the "client declines master's
+  // reschedule" branch — that doesn't actually cancel the booking, just
+  // reverts proposed* and stays CONFIRMED.
+  if (!declinesMasterChange) {
+    try {
+      await emitBookingCancelledSystemMessage({
+        bookingId: booking.id,
+        by: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
+      });
+    } catch (error) {
+      logError("Failed to emit booking system message (cancel)", {
+        bookingId: booking.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   return { id: updated.id, status: updated.status };

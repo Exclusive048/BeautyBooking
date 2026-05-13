@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { MessageBubble } from "@/features/chat/chat-window/message-bubble";
 import { DaySeparator } from "@/features/chat/chat-window/day-separator";
+import { SystemMessage } from "@/features/chat/chat-window/system-message";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ChatPerspective, ThreadItemDto } from "@/features/chat/types";
 
@@ -45,6 +46,16 @@ export function Thread({ items, perspective, viewerTimezone }: Props) {
             <DaySeparator
               key={item.id}
               dateKey={item.dateKey}
+              viewerTimezone={viewerTimezone}
+            />
+          );
+        }
+        if (item.senderType === "SYSTEM") {
+          return (
+            <SystemMessage
+              key={item.id}
+              message={item}
+              perspective={perspective}
               viewerTimezone={viewerTimezone}
             />
           );

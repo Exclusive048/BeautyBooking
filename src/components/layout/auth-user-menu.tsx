@@ -1,20 +1,43 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, User, Settings, Shield, LogIn } from "lucide-react";
+import { ChevronDown, User, Settings, Shield, LogIn, Briefcase, Building2, UserCircle2, Check } from "lucide-react";
 import { LogoutButton } from "@/features/auth/components/logout-button";
+import type { CabinetKind } from "@/lib/auth/available-cabinets";
+import { CABINET_URLS, detectCurrentCabinet } from "@/lib/auth/available-cabinets";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   userLabel: string;
   showAdminLink: boolean;
+  /**
+   * Cabinets the user can access. Order matters — drives the dropdown.
+   * Empty array hides the switcher entirely (legacy guests, fallback).
+   */
+  availableCabinets?: CabinetKind[];
 };
 
-export function AuthUserMenu({ userLabel, showAdminLink }: Props) {
+const CABINET_ICON: Record<CabinetKind, typeof UserCircle2> = {
+  user: UserCircle2,
+  master: Briefcase,
+  studio: Building2,
+};
+
+const CABINET_LABEL: Record<CabinetKind, string> = {
+  user: UI_TEXT.clientCabinet.switcher.client,
+  master: UI_TEXT.clientCabinet.switcher.master,
+  studio: UI_TEXT.clientCabinet.switcher.studio,
+};
+
+export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const pathname = usePathname() ?? "/";
+  const currentCabinet = detectCurrentCabinet(pathname);
+  const showSwitcher = availableCabinets.length > 1;
 
   useEffect(() => {
     if (!open) return;
@@ -67,8 +90,38 @@ export function AuthUserMenu({ userLabel, showAdminLink }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -6 }}
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute right-0 z-[100] mt-2 w-56 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
+            className="absolute right-0 z-[100] mt-2 w-64 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
           >
+            {showSwitcher ? (
+              <div className="space-y-0.5 pb-1">
+                <div className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+                  {UI_TEXT.clientCabinet.switcher.label}
+                </div>
+                {availableCabinets.map((c) => {
+                  const Icon = CABINET_ICON[c];
+                  const isActive = c === currentCabinet;
+                  return (
+                    <Link
+                      key={c}
+                      href={CABINET_URLS[c]}
+                      onClick={closeMenu}
+                      className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        isActive
+                          ? "bg-bg-input text-text-main"
+                          : "text-text-main hover:bg-bg-input"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
+                      <span className="flex-1">{CABINET_LABEL[c]}</span>
+                      {isActive ? (
+                        <Check className="h-4 w-4 text-primary" aria-hidden />
+                      ) : null}
+                    </Link>
+                  );
+                })}
+                <div className="my-1 border-t border-border-subtle/60" />
+              </div>
+            ) : null}
             <div className="space-y-0.5">
               <Link
                 href="/cabinet/profile"

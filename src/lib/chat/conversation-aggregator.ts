@@ -371,6 +371,27 @@ export async function getConversationThread(input: {
               body: true,
               readAt: true,
               createdAt: true,
+              referencedBooking: {
+                select: {
+                  id: true,
+                  status: true,
+                  startAtUtc: true,
+                  endAtUtc: true,
+                  provider: { select: { address: true } },
+                  masterProvider: { select: { address: true } },
+                  serviceItems: {
+                    select: {
+                      titleSnapshot: true,
+                      priceSnapshot: true,
+                      durationSnapshotMin: true,
+                    },
+                    take: 1,
+                  },
+                  service: {
+                    select: { name: true, price: true, durationMin: true },
+                  },
+                },
+              },
             },
           },
         },
@@ -385,15 +406,31 @@ export async function getConversationThread(input: {
   const flat = bookings.flatMap((booking) => {
     const chat = booking.chat;
     if (!chat) return [];
-    return chat.messages.map((message) => ({
-      id: message.id,
-      senderType: message.senderType,
-      senderName: message.senderName,
-      body: message.body,
-      readAt: message.readAt,
-      createdAt: message.createdAt,
-      bookingId: booking.id,
-    }));
+    return chat.messages.map((message) => {
+      const ref = message.referencedBooking;
+      const refItem = ref?.serviceItems[0];
+      return {
+        id: message.id,
+        senderType: message.senderType,
+        senderName: message.senderName,
+        body: message.body,
+        readAt: message.readAt,
+        createdAt: message.createdAt,
+        bookingId: booking.id,
+        bookingCard: ref
+          ? {
+              id: ref.id,
+              status: ref.status,
+              startAtUtc: ref.startAtUtc?.toISOString() ?? null,
+              endAtUtc: ref.endAtUtc?.toISOString() ?? null,
+              serviceName: refItem?.titleSnapshot ?? ref.service.name,
+              priceSnapshot: refItem?.priceSnapshot ?? ref.service.price,
+              durationMin: refItem?.durationSnapshotMin ?? ref.service.durationMin,
+              address: ref.masterProvider?.address ?? ref.provider.address ?? null,
+            }
+          : null,
+      };
+    });
   });
   flat.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 

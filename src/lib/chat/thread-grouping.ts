@@ -7,6 +7,18 @@
  */
 import type { ChatSenderType } from "@prisma/client";
 
+/** Booking snapshot attached to a system message that pins a card. */
+export type ThreadBookingCard = {
+  id: string;
+  status: string;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  serviceName: string;
+  priceSnapshot: number;
+  durationMin: number;
+  address: string | null;
+};
+
 export type ThreadMessage = {
   type: "message";
   id: string;
@@ -16,6 +28,8 @@ export type ThreadMessage = {
   readAt: string | null;
   createdAt: string;
   bookingId: string;
+  /** Booking referenced by a SYSTEM message (lifecycle card). Null otherwise. */
+  bookingCard: ThreadBookingCard | null;
 };
 
 export type ThreadDaySeparator = {
@@ -35,6 +49,7 @@ type RawMessage = {
   readAt: Date | null;
   createdAt: Date;
   bookingId: string;
+  bookingCard?: ThreadBookingCard | null;
 };
 
 export function injectDaySeparators(
@@ -62,6 +77,7 @@ export function injectDaySeparators(
       readAt: message.readAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
       bookingId: message.bookingId,
+      bookingCard: message.bookingCard ?? null,
     });
   }
   return out;
