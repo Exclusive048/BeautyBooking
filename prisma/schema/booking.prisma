@@ -102,6 +102,11 @@ model Booking {
 
   modelApplication ModelApplication? @relation("ModelApplicationBooking")
 
+  // Cards rendered inline in chat threads reference this booking. Plural —
+  // a booking can collect several system messages (created → confirmed →
+  // rescheduled). See ChatMessage.referencedBookingId.
+  chatMessageReferences ChatMessage[] @relation("ChatMessageBooking")
+
   @@index([providerId, startAtUtc, endAtUtc])
   @@index([providerId])
   @@index([masterProviderId])
@@ -172,10 +177,27 @@ model ChatMessage {
 
   readAt DateTime?
 
+  // System messages can pin a booking card (status change, reschedule, etc.).
+  // Cascade is SetNull so deleting a booking just unlinks the card — message
+  // stays in the chat as plain text for audit-trail purposes.
+  referencedBookingId String?
+
+  referencedBooking Booking? @relation("ChatMessageBooking", fields: [referencedBookingId], references: [id], onDelete: SetNull)
+
+  /**
+   * Lifecycle event identifier for system messages (e.g. BOOKING_CONFIRMED,
+   * BOOKING_RESCHEDULED). Used together with referencedBookingId for idempotent
+   * inserts — emit-once per (bookingId, eventKey). Free-text for now; if
+   * we need stricter enforcement promote to an enum.
+   */
+  systemEventKey String?
+
   createdAt DateTime @default(now())
 
+  @@unique([referencedBookingId, systemEventKey])
   @@index([chatId, createdAt])
   @@index([chatId, readAt])
+  @@index([referencedBookingId])
 }
 
 // chat-url-fix: opaque public identifier for (provider, client) chat

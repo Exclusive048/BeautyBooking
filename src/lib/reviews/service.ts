@@ -579,6 +579,67 @@ export async function reportReview(input: {
   return { reported: true };
 }
 
+/**
+ * 48-hour edit window for a client's own review. Matches the UI hint
+ * («Можно изменить в течение 48 часов после публикации»). The window starts
+ * at the review's `createdAt` — repeat edits all share the original anchor,
+ * which is intentional: editing N times shouldn't extend the window. Master
+ * replies don't lock editing here (they lock deletion in `deleteReview`).
+ */
+const EDIT_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+export async function updateReview(input: {
+  reviewId: string;
+  currentUser: Pick<UserProfile, "id" | "roles">;
+  rating: number;
+  text?: string;
+}): Promise<{ id: string; rating: number; text: string | null }> {
+  const review = await prisma.review.findUnique({
+    where: { id: input.reviewId },
+    select: {
+      id: true,
+      authorId: true,
+      createdAt: true,
+      targetType: true,
+      targetId: true,
+    },
+  });
+  if (!review) {
+    throw new AppError("Review not found", 404, "NOT_FOUND");
+  }
+  if (review.authorId !== input.currentUser.id) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+  const age = Date.now() - review.createdAt.getTime();
+  if (age > EDIT_WINDOW_MS) {
+    throw new AppError(
+      "Отзыв можно редактировать только в течение 48 часов после публикации",
+      409,
+      "EDIT_WINDOW_EXPIRED",
+    );
+  }
+  if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+    throw new AppError("Invalid rating", 400, "VALIDATION_ERROR");
+  }
+
+  const trimmed = input.text?.trim();
+  const textValue = trimmed && trimmed.length > 0 ? trimmed.slice(0, 1000) : null;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.review.update({
+      where: { id: review.id },
+      data: { rating: input.rating, text: textValue },
+      select: { id: true, rating: true, text: true },
+    });
+    // Avg rating must reflect the new score immediately — same recalc path
+    // as create/delete keeps the four mutation sites symmetrical.
+    await recalculateTargetRatings(tx, review.targetType, review.targetId);
+    return next;
+  });
+
+  return updated;
+}
+
 export async function deleteReview(input: {
   reviewId: string;
   currentUser: Pick<UserProfile, "id" | "roles">;

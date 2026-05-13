@@ -6,17 +6,45 @@ type Props = {
   children: ReactNode;
   userLabel?: string | null;
   favoritesCount?: number;
+  upcomingBookingsCount?: number;
+  unreadNotificationsCount?: number;
+  pendingReviewsCount?: number;
 };
 
-export function CabinetLayout({ children, userLabel, favoritesCount }: Props) {
+/**
+ * Client cabinet shell. Mirrors the master cabinet pattern: full-viewport
+ * sidebar + flex-1 content. Pages own their own max-width / horizontal
+ * padding — the layout deliberately does not constrain (so a bookings list
+ * can use the whole desktop width while a settings page can still center).
+ *
+ * Mobile: sidebar collapses, bottom-nav handles primary navigation. The
+ * `pb-24 lg:pb-0` on the main element keeps content above the fixed bottom
+ * nav on small screens.
+ */
+export function CabinetLayout({
+  children,
+  userLabel,
+  favoritesCount,
+  upcomingBookingsCount,
+  unreadNotificationsCount,
+  pendingReviewsCount,
+}: Props) {
   return (
-    <div className="min-h-dvh bg-bg-page">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 pb-24 md:py-10 md:pb-10 lg:flex-row lg:items-start">
-        <div className="hidden lg:block">
-          <CabinetSidebar userLabel={userLabel} favoritesCount={favoritesCount} />
+    <div className="flex min-h-screen bg-bg-page">
+      <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
+        <div className="sticky top-0 h-screen overflow-y-auto p-4">
+          <CabinetSidebar
+            userLabel={userLabel}
+            favoritesCount={favoritesCount}
+            upcomingBookingsCount={upcomingBookingsCount}
+            unreadNotificationsCount={unreadNotificationsCount}
+            pendingReviewsCount={pendingReviewsCount}
+          />
         </div>
-        <main className="min-w-0 flex-1 space-y-6">{children}</main>
       </div>
+
+      <main className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
+
       <CabinetBottomNav />
     </div>
   );

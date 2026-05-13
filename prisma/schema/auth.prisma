@@ -11,6 +11,8 @@ model UserProfile {
 
   email String? @unique
 
+  emailVerifiedAt DateTime?
+
   telegramId String? @unique
 
   telegramUsername String?
@@ -37,6 +39,8 @@ model UserProfile {
   middleName String?
 
   birthDate DateTime?
+
+  hideAgeYear Boolean @default(true)
 
   address String?
 

@@ -9,6 +9,7 @@ import { CitySelector } from "@/features/cities/components/city-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
+import { getAvailableCabinets, type CabinetKind } from "@/lib/auth/available-cabinets";
 import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { hasAdminRole } from "@/lib/auth/guards";
 import { hasMasterProfile } from "@/lib/auth/roles";
@@ -138,12 +139,14 @@ export async function Topbar() {
     master: null,
     studio: null,
   };
+  let availableCabinets: CabinetKind[] = [];
 
   if (user) {
     const links = await loadWorkspaceLinks(user.id);
     userLabel = user.displayName?.trim() || user.phone || UI_TEXT.auth.menu;
     showAdminLink = hasAdminRole(user);
     workspaceLinks = links;
+    availableCabinets = getAvailableCabinets(user.roles ?? []);
   }
 
   return (
@@ -220,7 +223,11 @@ export async function Topbar() {
                 {workspaceLinks.studio ? (
                   <WorkspaceShortcutLink item={workspaceLinks.studio} isStudio />
                 ) : null}
-                <AuthUserMenu userLabel={userLabel} showAdminLink={showAdminLink} />
+                <AuthUserMenu
+                  userLabel={userLabel}
+                  showAdminLink={showAdminLink}
+                  availableCabinets={availableCabinets}
+                />
               </div>
               <AuthMobileMenu
                 userLabel={userLabel}

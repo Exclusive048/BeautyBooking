@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { FocalImage } from "@/components/ui/focal-image";
 import { Button } from "@/components/ui/button";
+import { FavoriteToggleButton } from "@/components/ui/favorite-toggle-button";
 import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
 import { AvailabilityHint } from "@/features/public-profile/master/components/availability-hint";
 import { PremiumRing } from "@/features/public-profile/master/components/premium-ring";
@@ -17,6 +18,8 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   view: MasterPublicProfileView;
+  isAuthenticated?: boolean;
+  initialFavorited?: boolean;
 };
 
 const T = UI_TEXT.publicProfile.hero;
@@ -46,7 +49,7 @@ function formatExperience(months: number | null): string | null {
   );
 }
 
-export function HeroBlock({ view }: Props) {
+export function HeroBlock({ view, isAuthenticated = false, initialFavorited = false }: Props) {
   const { provider, planTier, experienceMonths, availability } = view;
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const isPremium = planTier === "PREMIUM";
@@ -202,6 +205,12 @@ export function HeroBlock({ view }: Props) {
             <HotSlotsSubscribeButton
               providerId={provider.id}
               enabled={provider.hotSlotsEnabled}
+            />
+            <FavoriteToggleButton
+              providerId={provider.id}
+              initialFavorited={initialFavorited}
+              isAuthenticated={isAuthenticated}
+              variant="floating"
             />
             <Button
               variant="ghost"

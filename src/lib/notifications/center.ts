@@ -201,7 +201,7 @@ export async function getNotificationCenterData(input: {
         })
       : Promise.resolve([]),
     prisma.notification.findMany({
-      where: { userId: input.userId },
+      where: { userId: input.userId, deletedAt: null },
       select: {
         id: true,
         title: true,
@@ -234,7 +234,7 @@ export async function getNotificationCenterData(input: {
       take: 100,
     }),
     prisma.notification.count({
-      where: { userId: input.userId, isRead: false },
+      where: { userId: input.userId, isRead: false, deletedAt: null },
     }),
   ]);
 

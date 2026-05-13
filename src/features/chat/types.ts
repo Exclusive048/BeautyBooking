@@ -28,15 +28,30 @@ export type ConversationListItemDto = {
   latestActivityAt: string;
 };
 
+/** Booking snapshot pinned by a SYSTEM message. */
+export type ThreadBookingCardDto = {
+  id: string;
+  status: string;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  serviceName: string;
+  priceSnapshot: number;
+  durationMin: number;
+  address: string | null;
+};
+
 export type ThreadMessageDto = {
   type: "message";
   id: string;
-  senderType: "CLIENT" | "MASTER";
+  /** SYSTEM is a centered notification, rendered without a sided bubble. */
+  senderType: "CLIENT" | "MASTER" | "SYSTEM";
   senderName: string;
   body: string;
   readAt: string | null;
   createdAt: string;
   bookingId: string;
+  /** Card rendered alongside a SYSTEM message. Null for plain text. */
+  bookingCard: ThreadBookingCardDto | null;
 };
 
 export type ThreadDaySeparatorDto = {

@@ -23,10 +23,17 @@ model Notification {
 
   readAt DateTime?
 
+  // Soft-delete marker. Once set, all read paths (badge count, list,
+  // mark-all-read) filter the row out so it vanishes from the user's
+  // surface — but the row persists for audit/restoration until a future
+  // cleanup job purges old soft-deletes. `null` = active.
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
 
   @@index([userId, isRead, createdAt])
   @@index([userId, createdAt])
+  @@index([userId, deletedAt, createdAt])
   @@index([bookingId])
 }
 

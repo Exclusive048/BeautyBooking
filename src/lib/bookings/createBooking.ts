@@ -17,10 +17,11 @@ import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-co
 import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
 import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
-import { logInfo } from "@/lib/logging/logger";
+import { logInfo, logError } from "@/lib/logging/logger";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
+import { emitBookingCreatedSystemMessage } from "@/lib/chat/system-messages";
 
 function mapPrismaBookingConflict(error: unknown): AppError | null {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -277,6 +278,19 @@ export async function createBooking(input: {
     resolvedMasterProviderId ?? (provider.type === ProviderType.MASTER ? provider.id : null);
   if (advisorMasterId) {
     await invalidateAdvisorCache(advisorMasterId);
+  }
+
+  // Emit the BOOKING_CREATED system message into the chat. Idempotent via
+  // (referencedBookingId, systemEventKey) unique constraint, so safe across
+  // retries. Failures are non-fatal — chat decoration shouldn't block the
+  // booking response.
+  try {
+    await emitBookingCreatedSystemMessage(created.id);
+  } catch (error) {
+    logError("Failed to emit booking system message (create)", {
+      bookingId: created.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return toBookingDto(created);

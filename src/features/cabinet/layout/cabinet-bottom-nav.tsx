@@ -2,19 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, User, Briefcase } from "lucide-react";
+import { Calendar, Heart, Send, User, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const TABS = [
-  { label: UI_TEXT.clientCabinet.nav.home, href: "/cabinet", icon: LayoutDashboard, exact: true },
   { label: UI_TEXT.clientCabinet.nav.bookings, href: "/cabinet/bookings", icon: Calendar },
+  { label: UI_TEXT.clientCabinet.nav.messages, href: "/cabinet/messages", icon: Send },
+  { label: UI_TEXT.clientCabinet.nav.favorites, href: "/cabinet/favorites", icon: Heart },
+  { label: UI_TEXT.clientCabinet.nav.reviews, href: "/cabinet/reviews", icon: Star },
   { label: UI_TEXT.clientCabinet.nav.profile, href: "/cabinet/profile", icon: User },
-  { label: UI_TEXT.clientCabinet.nav.roles, href: "/cabinet/roles", icon: Briefcase },
 ];
 
-function isActive(pathname: string, href: string, exact?: boolean) {
-  if (exact) return pathname === href;
+function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -27,8 +27,8 @@ export function CabinetBottomNav() {
       <div className="absolute inset-0 border-t border-border-subtle/60 bg-bg-card/90 backdrop-blur-xl" />
       {/* Safe area padding */}
       <div className="relative flex items-stretch justify-around pb-[env(safe-area-inset-bottom,0px)]">
-        {TABS.map(({ label, href, icon: Icon, exact }) => {
-          const active = isActive(pathname, href, exact);
+        {TABS.map(({ label, href, icon: Icon }) => {
+          const active = isActive(pathname ?? "/", href);
           return (
             <Link
               key={href}

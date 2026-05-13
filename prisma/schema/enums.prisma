@@ -142,6 +142,8 @@ enum ChatSenderType {
   CLIENT
 
   MASTER
+
+  SYSTEM
 }
 
 // === Schedule ===
