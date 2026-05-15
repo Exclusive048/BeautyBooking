@@ -55,6 +55,14 @@ const GROUP_MAP: Record<NotificationType, ClientNotificationGroup> = {
   CHAT_MESSAGE_RECEIVED: "system",
   CATEGORY_APPROVED: "system",
   CATEGORY_REJECTED: "system",
+  // Admin-initiated notifications all surface in the "system" group —
+  // they're operational events from the platform, not user-driven.
+  BILLING_PLAN_GRANTED_BY_ADMIN: "system",
+  BILLING_PLAN_EDITED: "system",
+  BILLING_SUBSCRIPTION_CANCELLED_BY_ADMIN: "system",
+  BILLING_PAYMENT_REFUNDED: "system",
+  REVIEW_DELETED_BY_ADMIN: "system",
+  SUBSCRIPTION_GRANTED_BY_ADMIN: "system",
 };
 
 export function groupForNotificationType(

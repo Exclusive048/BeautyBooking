@@ -1,0 +1,51 @@
+// === DOMAIN: Admin Audit ===
+//
+// Single audit log for every privileged admin action. Replaces the
+// `logInfo("admin.*", ...)` patchwork that grew through Phase 2 by
+// giving us a queryable history with FK-enforced links to the actor
+// (`admin`) and (where relevant) the target row.
+//
+// The existing `BillingAuditLog` (see billing.prisma) is **not**
+// removed here — its retirement is a separate decision tracked in
+// ADMIN-AUDIT-INTEGRATION. Until then both tables coexist.
+
+model AdminAuditLog {
+  id String @id @default(cuid())
+
+  adminUserId String
+
+  // Restrict: we never want to drop an admin user while their audit
+  // trail still references them. If the account is ever fully removed
+  // its rows must be reassigned or migrated explicitly first.
+  admin UserProfile @relation("AdminAuditLogActor", fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  action AdminAuditAction
+
+  /// Free-form discriminator: "user" / "review" / "city" / "plan" /
+  /// "subscription" / "payment" / "category" / "setting" / null.
+  /// Indexed together with `targetId` for fast per-entity lookups.
+  targetType String?
+
+  targetId String?
+
+  /// Structured detail blob — typically `{ diff: { before, after } }`
+  /// for state changes, or action-specific context (e.g. plan code,
+  /// flag key, refund amount). Schema is enforced at the call site,
+  /// not at the DB layer.
+  details Json?
+
+  /// Optional admin-supplied free text (e.g. cancel reason, delete
+  /// reason). Surfaced in UI; not used for branching logic.
+  reason String?
+
+  ipAddress String?
+
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([adminUserId, createdAt(sort: Desc)])
+  @@index([targetType, targetId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}

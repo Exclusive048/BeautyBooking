@@ -6,6 +6,7 @@ import type {
   CatalogSort,
 } from "@/lib/catalog/schemas";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 /** Encode an internal row ID as an opaque, URL-safe cursor token. */
 function encodeCursor(id: string): string {
@@ -419,6 +420,7 @@ async function loadSmartTagCounts(
     where: {
       targetType: "provider",
       targetId: { in: providerIds },
+      ...ACTIVE_REVIEW_FILTER,
       tags: {
         some: {
           tag: {

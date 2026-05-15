@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
+import { logInfo } from "@/lib/logging/logger";
 
 const SETTINGS_KEYS = {
   seoTitle: "siteSeoTitle",
@@ -23,13 +26,15 @@ async function readSetting(key: string): Promise<string | null> {
   return setting?.value ?? null;
 }
 
-async function writeSetting(key: string, value: string | null) {
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+async function writeSettingTx(tx: TxClient, key: string, value: string | null) {
   if (value == null || value.trim().length === 0) {
-    await prisma.appSetting.deleteMany({ where: { key } });
+    await tx.appSetting.deleteMany({ where: { key } });
     return;
   }
 
-  await prisma.appSetting.upsert({
+  await tx.appSetting.upsert({
     where: { key },
     create: { key, value },
     update: { value },
@@ -65,10 +70,46 @@ export async function PATCH(req: Request) {
     const seoTitle = parsed.data.seoTitle ?? null;
     const seoDescription = parsed.data.seoDescription ?? null;
 
-    await Promise.all([
-      writeSetting(SETTINGS_KEYS.seoTitle, seoTitle),
-      writeSetting(SETTINGS_KEYS.seoDescription, seoDescription),
+    const [prevTitle, prevDescription] = await Promise.all([
+      readSetting(SETTINGS_KEYS.seoTitle),
+      readSetting(SETTINGS_KEYS.seoDescription),
     ]);
+
+    // Build the diff up-front so both the AdminAuditLog row and the
+    // structured log emit identical shapes. Settings writes happen
+    // inside the same transaction as the audit so a failed audit
+    // rolls the SEO update back.
+    const changed: Record<string, { before: string | null; after: string | null }> = {};
+    if (prevTitle !== seoTitle) {
+      changed.seoTitle = { before: prevTitle, after: seoTitle };
+    }
+    if (prevDescription !== seoDescription) {
+      changed.seoDescription = { before: prevDescription, after: seoDescription };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await writeSettingTx(tx, SETTINGS_KEYS.seoTitle, seoTitle);
+      await writeSettingTx(tx, SETTINGS_KEYS.seoDescription, seoDescription);
+
+      if (Object.keys(changed).length > 0) {
+        await createAdminAuditLog({
+          tx,
+          adminUserId: auth.user.id,
+          action: "SETTINGS_SEO_UPDATED",
+          targetType: "app_setting",
+          targetId: "seo",
+          details: { changes: changed },
+          context: getAdminAuditContext(req),
+        });
+      }
+    });
+
+    if (Object.keys(changed).length > 0) {
+      logInfo("admin.settings.seo.updated", {
+        adminUserId: auth.user.id,
+        changed,
+      });
+    }
 
     return ok({ seoTitle, seoDescription });
   } catch (error) {

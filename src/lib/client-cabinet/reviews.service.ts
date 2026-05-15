@@ -1,5 +1,6 @@
 import { BookingStatus, ReviewTargetType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const EDIT_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -48,7 +49,7 @@ export type PendingReviewBooking = {
 
 export async function listClientReviews(userId: string): Promise<ClientReviewItem[]> {
   const rows = await prisma.review.findMany({
-    where: { authorId: userId },
+    where: { authorId: userId, ...ACTIVE_REVIEW_FILTER },
     orderBy: { createdAt: "desc" },
     include: {
       master: {
@@ -109,12 +110,16 @@ export async function computeReviewsKpi(userId: string): Promise<ClientReviewsKp
 
   const [agg, respondedCount, pendingCount] = await Promise.all([
     prisma.review.aggregate({
-      where: { authorId: userId },
+      where: { authorId: userId, ...ACTIVE_REVIEW_FILTER },
       _count: { _all: true },
       _avg: { rating: true },
     }),
     prisma.review.count({
-      where: { authorId: userId, replyText: { not: null } },
+      where: {
+        authorId: userId,
+        replyText: { not: null },
+        ...ACTIVE_REVIEW_FILTER,
+      },
     }),
     prisma.booking.count({
       where: {

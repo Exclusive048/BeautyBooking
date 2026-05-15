@@ -21,6 +21,8 @@ import {
   BOOKING_REMINDER_JOB_TYPE,
   DEFAULT_JOB_MAX_ATTEMPTS,
   MEDIA_CLEANUP_JOB_TYPE,
+  MRR_SNAPSHOT_DAILY_JOB_TYPE,
+  PLAN_EDITED_NOTIFY_JOB_TYPE,
   SLOT_FREED_JOB_TYPE,
   TELEGRAM_SEND_JOB_TYPE,
   VISUAL_SEARCH_INDEX_JOB_TYPE,
@@ -41,6 +43,8 @@ import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-p
 import { runMediaCleanup } from "@/lib/media/cleanup";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
+import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
+import { processPlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
 
 ensureVisualSearchStartupConfig();
 
@@ -432,6 +436,42 @@ async function processMediaCleanupJob(
   await runMediaCleanup();
 }
 
+async function processMrrSnapshotDailyJob(
+  job: Extract<Job, { type: typeof MRR_SNAPSHOT_DAILY_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  const result = await createMrrSnapshotForToday();
+  logInfo("worker.mrr.snapshot.processed", {
+    created: result.created,
+    snapshotDate: result.snapshot.snapshotDate.toISOString().slice(0, 10),
+    mrrKopeks: result.snapshot.mrrKopeks.toString(),
+    activeCount: result.snapshot.activeSubscriptionsCount,
+  });
+}
+
+async function processPlanEditedNotifyJob(
+  job: Extract<Job, { type: typeof PLAN_EDITED_NOTIFY_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  const result = await processPlanEditedMassNotification(job.payload);
+  logInfo("worker.notification.plan-edited.mass.processed", {
+    planId: job.payload.planId,
+    planCode: job.payload.planCode,
+    recipients: result.recipients,
+    failures: result.failures,
+  });
+}
+
 async function processJob(job: Job): Promise<void> {
   try {
     if (job.type === TELEGRAM_SEND_JOB_TYPE) {
@@ -446,6 +486,10 @@ async function processJob(job: Job): Promise<void> {
       await processYookassaWebhookJob(job);
     } else if (job.type === MEDIA_CLEANUP_JOB_TYPE) {
       await processMediaCleanupJob(job);
+    } else if (job.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
+      await processMrrSnapshotDailyJob(job);
+    } else if (job.type === PLAN_EDITED_NOTIFY_JOB_TYPE) {
+      await processPlanEditedNotifyJob(job);
     } else {
       const unknownJob = job as unknown as { id?: string; type?: string };
       logError("Worker received unknown job type", {

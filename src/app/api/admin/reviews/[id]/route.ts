@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import type { ReviewTargetType, Prisma } from "@prisma/client";
 
 const dismissSchema = z.object({
@@ -19,7 +20,7 @@ async function recalculateTargetRatings(
   targetId: string
 ): Promise<void> {
   const aggregate = await tx.review.aggregate({
-    where: { targetType, targetId },
+    where: { targetType, targetId, ...ACTIVE_REVIEW_FILTER },
     _avg: { rating: true },
     _count: { _all: true },
   });
@@ -78,15 +79,33 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
     const review = await prisma.review.findUnique({
       where: { id },
-      select: { id: true, targetType: true, targetId: true },
+      select: { id: true, targetType: true, targetId: true, deletedAt: true },
     });
 
     if (!review) {
       return fail("Отзыв не найден.", 404, "NOT_FOUND");
     }
 
+    // Idempotent: already soft-deleted — return success without
+    // re-running the rating recalc. Matches the new admin delete
+    // service in `delete-review.service.ts`.
+    if (review.deletedAt) {
+      return ok({ id });
+    }
+
+    // Soft delete (REVIEW-SOFT-DELETE-A). The new admin UI uses the
+    // dedicated `POST /[id]/delete` route which also writes audit +
+    // dispatches notification; this legacy DELETE handler keeps the
+    // minimal flow (no audit/notify) for backwards compatibility.
+    // BACKLOG: retire once no consumers remain.
     await prisma.$transaction(async (tx) => {
-      await tx.review.delete({ where: { id } });
+      await tx.review.update({
+        where: { id },
+        data: {
+          deletedAt: new Date(),
+          deletedByUserId: auth.user.id,
+        },
+      });
       await recalculateTargetRatings(tx, review.targetType, review.targetId);
     });
 

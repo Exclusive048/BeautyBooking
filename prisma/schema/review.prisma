@@ -39,6 +39,18 @@ model Review {
 
   tags ReviewTagOnReview[]
 
+  /// Soft-delete timestamp. Set by admin moderation flow (see
+  /// REVIEW-SOFT-DELETE-A). All active-review queries must filter
+  /// `deletedAt: null`. Behaviour switch comes in a follow-up commit;
+  /// existing endpoints still hard-delete until then.
+  deletedAt DateTime?
+
+  deletedByUserId String?
+
+  deletedBy UserProfile? @relation("ReviewDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+
+  deletedReason String?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -46,6 +58,7 @@ model Review {
   @@index([targetType, targetId])
   @@index([studioId, createdAt])
   @@index([masterId, createdAt])
+  @@index([deletedAt])
 }
 
 model ReviewTag {

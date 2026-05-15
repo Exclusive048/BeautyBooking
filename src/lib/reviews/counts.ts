@@ -1,6 +1,7 @@
 import { ReviewTargetType } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 /**
  * Reviews left for this master that haven't received a reply yet. Drives
@@ -15,6 +16,7 @@ export const getUnansweredReviewsCountForMaster = cache(
         targetId: masterProviderId,
         replyText: null,
         reportedAt: null,
+        ...ACTIVE_REVIEW_FILTER,
       },
     });
   },

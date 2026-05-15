@@ -1,6 +1,8 @@
 import { CategoryStatus, NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { createNotification, publishNotifications } from "@/lib/notifications/service";
@@ -9,7 +11,7 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(_req: Request, ctx: RouteContext) {
+export async function POST(req: Request, ctx: RouteContext) {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
 
@@ -19,7 +21,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
 
     const category = await prisma.globalCategory.findUnique({
       where: { id },
-      select: { id: true, name: true, proposedBy: true, status: true },
+      select: { id: true, name: true, slug: true, proposedBy: true, status: true },
     });
     if (!category) {
       return fail("Not found", 404, "NOT_FOUND");
@@ -28,10 +30,24 @@ export async function POST(_req: Request, ctx: RouteContext) {
       return fail("Category is not pending moderation", 409, "CONFLICT");
     }
 
-    const updated = await prisma.globalCategory.update({
-      where: { id },
-      data: { status: "APPROVED", reviewedAt: new Date() },
-      select: { id: true, status: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.globalCategory.update({
+        where: { id },
+        data: { status: "APPROVED", reviewedAt: new Date() },
+        select: { id: true, status: true },
+      });
+
+      await createAdminAuditLog({
+        tx,
+        adminUserId: auth.user.id,
+        action: "CATEGORY_APPROVED",
+        targetType: "category",
+        targetId: id,
+        details: { categorySlug: category.slug, name: category.name },
+        context: getAdminAuditContext(req),
+      });
+
+      return row;
     });
 
     if (category.proposedBy) {

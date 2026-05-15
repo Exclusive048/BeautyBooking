@@ -12,6 +12,18 @@ import { sha256, formatTimeBucketUtc } from "@/lib/billing/utils";
 
 import { createBillingAuditLog } from "@/lib/billing/audit";
 
+import { createAdminAuditLogSafe } from "@/lib/audit/admin-audit";
+
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
+
+import { NotificationType } from "@prisma/client";
+
+import { dispatchAdminInitiatedNotification } from "@/lib/notifications/admin-initiated";
+
+import { buildRefundBody } from "@/lib/notifications/admin-body-templates";
+
+import { logError } from "@/lib/logging/logger";
+
 
 
 export const runtime = "nodejs";
@@ -25,6 +37,8 @@ const bodySchema = z.object({
   yookassaPaymentId: z.string().trim().min(1).optional(),
 
   amountKopeks: z.number().int().min(1).optional(),
+
+  reason: z.string().trim().max(500).optional(),
 
 });
 
@@ -52,7 +66,7 @@ export async function POST(req: Request) {
 
 
 
-    const { paymentId, yookassaPaymentId, amountKopeks } = parsed.data;
+    const { paymentId, yookassaPaymentId, amountKopeks, reason } = parsed.data;
 
     if (!paymentId && !yookassaPaymentId) {
 
@@ -154,9 +168,66 @@ export async function POST(req: Request) {
 
       action: "REFUND_REQUESTED",
 
-      details: { refundId: refund.id, status: refund.status, amountKopeks: refundAmount },
+      details: {
+        refundId: refund.id,
+        status: refund.status,
+        amountKopeks: refundAmount,
+        reason: reason ?? null,
+      },
 
     });
+
+    // The YooKassa refund call has already mutated external state — do
+    // not let an audit-write failure surface as a 500. Use the safe
+    // variant; failures are logged via `logError("admin-audit.*")`.
+    await createAdminAuditLogSafe({
+      adminUserId: auth.user.id,
+      action: "BILLING_PAYMENT_REFUNDED",
+      targetType: "payment",
+      targetId: payment.id,
+      details: {
+        refundId: refund.id,
+        status: refund.status,
+        amountKopeks: refundAmount,
+        subscriptionId: payment.subscriptionId,
+        userId: payment.subscription.userId,
+      },
+      reason: reason ?? null,
+      context: getAdminAuditContext(req),
+    });
+
+    // Notify the user that their payment was refunded. Like the audit
+    // log above, failure here must not surface as a 500 — the refund
+    // already happened on YooKassa's side.
+    if (refund.status === "succeeded") {
+      try {
+        await dispatchAdminInitiatedNotification({
+          targetUserId: payment.subscription.userId,
+          type: NotificationType.BILLING_PAYMENT_REFUNDED,
+          title: "Платёж возвращён",
+          body: buildRefundBody({
+            amountKopeks: refundAmount,
+            reason: reason ?? null,
+          }),
+          url: "/cabinet/billing",
+          payload: {
+            paymentId: payment.id,
+            subscriptionId: payment.subscriptionId,
+            refundAmountKopeks: refundAmount,
+            yookassaRefundId: refund.id,
+          },
+        });
+      } catch (notifyError) {
+        logError("admin.billing.refund.notify_failed", {
+          paymentId: payment.id,
+          userId: payment.subscription.userId,
+          error:
+            notifyError instanceof Error
+              ? notifyError.message
+              : String(notifyError),
+        });
+      }
+    }
 
 
 

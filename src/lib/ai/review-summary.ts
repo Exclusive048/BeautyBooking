@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { aiChat } from "@/lib/ai/client";
 import { assertAiFeaturesEnabled } from "@/lib/ai/config";
 import { AI_PROMPTS } from "@/lib/ai/prompts";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 const CACHE_KEY_PREFIX = "ai:review-summary:";
 const CACHE_TTL_SECONDS = 86_400;
@@ -21,7 +22,12 @@ export async function getReviewSummary(providerId: string): Promise<{
   await assertAiFeaturesEnabled();
 
   const reviewsCount = await prisma.review.count({
-    where: { targetType: "provider", targetId: providerId, text: { not: null } },
+    where: {
+      targetType: "provider",
+      targetId: providerId,
+      text: { not: null },
+      ...ACTIVE_REVIEW_FILTER,
+    },
   });
 
   if (reviewsCount < MIN_REVIEWS_FOR_SUMMARY) {
@@ -34,7 +40,12 @@ export async function getReviewSummary(providerId: string): Promise<{
   }
 
   const reviews = await prisma.review.findMany({
-    where: { targetType: "provider", targetId: providerId, text: { not: null } },
+    where: {
+      targetType: "provider",
+      targetId: providerId,
+      text: { not: null },
+      ...ACTIVE_REVIEW_FILTER,
+    },
     orderBy: { createdAt: "desc" },
     take: MAX_REVIEWS_FOR_PROMPT,
     select: { rating: true, text: true, createdAt: true },

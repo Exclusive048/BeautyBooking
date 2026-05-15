@@ -272,6 +272,17 @@ enum NotificationType {
   CHAT_MESSAGE_RECEIVED
   CATEGORY_APPROVED
   CATEGORY_REJECTED
+  // Admin-initiated notifications (NOTIFICATION-TYPES-A, 2026-05-14).
+  // Distinct enum values let recipients distinguish a regular event
+  // (subscription expired on its own) from an admin override (cancelled
+  // by support). UI consumers should treat unknown enum values
+  // gracefully — fallbacks live in `src/lib/notifications/presentation.ts`.
+  BILLING_PLAN_GRANTED_BY_ADMIN
+  BILLING_PLAN_EDITED
+  BILLING_SUBSCRIPTION_CANCELLED_BY_ADMIN
+  BILLING_PAYMENT_REFUNDED
+  REVIEW_DELETED_BY_ADMIN
+  SUBSCRIPTION_GRANTED_BY_ADMIN
 }
 
 // === Media ===
@@ -368,4 +379,68 @@ enum ModelApplicationStatus {
   APPROVED_WAITING_CLIENT
 
   CONFIRMED
+}
+
+// === Admin Audit ===
+
+/// Discrete action types written to `AdminAuditLog.action`. Names
+/// follow `DOMAIN_VERB` so log queries can filter by prefix
+/// (e.g. all `BILLING_*` events). Future actions append to the tail;
+/// removed actions stay listed for backwards-compatible reads.
+enum AdminAuditAction {
+  // User management (ADMIN-USERS-A)
+  USER_PLAN_GRANTED
+
+  USER_BLOCKED
+
+  USER_UNBLOCKED
+
+  USER_ROLE_ADDED
+
+  USER_ROLE_REMOVED
+
+  USER_ACCOUNT_DELETED
+
+  // Billing (ADMIN-BILLING-A + B)
+  BILLING_PLAN_EDITED
+
+  BILLING_SUBSCRIPTION_CANCELLED
+
+  BILLING_PAYMENT_REFUNDED
+
+  // Cities (ADMIN-CITIES-UI)
+  CITY_CREATED
+
+  CITY_UPDATED
+
+  CITY_DELETED
+
+  CITY_MERGED
+
+  CITY_VERIFIED
+
+  // Catalog (ADMIN-CATALOG-A)
+  CATEGORY_APPROVED
+
+  CATEGORY_REJECTED
+
+  CATEGORY_EDITED
+
+  // Reviews (ADMIN-REVIEWS-A)
+  REVIEW_APPROVED
+
+  REVIEW_DELETED
+
+  REVIEW_RESTORED
+
+  // Settings (ADMIN-SETTINGS-A)
+  SETTINGS_LOGO_UPDATED
+
+  SETTINGS_LOGIN_HERO_UPDATED
+
+  SETTINGS_SEO_UPDATED
+
+  SETTINGS_FLAG_TOGGLED
+
+  SETTINGS_APP_SETTING_UPDATED
 }

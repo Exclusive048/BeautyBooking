@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { reviewIdParamSchema } from "@/lib/reviews/schemas";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -41,8 +42,11 @@ export async function POST(req: Request, ctx: RouteContext) {
       return jsonFail(400, "Validation error", "VALIDATION_ERROR");
     }
 
-    const review = await prisma.review.findUnique({
-      where: { id: parsedParams.data.id },
+    // `findFirst` lets us combine the unique id with the soft-delete
+    // filter — admin can still load deleted reviews via the admin
+    // module, but AI suggest-reply should never operate on them.
+    const review = await prisma.review.findFirst({
+      where: { id: parsedParams.data.id, ...ACTIVE_REVIEW_FILTER },
       select: {
         id: true,
         text: true,

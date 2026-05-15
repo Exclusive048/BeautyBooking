@@ -2,6 +2,7 @@ import { BookingStatus, ProviderType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
+import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 export type StudioDashboardStats = {
   bookingsTodayCount: number;
@@ -108,6 +109,7 @@ export async function getStudioDashboardStats(studioId: string): Promise<StudioD
         where: {
           studioId: studio.id,
           createdAt: { gte: last7Days },
+          ...ACTIVE_REVIEW_FILTER,
         },
       }),
     ]);

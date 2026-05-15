@@ -101,6 +101,10 @@ const ERROR_CODES = [
   "TIME_RANGE_INVALID",
   "UNAUTHORIZED",
   "VALIDATION_ERROR",
+  // Admin billing features editor (ADMIN-BILLING-FIX-B)
+  "PARENT_NOT_FOUND",
+  "INHERITANCE_CYCLE",
+  "STRICT_LIMIT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
