@@ -154,6 +154,13 @@ function CalendarBookingChat({ bookingId }: { bookingId: string }) {
     </div>
   );
 }
+/**
+ * @deprecated STUDIO-SCHEDULE-A replaced this with
+ * `src/features/studio-cabinet/schedule/`. Orphan after the calendar
+ * page rewrite — Phase 7 cleanup will remove this 695-line client
+ * component (only comment-level reference left in
+ * `master-schedule-editor.tsx`).
+ */
 export function StudioCalendarPage({ studioId }: Props) {
   const t = UI_TEXT.studioCabinet.calendar;
   const viewerTimeZone = useViewerTimeZoneContext();

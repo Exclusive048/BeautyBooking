@@ -10,7 +10,8 @@
 > - ✅ Symmetric switcher rollback (SYMMETRIC-SWITCHER-A — cabinet UI без duplicate switcher)
 > - ✅ Dashboard redesign (STUDIO-DASHBOARD-A — rich KPIs + attention + revenue chart)
 > - ✅ Masters page redesign (STUDIO-MASTERS-A — 2-col list+detail, status filters, invite/pause/activate)
-> - ⏳ Calendar, Bookings, Services, Clients, Reviews, Analytics, Finance, Settings
+> - ✅ Schedule multi-master redesign (STUDIO-SCHEDULE-A — день grid + неделя occupancy + action menus, NO D&D / NO Месяц)
+> - ⏳ Bookings, Services, Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -525,7 +526,7 @@ src/
 | URL | Описание |
 |-----|---------|
 | `/cabinet/studio` | Главная студии — rich dashboard (today banner / 4 KPI tiles / top masters / attention / occupancy / popular services / revenue chart) ✅ STUDIO-DASHBOARD-A |
-| `/cabinet/studio/calendar` | Календарь студии |
+| `/cabinet/studio/calendar` | Расписание студии — multi-master день grid + неделя occupancy + action menus + URL state ?view/?date ✅ STUDIO-SCHEDULE-A |
 | `/cabinet/studio/schedule-requests` | Approval/reject заявок мастеров на изменение расписания ✅ STUDIO-SCHEDULE-REQUEST-APPROVAL-A |
 | `/cabinet/studio/analytics` | Аналитика студии |
 | `/cabinet/studio/clients` | CRM клиентов студии |
@@ -986,6 +987,7 @@ src/
 | 19 | **AdminAuditLog safe variant вне транзакций для resilience** | `src/lib/audit/admin-audit.ts` (`createAdminAuditLogSafe`) | Когда business action уже мутировал external state (например refund → YooKassa API call) и rollback невозможен — использовать safe variant. Failure logs через `logError("admin-audit.create.failed", ...)` но не surface'ит 500 admin'у. Currently 1 site: `/api/admin/billing/refund` POST. |
 | 20 | **Studio masters никогда не показывают PREMIUM badge** | global UI rule (STUDIO-MASTERS-A) | Подписка `UserSubscription.scope = STUDIO` шарится на всю команду студии — индивидуальный мастер не «оплачивает PREMIUM». Поэтому в любой surface где рендерится studio master (cabinet team list/detail, catalog cards, public profile, master cards in dashboard) — `PremiumBadge` должен быть suppressed. На `/cabinet/studio/team` запрет implicit (badge не рендерится). На other surfaces нужен утилитарный helper `isStudioMaster(provider) → studioId !== null` для checked rendering. Backlog 🟡 для shared helper. |
 | 21 | **Studio masters permissions работают по default правилам** | UX rule (STUDIO-MASTERS-A) | В studio masters detail panel НЕТ permissions toggles (schedule edit / services edit / notifications). Это intentional: schedule changes идут через approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A), services управляются по studio policy, notifications — через user-level preferences. Если permission gating потребуется в будущем — это новые schema fields + UI, не toggles в текущем дизайне. |
+| 22 | **Studio admin booking CRUD direct vs approval flow scope** | `src/lib/studio/bookings.service.ts` (`createStudioBooking`, `moveStudioBooking`) + `src/app/api/bookings/[id]/cancel/route.ts` (STUDIO-SCHEDULE-A) | Studio admin booking operations (создать / перенести / отменить запись) идут **прямо** через Booking CRUD — никакой ScheduleChangeRequest approval. Admin has authority over studio bookings. `ScheduleChangeRequest` approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A) — это **отдельный концепт**: применяется ТОЛЬКО к master-initiated working-hours / day-off changes (через `applyScheduleSnapshot` / week schedule edits), не к individual bookings. Confusing эти 2 scope ломает либо UX (admin не может быстро управлять записями), либо authority model (master может обойти approval). |
 
 ---
 
@@ -1114,6 +1116,30 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-16 — STUDIO-SCHEDULE-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 6/13. `/cabinet/studio/calendar` rewrite — legacy 695-LOC client component заменён server-orchestrated multi-master grid с action menus, URL state, manual refresh.
+  - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/schedule/`:
+    - `lib/time-grid.ts` — constants `DAY_START_HOUR=9` / `DAY_END_HOUR=21` / `SLOT_MINUTES=30` / `SLOT_HEIGHT_PX=28`. Pure helpers `offsetPxFromDayStart`, `durationPx`, `parseDateKey`, `toDateKey`, `addUtcDays`
+    - `lib/booking-status-display.ts` — `bookingToneFromStatus(BookingStatus)` + `BOOKING_CELL_CLASS` Tailwind bundle (5 tones: confirmed / pending / new / done / muted)
+    - `lib/view-state.ts` — `parseScheduleView` (only "day" | "week", no month per scope decision)
+    - `server/types.ts` — DTOs (ScheduleDayData, ScheduleKpis, ScheduleWeekData, StudioScheduleData, ScheduleBookingCell с tone field, etc)
+    - `server/schedule-data.service.ts` — `loadStudioScheduleData({studioId, dateKey, view})` orchestrator. Parallel: day data (masters + bookings + breaks) / services catalog / optional week data. First-time-client detection через `clientUserId` earliest-booking groupBy. KPIs computed inline. Header doc-comment делает invariant #22 явным
+    - `components/` — 12 files: page orchestrator, header (URL-driven view toggle + date nav + refresh + add-button), kpi-row (4 tiles), legend, day-view subdir (day-grid + time-axis + master-column-header + current-time-line + disabled-master-overlay), week-view subdir (week-grid), dialogs subdir (create-booking-dialog + booking-action-menu + move-booking-dialog + cancel-booking-dialog)
+  - **Раздел 5 (Бизнес-логика):**
+    - **Day grid:** master columns × time rows. Booking cells absolute-positioned by `offsetPxFromDayStart(start)` and `durationPx(start, end)`. Status color tone applied per `bookingToneFromStatus`. First-time clients get "new" tone (emerald). Empty cells clickable → create-booking-dialog. Booking cells clickable → action-menu (details/move/cancel popover). Disabled masters (Provider.isPublished=false) get hatched overlay "Недоступен" (no "В отпуске до X" — no schema field for vacation end)
+    - **Week view simplified:** master rows × weekday columns. Each cell = `booked/capacity + progress bar`. Click → switch to day view of that date. Avoids per-booking rendering (would overload visually for N masters × 7 days)
+    - **Action menus вместо D&D** (scope decision): clicking booking opens modal с 4 actions (Перенести на мастера / Перенести по времени / Детали / Отменить). Move dialogs reuse `PATCH /api/studio/bookings/[id]/move` (existing — KEEP_SERVICE strategy, KEEP_PRICE pricing). Cancel reuses `POST /api/bookings/[id]/cancel` (existing generic endpoint, не studio-specific)
+    - **Create booking:** click empty cell → dialog с master/service/client/phone form. Submit → `POST /api/studio/bookings` (existing `createStudioBooking`). Conflict check server-side через existing flow. Phone optional, normalized через `normalizeRussianPhone`. Pre-filled master + startAt from clicked slot
+    - **Admin direct edit invariant** — добавлен Раздел 12 invariant #22 (booking CRUD direct, ScheduleChangeRequest scope = master working-hours only). Reaffirms boundary between STUDIO-SCHEDULE-A и STUDIO-SCHEDULE-REQUEST-APPROVAL-A
+    - **KPIs:** bookings count + confirmed count + revenue (sum BookingServiceItem.priceSnapshot fallback Service.price) + occupancy % (pragmatic `bookings / (mastersOnShift × 5)` proxy consistent с dashboard) + free windows count
+    - **Manual refresh:** Header «Обновить» button triggers `router.refresh()` + sets local timestamp. **NO auto-refresh / NO SSE** per scope. Each successful action (create/move/cancel) also triggers `router.refresh()`
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/calendar` теперь rich multi-master schedule (was: legacy 695-LOC client с tabs/services/chat/editor). URL params `?view=day|week&date=YYYY-MM-DD` shareable. Никаких новых API endpoints — все existing endpoints reused (`GET /api/studio/calendar`, `POST /api/studio/bookings`, `PATCH /api/studio/bookings/[id]/move`, `POST /api/bookings/[id]/cancel`, `POST /api/studio/blocks`)
+  - **Раздел 12 (Инварианты):** добавлен **#22** (admin booking CRUD direct vs approval flow scope)
+  - **UI_TEXT:** новый subtree `studioCabinet.scheduleV2.*` (~90 keys — header / kpis / legend / column / cell / actions / createDialog / moveDialog / cancelDialog / weekView / empty / errors). Старый `studioCabinet.calendar.*` оставлен (legacy `StudioCalendarPage` ещё в tree). Phase 7 cleanup удалит вместе
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved (один новый unused warning fixed inline), encoding/mojibake/prisma ✅, 247/247 tests
+  - **@deprecated:** `StudioCalendarPage` (`src/features/studio/components/studio-calendar-page.tsx`, 695 LOC) — orphan after rewrite (only comment-level reference в `master-schedule-editor.tsx`). Phase 7 cleanup will delete
+  - **Backlog spawned:** D&D bookings, Месяц view, break management UI (TimeBlock create/remove dialog), booking detail drawer (richer than action menu), SSE live updates, mobile pinch-zoom, conflict warning UI, bulk operations, master schedule quick-edit from calendar
+  - **Next:** STUDIO-BOOKINGS-A — bookings list view
 
 - **2026-05-15 — STUDIO-MASTERS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 5/13. `/cabinet/studio/team` page rewrite — legacy list cards + inline create modal заменены 2-column layout (filters + list / detail panel) с URL-driven state.
   - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/masters/`:
