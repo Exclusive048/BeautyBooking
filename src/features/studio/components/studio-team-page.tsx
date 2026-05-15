@@ -11,6 +11,12 @@ import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 
+/**
+ * @deprecated STUDIO-MASTERS-A replaced this with
+ * `src/features/studio-cabinet/masters/`. No active importers after the
+ * team-page rewrite. Phase 7 cleanup will remove this file plus the
+ * legacy `team-member-card.tsx` / `team-tabs.tsx` companions.
+ */
 export type StudioTeamMaster = {
   id: string;
   name: string;

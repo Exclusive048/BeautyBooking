@@ -1,0 +1,71 @@
+import { Plus, Users } from "lucide-react";
+import { UI_TEXT } from "@/lib/ui/text";
+import type { StudioMasterListItem } from "../server/types";
+import { MasterListItem } from "./master-list-item";
+
+const T = UI_TEXT.studioCabinet.mastersV2;
+
+export function MastersList({
+  items,
+  selectedId,
+  totalCount,
+  onInviteClick,
+}: {
+  items: StudioMasterListItem[];
+  selectedId: string | null;
+  totalCount: number;
+  /** Server component cannot pass functions across boundaries; the
+   * invite-card is a presentational link to the page-level `?invite=1`
+   * trigger handled by `MastersHeader`. We instead surface a button
+   * that the parent client wraps; for simplicity, this footer renders
+   * a Link/button passed in. */
+  onInviteClick?: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        {T.list.shownTemplate
+          .replace("{count}", String(items.length))
+          .replace("{total}", String(totalCount))}
+      </p>
+
+      {items.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-8 text-center">
+          <Users className="h-8 w-8 text-text-sec/40" aria-hidden />
+          <p className="text-sm text-text-sec">{T.list.empty}</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((master) => (
+            <li key={master.id}>
+              <MasterListItem master={master} isSelected={master.id === selectedId} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {onInviteClick ? (
+        <button
+          type="button"
+          onClick={onInviteClick}
+          className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border-subtle bg-bg-card/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-bg-input/30"
+        >
+          <span
+            aria-hidden
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"
+          >
+            <Plus className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-main">
+              {T.inviteCard.title}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-text-sec">
+              {T.inviteCard.subtitle}
+            </p>
+          </div>
+        </button>
+      ) : null}
+    </div>
+  );
+}

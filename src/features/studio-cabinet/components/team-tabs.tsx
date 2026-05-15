@@ -10,6 +10,11 @@ type Props = {
   workingCount: number;
 };
 
+/**
+ * @deprecated STUDIO-MASTERS-A replaced the team-page filter tabs with
+ * a config-driven `MastersFilters`. Orphan after the rewrite — Phase 7
+ * cleanup will remove it.
+ */
 export function TeamTabs({ active, allCount, workingCount }: Props) {
   const base = "relative rounded-xl px-3 py-2 text-sm font-medium transition-all duration-300";
   const on =

@@ -69,11 +69,13 @@
 - [x] **Studio cabinet shell foundation** — sidebar rewrite + minimalistic topbar + UserChip + sidebar counts service. Single source of truth для navigation `src/features/studio-cabinet/config/studio-nav.ts` (12 items в 5 группах: Студия, Команда, Клиенты, Бизнес, Студия meta — без Rooms intentionally). Использует master-cabinet shared primitives (`SidebarItem`, `NavGroup`, `BrandLogo`) для pixel-level parity. Badge counts (`scheduleRequestsPending`, `reviewsUnanswered`, `notificationsUnread`) запрашиваются параллельно через `getStudioSidebarCounts`. Topbar минималистичный (studio chip + theme toggle + external link), per-page headers — в отдельных коммитах per page. Mobile bottom nav адаптирован под новый `STUDIO_NAV` config с More drawer. Existing pages работают под новым shell без изменений. Legacy `studio-navbar.tsx` остаётся untouched (используется billing page out-of-route) — pursue cleanup в Phase 7 (STUDIO-SHELL-A)
 - [x] **Symmetric switcher rollback** — initial STUDIO-SHELL-A добавил dropdown с «Перейти в кабинет мастера» в `StudioUserChip`. **User уточнил:** cross-cabinet навигация уже существует в public header (`auth-user-menu.tsx` через `clientCabinet.switcher.*`), в cabinet UI duplication — лишний noise. Откат: `StudioUserChip` simplified to static info-card (mirrors `MasterUserChip` pattern — avatar + name + studio tagline, no interactivity). Удалены `hasMasterCabinet` prop chain, server helper `userHasMasterCabinet()` (orphan after rollback), UI_TEXT keys `switchToMaster` / `profile` / `logout`. Public header switcher НЕ затронут. Closes open question из STUDIO-SHELL-A (option B selected: one-way OK, cross-cabinet nav exclusively через public header) (SYMMETRIC-SWITCHER-A)
 - [x] **Studio cabinet dashboard redesign** — `/cabinet/studio` page rewritten as rich dashboard mirroring master pattern. New module `src/features/studio-cabinet/dashboard/` (10 components + 1 server service + 2 lib helpers) replaces legacy 4-card stats + quick actions. Sections: Today banner (gradient hero с avatars on shift + counter), 4 KPI tiles (Выручка / Записи / Загрузка / Рейтинг — все за 30 дней с delta-badges vs предыдущий период), Top-5 masters by revenue 30d + progress bars, Attention panel (4 типа items: pending master approvals / bookings awaiting confirmation / unanswered reviews / pending schedule-requests — items с count=0 hidden), Top-3 masters by occupancy today (заменяет «Загрузка кабинетов» из jsx референса, rooms excluded per scope), Popular services (top 5 by booking count за 30d), Revenue chart с client-side period selector (7д/30д/90д/Год) и refresh через новый `/api/studio/dashboard/revenue` endpoint. Уровень загрузки — pragmatic proxy `bookings/(masters×30×5)` (precise slot-engine computation → backlog). Page styling — upgraded body sections с new design language но без StudioPageHeader pattern (тот введётся в following commits). Legacy `getStudioDashboardStats` + `DashboardNavCards` помечены `@deprecated` (no other consumers, Phase 7 cleanup). UI_TEXT subtree `studioCabinet.dashboardV2.*` (~50 keys) (STUDIO-DASHBOARD-A)
+- [x] **Studio masters page redesign** — `/cabinet/studio/team` page rewritten с 2-column layout (filters + list / detail panel). New module `src/features/studio-cabinet/masters/` (10 components + 2 server services + 2 lib helpers). Status display derived from existing data model (Provider.ownerUserId + isPublished + pending StudioInvite presence) — maps to ACTIVE / INVITED / DISABLED без schema migration. URL state `?tab=` / `?q=` / `?master=` для shareable filters + selection. Detail panel: header с avatar + status + actions (Расписание / Публичный профиль / Написать / Pause-Activate), 4 KPI tiles (revenue / bookings / occupancy / rating за 30 дней — display only, **no commission, no payouts**), week schedule (7 дней Mon-Sun с occupancy bars + today highlight). Invite через ModalSurface dialog → reuses existing `POST /api/studio/masters`. Pause/Activate через existing `PATCH /api/studio/masters/[id]` с `isActive` flag. **Studio masters никогда не показывают PREMIUM badge** — invariant добавлен в Раздел 12. **Permissions toggles полностью отсутствуют** — schedule через approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A), services по studio policy, notifications через user preferences. Capacity occupancy proxy = `bookings / (30 × 5)` consistent с dashboard heuristic. Legacy `StudioTeamPage` / `TeamMemberCard` / `TeamTabs` помечены `@deprecated`. Existing `MasterCardDrawer` сохранён — используется в studio-services-page. UI_TEXT subtree `studioCabinet.mastersV2.*` (~60 keys) (STUDIO-MASTERS-A)
 
 ### ⏳ Cabinet Studio (полный redesign отдельно)
 - [x] **Schedule request approval UI** — closed functional gap (STUDIO-SCHEDULE-REQUEST-APPROVAL-A)
 - [x] **Shell foundation** — sidebar + topbar + UserChip + bottom-nav (STUDIO-SHELL-A)
 - [x] **Dashboard redesign** — rich KPIs + attention + revenue chart (STUDIO-DASHBOARD-A)
+- [x] **Masters page redesign** — 2-col list+detail, status filters, invite/pause/activate (STUDIO-MASTERS-A)
 - [ ] Calendar redesign (multi-master view)
 - [ ] Team management (invites, roles, permissions)
 - [ ] Studio bookings list
@@ -208,6 +210,25 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 🔵 **Nice-to-have:**
 - **Public header switcher polish** — `auth-user-menu.tsx` сейчас содержит две кнопки переключения (master/studio/client). User упомянул, что styling could be прокачан visually. Backlog как UI polish — не блокирует функционал
+
+### Из STUDIO-MASTERS-A (2026-05-15)
+
+🟠 **High priority:**
+- **«В отпуске» status** — schema StudioMemberStatus имеет 3 значения (ACTIVE/INVITED/DISABLED). Reference jsx показывал 4 (включая «В отпуске»). Если бизнес-требование разделить «Пауза» от «Отпуск» — нужно либо новое enum value + миграция, либо отдельное поле `vacationUntil`. Сейчас «Пауза» (DISABLED) покрывает оба случая
+- **Remove from studio (kick)** — у admin есть API `/api/cabinet/studio/members/[memberId]/remove` (с transferServices флагом), но UI button для этого в new masters detail panel НЕ surfaced. Сейчас admin может только pause/activate. Добавить «Удалить из студии» кнопку с confirm dialog + transfer services опцией
+
+🟡 **Medium priority:**
+- **`isStudioMaster(provider)` utility helper** — для catalog cards / public profile / любых surface где нужно решать, показывать ли PREMIUM badge. Studio masters в `isStudioMaster=true` → suppress badge. Reuses across multiple surfaces (rule из STUDIO-MASTERS-A scope). Сейчас в studio cabinet masters surface — handled implicitly (no badge rendered)
+- **Export CSV/Excel мастеров** — отложено per scope
+- **Bulk actions** — pause multiple masters, send mass message
+- **Edit master profile from studio** — currently через PATCH endpoint доступно (name/tagline/isActive), но dialog для UI редактирования name/tagline НЕ surfaced. Reuse existing `MasterCardDrawer` (используется в services page) или новый dialog
+- **Master role within studio editing** — StudioMembership.roles[] (OWNER/ADMIN/MASTER/FINANCE) НЕ редактируется через UI
+
+🔵 **Nice-to-have:**
+- **Sort options** — by revenue / by joined / by rating / by last activity
+- **Master activity log** — last action timestamp («последняя запись 2 часа назад»)
+- **Saved filters / segments** — admin saves common filter combos
+- **Precise per-master week schedule total** — current `total = 5 if active day else 0` heuristic; replace with ScheduleEngine.getDayPlan slot count
 
 ### Из STUDIO-DASHBOARD-A (2026-05-15)
 

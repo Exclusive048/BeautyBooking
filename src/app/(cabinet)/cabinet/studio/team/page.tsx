@@ -1,15 +1,28 @@
 import { redirect } from "next/navigation";
-import { TeamMemberCard } from "@/features/studio-cabinet/components/team-member-card";
-import { TeamTabs } from "@/features/studio-cabinet/components/team-tabs";
-import { StudioTeamPage, type StudioTeamMaster } from "@/features/studio/components/studio-team-page";
-import { serverApiFetch } from "@/lib/api/server-fetch";
+import { StudioMastersPage } from "@/features/studio-cabinet/masters/components/studio-masters-page";
+import { loadStudioMastersList } from "@/features/studio-cabinet/masters/server/masters-list.service";
+import { loadStudioMasterDetail } from "@/features/studio-cabinet/masters/server/master-detail.service";
+import {
+  isStudioMasterFilter,
+  type StudioMasterFilter,
+} from "@/features/studio-cabinet/masters/server/types";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { UI_TEXT } from "@/lib/ui/text";
+
+type SearchParams = {
+  tab?: string;
+  q?: string;
+  master?: string;
+  /** Legacy `?filter=working_today` from the old team page — quietly
+   * collapsed to `all` so external links keep landing on the page. */
+  filter?: string;
+};
 
 type Props = {
-  searchParams?: Promise<{ filter?: string }> | { filter?: string };
+  searchParams?: Promise<SearchParams> | SearchParams;
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function StudioTeamRoute({ searchParams }: Props) {
   const user = await getSessionUser();
@@ -22,51 +35,35 @@ export default async function StudioTeamRoute({ searchParams }: Props) {
     redirect("/403");
   }
 
-  const resolvedSearchParams = searchParams instanceof Promise ? await searchParams : searchParams;
-  const filter = resolvedSearchParams?.filter === "working_today" ? "working_today" : "all";
-  const mastersRes = await serverApiFetch<{ masters: StudioTeamMaster[] }>(
-    `/api/studio/masters?studioId=${encodeURIComponent(studioId)}`
-  );
-  const masters = mastersRes.ok ? mastersRes.data.masters : [];
-  const workingMasters = masters.filter((master) => master.isActive);
+  const params = searchParams instanceof Promise ? await searchParams : searchParams;
+  const tab = params?.tab;
+  const filter: StudioMasterFilter = isStudioMasterFilter(tab) ? tab : "all";
+  const search = params?.q?.trim() ?? "";
+  const selectedMasterId = params?.master ?? null;
+
+  const list = await loadStudioMastersList({
+    studioId,
+    currentUserId: user.id,
+    filter,
+    search,
+  });
+
+  const detail = selectedMasterId
+    ? await loadStudioMasterDetail({
+        studioId,
+        masterId: selectedMasterId,
+        currentUserId: user.id,
+      })
+    : null;
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-text-main">{UI_TEXT.studioCabinet.teamPage.title}</h1>
-        <p className="mt-1 text-sm text-text-sec">{UI_TEXT.studioCabinet.teamPage.subtitle}</p>
-      </div>
-
-      <TeamTabs
-        active={filter}
-        allCount={masters.length}
-        workingCount={workingMasters.length}
-      />
-
-      {filter === "working_today" ? (
-        workingMasters.length > 0 ? (
-          <div className="grid gap-4">
-            {workingMasters.map((master) => (
-              <TeamMemberCard
-                key={master.id}
-                name={master.name}
-                specialty={master.title}
-                statusLabel={UI_TEXT.studioCabinet.teamPage.statusFree}
-                statusTone="free"
-                shift="—"
-                bookingsInfo="—"
-                actionHref={`/cabinet/studio/calendar?masterId=${master.id}&view=day&date=today`}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">
-            {UI_TEXT.studioCabinet.teamPage.emptyActiveShifts}
-          </div>
-        )
-      ) : (
-        <StudioTeamPage studioId={studioId} />
-      )}
-    </section>
+    <StudioMastersPage
+      studioId={studioId}
+      filter={filter}
+      search={search}
+      selectedMasterId={detail ? selectedMasterId : null}
+      list={list}
+      detail={detail}
+    />
   );
 }

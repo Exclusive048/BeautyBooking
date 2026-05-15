@@ -14,6 +14,10 @@ type Props = {
   actionHref: string;
 };
 
+/**
+ * @deprecated STUDIO-MASTERS-A replaced the consumers of this card.
+ * Orphan after the team-page rewrite — Phase 7 cleanup will remove it.
+ */
 export function TeamMemberCard({
   name,
   specialty,

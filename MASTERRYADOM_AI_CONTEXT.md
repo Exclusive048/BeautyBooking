@@ -9,7 +9,8 @@
 > - ✅ Shell foundation (STUDIO-SHELL-A — sidebar/topbar/UserChip/bottom-nav + nav config + counts service)
 > - ✅ Symmetric switcher rollback (SYMMETRIC-SWITCHER-A — cabinet UI без duplicate switcher)
 > - ✅ Dashboard redesign (STUDIO-DASHBOARD-A — rich KPIs + attention + revenue chart)
-> - ⏳ Calendar, Bookings, Team, Services, Clients, Reviews, Analytics, Finance, Settings
+> - ✅ Masters page redesign (STUDIO-MASTERS-A — 2-col list+detail, status filters, invite/pause/activate)
+> - ⏳ Calendar, Bookings, Services, Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -531,7 +532,7 @@ src/
 | `/cabinet/studio/finance` | Финансы |
 | `/cabinet/studio/services` | Услуги |
 | `/cabinet/studio/services/new` | Добавление услуги |
-| `/cabinet/studio/team` | Команда |
+| `/cabinet/studio/team` | Мастера студии — 2-col list+detail с filters + Pause/Activate + Invite ✅ STUDIO-MASTERS-A |
 | `/cabinet/studio/team/add` | Добавление члена команды |
 | `/cabinet/studio/reviews` | Отзывы студии |
 | `/cabinet/studio/settings` | Настройки |
@@ -983,6 +984,8 @@ src/
 | 17 | **Review soft-delete: `deletedAt: null` filter в публичных запросах** | `src/lib/reviews/soft-delete.ts` (`ACTIVE_REVIEW_FILTER`) + REVIEW-SOFT-DELETE-A | Все queries активных отзывов используют `ACTIVE_REVIEW_FILTER` constant (`{ deletedAt: null }`) — public catalog, master/client cabinets, ratings recalc, AI summary, admin moderation. **Enforced** в 18 sites после REVIEW-SOFT-DELETE-A (2026-05-14). Любой новый review query без filter — потенциальный data leak. Exceptions: `kpis.service.ts:deletedLastWeek` (intentionally queries deleted set), `delete-master.ts:tx.review.deleteMany` (account-wide cascade, different semantic from moderation). |
 | 18 | **AdminAuditLog writes inside transactions для atomicity** | `src/lib/audit/admin-audit.ts` (`createAdminAuditLog` strict) | Audit запись для admin business action должна идти **внутри той же транзакции** (parameter `tx: Prisma.TransactionClient`). Если audit fails, business mutation rolls back — это desired behaviour для consistency. Cancel-subscription, plan-edit, plan-change, city-CRUD, review-approve/delete, settings-flag/SEO/app-setting — все следуют этому паттерну. |
 | 19 | **AdminAuditLog safe variant вне транзакций для resilience** | `src/lib/audit/admin-audit.ts` (`createAdminAuditLogSafe`) | Когда business action уже мутировал external state (например refund → YooKassa API call) и rollback невозможен — использовать safe variant. Failure logs через `logError("admin-audit.create.failed", ...)` но не surface'ит 500 admin'у. Currently 1 site: `/api/admin/billing/refund` POST. |
+| 20 | **Studio masters никогда не показывают PREMIUM badge** | global UI rule (STUDIO-MASTERS-A) | Подписка `UserSubscription.scope = STUDIO` шарится на всю команду студии — индивидуальный мастер не «оплачивает PREMIUM». Поэтому в любой surface где рендерится studio master (cabinet team list/detail, catalog cards, public profile, master cards in dashboard) — `PremiumBadge` должен быть suppressed. На `/cabinet/studio/team` запрет implicit (badge не рендерится). На other surfaces нужен утилитарный helper `isStudioMaster(provider) → studioId !== null` для checked rendering. Backlog 🟡 для shared helper. |
+| 21 | **Studio masters permissions работают по default правилам** | UX rule (STUDIO-MASTERS-A) | В studio masters detail panel НЕТ permissions toggles (schedule edit / services edit / notifications). Это intentional: schedule changes идут через approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A), services управляются по studio policy, notifications — через user-level preferences. Если permission gating потребуется в будущем — это новые schema fields + UI, не toggles в текущем дизайне. |
 
 ---
 
@@ -1111,6 +1114,28 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-15 — STUDIO-MASTERS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 5/13. `/cabinet/studio/team` page rewrite — legacy list cards + inline create modal заменены 2-column layout (filters + list / detail panel) с URL-driven state.
+  - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/masters/`:
+    - `lib/status-display.ts` — `StudioMasterDisplayStatus = "ACTIVE" | "INVITED" | "DISABLED"` derived from existing data model (no schema change). Tone mapping + Tailwind badge class map
+    - `lib/week-occupancy.ts` — `getMasterWeekOccupancy({providerId})` returns 7-cell Mon..Sun array. Uses `WeeklyScheduleConfig.days[].isActive` for day-off detection + counts bookings in week window. Capacity heuristic = 5 per active day (consistent с dashboard occupancy proxy)
+    - `server/types.ts` — DTOs (`StudioMasterListItem`, `StudioMastersListData`, `StudioMasterDetail`, `StudioMasterFilter`)
+    - `server/masters-list.service.ts` — `loadStudioMastersList({studioId, currentUserId, filter, search})`. Параллельный fetch providers + invites + 30d bookings, derive status, aggregate metrics. Counts always cover full studio; items is filtered subset
+    - `server/master-detail.service.ts` — `loadStudioMasterDetail({studioId, masterId, currentUserId})`. Parallel: bookings period, distinct clientUserIds (lifetime), pending invite lookup, week schedule, StudioMembership.createdAt (joined timestamp)
+    - `components/` — 10 файлов: page orchestrator, header (с Invite button + dialog), filters (URL-driven), list + list-item, detail header (с actions + Pause/Activate trigger), KPIs row, week schedule, panel + empty state, invite-dialog, pause-master-dialog
+  - **Раздел 5 (Бизнес-логика):**
+    - **Status derivation:** `Provider.ownerUserId == null OR pending StudioInvite for phone` → `INVITED`; `isPublished` → `ACTIVE`; иначе → `DISABLED`. Matches existing `listStudioMasters` semantics, без schema migration
+    - **Joined timestamp:** `StudioMembership.createdAt` если exists, иначе fallback на `Provider.createdAt`. No dedicated `joinedAt` field в schema (backlog если потребуется precise)
+    - **Pause/Activate:** reuse existing `PATCH /api/studio/masters/[id]` с `isActive` flag → `Provider.isPublished` toggle. Single atomic write
+    - **Invite:** reuse existing `POST /api/studio/masters` (создаёт Provider stub + StudioInvite). SMS dispatch — fail-soft если SMS gateway не настроен (текущий MVP)
+    - **NO commission, NO payouts, NO permissions toggles, NO PREMIUM badge** — explicitly excluded per scope (см. инварианты 20-21)
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/team` теперь rich 2-column page (was: filter tabs + simple card grid). URL params `?tab=all|active|invited|disabled` / `?q=<search>` / `?master=<id>` — shareable + browser back support. Legacy `?filter=working_today` collapses to `all` (acceptable graceful degrade). Никаких новых API endpoints — все existing `/api/studio/masters/*` + `/api/cabinet/studio/members/*` reused
+  - **Раздел 12 (Инварианты):** добавлены **#20** (studio masters никогда не показывают PREMIUM badge — subscription шарится) и **#21** (permissions работают по default правилам, no toggles in UI)
+  - **UI_TEXT:** новый subtree `studioCabinet.mastersV2.*` (~60 keys — header / filters / status / listItem / list / inviteCard / detail / inviteDialog / pauseDialog / activateDialog / errors). Старый `studioCabinet.team*` + `teamPage*` + `teamTabs*` keys остались — больше не consumed, к удалению в Phase 7
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **@deprecated:** `StudioTeamPage` (`src/features/studio/components/studio-team-page.tsx`), `TeamMemberCard`, `TeamTabs`. `MasterCardDrawer` НЕ deprecated — still used by `studio-services-page.tsx`. `/cabinet/studio/team/add` route — orphan (no consumers in src/), к удалению в Phase 7
+  - **Backlog spawned:** «В отпуске» status (4th value if business needs split), Remove-from-studio UI button (API exists), `isStudioMaster()` shared helper, edit master profile dialog, master role editing, precise week schedule via ScheduleEngine
+  - **Next:** STUDIO-CALENDAR-A — multi-master calendar view
 
 - **2026-05-15 — STUDIO-DASHBOARD-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 4/13. `/cabinet/studio` page rewrite — legacy 4-card stats + 4-quick-action grid заменены rich dashboard mirroring master pattern.
   - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/dashboard/`:
