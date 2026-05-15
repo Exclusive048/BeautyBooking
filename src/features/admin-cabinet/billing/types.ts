@@ -57,6 +57,14 @@ export type AdminPlanCard = {
   tier: PlanTier;
   scope: SubscriptionScope;
   features: AdminPlanFeatureLine[];
+  /** Raw `BillingPlan.features` Json — the overrides this plan
+   * stores in DB. Pre-typed as the catalog-respecting shape so the
+   * features editor (ADMIN-BILLING-FIX-B) can edit without an extra
+   * fetch. UI cards use the rendered `features` array above. */
+  rawFeatures: import("@/lib/billing/features").PlanFeatureOverrides;
+  /** Parent plan id (cuid) — the editor needs this to render the
+   * inheritance select and resolve `parentEffective` features. */
+  inheritsFromPlanId: string | null;
   prices: AdminPlanPrice[];
   /** Per-month equivalent — when there is a 1-month price we use it
    * directly; otherwise we derive from the cheapest period. Display-
@@ -66,6 +74,19 @@ export type AdminPlanCard = {
   isFeatured: boolean;
   sortOrder: number;
   isActive: boolean;
+};
+
+/** Minimal shape passed to the features editor for inheritance
+ * resolution — only what `resolveEffectiveFeatures` / `deriveUiState`
+ * need from sibling plans. Keeps the props bundle small. */
+export type AdminPlanInheritanceCandidate = {
+  id: string;
+  code: string;
+  name: string;
+  tier: PlanTier;
+  scope: SubscriptionScope;
+  inheritsFromPlanId: string | null;
+  rawFeatures: import("@/lib/billing/features").PlanFeatureOverrides;
 };
 
 export type AdminSubscriptionRow = {

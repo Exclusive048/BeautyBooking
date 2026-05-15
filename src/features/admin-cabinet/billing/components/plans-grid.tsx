@@ -11,12 +11,18 @@ import {
 } from "@/features/admin-cabinet/billing/components/plan-edit-dialog";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
-import type { AdminPlanCard } from "@/features/admin-cabinet/billing/types";
+import type {
+  AdminPlanCard,
+  AdminPlanInheritanceCandidate,
+} from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing;
 
 type Props = {
   plans: AdminPlanCard[];
+  /** All plans (light shape) — passed through to the edit dialog
+   * for inheritance resolution. */
+  candidates: AdminPlanInheritanceCandidate[];
 };
 
 type Toast = { kind: "success" | "error"; text: string } | null;
@@ -25,7 +31,7 @@ type Toast = { kind: "success" | "error"; text: string } | null;
  * renders each group as a 3-column grid on `lg`, dropping to 2/1
  * on smaller viewports. Edit dialog state lives here so a single
  * dialog instance handles all 6 cards. */
-export function PlansGrid({ plans }: Props) {
+export function PlansGrid({ plans, candidates }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState<AdminPlanCard | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -94,6 +100,7 @@ export function PlansGrid({ plans }: Props) {
       <PlanEditDialog
         open={editing !== null}
         plan={editing}
+        candidates={candidates}
         onClose={() => setEditing(null)}
         onSubmit={handleSubmit}
       />

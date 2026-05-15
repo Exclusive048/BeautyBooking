@@ -11,6 +11,7 @@ import { planFeatureLines } from "@/features/admin-cabinet/billing/lib/feature-d
 import { isFeaturedTier } from "@/features/admin-cabinet/billing/lib/plan-display";
 import type {
   AdminPlanCard,
+  AdminPlanInheritanceCandidate,
   AdminPlanPrice,
 } from "@/features/admin-cabinet/billing/types";
 
@@ -107,6 +108,8 @@ export async function listAdminPlans(): Promise<AdminPlanCard[]> {
       tier: plan.tier,
       scope: plan.scope,
       features: planFeatureLines(effective, plan.scope),
+      rawFeatures: parseOverrides(plan.features),
+      inheritsFromPlanId: plan.inheritsFromPlanId ?? null,
       prices: validPrices,
       primaryPricePerMonthKopeks: pickPrimaryPerMonth(validPrices),
       activeSubscriptionsCount: countByPlan.get(plan.id) ?? 0,
@@ -115,6 +118,33 @@ export async function listAdminPlans(): Promise<AdminPlanCard[]> {
       isActive: plan.isActive,
     };
   });
+}
+
+/** Light shape used by the features editor to render the
+ * inheritance select and resolve `parentEffective`. One row per plan
+ * in the system — small payload, single query. */
+export async function listInheritanceCandidates(): Promise<AdminPlanInheritanceCandidate[]> {
+  const plans = await prisma.billingPlan.findMany({
+    orderBy: [{ scope: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      tier: true,
+      scope: true,
+      inheritsFromPlanId: true,
+      features: true,
+    },
+  });
+  return plans.map((p) => ({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    tier: p.tier,
+    scope: p.scope,
+    inheritsFromPlanId: p.inheritsFromPlanId ?? null,
+    rawFeatures: parseOverrides(p.features),
+  }));
 }
 
 /**

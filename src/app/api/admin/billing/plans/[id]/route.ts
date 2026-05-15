@@ -17,6 +17,14 @@ import {
   type PlanEditDiff,
 } from "@/lib/notifications/admin-body-templates";
 import { enqueuePlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
+import { FEATURE_CATALOG, type FeatureKey, type LimitFeatureKey } from "@/lib/billing/feature-catalog";
+import {
+  isRelaxedLimit,
+  parseOverrides,
+  resolveEffectiveFeatures,
+  type PlanFeatureOverrides,
+  type PlanNode,
+} from "@/lib/billing/features";
 
 export const runtime = "nodejs";
 
@@ -28,15 +36,19 @@ type RouteContext = { params: Promise<{ id: string }> };
  * route uses the more conventional `[id]` segment AND writes a
  * `BillingAuditLog` row with a before/after diff.
  *
- * Editable fields are intentionally narrow:
+ * Editable fields:
  *   - `name`, `isActive`, `sortOrder` — admin chrome
  *   - `prices` — period -> kopeks
+ *   - `features` — overrides Json blob (validated against the
+ *     inheritance chain via `assertRelaxedLimits` so a child plan
+ *     can never tighten a parent's numeric limit)
+ *   - `inheritsFromPlanId` — parent plan id (or `null` to detach).
+ *     Validated with `assertParentExists` + `assertNoInheritanceCycle`
+ *     so we never create a cycle in the inheritance DAG.
  *
  * Not editable here:
- *   - `code`, `tier`, `scope` — invariant identifiers
- *   - `features` — has nontrivial inheritance/relaxed-limit logic;
- *     stays on the legacy endpoint for now. ADMIN-BILLING-B may
- *     bring a dedicated features editor.
+ *   - `code`, `tier`, `scope` — invariant identifiers (changing
+ *     these would break running subscriptions / cron lookups by code).
  */
 const bodySchema = z.object({
   name: z.string().trim().min(1).optional(),
@@ -52,7 +64,91 @@ const bodySchema = z.object({
       }),
     )
     .optional(),
+  features: z.record(z.string(), z.unknown()).optional(),
+  inheritsFromPlanId: z.string().trim().min(1).nullable().optional(),
 });
+
+const LIMIT_FEATURE_KEYS = (Object.keys(FEATURE_CATALOG) as FeatureKey[]).filter(
+  (key) => FEATURE_CATALOG[key].kind === "limit",
+) as LimitFeatureKey[];
+
+/** Throws 404 if `inheritsFromPlanId` is non-null and the parent
+ * row doesn't exist. Skips when the value is null/undefined. */
+async function assertParentExists(
+  tx: Prisma.TransactionClient,
+  inheritsFromPlanId: string | null | undefined,
+): Promise<void> {
+  if (!inheritsFromPlanId) return;
+  const parent = await tx.billingPlan.findUnique({
+    where: { id: inheritsFromPlanId },
+    select: { id: true },
+  });
+  if (!parent) {
+    throw new AppError("Родительский тариф не найден", 404, "PARENT_NOT_FOUND");
+  }
+}
+
+/** Walks the inheritance chain from `inheritsFromPlanId` upward.
+ * If we encounter `planId` (the plan being edited) we've created a
+ * cycle. The walk is bounded by `MAX_DEPTH` as a final safety net
+ * against pre-existing corrupted chains. */
+async function assertNoInheritanceCycle(
+  tx: Prisma.TransactionClient,
+  planId: string,
+  inheritsFromPlanId: string | null | undefined,
+): Promise<void> {
+  if (!inheritsFromPlanId) return;
+  const MAX_DEPTH = 16;
+  let current: string | null = inheritsFromPlanId;
+  const visited = new Set<string>();
+  for (let depth = 0; depth < MAX_DEPTH && current; depth += 1) {
+    if (current === planId) {
+      throw new AppError(
+        "Обнаружен цикл наследования тарифов",
+        400,
+        "INHERITANCE_CYCLE",
+      );
+    }
+    if (visited.has(current)) break; // corrupted chain — stop without false-positive
+    visited.add(current);
+    const parent: { inheritsFromPlanId: string | null } | null =
+      await tx.billingPlan.findUnique({
+        where: { id: current },
+        select: { inheritsFromPlanId: true },
+      });
+    current = parent?.inheritsFromPlanId ?? null;
+  }
+}
+
+/** For every numeric limit override in `next`, confirms that the
+ * child's value is not stricter than the resolved `parentEffective`
+ * limit. Booleans are skipped — `parseOverrides` already drops the
+ * `false` values, and a `true` is always equal-or-richer than a
+ * parent `true`. Throws `AppError(400, "STRICT_LIMIT")` with the
+ * offending key in `fieldErrors`. */
+function assertRelaxedLimits(
+  next: PlanFeatureOverrides,
+  parentEffective: Record<string, unknown>,
+): void {
+  for (const key of LIMIT_FEATURE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(next, key)) continue;
+    const nextValue = (next as Record<string, unknown>)[key];
+    const parentValue = parentEffective[key];
+    if (
+      !isRelaxedLimit(
+        parentValue as number | null | undefined,
+        (nextValue ?? null) as number | null,
+      )
+    ) {
+      throw new AppError(
+        "Лимит нельзя сделать строже, чем у родительского тарифа.",
+        400,
+        "STRICT_LIMIT",
+        { fieldErrors: { [key]: "Limit cannot be stricter than parent." } },
+      );
+    }
+  }
+}
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
   const auth = await requireAdminAuth();
@@ -72,7 +168,9 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       patch.name !== undefined ||
       patch.isActive !== undefined ||
       patch.sortOrder !== undefined ||
-      (patch.prices && patch.prices.length > 0);
+      (patch.prices && patch.prices.length > 0) ||
+      patch.features !== undefined ||
+      patch.inheritsFromPlanId !== undefined;
     if (!hasAny) {
       return fail("Нет полей для обновления", 400, "VALIDATION_ERROR");
     }
@@ -87,10 +185,69 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      // Inheritance + relaxed-limit validation when those fields are
+      // part of the patch. The effective inheritance is whatever the
+      // request asks for, falling back to the current value when the
+      // patch leaves `inheritsFromPlanId` untouched.
+      const beforePlan = await tx.billingPlan.findUnique({
+        where: { id },
+        select: { inheritsFromPlanId: true, features: true },
+      });
+      if (!beforePlan) {
+        throw new AppError("Тариф не найден", 404, "NOT_FOUND");
+      }
+      const effectiveInherits =
+        patch.inheritsFromPlanId !== undefined
+          ? patch.inheritsFromPlanId
+          : beforePlan.inheritsFromPlanId;
+
+      if (patch.inheritsFromPlanId !== undefined) {
+        await assertParentExists(tx, effectiveInherits);
+        await assertNoInheritanceCycle(tx, id, effectiveInherits);
+      }
+
+      const nextOverrides =
+        patch.features !== undefined
+          ? parseOverrides(patch.features)
+          : null;
+
+      if (nextOverrides !== null && effectiveInherits) {
+        // Build a plan map for parent resolution. Includes the plan
+        // under edit as a draft so the parent's chain is correct when
+        // the admin swaps both `inheritsFromPlanId` and `features` in
+        // the same request.
+        const allPlans = await tx.billingPlan.findMany({
+          select: { id: true, inheritsFromPlanId: true, features: true },
+        });
+        const planNodes: Map<string, PlanNode> = new Map(
+          allPlans.map((p) => [
+            p.id,
+            {
+              id: p.id,
+              inheritsFromPlanId: p.inheritsFromPlanId,
+              features: p.features,
+            },
+          ]),
+        );
+        const parentEffective = resolveEffectiveFeatures(
+          effectiveInherits,
+          planNodes,
+        ) as Record<string, unknown>;
+        assertRelaxedLimits(nextOverrides, parentEffective);
+      }
+
       const data: Prisma.BillingPlanUpdateInput = {};
       if (patch.name !== undefined) data.name = patch.name.trim();
       if (patch.isActive !== undefined) data.isActive = patch.isActive;
       if (patch.sortOrder !== undefined) data.sortOrder = patch.sortOrder;
+      if (patch.inheritsFromPlanId !== undefined) {
+        data.inheritsFromPlan = patch.inheritsFromPlanId
+          ? { connect: { id: patch.inheritsFromPlanId } }
+          : { disconnect: true };
+      }
+      if (nextOverrides !== null) {
+        data.features = nextOverrides as Prisma.InputJsonValue;
+      }
       await tx.billingPlan.update({ where: { id }, data });
 
       if (patch.prices && patch.prices.length > 0) {
@@ -172,6 +329,36 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
         }
         if (Object.keys(priceDiff).length > 0) {
           diff.prices = { before: priceDiff, after: undefined };
+        }
+      }
+
+      if (
+        patch.inheritsFromPlanId !== undefined &&
+        (patch.inheritsFromPlanId ?? null) !== (beforePlan.inheritsFromPlanId ?? null)
+      ) {
+        diff.inheritsFromPlanId = {
+          before: beforePlan.inheritsFromPlanId ?? null,
+          after: patch.inheritsFromPlanId ?? null,
+        };
+      }
+
+      // Features diff: capture every catalog key whose value moved.
+      // We compare the parsed overrides on both sides so transient
+      // keys outside FEATURE_CATALOG can't sneak into the audit log.
+      if (nextOverrides !== null) {
+        const beforeOverrides = parseOverrides(beforePlan.features);
+        const featureDiff: Record<string, { before: unknown; after: unknown }> = {};
+        for (const key of Object.keys(FEATURE_CATALOG) as FeatureKey[]) {
+          const beforeVal = (beforeOverrides as Record<string, unknown>)[key];
+          const afterVal = (nextOverrides as Record<string, unknown>)[key];
+          // Strict equality is enough — overrides are primitives
+          // (boolean true / number / null / undefined).
+          if (beforeVal !== afterVal) {
+            featureDiff[key] = { before: beforeVal, after: afterVal };
+          }
+        }
+        if (Object.keys(featureDiff).length > 0) {
+          diff.features = { before: featureDiff, after: undefined };
         }
       }
 
@@ -265,6 +452,43 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       }
       if (Object.keys(subscriberPrices).length > 0) {
         subscriberDiff.prices = subscriberPrices;
+      }
+    }
+
+    // Render a human-friendly features summary for subscribers. We
+    // re-derive the diff against the *active* feature catalog so an
+    // override on a `status: planned` key (which the UI shouldn't show
+    // anyway) doesn't generate noise like "добавлено: <planned key>".
+    if (patch.features !== undefined && updated) {
+      const beforeOverrides = parseOverrides(before.features);
+      const afterOverrides = parseOverrides(updated.features);
+      const added: string[] = [];
+      const removed: string[] = [];
+      const limitChanges: string[] = [];
+      for (const key of Object.keys(FEATURE_CATALOG) as FeatureKey[]) {
+        const def = FEATURE_CATALOG[key];
+        if (def.status !== "active") continue;
+        const beforeVal = (beforeOverrides as Record<string, unknown>)[key];
+        const afterVal = (afterOverrides as Record<string, unknown>)[key];
+        if (beforeVal === afterVal) continue;
+        if (def.kind === "boolean") {
+          if (afterVal === true) added.push(def.title);
+          else removed.push(def.title);
+        } else if (def.kind === "limit") {
+          // For limits we only summarise direction, not raw numbers —
+          // detailed limit values live in the audit log, not the
+          // subscriber notification.
+          limitChanges.push(def.title);
+        }
+      }
+      const fragments: string[] = [];
+      if (added.length > 0) fragments.push(`добавлено: ${added.join(", ")}`);
+      if (removed.length > 0) fragments.push(`убрано: ${removed.join(", ")}`);
+      if (limitChanges.length > 0) {
+        fragments.push(`изменены лимиты: ${limitChanges.join(", ")}`);
+      }
+      if (fragments.length > 0) {
+        subscriberDiff.featuresSummary = fragments.join("; ");
       }
     }
 

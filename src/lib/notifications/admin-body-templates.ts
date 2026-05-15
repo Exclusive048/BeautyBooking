@@ -43,6 +43,13 @@ export type PlanEditDiff = {
   isActive?: { before: boolean; after: boolean };
   /** Map period (e.g. `"3m"`) to kopeks-pair. Always before/after kopeks. */
   prices?: Record<string, { before: number; after: number }>;
+  /** Set when the admin touched the `features` Json. The string is the
+   * already-rendered Russian phrase (e.g. "добавлено: Горящие окошки;
+   * убрано: Лимит мастеров"); building it requires `FEATURE_CATALOG`
+   * and lives at the call site so this module stays purely
+   * presentational. `null` here means "no user-visible feature change"
+   * — the caller should omit the key altogether in that case. */
+  featuresSummary?: string;
 };
 
 /** Returns a human-readable summary string, or `null` if the diff
@@ -71,6 +78,10 @@ export function buildPlanEditedSummary(diff: PlanEditDiff): string | null {
         `цена за ${label}: ${formatRubles(value.before)} → ${formatRubles(value.after)}`,
       );
     }
+  }
+
+  if (diff.featuresSummary && diff.featuresSummary.trim().length > 0) {
+    parts.push(`возможности тарифа: ${diff.featuresSummary.trim()}`);
   }
 
   if (parts.length === 0) return null;

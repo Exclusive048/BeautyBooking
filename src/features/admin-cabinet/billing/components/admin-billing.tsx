@@ -9,6 +9,7 @@ import type {
   AdminBillingTab,
   AdminPaymentRow,
   AdminPlanCard,
+  AdminPlanInheritanceCandidate,
   AdminSubscriptionRow,
 } from "@/features/admin-cabinet/billing/types";
 
@@ -16,6 +17,9 @@ type Props = {
   activeTab: AdminBillingTab;
   kpis: AdminBillingKpis;
   plans: AdminPlanCard[];
+  /** Light shape of every plan — used by the features editor's
+   * inheritance select. Loaded once at SSR. */
+  candidates: AdminPlanInheritanceCandidate[];
   subscriptions: {
     rows: AdminSubscriptionRow[];
     nextCursor: string | null;
@@ -40,6 +44,7 @@ export function AdminBilling({
   activeTab,
   kpis,
   plans,
+  candidates,
   subscriptions,
   payments,
 }: Props) {
@@ -48,7 +53,9 @@ export function AdminBilling({
       <BillingHeader />
       <BillingKpiRow data={kpis} />
       <BillingTabs active={activeTab} />
-      {activeTab === "plans" ? <PlansGrid plans={plans} /> : null}
+      {activeTab === "plans" ? (
+        <PlansGrid plans={plans} candidates={candidates} />
+      ) : null}
       {activeTab === "subs" ? (
         <SubscriptionsTab
           rows={subscriptions.rows}

@@ -1,7 +1,10 @@
 import { AdminBilling } from "@/features/admin-cabinet/billing/components/admin-billing";
 import { getAdminBillingKpis } from "@/features/admin-cabinet/billing/server/kpis.service";
 import { listAdminPayments } from "@/features/admin-cabinet/billing/server/payments.service";
-import { listAdminPlans } from "@/features/admin-cabinet/billing/server/plans.service";
+import {
+  listAdminPlans,
+  listInheritanceCandidates,
+} from "@/features/admin-cabinet/billing/server/plans.service";
 import { listAdminSubscriptions } from "@/features/admin-cabinet/billing/server/subscriptions.service";
 import type { AdminBillingTab } from "@/features/admin-cabinet/billing/types";
 
@@ -31,9 +34,10 @@ export default async function AdminBillingPage({
   // Always fetch KPIs (shared across tabs). Plans/subs/payments
   // fetched in parallel — the request budget is dominated by the
   // slowest, which is fine for an admin SSR page.
-  const [kpis, plans, subscriptions, payments] = await Promise.all([
+  const [kpis, plans, candidates, subscriptions, payments] = await Promise.all([
     getAdminBillingKpis(),
     listAdminPlans(),
+    listInheritanceCandidates(),
     listAdminSubscriptions({ cursor: subCursor }),
     listAdminPayments({ historyCursor: payCursor }),
   ]);
@@ -43,6 +47,7 @@ export default async function AdminBillingPage({
       activeTab={activeTab}
       kpis={kpis}
       plans={plans}
+      candidates={candidates}
       subscriptions={{
         rows: subscriptions.items,
         nextCursor: subscriptions.nextCursor,
