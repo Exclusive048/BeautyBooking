@@ -1,12 +1,13 @@
 # МастерРядом — Контекст проекта для ИИ
 > Дата аудита: **13 мая 2026** (refresh — CONTEXT-REFRESH-V2; предыдущий snapshot был 7 мая 2026)
 > Файлов проверено: **1407 TypeScript-файлов** в `src/` (271 API route.ts + 89 page.tsx)
-> Коммит/ветка: `designAdminCabinet`. Последний коммит main: `e0bf550` (Merge PR #70 — Client Cabinet).
+> Коммит/ветка: `designStudioCabinet`. Последний коммит main: `b3eedaf` (Merge PR #71 — Admin Cabinet).
 > Моделей: **65**, enum'ов: **36**, миграций: **16** (последняя — `20260514000936_add_admin_initiated_notification_types`).
 >
-> **Active sprint:** редизайн админ-панели в ветке `designAdminCabinet`.
-> - ✅ Shell (ADMIN-SHELL-A) · ✅ Dashboard (ADMIN-DASH-A) · ✅ Catalog (ADMIN-CATALOG-A)
-> - ⏳ Cities, Users, Billing, Settings, Reviews
+> **Active sprint:** редизайн кабинета студии в ветке `designStudioCabinet`.
+> - ✅ Schedule request approval UI (STUDIO-SCHEDULE-REQUEST-APPROVAL-A — closed functional gap)
+> - ✅ Shell foundation (STUDIO-SHELL-A — sidebar/topbar/UserChip/bottom-nav + nav config + counts service)
+> - ⏳ Dashboard, Calendar, Bookings, Team, Services, Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -522,6 +523,7 @@ src/
 |-----|---------|
 | `/cabinet/studio` | Главная студии |
 | `/cabinet/studio/calendar` | Календарь студии |
+| `/cabinet/studio/schedule-requests` | Approval/reject заявок мастеров на изменение расписания ✅ STUDIO-SCHEDULE-REQUEST-APPROVAL-A |
 | `/cabinet/studio/analytics` | Аналитика студии |
 | `/cabinet/studio/clients` | CRM клиентов студии |
 | `/cabinet/studio/finance` | Финансы |
@@ -1107,6 +1109,33 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-15 — STUDIO-SHELL-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 2/13. Foundation для всех последующих коммитов: sidebar + topbar + UserChip + sidebar counts + nav config. **Никаких изменений existing pages** — каждая page получит свой own redesign в dedicated commit.
+  - **Раздел 3 (Архитектура):** новый подмодуль `src/features/studio-cabinet/`:
+    - `config/studio-nav.ts` — single source of truth для navigation (12 items в 5 группах: Студия / Команда / Клиенты / Бизнес / Студия meta — без Rooms intentionally per scope decision). Lookup helper `isStudioNavItemActive(pathname, item)`
+    - `server/sidebar-counts.service.ts` — `getStudioSidebarCounts({studioId, userId, phone})` параллельно считает 3 badge counts (scheduleRequestsPending / reviewsUnanswered / notificationsUnread). Reuses `ACTIVE_REVIEW_FILTER` + existing `getUnreadBadgeCount` с `context: "personal"`
+    - `server/studio-info.service.ts` — `getStudioShellInfo(studioId)` (Prisma query, replaces legacy HTTP roundtrip через `/api/providers/me`) + `userHasMasterCabinet(userId)` (mirrors check из master layout)
+    - `components/studio-sidebar.tsx` — **rewrite** (старая версия — collapsible Settings group с 6 children — заменена). Использует master-cabinet shared primitives (`SidebarItem`, `NavGroup`, `BrandLogo`) для pixel-level visual parity
+    - `components/studio-topbar.tsx` — sticky minimalistic topbar: studio chip + theme toggle + external link. Sits below global navbar via `top-[var(--topbar-h)]`. Per-page headers — в отдельных коммитах per page
+    - `components/studio-user-chip.tsx` — UserChip с dropdown (differs from master's static info-chip): «Перейти в кабинет мастера» (показывается только если `hasMasterCabinet: true`) / «Профиль платформы» / «Выйти»
+    - `components/studio-bottom-nav.tsx` — adapted to read `STUDIO_NAV` config (4 primary tabs + More drawer); badges на mobile показываются на иконках
+  - **Раздел 5 (Бизнес-логика):** новых business flows нет. Functional change только в shell wiring — `studio.cabinet.layout` теперь aggregates 4 parallel reads (`getStudioShellInfo`, `getStudioSidebarCounts`, `userHasMasterCabinet`, `getCurrentSubscriptionRow`) в single `Promise.all`. **Existing pages работают без изменений** — `/cabinet/studio`, `/calendar`, `/team`, `/services`, `/clients`, `/reviews`, `/analytics`, `/finance`, `/profile`, `/settings`, `/schedule-requests` всё рендерится под новым shell с старым content
+  - **Раздел 6 (Маршруты):** nav config указывает 2 запланированных pages, которые не существуют yet: `/cabinet/studio/bookings`, `/cabinet/studio/notifications` — будут добавлены в STUDIO-BOOKINGS-A / STUDIO-NOTIFICATIONS-A. Сейчас при клике dadут 404 (acceptable per scope)
+  - **UI_TEXT:** расширен `studioCabinet.*` — `appCaption`, `nav.ariaLabel`, `nav.groups.{studio,team,clients,business,studioMeta,studioMetaExternal}`, `nav.items.{14 keys}`, `topbar.{studioChip,openPublicPage}`, `userChip.{currentContext,switchToMaster,profile,logout}`, `bottomNav.{more,moreTitle,close}`. Старые flat keys (`nav.home`, `.calendar` и т.д.) **оставлены** — используются legacy `studio-navbar.tsx` (через billing page out-of-route)
+  - **Validation:** typecheck ✅, lint — no new errors в моих файлах (baseline 823/122 preserved — note: baseline вырос с 588/87 не из моих изменений, из ранних commits), encoding/mojibake ✅, prisma validate ✅, 247/247 tests passing
+  - **Symmetric switcher gap:** Master cabinet's `MasterUserChip` это static info-card (no dropdown). Studio → Master переход доступен через новый `StudioUserChip` dropdown. Master → Studio переход **не существует** — backlog 🟠 как user decision required (one-way trap acceptable / add symmetric switcher / другой подход)
+  - **Legacy:** `studio-navbar.tsx` остаётся (используется billing page out-of-route). Не помечен `@deprecated`, к cleanup в Phase 7 когда billing page получит redesign
+  - **Next:** STUDIO-DASHBOARD-A — редизайн `/cabinet/studio` с per-page `<StudioPageHeader>` pattern (аналог `MasterPageHeader`)
+
+- **2026-05-15 — STUDIO-SCHEDULE-REQUEST-APPROVAL-A** (commit on `designStudioCabinet`). Closed functional gap: API `/api/studio/schedule/requests/*` существовал, но не было UI для approve/reject.
+  - **Раздел 3 (Архитектура):** новый подмодуль `src/features/studio-cabinet/schedule-requests/` — server service (`list.service.ts` — pending + recently resolved), lib helper (`payload-display.ts` — pure preview builder для `EDITOR_V1` / legacy `SchedulePayload` / unknown), 5 UI components (page / request-card / payload-preview / approve-dialog / reject-dialog). Без миграций, без новых API.
+  - **Раздел 5 (Бизнес-логика):** approve/reject flow остался полностью as-is (existing endpoints + `notifyScheduleRequestApproved/Rejected` notifications). Новый surface — UI page `/cabinet/studio/schedule-requests` с двумя секциями (Ожидают / Недавние) и inline payload preview. Reject требует комментарий ≤500 chars (existing API contract). Approve — confirmation modal (no comment field). После любого действия — `router.refresh()` для re-fetch SSR данных.
+  - **Раздел 6 (Маршруты):** новая page `/cabinet/studio/schedule-requests` (✅). Studio sidebar получил новый nav-item «Заявки на расписание» (`CalendarClock` icon) с pending count badge — count fetched через `countPendingScheduleRequests(studioId)` в layout, проходит в `StudioSidebar` через новый prop `pendingScheduleRequests`. Никаких новых API endpoints — все 4 existing endpoints (`GET /api/studio/schedule/requests`, `GET .../[id]`, `POST .../approve`, `POST .../reject`) reused as-is.
+  - **UI_TEXT:** новый subtree `studioCabinet.scheduleRequests.*` (~30 keys — title/subtitle/preview labels/status badges/action buttons/dialog content/error messages). `studioCabinet.nav.scheduleRequests` добавлен.
+  - **Стайлинг:** existing studio cabinet pattern — `<Card>` + `<Badge>` + section header + empty state с `CalendarClock` icon. **НЕ** MasterPageHeader (зарезервирован для STUDIO-SHELL-A). `ModalSurface` для approve/reject dialogs (canonical pattern per modals-investigation invariant).
+  - **Validation:** typecheck ✅, lint — no new errors в моих файлах, encoding/mojibake ✅, prisma validate ✅, 247/247 tests passing
+  - **Audit log:** intentionally **не** добавлен — per scope studio admin actions писать только через `logInfo` (audit log зарезервирован для admin platform). Можно добавить позже если потребуется.
+  - **Next:** STUDIO-SHELL-A (foundation для остального Studio Cabinet redesign — sidebar shell + page header pattern)
 
 - **2026-05-15 — ADMIN-BILLING-FIX-B** (commit on `designAdminCabinet`). Features editor restored 1:1 из legacy. **🎉 Admin Billing CLOSED.**
   - **Раздел 3 (Архитектура):** новый компонент [`plan-features-editor.tsx`](src/features/admin-cabinet/billing/components/plan-features-editor.tsx) — search + grouped sections + boolean switches + numeric limits + «Безлимит» toggle + inheritance hints + client-side relaxed-limit validation. Все domain helpers (`resolveEffectiveFeatures`, `parseOverrides`, `applyOverrides`, `deriveUiState`, `canDisableFeature`, `isRelaxedLimit`) — 100% reused, без изменений

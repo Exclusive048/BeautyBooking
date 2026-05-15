@@ -3,70 +3,103 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  CalendarDays,
-  Users,
-  UserCircle,
-  MoreHorizontal,
-  Star,
-  BarChart3,
-  Settings,
-  Wallet,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { MoreHorizontal, X, type LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  STUDIO_NAV,
+  isStudioNavItemActive,
+  type StudioNavBadgeKey,
+  type StudioNavItem,
+} from "@/features/studio-cabinet/config/studio-nav";
+import type { StudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
-const tStudio = UI_TEXT.studioCabinet.nav;
-const tMore = UI_TEXT.master.bookingsPage;
-
-type TabItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  exact?: boolean;
+type Props = {
+  counts: StudioSidebarCounts;
 };
 
-const TABS: TabItem[] = [
-  { href: "/cabinet/studio", label: tStudio.home, icon: LayoutDashboard, exact: true },
-  { href: "/cabinet/studio/calendar", label: tStudio.calendar, icon: CalendarDays },
-  { href: "/cabinet/studio/team", label: tStudio.team, icon: Users },
-  { href: "/cabinet/studio/clients", label: tStudio.clients, icon: UserCircle },
-];
+const T = UI_TEXT.studioCabinet;
 
-const MORE_ITEMS = [
-  { href: "/cabinet/studio/reviews", label: tStudio.reviews, icon: Star },
-  { href: "/cabinet/studio/analytics", label: tStudio.analytics, icon: BarChart3 },
-  { href: "/cabinet/studio/finance", label: tStudio.finance, icon: Wallet },
-  { href: "/cabinet/studio/settings", label: tStudio.settingsAria, icon: Settings },
-];
+const PRIMARY_TAB_IDS = ["dashboard", "schedule", "schedule-requests", "masters"] as const;
 
-const MORE_PATHS = MORE_ITEMS.map((item) => item.href).concat([
-  "/cabinet/studio/billing",
-  "/cabinet/studio/services",
-]);
-
-function isActive(pathname: string, href: string, exact?: boolean): boolean {
-  const path = href.split("?")[0] ?? href;
-  if (exact) return pathname === path;
-  return pathname === path || pathname.startsWith(`${path}/`);
+function flatNavItems(): StudioNavItem[] {
+  return STUDIO_NAV.flatMap((group) => group.items);
 }
 
-function isMoreActive(pathname: string): boolean {
-  return MORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+function pickPrimaryTabs(): StudioNavItem[] {
+  const flat = flatNavItems();
+  return PRIMARY_TAB_IDS.map((id) => flat.find((item) => item.id === id)).filter(
+    (item): item is StudioNavItem => Boolean(item),
+  );
 }
 
-export function StudioBottomNav() {
+function pickMoreItems(): StudioNavItem[] {
+  const primaryIds = new Set<string>(PRIMARY_TAB_IDS);
+  return flatNavItems().filter((item) => !primaryIds.has(item.id));
+}
+
+function badgeValue(
+  counts: StudioSidebarCounts,
+  badgeKey: StudioNavBadgeKey | undefined,
+): number {
+  if (!badgeKey) return 0;
+  return counts[badgeKey];
+}
+
+function NavTab({
+  item,
+  badge,
+  active,
+}: {
+  item: StudioNavItem;
+  badge: number;
+  active: boolean;
+}) {
+  const Icon: LucideIcon = item.icon;
+  const label = T.nav.items[item.labelKey];
+  return (
+    <Link
+      href={item.href}
+      className="relative flex flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
+      aria-current={active ? "page" : undefined}
+    >
+      <span className="relative">
+        <Icon
+          className={cn("h-5 w-5", active ? "text-primary" : "text-text-sec")}
+          aria-hidden
+        />
+        {badge > 0 ? (
+          <span
+            aria-hidden
+            className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-white"
+          >
+            {badge > 9 ? "9+" : badge}
+          </span>
+        ) : null}
+      </span>
+      <span
+        className={cn(
+          "text-[10px] font-medium",
+          active ? "text-primary" : "text-text-sec",
+        )}
+      >
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+export function StudioBottomNav({ counts }: Props) {
   const pathname = usePathname();
-  const moreActive = isMoreActive(pathname);
   const [moreOpen, setMoreOpen] = useState(false);
+
+  const primary = pickPrimaryTabs();
+  const more = pickMoreItems();
+  const moreActive = more.some((item) => isStudioNavItemActive(pathname, item));
 
   return (
     <>
-      {/* More drawer */}
       <AnimatePresence>
         {moreOpen ? (
           <>
@@ -93,32 +126,47 @@ export function StudioBottomNav() {
                 <div className="h-1 w-10 rounded-full bg-border-subtle" />
               </div>
               <div className="flex items-center justify-between px-5 pb-3 pt-1">
-                <span className="text-sm font-semibold text-text-main">{tMore.moreDrawerTitle}</span>
+                <span className="text-sm font-semibold text-text-main">
+                  {T.bottomNav.moreTitle}
+                </span>
                 <button
                   type="button"
                   onClick={() => setMoreOpen(false)}
                   className="rounded-lg p-1.5 text-text-sec hover:text-text-main"
-                  aria-label="Закрыть"
+                  aria-label={T.bottomNav.close}
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-1 px-4 pb-6 pt-1">
-                {MORE_ITEMS.map((item) => {
+                {more.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(pathname, item.href);
+                  const active = isStudioNavItemActive(pathname, item);
+                  const badge = badgeValue(counts, item.badgeKey);
                   return (
                     <Link
-                      key={item.href}
+                      key={item.id}
                       href={item.href}
                       onClick={() => setMoreOpen(false)}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
-                        active ? "bg-primary/10 text-primary" : "text-text-sec hover:bg-bg-input"
+                        "relative flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-text-sec hover:bg-bg-input",
                       )}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
-                      <span className="text-[11px] font-medium leading-tight">{item.label}</span>
+                      <span className="text-[11px] font-medium leading-tight">
+                        {T.nav.items[item.labelKey]}
+                      </span>
+                      {badge > 0 ? (
+                        <span
+                          aria-hidden
+                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-white"
+                        >
+                          {badge > 9 ? "9+" : badge}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -128,29 +176,19 @@ export function StudioBottomNav() {
         ) : null}
       </AnimatePresence>
 
-      {/* Tab bar */}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        aria-label="Навигация студии"
+        aria-label={T.nav.ariaLabel}
       >
         <div className="border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl">
           <ul className="flex items-stretch">
-            {TABS.map((tab) => {
-              const active = isActive(pathname, tab.href, tab.exact);
-              const Icon = tab.icon;
+            {primary.map((item) => {
+              const active = isStudioNavItemActive(pathname, item);
+              const badge = badgeValue(counts, item.badgeKey);
               return (
-                <li key={`${tab.href}-${tab.label}`} className="flex-1">
-                  <Link
-                    href={tab.href}
-                    className="flex flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
-                    aria-current={active ? "page" : undefined}
-                  >
-                    <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-text-sec")} aria-hidden />
-                    <span className={cn("text-[10px] font-medium", active ? "text-primary" : "text-text-sec")}>
-                      {tab.label}
-                    </span>
-                  </Link>
+                <li key={item.id} className="flex-1">
+                  <NavTab item={item} badge={badge} active={active} />
                 </li>
               );
             })}
@@ -162,11 +200,19 @@ export function StudioBottomNav() {
                 aria-expanded={moreOpen}
               >
                 <MoreHorizontal
-                  className={cn("h-5 w-5", moreActive || moreOpen ? "text-primary" : "text-text-sec")}
+                  className={cn(
+                    "h-5 w-5",
+                    moreActive || moreOpen ? "text-primary" : "text-text-sec",
+                  )}
                   aria-hidden
                 />
-                <span className={cn("text-[10px] font-medium", moreActive || moreOpen ? "text-primary" : "text-text-sec")}>
-                  {UI_TEXT.master.topbar.nav.more}
+                <span
+                  className={cn(
+                    "text-[10px] font-medium",
+                    moreActive || moreOpen ? "text-primary" : "text-text-sec",
+                  )}
+                >
+                  {T.bottomNav.more}
                 </span>
               </button>
             </li>

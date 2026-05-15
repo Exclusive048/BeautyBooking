@@ -65,8 +65,12 @@
 - [x] **Review soft delete** — hard delete заменён на `deletedAt` mark в admin moderation + user self-delete paths. `ACTIVE_REVIEW_FILTER` constant применён в 18+ query sites (public profile / cabinet / ratings recalc / AI summary / catalog smart tags / search-by-time / admin moderation list + counts). KPI `deletedLastWeek` теперь real (был null placeholder). Idempotent re-delete. Restore = manual SQL only (no UI flow per scope) (REVIEW-SOFT-DELETE-A). **🎉 Pre-launch batch (4/4) closed.**
 - [x] **Admin billing plans cleanup (data + seed)** — diagnostic script `scripts/cleanup-duplicate-billing-plans.ts` (dry-run default + `--confirm`, per-plan transaction, idempotent) собирает 12 plan rows → 6 канонических UPPERCASE. `prisma/seed-test.sql` BillingPlan + BillingPlanPrice inserts удалены (single source of truth = `prisma/seeds/test-data/seed-billing-plans.ts`). Runbook в `docs/runbooks/cleanup-duplicate-billing-plans.md`. **Execution требуется на production перед launch.** (ADMIN-BILLING-FIX-A)
 - [x] **Admin billing features editor restored** — full reconstruction 1:1 из legacy: tab navigation (Основное / Возможности), inheritance select, search + grouped sections + per-feature rendering (boolean switch + numeric limit + «Безлимит»), inheritance hints, client-side relaxed-limit preview + server-side `assertRelaxedLimits` / `assertNoInheritanceCycle` / `assertParentExists`. Endpoint `PATCH /api/admin/billing/plans/[id]` расширен на `features` + `inheritsFromPlanId`. Audit log diff captures feature/inheritance changes, mass-notify `BILLING_PLAN_EDITED` теперь summarises feature changes. 29 unit tests на helpers (`isRelaxedLimit`, `resolveEffectiveFeatures`, `parseOverrides`, `applyOverrides`, `deriveUiState`, `canDisableFeature`, cycle resilience). `featuresNote` placeholder удалён (ADMIN-BILLING-FIX-B). **🎉 Admin Billing полностью завершён (A + B + FIX-A + FIX-B).**
+- [x] **Studio schedule request approval UI** — закрыт functional gap: API `/api/studio/schedule/requests/*` (GET list + GET detail + POST approve + POST reject) уже существовал, но не было UI surface. Новая страница `/cabinet/studio/schedule-requests` с двумя секциями (Ожидают решения / Недавние решения), per-request card с inline preview payload (EDITOR_V1 + legacy + unknown formats), Approve/Reject действия через `ModalSurface` диалоги (reject требует комментарий). Sidebar получил pending count badge — `countPendingScheduleRequests(studioId)` fetched в layout, передаётся в `StudioSidebar` (новый prop). Module `src/features/studio-cabinet/schedule-requests/` (server service + lib payload-display + 5 components). Стайлинг — existing studio cabinet pattern (header + Card + Badge), без MasterPageHeader (зарезервирован для STUDIO-SHELL-A). UI_TEXT subtree `studioCabinet.scheduleRequests.*` (30+ keys). Notifications мастеру (`SCHEDULE_REQUEST_APPROVED` / `SCHEDULE_REQUEST_REJECTED`) уже работают через existing `notifyScheduleRequestApproved/Rejected` (STUDIO-SCHEDULE-REQUEST-APPROVAL-A)
+- [x] **Studio cabinet shell foundation** — sidebar rewrite + minimalistic topbar + UserChip с role switcher dropdown + sidebar counts service. Single source of truth для navigation `src/features/studio-cabinet/config/studio-nav.ts` (12 items в 5 группах: Студия, Команда, Клиенты, Бизнес, Студия meta — без Rooms intentionally). Использует master-cabinet shared primitives (`SidebarItem`, `NavGroup`, `BrandLogo`) для pixel-level parity. Badge counts (`scheduleRequestsPending`, `reviewsUnanswered`, `notificationsUnread`) запрашиваются параллельно через `getStudioSidebarCounts`. Topbar минималистичный (studio chip + theme toggle + external link), per-page headers — в отдельных коммитах per page. UserChip с dropdown: «Перейти в кабинет мастера» (показывается только если `userHasMasterCabinet === true`), «Профиль платформы», «Выйти». Mobile bottom nav адаптирован под новый `STUDIO_NAV` config с More drawer. Existing pages работают под новым shell без изменений. Legacy `studio-navbar.tsx` остаётся untouched (используется billing page out-of-route) — pursue cleanup в Phase 7 (STUDIO-SHELL-A)
 
 ### ⏳ Cabinet Studio (полный redesign отдельно)
+- [x] **Schedule request approval UI** — closed functional gap (STUDIO-SCHEDULE-REQUEST-APPROVAL-A)
+- [x] **Shell foundation** — sidebar + topbar + UserChip + bottom-nav (STUDIO-SHELL-A)
 - [ ] Calendar redesign (multi-master view)
 - [ ] Team management (invites, roles, permissions)
 - [ ] Studio bookings list
@@ -163,6 +167,11 @@ Backend filters только по `isPublished`. Новые поля досту�
 ### Из ADMIN-DASH-A audit (после выполнения)
 - **APM / реальный мониторинг (API uptime + p95 response time)** — сейчас admin health показывает «—» для этих метрик. Подключить Prometheus/Sentry/Yandex Cloud Monitoring. Phase 6
 
+### Из STUDIO-SHELL-A audit (2026-05-15)
+- **Symmetric role switcher в Master cabinet** — Master sidebar's `MasterUserChip` это static info-card (no dropdown). Поэтому переход studio → master доступен через новый StudioUserChip dropdown, но обратный переход master → studio — отсутствует. User с двумя cabinet'ами оказывается в one-way trap (приходится использовать URL bar или log out / log in). Decision required: **A)** добавить symmetric dropdown в master cabinet (изменение master cabinet outside текущего sprint scope), **B)** one-way OK (acceptable как trial release behaviour), **C)** добавить сейчас как короткий follow-up commit. **Default до user decision — B (one-way OK)**, документировать в release notes
+- **Per-page StudioPageHeader pattern** — отдельный sticky header для каждой страницы (breadcrumb / title / actions) появится в dedicated коммитах STUDIO-DASHBOARD-A / STUDIO-CALENDAR-A / etc. Текущий topbar намеренно lean и не претендует на эту роль
+- **Legacy `studio-navbar.tsx` orphan** — после rewrite основного StudioSidebar legacy navbar остаётся используемым только в `src/app/(cabinet)/cabinet/billing/page.tsx` (cross-cabinet billing surface). Помечен на удаление через Phase 7 cleanup когда billing page получит свой redesign
+
 ---
 
 ## 🟡 MEDIUM PRIORITY
@@ -186,6 +195,11 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 - Section 8 риск: для master/studio много `deleteMany` вместо anonymization
 - При GDPR/152-ФЗ запросах — нужна **анонимизация** для бронирований и отзывов
 - User-account уже анонимизируется, расширить на provider entities
+
+### Из STUDIO-SHELL-A (2026-05-15)
+- **Cache sidebar counts** — `getStudioSidebarCounts` запускает 3 параллельные queries при каждой загрузке любой studio-cabinet page. Сейчас acceptable (small indexed counts), но при росте может стать hotspot. Опция — `React.cache` per-render или 30-second Redis TTL. Pre-launch только если виден latency impact
+- **StudioMember vs StudioMembership redundancy** (из STUDIO-AUDIT) — две модели для одного концепта. Только `StudioMembership` canonical (state machine PENDING/ACTIVE/REJECTED/LEFT), `StudioMember` orphan-ish. Cleanup migration на будущее
+- **Глобальный `getStudioContext()` hook** — пересмотр shared utility чтобы внутренние pages могли pull studio info без duplicate fetch. Refactor opportunity, не сейчас
 
 ### Legacy admin code (из ADMIN-SHELL-A)
 - **`UI_TEXT.admin.nav.*`** — dead-letter после ADMIN-SHELL-A. Удалить вместе с `admin-sidebar.tsx` (Phase 7 cleanup sweep)
