@@ -16,6 +16,12 @@ type Props = {
   className?: string;
 };
 
+/**
+ * @deprecated STUDIO-DASHBOARD-A replaced this with the new dashboard
+ * KPI tiles (`StudioKpiRow`). Kept around for Phase 7 cleanup so the
+ * git diff stays focused on the new feature module; no remaining
+ * importers after the dashboard rewrite.
+ */
 export function DashboardNavCards({ items, className }: Props) {
   return (
     <div className={cn("grid gap-4 md:grid-cols-2", className)}>

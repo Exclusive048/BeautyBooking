@@ -5780,6 +5780,81 @@ export const UI_TEXT = {
       total: "Итого",
       moneySuffix: "₽",
     },
+    dashboardV2: {
+      banner: {
+        titleTemplate: "Сегодня в студии {count} записей",
+        subtitleTemplate: "{onShift} мастеров на смене, средняя загрузка {load}%.",
+        onShiftLabel: "Сейчас на смене",
+        outOfTemplate: "из {total}",
+      },
+      kpis: {
+        revenue: {
+          label: "Выручка за 30 дней",
+          subtitle: "vs. прошлый месяц",
+        },
+        bookings: {
+          label: "Записей за 30 дней",
+          averageCheckTemplate: "средний чек {amount}",
+        },
+        occupancy: {
+          label: "Загрузка студии",
+          subtitle: "{count} мастеров на смене",
+        },
+        rating: {
+          label: "Средний рейтинг",
+          subtitle: "{count} отзывов",
+        },
+      },
+      topMasters: {
+        title: "ТОП-мастера",
+        subtitle: "По выручке за 30 дней",
+        seeAll: "Все мастера",
+        bookingsTemplate: "{count} записей",
+        empty: "За последний месяц записей не было.",
+      },
+      attention: {
+        title: "Требуют внимания",
+        subtitleTemplate: "{count} задач · {urgent} срочных",
+        empty: "Очередь пуста",
+        emptyBody: "Всё под контролем.",
+        urgentLabel: "Срочно",
+        items: {
+          pendingMastersTitle: "Заявок мастеров: {count}",
+          pendingMastersAction: "Открыть",
+          bookingsAwaitingTitle: "Записей ждут подтверждения: {count}",
+          bookingsAwaitingAction: "Записи",
+          reviewsUnansweredTitle: "Отзывов без ответа: {count}",
+          reviewsUnansweredAction: "Ответить",
+          scheduleRequestsTitle: "Заявок на расписание: {count}",
+          scheduleRequestsAction: "Решить",
+        },
+      },
+      topOccupancy: {
+        title: "Топ загруженности",
+        subtitle: "Сегодня",
+        slotsTemplate: "{booked} из {total} записей",
+        empty: "Сегодня свободный день.",
+      },
+      popularServices: {
+        title: "Популярные услуги",
+        subtitle: "За 30 дней",
+        countTemplate: "{count} раз · {percent}% всех записей",
+        empty: "Нет данных за выбранный период.",
+      },
+      revenueChart: {
+        title: "Выручка по мастерам",
+        totalLabel: "за период",
+        bookingsTemplate: "{count} записей",
+        periodSelector: {
+          "7d": "7д",
+          "30d": "30д",
+          "90d": "90д",
+          "365d": "Год",
+        },
+        empty: "Нет данных за выбранный период.",
+        error: "Не удалось загрузить данные. Попробуйте ещё раз.",
+      },
+    },
     scheduleRequests: {
       title: "Заявки на расписание",
       subtitle: "Мастера студии запрашивают изменения графика — подтвердите или отклоните.",

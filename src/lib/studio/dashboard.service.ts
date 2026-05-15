@@ -45,6 +45,14 @@ async function getStudioContext(studioId: string): Promise<StudioContext> {
   return studio;
 }
 
+/**
+ * @deprecated STUDIO-DASHBOARD-A replaced the dashboard consumer with
+ * `loadStudioDashboardData` from
+ * `src/features/studio-cabinet/dashboard/server/dashboard-data.service.ts`.
+ * This function is kept around in case non-dashboard surfaces still need
+ * the legacy quick stats — verified by `grep` at commit time, no other
+ * importers exist. Phase 7 cleanup will remove it.
+ */
 export async function getStudioDashboardStats(studioId: string): Promise<StudioDashboardStats> {
   const studio = await getStudioContext(studioId);
 

@@ -7,7 +7,9 @@
 > **Active sprint:** редизайн кабинета студии в ветке `designStudioCabinet`.
 > - ✅ Schedule request approval UI (STUDIO-SCHEDULE-REQUEST-APPROVAL-A — closed functional gap)
 > - ✅ Shell foundation (STUDIO-SHELL-A — sidebar/topbar/UserChip/bottom-nav + nav config + counts service)
-> - ⏳ Dashboard, Calendar, Bookings, Team, Services, Clients, Reviews, Analytics, Finance, Settings
+> - ✅ Symmetric switcher rollback (SYMMETRIC-SWITCHER-A — cabinet UI без duplicate switcher)
+> - ✅ Dashboard redesign (STUDIO-DASHBOARD-A — rich KPIs + attention + revenue chart)
+> - ⏳ Calendar, Bookings, Team, Services, Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -521,7 +523,7 @@ src/
 ### Кабинет студии (требует роль STUDIO/STUDIO_ADMIN)
 | URL | Описание |
 |-----|---------|
-| `/cabinet/studio` | Главная студии |
+| `/cabinet/studio` | Главная студии — rich dashboard (today banner / 4 KPI tiles / top masters / attention / occupancy / popular services / revenue chart) ✅ STUDIO-DASHBOARD-A |
 | `/cabinet/studio/calendar` | Календарь студии |
 | `/cabinet/studio/schedule-requests` | Approval/reject заявок мастеров на изменение расписания ✅ STUDIO-SCHEDULE-REQUEST-APPROVAL-A |
 | `/cabinet/studio/analytics` | Аналитика студии |
@@ -1109,6 +1111,27 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-15 — STUDIO-DASHBOARD-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 4/13. `/cabinet/studio` page rewrite — legacy 4-card stats + 4-quick-action grid заменены rich dashboard mirroring master pattern.
+  - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/dashboard/`:
+    - `lib/period-options.ts` — `StudioDashboardPeriodId = "7d" | "30d" | "90d" | "365d"` + helpers (local state period selector, not URL-driven — отличается от master analytics)
+    - `lib/format-delta.ts` — pure formatters: `formatRelativeDelta` (revenue/bookings), `formatPointsDelta` (percentage KPIs: «+6 п.п.»), `formatRatingDelta` («+0.1»)
+    - `server/types.ts` — все DTOs
+    - `server/dashboard-data.service.ts` — `loadStudioDashboardData({studioId})` orchestrator + extracted `buildRevenueChart(studioId, period)` (export для API endpoint reuse). Все sub-builders private. Parallel `Promise.all` для 6 sections after initial banner data
+    - `components/` — 8 файлов: `studio-dashboard-page.tsx` (server orchestrator), `studio-today-banner.tsx` (gradient hero), `studio-kpi-row.tsx` (4 tiles), `studio-top-masters.tsx` (top 5 + progress bars), `studio-attention-panel.tsx`, `studio-top-occupancy.tsx`, `studio-popular-services.tsx`, `studio-revenue-chart.tsx` (client, period selector + fetch)
+  - **Раздел 5 (Бизнес-логика):** новые business reads:
+    - **«Загрузка студии» KPI** — pragmatic proxy `bookings_count / (totalMasters × 30 days × 5 slots/day) × 100`. Precise slot-engine occupancy → backlog 🟡
+    - **«Топ загруженности сегодня»** — replacement секции «Загрузка кабинетов» (rooms excluded per scope). Heuristic capacity `5 bookings = 100%`. Top 3 by occupancy %, excluded если 0 bookings
+    - **Top masters by revenue 30d** — booking aggregation through existing `Booking.serviceItems[].priceSnapshot` fallback to `Service.price`. ProviderId == studio's own provider (studio entity, not master) filtered out
+    - **Attention items** — 4 types: `pending-master-approvals` (StudioMembership PENDING), `bookings-awaiting` (Booking PENDING + CHANGE_REQUESTED), `reviews-unanswered` (studio reviews replyText=null), `schedule-requests` (existing `countPendingScheduleRequests` logic inline). Items с count=0 — НЕ рендерятся. Urgent flag drives badge.
+    - **Popular services 30d** — `groupBy serviceId`, top 5 by count + share % + avg price + revenue
+    - **Revenue chart** — new endpoint `GET /api/studio/dashboard/revenue?period=...` (OWNER/ADMIN gate, no plan-gate — different from `/api/analytics/revenue/by-master` which requires `analytics_revenue` feature). Studio admin sees revenue overview without subscription tier dependency
+  - **Раздел 6 (Маршруты):** `/cabinet/studio` теперь rich dashboard (was: 4 stats cards + quick actions). Новый endpoint `GET /api/studio/dashboard/revenue?period=7d|30d|90d|365d`. Auth: OWNER или ADMIN role в студии
+  - **UI_TEXT:** новый subtree `studioCabinet.dashboardV2.*` (~50 keys — banner / kpis / topMasters / attention / topOccupancy / popularServices / revenueChart). Старый `studioCabinet.dashboard.*` оставлен — больше не consumed, к удалению в Phase 7
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **@deprecated:** `getStudioDashboardStats` (`src/lib/studio/dashboard.service.ts`) + `DashboardNavCards` (`src/features/studio-cabinet/components/`) — оба marked, no other consumers
+  - **Backlog spawned:** precise occupancy via ScheduleEngine, rating delta historical snapshots, analytics gating for dashboard, AI insights for banner subtitle
+  - **Next:** STUDIO-CALENDAR-A — multi-master calendar view
 
 - **2026-05-15 — SYMMETRIC-SWITCHER-A** (commit on `designStudioCabinet`). Откат role-switcher mechanism, добавленного в STUDIO-SHELL-A. Closes open question by user decision: cross-cabinet навигация exclusively через public header, cabinet UI не хостит duplicate switcher.
   - **Раздел 3 (Архитектура):** `StudioUserChip` rewrite — был interactive dropdown (avatar trigger + menu items: switch to master / profile / logout), стал static info-card (mirrors `MasterUserChip` pattern — avatar + name + studio tagline). Удалён server helper `userHasMasterCabinet()` из `studio-info.service.ts` (orphan after rollback — no other consumers). Layout `Promise.all` сократился c 4 до 3 parallel reads.
