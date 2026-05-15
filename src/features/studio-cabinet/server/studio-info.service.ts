@@ -52,15 +52,3 @@ export async function getStudioShellInfo(studioId: string): Promise<StudioShellI
   };
 }
 
-/**
- * True when the current user owns a Master cabinet — drives whether the
- * studio UserChip exposes a «Switch to Master» action. Mirrors the
- * existence check used in the Master layout (`Provider.masterProfile`).
- */
-export async function userHasMasterCabinet(userId: string): Promise<boolean> {
-  const master = await prisma.provider.findFirst({
-    where: { ownerUserId: userId, type: ProviderType.MASTER },
-    select: { masterProfile: { select: { id: true } } },
-  });
-  return Boolean(master?.masterProfile);
-}

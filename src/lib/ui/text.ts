@@ -5480,10 +5480,7 @@ export const UI_TEXT = {
       openPublicPage: "Открыть страницу студии",
     },
     userChip: {
-      currentContext: "Я студия",
-      switchToMaster: "Перейти в кабинет мастера",
-      profile: "Профиль платформы",
-      logout: "Выйти",
+      currentContext: "{studio}",
     },
     bottomNav: {
       more: "Ещё",

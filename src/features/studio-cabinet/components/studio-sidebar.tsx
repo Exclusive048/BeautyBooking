@@ -21,7 +21,6 @@ type Props = {
   user: {
     name: string;
     avatarUrl: string | null;
-    hasMasterCabinet: boolean;
   };
   studio: {
     name: string;
@@ -108,12 +107,8 @@ export function StudioSidebar({ counts, user, studio }: Props) {
         <StudioUserChip
           name={user.name}
           avatarUrl={user.avatarUrl}
-          hasMasterCabinet={user.hasMasterCabinet}
+          studioName={studio.name}
         />
-      </div>
-
-      <div className="px-4 py-3 text-[11px] text-text-sec/70">
-        <p className="truncate">{studio.name}</p>
       </div>
     </aside>
   );

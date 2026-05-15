@@ -1110,6 +1110,15 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-15 — SYMMETRIC-SWITCHER-A** (commit on `designStudioCabinet`). Откат role-switcher mechanism, добавленного в STUDIO-SHELL-A. Closes open question by user decision: cross-cabinet навигация exclusively через public header, cabinet UI не хостит duplicate switcher.
+  - **Раздел 3 (Архитектура):** `StudioUserChip` rewrite — был interactive dropdown (avatar trigger + menu items: switch to master / profile / logout), стал static info-card (mirrors `MasterUserChip` pattern — avatar + name + studio tagline). Удалён server helper `userHasMasterCabinet()` из `studio-info.service.ts` (orphan after rollback — no other consumers). Layout `Promise.all` сократился c 4 до 3 parallel reads.
+  - **Раздел 5 (Бизнес-логика):** **invariant:** cross-cabinet navigation lives ONLY в public header (`src/components/layout/auth-user-menu.tsx` через `clientCabinet.switcher.*`). Cabinet UI не дублирует это — это лишний noise и duplicate maintenance surface. Both Master и Studio cabinets имеют symmetric pattern: bottom-of-sidebar static info-chip, no interactive dropdown.
+  - **UI_TEXT:** `studioCabinet.userChip.{switchToMaster, profile, logout}` удалены. `currentContext` оставлен и переформатирован под static use ("{studio}" placeholder вместо "Я студия"). `studioCabinet.appCaption`, `topbar.*`, `bottomNav.*` — без изменений.
+  - **Public header switcher НЕ затронут** — `clientCabinet.switcher.*` keys intact, `auth-user-menu.tsx` not modified. Independent namespace.
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests passing
+  - **Resolves:** open question из STUDIO-SHELL-A («Symmetric switcher» backlog item) — selected Option B (one-way OK / cross-cabinet nav exclusively через public header)
+  - **Next:** STUDIO-DASHBOARD-A — редизайн `/cabinet/studio` с per-page `<StudioPageHeader>` pattern
+
 - **2026-05-15 — STUDIO-SHELL-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 2/13. Foundation для всех последующих коммитов: sidebar + topbar + UserChip + sidebar counts + nav config. **Никаких изменений existing pages** — каждая page получит свой own redesign в dedicated commit.
   - **Раздел 3 (Архитектура):** новый подмодуль `src/features/studio-cabinet/`:
     - `config/studio-nav.ts` — single source of truth для navigation (12 items в 5 группах: Студия / Команда / Клиенты / Бизнес / Студия meta — без Rooms intentionally per scope decision). Lookup helper `isStudioNavItemActive(pathname, item)`

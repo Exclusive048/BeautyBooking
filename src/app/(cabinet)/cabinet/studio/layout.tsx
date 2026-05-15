@@ -7,10 +7,7 @@ import { StudioSidebar } from "@/features/studio-cabinet/components/studio-sideb
 import { StudioBottomNav } from "@/features/studio-cabinet/components/studio-bottom-nav";
 import { StudioTopbar } from "@/features/studio-cabinet/components/studio-topbar";
 import { getStudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
-import {
-  getStudioShellInfo,
-  userHasMasterCabinet,
-} from "@/features/studio-cabinet/server/studio-info.service";
+import { getStudioShellInfo } from "@/features/studio-cabinet/server/studio-info.service";
 import { TrialEndingBanner } from "@/features/cabinet/components/trial-ending-banner";
 import { TrialStatusBadge } from "@/features/cabinet/components/trial-status-badge";
 import {
@@ -38,14 +35,13 @@ export default async function StudioCabinetLayout({
     redirect("/403");
   }
 
-  const [studioInfo, sidebarCounts, hasMasterCabinet, subscription] = await Promise.all([
+  const [studioInfo, sidebarCounts, subscription] = await Promise.all([
     getStudioShellInfo(studioId),
     getStudioSidebarCounts({
       studioId,
       userId: user.id,
       phone: user.phone ?? null,
     }),
-    userHasMasterCabinet(user.id),
     getCurrentSubscriptionRow(user.id, SubscriptionScope.STUDIO),
   ]);
 
@@ -77,7 +73,6 @@ export default async function StudioCabinetLayout({
               user={{
                 name: userName,
                 avatarUrl: studioInfo?.avatarUrl ?? null,
-                hasMasterCabinet,
               }}
               studio={{
                 name: studioForShell.name,
