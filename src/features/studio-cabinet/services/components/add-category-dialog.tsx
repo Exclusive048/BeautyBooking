@@ -11,12 +11,17 @@ const T = UI_TEXT.studioCabinet.servicesV2.addCategoryDialog;
 const E = UI_TEXT.studioCabinet.servicesV2.errors;
 
 type Props = {
-  studioId: string;
   open: boolean;
   onClose: () => void;
 };
 
-export function AddCategoryDialog({ studioId, open, onClose }: Props) {
+/**
+ * CATEGORY-UNIFICATION-A: proposes a new GlobalCategory (PENDING +
+ * scoped to current user via `proposedBy/createdByUserId`). Replaces
+ * the legacy studio-scoped `ServiceCategory` create flow. Mirrors the
+ * master cabinet's "propose category" pattern.
+ */
+export function AddCategoryDialog({ open, onClose }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -38,10 +43,10 @@ export function AddCategoryDialog({ studioId, open, onClose }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/studio/categories", {
+      const response = await fetch("/api/categories/propose", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ studioId, title: trimmed }),
+        body: JSON.stringify({ name: trimmed }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as

@@ -1,11 +1,27 @@
-import { BookingStatus, Prisma, ProviderType } from "@prisma/client";
+import {
+  BookingStatus,
+  CategoryStatus,
+  Prisma,
+  ProviderType,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type {
-  StudioServiceCategoryRow,
-  StudioServiceDetail,
-  StudioServiceListItem,
-  StudioServicesKpis,
+import {
+  UNCATEGORIZED_KEY,
+  type StudioCategoryPickerOption,
+  type StudioServiceCategoryRow,
+  type StudioServiceDetail,
+  type StudioServiceListItem,
+  type StudioServicesKpis,
 } from "../lib/types";
+
+/**
+ * CATEGORY-UNIFICATION-A: services-data service reads + groups by
+ * `GlobalCategory` (the field the public catalog filters on). Pending
+ * categories proposed by `currentUserId` are surfaced alongside
+ * APPROVED globals — mirrors the master cabinet's
+ * `listAvailableGlobalCategories` semantics so the studio admin can
+ * use a freshly-proposed category right away.
+ */
 
 const COMPLETED_STATUSES = [
   BookingStatus.CONFIRMED,
@@ -71,8 +87,108 @@ async function get30dBookingsByService(
   return map;
 }
 
+/**
+ * Available categories for the studio admin's pickers — APPROVED
+ * globally visible categories plus own-pending proposals. Excludes
+ * the `visualSearchSlug=hot` system category (reserved for hot-slot
+ * routing, not a catalog filter).
+ */
+export async function listAvailableCategoriesForStudio(
+  currentUserId: string,
+): Promise<StudioCategoryPickerOption[]> {
+  const rows = await prisma.globalCategory.findMany({
+    where: {
+      visualSearchSlug: { not: "hot" },
+      OR: [
+        { status: CategoryStatus.APPROVED, visibleToAll: true },
+        { createdByUserId: currentUserId },
+        { proposedBy: currentUserId },
+      ],
+    },
+    select: { id: true, name: true, status: true },
+    orderBy: { name: "asc" },
+  });
+  return rows
+    .filter((row) => row.status !== CategoryStatus.REJECTED)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      status: row.status === CategoryStatus.APPROVED ? "APPROVED" : "PENDING",
+    }));
+}
+
+async function buildCategoriesSidebar(
+  studioId: string,
+  currentUserId: string,
+): Promise<StudioServiceCategoryRow[]> {
+  const services = await prisma.service.findMany({
+    where: { studioId },
+    select: { id: true, globalCategoryId: true },
+  });
+  const inUseIds = Array.from(
+    new Set(
+      services
+        .map((s) => s.globalCategoryId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const uncategorizedCount = services.filter((s) => !s.globalCategoryId).length;
+
+  // Union: in-use ∪ APPROVED-visible ∪ own-pending. Sidebar shows the
+  // same pickable set as the dialog dropdown so studio admin can
+  // navigate by category before attaching a service.
+  const globals = await prisma.globalCategory.findMany({
+    where: {
+      visualSearchSlug: { not: "hot" },
+      OR: [
+        ...(inUseIds.length > 0 ? [{ id: { in: inUseIds } }] : []),
+        { status: CategoryStatus.APPROVED, visibleToAll: true },
+        { createdByUserId: currentUserId },
+        { proposedBy: currentUserId },
+      ],
+    },
+    select: { id: true, name: true, status: true },
+    orderBy: { name: "asc" },
+  });
+
+  const countByCategory = new Map<string, number>();
+  for (const service of services) {
+    if (!service.globalCategoryId) continue;
+    countByCategory.set(
+      service.globalCategoryId,
+      (countByCategory.get(service.globalCategoryId) ?? 0) + 1,
+    );
+  }
+
+  const rows: StudioServiceCategoryRow[] = globals
+    .filter((g) => g.status !== CategoryStatus.REJECTED)
+    .map<StudioServiceCategoryRow>((g) => ({
+      id: g.id,
+      title: g.name,
+      servicesCount: countByCategory.get(g.id) ?? 0,
+      status: g.status === CategoryStatus.APPROVED ? "APPROVED" : "PENDING",
+    }))
+    // APPROVED first then PENDING, alphabetical within each tier.
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "APPROVED" ? -1 : 1;
+      return a.title.localeCompare(b.title, "ru");
+    });
+
+  if (uncategorizedCount > 0) {
+    rows.push({
+      id: UNCATEGORIZED_KEY,
+      title: "Без категории",
+      servicesCount: uncategorizedCount,
+      status: "uncategorized",
+    });
+  }
+
+  return rows;
+}
+
 export async function loadStudioServicesListData(input: {
   studioId: string;
+  currentUserId: string;
   categoryId?: string | null;
   search?: string;
 }): Promise<{
@@ -94,47 +210,25 @@ export async function loadStudioServicesListData(input: {
     };
   }
 
-  const [categoriesRaw, allServices] = await Promise.all([
-    prisma.serviceCategory.findMany({
-      where: { studioId: studio.id },
-      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-      select: { id: true, title: true, sortOrder: true },
-    }),
-    prisma.service.findMany({
-      where: { studioId: studio.id },
-      select: {
-        id: true,
-        categoryId: true,
-      },
-    }),
+  const [categories, totalServicesCount] = await Promise.all([
+    buildCategoriesSidebar(studio.id, input.currentUserId),
+    prisma.service.count({ where: { studioId: studio.id } }),
   ]);
-
-  const servicesCountByCategory = new Map<string, number>();
-  for (const service of allServices) {
-    if (!service.categoryId) continue;
-    servicesCountByCategory.set(
-      service.categoryId,
-      (servicesCountByCategory.get(service.categoryId) ?? 0) + 1,
-    );
-  }
-
-  const categories: StudioServiceCategoryRow[] = categoriesRaw.map((cat) => ({
-    id: cat.id,
-    title: cat.title,
-    servicesCount: servicesCountByCategory.get(cat.id) ?? 0,
-    sortOrder: cat.sortOrder,
-  }));
 
   const selectedCategoryId =
     input.categoryId && categories.some((c) => c.id === input.categoryId)
       ? input.categoryId
       : categories[0]?.id ?? null;
 
-  const searchTrimmed = input.search?.trim().toLowerCase() ?? "";
+  const searchTrimmed = input.search?.trim() ?? "";
 
   const where: Prisma.ServiceWhereInput = {
     studioId: studio.id,
-    ...(selectedCategoryId ? { categoryId: selectedCategoryId } : {}),
+    ...(selectedCategoryId === UNCATEGORIZED_KEY
+      ? { globalCategoryId: null }
+      : selectedCategoryId
+        ? { globalCategoryId: selectedCategoryId }
+        : {}),
     ...(searchTrimmed
       ? {
           OR: [
@@ -157,7 +251,7 @@ export async function loadStudioServicesListData(input: {
         price: true,
         basePrice: true,
         baseDurationMin: true,
-        categoryId: true,
+        globalCategoryId: true,
         isActive: true,
         masterServices: {
           where: { isEnabled: true },
@@ -179,7 +273,7 @@ export async function loadStudioServicesListData(input: {
     name: service.title?.trim() || service.name,
     durationMin: service.baseDurationMin ?? service.durationMin,
     priceKopeks: service.basePrice ?? service.price,
-    categoryId: service.categoryId ?? null,
+    categoryId: service.globalCategoryId ?? null,
     isActive: service.isActive,
     bookings30d: bookingsByService.get(service.id)?.count ?? 0,
     masters: service.masterServices.map((ms) => ({
@@ -193,7 +287,7 @@ export async function loadStudioServicesListData(input: {
     categories,
     items,
     selectedCategoryId,
-    totalServices: allServices.length,
+    totalServices: totalServicesCount,
   };
 }
 
@@ -215,27 +309,36 @@ export async function loadStudioServicesKpis(
     };
   }
 
-  const [services, categoriesCount, bookingsByService] = await Promise.all([
-    prisma.service.findMany({
-      where: { studioId: studio.id },
-      select: {
-        id: true,
-        name: true,
-        title: true,
-        price: true,
-        basePrice: true,
-        masterServices: {
-          where: { isEnabled: true },
-          select: { id: true },
-          take: 1,
-        },
+  const services = await prisma.service.findMany({
+    where: { studioId: studio.id },
+    select: {
+      id: true,
+      name: true,
+      title: true,
+      price: true,
+      basePrice: true,
+      globalCategoryId: true,
+      masterServices: {
+        where: { isEnabled: true },
+        select: { id: true },
+        take: 1,
       },
-    }),
-    prisma.serviceCategory.count({ where: { studioId: studio.id } }),
-    get30dBookingsByService(studio.id, studio.providerId),
-  ]);
+    },
+  });
 
-  // Popular service — highest bookings30d
+  const usedGlobalCategoryIds = new Set<string>();
+  let hasUncategorized = false;
+  for (const service of services) {
+    if (service.globalCategoryId) usedGlobalCategoryIds.add(service.globalCategoryId);
+    else hasUncategorized = true;
+  }
+  const categoriesCount = usedGlobalCategoryIds.size + (hasUncategorized ? 1 : 0);
+
+  const bookingsByService = await get30dBookingsByService(
+    studio.id,
+    studio.providerId,
+  );
+
   let popularServiceId: string | null = null;
   let popularBookings = 0;
   for (const [serviceId, stats] of bookingsByService.entries()) {
@@ -248,7 +351,6 @@ export async function loadStudioServicesKpis(
     ? services.find((s) => s.id === popularServiceId)
     : null;
 
-  // Average check — total revenue / total bookings in 30d
   let totalRevenue = 0;
   let totalCount = 0;
   for (const stats of bookingsByService.values()) {
@@ -294,7 +396,7 @@ export async function loadStudioServiceDetail(input: {
       price: true,
       basePrice: true,
       baseDurationMin: true,
-      categoryId: true,
+      globalCategoryId: true,
       isActive: true,
       masterServices: {
         where: { isEnabled: true },
@@ -353,7 +455,7 @@ export async function loadStudioServiceDetail(input: {
     name: service.title?.trim() || service.name,
     durationMin: service.baseDurationMin ?? service.durationMin,
     priceKopeks: service.basePrice ?? service.price,
-    categoryId: service.categoryId ?? null,
+    categoryId: service.globalCategoryId ?? null,
     isActive: service.isActive,
     bookings30d: periodBookings.length,
     masters: assignedMasters,

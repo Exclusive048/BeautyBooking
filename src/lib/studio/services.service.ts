@@ -197,10 +197,17 @@ export async function reorderStudioCategories(input: {
 
 export async function createStudioService(input: {
   studioId: string;
-  categoryId: string;
+  /** CATEGORY-UNIFICATION-A: optional. Legacy ServiceCategory FK kept
+   * for `studio-settings-page.tsx`; new flow leaves it null. */
+  categoryId?: string;
   title: string;
   description?: string;
+  /** Drives catalog visibility. Accepts APPROVED globals OR a pending
+   * category proposed by `proposerUserId`. */
   globalCategoryId?: string;
+  /** Required when `globalCategoryId` points at a PENDING category
+   * (own-pending check mirrors `listAvailableGlobalCategories`). */
+  proposerUserId?: string;
   basePrice: number;
   baseDurationMin: number;
 }): Promise<{ id: string }> {
@@ -208,27 +215,49 @@ export async function createStudioService(input: {
   const normalizedPrice = normalizeStudioServicePrice(input.basePrice);
   const normalizedDurationMin = normalizeStudioServiceDurationMin(input.baseDurationMin);
   const globalCategoryId = input.globalCategoryId?.trim() || null;
+  const categoryId = input.categoryId?.trim() || null;
 
-  const category = await prisma.serviceCategory.findUnique({
-    where: { id: input.categoryId },
-    select: { studioId: true },
-  });
-  if (!category || category.studioId !== studio.id) {
-    throw new AppError("Category not found", 404, "NOT_FOUND");
+  // Legacy ServiceCategory path: validate only when client supplied it.
+  if (categoryId) {
+    const category = await prisma.serviceCategory.findUnique({
+      where: { id: categoryId },
+      select: { studioId: true },
+    });
+    if (!category || category.studioId !== studio.id) {
+      throw new AppError("Category not found", 404, "NOT_FOUND");
+    }
   }
 
   if (globalCategoryId) {
     const globalCategory = await prisma.globalCategory.findUnique({
       where: { id: globalCategoryId },
-      select: { id: true, status: true, visualSearchSlug: true },
+      select: {
+        id: true,
+        status: true,
+        visualSearchSlug: true,
+        proposedBy: true,
+        createdByUserId: true,
+      },
     });
-    if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.visualSearchSlug === "hot") {
+    if (!globalCategory || globalCategory.visualSearchSlug === "hot") {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    }
+    const isApproved = globalCategory.status === CategoryStatus.APPROVED;
+    const isOwnPending =
+      globalCategory.status === CategoryStatus.PENDING &&
+      Boolean(input.proposerUserId) &&
+      (globalCategory.proposedBy === input.proposerUserId ||
+        globalCategory.createdByUserId === input.proposerUserId);
+    if (!isApproved && !isOwnPending) {
+      throw new AppError("Глобальная категория недоступна", 404, "NOT_FOUND");
     }
   }
 
   const last = await prisma.service.findFirst({
-    where: { studioId: studio.id, categoryId: input.categoryId },
+    where: {
+      studioId: studio.id,
+      ...(categoryId ? { categoryId } : { categoryId: null }),
+    },
     orderBy: { sortOrder: "desc" },
     select: { sortOrder: true },
   });
@@ -238,7 +267,7 @@ export async function createStudioService(input: {
       data: {
         providerId: studio.providerId,
         studioId: studio.id,
-        categoryId: input.categoryId,
+        categoryId,
         globalCategoryId,
         name: input.title.trim(),
         title: input.title.trim(),

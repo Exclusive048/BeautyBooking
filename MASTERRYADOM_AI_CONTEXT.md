@@ -14,6 +14,7 @@
 > - ✅ Bookings journal (STUDIO-BOOKINGS-A — table-based journal с VIP/new badges + action menu reuse + phone required fix)
 > - ✅ Services management (STUDIO-SERVICES-A — 3-col layout categories + list + detail с CRUD + master assign)
 > - ✅ Gap fixes (STUDIO-GAPS-FIX-A — chat icon removed + break management dialog + cache invalidation fix)
+> - ✅ 🔴 Category unification (CATEGORY-UNIFICATION-A — pre-launch blocker resolved, services route via GlobalCategory, catalog matching works)
 > - ⏳ Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
@@ -992,6 +993,7 @@ src/
 | 20 | **Studio masters никогда не показывают PREMIUM badge** | global UI rule (STUDIO-MASTERS-A) | Подписка `UserSubscription.scope = STUDIO` шарится на всю команду студии — индивидуальный мастер не «оплачивает PREMIUM». Поэтому в любой surface где рендерится studio master (cabinet team list/detail, catalog cards, public profile, master cards in dashboard) — `PremiumBadge` должен быть suppressed. На `/cabinet/studio/team` запрет implicit (badge не рендерится). На other surfaces нужен утилитарный helper `isStudioMaster(provider) → studioId !== null` для checked rendering. Backlog 🟡 для shared helper. |
 | 21 | **Studio masters permissions работают по default правилам** | UX rule (STUDIO-MASTERS-A) | В studio masters detail panel НЕТ permissions toggles (schedule edit / services edit / notifications). Это intentional: schedule changes идут через approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A), services управляются по studio policy, notifications — через user-level preferences. Если permission gating потребуется в будущем — это новые schema fields + UI, не toggles в текущем дизайне. |
 | 22 | **Studio admin booking CRUD direct vs approval flow scope** | `src/lib/studio/bookings.service.ts` (`createStudioBooking`, `moveStudioBooking`) + `src/app/api/bookings/[id]/cancel/route.ts` (STUDIO-SCHEDULE-A) | Studio admin booking operations (создать / перенести / отменить запись) идут **прямо** через Booking CRUD — никакой ScheduleChangeRequest approval. Admin has authority over studio bookings. `ScheduleChangeRequest` approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A) — это **отдельный концепт**: применяется ТОЛЬКО к master-initiated working-hours / day-off changes (через `applyScheduleSnapshot` / week schedule edits), не к individual bookings. Confusing эти 2 scope ломает либо UX (admin не может быстро управлять записями), либо authority model (master может обойти approval). |
+| 23 | **Category visibility: APPROVED = public; PENDING = creator scope only** | `src/features/studio-cabinet/services/server/services-data.service.ts` (`listAvailableCategoriesForStudio`) + `src/lib/master/services-view.service.ts` (`listAvailableGlobalCategories`) + `/api/catalog/global-categories` GET + `catalog.service.ts` filter (CATEGORY-UNIFICATION-A) | `GlobalCategory.status = APPROVED` AND `visibleToAll = true` → visible everywhere (public catalog, all studios, all masters). `GlobalCategory.status = PENDING` → visible ТОЛЬКО to creator (`createdByUserId` / `proposedBy` match `auth.user.id`) in their own service/portfolio picker. Public catalog (`/api/catalog/global-categories`) **строго** filters `status: APPROVED, visibleToAll: true` — pending drafts never leak. Master `service-modal.tsx` + studio `add-service-dialog.tsx` propose new categories via `POST /api/categories/propose` → создаёт `status: PENDING, visibleToAll: false`. Категория становится globally visible только после admin approval. **Никогда не filter catalog/public surfaces by `OR: [APPROVED, own-PENDING]`** — это сломает invariant (см. `catalog/global-categories/route.ts` services-category-creation-restore comment про prior bug). |
 
 ---
 
@@ -1120,6 +1122,43 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-16 — 🔴 CATEGORY-UNIFICATION-A** (commit on `designStudioCabinet`). Pre-launch product-critical blocker resolved. Studio-created services now correctly attach to `GlobalCategory` and appear in the public catalog category filters. **No schema migration required** — forward-only unification strategy.
+  - **Audit findings:**
+    - **Catalog matching by `globalCategoryId` only** (`src/lib/catalog/catalog.service.ts:332`). Services without `globalCategoryId` are invisible to public category filters
+    - Only **2 files** actually do `prisma.serviceCategory.*` queries: legacy `src/lib/studio/services.service.ts` + my new STUDIO-SERVICES-A `src/features/studio-cabinet/services/server/services-data.service.ts`
+    - **Master flow is the proven reference pattern** — `master/components/services/modals/service-modal.tsx` uses `globalCategoryId` only, picker via `listAvailableGlobalCategories(ownerUserId)` (APPROVED + own-pending), inline propose via `POST /api/categories/propose`
+    - **Scope visibility already supported** by `GlobalCategory.{status, proposedBy, createdByUserId, visibleToAll}` fields. No schema additions needed
+    - `Service.categoryId` was already optional in Prisma — only Zod validator enforced `min(1)`
+  - **Strategy: Forward-only unification (Strategy 1).** Backed by audit; no schema migration required; pre-launch data not critical (per user scope decision)
+  - **Раздел 3 (Архитектура):** 
+    - **Modified:** `src/lib/studio/schemas.ts` — `createStudioServiceSchema.categoryId` relaxed to optional + comment explaining forward path
+    - **Modified:** `src/lib/studio/services.service.ts` — `createStudioService` accepts optional `categoryId` + new `proposerUserId` param, validates `globalCategoryId` against APPROVED-or-own-pending (mirrors `listAvailableGlobalCategories` semantics)
+    - **Modified:** `src/app/api/studio/services/route.ts` POST — passes `user.id` as `proposerUserId`
+    - **Rewrite:** `src/features/studio-cabinet/services/server/services-data.service.ts` — groups by `globalCategoryId` (was `categoryId`); sidebar unions in-use ∪ APPROVED-visible ∪ own-pending; synthetic `UNCATEGORIZED_KEY` bucket for legacy services. New exported helper `listAvailableCategoriesForStudio(userId)` for pickers
+    - **Modified:** `src/features/studio-cabinet/services/lib/types.ts` — `StudioServiceCategoryRow.status` (APPROVED/PENDING/uncategorized) + new `StudioCategoryPickerOption` + `UNCATEGORIZED_KEY` constant
+    - **Modified:** `src/app/(cabinet)/cabinet/studio/services/page.tsx` — fetches + passes `currentUserId` and `pickerOptions`
+    - **Modified:** `src/features/studio-cabinet/services/components/studio-services-page.tsx` — `pickerOptions` prop pass-through
+    - **Rewrite:** `src/features/studio-cabinet/services/components/services-header.tsx` — passes `pickerOptions` to add-dialog (no `categories` prop)
+    - **Rewrite:** `src/features/studio-cabinet/services/components/add-service-dialog.tsx` — picker shows APPROVED + own-pending with `· на модерации` suffix; inline «+ Новая категория» calls `POST /api/categories/propose` and auto-selects; sends `globalCategoryId`
+    - **Modified:** `src/features/studio-cabinet/services/components/service-detail-panel.tsx` — picker via `pickerOptions`; PATCH body switches `categoryId` → `globalCategoryId`
+    - **Modified:** `src/features/studio-cabinet/services/components/categories-sidebar.tsx` — shows PENDING badge + tooltip; drops `studioId` requirement
+    - **Modified:** `src/features/studio-cabinet/services/components/add-category-dialog.tsx` — rewired from `/api/studio/categories` → `/api/categories/propose` (mirrors master flow)
+  - **Раздел 4 (Модель данных):** **No migration.** `GlobalCategory` (existing model — `status`, `visibleToAll`, `proposedBy`, `createdByUserId`, `createdByProviderId`) is the unified category source. `ServiceCategory` model preserved (still used by `studio-settings-page.tsx` services tab). `Service.{categoryId, globalCategoryId}` both remain in schema as before
+  - **Раздел 5 (Бизнес-логика):**
+    - **Studio service create flow:** picker shows union (APPROVED visible globally + own-PENDING proposed by current user). Inline propose creates `GlobalCategory.status=PENDING, visibleToAll=false, proposedBy/createdByUserId=user.id`. Service attaches via `globalCategoryId` (NOT `categoryId`). Catalog matches and surfaces the service in public filters
+    - **Category visibility (invariant #23):** APPROVED visible everywhere; PENDING ONLY in own creator's pickers. Public catalog (`/api/catalog/global-categories`) strict-filters APPROVED + visibleToAll
+    - **Master flow preserved** — uses same `listAvailableGlobalCategories(userId)` + `POST /api/categories/propose`. Studio admin and master share the unified pattern
+    - **Legacy `studio-settings-page.tsx` services tab still works** — uses legacy `createStudioService` path with `categoryId` populated (validator-relaxed but not breaking). Future Phase 7 cleanup removes legacy tab + ServiceCategory model
+  - **Раздел 6 (Маршруты):** existing endpoints used (no new routes):
+    - `POST /api/studio/services` (now accepts `globalCategoryId` without `categoryId`; passes `proposerUserId` from session)
+    - `POST /api/categories/propose` (existing master-side endpoint, now also called from studio add-category-dialog)
+    - `/api/catalog/global-categories` GET (public catalog — APPROVED + visibleToAll, untouched)
+  - **Раздел 12 (Инварианты):** new **#23** (Category visibility: APPROVED public / PENDING creator-scope) — strict invariant for any future surface filtering categories
+  - **UI_TEXT:** new keys в `studioCabinet.servicesV2.addServiceDialog.*` (`categoryNone`, `pendingSuffix`, `proposeCategory`, `proposeHint`, `proposePlaceholder`, `proposeSubmit/Submitting`, `proposeCancel`) + `categories.{pendingBadge, pendingHint}` + `detail.{categoryNone, pendingSuffix}`. Legacy `addCategoryDialog.*` keys reused (rewired to propose flow)
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **🔴 Pre-launch blocker closed:** core product flow «студия создаёт услугу → клиент находит её в каталоге» теперь работает. Services attached via new flow have `globalCategoryId` → appear в catalog category filters (verified by reading `catalog.service.ts:324-345`)
+  - **Next:** STUDIO-PACKAGES-A — service packages для studio (master pattern reference)
 
 - **2026-05-16 — STUDIO-GAPS-FIX-A** (commit on `designStudioCabinet`). Gap fix commit между STUDIO-SERVICES-A и STUDIO-CLIENTS-A. Closes 2 carryover items + adds surgical cache invalidation fix.
   - **Раздел 3 (Архитектура):**

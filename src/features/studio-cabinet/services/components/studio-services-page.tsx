@@ -1,4 +1,5 @@
 import type {
+  StudioCategoryPickerOption,
   StudioServiceCategoryRow,
   StudioServiceDetail,
   StudioServiceListItem,
@@ -14,6 +15,7 @@ import { ServicesList } from "./services-list";
 type Props = {
   studioId: string;
   categories: StudioServiceCategoryRow[];
+  pickerOptions: StudioCategoryPickerOption[];
   selectedCategoryId: string | null;
   items: StudioServiceListItem[];
   search: string;
@@ -24,6 +26,7 @@ type Props = {
 export function StudioServicesPage({
   studioId,
   categories,
+  pickerOptions,
   selectedCategoryId,
   items,
   search,
@@ -39,7 +42,7 @@ export function StudioServicesPage({
         studioId={studioId}
         servicesCount={kpis.totalServices}
         categoriesCount={kpis.totalCategories}
-        categories={categories}
+        pickerOptions={pickerOptions}
       />
       <ServicesKpiRow kpis={kpis} />
 
@@ -60,7 +63,7 @@ export function StudioServicesPage({
             <ServiceDetailPanel
               studioId={studioId}
               detail={detail}
-              categories={categories}
+              pickerOptions={pickerOptions}
             />
           ) : (
             <ServiceDetailEmpty />

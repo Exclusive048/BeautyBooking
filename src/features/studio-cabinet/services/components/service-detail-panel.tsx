@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
-  StudioServiceCategoryRow,
+  StudioCategoryPickerOption,
   StudioServiceDetail,
   StudioServiceMasterChip,
 } from "../lib/types";
@@ -32,10 +32,10 @@ function initials(name: string): string {
 type Props = {
   studioId: string;
   detail: StudioServiceDetail;
-  categories: StudioServiceCategoryRow[];
+  pickerOptions: StudioCategoryPickerOption[];
 };
 
-export function ServiceDetailPanel({ studioId, detail, categories }: Props) {
+export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
   const router = useRouter();
   const [name, setName] = useState(detail.name);
   const [price, setPrice] = useState(String(Math.round(detail.priceKopeks / 100)));
@@ -86,7 +86,10 @@ export function ServiceDetailPanel({ studioId, detail, categories }: Props) {
           title: name.trim(),
           basePrice: priceNum * 100,
           baseDurationMin: durationNum,
-          categoryId: categoryId || undefined,
+          // CATEGORY-UNIFICATION-A: send globalCategoryId (or null) — that's
+          // what the public catalog filters on. Legacy ServiceCategory FK
+          // is no longer managed from the new UI.
+          globalCategoryId: categoryId || null,
           isActive,
         }),
       });
@@ -189,9 +192,11 @@ export function ServiceDetailPanel({ studioId, detail, categories }: Props) {
               onChange={(e) => setCategoryId(e.target.value)}
               disabled={saving}
             >
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.title}
+              <option value="">{T.categoryNone}</option>
+              {pickerOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                  {option.status === "PENDING" ? ` · ${T.pendingSuffix}` : ""}
                 </option>
               ))}
             </Select>

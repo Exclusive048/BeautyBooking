@@ -11,13 +11,15 @@ import { AddCategoryDialog } from "./add-category-dialog";
 const T = UI_TEXT.studioCabinet.servicesV2.categories;
 
 type Props = {
-  studioId: string;
+  /** Kept on the prop interface for the (unused now) page wrapper, but
+   * the rewired AddCategoryDialog uses `/api/categories/propose` which
+   * is studio-agnostic — see CATEGORY-UNIFICATION-A. */
+  studioId?: string;
   categories: StudioServiceCategoryRow[];
   selectedCategoryId: string | null;
 };
 
 export function CategoriesSidebar({
-  studioId,
   categories,
   selectedCategoryId,
 }: Props) {
@@ -70,8 +72,18 @@ export function CategoriesSidebar({
                   )}
                   aria-pressed={active}
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {category.title}
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate text-sm font-medium">
+                      {category.title}
+                    </span>
+                    {category.status === "PENDING" ? (
+                      <span
+                        className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
+                        title={T.pendingHint}
+                      >
+                        {T.pendingBadge}
+                      </span>
+                    ) : null}
                   </span>
                   <span
                     className={cn(
@@ -90,11 +102,7 @@ export function CategoriesSidebar({
         </ul>
       )}
 
-      <AddCategoryDialog
-        studioId={studioId}
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-      />
+      <AddCategoryDialog open={addOpen} onClose={() => setAddOpen(false)} />
     </aside>
   );
 }

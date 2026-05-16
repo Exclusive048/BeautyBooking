@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { StudioServicesPage } from "@/features/studio-cabinet/services/components/studio-services-page";
 import {
+  listAvailableCategoriesForStudio,
   loadStudioServiceDetail,
   loadStudioServicesKpis,
   loadStudioServicesListData,
@@ -36,9 +37,15 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
   const serviceId = params?.service ?? null;
   const search = params?.q?.trim() ?? "";
 
-  const [listData, kpis] = await Promise.all([
-    loadStudioServicesListData({ studioId, categoryId, search }),
+  const [listData, kpis, pickerOptions] = await Promise.all([
+    loadStudioServicesListData({
+      studioId,
+      currentUserId: user.id,
+      categoryId,
+      search,
+    }),
     loadStudioServicesKpis(studioId),
+    listAvailableCategoriesForStudio(user.id),
   ]);
 
   const detail = serviceId
@@ -49,6 +56,7 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
     <StudioServicesPage
       studioId={studioId}
       categories={listData.categories}
+      pickerOptions={pickerOptions}
       selectedCategoryId={listData.selectedCategoryId}
       items={listData.items}
       search={search}

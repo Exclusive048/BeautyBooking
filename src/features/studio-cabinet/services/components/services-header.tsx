@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
-import type { StudioServiceCategoryRow } from "../lib/types";
+import type { StudioCategoryPickerOption } from "../lib/types";
 import { AddServiceDialog } from "./add-service-dialog";
 
 const T = UI_TEXT.studioCabinet.servicesV2.header;
@@ -13,14 +13,14 @@ type Props = {
   studioId: string;
   servicesCount: number;
   categoriesCount: number;
-  categories: StudioServiceCategoryRow[];
+  pickerOptions: StudioCategoryPickerOption[];
 };
 
 export function ServicesHeader({
   studioId,
   servicesCount,
   categoriesCount,
-  categories,
+  pickerOptions,
 }: Props) {
   const [open, setOpen] = useState(false);
   return (
@@ -37,12 +37,7 @@ export function ServicesHeader({
           </h1>
           <p className="mt-1 max-w-xl text-sm text-text-sec">{T.subtitle}</p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => setOpen(true)}
-          disabled={categories.length === 0}
-          title={categories.length === 0 ? T.noCategoriesHint : undefined}
-        >
+        <Button variant="primary" onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" aria-hidden />
           {T.addService}
         </Button>
@@ -50,7 +45,7 @@ export function ServicesHeader({
 
       <AddServiceDialog
         studioId={studioId}
-        categories={categories}
+        pickerOptions={pickerOptions}
         open={open}
         onClose={() => setOpen(false)}
       />
