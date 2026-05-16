@@ -1,12 +1,26 @@
 import { redirect } from "next/navigation";
+import { StudioServicesPage } from "@/features/studio-cabinet/services/components/studio-services-page";
+import {
+  loadStudioServiceDetail,
+  loadStudioServicesKpis,
+  loadStudioServicesListData,
+} from "@/features/studio-cabinet/services/server/services-data.service";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { StudioServicesPage } from "@/features/studio/components/studio-services-page";
-import { UI_TEXT } from "@/lib/ui/text";
 
-export const runtime = "nodejs";
+type SearchParams = {
+  category?: string;
+  service?: string;
+  q?: string;
+};
 
-export default async function StudioServicesRoute() {
+type Props = {
+  searchParams?: Promise<SearchParams> | SearchParams;
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function StudioServicesRoute({ searchParams }: Props) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
@@ -17,15 +31,29 @@ export default async function StudioServicesRoute() {
     redirect("/403");
   }
 
-  const t = UI_TEXT.studioCabinet.routes;
+  const params = searchParams instanceof Promise ? await searchParams : searchParams;
+  const categoryId = params?.category ?? null;
+  const serviceId = params?.service ?? null;
+  const search = params?.q?.trim() ?? "";
+
+  const [listData, kpis] = await Promise.all([
+    loadStudioServicesListData({ studioId, categoryId, search }),
+    loadStudioServicesKpis(studioId),
+  ]);
+
+  const detail = serviceId
+    ? await loadStudioServiceDetail({ studioId, serviceId })
+    : null;
 
   return (
-    <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold text-text-main">{t.servicesTitle}</h2>
-        <p className="text-sm text-text-sec">{t.servicesSubtitle}</p>
-      </header>
-      <StudioServicesPage studioId={studioId} />
-    </section>
+    <StudioServicesPage
+      studioId={studioId}
+      categories={listData.categories}
+      selectedCategoryId={listData.selectedCategoryId}
+      items={listData.items}
+      search={search}
+      detail={detail}
+      kpis={kpis}
+    />
   );
 }

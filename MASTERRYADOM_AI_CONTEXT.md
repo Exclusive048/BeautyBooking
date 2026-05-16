@@ -12,7 +12,8 @@
 > - ✅ Masters page redesign (STUDIO-MASTERS-A — 2-col list+detail, status filters, invite/pause/activate)
 > - ✅ Schedule multi-master redesign (STUDIO-SCHEDULE-A — день grid + неделя occupancy + action menus, NO D&D / NO Месяц)
 > - ✅ Bookings journal (STUDIO-BOOKINGS-A — table-based journal с VIP/new badges + action menu reuse + phone required fix)
-> - ⏳ Services, Clients, Reviews, Analytics, Finance, Settings
+> - ✅ Services management (STUDIO-SERVICES-A — 3-col layout categories + list + detail с CRUD + master assign)
+> - ⏳ Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -533,8 +534,8 @@ src/
 | `/cabinet/studio/analytics` | Аналитика студии |
 | `/cabinet/studio/clients` | CRM клиентов студии |
 | `/cabinet/studio/finance` | Финансы |
-| `/cabinet/studio/services` | Услуги |
-| `/cabinet/studio/services/new` | Добавление услуги |
+| `/cabinet/studio/services` | Услуги студии — 3-col categories+list+detail с CRUD + master assign ✅ STUDIO-SERVICES-A |
+| `/cabinet/studio/services/new` | Добавление услуги (legacy redirect) |
 | `/cabinet/studio/team` | Мастера студии — 2-col list+detail с filters + Pause/Activate + Invite ✅ STUDIO-MASTERS-A |
 | `/cabinet/studio/team/add` | Добавление члена команды |
 | `/cabinet/studio/reviews` | Отзывы студии |
@@ -1118,6 +1119,25 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-16 — STUDIO-SERVICES-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 8/13. `/cabinet/studio/services` rewrite — 3-col layout (categories sidebar / list / detail panel) replaces legacy 1080-LOC services client component.
+  - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/services/`:
+    - `lib/types.ts` — DTOs (`StudioServiceCategoryRow`, `StudioServiceListItem`, `StudioServiceDetail`, `StudioServiceMasterChip`, `StudioServicesKpis`)
+    - `server/services-data.service.ts` — `loadStudioServicesListData` (categories + filtered services + 30d bookings batched через single groupBy-like findMany) + `loadStudioServicesKpis` (totals / popular / avg check / without-master) + `loadStudioServiceDetail` (full detail + assigned masters + available masters + 30d stats)
+    - `components/` — 12 files: page orchestrator, services-header (with add-service dialog), services-kpi-row (4 tiles), categories-sidebar (with add-category dialog), services-search, services-list, service-list-item (no ТОП/доп badges), service-detail-panel (form + masters chips + stats + Save/Delete), service-detail-empty, add-service-dialog, add-category-dialog, assign-master-dialog, delete-service-dialog
+  - **Раздел 5 (Бизнес-логика):**
+    - **Legitimate flag decision:** `Service.isActive` toggle surfaced в detail panel (audit нашёл real boolean used by `updateStudioService` endpoint; drives catalog/booking visibility). **NO фейк toggles** — все 4 из jsx референса (online booking / public price / master price change / addon) убраны. `onlinePaymentEnabled` плагин-gated — оставлен на будущее (backlog)
+    - **Category flow simplified:** UI работает с `ServiceCategory` (legacy studio-scoped, required by existing `createStudioService` endpoint constraint `categoryId.min(1)`). Master pattern «propose global category» (`POST /api/categories/propose`) — backlog как enhancement (можно добавить опцию в add-category-dialog без schema migration)
+    - **Master assign mechanics:** existing `assignMasterToService` (upsert MasterService с `isEnabled`) reused. **New endpoint `POST /api/studio/services/[id]/unassign-master`** + `unassignMasterFromService` lib helper — soft-unassign через `MasterService.updateMany({isEnabled: false})`. Survives для analytics, mirror existing pattern
+    - **New endpoint `DELETE /api/studio/services/[id]?studioId=...`** + `deleteStudioService` lib helper — hard delete. `BookingServiceItem` snapshots survive (analytics OK)
+    - **Master chips link** в detail panel → `/cabinet/studio/team?master=<id>` (canonical detail из STUDIO-MASTERS-A). MasterCardDrawer integration **removed** в new design — legacy file сохранён только потому что embed'ed в `studio-settings-page.tsx` tab
+    - **KPI proxies:** popular service = max bookings30d, avg check = total revenue / total count за 30d, services-without-master = count of `Service.masterServices.length === 0`
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/services` rewrite. Новые endpoints: `DELETE /api/studio/services/[id]`, `POST /api/studio/services/[id]/unassign-master`. URL params `?category=<id>` / `?service=<id>` / `?q=<search>` — shareable
+  - **UI_TEXT:** новый subtree `studioCabinet.servicesV2.*` (~80 keys — header / kpis / categories / list / detail / addServiceDialog / addCategoryDialog / assignMasterDialog / deleteServiceDialog / errors). Старый `studioCabinet.routes.services*` оставлен — used by legacy services tab in settings page
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Legacy preservation:** `studio-services-page.tsx` (1080 LOC) **НЕ deprecated** — всё ещё консумится `studio-settings-page.tsx` tab. `MasterCardDrawer` тоже preserved для того же reason. Phase 7 cleanup убирает обоих когда settings page получает redesign
+  - **Backlog spawned:** import/export CSV, drag reorder, bulk operations, addon services, ТОП highlight, studio category global proposal flow, service description editing, legacy services tab cleanup
+  - **Next:** STUDIO-CLIENTS-A — clients/CRM management page
 
 - **2026-05-16 — STUDIO-BOOKINGS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 7/13. Новая page `/cabinet/studio/bookings` (раньше не существовала) — table-based журнал записей.
   - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/bookings/`:

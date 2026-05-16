@@ -439,4 +439,62 @@ export async function assignMasterToService(input: {
   return { serviceId: input.serviceId, masterId: input.masterId };
 }
 
+/**
+ * Soft-removes a master from a service by setting `MasterService.isEnabled
+ * = false`. Mirrors the `assignMasterToService` pattern (upsert with
+ * `isEnabled` flag) so the link record survives for analytics — the
+ * master simply stops offering this service. Used by the studio
+ * services page detail panel.
+ */
+export async function unassignMasterFromService(input: {
+  studioId: string;
+  serviceId: string;
+  masterId: string;
+}): Promise<{ serviceId: string; masterId: string }> {
+  const service = await prisma.service.findUnique({
+    where: { id: input.serviceId },
+    select: { id: true, studioId: true },
+  });
+  if (!service) {
+    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+  }
+  if (service.studioId && service.studioId !== input.studioId) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+
+  await prisma.masterService.updateMany({
+    where: {
+      masterProviderId: input.masterId,
+      serviceId: input.serviceId,
+    },
+    data: { isEnabled: false },
+  });
+
+  return { serviceId: input.serviceId, masterId: input.masterId };
+}
+
+/**
+ * Deletes a service from the studio catalogue. The Service row is
+ * removed entirely; cascading FKs handle MasterService cleanup. Hard
+ * delete is acceptable for catalogue items (no business retention need
+ * — analytics use `BookingServiceItem.priceSnapshot` snapshots, which
+ * survive service deletion).
+ */
+export async function deleteStudioService(input: {
+  studioId: string;
+  serviceId: string;
+}): Promise<{ id: string }> {
+  const service = await prisma.service.findUnique({
+    where: { id: input.serviceId },
+    select: { id: true, studioId: true },
+  });
+  if (!service) {
+    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+  }
+  if (service.studioId !== input.studioId) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+  await prisma.service.delete({ where: { id: service.id } });
+  return { id: service.id };
+}
 
