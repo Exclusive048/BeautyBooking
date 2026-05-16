@@ -13,6 +13,7 @@ import {
 import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
+import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 
 type SearchParams = {
@@ -60,6 +61,7 @@ async function loadShellExtras(studioId: string): Promise<{
         name: true,
         avatarUrl: true,
         isPublished: true,
+        ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,
       },
@@ -92,6 +94,9 @@ async function loadShellExtras(studioId: string): Promise<{
     mastersByService.set(link.serviceId, arr);
   }
 
+  // STUDIO-BUGS-FIX-A bug #5: scheduleMasters reuse drives the
+  // CreateBookingDialog / MoveBookingDialog master pickers — keep
+  // isAvailable aligned with the schedule grid's eligibility predicate.
   return {
     scheduleMasters: masters.map((m) => ({
       id: m.id,
@@ -99,7 +104,7 @@ async function loadShellExtras(studioId: string): Promise<{
       avatarUrl: m.avatarUrl ?? null,
       rating: m.ratingAvg ?? 0,
       reviewsCount: m.ratingCount ?? 0,
-      isAvailable: m.isPublished,
+      isAvailable: isStudioMasterActive(m),
     })),
     services: services.map((s) => ({
       id: s.id,

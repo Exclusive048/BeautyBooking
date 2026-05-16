@@ -220,10 +220,11 @@ async function listAvailableGlobalCategories(
 ): Promise<PortfolioCategoryOption[]> {
   // Mirrors the visibility rules used by createMasterPortfolioItem so
   // master can't pick a category they wouldn't be allowed to attach.
-  // Excludes the synthetic "hot" visualSearchSlug bucket.
+  // STUDIO-BUGS-FIX-A bug #3: filter the synthetic "hot" visualSearchSlug
+  // bucket post-query — Prisma's `{ not: "hot" }` on a nullable column
+  // excludes NULL rows, which silently drops freshly proposed categories.
   const rows = await prisma.globalCategory.findMany({
     where: {
-      visualSearchSlug: { not: "hot" },
       OR: [
         { status: CategoryStatus.APPROVED, visibleToAll: true },
         ...(ownerUserId
@@ -234,8 +235,10 @@ async function listAvailableGlobalCategories(
           : []),
       ],
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
-  return rows.map((row) => ({ id: row.id, name: row.name }));
+  return rows
+    .filter((row) => row.visualSearchSlug !== "hot")
+    .map((row) => ({ id: row.id, name: row.name }));
 }

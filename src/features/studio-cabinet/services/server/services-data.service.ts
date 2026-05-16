@@ -96,20 +96,29 @@ async function get30dBookingsByService(
 export async function listAvailableCategoriesForStudio(
   currentUserId: string,
 ): Promise<StudioCategoryPickerOption[]> {
+  // STUDIO-BUGS-FIX-A bug #3: Prisma's `{ not: "hot" }` on a nullable field
+  // excludes NULL rows (documented SQL-semantics behaviour). Freshly proposed
+  // categories have `visualSearchSlug = null`, so the previous in-WHERE filter
+  // silently dropped them from the picker. Select the field and filter
+  // post-query — keeps the query simple and works regardless of Prisma
+  // version.
   const rows = await prisma.globalCategory.findMany({
     where: {
-      visualSearchSlug: { not: "hot" },
       OR: [
         { status: CategoryStatus.APPROVED, visibleToAll: true },
         { createdByUserId: currentUserId },
         { proposedBy: currentUserId },
       ],
     },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
   return rows
-    .filter((row) => row.status !== CategoryStatus.REJECTED)
+    .filter(
+      (row) =>
+        row.status !== CategoryStatus.REJECTED &&
+        row.visualSearchSlug !== "hot",
+    )
     .map((row) => ({
       id: row.id,
       name: row.name,
@@ -137,9 +146,11 @@ async function buildCategoriesSidebar(
   // Union: in-use ∪ APPROVED-visible ∪ own-pending. Sidebar shows the
   // same pickable set as the dialog dropdown so studio admin can
   // navigate by category before attaching a service.
-  const globals = await prisma.globalCategory.findMany({
+  // STUDIO-BUGS-FIX-A bug #3: post-query filter for visualSearchSlug=hot
+  // (Prisma `not` on nullable column excludes NULL rows — see
+  // listAvailableCategoriesForStudio above).
+  const globalsRaw = await prisma.globalCategory.findMany({
     where: {
-      visualSearchSlug: { not: "hot" },
       OR: [
         ...(inUseIds.length > 0 ? [{ id: { in: inUseIds } }] : []),
         { status: CategoryStatus.APPROVED, visibleToAll: true },
@@ -147,9 +158,10 @@ async function buildCategoriesSidebar(
         { proposedBy: currentUserId },
       ],
     },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
+  const globals = globalsRaw.filter((g) => g.visualSearchSlug !== "hot");
 
   const countByCategory = new Map<string, number>();
   for (const service of services) {
@@ -408,8 +420,16 @@ export async function loadStudioServiceDetail(input: {
   });
   if (!service) return null;
 
+  // STUDIO-BUGS-FIX-A bug #5: assign-master picker shows only ACTIVE
+  // masters. INVITED (ownerUserId IS NULL) and DISABLED (isPublished=false)
+  // are filtered out at the source so they never appear in the dropdown.
   const allMasters = await prisma.provider.findMany({
-    where: { type: ProviderType.MASTER, studioId: studio.providerId },
+    where: {
+      type: ProviderType.MASTER,
+      studioId: studio.providerId,
+      ownerUserId: { not: null },
+      isPublished: true,
+    },
     select: { id: true, name: true, avatarUrl: true },
     orderBy: { name: "asc" },
   });

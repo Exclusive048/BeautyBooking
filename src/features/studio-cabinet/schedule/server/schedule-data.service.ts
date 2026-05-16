@@ -4,6 +4,7 @@ import {
   type TimeBlockType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { bookingToneFromStatus } from "../lib/booking-status-display";
 import {
   DAY_END_HOUR,
@@ -84,6 +85,7 @@ async function buildDayData(
         name: true,
         avatarUrl: true,
         isPublished: true,
+        ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,
       },
@@ -152,13 +154,16 @@ async function buildDayData(
     }
   }
 
+  // STUDIO-BUGS-FIX-A bug #5: INVITED masters (no ownerUserId) render as
+  // disabled columns — they cannot accept bookings until the invite is
+  // accepted. `isStudioMasterActive` covers both ownership + isPublished.
   const columns: ScheduleMasterColumn[] = masters.map((master) => ({
     id: master.id,
     name: master.name,
     avatarUrl: master.avatarUrl ?? null,
     rating: master.ratingAvg ?? 0,
     reviewsCount: master.ratingCount ?? 0,
-    isAvailable: master.isPublished,
+    isAvailable: isStudioMasterActive(master),
   }));
 
   const bookingCells: ScheduleBookingCell[] = bookings
@@ -258,6 +263,7 @@ async function buildWeekData(
         name: true,
         avatarUrl: true,
         isPublished: true,
+        ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,
       },
@@ -302,7 +308,11 @@ async function buildWeekData(
     countsByMasterAndDay.set(masterId, byDay);
   }
 
+  // STUDIO-BUGS-FIX-A bug #5: INVITED masters get zero capacity + isDayOff
+  // across the whole week. They surface in the grid so admin sees they
+  // exist, but with no schedulable hours.
   const rows: ScheduleWeekRow[] = masters.map((master) => {
+    const active = isStudioMasterActive(master);
     const byDay = countsByMasterAndDay.get(master.id) ?? new Map();
     return {
       master: {
@@ -311,11 +321,11 @@ async function buildWeekData(
         avatarUrl: master.avatarUrl ?? null,
         rating: master.ratingAvg ?? 0,
         reviewsCount: master.ratingCount ?? 0,
-        isAvailable: master.isPublished,
+        isAvailable: active,
       },
       cells: days.map((day) => {
         const booked = byDay.get(day.dateKey) ?? 0;
-        const capacity = master.isPublished ? DAILY_CAPACITY : 0;
+        const capacity = active ? DAILY_CAPACITY : 0;
         const percent =
           capacity > 0 ? Math.min(Math.round((booked / capacity) * 100), 100) : 0;
         return {
@@ -323,7 +333,7 @@ async function buildWeekData(
           booked,
           capacity,
           percent,
-          isDayOff: !master.isPublished,
+          isDayOff: !active,
         };
       }),
     };

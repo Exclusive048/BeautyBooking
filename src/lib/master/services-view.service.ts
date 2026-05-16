@@ -303,9 +303,12 @@ function groupByCategory(services: ServiceItemView[]): ServicesByCategory[] {
 async function listAvailableGlobalCategories(
   ownerUserId: string | null
 ): Promise<ServiceCategoryOption[]> {
+  // STUDIO-BUGS-FIX-A bug #3: Prisma's `{ not: "hot" }` on a nullable column
+  // excludes NULL rows (SQL semantics, documented Prisma behaviour). Freshly
+  // proposed categories have `visualSearchSlug = null` — filter post-query
+  // so they survive into the picker.
   const rows = await prisma.globalCategory.findMany({
     where: {
-      visualSearchSlug: { not: "hot" },
       OR: [
         { status: CategoryStatus.APPROVED, visibleToAll: true },
         ...(ownerUserId
@@ -313,8 +316,10 @@ async function listAvailableGlobalCategories(
           : []),
       ],
     },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
-  return rows.map((row) => ({ id: row.id, name: row.name, status: row.status }));
+  return rows
+    .filter((row) => row.visualSearchSlug !== "hot")
+    .map((row) => ({ id: row.id, name: row.name, status: row.status }));
 }

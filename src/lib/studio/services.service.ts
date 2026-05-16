@@ -1,6 +1,7 @@
 import { CategoryStatus } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
 export type StudioServiceAssignedMaster = {
@@ -441,13 +442,13 @@ export async function assignMasterToService(input: {
   }
 
   const studio = await getStudioContext(input.studioId);
-  const master = await prisma.provider.findFirst({
-    where: { id: input.masterId, type: "MASTER", studioId: studio.providerId },
-    select: { id: true },
+  // STUDIO-BUGS-FIX-A bug #5: gate assignment on ACTIVE master status.
+  // INVITED (ownerUserId IS NULL) or DISABLED (isPublished=false) masters
+  // throw 409 MASTER_NOT_ACTIVE.
+  await requireActiveStudioMaster({
+    studioProviderId: studio.providerId,
+    masterId: input.masterId,
   });
-  if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
-  }
 
   await prisma.masterService.upsert({
     where: { masterProviderId_serviceId: { masterProviderId: input.masterId, serviceId: input.serviceId } },
