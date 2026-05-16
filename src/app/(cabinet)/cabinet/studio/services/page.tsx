@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { StudioServicesPage } from "@/features/studio-cabinet/services/components/studio-services-page";
 import {
+  loadStudioPackagePickerServices,
+  loadStudioPackages,
+} from "@/features/studio-cabinet/services/server/packages-data.service";
+import {
   listAvailableCategoriesForStudio,
   loadStudioServiceDetail,
   loadStudioServicesKpis,
@@ -37,7 +41,13 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
   const serviceId = params?.service ?? null;
   const search = params?.q?.trim() ?? "";
 
-  const [listData, kpis, pickerOptions] = await Promise.all([
+  const [
+    listData,
+    kpis,
+    pickerOptions,
+    packages,
+    packagePickerServices,
+  ] = await Promise.all([
     loadStudioServicesListData({
       studioId,
       currentUserId: user.id,
@@ -46,6 +56,8 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
     }),
     loadStudioServicesKpis(studioId),
     listAvailableCategoriesForStudio(user.id),
+    loadStudioPackages(studioId),
+    loadStudioPackagePickerServices(studioId),
   ]);
 
   const detail = serviceId
@@ -62,6 +74,8 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
       search={search}
       detail={detail}
       kpis={kpis}
+      packages={packages}
+      packagePickerServices={packagePickerServices}
     />
   );
 }

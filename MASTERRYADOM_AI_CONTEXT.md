@@ -15,6 +15,7 @@
 > - ✅ Services management (STUDIO-SERVICES-A — 3-col layout categories + list + detail с CRUD + master assign)
 > - ✅ Gap fixes (STUDIO-GAPS-FIX-A — chat icon removed + break management dialog + cache invalidation fix)
 > - ✅ 🔴 Category unification (CATEGORY-UNIFICATION-A — pre-launch blocker resolved, services route via GlobalCategory, catalog matching works)
+> - ✅ Service packages (STUDIO-PACKAGES-A — strict mirror master ServicePackage pattern, no schema migration, reuses master mutations)
 > - ⏳ Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
@@ -1122,6 +1123,27 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-17 — STUDIO-PACKAGES-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 11/13. Strict mirror of master `ServicePackage` pattern для studio cabinet. **No schema migration.**
+  - **Audit findings:**
+    - `ServicePackage.masterId` is generic `Provider` FK (no `Provider.type` constraint at DB level), reusable для studio Provider records. Field name semantically misleading once studios use it
+    - Master mutations (`createMasterPackage`/`updateMasterPackage`/`deleteMasterPackage` in `src/lib/master/services-mutations.ts`) check `service.providerId === masterId` for ownership — works correctly for studio because `Service.providerId === studio.providerId`
+    - Pure pricing helper `computeBundlePricing` (`src/features/master/components/services/lib/compute-bundle-pricing.ts`) — PERCENT round(total × value / 100), FIXED min(total, value), final = max(0, total − discount). Reusable as-is
+    - Zod schemas (`createMasterPackageSchema` / `updateMasterPackageSchema` в `src/lib/master/schemas.ts`) reusable через `.extend({ studioId })` / `.and(z.object({ studioId }))`
+    - Catalog НЕ surfaces packages currently — master `bundle-card.tsx` имеет TODO «Booking is deferred until the public booking flow integrates ServicePackage». Public catalog work deferred along with master parity
+  - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/services/` (extended):
+    - `server/packages-data.service.ts` — `loadStudioPackages(studioId)` resolves studio.providerId → `prisma.servicePackage.findMany({ where: { masterId: providerId } })` с items.service include, maps to StudioPackageView with computed pricing + hasDisabledComponent flag. `loadStudioPackagePickerServices(studioId)` returns studio services для modal's service-picker
+    - `components/packages-section.tsx` — section header с «Создать пакет» button (disabled when <2 services) + grid of PackageCards или empty state
+    - `components/package-card.tsx` — brand-gradient-soft card, edit + delete icon buttons, components list, warning for disabled components, final price + savings + duration
+    - `components/package-modal.tsx` — mirrors master BundleModal. State: name / selectedIds / discountType / discountValue (string с comma→dot parse, kopeks для FIXED) / isEnabled. Uses `computeBundlePricing` для live preview
+    - `components/delete-package-dialog.tsx` — confirmation dialog
+  - **Раздел 6 (Маршруты):** 2 новых API endpoints — `POST /api/studio/service-packages` (body extends `createMasterPackageSchema` + `studioId`; ensureStudioRole [OWNER, ADMIN]; passes `studio.providerId` as `masterId` to `createMasterPackage`) + `PATCH/DELETE /api/studio/service-packages/[id]` (PATCH body extends `updateMasterPackageSchema` + `studioId`; DELETE accepts `?studioId=`). Thin wrappers — все validation/transaction logic в shared master mutations
+  - **Раздел 5 (Бизнес-логика):** **NO new business logic** — all CRUD goes through existing master mutations. Studio packages identical к master packages semantically (compose 2+ existing services + discount). Owner check `service.providerId === masterId` correctly scopes services к studio Provider. **Key insight:** `ServicePackage.masterId` field name is misleading once studios use it — backlog rename `masterId` → `providerId` (not blocking, ~30-min focused commit). No `Provider.type` validation needed at field level because routes already gate с `ensureStudioRole`
+  - **UI_TEXT:** 4 new subtrees under `studioCabinet.servicesV2.*` — `packages.{sectionTitle,sectionSubtitle,addPackage,emptyTitle,emptyBody,minServicesHint}` (~6 keys), `package.{edit,delete,pausedBadge,componentsLabel,componentDisabled,warningDisabledComponents,finalPriceLabel,savingsTemplate,durationTemplate}` (~9 keys), `packageDialog.*` (~22 keys: titleCreate/titleEdit/name/services/discount/preview/isEnabled/submit variants), `deletePackageDialog.{title,bodyTemplate,cancel,confirm,submitting}` (~5 keys). Plus 4 error keys (`packageNameRequired,packageMinServices,packageSave,packageDelete`)
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Catalog visibility:** **deferred** — public catalog surface для packages пока не существует, master cabinet lives с этой gap. When integration происходит, both master + studio packages подключаются single shot through unified `globalCategoryId` mechanism
+  - **Backlog spawned:** public catalog / booking flow integration for ServicePackage (🟠), `masterId` → `providerId` rename migration (🟠), package analytics (bookings/revenue/popularity 🟡), package master assign (🟡), package reorder D&D (🟡), package duplicate/clone (🟡), discount preview improvements (🔵), package validity period (🔵), «Featured» package highlight (🔵)
+  - **Next:** STUDIO-CLIENTS-A — clients management
 
 - **2026-05-16 — 🔴 CATEGORY-UNIFICATION-A** (commit on `designStudioCabinet`). Pre-launch product-critical blocker resolved. Studio-created services now correctly attach to `GlobalCategory` and appear in the public catalog category filters. **No schema migration required** — forward-only unification strategy.
   - **Audit findings:**

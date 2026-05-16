@@ -5,7 +5,12 @@ import type {
   StudioServiceListItem,
   StudioServicesKpis,
 } from "../lib/types";
+import type {
+  StudioPackagePickerService,
+  StudioPackageView,
+} from "../server/packages-data.service";
 import { CategoriesSidebar } from "./categories-sidebar";
+import { PackagesSection } from "./packages-section";
 import { ServiceDetailEmpty } from "./service-detail-empty";
 import { ServiceDetailPanel } from "./service-detail-panel";
 import { ServicesHeader } from "./services-header";
@@ -21,6 +26,8 @@ type Props = {
   search: string;
   detail: StudioServiceDetail | null;
   kpis: StudioServicesKpis;
+  packages: StudioPackageView[];
+  packagePickerServices: StudioPackagePickerService[];
 };
 
 export function StudioServicesPage({
@@ -32,6 +39,8 @@ export function StudioServicesPage({
   search,
   detail,
   kpis,
+  packages,
+  packagePickerServices,
 }: Props) {
   const selectedCategory =
     categories.find((c) => c.id === selectedCategoryId) ?? null;
@@ -70,6 +79,12 @@ export function StudioServicesPage({
           )}
         </div>
       </div>
+
+      <PackagesSection
+        studioId={studioId}
+        packages={packages}
+        pickerServices={packagePickerServices}
+      />
     </div>
   );
 }
