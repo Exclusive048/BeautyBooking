@@ -94,13 +94,19 @@ export function CreateBookingDialog({
       setError(E.clientNameRequired);
       return;
     }
+    if (!clientPhone.trim()) {
+      setError(E.clientPhoneRequired);
+      return;
+    }
+    const normalizedPhone = normalizeRussianPhone(clientPhone);
+    if (!normalizedPhone) {
+      setError(E.clientPhoneInvalid);
+      return;
+    }
     if (!startAtUtc) {
       setError(E.create);
       return;
     }
-    const normalizedPhone = clientPhone.trim()
-      ? normalizeRussianPhone(clientPhone) ?? null
-      : null;
 
     setSubmitting(true);
     setError(null);
@@ -114,7 +120,7 @@ export function CreateBookingDialog({
           serviceId,
           startAt: startAtUtc,
           clientName: clientName.trim(),
-          clientPhone: normalizedPhone ?? undefined,
+          clientPhone: normalizedPhone,
         }),
       });
       if (!response.ok) {

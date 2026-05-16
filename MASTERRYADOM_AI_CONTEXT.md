@@ -11,7 +11,8 @@
 > - ✅ Dashboard redesign (STUDIO-DASHBOARD-A — rich KPIs + attention + revenue chart)
 > - ✅ Masters page redesign (STUDIO-MASTERS-A — 2-col list+detail, status filters, invite/pause/activate)
 > - ✅ Schedule multi-master redesign (STUDIO-SCHEDULE-A — день grid + неделя occupancy + action menus, NO D&D / NO Месяц)
-> - ⏳ Bookings, Services, Clients, Reviews, Analytics, Finance, Settings
+> - ✅ Bookings journal (STUDIO-BOOKINGS-A — table-based journal с VIP/new badges + action menu reuse + phone required fix)
+> - ⏳ Services, Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -527,6 +528,7 @@ src/
 |-----|---------|
 | `/cabinet/studio` | Главная студии — rich dashboard (today banner / 4 KPI tiles / top masters / attention / occupancy / popular services / revenue chart) ✅ STUDIO-DASHBOARD-A |
 | `/cabinet/studio/calendar` | Расписание студии — multi-master день grid + неделя occupancy + action menus + URL state ?view/?date ✅ STUDIO-SCHEDULE-A |
+| `/cabinet/studio/bookings` | Журнал записей — table с filter chips + status/master/search + VIP/new badges + action menu reuse ✅ STUDIO-BOOKINGS-A |
 | `/cabinet/studio/schedule-requests` | Approval/reject заявок мастеров на изменение расписания ✅ STUDIO-SCHEDULE-REQUEST-APPROVAL-A |
 | `/cabinet/studio/analytics` | Аналитика студии |
 | `/cabinet/studio/clients` | CRM клиентов студии |
@@ -1116,6 +1118,30 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-16 — STUDIO-BOOKINGS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 7/13. Новая page `/cabinet/studio/bookings` (раньше не существовала) — table-based журнал записей.
+  - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/bookings/`:
+    - `lib/source-display.ts` — `getBookingSourceDisplay(BookingSource)` + `SOURCE_BADGE_CLASS` (WEB → «Каталог» info tone, MANUAL → «Звонок» neutral, APP → «Приложение» neutral graceful)
+    - `lib/time-range-filter.ts` — `parseBookingsTimeRange` + `bookingsTimeRangeBounds` (today / tomorrow / week / all → UTC bounds)
+    - `server/types.ts` — DTOs (`StudioBookingRow`, `StudioBookingsListData`, `StudioBookingsKpis`, etc)
+    - `server/bookings-list.service.ts` — `listStudioBookings` с filters (range / status / master / search), cursor pagination (50/page), batched VIP/new client detection через single lifetime-bookings query per page
+    - `server/bookings-kpis.service.ts` — `loadStudioBookingsKpis` (5 tiles: today / needs action / confirmed 7d / revenue today + delta vs 30d avg / no-show 7d) + `loadStudioMasterOptions`
+    - `components/` — 8 files: page orchestrator, header, kpi-row, filters (URL-driven), table, row (inline reuse of schedule's BookingActionMenu via type adapter), pagination, plus empty state inside table
+  - **Раздел 5 (Бизнес-логика):**
+    - **VIP badge mechanism reused** — `CLIENT_STATUS_THRESHOLDS.VIP_LTV_KOPEKS` (5 000 000 копеек / 50 000 ₽) from `src/lib/master/clients-classifier.ts`. Studio admin sees the same VIP signal that master cabinet's CRM applies. ClientKey resolution: `user:<id>` если `clientUserId`, иначе `phone:<normalized>`. Stats batched lifetime через single broad `prisma.booking.findMany({where: {OR: [studioId, providerId], status: COMPLETED}})` per page render — no N+1 risk
+    - **«новый» badge** — client с `completedCount <= 1` в studio scope (first visit OR currently making first visit). Computed from same batched stats
+    - **KPI «Требуют действий»** — count of `PENDING + CHANGE_REQUESTED + NEW` starting today onwards. **NO «опаздывает»** sub-metric per scope
+    - **Revenue today delta** — vs 30-day daily average (proxy formula). `null` если нет history
+    - **Source mapping:** WEB → «Каталог», MANUAL → «Звонок», APP → graceful «Приложение» (reserved for future)
+    - **NO ручной смены статуса** — action menu reused from STUDIO-SCHEDULE-A as-is (Детали / Перенести на мастера / Перенести по времени / Отменить). Status changes остаются automatic-driven (booking flow)
+    - **Inline reuse strategy** — `BookingActionMenu` / `MoveBookingDialog` / `CancelBookingDialog` / `CreateBookingDialog` из `schedule/components/dialogs/` consumed напрямую through type adapter (`bookingToCell(StudioBookingRow): ScheduleBookingCell` в `booking-row.tsx`). Не делал extract-to-shared чтобы минимизировать риск регрессии — журнал передаёт совместимый shape
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/bookings` page route added (nav item already existed from STUDIO-SHELL-A, теперь functional). Никаких новых API endpoints — все existing endpoints (`POST /api/studio/bookings`, `PATCH /api/studio/bookings/[id]/move`, `POST /api/bookings/[id]/cancel`) reused
+  - **CarryOver fix:** **Phone required в CreateBookingDialog** — applied. `clientPhone` теперь обязательный + invalid-phone validation. Body всегда отправляет normalized phone (no more `undefined`)
+  - **UI_TEXT:** новый subtree `studioCabinet.bookingsV2.*` (~70 keys — header / kpis / filters (with statusLabels for 11 BookingStatus values) / table / client / source / actions / empty / pagination). Также добавлены 2 error keys в `scheduleV2.errors`: `clientPhoneRequired` / `clientPhoneInvalid`
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved (один новый unused warning fixed inline), encoding/mojibake/prisma ✅, 247/247 tests
+  - **N+1 prevention:** verified — list = 1 main query + 1 lifetime stats batch + 4 parallel range counts + 1 master include resolve. Cursor pagination keeps page sets manageable
+  - **Backlog spawned:** export CSV, saved filter segments, booking detail drawer (richer than action menu), bulk operations, sort by column, VIP threshold per-studio override
+  - **Next:** STUDIO-SERVICES-A — services management page
 
 - **2026-05-16 — STUDIO-SCHEDULE-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 6/13. `/cabinet/studio/calendar` rewrite — legacy 695-LOC client component заменён server-orchestrated multi-master grid с action menus, URL state, manual refresh.
   - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/schedule/`:
