@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Coffee, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -12,8 +12,13 @@ import {
   toDateKey,
 } from "../lib/time-grid";
 import type { StudioScheduleView } from "../lib/view-state";
-import type { ScheduleKpis, ScheduleMasterColumn } from "../server/types";
+import type {
+  ScheduleBreakCell,
+  ScheduleKpis,
+  ScheduleMasterColumn,
+} from "../server/types";
 import { CreateBookingDialog } from "./dialogs/create-booking-dialog";
+import { ManageBreaksDialog } from "./dialogs/manage-breaks-dialog";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.header;
 const WEEKDAY_LONG_RU = [
@@ -44,8 +49,10 @@ type Props = {
   studioId: string;
   view: StudioScheduleView;
   dateKey: string;
+  dayStartIso: string;
   kpis: ScheduleKpis;
   masters: ScheduleMasterColumn[];
+  breaks: ScheduleBreakCell[];
   services: Array<{
     id: string;
     name: string;
@@ -59,14 +66,17 @@ export function ScheduleHeader({
   studioId,
   view,
   dateKey,
+  dayStartIso,
   kpis,
   masters,
+  breaks,
   services,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [refreshing, startRefresh] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
+  const [breaksOpen, setBreaksOpen] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
   const date = parseDateKey(dateKey);
@@ -193,6 +203,14 @@ export function ScheduleHeader({
 
           <Button
             variant="secondary"
+            onClick={() => setBreaksOpen(true)}
+          >
+            <Coffee className="h-3.5 w-3.5" aria-hidden />
+            {T.manageBreaks}
+          </Button>
+
+          <Button
+            variant="secondary"
             onClick={handleRefresh}
             disabled={refreshing}
           >
@@ -221,6 +239,15 @@ export function ScheduleHeader({
         startAtUtc={null}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+      />
+
+      <ManageBreaksDialog
+        studioId={studioId}
+        masters={masters}
+        breaks={breaks}
+        dayStartIso={dayStartIso}
+        open={breaksOpen}
+        onClose={() => setBreaksOpen(false)}
       />
     </>
   );

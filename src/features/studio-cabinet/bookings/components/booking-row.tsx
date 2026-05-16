@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { MessageCircle, MoreHorizontal } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { FocalImage } from "@/components/ui/focal-image";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -181,15 +180,6 @@ export function BookingRow({
           >
             {statusLabel(row.status)}
           </span>
-        </td>
-        <td className="px-2 py-3 align-top">
-          <Link
-            href={`/cabinet/studio/bookings/${row.id}/chat`}
-            className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
-            aria-label={T.actions.openChat}
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden />
-          </Link>
         </td>
         <td className="px-2 py-3 align-top">
           <button

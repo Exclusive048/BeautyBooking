@@ -24,8 +24,10 @@ export function StudioSchedulePage({ studioId, view, data }: Props) {
         studioId={studioId}
         view={view}
         dateKey={data.dateKey}
+        dayStartIso={data.day.dayStartIso}
         kpis={data.kpis}
         masters={data.day.columns}
+        breaks={data.day.breaks}
         services={data.services}
       />
       <ScheduleKpiRow kpis={data.kpis} />

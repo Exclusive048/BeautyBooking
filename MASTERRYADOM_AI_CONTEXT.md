@@ -13,6 +13,7 @@
 > - ✅ Schedule multi-master redesign (STUDIO-SCHEDULE-A — день grid + неделя occupancy + action menus, NO D&D / NO Месяц)
 > - ✅ Bookings journal (STUDIO-BOOKINGS-A — table-based journal с VIP/new badges + action menu reuse + phone required fix)
 > - ✅ Services management (STUDIO-SERVICES-A — 3-col layout categories + list + detail с CRUD + master assign)
+> - ✅ Gap fixes (STUDIO-GAPS-FIX-A — chat icon removed + break management dialog + cache invalidation fix)
 > - ⏳ Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
@@ -1119,6 +1120,26 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-16 — STUDIO-GAPS-FIX-A** (commit on `designStudioCabinet`). Gap fix commit между STUDIO-SERVICES-A и STUDIO-CLIENTS-A. Closes 2 carryover items + adds surgical cache invalidation fix.
+  - **Раздел 3 (Архитектура):**
+    - **New:** `src/features/studio-cabinet/schedule/components/dialogs/manage-breaks-dialog.tsx` — modal с existing breaks list (per current viewed day) + add-form (master + start datetime + end datetime + optional note). Triggered from schedule header «Перерывы» button (added next to «Обновить»)
+    - **Modified:** `src/features/studio-cabinet/bookings/components/booking-row.tsx` + `bookings-table.tsx` — chat icon column полностью removed (was broken — 404 link). Drop `MessageCircle` icon, `Link` import; drop extra `<th aria-hidden>` cell. `bookingsV2.actions.openChat` UI_TEXT key оставлен как dead-letter (Phase 7 cleanup)
+    - **Modified:** `src/features/studio-cabinet/schedule/components/schedule-header.tsx` — added `breaks` + `dayStartIso` props, «Перерывы» button, `ManageBreaksDialog` integration
+    - **Modified:** `src/features/studio-cabinet/schedule/components/studio-schedule-page.tsx` — pass-through `data.day.breaks` + `data.day.dayStartIso` to header
+    - **Modified:** `src/lib/studio/calendar.service.ts` — `createStudioBlock` / `updateStudioBlock` / `deleteStudioBlock` теперь вызывают `invalidateSlotsForMaster(masterId)` после Prisma mutation. Pre-existing gap (endpoint created для legacy editor never invalidated public booking slot cache) — now closed
+  - **Раздел 5 (Бизнес-логика):**
+    - **Chat icon resolution (Option C — remove):** audit revealed `resolveChatAccess` in `src/lib/chat/access.ts` returns `forbidden` for any user who is not `booking.clientUserId` или `booking.masterProvider.ownerUserId`. Studio admin (third party) is **by design** not a chat participant. Options A (route) и B (drawer) both required auth model change (chat = 1:1 client↔master concept). Decision: remove icon. **Honest UX: no icon > broken icon.** Studio admin chat participation → backlog 🟠 as auth model + UI extension
+    - **Break management (Option built):** new dialog uses existing `POST /api/studio/blocks` + `DELETE /api/studio/blocks/[id]?studioId=...`. One-time breaks only (TimeBlock model). Recurring weekly breaks (ScheduleBreak via editor.ts) → backlog 🟠
+    - **Admin direct break** — no approval flow (инвариант #22: studio admin booking/break CRUD direct, ScheduleChangeRequest scope = master working-hours only)
+    - **Cache invalidation fix is structural** — applies to ALL block/break operations going through `calendar.service.ts`, не только new admin dialog. Legacy editor consumers also benefit from this consistency. Pre-launch hardening
+  - **Раздел 6 (Маршруты):** никаких новых API endpoints. Existing endpoints `POST /api/studio/blocks`, `PATCH /api/studio/blocks/[id]`, `DELETE /api/studio/blocks/[id]` reused as-is. Bookings journal route не изменён (только UI internals)
+  - **UI_TEXT:** new `studioCabinet.scheduleV2.breakDialog.*` (~13 keys) + `header.manageBreaks` + 4 new error keys (`breakMasterRequired`, `breakTimeRange`, `breakCreate`, `breakDelete`)
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Carryover closed:**
+    - Chat icon route 404 (from STUDIO-BOOKINGS-A Pre-launch risks) — closed (icon removed, backlog item created for auth model extension)
+    - Break management UI dialog (from STUDIO-SCHEDULE-A High priority backlog) — closed (one-time dialog built, recurring → enhancement backlog)
+  - **Next:** STUDIO-CLIENTS-A — clients/CRM management page
 
 - **2026-05-16 — STUDIO-SERVICES-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 8/13. `/cabinet/studio/services` rewrite — 3-col layout (categories sidebar / list / detail panel) replaces legacy 1080-LOC services client component.
   - **Раздел 3 (Архитектура):** новый namespace `src/features/studio-cabinet/services/`:

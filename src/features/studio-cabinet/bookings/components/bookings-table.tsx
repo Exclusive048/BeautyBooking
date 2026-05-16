@@ -52,7 +52,6 @@ export function BookingsTable({ studioId, rows, masters }: Props) {
                 {T.colStatus}
               </th>
               <th className="w-10 px-2 py-2" aria-hidden />
-              <th className="w-10 px-2 py-2" aria-hidden />
             </tr>
           </thead>
           <tbody>
