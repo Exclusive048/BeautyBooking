@@ -69,9 +69,13 @@ export async function loadStudioMasterDetail(input: {
   });
   if (!studio) return null;
 
+  // STUDIO-POLISH-A #4: `masterId` may be a cuid OR a `publicUsername`
+  // (the masters list URL prefers the public handle when available, so
+  // shared/bookmarked links may carry either). Resolve both shapes in a
+  // single query so the page-route handler stays simple.
   const provider = await prisma.provider.findFirst({
     where: {
-      id: input.masterId,
+      OR: [{ id: input.masterId }, { publicUsername: input.masterId }],
       type: ProviderType.MASTER,
       studioId: studio.providerId,
     },
@@ -201,6 +205,7 @@ export async function loadStudioMasterDetail(input: {
   const baseItem: StudioMasterListItem = {
     id: provider.id,
     providerId: provider.id,
+    urlHandle: provider.publicUsername ?? provider.id,
     userId: provider.ownerUserId ?? null,
     displayName,
     avatarUrl: provider.avatarUrl ?? null,

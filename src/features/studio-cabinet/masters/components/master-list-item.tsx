@@ -38,7 +38,10 @@ export function MasterListItem({
 
   const handleSelect = () => {
     const next = new URLSearchParams(searchParams.toString());
-    next.set("master", master.id);
+    // STUDIO-POLISH-A #4: prefer the public username so the URL exposes a
+    // human-readable handle (e.g. `?master=anna-sokolova`) instead of the
+    // raw cuid. Falls back to id when the master has no publicUsername.
+    next.set("master", master.urlHandle);
     router.replace(`?${next.toString()}`, { scroll: false });
   };
 

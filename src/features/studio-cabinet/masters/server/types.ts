@@ -4,6 +4,11 @@ import type { WeekScheduleCell } from "../lib/week-occupancy";
 export type StudioMasterListItem = {
   id: string;
   providerId: string;
+  /** Stable URL handle: prefers `Provider.publicUsername` (human-friendly,
+   * already public), falls back to `id` when not set. Drives the
+   * `?master=` selection param to avoid leaking raw cuids when a public
+   * slug exists (STUDIO-POLISH-A #4). */
+  urlHandle: string;
   userId: string | null;
   displayName: string;
   avatarUrl: string | null;

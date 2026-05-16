@@ -5475,10 +5475,6 @@ export const UI_TEXT = {
       },
     },
     appCaption: "КАБИНЕТ СТУДИИ",
-    topbar: {
-      studioChip: "{name} · {count}",
-      openPublicPage: "Открыть страницу студии",
-    },
     userChip: {
       currentContext: "{studio}",
     },
@@ -5782,7 +5778,7 @@ export const UI_TEXT = {
     },
     dashboardV2: {
       banner: {
-        titleTemplate: "Сегодня в студии {count} записей",
+        titleTemplate: "Сегодня в студии {studioName} — {count} записей",
         subtitleTemplate: "{onShift} мастеров на смене, средняя загрузка {load}%.",
         onShiftLabel: "Сейчас на смене",
         outOfTemplate: "из {total}",

@@ -95,6 +95,7 @@ export async function loadStudioMastersList(input: {
         contactPhone: true,
         isPublished: true,
         ownerUserId: true,
+        publicUsername: true,
         ratingAvg: true,
         ratingCount: true,
         owner: {
@@ -176,6 +177,7 @@ export async function loadStudioMastersList(input: {
     return {
       id: provider.id,
       providerId: provider.id,
+      urlHandle: provider.publicUsername ?? provider.id,
       userId: provider.ownerUserId ?? null,
       displayName,
       avatarUrl: provider.avatarUrl ?? null,

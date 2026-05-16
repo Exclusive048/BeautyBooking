@@ -17,6 +17,7 @@
 > - ✅ 🔴 Category unification (CATEGORY-UNIFICATION-A — pre-launch blocker resolved, services route via GlobalCategory, catalog matching works)
 > - ✅ Service packages (STUDIO-PACKAGES-A — strict mirror master ServicePackage pattern, no schema migration, reuses master mutations)
 > - ✅ Bug-fix sweep (STUDIO-BUGS-FIX-A — Prisma NULL-aware `not` filter on `visualSearchSlug` fixed in 4 sites; INVITED master eligibility guard `isStudioMasterActive` + `requireActiveStudioMaster` enforced in assign/booking/move/schedule)
+> - ✅ Visual polish (STUDIO-POLISH-A — full-width layout mirror master, hero text contrast fix + studioName in title, publicUsername в team URL, studio topbar удалён)
 > - ⏳ Clients, Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
@@ -1125,6 +1126,28 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-17 — STUDIO-POLISH-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 13/13 — sprint **functional + polish work complete**. 4 visual замечания из live testing, low-risk single commit, no functional changes, no schema migration.
+  - **Audit findings:**
+    - **Master cabinet layout** (`src/app/(cabinet)/cabinet/master/layout.tsx`) — sidebar + `<main className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>`. **No max-width clamp, no inner container** — pages decide their own padding/structure. Master dashboard wraps content в `<div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">`. Per-page `<MasterPageHeader>` provides sticky chrome
+    - **Master cabinet has NO topbar** — global navbar (public header) sits above; cabinet shell has only sidebar + main + mobile bottom nav
+    - **Master `GreetingHero`** uses explicit `text-white` on `bg-brand-gradient` — works in both themes (white always contrasts с burgundy gradient)
+    - **Studio current layout** (pre-fix): `<main className="...px-4 py-6...">` wrapping `<div className="mx-auto w-full max-w-6xl">{children}</div>` — content centered with 1152px clamp, leaving empty space on wider displays. Topbar (`<StudioTopbar>`) inserted между sidebar и main с studio chip + theme toggle + public-page link
+    - **Studio today banner** (pre-fix) used `text-[rgb(var(--accent-fg))]` — token resolves to near-black in light theme + dark mode не fixes it, so headline на бордовом градиенте плохо читался
+    - **`Provider.publicUsername`** (`prisma/schema/provider.prisma:87`) — `String? @unique`. Опционально, но present для published masters. Public profile URL pattern `/u/<publicUsername>`. Existing infrastructure ready to be the canonical URL handle
+    - **Studio topbar contents** (`studio-topbar.tsx`): (1) studio chip "{name} · {mastersCount}" — name uже live в sidebar UserChip (`studioName={studio.name}`); (2) "Открыть страницу студии" link — уже live as nav-item в sidebar `studioMetaExternal` group; (3) `<ThemeToggle />` — already in global public header. **Все три element полностью duplicate другие surfaces** → removal безопасно
+  - **Раздел 3 (Архитектура):**
+    - **#1 layout:** `src/app/(cabinet)/cabinet/studio/layout.tsx` — стрипнут intermediate `<div mx-auto w-full max-w-6xl>` wrapper, main теперь full-width с padding (как master). Flex column wrapper вокруг `<StudioTopbar>` + `<main>` свёрнут — main теперь direct flex-1 sibling sidebar (mirrors master structure)
+    - **#2 hero:** `studio-today-banner.tsx` — `text-[rgb(var(--accent-fg))]` → `text-white` (explicit, mirrors master `GreetingHero`). Title template (`dashboardV2.banner.titleTemplate`) теперь `«Сегодня в студии {studioName} — {count} записей»` (was `«Сегодня в студии {count} записей»`). Caption выше title больше не дублирует studio name (только дата)
+    - **#4 URL:** `StudioMasterListItem` тип расширен полем `urlHandle: string = publicUsername ?? id`. `master-list-item.tsx` пишет `urlHandle` в `?master=` param (вместо raw cuid). `loadStudioMasterDetail` query расширен `where: { OR: [{ id }, { publicUsername }], ... }` — resolves либо shape. `masters-list.tsx` сравнение `isSelected` matches against both `id` и `urlHandle` (бэкwards-compat для bookmarks)
+    - **#6 topbar:** **deleted** `src/features/studio-cabinet/components/studio-topbar.tsx`. UI_TEXT `studioCabinet.topbar.*` keys (studioChip, openPublicPage) удалены. Import из layout убран. Все 3 element duplicate elsewhere (verified pre-removal)
+  - **Раздел 5 (Бизнес-логика):** **NO functional changes.** Все 4 fix-а — visual/cosmetic. Хитрая часть для #4: `loadStudioMasterDetail` теперь принимает cuid OR publicUsername, resolves single query через `OR`. Никаких новых endpoints / API contracts
+  - **Раздел 6 (Маршруты):** **NO new routes.** Existing `/cabinet/studio/team?master=<value>` теперь принимает both cuid и publicUsername (URLs с cuid bookmarks продолжают работать)
+  - **Раздел 12 (Инварианты):** не затронуты — все existing invariants сохранены
+  - **UI_TEXT:** 2 keys удалены (`studioCabinet.topbar.studioChip`, `studioCabinet.topbar.openPublicPage`). 1 key updated (`studioCabinet.dashboardV2.banner.titleTemplate` — добавлен `{studioName}` placeholder). Чистка appCaption + userChip preserved
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Sprint complete (13/13):** Cabinet Studio shell + 6 page redesigns + 2 bug fix commits + visual polish. Ready для STUDIO-CLIENTS-A (next page) либо user может testing полной четвёрки (masters + schedule + bookings + services + packages)
+  - **Backlog spawned:** drop unused `mastersCount` field from `getStudioShellInfo` (🟡), per-page `<StudioPageHeader>` analog (🟡 — from STUDIO-SHELL-A), public catalog studio profile audit (🟡), profile preview popover в masters list (🔵), `publicUsername` setup CTA для masters without one (🔵)
 
 - **2026-05-17 — STUDIO-BUGS-FIX-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 12/13. Bug fix commit после live testing — два functional bug'а закрыты, **no schema migration**, минимальный scope.
   - **Bug #3 (category create/display) — root cause:**

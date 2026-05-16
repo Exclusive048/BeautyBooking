@@ -38,7 +38,13 @@ export function MastersList({
         <ul className="space-y-2">
           {items.map((master) => (
             <li key={master.id}>
-              <MasterListItem master={master} isSelected={master.id === selectedId} />
+              <MasterListItem
+                master={master}
+                isSelected={
+                  selectedId !== null &&
+                  (master.id === selectedId || master.urlHandle === selectedId)
+                }
+              />
             </li>
           ))}
         </ul>

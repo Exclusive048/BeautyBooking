@@ -30,8 +30,13 @@ export function StudioTodayBanner({ data, studioName }: Props) {
   const visibleMasters = data.mastersOnShift.slice(0, 5);
   const extraCount = Math.max(0, data.mastersOnShift.length - visibleMasters.length);
 
+  // STUDIO-POLISH-A #2: explicit `text-white` (mirrors master's
+  // GreetingHero). The previous `text-[rgb(var(--accent-fg))]` resolved to
+  // a near-black in light theme, making the title unreadable on the
+  // burgundy gradient. Title template now interpolates `{studioName}`
+  // so the headline names the studio directly.
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-brand-gradient p-6 text-[rgb(var(--accent-fg))] md:p-7">
+    <div className="relative overflow-hidden rounded-2xl bg-brand-gradient p-6 text-white md:p-7">
       <div
         aria-hidden
         className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(255,255,255,0.18),transparent_50%)]"
@@ -39,10 +44,12 @@ export function StudioTodayBanner({ data, studioName }: Props) {
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
         <div className="min-w-0">
           <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] opacity-75">
-            {today} · {studioName}
+            {today}
           </div>
           <h2 className="font-display text-2xl font-bold leading-tight md:text-3xl">
-            {T.titleTemplate.replace("{count}", String(data.bookingsToday))}
+            {T.titleTemplate
+              .replace("{studioName}", studioName)
+              .replace("{count}", String(data.bookingsToday))}
           </h2>
           <p className="mt-2 max-w-xl text-sm opacity-90 md:text-[15px]">
             {T.subtitleTemplate
