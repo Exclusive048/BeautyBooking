@@ -1,4 +1,11 @@
-import { AccountType, Prisma, type ReviewTargetType, type UserProfile } from "@prisma/client";
+import {
+  AccountType,
+  MembershipStatus,
+  Prisma,
+  StudioRole,
+  type ReviewTargetType,
+  type UserProfile,
+} from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
@@ -271,6 +278,11 @@ async function ensureMasterReviewAccess(review: {
       type: true,
       ownerUserId: true,
       masterProfile: { select: { userId: true } },
+      // STUDIO-REVIEWS-A: pull the studio link so an active OWNER/ADMIN
+      // membership in the same studio can reply on behalf of the studio.
+      // The reply text is the same shape (`replyText` field, no identity
+      // tracking) — surfaces label it «Ответ студии».
+      studioId: true,
     },
   });
 
@@ -278,9 +290,29 @@ async function ensureMasterReviewAccess(review: {
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
 
-  if (provider.ownerUserId !== currentUserId && provider.masterProfile?.userId !== currentUserId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  if (provider.ownerUserId === currentUserId) return;
+  if (provider.masterProfile?.userId === currentUserId) return;
+
+  if (provider.studioId) {
+    const studio = await prisma.studio.findUnique({
+      where: { providerId: provider.studioId },
+      select: { id: true },
+    });
+    if (studio) {
+      const membership = await prisma.studioMembership.findFirst({
+        where: {
+          studioId: studio.id,
+          userId: currentUserId,
+          status: MembershipStatus.ACTIVE,
+          roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
+        },
+        select: { id: true },
+      });
+      if (membership) return;
+    }
   }
+
+  throw new AppError("Forbidden", 403, "FORBIDDEN");
 }
 
 export async function createReview(input: {

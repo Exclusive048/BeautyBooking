@@ -21,7 +21,8 @@
 > - ✅ Showcase seed (STUDIO-SHOWCASE-SEED — Vision Beauty Studio: 7 ACTIVE masters / 35 services / 56 bookings / 15 reviews / 3 VIP clients / 2 PENDING categories / 3 packages / 12 notifications — full rich-data fixture для visual validation)
 > - ✅ Clients page (STUDIO-CLIENTS-A — 2-col segments+table, 5 KPI tiles, derived segments via `classifyClient` reuse, no birthday/blacklist/import/export/рассылка/custom)
 > - ✅ Seed consolidation (SEED-CONSOLIDATION-A — 4 showcase phones 100/200/300/400, `ensureUserByPhone` helper eliminates P2002, reset.ts extended scope, new admin showcase)
-> - ⏳ Reviews, Analytics, Finance, Settings
+> - ✅ Reviews page (STUDIO-REVIEWS-A — 3 stats cards including top services + 4 filter chips + master scope reply via extended `ensureMasterReviewAccess`, report reuses existing endpoint, «Ответ студии» label always)
+> - ⏳ Notifications, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -1129,6 +1130,34 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-17 — STUDIO-REVIEWS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 15/15 (first of the 5 follow-up pages). `/cabinet/studio/reviews` rewrite — legacy client-only table replaced by SSR module with stats + scoped reply.
+  - **Audit findings:**
+    - **Existing studio reviews page:** `src/features/studio/components/studio-reviews-page.tsx` — client component (SWR-style fetch) using the generic `/api/reviews?targetType=studio&targetId=` endpoint. Basic card list with public tags, no reply form, no stats, no per-master scope
+    - **Review model:** `Review` carries denormalised `studioId` + `masterId` (for reviews where `targetType=provider` and the master belongs to a studio). `replyText` + `repliedAt` for the published reply — **no `repliedByUserId` field** (reply identity is implicit). Report fields: `reportReason` (enum SPAM/FAKE/OFFENSIVE/INAPPROPRIATE/OTHER) + `reportComment` + `reportedAt` (denormalised — no separate `ReviewReport` model). Soft-delete via `deletedAt` (invariant #17)
+    - **Reply endpoint:** `POST /api/reviews/[id]/reply` calls `replyToReview` → `ensureMasterReviewAccess` which checks `provider.ownerUserId === currentUserId || provider.masterProfile?.userId === currentUserId`. Blocked studio admins.
+    - **Report endpoint:** `POST /api/reviews/[id]/report` calls `reportReview` — allows any logged-in user (except own author). One report per review (409 on retry)
+    - **Master cabinet has rich review components** (`ReviewsHeroCard`, `ReviewsDistribution`, `ReviewsKpiTiles`, `ReviewsFeed`, `ReviewReplyForm`, `ReviewActionsIsland`) + `computeReviewStats` aggregator — pattern reference for studio. Stats helpers are master-specific, reimplemented for studio scope
+    - **Showcase data:** 15 Vision reviews from STUDIO-SHOWCASE-SEED (11×5★ + 3×4★ + 1×3★, 7 with replies)
+  - **Раздел 3 (Архитектура):** new module `src/features/studio-cabinet/reviews/`:
+    - `lib/types.ts` — DTOs (`StudioReviewItem`, `StudioReviewsListData`, `StudioReviewsStats`, `StudioReviewFilter` union, `isStudioReviewFilter` guard)
+    - `lib/format.ts` — Russian relative-date label («сегодня» / «вчера» / «N дней назад» / «X мес. назад») + `initialsOf`
+    - `server/reviews-data.service.ts` — `loadStudioReviewsList` orchestrator. CRM scope via inline `resolveScope(studioId, currentUserId)` — checks `Studio.ownerUserId` direct OR active `StudioMembership` with OWNER/ADMIN roles for `isStudioAdmin`, OR finds the user's MASTER provider id within the studio. `canReply` set per row: admin → true for all; master → true only when `review.masterId === masterProvider.id`. Single broad Prisma query covers filter counts + stats + page items; master + service names come from one `booking.service` join. Cursor pagination (PAGE_LIMIT=20)
+    - `server/reviews-stats.service.ts` — `loadStudioReviewsStats` aggregates avg + distribution (5..1★ count + %) + top services by review count (top 5). No rating delta (no `RatingSnapshot` model, same gap STUDIO-DASHBOARD-A flagged). Top services REPLACES reference's "топ/анти-топ мастера" stat per spec
+    - `components/` — 11 files: page orchestrator, header, stats row (3 cards: rating-summary + distribution + top-services), rating-stars, filters (4 chips + master select, URL-driven), reviews-list with embedded ReportReviewDialog, review-card (avatar + rating + date + master·service + text + optional reply block + reply CTA + flag icon), reply form (POST `/api/reviews/[id]/reply`), report dialog (POST `/api/reviews/[id]/report` with 5-reason select + comment), pagination
+  - **Раздел 5 (Бизнес-логика):**
+    - **Reply identity invariant:** every published reply is labelled «Ответ студии» regardless of typed-by (admin or master). No `repliedByUserId` introduced — keeps schema unchanged and respects spec (no per-master attribution on studio surface)
+    - **CRM scope enforcement at SERVICE layer:** `canReply` computed in `loadStudioReviewsList`, NOT just in UI. Server-side filter ensures master in studio can't accidentally reply to a colleague's review even if they bypass the UI
+    - **Reply endpoint extension (small, surgical):** `ensureMasterReviewAccess` in `src/lib/reviews/service.ts` extended with 3 additional pass conditions: if the review's master has a `studioId`, find the corresponding `Studio` row, check if the current user has an ACTIVE `StudioMembership` with OWNER/ADMIN role → allow. ~12 LOC addition, no signature change. Backwards-compatible for master cabinet (existing checks still apply first)
+    - **Report flow direct reuse:** existing `/api/reviews/[id]/report` endpoint accepts any logged-in user. Studio admin's report goes into Review's denormalised `reportReason/reportComment/reportedAt` fields — admin moderation surfaces it on `/admin/reviews` (ADMIN-REVIEWS-A). One-per-review enforced server-side
+    - **Reviews are immutable from the studio surface** — no delete/hide. Moderation happens via Report → admin (soft-delete invariant #17)
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/reviews` page rewritten (was: basic table + filter, now: rich SSR with stats + scoped reply). URL params `?filter=all|no_reply|low_rating|five_star&master=<id>&cursor=<key>`. **No new API endpoints** — reuses existing `/api/reviews/[id]/{reply,report}`
+  - **Раздел 12 (Инварианты):** **#17 strengthened** — Review soft-delete remains the only moderation path. Studio surface explicitly excludes delete/hide; "Пожаловаться" goes through the existing admin moderation pipe (which writes `deletedAt` + `deletedByUserId` + `deletedReason` if admin chooses to soft-delete)
+  - **UI_TEXT:** new subtree `studioCabinet.reviewsV2.*` (~45 keys — header / stats / filters / card / actions / replyForm / reportDialog / pagination / empty / toasts). Legacy `studioCabinet.reviews.*` kept (still consumed by ClientCardDrawer surfaces)
+  - **@deprecated:** `src/features/studio/components/studio-reviews-page.tsx` — orphan after route rewrite. Phase 7 cleanup
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Backlog spawned:** Review request flow (🟡 — proactive prompt after finished bookings), Bulk reply / "Ответить всем" (🟡), Rating delta with snapshot model (🟡 — cross-ref STUDIO-DASHBOARD-A), Per-master reply identity (🟡 — needs `repliedByUserId`), Reply edit on studio surface (🟡 — PATCH endpoint exists but not surfaced), Top/anti-top masters by rating (🟡 — replaced with top services per spec), Quick-reply chip templates / review bookmark / sentiment analysis / review export CSV (🔵)
+  - **Sprint progress:** STUDIO-REVIEWS-A closes the first of the 5 follow-up pages. Remaining: Notifications integration, Analytics, Finance, Settings
 
 - **2026-05-17 — SEED-CONSOLIDATION-A** (commit on `designStudioCabinet`). Pre-launch hardening of the test-data seed pipeline. Fixes a P2002 fragility + introduces the 4-showcase phone schema (100/200/300/400).
   - **Audit findings:**

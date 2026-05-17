@@ -6228,6 +6228,65 @@ export const UI_TEXT = {
         loadMore: "Показать ещё",
       },
     },
+    reviewsV2: {
+      header: {
+        caption: "ОТЗЫВЫ · {total} всего · из них {noReply} без ответа",
+        title: "Отзывы клиентов",
+        subtitle: "Все отзывы по всем мастерам в одном месте. Отвечайте от имени студии.",
+      },
+      stats: {
+        avgTitle: "Средний рейтинг студии",
+        avgBasis: "На основе {count} отзывов · {percent}% положительные",
+        distributionTitle: "Распределение оценок",
+        topServicesTitle: "Топ услуг по отзывам",
+        topServicesCount: "{count} отзывов",
+        topServicesEmpty: "Пока нет отзывов с привязкой к услугам",
+      },
+      filters: {
+        all: "Все",
+        noReply: "Без ответа",
+        lowRating: "Низкие оценки",
+        fiveStar: "5 звёзд",
+        masterAll: "Все мастера",
+      },
+      card: {
+        replyCaption: "ОТВЕТ СТУДИИ",
+        reportedBadge: "На рассмотрении",
+      },
+      actions: {
+        reply: "Ответить",
+        report: "Пожаловаться",
+      },
+      replyForm: {
+        placeholder: "Ваш ответ клиенту…",
+        hint: "Ответ будет опубликован от имени студии.",
+        submit: "Опубликовать ответ",
+        submitting: "Публикуем…",
+        cancel: "Отмена",
+      },
+      reportDialog: {
+        title: "Пожаловаться на отзыв",
+        subtitle: "Жалоба отправится администратору платформы. Можно подать только один раз.",
+        reasonLabel: "Причина",
+        commentLabel: "Комментарий (необязательно)",
+        commentPlaceholder: "Опишите, почему отзыв нарушает правила",
+        submit: "Отправить",
+        submitting: "Отправляем…",
+        cancel: "Отмена",
+      },
+      pagination: {
+        loadMore: "Показать ещё",
+      },
+      empty: {
+        title: "Нет отзывов",
+        hint: "Отзывы клиентов будут появляться здесь после завершённых записей.",
+      },
+      toasts: {
+        replyPosted: "Ответ опубликован",
+        reported: "Жалоба отправлена",
+        error: "Не удалось выполнить действие. Попробуйте ещё раз.",
+      },
+    },
     clientsV2: {
       header: {
         caption: "КЛИЕНТСКАЯ БАЗА · {total} человек · {filtered} отфильтровано",
