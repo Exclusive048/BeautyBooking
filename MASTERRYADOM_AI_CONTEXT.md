@@ -22,7 +22,8 @@
 > - ✅ Clients page (STUDIO-CLIENTS-A — 2-col segments+table, 5 KPI tiles, derived segments via `classifyClient` reuse, no birthday/blacklist/import/export/рассылка/custom)
 > - ✅ Seed consolidation (SEED-CONSOLIDATION-A — 4 showcase phones 100/200/300/400, `ensureUserByPhone` helper eliminates P2002, reset.ts extended scope, new admin showcase)
 > - ✅ Reviews page (STUDIO-REVIEWS-A — 3 stats cards including top services + 4 filter chips + master scope reply via extended `ensureMasterReviewAccess`, report reuses existing endpoint, «Ответ студии» label always)
-> - ⏳ Notifications, Analytics, Finance, Settings
+> - ✅ Notifications page (STUDIO-NOTIFICATIONS-A — reuses 26-NOTIF `getNotificationCenterData` filtered by `channel === "STUDIO"`, 4 KPI tiles + 10 chip filters incl. team/finance, inline approve/reject for SCHEDULE_REQUEST mirrors master BOOKING_REQUEST pattern, no cabinet artifacts)
+> - ⏳ Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -1130,6 +1131,33 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-18 — STUDIO-NOTIFICATIONS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 16/16 (2nd of 5 follow-up pages). New `/cabinet/studio/notifications` route (sidebar nav-item from STUDIO-SHELL-A was 404 until now). Heavy reuse of 26-NOTIF master notif infrastructure.
+  - **Audit findings:**
+    - **Master 26-NOTIF pattern:** `src/features/master/components/notifications/*` (10 files) + `src/lib/master/notifications.service.ts` orchestrator. **Actionable model is mixed:** inline confirm/decline buttons for BOOKING_REQUEST/CREATED (binary action), navigation-only for everything else. Quote from notification-actions.tsx line 89: «BOOKING_REQUEST / BOOKING_CREATED: confirm/decline now hide when payload.bookingStatus reflects a terminal state». Pattern → studio mirrors with inline for SCHEDULE_REQUEST + nav for the rest
+    - **NotificationType enum:** 60 values across BOOKING_*/STUDIO_*/MODEL_*/HOT_SLOT_*/BILLING_*/REVIEW_*/CHAT_*/CATEGORY_*/MASTER_*/SUBSCRIPTION_GRANTED_BY_ADMIN. **No cabinet/room type** (`grep model Cabinet|model Room|cabinetNumber` returns zero matches in prisma/schema + src/lib/studio). Confirmed absent — chip "Кабинеты" + «Кабинет N» line + cabinet-conflict type all dropped
+    - **Single-recipient delivery model:** `Notification.userId` is one user. Studio events (`notifyStudioInviteAccepted`, `notifyScheduleRequestSubmitted` in `src/lib/notifications/studio-notifications.ts`) target `studio.ownerUserId` directly. No multi-cast — admin without explicit addressing wouldn't see owner's items. Service matches this semantics: shows the current user's own notifications, scoped by channel
+    - **`getNotificationCenterData`** (`src/lib/notifications/center.ts:159`) already computes per-notification `channel: "MASTER" | "STUDIO" | "SYSTEM"` via `classifyNotificationChannel` + injects pseudo-notifications for PENDING ScheduleChangeRequest rows (id format `schedule-request:<realId>`, type `"SCHEDULE_REQUEST"`, channel `"STUDIO"`, `openHref: "/cabinet/studio/team"` — trivial-fix backlog item to point at `/cabinet/studio/schedule-requests`)
+    - **Bulk read-all endpoint:** `POST /api/notifications/read-all?context=master|personal|all` exists. Reused with `context=all`
+    - **Approve/reject endpoints:** `POST /api/studio/schedule/requests/[id]/approve` + `.../reject` from STUDIO-SCHEDULE-REQUEST-APPROVAL-A. Body: none for approve, `{ comment }` for reject. Reused as-is
+    - **Showcase seed:** 12 notifications for Vision owner across 7 types (BOOKING_REQUEST / REVIEW_LEFT ×2 / BOOKING_REMINDER_2H / BOOKING_CANCELLED_BY_CLIENT / BOOKING_RESCHEDULED / CHAT_MESSAGE_RECEIVED / MASTER_WEEKLY_STATS) + 2 PENDING ScheduleChangeRequest pseudo-items via center
+  - **Раздел 3 (Архитектура):** new module `src/features/studio-cabinet/notifications/`:
+    - `lib/types.ts` — DTOs (`StudioNotificationChip` union, KPI/data shapes, type guard, re-export of master `NotificationDayGroup` + `NotificationSort`)
+    - `lib/chip-classifier.ts` — `classifyStudioChip(type)` extends master's `classifyTabBucket` with `team` (STUDIO_*) + `finance` (BILLING_* including admin-initiated variants) + `cancellations`/`reschedules` as distinct buckets. All NotificationType enum values explicitly mapped; unknown → `"system"` fallback
+    - `server/notifications-data.service.ts` — `loadStudioNotificationsData` orchestrator. Calls `getNotificationCenterData` + `getPushEnabled` in parallel. Filters `channel === "STUDIO"`. Computes 4 KPIs (unread, today, needs-decision via SCHEDULE_REQUEST count, push enabled) + 10 chip counts from full set, then applies chip filter + day grouping. ~140 LOC
+    - `components/` — 7 files: server orchestrator (page), KPI row (4 tiles), URL-driven filters with bulk «Прочитать всё», info banner with link to settings, day-grouped feed, server-rendered notification card (uses master's `getCardConfig` + `readNotificationPayload` for visual config + payload extraction), client island actions (inline approve/reject for SCHEDULE_REQUEST with prompt-based comment for reject, mirror master decline pattern; nav chips for other types: «К записи / К отзыву / К чату / К клиенту»)
+  - **Раздел 5 (Бизнес-логика):**
+    - **Reuse-first approach** — three master 26-NOTIF helpers imported directly: `getNotificationCenterData` (server), `groupNotificationsByDay` (server), `getCardConfig` + `readNotificationPayload` (cards). Studio adds chip classifier on top, not from scratch
+    - **Scope semantics:** studio cabinet page shows notifications addressed to the current user (admin or owner) with `channel === "STUDIO"`. This matches the existing single-recipient `Notification.userId` model. Multi-cast / true studio-wide feed is backlog (would need broadcast at delivery time)
+    - **Master notif page unchanged** — master continues to see `channel === "MASTER"` items; studio's filter is mutually exclusive. Master-addressed booking notifications surface in master cabinet, not duplicated here (info banner explains this to admins)
+    - **Cabinet/room exclusion enforced:** no schema model, no notification type, no UI artifact. Reviewed reference jsx and dropped all 3 cabinet-related surfaces (chip / «Кабинет N» / conflict)
+    - **Actionable inline pattern:** SCHEDULE_REQUEST is the one type studio admin acts on from the feed. Inline Approve / Reject mirrors master's BOOKING_REQUEST inline (binary action, instant feedback). Reject uses `window.prompt` for comment (same UX as master decline). «Открыть запрос» nav link still provided for context-heavy review
+  - **Раздел 6 (Маршруты):** **NEW route** `/cabinet/studio/notifications` — finally functional (sidebar nav config from STUDIO-SHELL-A pointed at this URL but no `page.tsx` existed → 404 until now). URL params `?chip=` / `?sort=`. **No new API endpoints** — POST `/api/studio/schedule/requests/[id]/{approve,reject}` + `POST /api/notifications/read-all?context=all` reused
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **UI_TEXT:** new subtree `studioCabinet.notificationsV2.*` (~55 keys — header / kpis / filters / infoBanner / card / actions / empty / errors). Reuses master notif card icon config + payload extractors, so no per-type UI_TEXT duplicated
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Backlog spawned:** Cabinet/room model with schema migration + conflict detection (🟠 — only if real studios hit this), Per-team-member push settings (🟠 — settings page redesign dependency), Multi-recipient broadcast (🟡 — admins seeing owner's items), Notification preferences (🟡), SSE live updates (🟡), Card per-action mark-read (🟡 — endpoint exists), «Открыть запрос» deep-anchor with `?focus=` (🟡), Group similar / Snooze / Search (🔵), Fix center.ts openHref for SCHEDULE_REQUEST to point at `/cabinet/studio/schedule-requests` (🔵 — trivial)
+  - **Sprint progress:** 16/16 commits closed. STUDIO-NOTIFICATIONS-A closes the 2nd of 5 follow-up pages. Remaining: Analytics, Finance, Settings
 
 - **2026-05-17 — STUDIO-REVIEWS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 15/15 (first of the 5 follow-up pages). `/cabinet/studio/reviews` rewrite — legacy client-only table replaced by SSR module with stats + scoped reply.
   - **Audit findings:**

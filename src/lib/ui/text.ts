@@ -6228,6 +6228,65 @@ export const UI_TEXT = {
         loadMore: "Показать ещё",
       },
     },
+    notificationsV2: {
+      header: {
+        caption: "УВЕДОМЛЕНИЯ · {unread} непрочитано из {total}",
+        title: "Уведомления",
+        subtitle:
+          "События студии в одной ленте. Уведомления о записях к мастеру дублируются в его личный кабинет.",
+      },
+      kpis: {
+        unread: "Непрочитанных",
+        unreadTemplate: "{count} из {total}",
+        today: "Сегодня",
+        todayTemplate: "{count} событий",
+        needsDecision: "Ждут решения",
+        needsDecisionTemplate: "{count} от владельца",
+        push: "Push в приложении",
+        pushEnabled: "Включены",
+        pushDisabled: "Выключены",
+        pushHint: "Дублируются автоматически",
+      },
+      filters: {
+        all: "Все",
+        unread: "Непрочитанные",
+        bookings: "Записи",
+        cancellations: "Отмены",
+        reschedules: "Переносы",
+        reviews: "Отзывы",
+        messages: "Сообщения",
+        team: "Команда",
+        finance: "Финансы",
+        system: "Системные",
+        sortNewest: "Сначала новые",
+        sortOldest: "Сначала старые",
+        markAllRead: "Прочитать всё",
+      },
+      infoBanner:
+        "Кто из команды получает push — настраивается в {settingsLink}. Уведомления о записях к мастеру дублируются в его личный кабинет.",
+      infoBannerLink: "Настройках студии",
+      card: {
+        relatesTo: "Касается",
+      },
+      actions: {
+        approve: "Подтвердить",
+        reject: "Отклонить",
+        rejectPrompt: "Укажите причину отклонения заявки:",
+        openRequest: "Открыть заявку",
+        openBooking: "К записи",
+        openReview: "К отзыву",
+        openChat: "К чату",
+        openClient: "К клиенту",
+        open: "Открыть",
+      },
+      empty: {
+        title: "Нет уведомлений",
+        hint: "События студии появятся здесь по мере поступления.",
+      },
+      errors: {
+        scheduleRequest: "Не удалось выполнить действие. Попробуйте ещё раз.",
+      },
+    },
     reviewsV2: {
       header: {
         caption: "ОТЗЫВЫ · {total} всего · из них {noReply} без ответа",
