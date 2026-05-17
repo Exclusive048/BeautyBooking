@@ -70,10 +70,15 @@ import {
   type UserProfile,
 } from "@prisma/client";
 import { logSeed } from "./helpers/log";
-import { seedEmail } from "./helpers/markers";
+import { ensureUserByPhone } from "./helpers/ensure-user";
+import {
+  SHOWCASE_PHONE_STUDIO_MASTER,
+  SHOWCASE_PHONE_STUDIO_OWNER,
+  seedEmail,
+} from "./helpers/markers";
 import { prisma } from "./helpers/prisma";
 
-const OWNER_PHONE = "+79992000000";
+const OWNER_PHONE = SHOWCASE_PHONE_STUDIO_OWNER;
 const OWNER_EMAIL = seedEmail("studio", "vision");
 const OWNER_FIRST = "Виктория";
 const OWNER_LAST = "Алмазова";
@@ -110,6 +115,11 @@ const MASTERS: MasterDef[] = [
 ];
 
 function masterPhone(ordinal: number): string {
+  // SEED-CONSOLIDATION-A: Marina (ordinal 1) is the master-in-studio
+  // showcase login. Her phone follows the +7 999 X00 00 00 schema
+  // (+79993000000), while the other six masters keep the +79992xxxxxx
+  // ordinal scheme. Reset.ts covers both prefixes.
+  if (ordinal === 1) return SHOWCASE_PHONE_STUDIO_MASTER;
   return `+79992${String(ordinal).padStart(6, "0")}`;
 }
 function masterSlug(ordinal: number, firstName: string, lastName: string): string {
@@ -217,25 +227,15 @@ function findPlan(plans: BillingPlan[], code: string): BillingPlan {
 // ---------------- Owner + Studio core ----------------
 
 async function ensureOwner(): Promise<UserProfile> {
-  return prisma.userProfile.upsert({
-    where: { email: OWNER_EMAIL },
-    update: {
-      phone: OWNER_PHONE,
-      firstName: OWNER_FIRST,
-      lastName: OWNER_LAST,
-      displayName: `${OWNER_FIRST} ${OWNER_LAST}`,
-      publicUsername: `${STUDIO_PUBLIC_USERNAME}-owner`,
-      roles: [AccountType.CLIENT, AccountType.STUDIO, AccountType.STUDIO_ADMIN],
-    },
-    create: {
-      email: OWNER_EMAIL,
-      phone: OWNER_PHONE,
-      firstName: OWNER_FIRST,
-      lastName: OWNER_LAST,
-      displayName: `${OWNER_FIRST} ${OWNER_LAST}`,
-      publicUsername: `${STUDIO_PUBLIC_USERNAME}-owner`,
-      roles: [AccountType.CLIENT, AccountType.STUDIO, AccountType.STUDIO_ADMIN],
-    },
+  // SEED-CONSOLIDATION-A: phone-first upsert + shadow release.
+  return ensureUserByPhone({
+    phone: OWNER_PHONE,
+    email: OWNER_EMAIL,
+    publicUsername: `${STUDIO_PUBLIC_USERNAME}-owner`,
+    firstName: OWNER_FIRST,
+    lastName: OWNER_LAST,
+    displayName: `${OWNER_FIRST} ${OWNER_LAST}`,
+    roles: [AccountType.CLIENT, AccountType.STUDIO, AccountType.STUDIO_ADMIN],
   });
 }
 
@@ -365,25 +365,14 @@ async function ensureMasters(studioProviderId: string, studioId: string): Promis
     const email = seedEmail("master", slug);
     const phone = masterPhone(def.ordinal);
 
-    const user = await prisma.userProfile.upsert({
-      where: { email },
-      update: {
-        phone,
-        firstName: def.firstName,
-        lastName: def.lastName,
-        displayName: `${def.firstName} ${def.lastName}`,
-        publicUsername: slug,
-        roles: [AccountType.CLIENT, AccountType.MASTER],
-      },
-      create: {
-        email,
-        phone,
-        firstName: def.firstName,
-        lastName: def.lastName,
-        displayName: `${def.firstName} ${def.lastName}`,
-        publicUsername: slug,
-        roles: [AccountType.CLIENT, AccountType.MASTER],
-      },
+    const user = await ensureUserByPhone({
+      phone,
+      email,
+      publicUsername: slug,
+      firstName: def.firstName,
+      lastName: def.lastName,
+      displayName: `${def.firstName} ${def.lastName}`,
+      roles: [AccountType.CLIENT, AccountType.MASTER],
     });
 
     const provider = await prisma.provider.upsert({

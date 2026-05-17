@@ -20,6 +20,7 @@
 > - ✅ Visual polish (STUDIO-POLISH-A — full-width layout mirror master, hero text contrast fix + studioName in title, publicUsername в team URL, studio topbar удалён)
 > - ✅ Showcase seed (STUDIO-SHOWCASE-SEED — Vision Beauty Studio: 7 ACTIVE masters / 35 services / 56 bookings / 15 reviews / 3 VIP clients / 2 PENDING categories / 3 packages / 12 notifications — full rich-data fixture для visual validation)
 > - ✅ Clients page (STUDIO-CLIENTS-A — 2-col segments+table, 5 KPI tiles, derived segments via `classifyClient` reuse, no birthday/blacklist/import/export/рассылка/custom)
+> - ✅ Seed consolidation (SEED-CONSOLIDATION-A — 4 showcase phones 100/200/300/400, `ensureUserByPhone` helper eliminates P2002, reset.ts extended scope, new admin showcase)
 > - ⏳ Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
@@ -1128,6 +1129,35 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-17 — SEED-CONSOLIDATION-A** (commit on `designStudioCabinet`). Pre-launch hardening of the test-data seed pipeline. Fixes a P2002 fragility + introduces the 4-showcase phone schema (100/200/300/400).
+  - **Audit findings:**
+    - **P2002 root cause:** `seed-showcase-master.ts:120` used `prisma.userProfile.upsert({ where: { email } })` with `phone` in the `create` branch. When canonical identifiers drifted between seed generations (e.g. phone migrated from `+79991000009` → `+79991000000`), the `where: { email }` clause didn't match the stale row, so Prisma took the `create` path — and collided on the `phone` unique constraint held by the stale row. Same anti-pattern in `seed-showcase-studio.ts` for owner + masters
+    - **UserProfile unique constraints:** `id`, `phone @unique`, `email @unique`, `publicUsername @unique` (nullable). Any of these can collide on create if shadow rows exist
+    - **Generic seed range:** `+7900000xxxx` (4-digit suffix) via `seedPhone()`. Ordinals 1-99 masters, 100-149 clients, 150-199 studio owners. Independent of showcase prefixes
+    - **Showcase phones (pre-fix):** master `+79991000009`, studio owner `+79992000000`, studio masters `+79992000001..+79992000007`. No admin showcase existed
+    - **`reset.ts` (pre-fix):** OR-matched on `SEED_EMAIL_DOMAIN` ending + `SEED_PHONE_PREFIX` startsWith. Showcase phones caught by email marker but not by phone prefix
+  - **Раздел 3 (Архитектура):**
+    - **New** `prisma/seeds/test-data/helpers/ensure-user.ts` — `ensureUserByPhone(input)` exports a two-phase upsert. **Phase 1 — shadow release:** finds any row with `phone != input.phone` holding the canonical email OR publicUsername; renames their unique fields to per-row placeholders (`released-<id>@<SEED_EMAIL_DOMAIN>` for email, `null` for publicUsername). FK refs (bookings, cards, subscriptions) survive because we only touch unique fields, not the id. **Phase 2 — upsert by phone:** standard `upsert({ where: { phone }, update, create })` — guaranteed to succeed because Phase 1 freed all conflicting uniques
+    - **New** `prisma/seeds/test-data/seed-showcase-admin.ts` — minimal `[CLIENT, ADMIN]`-roled user via `ensureUserByPhone`. No provider, no studio, no bookings — just unlocks `/admin` routes for testing Phase 2 surfaces
+    - **Modified** `helpers/markers.ts` — added `SHOWCASE_PHONE_{MASTER,STUDIO_OWNER,STUDIO_MASTER,ADMIN}` constants + `SHOWCASE_PHONE_PREFIXES = ["+79991","+79992","+79993","+79994"]`. `seedEmail` extended to accept `"admin"` role. `isSeedUser` now also matches showcase phone prefixes
+    - **Modified** `reset.ts` — OR clause extended with each `SHOWCASE_PHONE_PREFIXES` entry as `phone.startsWith`. Defense-in-depth: showcase users are caught even if their email marker drifts
+    - **Modified** `seed-showcase-master.ts` — `PHONE` constant migrated from `+79991000009` → `SHOWCASE_PHONE_MASTER` (`+79991000000`). `ensureUser()` rewritten to delegate to `ensureUserByPhone`
+    - **Modified** `seed-showcase-studio.ts` — owner upsert + each master upsert (in `ensureMasters` loop) both delegate to `ensureUserByPhone`. `masterPhone(ordinal=1)` returns `SHOWCASE_PHONE_STUDIO_MASTER` (`+79993000000`) so Марина is reachable as the master-in-studio showcase login; other ordinals keep `+79992xxxxxx`
+    - **Modified** `index.ts` — `seedShowcaseAdmin()` called after `seedShowcaseStudio()`. Header docstring rewritten with the four-phone schema reference table
+  - **Раздел 5 (Бизнес-логика):** **No behavior changes in app code.** This is seed infrastructure hardening only. Showcase studio inv. #20 + #24 still hold (Марина is ACTIVE: `ownerUserId` set + `isPublished=true`; she shares the studio's PREMIUM subscription, no individual PremiumBadge)
+  - **Раздел 6 (Маршруты):** **No new endpoints.** Showcase routes already exist
+  - **Раздел 9 (Тестирование):** seed system has 4 fixed-phone showcase accounts for hands-on testing:
+    - `+7 999 100 00 00` → `/cabinet/master` (Анна Соколова, solo)
+    - `+7 999 200 00 00` → `/cabinet/studio` (Виктория Алмазова, Vision PREMIUM)
+    - `+7 999 300 00 00` → `/cabinet/master` (Марина, member of Vision)
+    - `+7 999 400 00 00` → `/admin` (Platform admin)
+    - OTP code: server logs (`logInfo("OTP requested")`, SMS-шлюз не подключён)
+    - Run: `npm run seed:test:reset` (recommended once after pull), then `npm run seed:test`. Idempotent: subsequent `seed:test` runs without reset no longer throw P2002
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests. **Seed not executed against live DB** (Postgres unavailable in dev env) — verified structurally via Prisma client types + reasoned end-to-end on first/second-run scenarios
+  - **Generic seed scope:** intentionally kept stable (`seedProviders` 28 masters / 6 studios; `seedClients` 15 clients). Existing upsert-by-email pattern doesn't hit P2002 because of unique slug-derived emails. "Больше данных" goal already satisfied via STUDIO-SHOWCASE-SEED rich fixture (7 masters / 35 services / 56 bookings / 15 reviews / 3 VIP clients / 12 notifications) — bumping generic counts adds risk of breaking existing tests without proportional benefit
+  - **Backlog spawned:** none — pure infrastructure fix, no follow-ups required
 
 - **2026-05-17 — STUDIO-CLIENTS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 14/14. `/cabinet/studio/clients` rewrite — legacy 214-LOC SWR-fetched table заменён server-orchestrated 2-col layout с derived segments + KPIs.
   - **Audit findings:**

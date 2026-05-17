@@ -64,6 +64,23 @@
  * email/publicUsername/composite uniques. Reset через email-маркер.
  *
  * ============================================================
+ * SHOWCASE PHONES (SEED-CONSOLIDATION-A schema 100/200/300/400)
+ * ============================================================
+ *
+ *  +7 999 100 00 00  → /cabinet/master   Анна Соколова (solo)
+ *  +7 999 200 00 00  → /cabinet/studio   Виктория (Vision owner)
+ *  +7 999 300 00 00  → /cabinet/master   Марина (member of Vision)
+ *  +7 999 400 00 00  → /admin            Platform admin
+ *
+ * OTP code: server logs (logInfo "OTP requested"). SMS-шлюз не
+ * подключён (см. P1 в context).
+ *
+ * Idempotency: each showcase uses `ensureUserByPhone` (phone-first
+ * upsert with shadow release) — повторный `npm run seed:test` без
+ * reset не падает P2002 даже если canonical email/publicUsername
+ * сдвигались между прогонами.
+ *
+ * ============================================================
  */
 
 import { prisma } from "./helpers/prisma";
@@ -80,6 +97,7 @@ import { seedModelOffers } from "./seed-model-offers";
 import { seedFavorites } from "./seed-favorites";
 import { seedShowcaseMaster } from "./seed-showcase-master";
 import { seedShowcaseStudio } from "./seed-showcase-studio";
+import { seedShowcaseAdmin } from "./seed-showcase-admin";
 
 async function main() {
   if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
@@ -107,9 +125,12 @@ async function main() {
   const favCount = await seedFavorites({ clients, masters, studios });
 
   // Showcase rigs come last — they depend on the seeded clients pool
-  // and on the resolved billing plans.
+  // and on the resolved billing plans. The four showcase phones
+  // (+7 999 100/200/300/400 00 00) cover solo master / studio owner /
+  // master-in-studio (Марина из Vision) / admin respectively.
   await seedShowcaseMaster({ clients, plans });
   await seedShowcaseStudio({ clients, plans });
+  await seedShowcaseAdmin();
 
   logSeed.summary({
     cities: cities.length,

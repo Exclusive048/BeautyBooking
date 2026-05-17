@@ -3,13 +3,37 @@
 export const SEED_EMAIL_DOMAIN = "test.masterryadom.local";
 export const SEED_PHONE_PREFIX = "+7900000";
 
+/**
+ * SEED-CONSOLIDATION-A — showcase phone schema.
+ *
+ * The four showcase accounts use fixed, memorable phones outside the
+ * generic seed range so they're trivially demoable:
+ *
+ *   +7 999 100 00 00  — solo master (Анна Соколова)
+ *   +7 999 200 00 00  — studio owner (Виктория Алмазова, Vision)
+ *   +7 999 300 00 00  — master inside a studio (Марина, member of Vision)
+ *   +7 999 400 00 00  — admin
+ *
+ * The team in the studio showcase ALSO uses the +79992xxxxxx prefix
+ * (one per master ordinal). All four buckets are caught by
+ * `SHOWCASE_PHONE_PREFIXES` so reset.ts can wipe them even if the email
+ * marker drifts.
+ */
+export const SHOWCASE_PHONE_MASTER = "+79991000000";
+export const SHOWCASE_PHONE_STUDIO_OWNER = "+79992000000";
+export const SHOWCASE_PHONE_STUDIO_MASTER = "+79993000000";
+export const SHOWCASE_PHONE_ADMIN = "+79994000000";
+
+export const SHOWCASE_PHONE_PREFIXES = ["+79991", "+79992", "+79993", "+79994"] as const;
+
 export function isSeedUser(input: { email?: string | null; phone?: string | null }): boolean {
   if (input.email && input.email.endsWith(`@${SEED_EMAIL_DOMAIN}`)) return true;
   if (input.phone && input.phone.startsWith(SEED_PHONE_PREFIX)) return true;
+  if (input.phone && SHOWCASE_PHONE_PREFIXES.some((p) => input.phone!.startsWith(p))) return true;
   return false;
 }
 
-export function seedEmail(role: "master" | "studio" | "client", slug: string): string {
+export function seedEmail(role: "master" | "studio" | "client" | "admin", slug: string): string {
   return `seed-${role}-${slug}@${SEED_EMAIL_DOMAIN}`;
 }
 
