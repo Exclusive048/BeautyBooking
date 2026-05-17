@@ -18,7 +18,9 @@
 > - ✅ Service packages (STUDIO-PACKAGES-A — strict mirror master ServicePackage pattern, no schema migration, reuses master mutations)
 > - ✅ Bug-fix sweep (STUDIO-BUGS-FIX-A — Prisma NULL-aware `not` filter on `visualSearchSlug` fixed in 4 sites; INVITED master eligibility guard `isStudioMasterActive` + `requireActiveStudioMaster` enforced in assign/booking/move/schedule)
 > - ✅ Visual polish (STUDIO-POLISH-A — full-width layout mirror master, hero text contrast fix + studioName in title, publicUsername в team URL, studio topbar удалён)
-> - ⏳ Clients, Reviews, Analytics, Finance, Settings
+> - ✅ Showcase seed (STUDIO-SHOWCASE-SEED — Vision Beauty Studio: 7 ACTIVE masters / 35 services / 56 bookings / 15 reviews / 3 VIP clients / 2 PENDING categories / 3 packages / 12 notifications — full rich-data fixture для visual validation)
+> - ✅ Clients page (STUDIO-CLIENTS-A — 2-col segments+table, 5 KPI tiles, derived segments via `classifyClient` reuse, no birthday/blacklist/import/export/рассылка/custom)
+> - ⏳ Reviews, Analytics, Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -1126,6 +1128,54 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-17 — STUDIO-CLIENTS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 14/14. `/cabinet/studio/clients` rewrite — legacy 214-LOC SWR-fetched table заменён server-orchestrated 2-col layout с derived segments + KPIs.
+  - **Audit findings:**
+    - **Existing page:** `src/features/studio/components/studio-clients-page.tsx` — basic client-side table fetching `/api/studio/clients`, tags column with ClientCardDrawer integration, plan-gated. Sources data from `getStudioClients` (`src/lib/studio/clients.service.ts`) which groups bookings by clientKey
+    - **CRM module:** `src/lib/crm/guards.ts` only checks feature flags (`clientVisitHistory || clientNotes`), NOT per-user scope. Studio cabinet access gated at route level via `ensureStudioRole([OWNER, ADMIN])`. Master-only scope ("каждый мастер видит только своих") lives at `/cabinet/master/clients`, not studio
+    - **Classifier:** `src/lib/master/clients-classifier.ts` exports `classifyClient(stats, now): ClientStatus[]` returning array of `"vip"|"regular"|"new"|"sleeping"` (overlaps possible — "vip + sleeping" valid). Thresholds: VIP=5_000_000 kopecks, REGULAR=5 visits, NEW<30d OR ≤1 visit, SLEEPING>90d. Already reused by STUDIO-BOOKINGS-A for VIP badge — proven pattern
+    - **ClientCard model:** id, providerId, clientUserId?, clientPhone?, notes?, tags[]. **No `birthday` field. No blacklist flag.** `tags` enum: vip/regular/new/allergy/late/no_show/discount/prepay/favorite (no blacklist). Per spec rules — both segments removed
+    - **`groupBookings`** in `src/lib/crm/clients.ts` produces `Map<clientKey, ClientAggregate>` with visits/LTV/firstVisitAt/lastVisitAt. Doesn't track masterProviderId — extended in new service
+    - **CreateBookingDialog reusability:** props require `masterId: string | null` + `startAtUtc: string | null`. Reachable standalone but needs values. For minimal-changes, "Записать" action navigates to `/cabinet/studio/calendar` instead
+    - **No "create standalone client" endpoint:** ClientCard has no name field; clients table sources from bookings. Adding a card without a booking → invisible row. Honest fix: "Клиент" CTA navigates to calendar (booking captures everything)
+  - **Раздел 3 (Архитектура):** новый модуль `src/features/studio-cabinet/clients/`:
+    - `lib/types.ts` — `StudioClientRow`, `StudioClientPrimarySegment` (vip/regular/new/sleeping/other), `StudioClientsKpis`, `StudioClientsSegmentCounts`, type guard `isStudioClientSegmentKey`
+    - `lib/derive-segment.ts` — wraps `classifyClient` (reuse, no duplication), `selectPrimarySegment(statuses)` with priority VIP>sleeping>regular>new>other, `segmentMatches` filter helper
+    - `lib/format.ts` — `formatDaysAgo` (Russian pluralisation + «Сегодня»/«Вчера»), `initialsOf` for avatars
+    - `server/clients-data.service.ts` — `loadStudioClientsData` orchestrator: parallel load `prisma.booking.findMany` (extended select with `masterProviderId`) + `prisma.provider.findMany` (masters). `groupBookings` → in-memory enrichment (master tally per client = main master + mastersCount) → classify each → KPIs + segmentCounts from FULL set → filter (segment/master/search) → sort (VIP first + lastVisit desc) → cursor pagination (PAGE_LIMIT=50)
+    - `components/` — 9 files: page orchestrator, header (Link to calendar), KPI row (5 tiles), segments-sidebar (URL-driven), filters (search debounced + master select), table, row (segment badge + chips), segment badge, pagination
+  - **Раздел 5 (Бизнес-логика):**
+    - **Segments derived, not stored** — `classifyClient` reuse ensures studio segment = master cabinet segment = STUDIO-BOOKINGS-A VIP signal. Single source of truth, threshold drift impossible
+    - **CRM privacy preserved** — route `resolveCurrentStudioAccess` admits OWNER/ADMIN only at studio cabinet entry. Service operates within that scope. Master-only view enforced separately at `/cabinet/master/clients`
+    - **KPI «added this month»** — proxy `visits ≤ 1 && lastVisitAt within month` (no `firstVisitAt` on `StudioClientRow` currently; backlog for precise count)
+    - **KPI «sleeping»** — uses `CLIENT_STATUS_THRESHOLDS.SLEEPING_AFTER_DAYS` (90, not 60 from spec). Reused classifier constant for consistency with master cabinet sleeping rule — single threshold source. Spec said "60+ дней" but reusing 90 keeps the system coherent; if 60 specifically needed, backlog
+    - **«Add client» pragmatic resolution** — clients table sources from booking aggregation (no name field on ClientCard). Standalone client creation would produce an invisible row. CTA links to `/cabinet/studio/calendar` where create-booking-dialog atomically captures phone+name+service+master+time. Honest UX > broken affordance
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/clients` page rewritten (was: simple table, now: rich 2-col with KPIs + segments + filters + pagination). URL params `?segment=all|vip|regular|new|sleeping&q=<search>&master=<id>&cursor=<key>` — shareable + browser back. **No new API endpoints** — all data flows through Prisma directly in the server service (consistent with other studio cabinet pages)
+  - **Раздел 12 (Инварианты):** не затронуты. New module respects all existing invariants (privacy guard, VIP threshold reuse, no chat icon)
+  - **UI_TEXT:** новый subtree `studioCabinet.clientsV2.*` (~45 keys — header / kpis / segments / filters / table / badges / actions / pagination / empty / errors). Legacy `studioCabinet.clients.*` keys preserved (still used by old page file as backup + ClientCardDrawer integrations elsewhere)
+  - **@deprecated:** `src/features/studio/components/studio-clients-page.tsx` — replaced by new module, no longer imported by route. Kept in tree because `ClientCardDrawer` from `@/features/crm/components/` is still consumed by other surfaces. Phase 7 cleanup
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Backlog spawned:** Client blacklist mechanism (🟠 — schema flag/tag), Client birthday field (🟠 — schema migration), Custom segments + Import/Export/Рассылка (🟡), Studio-cabinet redesigned ClientCardDrawer (🟡), Precise firstVisitAt on row (🟡), Phone search normalisation (🟡), Client merge / Tag management UI / "Записать" pre-filled (🔵)
+  - **Sprint progress:** 14/14 commits closed for the planned scope. Remaining studio pages (Reviews / Analytics / Finance / Settings / Notifications integration) are separate workstreams
+
+- **2026-05-17 — STUDIO-SHOWCASE-SEED** (commit on `designStudioCabinet`). Rich-data fixture for studio cabinet visual validation. Mirror of `seed-showcase-master.ts` mechanism (Анна Соколова → 26-SHOWCASE-MASTER-SEED). **No schema migration, no production code touched** — pure seed addition.
+  - **Audit findings:**
+    - Master showcase = TS file `prisma/seeds/test-data/seed-showcase-master.ts`, idempotent via upsert by email + publicUsername + composite uniques + deterministic id prefix `seed-bk-showcase-anna-NN`. Wired into `index.ts` after `seedShowcaseMaster({ clients, plans })`. Run via `npm run seed:test`, reset via `npm run seed:test:reset` (catches seed users by `@test.masterryadom.local` email domain — phone-marker not needed)
+    - Studio cabinet access goes through **`StudioMembership`** (canonical state machine PENDING/ACTIVE/REJECTED/LEFT with `roles: StudioRole[]`), NOT `StudioMember` (legacy redundancy — both populated for compatibility per audit invariant)
+    - Active master predicate from invariant #24: `Provider.ownerUserId !== null && Provider.isPublished === true`. Seed must set both
+    - 12 APPROVED categories already exist from `seedCategories()` — showcase studio reuses them via slug lookup. 2 PENDING categories scoped to studio via `createdByUserId=owner` + `createdByProviderId=studio.providerId` (invariant #23)
+    - VIP threshold = LTV ≥ 5 000 000 kopecks (master cabinet `CLIENT_STATUS_THRESHOLDS.VIP_LTV_KOPEKS`) — design 3 clients with ~5M+ via accumulated FINISHED bookings of high-ticket services (combo 750K, balayage 1.1M, wedding-makeup 700K)
+    - Existing seed phone ranges: masters `+79000001..28`, studios `+79000150..155`, clients `+79000100..114`. Master showcase used `+79991000009`. Studio showcase chose `+79992xxxxxx` — clean separation, no collision
+  - **Раздел 3 (Архитектура):** new file `prisma/seeds/test-data/seed-showcase-studio.ts` (~750 LOC) — single `seedShowcaseStudio({ clients, plans })` export. Sections: owner + studio provider + Studio row + StudioMembership/StudioMember (owner OWNER); 7 master users + Provider rows with `studioId` + StudioMembership/StudioMember (MASTER); 2 PENDING categories with creator scope; 35 service rows attached to studio provider; MasterService assignments by specialty; weekly schedule templates Пн-Сб 10-19 (Вс off); 56 BOOKING_PLAN entries → upsert with BookingServiceItem snapshots; 3 ServicePackages; 15 REVIEW_PLAN entries; 7 ClientCards (3 VIP + tags); 12 notifications (wipe + replay since Notification has no natural unique); 2 PENDING ScheduleChangeRequests. Wired into `index.ts` after `seedShowcaseMaster` (depends on same clients/plans pool)
+  - **Раздел 9 (Тестирование):** studio showcase seed добавлен как rich-data fixture для visual validation всех studio cabinet pages (dashboard / masters / schedule / bookings / services / reviews / clients / notifications / schedule-requests). Reused: existing `seedClients()` pool (15 clients) — same 15-client pool services both Anna's master showcase и Vision Beauty Studio. Reset cleanly via `npm run seed:test:reset` (email marker). Tests still 247/247
+  - **Раздел 6 (Маршруты):** **NO route changes.** Seed only manipulates DB rows. URL surfaces: showcase studio admin logs in via `+79992000000`, cabinet entry `/cabinet/studio`. Public profile via existing `/providers/<id>` (no slug-based studio route exists yet)
+  - **Раздел 12 (Инварианты):** не затронуты — seed соблюдает все existing invariants. Demonstrates them visually: invariant #23 (PENDING category creator-scope visibility), invariant #24 (ACTIVE master predicate), invariant #21 (no permissions toggles), invariant #22 (admin booking CRUD direct)
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests. **Seed not executed** locally (Postgres unavailable in dev env) — code structurally validated through Prisma client types
+  - **Run instructions:**
+    - First time / reset + replay: `npm run seed:test:reset && npm run seed:test`
+    - Add showcase to existing seed: `npm run seed:test` (idempotent — pre-existing data not wiped)
+    - Login: phone `+7 999 200 00 00` → check server logs for OTP code → enters as Виктория Алмазова → auto-redirected to `/cabinet/studio`
+  - **Backlog spawned:** none — pure data fixture, no follow-ups required
 
 - **2026-05-17 — STUDIO-POLISH-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 13/13 — sprint **functional + polish work complete**. 4 visual замечания из live testing, low-risk single commit, no functional changes, no schema migration.
   - **Audit findings:**

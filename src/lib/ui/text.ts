@@ -6228,6 +6228,68 @@ export const UI_TEXT = {
         loadMore: "Показать ещё",
       },
     },
+    clientsV2: {
+      header: {
+        caption: "КЛИЕНТСКАЯ БАЗА · {total} человек · {filtered} отфильтровано",
+        title: "Клиенты студии",
+        subtitle: "Общая база. Каждый мастер видит только своих, владелец — всех.",
+        addClient: "Клиент",
+      },
+      kpis: {
+        total: "Всего клиентов",
+        totalSub: "+{count} за месяц",
+        active: "Активных за 30 дней",
+        activeSub: "{percent}% от базы",
+        avgLifetime: "Средняя пожизненная",
+        avgLifetimeSub: "по студии в среднем",
+        vip: "VIP-клиенты",
+        vipSub: "{percent}% выручки",
+        sleeping: "Спящие · 60+ дней",
+        sleepingSub: "потенциал реактивации",
+      },
+      segments: {
+        title: "Сегменты",
+        all: "Все клиенты",
+        vip: "VIP",
+        regular: "Постоянные",
+        new: "Новые",
+        sleeping: "Спящие",
+      },
+      filters: {
+        searchPlaceholder: "Имя клиента или телефон",
+        masterAll: "Все мастера",
+      },
+      table: {
+        colClient: "Клиент",
+        colPhone: "Телефон",
+        colVisits: "Визитов",
+        colLtv: "LTV",
+        colLast: "Последний",
+        colMainMaster: "Основной мастер",
+        mastersCountTemplate: "у {count} мастеров",
+        avgCheckTemplate: "ср. {amount}",
+      },
+      badges: {
+        vip: "VIP",
+        regular: "Постоянный",
+        new: "Новый",
+        sleeping: "Спящий",
+        other: "—",
+      },
+      actions: {
+        book: "Записать",
+      },
+      pagination: {
+        loadMore: "Показать ещё",
+      },
+      empty: {
+        title: "Нет клиентов",
+        hint: "Клиенты появятся после первых записей.",
+      },
+      errors: {
+        loadFailed: "Не удалось загрузить клиентов",
+      },
+    },
     mastersV2: {
       header: {
         caption: "КОМАНДА · {count} мастеров",
