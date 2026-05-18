@@ -1,26 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
-  SlotPickerOptimized,
-  groupSlotsByTimeOfDay,
-  type SlotItem as SlotPickerItem,
-} from "@/features/booking/components/slot-picker/slot-picker";
-import {
-  buildDateBounds,
   createBooking,
   fetchBookingMe,
   fetchMasterAvailability,
   fetchStudioMasters,
   fetchStudioProfile,
-  STUDIO_BOOKING_DAYS_AHEAD,
   todayKey,
   type BookingUser,
   type SlotItem,
@@ -35,6 +24,15 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { studioBookingUrl } from "@/lib/public-urls";
+import { BookingHero } from "./components/booking-hero";
+import { StepsBar, type WizardStep } from "./components/steps-bar";
+import { StepTransition } from "./components/step-transition";
+import { ServiceStep } from "./components/steps/service-step";
+import { MasterStep, ANY_MASTER_ID } from "./components/steps/master-step";
+import { WhenStep } from "./components/steps/when-step";
+import { YouStep } from "./components/steps/you-step";
+import { BookingSummary } from "./components/booking-summary";
+import { BookingError } from "./components/booking-error";
 
 type MasterAvailability = {
   serviceAvailable: boolean;
@@ -49,11 +47,15 @@ type Props = {
   initialServiceId?: string;
 };
 
-const ANY_MASTER_ID = "__any__";
-
 function buildLoginUrl(nextPath: string): string {
   const params = new URLSearchParams({ next: nextPath });
   return `/login?${params.toString()}`;
+}
+
+function formatDateLabel(dateKey: string): string {
+  const parsed = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return dateKey;
+  return parsed.toLocaleDateString("ru-RU", { day: "numeric", month: "short", weekday: "short" });
 }
 
 export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey, initialServiceId }: Props) {
@@ -62,21 +64,18 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [masters, setMasters] = useState<StudioMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
   const [masterId, setMasterId] = useState(initialMasterId ?? "");
   const [slotLabel, setSlotLabel] = useState("");
   const [availabilityByMaster, setAvailabilityByMaster] = useState<Record<string, MasterAvailability>>({});
-  const [masterSelectionError, setMasterSelectionError] = useState<string | null>(null);
 
   const [me, setMe] = useState<BookingUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [comment, setComment] = useState("");
   const [silentMode, setSilentMode] = useState(false);
-  // BOOKING-WIDGET-FOUNDATION-A: guest contacts. When no session,
-  // collect name + phone in-form instead of opening an auth modal.
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [bookingConfig, setBookingConfig] = useState<ServiceBookingConfig | null>(null);
@@ -90,13 +89,23 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null);
+  const [success, setSuccess] = useState<null | {
+    serviceName: string;
+    masterName: string;
+    dateLabel: string;
+    timeLabel: string;
+  }>(null);
 
-  const dateBounds = useMemo(() => buildDateBounds(new Date(), STUDIO_BOOKING_DAYS_AHEAD), []);
+  // Scenario: B if a master is locked in (initial param or single-master prefill);
+  // A otherwise (studio-wide). FOUNDATION already wired ?master= parsing.
+  const isScenarioB = Boolean(initialMasterId || initialMasterKey);
+  const [step, setStep] = useState<WizardStep>("service");
+  const [direction, setDirection] = useState<1 | -1>(1);
+
   const selectedService = useMemo(
     () => studio?.services.find((service) => service.id === serviceId) ?? null,
-    [serviceId, studio?.services]
+    [serviceId, studio?.services],
   );
 
   const availableMasters = useMemo(() => {
@@ -116,25 +125,40 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   const slots = useMemo(
     () => (resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.slots ?? [] : []),
-    [availabilityByMaster, resolvedMasterId]
+    [availabilityByMaster, resolvedMasterId],
   );
-  const slotItems = useMemo<SlotPickerItem[]>(
-    () =>
-      slots.map((slot) => {
-        return {
-          id: slot.label,
-          label: slot.label,
-          timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
-        };
-      }),
-    [slots, viewerTimeZone]
-  );
-  const slotGroups = useMemo(() => groupSlotsByTimeOfDay(slotItems), [slotItems]);
   const slotByLabel = useMemo(() => new Map(slots.map((slot) => [slot.label, slot])), [slots]);
   const selectedSlot = slotLabel ? slotByLabel.get(slotLabel) ?? null : null;
-  const selectedTimeLabel = selectedSlot
-    ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: viewerTimeZone })
-    : UI_TEXT.publicStudio.fallbackValue;
+
+  const prefilledMaster = useMemo(
+    () =>
+      initialMasterId
+        ? masters.find((m) => m.id === initialMasterId) ??
+          masters.find((m) => m.publicUsername?.toLowerCase() === initialMasterKey?.toLowerCase()) ??
+          null
+        : null,
+    [initialMasterId, initialMasterKey, masters],
+  );
+
+  // Goto helpers
+  const goNext = useCallback(
+    (from: WizardStep) => {
+      setDirection(1);
+      if (from === "service") setStep(isScenarioB ? "when" : "master");
+      else if (from === "master") setStep("when");
+      else if (from === "when") setStep("you");
+    },
+    [isScenarioB],
+  );
+  const goBack = useCallback(
+    (from: WizardStep) => {
+      setDirection(-1);
+      if (from === "you") setStep("when");
+      else if (from === "when") setStep(isScenarioB ? "service" : "master");
+      else if (from === "master") setStep("service");
+    },
+    [isScenarioB],
+  );
 
   const nextPath =
     typeof window !== "undefined"
@@ -142,32 +166,33 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
       : studioBookingUrl(
           { id: studioId, publicUsername: studio?.publicUsername ?? null },
           undefined,
-          "studio-booking-flow"
+          "studio-booking-flow",
         ) ?? "#";
+  const loginHref = buildLoginUrl(nextPath);
+  const studioBackHref = studio?.publicUsername ? `/u/${studio.publicUsername}` : `/u/${studioId}`;
+
+  // --- effects (logic preserved from FOUNDATION) -----------------------------
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setLoading(true);
-        setError(null);
-
+        setLoadError(null);
         const [profileRes, mastersRes] = await Promise.all([fetchStudioProfile(studioId), fetchStudioMasters(studioId)]);
         if (!profileRes.ok) throw new Error(profileRes.error);
         if (profileRes.provider.type !== "STUDIO") throw new Error(UI_TEXT.publicStudio.studioOnlyProfileError);
-
         if (cancelled) return;
         setStudio(profileRes.provider);
         setMasters(mastersRes.ok ? mastersRes.masters : []);
-      } catch (loadError) {
+      } catch (err) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : UI_TEXT.publicStudio.bookingError);
+          setLoadError(err instanceof Error ? err.message : UI_TEXT.publicStudio.bookingError);
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
@@ -191,95 +216,16 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   useEffect(() => {
     setSlotLabel("");
-    setMasterSelectionError(null);
   }, [serviceId]);
 
-  useEffect(() => {
-    if (!serviceId) {
-      setBookingConfig(null);
-      setBookingConfigError(null);
-      setBookingAnswers({});
-      setReferencePhotoAssetId(null);
-      setReferencePreviewUrl(null);
-      setReferenceUploadError(null);
-      setReferenceUploading(false);
-      setBookingConfigLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setBookingConfigLoading(true);
-    setBookingConfigError(null);
-    setBookingAnswers({});
-    setReferencePhotoAssetId(null);
-    setReferencePreviewUrl(null);
-    setReferenceUploadError(null);
-    setReferenceUploading(false);
-
-    (async () => {
-      try {
-        const config = await fetchPublicServiceBookingConfig(serviceId);
-        if (!cancelled) {
-          setBookingConfig(config);
-        }
-      } catch {
-        if (!cancelled) {
-          setBookingConfig(null);
-        setBookingConfigError(UI_TEXT.publicProfile.booking.bookingConfigLoadFailed);
-        }
-      } finally {
-        if (!cancelled) {
-          setBookingConfigLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [serviceId]);
-
-  useEffect(() => {
-    return () => {
-      if (referencePreviewUrl) {
-        URL.revokeObjectURL(referencePreviewUrl);
-      }
-    };
-  }, [referencePreviewUrl]);
-
-  useEffect(() => {
-    if (masterSelectionError) {
-      setMasterSelectionError(null);
-    }
-  }, [masterId, masterSelectionError]);
-
-  useEffect(() => {
-    if (!masters.length) return;
-    if (masterId && masterId !== ANY_MASTER_ID) {
-      const exists = masters.some((master) => master.id === masterId);
-      if (!exists) {
-        setMasterId("");
-      }
-      return;
-    }
-    if (!masterId && initialMasterKey) {
-      const normalized = initialMasterKey.trim().toLowerCase();
-      const match = masters.find((master) => master.publicUsername?.toLowerCase() === normalized);
-      if (match) {
-        setMasterId(match.id);
-      }
-    }
-  }, [initialMasterKey, masterId, masters]);
-
+  // Fetch availability per master when service or date changes
   useEffect(() => {
     if (!serviceId || masters.length === 0) {
       setAvailabilityByMaster({});
       return;
     }
-
     let cancelled = false;
     const unavailableCodes = new Set(["SERVICE_INVALID", "SERVICE_DISABLED", "SERVICE_NOT_FOUND"]);
-
     (async () => {
       setLoadingSlots(true);
       try {
@@ -287,11 +233,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           masters.map(async (master) => ({
             id: master.id,
             result: await fetchMasterAvailability(master.id, serviceId, selectedDate),
-          }))
+          })),
         );
-
         if (cancelled) return;
-
         const next: Record<string, MasterAvailability> = {};
         for (const entry of results) {
           if (entry.result.ok) {
@@ -309,29 +253,80 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         if (!cancelled) setLoadingSlots(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
   }, [masters, selectedDate, serviceId]);
 
+  // If service has a config (questions / reference photo) — load it
   useEffect(() => {
-    if (!serviceId || !masterId || masterId === ANY_MASTER_ID) return;
-    const availability = availabilityByMaster[masterId];
-    if (availability?.serviceAvailable === false) {
-      setMasterId("");
-      setMasterSelectionError(UI_TEXT.publicStudio.noMastersWithService);
-    }
-  }, [availabilityByMaster, masterId, serviceId]);
-
-  useEffect(() => {
-    if (!slots.length) {
-      setSlotLabel("");
+    if (!serviceId) {
+      setBookingConfig(null);
+      setBookingConfigError(null);
+      setBookingAnswers({});
+      setReferencePhotoAssetId(null);
+      setReferencePreviewUrl(null);
+      setReferenceUploadError(null);
+      setReferenceUploading(false);
+      setBookingConfigLoading(false);
       return;
     }
-    if (slotLabel && slots.some((slot) => slot.label === slotLabel)) return;
-    setSlotLabel(slots[0]?.label ?? "");
-  }, [slotLabel, slots]);
+    let cancelled = false;
+    setBookingConfigLoading(true);
+    setBookingConfigError(null);
+    setBookingAnswers({});
+    setReferencePhotoAssetId(null);
+    setReferencePreviewUrl(null);
+    setReferenceUploadError(null);
+    setReferenceUploading(false);
+    (async () => {
+      try {
+        const config = await fetchPublicServiceBookingConfig(serviceId);
+        if (!cancelled) setBookingConfig(config);
+      } catch {
+        if (!cancelled) {
+          setBookingConfig(null);
+          setBookingConfigError(UI_TEXT.publicProfile.booking.bookingConfigLoadFailed);
+        }
+      } finally {
+        if (!cancelled) setBookingConfigLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [serviceId]);
+
+  useEffect(() => {
+    return () => {
+      if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl);
+    };
+  }, [referencePreviewUrl]);
+
+  // Master prefill via initialMasterKey when masters arrive
+  useEffect(() => {
+    if (!masters.length) return;
+    if (masterId && masterId !== ANY_MASTER_ID) {
+      const exists = masters.some((master) => master.id === masterId);
+      if (!exists) setMasterId("");
+      return;
+    }
+    if (!masterId && initialMasterKey) {
+      const normalized = initialMasterKey.trim().toLowerCase();
+      const match = masters.find((master) => master.publicUsername?.toLowerCase() === normalized);
+      if (match) setMasterId(match.id);
+    }
+  }, [initialMasterKey, masterId, masters]);
+
+  // If selected slot disappears, reset
+  useEffect(() => {
+    if (!slots.length) return;
+    if (slotLabel && !slots.some((slot) => slot.label === slotLabel)) {
+      setSlotLabel("");
+    }
+  }, [slots, slotLabel]);
+
+  // --- handlers --------------------------------------------------------------
 
   async function handleReferenceUpload(file: File) {
     setReferenceUploadError(null);
@@ -341,7 +336,6 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
       if (current) URL.revokeObjectURL(current);
       return URL.createObjectURL(file);
     });
-
     const result = await uploadBookingReference(file);
     if (!result.ok) {
       setReferenceUploadError(result.error);
@@ -352,9 +346,38 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     setReferenceUploading(false);
   }
 
+  const isGuest = !meLoading && !me;
+  const guestValid = guestName.trim().length > 0 && guestPhone.trim().length > 0;
+  const contactsReady = isGuest ? guestValid : !!me;
+
+  const submitDisabled =
+    !studio ||
+    !selectedService ||
+    !resolvedMasterId ||
+    !slotLabel ||
+    !contactsReady ||
+    submitLoading ||
+    referenceUploading;
+
+  const done = useMemo<ReadonlySet<WizardStep>>(() => {
+    const set = new Set<WizardStep>();
+    if (serviceId) set.add("service");
+    if (masterId || isScenarioB) set.add("master");
+    if (slotLabel) set.add("when");
+    if (contactsReady) set.add("you");
+    return set;
+  }, [serviceId, masterId, slotLabel, contactsReady, isScenarioB]);
+
+  const statusLabel = useMemo(() => {
+    if (!serviceId) return UI_TEXT.bookingWidget.summary.badgeService;
+    if (!masterId && !isScenarioB) return UI_TEXT.bookingWidget.summary.badgeMaster;
+    if (!slotLabel) return UI_TEXT.bookingWidget.summary.badgeWhen;
+    if (!contactsReady) return UI_TEXT.bookingWidget.summary.badgeYou;
+    return UI_TEXT.bookingWidget.summary.badgeReady;
+  }, [serviceId, masterId, slotLabel, contactsReady, isScenarioB]);
+
   async function onSubmit() {
     if (!studio || !selectedService || !resolvedMasterId || !slotLabel) return;
-
     const slot = slotByLabel.get(slotLabel) ?? null;
     if (!slot) {
       setSubmitError(UI_TEXT.publicStudio.selectSlotFirst);
@@ -363,12 +386,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
     setSubmitLoading(true);
     setSubmitError(null);
-    setSubmitSuccess(null);
+    setSubmitErrorCode(null);
+
     try {
-      // BOOKING-WIDGET-FOUNDATION-A: guest contact validation. For
-      // signed-in users we trust the session profile; for guests we
-      // require name + phone (already required by server validation).
-      const isGuest = !me;
       if (isGuest) {
         if (!guestName.trim()) {
           setSubmitError(UI_TEXT.publicStudio.guestNameRequired);
@@ -388,10 +408,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         return;
       }
       if (bookingConfig?.questions?.length) {
-        const missingRequired = bookingConfig.questions.some(
-          (question) => question.required && !(bookingAnswers[question.id]?.trim() ?? "")
+        const missing = bookingConfig.questions.some(
+          (q) => q.required && !(bookingAnswers[q.id]?.trim() ?? ""),
         );
-        if (missingRequired) {
+        if (missing) {
           setSubmitError(UI_TEXT.publicProfile.booking.requiredQuestions);
           setSubmitLoading(false);
           return;
@@ -400,14 +420,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
       const answersPayload =
         bookingConfig?.questions
-          ?.map((question) => {
-            const value = bookingAnswers[question.id]?.trim() ?? "";
+          ?.map((q) => {
+            const value = bookingAnswers[q.id]?.trim() ?? "";
             if (!value) return null;
-            return {
-              questionId: question.id,
-              questionText: question.text,
-              answer: value,
-            };
+            return { questionId: q.id, questionText: q.text, answer: value };
           })
           .filter((item): item is { questionId: string; questionText: string; answer: string } => item !== null) ??
         null;
@@ -419,8 +435,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         startAtUtc: slot.startAtUtc,
         endAtUtc: slot.endAtUtc,
         slotLabel: slot.label,
-        clientName:
-          me?.displayName ?? (guestName.trim() || UI_TEXT.publicProfile.booking.clientFallbackName),
+        clientName: me?.displayName ?? (guestName.trim() || UI_TEXT.publicProfile.booking.clientFallbackName),
         clientPhone: me?.phone ?? guestPhone.trim(),
         comment: comment.trim() ? comment.trim() : null,
         silentMode,
@@ -429,348 +444,309 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
       });
 
       if (!result.ok) {
-        setSubmitError(result.error || UI_TEXT.publicStudio.bookingError);
+        setSubmitError(result.error || UI_TEXT.bookingWidget.errors.generic);
+        setSubmitErrorCode(result.code ?? null);
         return;
       }
-      setSubmitSuccess(UI_TEXT.publicStudio.bookingSuccess);
+
+      const masterName =
+        resolvedMasterId === masterId && masterId !== ANY_MASTER_ID
+          ? masters.find((m) => m.id === resolvedMasterId)?.name ?? ""
+          : masterId === ANY_MASTER_ID
+          ? UI_TEXT.bookingWidget.summary.anyMaster
+          : masters.find((m) => m.id === resolvedMasterId)?.name ?? "";
+
+      setSuccess({
+        serviceName: selectedService.name,
+        masterName,
+        dateLabel: formatDateLabel(selectedDate),
+        timeLabel: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
+      });
     } finally {
       setSubmitLoading(false);
     }
   }
 
+  // --- rendering -------------------------------------------------------------
+
   if (loading) {
+    return <BookingFlowSkeleton />;
+  }
+  if (loadError || !studio) {
     return (
-      <div className="rounded-2xl border border-border-subtle bg-bg-card p-6">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-3">
-            <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={`service-skeleton-${index}`} className="h-16 animate-pulse rounded-xl bg-muted" />
-            ))}
-          </div>
-          <div className="space-y-3">
-            <div className="h-4 w-36 animate-pulse rounded bg-muted" />
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 9 }).map((_, index) => (
-                <div key={`slot-skeleton-${index}`} className="h-8 animate-pulse rounded-lg bg-muted" />
-              ))}
-            </div>
-            <div className="h-28 animate-pulse rounded-xl bg-muted" />
-          </div>
-        </div>
+      <div className="rounded-2xl border border-red-300/60 bg-red-50/60 p-6 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+        {loadError ?? UI_TEXT.publicStudio.bookingError}
       </div>
     );
   }
-  if (error || !studio) {
+
+  if (success) {
     return (
-      <div className="rounded-2xl border border-red-300/60 bg-red-950/30 p-6 text-sm text-red-200">
-        {error ?? UI_TEXT.publicStudio.bookingError}
+      <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 sm:p-8">
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+          ✓
+        </div>
+        <h2 className="mt-4 font-display text-2xl font-semibold text-text">{UI_TEXT.bookingWidget.success.title}</h2>
+        <p className="mt-2 text-sm text-text-muted">
+          {UI_TEXT.bookingWidget.success.detailsTemplate
+            .replace("{service}", success.serviceName)
+            .replace("{master}", success.masterName || UI_TEXT.bookingWidget.summary.anyMaster)
+            .replace("{when}", `${success.dateLabel} · ${success.timeLabel}`)}
+        </p>
+        <p className="mt-2 text-xs text-text-muted">{UI_TEXT.bookingWidget.success.hint}</p>
+        <a
+          href={studioBackHref}
+          className="mt-5 inline-flex rounded-xl bg-bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-bg-muted/70"
+        >
+          {UI_TEXT.bookingWidget.success.backToStudio}
+        </a>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-6 rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
-        <section>
-          <h3 className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.chooseService}</h3>
-          <div className="mt-3 space-y-2">
-            {studio.services.map((service) => (
-              <Button
-                key={service.id}
-                variant={serviceId === service.id ? "primary" : "secondary"}
-                size="none"
-                onClick={() => setServiceId(service.id)}
-                className="w-full rounded-xl border px-3 py-3 text-left"
-              >
-                <div className="text-sm font-semibold">{service.name}</div>
-                <div className="mt-1 text-xs opacity-80">
-                  {service.price > 0
-                    ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
-                    : UI_TEXT.publicStudio.servicePriceOnRequest}
-                </div>
-              </Button>
-            ))}
-          </div>
-        </section>
+    <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+      <div className="space-y-4">
+        <BookingHero
+          studio={studio}
+          masters={masters}
+          prefilledMaster={prefilledMaster}
+          backHref={studioBackHref}
+        />
 
-        <section className={serviceId ? "" : "opacity-50"}>
-          <h3 className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.chooseMaster}</h3>
-          {!serviceId ? <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicStudio.selectServiceFirst}</div> : null}
-          {serviceId && loadingSlots ? (
-            <div className="mt-3 space-y-2">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`master-skeleton-${index}`} className="h-12 animate-pulse rounded-xl bg-muted" />
-              ))}
+        <StepsBar active={step} done={done} scenarioB={isScenarioB} />
+
+        <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 sm:p-6">
+          <StepTransition step={step} direction={direction}>
+            {step === "service" ? (
+              <ServiceStep
+                services={studio.services}
+                masters={masters}
+                selectedServiceId={serviceId}
+                prefilledMaster={prefilledMaster}
+                onPick={(id) => {
+                  setServiceId(id);
+                  goNext("service");
+                }}
+              />
+            ) : null}
+
+            {step === "master" ? (
+              <MasterStep
+                masters={masters}
+                availabilityByMaster={availabilityByMaster}
+                selectedMasterId={masterId}
+                selectedServiceName={selectedService?.name ?? ""}
+                onPick={(id) => {
+                  setMasterId(id);
+                  goNext("master");
+                }}
+                onBack={() => goBack("master")}
+              />
+            ) : null}
+
+            {step === "when" ? (
+              <WhenStep
+                slots={slots}
+                loading={loadingSlots}
+                selectedDate={selectedDate}
+                onDateChange={(date) => {
+                  setSelectedDate(date);
+                  setSlotLabel("");
+                }}
+                selectedSlotLabel={slotLabel}
+                onSlotChange={(label) => {
+                  setSlotLabel(label);
+                  goNext("when");
+                }}
+                viewerTimeZone={viewerTimeZone}
+                selectedMasterName={
+                  resolvedMasterId
+                    ? masters.find((m) => m.id === resolvedMasterId)?.name ?? ""
+                    : ""
+                }
+                isAnyMaster={masterId === ANY_MASTER_ID}
+                visibleSlotDays={30}
+                onBack={() => goBack("when")}
+              />
+            ) : null}
+
+            {step === "you" ? (
+              <YouStep
+                me={me}
+                meLoading={meLoading}
+                guestName={guestName}
+                guestPhone={guestPhone}
+                onGuestNameChange={setGuestName}
+                onGuestPhoneChange={setGuestPhone}
+                comment={comment}
+                onCommentChange={setComment}
+                silentMode={silentMode}
+                onSilentChange={setSilentMode}
+                loginHref={loginHref}
+                onBack={() => goBack("you")}
+              />
+            ) : null}
+          </StepTransition>
+
+          {step === "you" && bookingConfig
+            ? renderBookingConfig({
+                bookingConfig,
+                bookingConfigLoading,
+                bookingConfigError,
+                referencePreviewUrl,
+                referenceUploading,
+                referenceUploadError,
+                onReferenceUpload: handleReferenceUpload,
+                answers: bookingAnswers,
+                setAnswers: setBookingAnswers,
+              })
+            : null}
+
+          {step === "you" ? (
+            <div className="mt-4 space-y-3">
+              <BookingError
+                code={submitErrorCode}
+                fallback={submitError ?? undefined}
+                minBookingHoursAhead={null}
+                maxBookingDaysAhead={null}
+              />
             </div>
           ) : null}
-          {serviceId && !loadingSlots ? (
-            <div className="mt-3 space-y-2">
-              <Button
-                variant={masterId === ANY_MASTER_ID ? "primary" : "secondary"}
-                size="none"
-                onClick={() => setMasterId(ANY_MASTER_ID)}
-                className="w-full rounded-xl border px-3 py-3 text-left"
-              >
-                {UI_TEXT.publicStudio.anyMaster}
-              </Button>
-              {availableMasters.map((master) => (
-                <Button
-                  key={master.id}
-                  variant={masterId === master.id ? "primary" : "secondary"}
-                  size="none"
-                  onClick={() => setMasterId(master.id)}
-                  className="w-full rounded-xl border px-3 py-3 text-left"
-                >
-                  {master.name}
-                </Button>
-              ))}
-            </div>
-          ) : null}
-          {serviceId && masterSelectionError ? <div className="mt-2 text-xs text-amber-600">{masterSelectionError}</div> : null}
-        </section>
+        </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
-        <section className={serviceId ? "" : "opacity-50"}>
-          <h3 className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.chooseDate}</h3>
+      <aside className="lg:sticky lg:top-24 lg:self-start">
+        <BookingSummary
+          serviceName={selectedService?.name ?? null}
+          masterName={
+            resolvedMasterId ? masters.find((m) => m.id === resolvedMasterId)?.name ?? null : null
+          }
+          isAnyMaster={masterId === ANY_MASTER_ID}
+          dateLabel={selectedDate ? formatDateLabel(selectedDate) : null}
+          timeLabel={
+            selectedSlot ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: viewerTimeZone }) : null
+          }
+          totalKopeks={selectedService?.price ?? null}
+          cancellationDeadlineHours={studio.cancellationDeadlineHours ?? null}
+          submitDisabled={submitDisabled}
+          submitLoading={submitLoading}
+          onSubmit={onSubmit}
+          statusLabel={statusLabel}
+        />
+        {step !== "you" ? (
           <div className="mt-3">
-            <DatePicker value={selectedDate} min={dateBounds.min} max={dateBounds.max} onChange={setSelectedDate} />
+            <BookingError
+              code={submitErrorCode}
+              fallback={submitError ?? undefined}
+              minBookingHoursAhead={null}
+              maxBookingDaysAhead={null}
+            />
           </div>
-        </section>
+        ) : null}
+      </aside>
+    </div>
+  );
+}
 
-        <section className={serviceId && masterId ? "" : "opacity-50"}>
-          {loadingSlots ? (
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 9 }).map((_, index) => (
-                <div key={index} className="h-8 animate-pulse rounded-lg bg-muted" />
-              ))}
-            </div>
-          ) : !serviceId ? (
-            <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.selectServiceFirst}</div>
-          ) : !masterId ? (
-            <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.selectMasterFirst}</div>
-          ) : slots.length === 0 ? (
-            <div className="text-sm text-text-muted">{UI_TEXT.publicStudio.noSlots}</div>
-          ) : (
-            <SlotPickerOptimized groups={slotGroups} value={slotLabel} onChange={setSlotLabel} />
-          )}
-        </section>
+function BookingFlowSkeleton() {
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+      <div className="space-y-4">
+        <div className="h-44 animate-pulse rounded-2xl bg-bg-muted/40" />
+        <div className="h-14 animate-pulse rounded-xl bg-bg-muted/40" />
+        <div className="h-72 animate-pulse rounded-2xl bg-bg-muted/40" />
+      </div>
+      <div className="h-72 animate-pulse rounded-2xl bg-bg-muted/40" />
+    </div>
+  );
+}
 
-        <section className="rounded-xl border border-border-subtle bg-bg-input/60 p-4">
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">{UI_TEXT.publicStudio.chooseService}</span>
-              <span className="font-medium text-text">{selectedService?.name ?? UI_TEXT.publicStudio.fallbackValue}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">{UI_TEXT.publicStudio.chooseMaster}</span>
-              <span className="font-medium text-text">
-                {masterId === ANY_MASTER_ID
-                  ? UI_TEXT.publicStudio.anyMaster
-                  : masters.find((master) => master.id === resolvedMasterId)?.name ?? UI_TEXT.publicStudio.fallbackValue}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">{UI_TEXT.publicStudio.selectedDate}</span>
-              <span className="font-medium text-text">{selectedDate || UI_TEXT.publicStudio.fallbackValue}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">{UI_TEXT.publicStudio.selectedTime}</span>
-              <span className="font-medium text-text">{selectedTimeLabel}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-border pt-2">
-              <span className="text-text-muted">{UI_TEXT.publicStudio.total}</span>
-              <span className="font-semibold text-text">
-                {selectedService?.price ? UI_FMT.priceLabel(selectedService.price) : UI_TEXT.publicStudio.servicePriceOnRequest}
-              </span>
-            </div>
-          </div>
+function renderBookingConfig(input: {
+  bookingConfig: ServiceBookingConfig;
+  bookingConfigLoading: boolean;
+  bookingConfigError: string | null;
+  referencePreviewUrl: string | null;
+  referenceUploading: boolean;
+  referenceUploadError: string | null;
+  onReferenceUpload: (file: File) => void;
+  answers: Record<string, string>;
+  setAnswers: (updater: (current: Record<string, string>) => Record<string, string>) => void;
+}) {
+  const {
+    bookingConfig,
+    bookingConfigLoading,
+    bookingConfigError,
+    referencePreviewUrl,
+    referenceUploading,
+    referenceUploadError,
+    onReferenceUpload,
+    answers,
+    setAnswers,
+  } = input;
 
-          <label
-            className="mt-3 block cursor-pointer rounded-xl border border-border-subtle bg-bg-card p-3"
-            aria-label={UI_TEXT.publicProfile.booking.silentModeAria}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium text-text">
-                  {UI_TEXT.publicProfile.booking.silentModeTitle}
-                </div>
-                <div className="mt-1 text-xs text-text-muted">
-                  {UI_TEXT.publicProfile.booking.silentModeDesc}
-                </div>
-              </div>
-              <span
-                className={`relative mt-1 inline-flex h-6 w-11 shrink-0 rounded-full border transition ${
-                  silentMode ? "border-primary/70 bg-primary/25" : "border-border-subtle bg-muted/20"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={silentMode}
-                  onChange={(event) => setSilentMode(event.target.checked)}
-                  className="sr-only"
-                />
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-                    silentMode ? "left-6" : "left-0.5"
-                  }`}
-                />
-              </span>
-            </div>
+  if (bookingConfigLoading) {
+    return <div className="mt-4 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.bookingConfigLoading}</div>;
+  }
+  if (bookingConfigError) {
+    return <div className="mt-4 text-xs text-red-600">{bookingConfigError}</div>;
+  }
+  if (!bookingConfig.requiresReferencePhoto && bookingConfig.questions.length === 0) return null;
+
+  return (
+    <div className="mt-4 space-y-3 rounded-xl border border-border-subtle bg-bg-muted/30 p-4">
+      <div className="text-sm font-semibold text-text">{UI_TEXT.publicProfile.booking.bookingConfigTitle}</div>
+      {bookingConfig.requiresReferencePhoto ? (
+        <div>
+          <label className="block text-xs text-text-muted">
+            {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-red-500">*</span>
           </label>
-          <label className="mt-3 block text-xs text-text-muted">{UI_TEXT.publicProfile.booking.comment}</label>
-          <Textarea
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            placeholder={UI_TEXT.publicProfile.booking.commentPlaceholder}
-            className="mt-1 min-h-[84px]"
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              if (file) onReferenceUpload(file);
+            }}
+            disabled={referenceUploading}
+            className="mt-2 block w-full text-xs text-text-muted"
           />
-
-          
-          {bookingConfigLoading ? (
-            <div className="mt-3 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.bookingConfigLoading}</div>
+          {referenceUploading ? (
+            <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.referencePhotoUploading}</div>
           ) : null}
-          {bookingConfigError ? <div className="mt-3 text-xs text-red-600">{bookingConfigError}</div> : null}
-
-          {bookingConfig && (bookingConfig.requiresReferencePhoto || bookingConfig.questions.length > 0) ? (
-            <div className="mt-3 rounded-xl border border-border-subtle bg-bg-card p-3 text-sm">
-              <div className="text-sm font-semibold text-text">
-                {UI_TEXT.publicProfile.booking.bookingConfigTitle}
-              </div>
-
-              {bookingConfig.requiresReferencePhoto ? (
-                <div className="mt-3">
-                  <label className="block text-xs text-text-muted">
-                    {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null;
-                      if (file) void handleReferenceUpload(file);
-                    }}
-                    disabled={referenceUploading}
-                    className="mt-2 block w-full text-xs text-text-muted"
-                  />
-                  {referenceUploading ? (
-                    <div className="mt-2 text-xs text-text-muted">
-                      {UI_TEXT.publicProfile.booking.referencePhotoUploading}
-                    </div>
-                  ) : null}
-                  {referenceUploadError ? (
-                    <div className="mt-2 text-xs text-red-600">{referenceUploadError}</div>
-                  ) : null}
-                  {referencePreviewUrl ? (
-                    <div className="relative mt-3 h-48 w-full overflow-hidden rounded-xl">
-                      <Image
-                        src={referencePreviewUrl}
-                        alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 640px"
-                        className="object-cover"
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {bookingConfig.questions.length > 0 ? (
-                <div className="mt-3 space-y-3">
-                  {bookingConfig.questions.map((question) => (
-                    <label key={question.id} className="block text-xs text-text-muted">
-                      <span className="text-sm text-text">
-                        {question.text}
-                        {question.required ? <span className="text-red-500"> *</span> : null}
-                      </span>
-                      <Input
-                        type="text"
-                        value={bookingAnswers[question.id] ?? ""}
-                        onChange={(event) =>
-                          setBookingAnswers((current) => ({ ...current, [question.id]: event.target.value }))
-                        }
-                        className="mt-2"
-                        placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
-                      />
-                    </label>
-                  ))}
-                </div>
-              ) : null}
+          {referenceUploadError ? <div className="mt-2 text-xs text-red-600">{referenceUploadError}</div> : null}
+          {referencePreviewUrl ? (
+            <div className="relative mt-3 h-44 w-full overflow-hidden rounded-xl">
+              <Image
+                src={referencePreviewUrl}
+                alt={UI_TEXT.publicProfile.booking.referencePhotoAlt}
+                fill
+                sizes="(max-width: 768px) 100vw, 480px"
+                className="object-cover"
+              />
             </div>
           ) : null}
-          {!meLoading && !me ? (
-            <div className="mt-3 rounded-xl border border-border-subtle bg-bg-card p-3 text-sm">
-              <div className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.guestSectionTitle}</div>
-              <div className="mt-1 text-xs text-text-muted">{UI_TEXT.publicStudio.guestSectionHint}</div>
-              <label className="mt-3 block text-xs text-text-muted">
-                {UI_TEXT.publicStudio.guestNameLabel}
-              </label>
+        </div>
+      ) : null}
+      {bookingConfig.questions.length > 0 ? (
+        <div className="space-y-3">
+          {bookingConfig.questions.map((question) => (
+            <label key={question.id} className="block text-xs text-text-muted">
+              <span className="text-sm text-text">
+                {question.text}
+                {question.required ? <span className="text-red-500"> *</span> : null}
+              </span>
               <Input
                 type="text"
-                value={guestName}
-                onChange={(event) => setGuestName(event.target.value)}
-                placeholder={UI_TEXT.publicStudio.guestNamePlaceholder}
+                value={answers[question.id] ?? ""}
+                onChange={(event) =>
+                  setAnswers((current) => ({ ...current, [question.id]: event.target.value }))
+                }
                 className="mt-1"
-                autoComplete="name"
+                placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
               />
-              <label className="mt-2 block text-xs text-text-muted">
-                {UI_TEXT.publicStudio.guestPhoneLabel}
-              </label>
-              <Input
-                type="tel"
-                value={guestPhone}
-                onChange={(event) => setGuestPhone(event.target.value)}
-                placeholder={UI_TEXT.publicStudio.guestPhonePlaceholder}
-                className="mt-1"
-                autoComplete="tel"
-              />
-              <div className="mt-2 text-xs text-text-muted">
-                {UI_TEXT.publicStudio.guestLoginHint}{" "}
-                <Link href={buildLoginUrl(nextPath)} className="font-medium text-primary underline-offset-2 hover:underline">
-                  {UI_TEXT.publicStudio.guestLoginCta}
-                </Link>
-              </div>
-            </div>
-          ) : null}
-          {submitError ? <div className="mt-2 text-sm text-red-600">{submitError}</div> : null}
-          {submitSuccess ? <div className="mt-2 text-sm text-emerald-600">{submitSuccess}</div> : null}
-
-          <Button
-            variant="primary"
-            onClick={() => void onSubmit()}
-            disabled={submitLoading || referenceUploading || !selectedService || !resolvedMasterId || !slotLabel}
-            className="mt-4 w-full"
-          >
-            {UI_TEXT.publicStudio.book}
-          </Button>
-        </section>
-      </div>
-
-      {showAuthModal ? (
-        <div className="fixed inset-0 z-50">
-          <Button variant="wrapper" className="absolute inset-0 bg-black/45" onClick={() => setShowAuthModal(false)} aria-label={UI_TEXT.common.cancel} />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-xl">
-              <div className="text-lg font-semibold text-text">{UI_TEXT.publicStudio.authRequiredTitle}</div>
-              <div className="mt-2 text-sm text-text-muted">{UI_TEXT.publicStudio.authRequiredText}</div>
-              <div className="mt-4 flex gap-2">
-                <Link
-                  href={buildLoginUrl(nextPath)}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta py-2 text-center text-sm font-semibold text-[rgb(var(--accent-foreground))]"
-                >
-                  {UI_TEXT.publicStudio.login}
-                </Link>
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowAuthModal(false)}
-                  className="flex-1"
-                >
-                  {UI_TEXT.common.cancel}
-                </Button>
-              </div>
-            </div>
-          </div>
+            </label>
+          ))}
         </div>
       ) : null}
     </div>
