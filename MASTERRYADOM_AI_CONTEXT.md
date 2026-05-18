@@ -23,7 +23,8 @@
 > - ✅ Seed consolidation (SEED-CONSOLIDATION-A — 4 showcase phones 100/200/300/400, `ensureUserByPhone` helper eliminates P2002, reset.ts extended scope, new admin showcase)
 > - ✅ Reviews page (STUDIO-REVIEWS-A — 3 stats cards including top services + 4 filter chips + master scope reply via extended `ensureMasterReviewAccess`, report reuses existing endpoint, «Ответ студии» label always)
 > - ✅ Notifications page (STUDIO-NOTIFICATIONS-A — reuses 26-NOTIF `getNotificationCenterData` filtered by `channel === "STUDIO"`, 4 KPI tiles + 10 chip filters incl. team/finance, inline approve/reject for SCHEDULE_REQUEST mirrors master BOOKING_REQUEST pattern, no cabinet artifacts)
-> - ⏳ Analytics, Finance, Settings
+> - ✅ Analytics page (STUDIO-ANALYTICS-A — 4 view tabs over 15 reused `/api/analytics/*` endpoints, KPI + revenue compare overlay + sources donut + hours heatmap + Masters/Services/Clients tables, plan-gated via existing `analytics_*` feature catalog, no «ВАМ» payout column, inline-SVG charts, no custom date picker)
+> - ⏳ Finance, Settings
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
@@ -1131,6 +1132,35 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-18 — STUDIO-ANALYTICS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 17/17 (3rd of 5 follow-up pages). `/cabinet/studio/analytics` rewrite — legacy `<AnalyticsPage scope="STUDIO" />` (shared client component) replaced by SSR module with 4 view tabs, plan-gated sections, inline-SVG charts.
+  - **Audit findings:**
+    - **15 `/api/analytics/*` endpoints exist** (revenue ×4, dashboard ×1, bookings ×3, clients ×4, cohorts ×2, masters ×1). 13 support both MASTER + STUDIO scope; 2 are studio-exclusive (`/revenue/by-master`, `/masters`). **No infrastructure gap** — all 4 view tabs can be backed by existing endpoints
+    - **Feature gate catalog** (`src/lib/billing/feature-catalog.ts:72-125`): `analytics_dashboard` (FREE+), `analytics_revenue` (PRO+), `analytics_clients` (PRO+), `analytics_booking_insights` (PREMIUM+), `analytics_cohorts` (PREMIUM+), `analytics_forecast` (PREMIUM+). **Gating returns 403 server-side** via `ensureFeatureAccess` (throws `AppError("Функция недоступна на текущем тарифе.", 403, "FEATURE_GATE")`); UI uses `<FeatureGate>` overlay for blurred preview + upgrade CTA
+    - **Master analytics page** (`src/features/master/components/analytics/*`) — full pattern reference: 7 component files, inline-SVG charts (no recharts/chart.js), `getMasterAnalyticsView` server orchestrator. Comment in `src/app/(cabinet)/cabinet/master/analytics/page.tsx:10-12` explicitly noted studio needed its own redesign
+    - **BookingSource analytics gap:** NO endpoint exposes per-source breakdown. Computed inline via single Prisma `groupBy` in this commit (only 3 real enum values WEB/MANUAL/APP, no fabricated «Сарафан»/«Соцсети»). Moving to dedicated endpoint is backlog
+    - **Compare:** `/dashboard` endpoint supports `compare=1` natively (returns `compareRange` + previous-period KPI). `/revenue/timeline` doesn't — orchestrator calls it twice (current + previous range) and zips by index for the chart
+    - **Custom date range:** all endpoints accept arbitrary `from/to`; master cabinet gates the picker behind `customPeriod = analytics_cohorts || analytics_forecast` (PREMIUM proxy) showing «Скоро» alert. Studio ships presets only — picker backlogged
+  - **Раздел 3 (Архитектура):** new module `src/features/studio-cabinet/analytics/`:
+    - `lib/types.ts` — DTOs (`StudioAnalyticsViewData`, KPI/revenue/heatmap shapes, period+view+feature unions, type guards)
+    - `lib/source-mapping.ts` — `SOURCE_LABEL` + `SOURCE_TONE` + `SOURCE_RING` Tailwind class maps for WEB/MANUAL/APP only
+    - `server/analytics-features.ts` — `getStudioAnalyticsFeatures(userId)` projects `analytics_*` keys into `{dashboard, revenue, clients, bookingInsights, cohorts}` — mirrors `getMasterAnalyticsFeatures` shape for consistency
+    - `server/analytics-view.service.ts` — `loadStudioAnalyticsView` orchestrator (~290 LOC). Resolves analytics context via `resolveAnalyticsContext({scope:"STUDIO"})`, computes current + prev ranges via reused master `computeRollingRange`/`computePreviousRange`, KPI via `getDashboardKpi` with `prevRange`. Per-view dispatch: only the active tab's heavy data loaded (Overview = revenue×2 if compare + sources groupBy + heatmap; Masters = `getRevenueByMaster` + provider list + bookings groupBy; Services = `getRevenueByService` + service-masters inline groupBy for distinct count; Clients = `getClientSegments` + UserProfile name resolution for top 10)
+    - `components/` — 14 files: server page orchestrator, URL-driven controls (period 4-chip + view 4-tab + compare checkbox), KPI bar (5 metrics with delta arrows), 4 view components (overview/masters/services/clients), 3 chart components (revenue-line-chart with prev-period dashed overlay / sources-donut with stroke-dasharray slices / hours-heatmap as weekday×hour grid)
+  - **Раздел 5 (Бизнес-логика):**
+    - **Reuse-first architecture** — 13 of 15 analytics domain helpers used directly; orchestrator only adds (a) per-view dispatch, (b) BookingSource inline groupBy, (c) Services distinct-masters inline groupBy, (d) Clients top-10 name resolution. No new endpoints
+    - **Plan gating respects existing pattern** — `<FeatureGate>` from master cabinet reused verbatim (blurred preview + upgrade card). Sections whose flag is false skip data fetch entirely in the orchestrator (returns `null`), so FREE users don't trigger gated endpoint calls
+    - **Compare semantics:** KPIs + revenue chart get prev-period overlay via reused `getDashboardKpi` `prevRange` + double-call on `getRevenueTimeline`. Rating delta intentionally absent (no rating KPI; same snapshot gap STUDIO-DASHBOARD-A flagged for occupancy/rating)
+    - **No payouts / «ВАМ» column** — explicit per spec (consistency with STUDIO-SERVICES-A payout deferral). Masters table shows performance metrics only
+    - **No fabricated booking sources** — `groupBy({by: ["source"]})` returns only enum values that actually appear in data; sources with `count === 0` filtered out
+    - **Occupancy proxy** in Masters table uses dashboard 5-slots/day heuristic for consistency (cross-ref STUDIO-DASHBOARD-A backlog for precise integration)
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/analytics` rewritten (was: shared client `<AnalyticsPage>`, now: SSR module). URL params `?period=7d|30d|90d|year&view=overview|masters|services|clients&compare=on|off`. **No new API endpoints** — all 15 existing analytics endpoints reused
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **UI_TEXT:** new subtree `studioCabinet.analyticsV2.*` (~55 keys — header / periods / views / compare / kpi / overview / masters / services / clients). Master analytics keys NOT reused (different copy + view structure)
+  - **@deprecated:** `<AnalyticsPage scope="STUDIO" />` (`src/features/analytics/ui/analytics-page.tsx`) — orphan for studio after route rewrite (still used by master cabinet path indirectly? — needs verification, but the studio route no longer references it)
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Backlog spawned:** Cohort retention matrix UI (🟠 — endpoints exist, need view), Custom date range picker (🟠 — endpoints support `from/to`, picker missing), Revenue forecast widget (🟠 — endpoint exists, not surfaced), Analytics export Excel (🟡), Commission/payout column (🟡 — when payouts land), BookingSource as official endpoint (🟡), Funnel/lead-time Overview cards (🟡), Rating snapshot delta (🟡 — cross-ref dashboard), Master/Service deep-link drilldowns (🟡), Saved views / share PDF/PNG / source drilldown (🔵)
+  - **Sprint progress:** 17/17 commits closed. STUDIO-ANALYTICS-A closes the 3rd of 5 follow-up pages. Remaining: Finance, Settings
 
 - **2026-05-18 — STUDIO-NOTIFICATIONS-A** (commit on `designStudioCabinet`). Cabinet Studio sprint commit 16/16 (2nd of 5 follow-up pages). New `/cabinet/studio/notifications` route (sidebar nav-item from STUDIO-SHELL-A was 404 until now). Heavy reuse of 26-NOTIF master notif infrastructure.
   - **Audit findings:**
