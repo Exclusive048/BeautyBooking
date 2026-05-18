@@ -1,25 +1,20 @@
 import { redirect } from "next/navigation";
-import { StudioFinancePage } from "@/features/studio/components/studio-finance-page";
-import { getSessionUser } from "@/lib/auth/session";
-import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { UI_TEXT } from "@/lib/ui/text";
 
-export default async function StudioFinanceRoute() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-
-  let studioId: string;
-  try {
-    ({ studioId } = await resolveCurrentStudioAccess(user.id));
-  } catch {
-    redirect("/403");
-  }
-
-  return (
-    <section className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-main">{UI_TEXT.studioCabinet.financePage.title}</h1>
-      <p className="text-sm text-text-sec">{UI_TEXT.studioCabinet.financePage.subtitle}</p>
-      <StudioFinancePage studioId={studioId} />
-    </section>
-  );
+/**
+ * STUDIO-FINANCE-REMOVE-A (2026-05-18).
+ *
+ * The standalone studio Finance page was removed: every meaningful slice
+ * it offered (period revenue, breakdown by master, breakdown by service)
+ * is part of `/cabinet/studio/analytics`. A separate page would duplicate
+ * that surface — payouts, commission splits and expense tracking aren't
+ * built yet, so there'd be nothing to differentiate Finance from
+ * Analytics today.
+ *
+ * This route exists only to redirect old bookmarks / external links to
+ * the canonical analytics page (no 404). When a real payout flow lands,
+ * Finance will return with content distinct from analytics — tracked in
+ * BACKLOG.
+ */
+export default function StudioFinanceRedirect(): never {
+  redirect("/cabinet/studio/analytics");
 }

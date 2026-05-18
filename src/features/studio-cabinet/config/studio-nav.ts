@@ -11,7 +11,6 @@ import {
   Star,
   UserCircle,
   Users,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,7 +41,6 @@ export type StudioNavItem = {
     | "reviews"
     | "notifications"
     | "analytics"
-    | "finance"
     | "publicPage"
     | "settings";
   icon: LucideIcon;
@@ -152,12 +150,6 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         href: "/cabinet/studio/analytics",
         labelKey: "analytics",
         icon: BarChart3,
-      },
-      {
-        id: "finance",
-        href: "/cabinet/studio/finance",
-        labelKey: "finance",
-        icon: Wallet,
       },
     ],
   },

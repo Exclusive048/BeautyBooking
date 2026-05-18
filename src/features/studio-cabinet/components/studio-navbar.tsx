@@ -15,7 +15,6 @@ const NAV_ITEMS = [
   { href: "/cabinet/studio/clients", label: UI_TEXT.studioCabinet.nav.clients },
   { href: "/cabinet/studio/reviews", label: UI_TEXT.studioCabinet.dashboard.cards.reviews },
   { href: "/cabinet/studio/analytics", label: UI_TEXT.studioCabinet.nav.analytics },
-  { href: "/cabinet/studio/finance", label: UI_TEXT.studioCabinet.nav.finance },
 ];
 
 const ADMIN_ITEMS = [

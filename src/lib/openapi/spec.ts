@@ -983,27 +983,6 @@ export const openApiSpec = {
           clients: { type: "array", items: { $ref: "#/components/schemas/StudioClientListItem" } },
         },
       },
-      StudioFinanceRow: {
-        type: "object",
-        required: ["key", "label", "visitsCount", "sumAmount"],
-        properties: {
-          key: { type: "string" },
-          label: { type: "string" },
-          visitsCount: { type: "integer" },
-          sumAmount: { type: "integer" },
-        },
-      },
-      StudioFinanceData: {
-        type: "object",
-        required: ["groupBy", "rows", "totalVisits", "totalAmount", "hasCategories"],
-        properties: {
-          groupBy: { type: "string", enum: ["masters", "categories", "services"] },
-          rows: { type: "array", items: { $ref: "#/components/schemas/StudioFinanceRow" } },
-          totalVisits: { type: "integer" },
-          totalAmount: { type: "integer" },
-          hasCategories: { type: "boolean" },
-        },
-      },
       CreateTimeBlockInput: {
         type: "object",
         required: ["studioId", "masterId", "startAt", "endAt", "type"],
@@ -2704,31 +2683,6 @@ export const openApiSpec = {
         parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioClientsData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Studio not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/finance": {
-      get: {
-        summary: "Studio finance analytics from booking snapshots",
-        tags: ["studio", "finance"],
-        parameters: [
-          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
-          { name: "from", in: "query", required: true, schema: { type: "string" } },
-          { name: "to", in: "query", required: true, schema: { type: "string" } },
-          {
-            name: "groupBy",
-            in: "query",
-            required: false,
-            schema: { type: "string", enum: ["masters", "categories", "services"] },
-          },
-        ],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/StudioFinanceData" }),
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
