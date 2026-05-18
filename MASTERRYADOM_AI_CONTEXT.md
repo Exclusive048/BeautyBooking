@@ -29,6 +29,11 @@
 >
 > **🎉 Cabinet Studio sprint COMPLETE — 19 коммитов** (shell + dashboard + masters + schedule + bookings + services + packages + clients + reviews + notifications + analytics + settings + showcase seed + seed consolidation + 4 bug-fix/polish/cleanup commits).
 >
+> **▶ Public surfaces workstream started (после Cabinet Studio):**
+> - ✅ Public studio profile redesign (STUDIO-PUBLIC-PROFILE-A — dropped inline booking flow in favour of deep-link to `/u/[username]/booking`, added slot-bar CTA, reordered sections per spec; live slot aggregation backlogged because no studio-scope helper exists)
+> - ⏳ Booking widget `/u/[username]/booking` (NEXT priority — core conversion)
+> - ⏳ Master public profile follow-ups, Catalog enhancements, marketing pages, hot-slots, inspiration, models
+>
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
 
 ---
@@ -1135,6 +1140,33 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-18 — STUDIO-PUBLIC-PROFILE-A** (commit on `designStudioCabinet`). **First commit of the new Public surfaces workstream** (after Cabinet Studio sprint closed at 19/19). Surgical redesign of the existing `PublicStudioProfilePage` — drops inline booking flow + adds slot-bar CTA + reorders sections per spec.
+  - **Audit findings:**
+    - Route `/u/[username]/page.tsx` (lines 380–395) already resolves studio vs master via `result.providerType` and renders `PublicStudioProfilePage` for studios. Master uses `PublicMasterProfilePage` via the same handler. **No route change needed.**
+    - `loading.tsx` ships proper skeletons (HeroSkeleton / ServicesSkeleton / PortfolioSkeleton / ReviewsSkeleton / BookingSkeleton) — the audit-flagged "Suspense fallback=null" risk is already addressed
+    - `generateMetadata` + JSON-LD schema wired (lines 179–349)
+    - Each section is its own Suspense boundary; sections internally use `Promise.all` (verified in `hero-section.tsx` lines 26–29). Audit-flagged sequential-await risk is already mitigated
+    - **Studio slot aggregation GAP confirmed:** `buildSlotsForDay` is per-master only; no `getStudioFreeSlots` or `studioAvailability` helper exists. HotSlot is per-master too. Live "Сегодня свободны N окон" requires either N parallel per-master calls or a new aggregator service — backlog
+    - Real fields available: `Provider.{name, tagline, description, avatarUrl, bannerUrl, address, geoLat, geoLng, isPublished, rating, reviews, priceFrom, categories, availableToday, services[], publicUsername, cancellationDeadlineHours}` (per `ProviderProfileDto`). **NOT present:** `metro`, `walkMinutes`, `verified`, `history`, `values`, `philosophy`, `socialLinks`, separate `phone`, `acceptNewClients` not exposed in DTO (only on Provider model)
+    - **NO FAQ entity** in schema (confirmed)
+    - `studioBookingUrl()` helper already builds deep links — reused for the new slot-bar CTA
+  - **Раздел 3 (Архитектура):**
+    - **New:** `src/features/public-studio/sections/slot-bar-section.tsx` — accent gradient CTA bar with `<Sparkles>` icon + headline + deep-link button. Gated on `studio.isPublished` (DTO doesn't expose `acceptNewClients`, but `isPublished=true` is the public-page activity signal)
+    - **Rewritten:** `src/features/public-studio/public-studio-profile-page.tsx` — dropped `<StudioBookingSection>` import + render (booking flow now strictly at `/u/[username]/booking`). Added `<StudioSlotBarSection>` between hero + services. Reordered: hero → slot bar → services → team → photos → reviews → contacts (was: hero → booking → details → photos → reviews → services → team). Sticky bottom-right CTA changed anchor from `#studio-booking-entry` to `#studio-services`
+    - **No changes:** sections (`hero-section`, `services-section`, `team-section`, `photos-section`, `reviews-section`, `details-section`) all reused verbatim — they already use `Promise.all` and deep-link to booking via `studioBookingUrl`
+  - **Раздел 5 (Бизнес-логика):**
+    - **Booking flow moved off the profile** — `<StudioBookingSection>` + `<StudioBookingFlow>` no longer rendered on the public profile route. Both stay in the codebase because `/u/[username]/booking` (separate widget) consumes them. Cleanup of the legacy embed is Phase 7 territory
+    - **Slot-bar CTA without live counter** — honest UX: no studio-scope aggregator exists, so the bar invites the client into the booking widget where per-master availability is computed at click time. Live count → backlog
+    - **No edit affordances** on the public page — STUDIO-SETTINGS-A owns the studio's edit surface (consistency: public page is client-only, no owner toolbar)
+    - **No fabricated content** — FAQ section / history-values-philosophy block / verification badge / «Написать в студию» chat all left out because fields don't exist; surfaced as backlog items so the page ships with only what the schema actually supports
+  - **Раздел 6 (Маршруты):** `/u/[username]` page route untouched (it already routes to `PublicStudioProfilePage` for studios). The page composition is what changed. `/u/[username]/booking` route exists and is the canonical booking surface
+  - **Раздел 11 (Производительность):** `/u/[username]` SSR pattern already addresses the audit-flagged risks — parallel `Promise.all` at username resolution + section level, `loading.tsx` with proper skeletons (not null), per-section Suspense boundaries. This commit doesn't regress any of that
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **UI_TEXT:** new subtree `publicStudio.slotBar.*` (4 keys: label / headline / subline / book)
+  - **Validation:** typecheck ✅, lint baseline 823/122 preserved, encoding/mojibake/prisma ✅, 247/247 tests
+  - **Backlog spawned:** Studio public live slot aggregation (🟠 — new `getStudioFreeSlots` service), Booking widget redesign at `/u/[username]/booking` (🟠 — next priority per user), Public page view + conversion analytics (🟡 — affects all public pages), Studio FAQ entity (🟡), History/values/philosophy fields (🟡), Verification badge (🟡), Pre-booking studio chat (🟡 — auth model blocker), Metro/walkMinutes fields (🟡), Phone/social links exposed on DTO (🟡), Hero gallery enhancements / portfolio lightbox / OG image per studio / dedicated all-masters all-reviews all-portfolio pages / section-specific skeletons / FocalImage → next/image migration (🔵)
+  - **Next workstreams:** Booking widget redesign (CORE conversion, user explicitly flagged as priority), then Catalog enhancements / Marketing / Hot slots / Inspiration / Models. Plus the ongoing Phase 6/7/8 hardening backlog
 
 - **2026-05-18 — STUDIO-SETTINGS-A** (commit on `designStudioCabinet`). **🎉 Cabinet Studio sprint FINALE — 19/19 commits closed.** `/cabinet/studio/settings` index rewritten as a 5-section SSR page; old per-section sub-routes (profile/portfolio/general/public/features) left untouched for backwards-compat with the legacy `studio-settings-page.tsx` (still serving portfolio + main profile editing).
   - **Audit findings:**
