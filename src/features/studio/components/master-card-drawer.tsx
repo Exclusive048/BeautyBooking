@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -137,21 +138,23 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
     }
   };
 
+  // MODAL-UNIFY-IMPL-A: shell migrated to unified `<Drawer>`.
+  // Public API preserved; all fetch/save logic above untouched.
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-2xl overflow-auto border-l border-border-subtle bg-bg-card p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-base font-semibold text-text-main">{details?.name ?? t.titleFallback}</div>
-            <div className="text-xs text-text-sec">{details?.tagline ?? ""}</div>
-          </div>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            {t.close}
-          </Button>
-        </div>
+    <Drawer
+      open={masterId !== null}
+      onClose={onClose}
+      side="right"
+      size="lg"
+      title={details?.name ?? t.titleFallback}
+      ariaLabel={t.titleFallback}
+    >
+      <div className="space-y-4 p-5">
+        {details?.tagline ? (
+          <div className="text-xs text-text-sec">{details.tagline}</div>
+        ) : null}
 
-        <div className="mt-4 flex gap-2">
+        <div className="flex gap-2">
           {(["skills", "profile"] as const).map((item) => (
             <Button
               key={item}
@@ -263,6 +266,6 @@ export function MasterCardDrawer({ studioId, masterId, onClose, onSaved }: Props
           </div>
         ) : null}
       </div>
-    </div>
+    </Drawer>
   );
 }

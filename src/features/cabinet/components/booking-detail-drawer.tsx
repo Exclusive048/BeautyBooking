@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import ReactDOM from "react-dom";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { BOOKING_ACTION_WINDOW_MINUTES } from "@/lib/bookings/flow";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -111,8 +111,6 @@ export function BookingDetailDrawer({
 }: BookingDetailDrawerProps) {
   const t = UI_TEXT.clientCabinet;
   const viewerTimeZone = useViewerTimeZoneContext();
-  const [mounted, setMounted] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [showRescheduleForm, setShowRescheduleForm] = useState(false);
@@ -129,23 +127,11 @@ export function BookingDetailDrawer({
     return `Отмена возможна до ${UI_FMT.dateTimeLong(deadlineIso, { timeZone: viewerTimeZone })}`;
   }, [booking.provider.cancellationDeadlineHours, booking.startAtUtc, viewerTimeZone]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const id = requestAnimationFrame(() => setIsVisible(true));
-    return () => cancelAnimationFrame(id);
-  }, [mounted]);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  // MODAL-UNIFY-IMPL-A: shell migrated to unified `<Drawer>`. The
+  // primitive handles mount, portal-to-body, scroll-lock, escape,
+  // overlay-click, and the slide-in animation. The previous local
+  // `mounted` + `isVisible` state + custom escape listener are no
+  // longer needed.
 
   // Reset inline forms when booking changes
   useEffect(() => {
@@ -166,54 +152,37 @@ export function BookingDetailDrawer({
   const reviewId = reviewState?.reviewId ?? null;
   const reviewSubmitted = !reviewState?.canLeave && reviewId !== null;
 
-  if (!mounted) return null;
-
-  const content = (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        className={`relative h-full w-full max-w-[420px] overflow-y-auto bg-bg-page shadow-2xl transition-transform duration-300 ${
-          isVisible ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border-subtle px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 overflow-hidden rounded-full border border-border-subtle bg-bg-input">
-              {booking.provider.avatarUrl ? (
-                <FocalImage
-                  src={booking.provider.avatarUrl}
-                  alt=""
-                  width={48}
-                  height={48}
-                  className="rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
-                  {resolveInitial(booking.provider.name)}
-                </div>
-              )}
-            </div>
-            <div>
-              <div className="text-base font-semibold text-text-main">{booking.provider.name}</div>
-              {addressLine ? <div className="text-xs text-text-sec">{addressLine}</div> : null}
-            </div>
+  return (
+    <Drawer
+      open
+      onClose={onClose}
+      side="right"
+      size="md"
+      headerActions={
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 overflow-hidden rounded-full border border-border-subtle bg-bg-input">
+            {booking.provider.avatarUrl ? (
+              <FocalImage
+                src={booking.provider.avatarUrl}
+                alt=""
+                width={40}
+                height={40}
+                className="rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text-sec">
+                {resolveInitial(booking.provider.name)}
+              </div>
+            )}
           </div>
-          <Button
-            variant="icon"
-            size="icon"
-            onClick={onClose}
-            className="h-9 w-9 rounded-full border border-border-subtle bg-bg-input text-lg text-text-sec"
-            aria-label="Закрыть"
-          >
-            ×
-          </Button>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-text-main">{booking.provider.name}</div>
+            {addressLine ? <div className="truncate text-xs text-text-sec">{addressLine}</div> : null}
+          </div>
         </div>
-
+      }
+    >
+      <div>
         <div className="space-y-5 px-5 py-4">
           {/* Booking details */}
           <section className="space-y-4">
@@ -455,8 +424,6 @@ export function BookingDetailDrawer({
           ) : null}
         </div>
       </div>
-    </div>
+    </Drawer>
   );
-
-  return ReactDOM.createPortal(content, document.body);
 }

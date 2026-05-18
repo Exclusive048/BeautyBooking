@@ -7,6 +7,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
@@ -223,24 +224,26 @@ export function ClientCardDrawer({
 
   if (!clientKey) return null;
 
+  // MODAL-UNIFY-IMPL-A: shell migrated to unified `<Drawer>`. Public
+  // API and ALL fetch/mutation/state logic above are preserved
+  // verbatim — only the outer overlay/portal/scroll-lock is swapped.
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-2xl overflow-auto border-l border-border-subtle bg-bg-card p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-base font-semibold text-text-main">{clientName}</div>
-            <div className="text-xs text-text-sec">{clientPhone}</div>
-            <div className="mt-1 text-xs text-text-sec">
-              Посещений: {visitsCount} • {formatDaysAgo(daysSinceLastVisit)}
-            </div>
-          </div>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Закрыть
-          </Button>
+    <Drawer
+      open
+      onClose={onClose}
+      side="right"
+      size="lg"
+      title={clientName}
+      ariaLabel={clientName}
+      headerActions={
+        <div className="hidden text-xs text-text-sec sm:block">
+          <div>{clientPhone}</div>
+          <div>Посещений: {visitsCount} • {formatDaysAgo(daysSinceLastVisit)}</div>
         </div>
-
-        {loading ? <div className="mt-4 text-sm text-text-sec">Загружаем...</div> : null}
+      }
+    >
+      <div className="p-5">
+        {loading ? <div className="text-sm text-text-sec">Загружаем...</div> : null}
         {error ? (
           <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
         ) : null}
@@ -346,21 +349,21 @@ export function ClientCardDrawer({
             </section>
           </div>
         ) : null}
-      </div>
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) {
-            void uploadPhoto(file);
-          }
-          event.currentTarget.value = "";
-        }}
-      />
-    </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void uploadPhoto(file);
+            }
+            event.currentTarget.value = "";
+          }}
+        />
+      </div>
+    </Drawer>
   );
 }

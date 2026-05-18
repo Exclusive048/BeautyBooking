@@ -18,6 +18,8 @@ export const UI_TEXT = {
     namePlaceholder: "Имя",
     saved: "Сохранено",
     saving: "Сохраняем...",
+    save: "Сохранить",
+    errorGeneric: "Не удалось выполнить действие. Попробуйте ещё раз.",
     toggleTheme: "Переключить тему",
     confirmDefaultTitle: "Подтвердите действие",
     confirmDefaultLabel: "Подтвердить",
