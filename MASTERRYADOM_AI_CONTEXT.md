@@ -1144,6 +1144,33 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — FOOTER-REDESIGN-A** (commit on `designStudioCabinet`). Узкий редизайн глобального `Footer` — единственное что меняется: 1 CTA → 2 CTA карточки, inline brand-логотип → shared `<BrandLogo>`, выравнивание стилей через shared UI + tokens. **NO navbar / PublicHeader.js работы** — отдельный коммит позже (lint drift 858/134 будет закрыт там).
+  - **Audit reality-check:**
+    - User-provided spec described an aspirational footer (metric tiles 47/12400/284K/4.92, city/lang/currency selectors, App Store/Google Play buttons, full ИП/ИНН/ОГРНИП/152-ФЗ legal block, Cookies/Sitemap/Press-kit links) — **none of this exists in the codebase**
+    - Real footer (`src/components/layout/footer/Footer.tsx`): 1 brand-aspirational CTA at top + 2-col grid (brand block / 4 link columns: О платформе / Для клиентов / Для мастеров / Поддержка) + 1-line `<FooterCopyright>` (year + entity placeholder + privacy/terms)
+    - Per spec rule «весь контент footer ДОСЛОВНО сохранить» — I preserved whatever exists rather than fabricate aspirational content. The 3 scoped changes (2 CTA / alignment / logo) apply against the real footer
+    - `BrandLogo` shared component exists at `src/components/brand/brand-logo.tsx` (variant `full` = iconmark + wordmark) — canonical reuse, replaces inline duplication
+    - `/become-master` route already used by old `FooterCTA` (`CTA_HREF = "/become-master"`) — preserved. `/models` exists (model offers page from BACKLOG)
+    - **CTA metrics have no live data source** — current footer has zero metrics; new metrics (+34% / 12 мин / 1240 / −54%) are presentational, marked as backlog
+  - **Раздел 3 (Архитектура):**
+    - **REWRITTEN:** `src/components/layout/footer/FooterCTA.tsx` — single brand-aspirational card → **2 side-by-side CTA cards** (`grid gap-5 lg:grid-cols-2`, stack on mobile). Brand-gradient «Для мастеров» card (`bg-brand-gradient` + `shadow-brand` + soft white blur orb) → `/become-master`. Soft `bg-bg-elevated` «Для моделей» card → `/models`. Each card: badge chip + display title + subtitle + 2 metric pairs + shared `<Button>` CTA with `ArrowRight` icon. Internal `CTACard` + `Metric` sub-components for the 2-tone shape; uses `cn` for variant class composition; tokens-only colours; framer-motion entrance preserved
+    - **MODIFIED:** `src/components/layout/footer/Footer.tsx` — replaced 9-line inline brand-logo markup (gradient "М" square + dual-styled wordmark + `<Link href="/">`) with `<BrandLogo variant="full" size="md" href="/">` shared component. Removed orphan `Link` import. Rest of file unchanged
+    - **MODIFIED:** `src/lib/ui/text.ts` — extended `UI_TEXT.footer.*` with `ctaMasters.*` and `ctaModels.*` subtrees (~16 keys). Old `footer.cta.*` retained (orphan but cheap to keep until NAVBAR cleanup pass)
+    - **NOT changed:** `FooterColumn.tsx`, `FooterLink.tsx`, `FooterCopyright.tsx`, `FooterSocials.tsx`, `index.ts` — preserved verbatim. 4 link columns + their routes + brand description + socials + copyright + legal-entity line untouched
+  - **Раздел 5 (Бизнес-логика):**
+    - Footer is rendered globally via `<AppShell>` (`src/components/layout/app-shell.tsx`) — all public AND cabinet pages get it. Layout regression verified via typecheck + lint baseline preservation. No routing/content/functional change anywhere downstream
+    - 2 CTA cards funnel traffic to existing routes: `/become-master` (master onboarding marketing page) + `/models` (model offers marketplace)
+    - Metrics shown are **presentational marketing values, not live data** — no aggregation pipeline exists for them today. Same honest stance as the rest of the codebase (no fake-as-data)
+  - **Раздел 6 (Маршруты):** не затронуты — все footer-ссылки сохранили свои `href`s
+  - **Раздел 11 (Производительность):** no regression. Same `<motion.div>` entrance pattern, same `<Button>` usage. `<BrandLogo>` is the same component the navbar uses — no new asset / no new font / no new query
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **UI_TEXT:** 16 new keys under `footer.ctaMasters.*` + `footer.ctaModels.*`. Old `footer.cta.*` subtree retained (orphan, cleanup in NAVBAR commit)
+  - **Validation:** typecheck ✅, lint baseline **858/134 preserved** (external `.claude/references/PublicHeader.js` drift carried over — NAVBAR commit will close it back to 823/122), encoding/mojibake/prisma ✅, **274/274 tests** (no test surface changed)
+  - **Both themes** — brand-gradient card uses `text-white`+`text-white/85`+`text-white/75` overlays (works on the gradient surface), soft card uses `text-text-main`+`text-text-sec` tokens (auto-themes). No inline hex, no `dark:` overrides needed
+  - **Mobile-first:** cards stack vertically below `lg`, grid on `lg+`. Metrics wrap on narrow widths via `flex-wrap gap-x-6 gap-y-3`. Touch-friendly tap targets via `<Button size="md">`
+  - **Backlog spawned:** real CTA metrics (when an aggregation pipeline exists — current figures are presentational marketing values), aspirational footer content (city/lang/currency selectors, metric tiles, App-Play buttons, expanded legal block — none exist today, separate features each)
+  - **Next:** NAVBAR-REDESIGN (last redesign commit — will also close the 858/134 lint drift back to 823/122 by handling `.claude/references/PublicHeader.js`)
+
 - **2026-05-19 — CATALOG-ENHANCEMENTS-A** (commit on `designStudioCabinet`). Точечная интеграция 2 полей Provider в catalog card — `slotPrecision` + `availableToday`. **NO redesign, NO schema migration, NO schedule-engine на витрину.**
   - **Audit findings:**
     - `Provider.slotPrecision` is a `String` field (not Prisma enum) with canonical values `"exact" | "today_free" | "date_only"` per `src/lib/schedule/editor-shared.ts:86`

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import Link from "next/link";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { FooterCTA } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
@@ -71,21 +71,11 @@ export function Footer() {
 
         {/* Main grid */}
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,3fr)]">
-          {/* Brand column */}
+          {/* Brand column. FOOTER-REDESIGN-A: replaced inline gradient
+              "М" + wordmark with the shared `<BrandLogo>` component
+              (same iconmark/wordmark used by the navbar). */}
           <div className="space-y-5">
-            <Link href="/" className="inline-flex items-center gap-2.5">
-              <span
-                aria-hidden
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
-              >
-                <span className="font-display text-lg font-semibold italic leading-none text-white">
-                  М
-                </span>
-              </span>
-              <span className="font-display text-base font-medium text-text-main">
-                Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
-              </span>
-            </Link>
+            <BrandLogo variant="full" size="md" href="/" />
             <p className="text-sm leading-relaxed text-text-sec">{UI_TEXT.footer.brandDescription}</p>
             <FooterSocials />
           </div>
