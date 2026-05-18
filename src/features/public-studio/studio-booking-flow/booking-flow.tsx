@@ -75,6 +75,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [meLoading, setMeLoading] = useState(true);
   const [comment, setComment] = useState("");
   const [silentMode, setSilentMode] = useState(false);
+  // BOOKING-WIDGET-FOUNDATION-A: guest contacts. When no session,
+  // collect name + phone in-form instead of opening an auth modal.
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
   const [bookingConfig, setBookingConfig] = useState<ServiceBookingConfig | null>(null);
   const [bookingConfigLoading, setBookingConfigLoading] = useState(false);
   const [bookingConfigError, setBookingConfigError] = useState<string | null>(null);
@@ -361,6 +365,23 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     setSubmitError(null);
     setSubmitSuccess(null);
     try {
+      // BOOKING-WIDGET-FOUNDATION-A: guest contact validation. For
+      // signed-in users we trust the session profile; for guests we
+      // require name + phone (already required by server validation).
+      const isGuest = !me;
+      if (isGuest) {
+        if (!guestName.trim()) {
+          setSubmitError(UI_TEXT.publicStudio.guestNameRequired);
+          setSubmitLoading(false);
+          return;
+        }
+        if (!guestPhone.trim()) {
+          setSubmitError(UI_TEXT.publicStudio.guestPhoneRequired);
+          setSubmitLoading(false);
+          return;
+        }
+      }
+
       if (bookingConfig?.requiresReferencePhoto && !referencePhotoAssetId) {
         setSubmitError(UI_TEXT.publicProfile.booking.referencePhotoRequired);
         setSubmitLoading(false);
@@ -398,18 +419,15 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         startAtUtc: slot.startAtUtc,
         endAtUtc: slot.endAtUtc,
         slotLabel: slot.label,
-        clientName: me?.displayName ?? UI_TEXT.publicProfile.booking.clientFallbackName,
-        clientPhone: me?.phone ?? "",
+        clientName:
+          me?.displayName ?? (guestName.trim() || UI_TEXT.publicProfile.booking.clientFallbackName),
+        clientPhone: me?.phone ?? guestPhone.trim(),
         comment: comment.trim() ? comment.trim() : null,
         silentMode,
         referencePhotoAssetId,
         bookingAnswers: answersPayload,
       });
 
-      if (!result.ok && result.error === "AUTH_REQUIRED") {
-        setShowAuthModal(true);
-        return;
-      }
       if (!result.ok) {
         setSubmitError(result.error || UI_TEXT.publicStudio.bookingError);
         return;
@@ -681,9 +699,42 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
               ) : null}
             </div>
           ) : null}
+          {!meLoading && !me ? (
+            <div className="mt-3 rounded-xl border border-border-subtle bg-bg-card p-3 text-sm">
+              <div className="text-sm font-semibold text-text">{UI_TEXT.publicStudio.guestSectionTitle}</div>
+              <div className="mt-1 text-xs text-text-muted">{UI_TEXT.publicStudio.guestSectionHint}</div>
+              <label className="mt-3 block text-xs text-text-muted">
+                {UI_TEXT.publicStudio.guestNameLabel}
+              </label>
+              <Input
+                type="text"
+                value={guestName}
+                onChange={(event) => setGuestName(event.target.value)}
+                placeholder={UI_TEXT.publicStudio.guestNamePlaceholder}
+                className="mt-1"
+                autoComplete="name"
+              />
+              <label className="mt-2 block text-xs text-text-muted">
+                {UI_TEXT.publicStudio.guestPhoneLabel}
+              </label>
+              <Input
+                type="tel"
+                value={guestPhone}
+                onChange={(event) => setGuestPhone(event.target.value)}
+                placeholder={UI_TEXT.publicStudio.guestPhonePlaceholder}
+                className="mt-1"
+                autoComplete="tel"
+              />
+              <div className="mt-2 text-xs text-text-muted">
+                {UI_TEXT.publicStudio.guestLoginHint}{" "}
+                <Link href={buildLoginUrl(nextPath)} className="font-medium text-primary underline-offset-2 hover:underline">
+                  {UI_TEXT.publicStudio.guestLoginCta}
+                </Link>
+              </div>
+            </div>
+          ) : null}
           {submitError ? <div className="mt-2 text-sm text-red-600">{submitError}</div> : null}
           {submitSuccess ? <div className="mt-2 text-sm text-emerald-600">{submitSuccess}</div> : null}
-          {!meLoading && !me ? <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicStudio.authRequiredText}</div> : null}
 
           <Button
             variant="primary"

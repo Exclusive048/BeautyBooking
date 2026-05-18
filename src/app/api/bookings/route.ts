@@ -8,7 +8,8 @@ import { jsonOk, jsonFail } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { parseBody } from "@/lib/validation";
 import { bookingCreateSchema } from "@/lib/validation/bookings";
-import { getSessionUser, requireRole } from "@/lib/auth/access";
+import { getSessionUserFromRequest } from "@/lib/auth/session";
+import { hasAnyRole } from "@/lib/auth/guards";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { listProviderBookingsForOwner } from "@/lib/bookings/list";
@@ -50,13 +51,19 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   let userId: string | undefined;
   try {
-    // AUDIT (HTTP-обвязка создания):
-    // - реализовано: API остаётся thin wrapper, бизнес-логика в src/lib/bookings/*.
-    // - реализовано: путь без startAtUtc делегирует в createClientBooking (legacy slotLabel-path с вычислением UTC-времени).
-    const user = await getSessionUser(req);
-    userId = user.userId;
-    const roleError = requireRole(user, [AccountType.CLIENT]);
-    if (roleError) throw roleError;
+    // BOOKING-WIDGET-FOUNDATION-A: anonymous (guest) bookings allowed.
+    // If session present → must be CLIENT (preserve original behaviour:
+    // MASTER/STUDIO/ADMIN can't book through this endpoint). If no
+    // session → guest path: clientUserId=null, identity carried via
+    // clientPhone + clientName. Post-signup linking handled by
+    // `linkGuestBookingsToUserByPhone`.
+    const sessionUser = await getSessionUserFromRequest(req);
+    if (sessionUser) {
+      if (!hasAnyRole(sessionUser, [AccountType.CLIENT])) {
+        return jsonFail(403, "Forbidden", "FORBIDDEN");
+      }
+      userId = sessionUser.id;
+    }
 
     const {
       providerId,
@@ -73,6 +80,7 @@ export async function POST(req: Request) {
       referencePhotoAssetId,
       bookingAnswers,
     } = await parseBody(req, bookingCreateSchema);
+    const effectiveClientUserId: string | null = sessionUser?.id ?? null;
 
     const idempotencyKeyRaw = req.headers.get("x-idempotency-key");
     const idempotencyKey = idempotencyKeyRaw ? idempotencyKeyRaw.trim() : "";
@@ -98,7 +106,7 @@ export async function POST(req: Request) {
         silentMode,
         referencePhotoAssetId,
         bookingAnswers,
-        clientUserId: user.userId,
+        clientUserId: effectiveClientUserId,
         idempotencyKey: normalizedIdempotencyKey,
       });
       try {
@@ -122,11 +130,21 @@ export async function POST(req: Request) {
         outcome: "success",
         operation: "create-booking",
       });
-      void invalidateRecentMastersCache(user.userId);
+      if (effectiveClientUserId) {
+        void invalidateRecentMastersCache(effectiveClientUserId);
+      }
       return jsonOk({ booking: created }, { status: 201 });
     }
 
-    const booking = await createClientBooking(user.userId, {
+    // Legacy slotLabel-only path still requires a signed-in user
+    // because `createClientBooking` was not adapted for guests in this
+    // commit (scope: foundation only). The booking widget always sends
+    // startAtUtc/endAtUtc so this branch isn't reached in practice.
+    if (!effectiveClientUserId) {
+      return jsonFail(400, "startAtUtc/endAtUtc обязательны для гостевой брони.", "VALIDATION_ERROR");
+    }
+
+    const booking = await createClientBooking(effectiveClientUserId, {
       providerId,
       serviceId,
       hotSlotId: hotSlotId ?? null,
@@ -159,7 +177,9 @@ export async function POST(req: Request) {
       outcome: "success",
       operation: "create-booking",
     });
-    void invalidateRecentMastersCache(userId);
+    if (effectiveClientUserId) {
+      void invalidateRecentMastersCache(effectiveClientUserId);
+    }
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

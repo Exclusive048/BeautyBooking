@@ -168,7 +168,10 @@ export async function resolveBookingCore(input: {
   providerId: string;
   serviceId: string;
   masterProviderId: string | null;
-  clientUserId: string;
+  // BOOKING-WIDGET-FOUNDATION-A: null for guest bookings (no signed-in
+  // user). When null, owner-self-booking + acceptNewClients-priors checks
+  // are skipped — guest is always treated as a new client.
+  clientUserId: string | null;
   startAtUtc?: Date;
   endAtUtc?: Date | null;
   slotLabel?: string;
@@ -221,7 +224,11 @@ export async function resolveBookingCore(input: {
     throw new AppError("Service is not available", 400, "SERVICE_DISABLED");
   }
 
-  if (provider.ownerUserId && provider.ownerUserId === input.clientUserId) {
+  if (
+    input.clientUserId &&
+    provider.ownerUserId &&
+    provider.ownerUserId === input.clientUserId
+  ) {
     throw new AppError("Cannot book your own services", 400, "FORBIDDEN");
   }
 
@@ -315,22 +322,29 @@ export async function resolveBookingCore(input: {
   const now = new Date();
   assertBookingWindow(startAtUtc, provider, now);
   if (!provider.acceptNewClients) {
-    const priorBookingsCount = await prisma.booking.count({
-      where: {
-        clientUserId: input.clientUserId,
-        OR: [
-          { providerId: provider.id },
-          { masterProviderId: resolvedMasterProviderId ?? undefined },
-        ],
-        status: {
-          notIn: [
-            BookingStatus.REJECTED,
-            BookingStatus.CANCELLED,
-            BookingStatus.NO_SHOW,
-          ],
-        },
-      },
-    });
+    // BOOKING-WIDGET-FOUNDATION-A: guests (clientUserId === null) are
+    // treated as new clients with zero priors — `acceptNewClients=false`
+    // therefore blocks them just like a brand-new signed-in user. This
+    // is the same UX intent as the existing rule, no special carve-out
+    // for anonymous bookings.
+    const priorBookingsCount = input.clientUserId
+      ? await prisma.booking.count({
+          where: {
+            clientUserId: input.clientUserId,
+            OR: [
+              { providerId: provider.id },
+              { masterProviderId: resolvedMasterProviderId ?? undefined },
+            ],
+            status: {
+              notIn: [
+                BookingStatus.REJECTED,
+                BookingStatus.CANCELLED,
+                BookingStatus.NO_SHOW,
+              ],
+            },
+          },
+        })
+      : 0;
     assertAcceptsNewClient(provider, priorBookingsCount);
   }
 

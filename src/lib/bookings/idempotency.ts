@@ -40,19 +40,29 @@ const bookingSelect = {
 } satisfies Prisma.BookingSelect;
 
 async function loadBookingForIdempotency(
-  userId: string,
+  userId: string | null,
   bookingId: string
 ): Promise<BookingDto | null> {
-  const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, clientUserId: userId },
-    select: bookingSelect,
-  });
+  // BOOKING-WIDGET-FOUNDATION-A: guests have no userId. Idempotency key
+  // is already namespaced by phone (see createBooking), so collisions
+  // across users are impossible — we can safely return the cached
+  // booking by id without an ownership filter. Caller passes the row
+  // through DTO (no PII leakage beyond what the same caller submitted).
+  const booking = userId
+    ? await prisma.booking.findFirst({
+        where: { id: bookingId, clientUserId: userId },
+        select: bookingSelect,
+      })
+    : await prisma.booking.findFirst({
+        where: { id: bookingId, clientUserId: null },
+        select: bookingSelect,
+      });
   return booking ? toBookingDto(booking) : null;
 }
 
 async function waitForIdempotencyResult(
   key: string,
-  userId: string
+  userId: string | null
 ): Promise<BookingDto | null> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await getIdempotencyRecord(key);
@@ -68,7 +78,7 @@ async function waitForIdempotencyResult(
 export async function resolveBookingIdempotency(input: {
   key: string;
   ttlSeconds: number;
-  userId: string;
+  userId: string | null;
 }): Promise<{ booking: BookingDto | null; lockAcquired: boolean }> {
   const existing = await getIdempotencyRecord(input.key);
   if (existing?.status === "done") {
