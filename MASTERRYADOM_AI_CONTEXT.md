@@ -1144,6 +1144,30 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — CATALOG-ENHANCEMENTS-A** (commit on `designStudioCabinet`). Точечная интеграция 2 полей Provider в catalog card — `slotPrecision` + `availableToday`. **NO redesign, NO schema migration, NO schedule-engine на витрину.**
+  - **Audit findings:**
+    - `Provider.slotPrecision` is a `String` field (not Prisma enum) with canonical values `"exact" | "today_free" | "date_only"` per `src/lib/schedule/editor-shared.ts:86`
+    - The catalog listing query (`searchCatalogProviders` in `src/lib/catalog/catalog.service.ts`) **does NOT compute per-card `nextSlot`** — it hardcodes `nextSlot: null` (line 723 pre-commit) and exposes only the cheap `availableToday: boolean` snapshot already on `Provider`
+    - **The card never actually rendered availability before this commit** — its `nextSlot` field was always null on the listing path, so the «зелёная точка» chip was hidden by the `slotText ? ... : null` ternary. Provider preference (`slotPrecision`) had no consumer
+    - `visibleSlotDays` is NOT relevant to the card today (card has no horizon/calendar UI; only a single chip). Would matter only if a precomputed `nextSlot` snapshot existed
+    - `catalog/loading.tsx` exists (audit-flagged Suspense risk is not present for this route)
+  - **Раздел 3 (Архитектура):**
+    - **NEW:** `src/features/catalog/lib/slot-precision-format.ts` — pure helper. Exports `SlotPrecision` type + `normalizeSlotPrecision(unknown): SlotPrecision` + `formatAvailability({precision, nextSlotStartAt?, availableToday?, timeZone, fallbackToOpen?}): { label, tone }`. Switch logic: `exact + nextSlotStartAt` → «Ближайшее: {when}»; `today_free + availableToday` → «Сегодня свободно»; `date_only + nextSlotStartAt` → «Свободно {date}»; soft fallback when `exact` is set but no snapshot — `availableToday` still surfaces «Сегодня свободно» (graceful, NOT N× engine call). Returns `{ label: null }` when caller passes `fallbackToOpen: false` and nothing positive is known
+    - **Modified:** `src/lib/catalog/catalog.service.ts` — `searchCatalogProviders` Provider `select` extended with `slotPrecision: true` (already had `availableToday: true`). `CatalogProviderItem` DTO extended with optional `slotPrecision?: string` + `availableToday?: boolean` (existing `todaySlotsCount: 1` preserved for backwards compat). Both fields are scalar columns on the same row — no JOIN, no engine pass
+    - **Modified:** `src/features/catalog/components/catalog-card.tsx` — replaced inline `slotText = item.nextSlot ? UI_FMT.dateTimeShort(...) : null` with `formatAvailability(...)`. Chip rendering branches on `availability.tone` — `"available"` keeps the emerald dot + emerald text, `"neutral"` uses muted tone. Card frame (22a/22b) untouched
+    - **Modified:** `src/lib/ui/text.ts` — `UI_TEXT.catalog2.card.availability.{nextSlotExact, todayFree, dateOnly, bookingOpen}` (4 keys)
+  - **Раздел 5 (Бизнес-логика):**
+    - `slotPrecision` now consumed on the public catalog — provider's preference drives the card's chip. The 3 modes branch on the data already cheaply available
+    - `visibleSlotDays` deliberately NOT consumed here — no horizon UI in the card; would only be meaningful with a precomputed `nextSlot` snapshot (backlog)
+    - **Perf invariant preserved:** the catalog listing remains `N × O(1)` lookups per provider. No `buildSlotsForDay` fan-out. The booking widget's slot computation path is the only place schedule-engine still runs (per-master, on demand)
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Производительность):** no regression. Listing select adds 1 scalar column (`slotPrecision`); `formatAvailability` is a pure switch returning a string. Card render added zero network round-trips
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **UI_TEXT:** 4 new keys under `catalog2.card.availability.*`
+  - **Validation:** typecheck ✅, lint baseline 858/134 preserved (external `.claude/references/PublicHeader.js` drift carried over from previous commits — not my code), encoding/mojibake/prisma ✅, **274/274 tests** (no test surface changed)
+  - **Backlog spawned:** catalog availability pre-computation — a snapshot pipeline (provider's nearest free slot, computed off the booking write path, cached on `Provider` or Redis) is the dependency for `exact` + `date_only` paths to render their precise availability instead of soft-falling back to `today_free`. Same snapshot would give `visibleSlotDays` a meaningful clamp point in the card. Cost: requires booking-write hooks + an invalidator + a worker job — out of scope for this small commit
+  - **🎉 Public catalog filtering item from BACKLOG ✅ partially closed.** Remaining tracked work: catalog availability snapshot pipeline. Next workstream: navbar/footer (would also clear the lingering `.claude/references/PublicHeader.js` lint drift)
+
 - **2026-05-18 — MODAL-UNIFY-IMPL-A** (commit on `designStudioCabinet`). Final consolidation sweep — unified the project's modal/drawer system per the «достроить existing» variant chosen from MODAL-UNIFY-EXPLORE. **3 new primitives + 5 drawer migrations + 0 schema changes + 0 forced rewrites of 79 existing ModalSurface consumers.**
   - **Audit findings (from EXPLORE, confirmed during impl):**
     - `ModalSurface` already canonical: 79 files, 251 import-occurrences. Stable since the «modals-investigation» portal-to-body fix

@@ -7,11 +7,14 @@ import { Heart, Star } from "lucide-react";
 import { FocalImage } from "@/components/ui/focal-image";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { moneyRUB } from "@/lib/format";
-import { UI_FMT } from "@/lib/ui/fmt";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
 import type { ApiResponse } from "@/lib/types/api";
+import {
+  formatAvailability,
+  normalizeSlotPrecision,
+} from "@/features/catalog/lib/slot-precision-format";
 
 type CatalogCardItem = {
   type: "master" | "studio";
@@ -32,6 +35,12 @@ type CatalogCardItem = {
   nextSlot: { startAt: string } | null;
   todaySlotsCount?: number;
   isHighlighted?: boolean;
+  // CATALOG-ENHANCEMENTS-A: provider's slot-presentation preference
+  // surfaced by the listing query (cheap scalar). `availableToday`
+  // is the same boolean snapshot the listing already exposes
+  // (renamed from the implicit `todaySlotsCount > 0` signal).
+  slotPrecision?: string;
+  availableToday?: boolean;
 };
 
 type Props = {
@@ -128,9 +137,19 @@ export function CatalogCard({
         ? moneyRUB(item.minPrice)
         : "—";
 
-  const slotText = item.nextSlot
-    ? UI_FMT.dateTimeShort(item.nextSlot.startAt, { timeZone: viewerTimeZone })
-    : null;
+  // CATALOG-ENHANCEMENTS-A: availability is now precision-aware. The
+  // listing today only exposes the cheap `availableToday` snapshot
+  // (no per-card schedule-engine pass). The helper degrades
+  // gracefully — providers preferring `"exact"` still get the
+  // "Сегодня свободно" / "Запись открыта" fallback path until a
+  // precomputed `nextSlot` snapshot lands (backlog).
+  const availability = formatAvailability({
+    precision: normalizeSlotPrecision(item.slotPrecision),
+    nextSlotStartAt: item.nextSlot?.startAt ?? null,
+    availableToday: item.availableToday ?? (item.todaySlotsCount ?? 0) > 0,
+    timeZone: viewerTimeZone,
+    fallbackToOpen: false,
+  });
 
   const isNew = item.reviewsCount <= 0;
   const photo = item.photos[0] ?? null;
@@ -265,10 +284,23 @@ export function CatalogCard({
             <span className="text-text-sec">{TC.fromPrice} </span>
             <span className="tabular-nums">{priceText}</span>
           </span>
-          {slotText ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="tabular-nums">{slotText}</span>
+          {availability.label ? (
+            <span
+              className={
+                availability.tone === "available"
+                  ? "inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+                  : "inline-flex items-center gap-1.5 text-xs text-text-sec"
+              }
+            >
+              <span
+                aria-hidden
+                className={
+                  availability.tone === "available"
+                    ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+                    : "h-1.5 w-1.5 rounded-full bg-text-sec/40"
+                }
+              />
+              <span className="tabular-nums">{availability.label}</span>
             </span>
           ) : null}
         </div>

@@ -305,6 +305,12 @@ export const UI_TEXT = {
       distanceKm: "км",
       reviewsLabel: "({count})",
       newLabel: "Новый",
+      availability: {
+        nextSlotExact: "Ближайшее: {when}",
+        todayFree: "Сегодня свободно",
+        dateOnly: "Свободно {date}",
+        bookingOpen: "Запись открыта",
+      },
     },
     empty: {
       title: "Никого не нашли по этим фильтрам",

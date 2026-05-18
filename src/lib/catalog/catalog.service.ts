@@ -57,6 +57,15 @@ export type CatalogProviderItem = {
   nextSlot: { startAt: string } | null;
   todaySlotsCount?: number;
   isHighlighted?: boolean;
+  // CATALOG-ENHANCEMENTS-A: surface the provider's `slotPrecision`
+  // preference + the existing cheap `availableToday` snapshot so the
+  // card can render availability per the provider's chosen
+  // presentation (exact / today_free / date_only). `nextSlot` stays
+  // null in the listing today — precomputed nearest-slot snapshot is
+  // a separate backlog item to avoid N× schedule-engine on the
+  // listing.
+  slotPrecision?: string;
+  availableToday?: boolean;
 };
 
 export type CatalogModelOfferItem = {
@@ -579,6 +588,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       geoLat: true,
       geoLng: true,
       availableToday: true,
+      slotPrecision: true,
       ownerUserId: true,
       services: {
         where: { isEnabled: true, isActive: true },
@@ -721,6 +731,8 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
         : null,
       minPrice,
       nextSlot: null,
+      slotPrecision: provider.slotPrecision,
+      availableToday: provider.availableToday,
       ...(provider.availableToday ? { todaySlotsCount: 1 } : {}),
       ...(provider.ownerUserId && highlightedUserIds.has(provider.ownerUserId)
         ? { isHighlighted: true }
