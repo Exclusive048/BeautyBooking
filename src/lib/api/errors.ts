@@ -106,6 +106,10 @@ const ERROR_CODES = [
   "PARENT_NOT_FOUND",
   "INHERITANCE_CYCLE",
   "STRICT_LIMIT",
+  // Booking policy enforcement (BOOKING-WIDGET-A)
+  "BOOKING_TOO_SOON",
+  "BOOKING_TOO_FAR",
+  "NEW_CLIENTS_CLOSED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

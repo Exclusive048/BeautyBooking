@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { AppError, resolveErrorCode } from "@/lib/api/errors";
-import { ProviderType, Prisma } from "@prisma/client";
+import { BookingStatus, ProviderType, Prisma } from "@prisma/client";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { dateFromKey } from "@/lib/schedule/time";
 import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+import {
+  assertAcceptsNewClient,
+  assertBookingWindow,
+} from "@/lib/bookings/policy-enforcement";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -180,6 +184,12 @@ export async function resolveBookingCore(input: {
         studioId: true,
         autoConfirmBookings: true,
         bufferBetweenBookingsMin: true,
+        // BOOKING-WIDGET-A: policy fields surfaced here so the
+        // `assertBookingWindow` + `assertAcceptsNewClient` guards below
+        // can validate before the slot-check + transaction.
+        minBookingHoursAhead: true,
+        maxBookingDaysAhead: true,
+        acceptNewClients: true,
       },
     }),
     prisma.service.findUnique({
@@ -292,6 +302,36 @@ export async function resolveBookingCore(input: {
   const endAtUtc = input.endAtUtc ?? new Date(startAtUtc.getTime() + durationMin * 60 * 1000);
   if (!isValidDate(endAtUtc) || endAtUtc <= startAtUtc) {
     throw new AppError("Некорректная дата окончания.", 400, "DATE_INVALID");
+  }
+
+  // BOOKING-WIDGET-A: provider policy enforcement. Three rules surfaced
+  // here so direct API callers can't bypass the slot-UI filters:
+  //   1. `minBookingHoursAhead` → BOOKING_TOO_SOON (400)
+  //   2. `maxBookingDaysAhead` → BOOKING_TOO_FAR (400)
+  //   3. `acceptNewClients=false` + zero priors → NEW_CLIENTS_CLOSED (403)
+  // For (3) we only count when the flag is off, avoiding an extra query
+  // on the common path. Counted bookings exclude REJECTED/CANCELLED/
+  // NO_SHOW since those don't represent an existing relationship.
+  const now = new Date();
+  assertBookingWindow(startAtUtc, provider, now);
+  if (!provider.acceptNewClients) {
+    const priorBookingsCount = await prisma.booking.count({
+      where: {
+        clientUserId: input.clientUserId,
+        OR: [
+          { providerId: provider.id },
+          { masterProviderId: resolvedMasterProviderId ?? undefined },
+        ],
+        status: {
+          notIn: [
+            BookingStatus.REJECTED,
+            BookingStatus.CANCELLED,
+            BookingStatus.NO_SHOW,
+          ],
+        },
+      },
+    });
+    assertAcceptsNewClient(provider, priorBookingsCount);
   }
 
   const availabilityProviderId = resolvedMasterProviderId ?? provider.id;

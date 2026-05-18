@@ -31,7 +31,8 @@
 >
 > **▶ Public surfaces workstream started (после Cabinet Studio):**
 > - ✅ Public studio profile redesign (STUDIO-PUBLIC-PROFILE-A — dropped inline booking flow in favour of deep-link to `/u/[username]/booking`, added slot-bar CTA, reordered sections per spec; live slot aggregation backlogged because no studio-scope helper exists)
-> - ⏳ Booking widget `/u/[username]/booking` (NEXT priority — core conversion)
+> - ✅ Booking policy enforcement (BOOKING-WIDGET-A — closes pre-launch backlog gap: `minBookingHoursAhead` / `maxBookingDaysAhead` / `acceptNewClients` / `visibleSlotDays` now enforced server-side via new `policy-enforcement` helper + 18 unit tests; defense-in-depth at both slots endpoint and `resolveBookingCore`; full widget UX redesign deferred due to multiple entangled blockers)
+> - ⏳ Booking widget full UX redesign — animated wizard with scenarios A/B, sticky summary, hero context, slot aggregation; deferred after this commit
 > - ⏳ Master public profile follow-ups, Catalog enhancements, marketing pages, hot-slots, inspiration, models
 >
 > **Merged в main** с прошлого snapshot: Cabinet Master (полностью), Cabinet Client (полностью), Public master profile `/u/[username]` + booking widget, Chat foundation, Multi-city support, Stories rail, Trial subscriptions, Email OTP, Review reports.
@@ -1140,6 +1141,52 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-18 — BOOKING-WIDGET-A** (commit on `designStudioCabinet`). **Public surfaces workstream commit 2/N.** **Booking policy enforcement** wired into the existing booking flow + slots endpoint. Full widget UX redesign **deferred** per scope rule «приоритет надёжности над фичами» — closing the highest-risk gap first (P1 pre-launch blocker) without touching the 600+LOC client widget or `createBooking` core.
+  - **Audit findings:**
+    - **Auth gate blocker:** `/u/[username]/booking/page.tsx` does `requireAuth({ allowGuests: false })`. Anonymous catalog browsers hit redirect to login before they can pick a slot. Guest checkout path exists structurally (`linkGuestBookingsToUser` post-signup) but is not wired through the widget entry. Full redesign would need to unwind this gate — backlog
+    - **Scenario B not wired:** Direct booking with a specific master via `?master=<id>` query exists in URL spec but the widget hardcodes studio-scope service picker. Master-direct path → backlog
+    - **Studio slot aggregation missing:** `buildSlotsForDay` is per-master only. Live studio-scope free-slot rendering requires N parallel per-master calls or a new `getStudioFreeSlots` aggregator — same backlog item already opened by STUDIO-PUBLIC-PROFILE-A
+    - **Provider policy fields present + selectable:** `Provider.{minBookingHoursAhead, maxBookingDaysAhead, acceptNewClients, visibleSlotDays, slotPrecision, cancellationDeadlineHours, lateCancelAction, remindersEnabled}` all live in schema. **Enforcement gap confirmed:** existing `resolveBookingCore` validated dates + slot conflict + idempotency but did NOT enforce `minBookingHoursAhead` / `maxBookingDaysAhead` / `acceptNewClients`. Slots endpoint did NOT clamp `visibleSlotDays` horizon either. **This is the closeable gap.**
+    - **`createBooking` + idempotency lock + `ensureNoConflicts` + UTC + rate limiting** all intact and not to be rewritten (user constraint). Both `createBooking` and `createClientBooking` call `resolveBookingCore` → single injection point for defense-in-depth enforcement
+  - **Раздел 3 (Архитектура):**
+    - **New:** `src/lib/bookings/policy-enforcement.ts` — pure helper module. Exports `ProviderPolicy` type (structural — accepts any object with the policy keys) + 6 functions: `earliestBookableUtc`, `latestBookableUtc`, `isWithinBookableWindow`, `assertBookingWindow`, `assertAcceptsNewClient`, `clampVisibleSlotsHorizon`. All side-effect-free, no Prisma/Redis deps → safe to import from anywhere
+    - **New:** `src/lib/bookings/policy-enforcement.test.ts` — **18 unit tests** covering boundary inclusivity, negative-input clamping, both window sides, NEW_CLIENTS_CLOSED with/without priors, horizon clamping edge cases. Test count 247 → 265
+    - **Modified:** `src/lib/api/errors.ts` — 3 new ErrorCodes added to literal union: `BOOKING_TOO_SOON`, `BOOKING_TOO_FAR`, `NEW_CLIENTS_CLOSED` (HTTP 400/400/403)
+    - **Modified:** `src/lib/bookings/booking-core.ts` — extended Provider select to include `minBookingHoursAhead, maxBookingDaysAhead, acceptNewClients`. Added enforcement block right after date validation, before slot check. On `acceptNewClients=false`, runs single `prisma.booking.count` against the client's prior bookings with this provider/master, excluding REJECTED/CANCELLED/NO_SHOW. **Both `createBooking` and `createClientBooking` inherit the guard automatically** since both go through `resolveBookingCore`
+    - **Modified:** `src/app/api/public/providers/[providerId]/slots/route.ts` — extended Provider select with `minBookingHoursAhead, visibleSlotDays`. Before slot generation: clamp requested `toKey` via `clampVisibleSlotsHorizon` (caps at `now + visibleSlotDays`). After slot generation: filter out slots before `earliestBookableUtc` (caps at `now + minBookingHoursAhead`). Cheap server-side post-filter on already-built slot list — no perf regression
+  - **Раздел 5 (Бизнес-логика):**
+    - **Enforcement at TWO surfaces (defense-in-depth):**
+      1. **Public slots endpoint** filters/clamps before serving. UX wins: client never sees a slot they can't book
+      2. **`resolveBookingCore`** asserts at booking-creation time. Closes direct-API/race-condition gaps where a client bypasses the slot list (e.g. submits a stale slot, hits the booking endpoint directly, or another booker took the same slot)
+    - **`NEW_CLIENTS_CLOSED`** = `acceptNewClients=false` AND no prior non-cancelled bookings between this client and this provider (or, for studio bookings, the resolved master). Returning clients always pass. Anonymous/guest bookings (without `clientUserId`) skip this check — they'd be linked post-signup via existing `linkGuestBookingsToUser`
+    - **`BOOKING_TOO_SOON`** = `startAtUtc < now + minBookingHoursAhead`. Boundary is inclusive (a slot exactly at the limit is allowed)
+    - **`BOOKING_TOO_FAR`** = `startAtUtc > now + maxBookingDaysAhead`. Boundary inclusive
+    - **`visibleSlotDays` horizon clamp** in slots endpoint = `dateKey of (now + visibleSlotDays)`. Inclusive. Minimum 1 day even if provider sets 0/negative. Existing `toKey` request narrower than horizon wins
+    - **`createBooking` NOT rewritten** — only the shared `resolveBookingCore` helper extended (per user constraint). All idempotency / conflict / rate-limit / UTC plumbing preserved verbatim
+  - **Раздел 6 (Маршруты):** **No new routes.** `GET /api/public/providers/[providerId]/slots` extended with policy-aware filtering. Existing `POST /api/bookings` + `POST /api/clients/bookings` inherit enforcement through `resolveBookingCore`
+  - **Раздел 8 (Проблемы и риски):** **L1 «Booking enforcement новых полей» CLOSED** (was Pre-launch task). The createBooking path now honours `minBookingHoursAhead`/`maxBookingDaysAhead`/`acceptNewClients`. **L2 partially addressed:** `visibleSlotDays` horizon clamped in slots endpoint; `slotPrecision` rounding still pending (separate concern — that's display-time UX, not safety). **L3 `lateCancelAction === "fine"`** still no enforcement (deferred — needs payment-penalty infra). **`cancellationDeadlineHours`** also still pending; was in scope of widget redesign but no client-side enforcement today (server-side already in `cancelBooking`)
+  - **Раздел 11 (Производительность):** no regression. Slots endpoint added 1 cheap `Array.filter` + 1 dateKey-clamp helper call (both O(N) over already-built slot list). `resolveBookingCore` added at most 1 `prisma.booking.count({ where: ... })` and only when `acceptNewClients=false` (a minority of providers). Both happen inside flows that already do heavier Prisma work
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **UI_TEXT:** no new keys (server-side error codes flow through existing `AppError.message` → API response. UI copy for the 3 new error states is the widget redesign's job)
+  - **Validation:** typecheck ✅ (after adding 3 new ErrorCodes to literal union), encoding/mojibake/prisma ✅, **265/265 tests** (247 → 265, +18 from policy-enforcement.test.ts). Lint baseline drifted to 858/134 from external `.claude/references/PublicHeader.js` reference file — my code is lint-clean (verified via grep on `policy-enforcement.ts`, `slots/route.ts`, `booking-core.ts`)
+  - **Backlog spawned:**
+    - 🟠 Booking widget full UX redesign — animated 4/3-step wizard, sticky summary, hero, scenarios A (studio→service→master) + B (master direct via `?master=`), real `clampVisibleSlotsHorizon` consumption in calendar UI, friendly per-error copy
+    - 🟠 Scenario B (master-direct booking via `?master=<id>`) — needs widget refactor
+    - 🟠 Studio slot aggregation service (`getStudioFreeSlots`) — same backlog as STUDIO-PUBLIC-PROFILE-A
+    - 🟠 Guest booking flow through widget — currently auth-gated; needs widget refactor + UX decisions
+    - 🟡 `silentMode` flag exposed in widget UI (already a Booking schema column)
+    - 🟡 Routing split — `/u/` master + `/v/` (or `/s/`) studio (user decision deferred)
+    - 🟡 Online payment integration on widget
+    - 🟡 Client-side `cancellationDeadlineHours` enforcement + UX copy
+    - 🟡 Streaming + react-server-components refactor on `/u/[username]/booking` (currently fully client-rendered)
+    - 🟡 Per-error UI copy for `BOOKING_TOO_SOON` / `BOOKING_TOO_FAR` / `NEW_CLIENTS_CLOSED` (today user sees generic error message — server returns proper code/status, but widget UI is generic)
+    - 🔵 A/B test infrastructure for widget variants
+    - 🔵 HotSlot integration in booking widget
+    - 🔵 Multi-service booking (cart pattern)
+    - 🔵 Funnel analytics on booking widget
+    - 🔵 Skeleton refinements on widget
+  - **Next workstreams:** Booking widget full UX redesign (the deferred half), Master public profile follow-ups, Catalog enhancements, Marketing, Hot slots, Inspiration, Models. Plus Phase 6 hardening / Phase 7 cleanup / Phase 8 docs
 
 - **2026-05-18 — STUDIO-PUBLIC-PROFILE-A** (commit on `designStudioCabinet`). **First commit of the new Public surfaces workstream** (after Cabinet Studio sprint closed at 19/19). Surgical redesign of the existing `PublicStudioProfilePage` — drops inline booking flow + adds slot-bar CTA + reorders sections per spec.
   - **Audit findings:**
