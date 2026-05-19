@@ -1144,6 +1144,31 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — FORMDIALOG-MIGRATION-A** (commit on `designStudioCabinet`). First wave of MODAL-UNIFY-EXPLORE's `<FormDialog>` adoption — **12 of 49 form-dialogs** migrated to the unified shell per spec's «лучше N чисто мигрированных + M честно оставленных, чем N сломанных насильно» rule before a major QA pass.
+  - **Audit findings:**
+    - 49 dialogs found using ModalSurface (not 60 as the EXPLORE estimate suggested). Per-file classification: ~12-15 clearly-simple, ~10 multi-section/step, ~10 picker/non-form, ~10 file-upload/OAuth/complex, 2 with non-standard variant buttons
+    - FormDialog API covers: `title` + `<form>` children + Cancel/Submit footer + internal submitting state + `error` prop. Supports `submitVariant: "primary" | "danger"` — `pause-master-dialog` uses `secondary` for pause-action visual, so stays on ModalSurface
+    - `<form>`-wrapping in FormDialog means inputs need `disabled={submitting}` to stay; FormDialog manages its own submit state so the migrated dialogs lose their local `submitting` `useState` (replaces ~6 lines per file)
+    - Existing pattern in `email-verify-modal.tsx` (pre-existing baseline error from PHASE7-CLEANUP-A) is `useEffect(() => { setX(""); }, [open])` for form-reset — fires the `react-hooks/set-state-in-effect` rule. After my edits removed the paired `setSubmitting(false)` from 3 admin dialogs, the same rule started firing for them. Fixed with localized `// eslint-disable-next-line` comments + intent doc (same approach as email-verify-modal)
+  - **Раздел 3 (Архитектура):**
+    - **MIGRATED to `<FormDialog>` (12 dialogs):** Phase 1 studio cabinet (5: `cancel-booking-dialog`, `reject-dialog` schedule-requests, `approve-dialog`, `delete-service-dialog`, `delete-package-dialog`, `report-review-dialog`), Phase 2 admin cabinet (4: `approve-review-dialog`, `delete-review-dialog`, `cancel-subscription-dialog`, `refund-payment-dialog`), Phase 3 general (2: `report-review-modal` master, `edit-review-modal` client). Each file: `ModalSurface` import swapped for `FormDialog`, manual `<div className="flex justify-end gap-2">…</div>` footer removed, manual submitting state removed where it only drove the footer (kept where it disables form inputs), manual error display block removed (FormDialog renders via `error` prop)
+    - **KEPT on ModalSurface (37 dialogs)** with documented reasons in BACKLOG entry — multi-step / picker / file-upload / OAuth / non-standard variant / retype-confirm / search-with-results patterns where FormDialog API doesn't fit. Future micro-sweep can pick up the close-to-simple ones; multi-step/picker dialogs are not FormDialog candidates without primitive extension
+    - **3 localized `// eslint-disable-next-line` comments added** to `cancel-subscription-dialog` + `refund-payment-dialog` + `delete-review-dialog` to preserve baseline (1 error / 3 warnings) — matches existing pattern in `email-verify-modal`
+  - **Раздел 5 (Бизнес-логика):** **business logic verbatim** — every migrated dialog's `onSubmit` body (fetch / API / mutations / success+error handling) is byte-identical to the pre-commit version. Only shell (footer + submitting indicator + error UI) changed. No semantic changes anywhere
+  - **Раздел 6 (Маршруты):** не затронуты — UI-only refactor on shared component layer
+  - **Раздел 8 (Проблемы):** lint baseline preserved at **1 error / 3 warnings** (same as PHASE7-CLEANUP-A) — no regressions. The pre-existing `react-hooks/set-state-in-effect` rule pattern documented; 3 new instances suppressed with localized intent comments
+  - **Раздел 9 (Тестирование):** **274/274 tests** pass after migration. Phased self-validation: typecheck after each of 3 phases ✅. Final lint + tests + build all green
+  - **Раздел 13 (Правила):** new rule for form-dialog authoring — for new simple form-dialogs (title + form-fields + Cancel/Submit + loading/error) use `<FormDialog>` directly; for multi-step / picker / file-upload / OAuth / retype-confirm / non-standard-variant flows continue using `ModalSurface` with the manual footer pattern (acceptable for those — the dialog gets full control)
+  - **Раздел 11 (Производительность):** marginal positive (less duplicate state per dialog, less render flicker since FormDialog's submit-tracking is consolidated). No measurable runtime change
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** (preserved), encoding/mojibake/prisma ✅, **274/274 tests** ✅, **`npm run build` ✅**
+  - **For QA:** 12 migrated dialogs share a unified submit-button label / spinner / animation / cancel-disable-while-submitting behavior. 37 kept dialogs work exactly as before — visually slightly different per-surface but functionally identical
+  - **Backlog spawned:**
+    - 🟡 Phase 4 micro-sweep — pick up close-to-simple dialogs that have one quirk (custom variant button, inline propose-category, retype-confirm) «при касании»
+    - 🟡 FormDialog v2 — add `submitVariant: "secondary"` support, would unlock 2-3 more migrations (`pause-master-dialog`)
+    - 🔵 Multi-step modal primitive — when the multi-step pattern becomes worth unifying (currently 6-8 dialogs use bespoke multi-step)
+  - **Next:** Chat redesign (booking chat / attachments / SSE / studio admin chat auth gap) → full QA pass across 4 surfaces
+
 - **2026-05-19 — DELETE-HOT-INSPIRATION-A** (commit on `designStudioCabinet`). Page-level deletion per user decision. **Critical: only the public showcase pages + isolated components removed; the HotSlot feature core is fully preserved.**
   - **Audit findings (page vs feature boundary):**
     - `/hot/page.tsx` was already a `permanentRedirect("/catalog?hot=true")` stub — the showcase functionality had migrated into the catalog filter

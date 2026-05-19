@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ModalSurface } from "@/components/ui/modal-surface";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ClientReviewItem } from "@/lib/client-cabinet/reviews.service";
@@ -66,81 +65,66 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
   }
 
   return (
-    <ModalSurface open onClose={onClose} title={T.editAction}>
-      <div className="space-y-4">
-        <div className="rounded-xl bg-bg-input/50 p-3 text-sm">
-          <div className="font-semibold text-text-main">
-            {review.target.name}
-          </div>
-          {review.serviceName ? (
-            <div className="mt-0.5 text-text-sec">{review.serviceName}</div>
-          ) : null}
-        </div>
-
-        <div>
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-            Оценка
-          </div>
-          <div className="flex items-center gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setRating(n)}
-                className="p-1"
-                aria-label={`${n}`}
-              >
-                <Star
-                  className={`h-7 w-7 transition ${
-                    n <= rating ? "fill-primary text-primary" : "text-text-sec/40"
-                  }`}
-                  aria-hidden
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="edit-review-text"
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
-          >
-            Текст отзыва
-          </label>
-          <Textarea
-            id="edit-review-text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={FORM_T.textPlaceholder}
-            rows={4}
-            maxLength={1000}
-          />
-          <div className="text-right font-mono text-xs text-text-sec">
-            {text.length}/1000
-          </div>
-        </div>
-
-        {error ? (
-          <div className="rounded-xl border border-rose-300/50 bg-rose-50/60 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-            {error}
-          </div>
+    <FormDialog
+      open
+      onClose={onClose}
+      title={T.editAction}
+      submitLabel={UI_TEXT.clientCabinet.common.save}
+      cancelLabel={FORM_T.cancel}
+      onSubmit={handleSubmit}
+      error={error}
+      submitDisabled={!canSubmit}
+    >
+      <div className="rounded-xl bg-bg-input/50 p-3 text-sm">
+        <div className="font-semibold text-text-main">{review.target.name}</div>
+        {review.serviceName ? (
+          <div className="mt-0.5 text-text-sec">{review.serviceName}</div>
         ) : null}
+      </div>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
-            {FORM_T.cancel}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-          >
-            {submitting ? FORM_T.sending : UI_TEXT.clientCabinet.common.save}
-          </Button>
+      <div>
+        <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          Оценка
+        </div>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setRating(n)}
+              className="p-1"
+              aria-label={`${n}`}
+            >
+              <Star
+                className={`h-7 w-7 transition ${
+                  n <= rating ? "fill-primary text-primary" : "text-text-sec/40"
+                }`}
+                aria-hidden
+              />
+            </button>
+          ))}
         </div>
       </div>
-    </ModalSurface>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="edit-review-text"
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+        >
+          Текст отзыва
+        </label>
+        <Textarea
+          id="edit-review-text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={FORM_T.textPlaceholder}
+          rows={4}
+          maxLength={1000}
+        />
+        <div className="text-right font-mono text-xs text-text-sec">
+          {text.length}/1000
+        </div>
+      </div>
+    </FormDialog>
   );
 }

@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ModalSurface } from "@/components/ui/modal-surface";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -80,51 +79,41 @@ export function ReportReviewDialog({ reviewId, onClose }: Props) {
   };
 
   return (
-    <ModalSurface open={Boolean(reviewId)} onClose={handleClose} title={T.title}>
-      <div className="space-y-3">
-        <p className="text-sm text-text-sec">{T.subtitle}</p>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">{T.reasonLabel}</span>
-          <Select
-            value={reason}
-            onChange={(e) => setReason(e.target.value as typeof reason)}
-            disabled={submitting}
-          >
-            {REASONS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">{T.commentLabel}</span>
-          <Textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder={T.commentPlaceholder}
-            rows={3}
-            disabled={submitting}
-            maxLength={500}
-          />
-        </label>
-        {error ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
-          >
-            {error}
-          </div>
-        ) : null}
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <Button variant="ghost" onClick={handleClose} disabled={submitting}>
-            {T.cancel}
-          </Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? T.submitting : T.submit}
-          </Button>
-        </div>
-      </div>
-    </ModalSurface>
+    <FormDialog
+      open={Boolean(reviewId)}
+      onClose={handleClose}
+      title={T.title}
+      submitLabel={T.submit}
+      cancelLabel={T.cancel}
+      onSubmit={handleSubmit}
+      error={error}
+    >
+      <p className="text-sm text-text-sec">{T.subtitle}</p>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-text-main">{T.reasonLabel}</span>
+        <Select
+          value={reason}
+          onChange={(e) => setReason(e.target.value as typeof reason)}
+          disabled={submitting}
+        >
+          {REASONS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </Select>
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-text-main">{T.commentLabel}</span>
+        <Textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder={T.commentPlaceholder}
+          rows={3}
+          disabled={submitting}
+          maxLength={500}
+        />
+      </label>
+    </FormDialog>
   );
 }

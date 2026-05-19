@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { ModalSurface } from "@/components/ui/modal-surface";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
@@ -35,12 +34,12 @@ export function CancelSubscriptionDialog({
   onConfirm,
 }: Props) {
   const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    // Reset the form when the dialog re-opens for a different subscription.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReason("");
-    setSubmitting(false);
   }, [open]);
 
   if (!subscription) return null;
@@ -57,44 +56,33 @@ export function CancelSubscriptionDialog({
         .replace("{user}", subscription.user.displayName)
         .replace("{plan}", subscription.plan.name);
 
-  const submit = async () => {
-    setSubmitting(true);
-    try {
-      await onConfirm(reason.trim());
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <ModalSurface open={open} onClose={onClose} title={T.title}>
-      <div className="space-y-4">
-        <p className="text-sm text-text-main">{body}</p>
-        <div>
-          <label
-            htmlFor="cancel-reason"
-            className="mb-1.5 block text-xs font-medium text-text-sec"
-          >
-            {T.reasonLabel}
-          </label>
-          <Textarea
-            id="cancel-reason"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder={T.reasonPlaceholder}
-            rows={3}
-            maxLength={500}
-          />
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            {T.cancel}
-          </Button>
-          <Button variant="danger" onClick={() => void submit()} disabled={submitting}>
-            {T.confirm}
-          </Button>
-        </div>
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      title={T.title}
+      submitLabel={T.confirm}
+      cancelLabel={T.cancel}
+      submitVariant="danger"
+      onSubmit={() => onConfirm(reason.trim())}
+    >
+      <p className="text-sm text-text-main">{body}</p>
+      <div>
+        <label
+          htmlFor="cancel-reason"
+          className="mb-1.5 block text-xs font-medium text-text-sec"
+        >
+          {T.reasonLabel}
+        </label>
+        <Textarea
+          id="cancel-reason"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder={T.reasonPlaceholder}
+          rows={3}
+          maxLength={500}
+        />
       </div>
-    </ModalSurface>
+    </FormDialog>
   );
 }
