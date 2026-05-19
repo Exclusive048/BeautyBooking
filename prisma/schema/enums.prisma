@@ -301,6 +301,8 @@ enum MediaEntityType {
   CLIENT_CARD
 
   BOOKING
+
+  CHAT_MESSAGE
 }
 
 enum MediaKind {
@@ -313,6 +315,8 @@ enum MediaKind {
   CLIENT_CARD_PHOTO
 
   BOOKING_REFERENCE
+
+  CHAT_ATTACHMENT
 }
 
 enum MediaAssetStatus {

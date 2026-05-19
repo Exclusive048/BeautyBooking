@@ -13,9 +13,18 @@ export const runtime = "nodejs";
 
 type RouteParams = Promise<{ slug: string }>;
 
-const bodySchema = z.object({
-  body: z.string().trim().min(1, "Сообщение пустое.").max(1000),
-});
+const bodySchema = z
+  .object({
+    // CHAT-FOUNDATION-A-MIGRATION: body OR attachment required.
+    // `sendConversationMessage` enforces the same invariant; this
+    // refine just surfaces the friendlier message at parse time.
+    body: z.string().trim().max(1000).optional().default(""),
+    attachmentMediaAssetId: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine(
+    (value) => (value.body && value.body.length > 0) || Boolean(value.attachmentMediaAssetId),
+    { message: "Сообщение пустое.", path: ["body"] },
+  );
 
 const RATE_LIMIT = { limit: 30, windowSeconds: 60 };
 
@@ -52,6 +61,7 @@ export async function POST(
       perspective,
       userId: user.userId,
       body: body.body,
+      attachmentMediaAssetId: body.attachmentMediaAssetId ?? null,
     });
     return jsonOk(result, { status: 201 });
   } catch (error) {

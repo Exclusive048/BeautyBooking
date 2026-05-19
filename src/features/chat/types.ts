@@ -52,6 +52,12 @@ export type ThreadMessageDto = {
   bookingId: string;
   /** Card rendered alongside a SYSTEM message. Null for plain text. */
   bookingCard: ThreadBookingCardDto | null;
+  /**
+   * Optional image attachment id (CHAT-FOUNDATION-A-MIGRATION + CHAT-UI-A).
+   * Renderer fetches the file via `/api/media/file/{id}` — the same
+   * auth-aware media-delivery path portfolio + avatars use.
+   */
+  attachmentMediaAssetId: string | null;
 };
 
 export type ThreadDaySeparatorDto = {

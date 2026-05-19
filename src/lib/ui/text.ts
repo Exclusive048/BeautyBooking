@@ -7284,6 +7284,12 @@ export const UI_TEXT = {
         "Запись завершена — есть 24 часа на финальные сообщения.",
       footer:
         "ENTER — отправить · SHIFT+ENTER — новая строка · личные сообщения видны только вам и собеседнику",
+      attachAria: "Прикрепить фото",
+      attachUploading: "Загружаем фото…",
+      attachUploadFailed: "Не удалось загрузить фото. Попробуйте ещё раз.",
+      attachInvalidType: "Поддерживаются JPEG, PNG, WebP.",
+      attachTooLarge: "Файл слишком большой.",
+      attachRemoveAria: "Убрать вложение",
     },
     weekdayShort: ["пн", "вт", "ср", "чт", "пт", "сб", "вс"] as string[],
     monthsGenitive: [

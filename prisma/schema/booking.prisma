@@ -177,6 +177,17 @@ model ChatMessage {
 
   readAt DateTime?
 
+  // CHAT-FOUNDATION-A-MIGRATION: optional image attachment per chat
+  // message. Mirrors the booking-reference upload pattern — the
+  // asset is owner-scoped via `MediaAsset.createdByUserId`, lives
+  // under `kind=CHAT_ATTACHMENT` + `entityType=CHAT_MESSAGE`, and
+  // gets re-pointed from `pending:<userId>` to `chat-message:<msgId>`
+  // when the link is persisted (marks it used so the same asset
+  // can't be reattached to a second message).
+  attachmentMediaAssetId String?
+
+  attachmentMediaAsset MediaAsset? @relation("ChatMessageAttachment", fields: [attachmentMediaAssetId], references: [id], onDelete: SetNull)
+
   // System messages can pin a booking card (status change, reschedule, etc.).
   // Cascade is SetNull so deleting a booking just unlinks the card — message
   // stays in the chat as plain text for audit-trail purposes.
@@ -198,6 +209,7 @@ model ChatMessage {
   @@index([chatId, createdAt])
   @@index([chatId, readAt])
   @@index([referencedBookingId])
+  @@index([attachmentMediaAssetId])
 }
 
 // chat-url-fix: opaque public identifier for (provider, client) chat

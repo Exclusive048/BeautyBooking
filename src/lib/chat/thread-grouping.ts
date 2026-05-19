@@ -30,6 +30,12 @@ export type ThreadMessage = {
   bookingId: string;
   /** Booking referenced by a SYSTEM message (lifecycle card). Null otherwise. */
   bookingCard: ThreadBookingCard | null;
+  /**
+   * Optional image attachment (CHAT-FOUNDATION-A-MIGRATION).
+   * Renderer fetches the file via `/api/media/file/{id}` — the
+   * existing media-delivery path used by portfolio + avatars.
+   */
+  attachmentMediaAssetId: string | null;
 };
 
 export type ThreadDaySeparator = {
@@ -50,6 +56,7 @@ type RawMessage = {
   createdAt: Date;
   bookingId: string;
   bookingCard?: ThreadBookingCard | null;
+  attachmentMediaAssetId?: string | null;
 };
 
 export function injectDaySeparators(
@@ -78,6 +85,7 @@ export function injectDaySeparators(
       createdAt: message.createdAt.toISOString(),
       bookingId: message.bookingId,
       bookingCard: message.bookingCard ?? null,
+      attachmentMediaAssetId: message.attachmentMediaAssetId ?? null,
     });
   }
   return out;

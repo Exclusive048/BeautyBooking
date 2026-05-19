@@ -18,6 +18,11 @@ const messageSelect = {
   body: true,
   readAt: true,
   createdAt: true,
+  // CHAT-FOUNDATION-A-MIGRATION: surface the optional attachment id
+  // for the client renderer. Keeping the select minimal (id only) —
+  // the URL/dimensions are looked up separately via the existing
+  // media-delivery path when the UI actually needs to render.
+  attachmentMediaAssetId: true,
 } as const;
 
 export async function GET(req: NextRequest, ctx: { params: RouteParams }) {
