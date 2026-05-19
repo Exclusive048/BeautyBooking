@@ -1144,6 +1144,48 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — NAVBAR-REDESIGN-A** (commit on `designStudioCabinet`). **🎉 ПОСЛЕДНИЙ redesign-коммит. Redesign phase OFFICIALLY COMPLETE.** Reality-check per FOOTER-REDESIGN-A lesson turned out to apply even harder here — most of what the spec described as «нужно построить» already exists in `src/components/layout/topbar.tsx`. Two surgical changes shipped: brand-logo alignment + lint-drift closure.
+  - **Reality-check audit findings (the most important section):**
+    - The actual navbar component is `Topbar` (`src/components/layout/topbar.tsx`), NOT `Navbar`. Rendered by `<AppShell>` (`src/components/layout/app-shell.tsx`) — globally on every page (public + cabinets)
+    - **All 5 role-driven states already exist** via canonical auth infrastructure:
+      - `getSessionUser()` resolves the authenticated user with `roles[]`
+      - `getAvailableCabinets(roles)` from `src/lib/auth/available-cabinets.ts` returns the `CabinetKind[]` set
+      - `loadWorkspaceLinks(user.id)` in topbar.tsx invokes `hasMasterProfile()` + `hasStudioAdminAccess()` and conditionally returns master / studio shortcut links
+      - `<AuthUserMenu>` accepts `availableCabinets` prop and renders the dropdown's switcher when length > 1
+      - The 5 states branch naturally: guest → `<TopbarAuthButton>` + theme + mobile drawer; authed-client → bell + theme + AuthUserMenu (workspace shortcuts both null); authed-master → + master shortcut button; authed-studio → + studio shortcut button; authed-master+studio → + both shortcut buttons (AuthUserMenu also renders the «Профессиональные кабинеты» switcher in its dropdown)
+    - **Every element the spec said «нужно построить» already exists:**
+      - `<CitySelector>` from `features/cities/components/city-selector` — wired between iconmark + wordmark
+      - `<NotificationsBell>` from `components/notifications/notifications-bell` — rendered for authed users
+      - `<ThemeToggle>` from `components/theme-toggle` — both guest + authed
+      - `<AuthUserMenu>` — dropdown with profile / proRoles / settings / logout + switcher
+      - `<AuthMobileMenu>` — mobile drawer for both guest + authed
+      - `<TopbarAuthButton>` — guest login + become-master CTA
+      - `<WorkspaceShortcutLink>` — master / studio quick-access avatar buttons
+    - **All NAV_LINKS routes resolve to real pages:** `/catalog`, `/models`, `/cabinet/bookings` (the `myBookings` route — exists)
+    - **Inline brand-logo block** in Topbar.tsx (22 lines: gradient "М" square + wordmark with styled `<em>`) — duplicated from the same pattern the footer used before FOOTER-REDESIGN-A. Same fix applies — replace with `<BrandLogo>` shared component
+    - **Lint drift source** is `.claude/references/*.{js,jsx}` files (`PublicHeader.js`, `admin-shell.jsx`, `catalog.js`, `clientBookings.js`, and ~12 others) — standalone design sketches with React-style JSX that doesn't transpile or import from the project. They're not application code. As the references folder grew through redesign work, they entered the lint surface and inflated the count from 823/122 to 858/134
+  - **Раздел 3 (Архитектура):**
+    - **MODIFIED:** `src/components/layout/topbar.tsx` — replaced the 22-line inline brand-logo block (gradient "М" square + styled wordmark + duplicate `<Link href="/">` × 2) with `<BrandLogo variant="iconOnly" size="md">` (iconmark slot — `siteLogo?.url` from admin upload still wins as override via `getSiteLogoAsset()`) + `<BrandLogo variant="monoText" size="sm">` (wordmark slot, separated by the existing `<CitySelector>` between them). Matches FOOTER-REDESIGN-A's earlier brand-logo alignment fix for visual + import consistency across the global shell
+    - **MODIFIED:** `eslint.config.mjs` — added `".claude/**"` to `globalIgnores`. Closes the design-references lint drift. Result: 858/134 → 1/4 (the remaining 1 error + 4 warnings are pre-existing project code issues unrelated to navbar/topbar — they pre-date both this commit AND the 823/122 «old baseline» which was also inflated by `.claude` references)
+    - **NO new components written.** All 5 role states already work via existing auth resolution. No `Navbar` shell, no role-driven branching code, no `<CitySelector>` build, no `<NotificationsBell>` build, no `<ThemeToggle>` build, no `<AuthUserMenu>` build — all of those exist
+  - **Раздел 5 (Бизнес-логика):** не затронута. Auth resolution paths (`getSessionUser` + `getAvailableCabinets` + `loadWorkspaceLinks` + `hasMasterProfile` + `hasStudioAdminAccess` + `MembershipStatus.ACTIVE` filter) all preserved verbatim. The 5 role-driven UI states are emergent from the existing logic — no UI branching needed beyond what already exists
+  - **Раздел 6 (Маршруты):** не затронуты. All NAV_LINKS routes (`/catalog`, `/models`, `/cabinet/bookings`), guest routes (`/login`, `/become-master`), and cabinet routes (`MASTER_CABINET_PATH`, `STUDIO_CABINET_PATH`) preserved verbatim
+  - **Раздел 10 (Безопасность):** не затронута. Auth resolution reused as-is. No new auth surface
+  - **Раздел 11 (Производительность):** no regression. `<BrandLogo>` is the same component the footer already uses (FOOTER-REDESIGN-A) — no new asset / no new font / no new query. Lint config change is config-only
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Раздел 13 (Правила):** new note — `<BrandLogo>` canonical across both Topbar (iconmark + wordmark) and Footer (full). `.claude/**` excluded from lint scope (design references aren't application code)
+  - **UI_TEXT:** не затронут (all existing `nav.*` + `auth.*` + `cities.*` + `clientCabinet.switcher.*` keys reused as-is)
+  - **Validation:** typecheck ✅, **lint 858/134 → 1/4** (drift CLOSED, well under the 823/122 target — that target was itself inflated by `.claude` references), encoding/mojibake/prisma ✅, **274/274 tests** (no test surface changed)
+  - **Showcase verification (5 role paths via 4 seed accounts + guest):**
+    - Guest (no session): TopbarAuthButton + ThemeToggle + mobile drawer ✅
+    - Анна (`+79991000000`, MASTER role): bell + theme + master shortcut + AuthUserMenu ✅
+    - Виктория Vision (`+79992000000`, STUDIO role): bell + theme + studio shortcut + AuthUserMenu ✅
+    - Марина (`+79993000000`, MASTER role within Vision studio — has hasMasterProfile=true): same path as Анна (Марина doesn't admin the studio so `hasStudioAdminAccess` returns false) ✅
+    - Admin (`+79994000000`, ADMIN role): authed-client path + admin link in AuthUserMenu ✅
+    - master+studio combined: any user with both roles would render both shortcuts + switcher in dropdown — not in current seed but the branching exists
+  - **Backlog spawned:** none — every spec-described element was already real, no aspirational item became a deferred backlog entry (contrast with footer where city/lang/currency selectors / metric tiles / App-Play / extended legal were all aspirational and got backlogged). 1 lingering pre-existing lint error + 4 warnings unrelated to navbar — acceptable, can be cleaned in Phase 7
+  - **🎉 REDESIGN PHASE OFFICIALLY COMPLETE.** Full timeline: Cabinet Master sprint → Cabinet Studio sprint (19 commits, closed with STUDIO-SETTINGS-A) → Cabinet Client → Admin Panel (Phase 2 closed) → public master profile redesign → public studio profile redesign (STUDIO-PUBLIC-PROFILE-A) → booking widget FOUNDATION (guest path, scenario A/B, aggregator) → booking widget UI (wizard, animation, per-error, silent toggle) → modal unification (3 new primitives + 5 drawer migrations) → catalog enhancements (slotPrecision/availableToday) → footer redesign (2 CTA + BrandLogo) → navbar redesign (this commit). **Next workstreams:** Chat redesign (booking chat / attachments / SSE / studio admin chat auth gap), Phase 6 hardening (SMS gateway P1, `{ not: value }` sweep, multi-recipient notif, CI tests, catalog availability snapshot pipeline, `aggregateStudioSlots` SSR wiring), Phase 7 cleanup (`@deprecated` sweep + legacy 60 form-dialogs migration to FormDialog «при касании» + 837-LOC `studio-settings-page.tsx` retire), Phase 8 docs. **Recommended before Chat:** accumulated QA pass (Cabinet Studio 19 commits + booking widget guest path + seed P2002 fix + 5 drawer migrations + footer + navbar visual smoke in both themes + mobile)
+
 - **2026-05-19 — FOOTER-REDESIGN-A** (commit on `designStudioCabinet`). Узкий редизайн глобального `Footer` — единственное что меняется: 1 CTA → 2 CTA карточки, inline brand-логотип → shared `<BrandLogo>`, выравнивание стилей через shared UI + tokens. **NO navbar / PublicHeader.js работы** — отдельный коммит позже (lint drift 858/134 будет закрыт там).
   - **Audit reality-check:**
     - User-provided spec described an aspirational footer (metric tiles 47/12400/284K/4.92, city/lang/currency selectors, App Store/Google Play buttons, full ИП/ИНН/ОГРНИП/152-ФЗ legal block, Cookies/Sitemap/Press-kit links) — **none of this exists in the codebase**
