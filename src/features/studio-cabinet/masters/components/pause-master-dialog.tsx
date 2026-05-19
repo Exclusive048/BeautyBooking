@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ModalSurface } from "@/components/ui/modal-surface";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const TPause = UI_TEXT.studioCabinet.mastersV2.pauseDialog;
@@ -68,29 +67,19 @@ export function PauseMasterDialog({
   }
 
   return (
-    <ModalSurface open={open} onClose={handleClose} title={T.title}>
-      <div className="space-y-4">
-        <p className="text-sm text-text-sec">
-          {T.bodyTemplate.replace("{name}", masterName)}
-        </p>
-        {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
-            {error}
-          </div>
-        ) : null}
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={handleClose} disabled={submitting}>
-            {T.cancel}
-          </Button>
-          <Button
-            variant={mode === "pause" ? "secondary" : "primary"}
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? T.submitting : T.confirm}
-          </Button>
-        </div>
-      </div>
-    </ModalSurface>
+    <FormDialog
+      open={open}
+      onClose={handleClose}
+      title={T.title}
+      submitLabel={T.confirm}
+      cancelLabel={T.cancel}
+      submitVariant={mode === "pause" ? "secondary" : "primary"}
+      onSubmit={handleSubmit}
+      error={error}
+    >
+      <p className="text-sm text-text-sec">
+        {T.bodyTemplate.replace("{name}", masterName)}
+      </p>
+    </FormDialog>
   );
 }

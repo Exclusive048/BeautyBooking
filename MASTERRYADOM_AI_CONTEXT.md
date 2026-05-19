@@ -1144,6 +1144,26 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — FORMDIALOG-V2-A** (commit on `designStudioCabinet`). Narrow extension of `FormDialog` + 2 newly-unblocked migrations. **ModalSurface untouched** (79 consumers held sacred before the major QA pass).
+  - **Audit findings:**
+    - `FormDialog.submitVariant` was typed `"primary" | "danger"` though `sharedUI Button` supports `"secondary"` natively. Only `pause-master-dialog` truly needed it (uses `variant={mode === "pause" ? "secondary" : "primary"}` to de-emphasise the pause action)
+    - **`invite-master-dialog` was MISCLASSIFIED in FORMDIALOG-MIGRATION-A** as «non-standard variant» — re-audit shows it uses `variant="primary"` and fits V1 cleanly. This commit corrects that
+    - Grep-scan of all 35 remaining kept dialogs found no other secondary-submit cases. The remaining 33 are structurally outside `submitVariant` scope (multi-step / file-upload / OAuth / picker / retype-confirm / search-with-results)
+  - **Раздел 3 (Архитектура):**
+    - **MODIFIED:** `src/components/ui/form-dialog.tsx` — `submitVariant` union widened to include `"secondary"`. Body simplified from explicit ternary to `submitVariant ?? "primary"` (sharedUI Button validates the union; default keeps V1 byte-identical behaviour). Doc comment explains V2 rationale. **No new structural support added** (no multi-step, no custom-footer — those remain ModalSurface territory)
+    - **MIGRATED:** `pause-master-dialog.tsx` — `submitVariant={mode === "pause" ? "secondary" : "primary"}` preserves the original visual
+    - **MIGRATED:** `invite-master-dialog.tsx` — default primary submit; 3 form fields preserved verbatim with `disabled={submitting}` plumbing intact; all validation (`normalizeRussianPhone` + required-field checks) byte-identical
+    - **`ModalSurface` NOT touched** — 79 consumers preserved (per spec rule «79 — священны перед QA»)
+  - **Раздел 5 (Бизнес-логика):** business logic byte-identical for both migrations — `onSubmit`/`handleClose`/`reset`/validation/state all preserved. Only shell changed (manual footer + manual submitting label + manual error display → FormDialog's built-in versions)
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Производительность):** no regression (less duplicate state per migrated dialog, same primitives)
+  - **Раздел 13 (Правила):** updated rule — `FormDialog` now supports `submitVariant: "primary" | "danger" | "secondary"`. Use `"secondary"` for non-destructive but non-positive actions (e.g. pause, archive, hide). For multi-step / picker / OAuth / file-upload / retype-confirm continue using `ModalSurface` directly
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** (baseline preserved from PHASE7-CLEANUP-A), encoding/mojibake/prisma ✅, **274/274 tests** ✅, **`npm run build` ✅**
+  - **FormDialog migration totals:** 14 of 49 dialogs unified (12 V1 + 2 V2). 33 still-kept are structurally outside `submitVariant` scope and require either primitive extension (out of scope) or a different unification pattern altogether
+  - **Backlog spawned:** none new. Multi-step modal primitive + file-upload/OAuth dialogs remain as previously logged structural items
+  - **Next:** Chat redesign → full QA pass
+
 - **2026-05-19 — FORMDIALOG-MIGRATION-A** (commit on `designStudioCabinet`). First wave of MODAL-UNIFY-EXPLORE's `<FormDialog>` adoption — **12 of 49 form-dialogs** migrated to the unified shell per spec's «лучше N чисто мигрированных + M честно оставленных, чем N сломанных насильно» rule before a major QA pass.
   - **Audit findings:**
     - 49 dialogs found using ModalSurface (not 60 as the EXPLORE estimate suggested). Per-file classification: ~12-15 clearly-simple, ~10 multi-section/step, ~10 picker/non-form, ~10 file-upload/OAuth/complex, 2 with non-standard variant buttons

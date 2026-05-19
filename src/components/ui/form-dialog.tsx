@@ -25,7 +25,15 @@ type Props = {
   onSubmit: () => void | Promise<void>;
   submitLabel?: string;
   cancelLabel?: string;
-  submitVariant?: "primary" | "danger";
+  /**
+   * Submit button visual. FORMDIALOG-V2-A added `"secondary"` to
+   * unlock dialogs whose UX intentionally de-emphasises the
+   * primary action (e.g. `pause-master-dialog` — pausing a master
+   * is non-destructive but also non-positive, so the button is
+   * presented in the secondary tone). Default `"primary"` keeps
+   * the original V1 behaviour for all 12 existing callers.
+   */
+  submitVariant?: "primary" | "danger" | "secondary";
   /**
    * Disable the submit button externally (e.g. while form is
    * incomplete or validating). The dialog also disables it during
@@ -138,7 +146,7 @@ export function FormDialog({
           </Button>
           <Button
             type="submit"
-            variant={submitVariant === "danger" ? "danger" : "primary"}
+            variant={submitVariant ?? "primary"}
             size="sm"
             disabled={submitting || submitDisabled}
           >
