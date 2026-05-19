@@ -1144,6 +1144,38 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — DELETE-HOT-INSPIRATION-A** (commit on `designStudioCabinet`). Page-level deletion per user decision. **Critical: only the public showcase pages + isolated components removed; the HotSlot feature core is fully preserved.**
+  - **Audit findings (page vs feature boundary):**
+    - `/hot/page.tsx` was already a `permanentRedirect("/catalog?hot=true")` stub — the showcase functionality had migrated into the catalog filter
+    - `/inspiration/page.tsx` had a "Do not delete" comment referencing a future AI-driven concept; per explicit user decision in the spec, deleted
+    - `HotSlotsPage` + `HotSlotsPageClient` only consumed by the `/hot` route → isolated, safe to delete
+    - `InspirationFeedPage` + `InspirationFeedClient` only consumed by the `/inspiration` route → isolated, safe to delete
+    - `HotSlotsSubscribeButton` ALSO used by `public-profile/master/hero-block.tsx` → NOT isolated → kept
+    - `HotSlotsPreview` ALSO used by `landing-home.tsx` → NOT isolated → kept
+    - `/api/hot-slots` + `/api/hot-slots/subscribe` ALSO consumed by the kept components above → NOT isolated → kept
+    - Master cabinet hot-slots sections + `/api/provider/hot-slots/rule` + `/api/admin/hot-slots/run` + all of `src/lib/hot-slots/*` (anti-fraud, pricing, runtime, subscriptions, job, smart-price-job, notifications, eligibility, schemas, service, slot-freed, constants, validation tests) → booking-critical core, untouched
+    - HotSlot schema model + migrations untouched (NO schema migration)
+  - **Раздел 3 (Архитектура):**
+    - **DELETED 6 files (verified isolated to deleted pages):**
+      - `src/app/(public)/hot/page.tsx`
+      - `src/app/(public)/inspiration/page.tsx`
+      - `src/features/hot-slots/hot-slots-page.tsx`
+      - `src/features/hot-slots/hot-slots-page-client.tsx`
+      - `src/features/feed/components/inspiration-feed-page.tsx`
+      - `src/features/feed/components/inspiration-feed-client.tsx`
+      - Empty parent dirs `src/app/(public)/hot/` + `src/app/(public)/inspiration/` also removed
+    - **MODIFIED:** `src/app/sitemap.ts` — dropped `${baseUrl}/hot` static-route entry (route gone). `/inspiration` was never in sitemap (was hidden from navigation per file comment)
+    - **NOT touched (verified active consumers):** `HotSlotsSubscribeButton`, `HotSlotsPreview`, public list `/api/hot-slots`, subscribe `/api/hot-slots/subscribe`, all of `src/lib/hot-slots/*`, master cabinet hot-slots sections, master rule API, admin run API, OpenAPI spec entry, HotSlot schema model, `isHotSlotRebookBlocked` in booking-core
+  - **Раздел 5 (Бизнес-логика):** **HotSlot feature continues to work fully:** master creates hot-slot rules in cabinet → worker runs `HOT_SLOT_EXPIRING` job → anti-fraud blocks rebook abuse in `createBooking` → notifications fire → landing-home shows the preview → master public profile shows the subscribe button. Only the dedicated public showcase page `/hot` is gone (the catalog filter `/catalog?hot=true` was already the canonical surface). `/inspiration` was a never-shipped placeholder feature
+  - **Раздел 6 (Маршруты):** `/hot` and `/inspiration` removed from public routes. Build output confirms — neither appears in the route list. **404 on `/hot`** from this commit (the redirect stub is gone) — acceptable per spec; old bookmarks will break. `/inspiration` was hidden from nav so no user impact
+  - **Раздел 8 (Проблемы и риски):** **Stale BACKLOG.md roadmap section overhauled.** The "⏳ Cabinet Studio" + "⏳ Public surfaces remaining" + "⏳ После всех redesigns" sub-sections claimed redesign incomplete though all surfaces shipped during the sprint (Cabinet Studio 19 commits, public profile, booking widget, modal, catalog, footer, navbar all ✅). Roadmap now reflects reality. `/hot` + `/inspiration` removed from "Public surfaces remaining" list. `master-schedule-editor.tsx` retire entry removed (already done in PHASE7-CLEANUP-A)
+  - **Раздел 9 (Тестирование):** не затронут — 274/274 tests pass. **HotSlot core tests (`anti-fraud.test.ts` + `validation.test.ts`) both pass** — feature confirmed alive
+  - **Раздел 11 (Производительность):** marginal positive — smaller bundle (orphan page-client removed). No runtime change to the live HotSlot core
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** (unchanged from PHASE7-CLEANUP-A baseline — no new issues), encoding/mojibake/prisma ✅, **274/274 tests**, **`npm run build` ✅** (production build green, `/hot` + `/inspiration` confirmed gone from route list, `/u/[username]/booking` + `/catalog` + master public profile + landing all build successfully)
+  - **Open question for user (not blocker):** HotSlot feature without dedicated public showcase — the catalog filter `/catalog?hot=true` is the surface, but if users discover hot slots less, the feature may become de-facto dead. Decision later: either surface in another way, or accept reduced visibility, or eventually remove the whole feature
+  - **Next workstreams (per spec sequence):** FORMDIALOG-MIGRATION (60 form-dialogs → `<FormDialog>`) → Chat redesign → full QA pass
+
 - **2026-05-19 — PHASE7-CLEANUP-A** (commit on `designStudioCabinet`). Pre-QA safe cleanup. **Audit-driven, NOT bulk-delete** per the category-dual-system precedent (where @deprecated symbols were actively imported). Every candidate verified via static + dynamic + re-export grep before removal.
   - **Audit findings:**
     - 13 `@deprecated` markers found across the codebase. Per-file usage check resolved each into one of 3 buckets: (a) **dead cluster — safe to delete**, (b) **deprecated but actively consumed — must leave**, (c) **deprecated prop on live component — must leave**
