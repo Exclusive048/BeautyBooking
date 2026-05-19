@@ -801,9 +801,9 @@ src/
 - Нет глобального Next.js middleware для проверки авторизации на уровне роутов.
 - Каждый API route проверяет auth самостоятельно через `requireAuth()` / `getSessionUser()`.
 
-**T7: Нет CI-шага для запуска тестов** — Сделано: НЕТ. **Pre-launch task**.
-- `quality-gates.yml` НЕ включает `npm run test`.
-- Тесты (29 файлов) запускаются только вручную.
+**T7: ~~Нет CI-шага для запуска тестов~~** — **Сделано** (закрыто ранее, верифицировано в TEST-COVERAGE-A 2026-05-19).
+- `quality-gates.yml` содержит `Run tests: npm run test -- --reporter=verbose --bail 1` между Typecheck и Mojibake check.
+- Тесты (45 файлов / 358 тестов) запускаются в CI на каждый push/PR.
 
 **T8: Swagger/OpenAPI генерируется скриптом, не в CI**
 - `scripts/generate-openapi.mjs` — генерация OpenAPI-спецификации. В CI не проверяется актуальность.
@@ -853,7 +853,9 @@ src/
 - Environment: node
 - Plugins: vite-tsconfig-paths (поддержка `@/` алиасов)
 
-### Тестовые файлы (34 файла, актуально 2026-05-13)
+### Тестовые файлы (45 файлов / 358 тестов, актуально 2026-05-19)
+
+**Новое в TEST-COVERAGE-A (2026-05-19):** `src/lib/billing/utils.test.ts` (15) + `src/lib/billing/marketing-pricing.test.ts` (19) + `src/lib/billing/guards.test.ts` (6) + `src/lib/bookings/flow.test.ts` (32) + `src/lib/bookings/idempotency-key.test.ts` (6) — pure-helper coverage. `quality-gates.yml` уже запускает `npm run test` в CI (T7 закрыт).
 
 **Новое в MRR-SNAPSHOTS-A:** `src/lib/billing/mrr.test.ts` (6 tests) + `src/lib/billing/mrr-snapshot.test.ts` (6 tests) — pure calculateMRR + idempotent snapshot creation + race fallback + UTC date truncation.
 
@@ -1143,6 +1145,25 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-19 — TEST-COVERAGE-A** (commit on `designStudioCabinet`, фоновый трек параллельно ручному QA). **Strict isolation: working code 0 modifications** — только 5 новых `*.test.ts` файлов. **Audit:** (a) CI integration уже был сделан раньше (`quality-gates.yml` уже содержит `Run tests` step — стейл-таска T7 в CONTEXT). (b) В billing уже покрыты `features.ts`/`mrr.ts`/`mrr-snapshot.ts`/`trial.ts`; pure-функции `utils.ts`/`marketing-pricing.ts`/`guards.ts` — нет. (c) В bookings уже покрыты `reminders.ts`/`link-guest-bookings.ts`/`policy-enforcement.ts`; pure-функции `flow.ts` + `idempotency-key`-helper — нет. **Strategy:** pure-function focus only. Сложные Prisma-mock пути (`createBooking`/`cancelBooking`/`marketing-pricing.load`/`get-current-plan`/idempotency-Prisma) deferred как integration-tests per spec rule «лучше ядро покрыто чисто, чем всё поверхностно».
+  - **Раздел 3 (Архитектура):** 5 новых test-файлов, 0 рабочих файлов изменено
+    - `src/lib/billing/utils.test.ts` — 15 tests (sha256 / formatTimeBucketUtc / addMonthsUtc — billing-critical day-clamping для месячных периодов, leap-year, year rollover, 12mo/6mo billing, ms preservation)
+    - `src/lib/billing/marketing-pricing.test.ts` — 19 tests (calcSavingsPercent / findPrice / listIncludedFeatures с scope filter)
+    - `src/lib/billing/guards.test.ts` — 6 tests (3 AppError factories — FEATURE_GATE 403 / SYSTEM_FEATURE_DISABLED 403 / LIMIT_REACHED 409)
+    - `src/lib/bookings/flow.test.ts` — 32 tests (normalizeBookingStatus exhaustive table / resolveBookingRuntimeStatus runtime promotion с grace / minutesUntilStart / 60-min action window / cancellation deadline 423 / canCancelOrReschedule по статусам)
+    - `src/lib/bookings/idempotency-key.test.ts` — 6 tests (key composition, determinism, guest namespace из BOOKING-WIDGET-FOUNDATION-A, TTL=600s)
+  - **Раздел 9 (Тестирование):** test count 274 → **358** (+84). Test files 40 → 45. **CI:** `quality-gates.yml` уже запускает `npm run test -- --reporter=verbose --bail 1` between Typecheck и Mojibake — закрывает T7. **Покрыто billing pure helpers** (utils period-math / marketing-pricing.calc / guards). **Покрыто bookings flow state-machine** (status transitions + 60-min cancel/reschedule window + cancellation deadline). **НЕ покрыто (backlog):** createBooking integration (deep Prisma chain), cancelBooking, marketing-pricing.load SSR path, idempotency Prisma-touching paths, getCurrentPlan, deletion/visual-search, E2E
+  - **Раздел 5 (Бизнес-логика):** не затронута — рабочий код не тронут, тесты документируют текущее поведение
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 8 (Проблемы):** **L1 (booking enforcement новых полей)** ранее закрыт — этот коммит не открыл новых рисков. **T7 (нет CI тестов)** оказался устаревшим — CI уже запускал тесты, заметка в CONTEXT была неточной
+  - **Раздел 10 (Безопасность):** не затронут
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **One discovery during writing (NOT a bug):** `listIncludedFeatures` фильтрует features по scope appliesTo — STUDIO-only ключ типа `maxTeamMasters` невидим на MASTER plan. Тест изначально был написан в неправильном предположении; исправлен + добавлен symmetric тест для STUDIO scope
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** preserved (PHASE7-CLEANUP-A baseline), encoding/mojibake/prisma ✅, **358/358 tests** ✅, **`npm run build` ✅**, **`git status --short` показывает только 5 `??` test files** (рабочий код 0 изменений — manual QA isolation preserved)
+  - **Pre-launch risks (новых не обнаружено):** все pre-launch L1-L5 + T1-T9 не затронуты этим коммитом
+  - **Open questions:** нет — все тесты pass, никакого подозрительного поведения тестами не вскрыто
+  - **Next background workstreams:** BOOKING-ENFORCEMENT (после QA Этап 2.1 — не раньше, пересечётся с booking-критичным QA), потом multi-recipient notifications (после notif QA). Сложные Prisma-mock integration tests — отдельный коммит когда integration-test infrastructure появится
 
 - **2026-05-19 — CHAT-UI-A** (commit on `designStudioCabinet`). **🎉 ПЛАТФОРМА ДОСТРОЕНА — финальный большой коммит редизайн-спринта.** Closes chat UX consumption of CHAT-FOUNDATION-A (SSE + receipts) + CHAT-FOUNDATION-A-MIGRATION (attachments backend).
   - **Audit reality-check applied per FOOTER/NAVBAR lesson** — spec scoped 5 redesign goals; audit revealed **4 of 5 already production-grade**, only attachment picker/render was the actual gap:
