@@ -32,10 +32,11 @@ model MediaAsset {
 
   createdByUserId String?
 
-  createdBy         UserProfile?         @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  clientCardPhotos  ClientCardPhoto[]    @relation("ClientCardPhotoAsset")
-  bookingReferences Booking[]            @relation("BookingReferencePhoto")
-  embedding         MediaAssetEmbedding?
+  createdBy              UserProfile?         @relation("MediaAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  clientCardPhotos       ClientCardPhoto[]    @relation("ClientCardPhotoAsset")
+  bookingReferences      Booking[]            @relation("BookingReferencePhoto")
+  chatMessageAttachments ChatMessage[]        @relation("ChatMessageAttachment")
+  embedding              MediaAssetEmbedding?
 
   createdAt DateTime @default(now())
 

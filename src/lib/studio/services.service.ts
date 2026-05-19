@@ -1,6 +1,7 @@
 import { CategoryStatus } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
 export type StudioServiceAssignedMaster = {
@@ -197,10 +198,17 @@ export async function reorderStudioCategories(input: {
 
 export async function createStudioService(input: {
   studioId: string;
-  categoryId: string;
+  /** CATEGORY-UNIFICATION-A: optional. Legacy ServiceCategory FK kept
+   * for `studio-settings-page.tsx`; new flow leaves it null. */
+  categoryId?: string;
   title: string;
   description?: string;
+  /** Drives catalog visibility. Accepts APPROVED globals OR a pending
+   * category proposed by `proposerUserId`. */
   globalCategoryId?: string;
+  /** Required when `globalCategoryId` points at a PENDING category
+   * (own-pending check mirrors `listAvailableGlobalCategories`). */
+  proposerUserId?: string;
   basePrice: number;
   baseDurationMin: number;
 }): Promise<{ id: string }> {
@@ -208,27 +216,49 @@ export async function createStudioService(input: {
   const normalizedPrice = normalizeStudioServicePrice(input.basePrice);
   const normalizedDurationMin = normalizeStudioServiceDurationMin(input.baseDurationMin);
   const globalCategoryId = input.globalCategoryId?.trim() || null;
+  const categoryId = input.categoryId?.trim() || null;
 
-  const category = await prisma.serviceCategory.findUnique({
-    where: { id: input.categoryId },
-    select: { studioId: true },
-  });
-  if (!category || category.studioId !== studio.id) {
-    throw new AppError("Category not found", 404, "NOT_FOUND");
+  // Legacy ServiceCategory path: validate only when client supplied it.
+  if (categoryId) {
+    const category = await prisma.serviceCategory.findUnique({
+      where: { id: categoryId },
+      select: { studioId: true },
+    });
+    if (!category || category.studioId !== studio.id) {
+      throw new AppError("Category not found", 404, "NOT_FOUND");
+    }
   }
 
   if (globalCategoryId) {
     const globalCategory = await prisma.globalCategory.findUnique({
       where: { id: globalCategoryId },
-      select: { id: true, status: true, visualSearchSlug: true },
+      select: {
+        id: true,
+        status: true,
+        visualSearchSlug: true,
+        proposedBy: true,
+        createdByUserId: true,
+      },
     });
-    if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.visualSearchSlug === "hot") {
+    if (!globalCategory || globalCategory.visualSearchSlug === "hot") {
       throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+    }
+    const isApproved = globalCategory.status === CategoryStatus.APPROVED;
+    const isOwnPending =
+      globalCategory.status === CategoryStatus.PENDING &&
+      Boolean(input.proposerUserId) &&
+      (globalCategory.proposedBy === input.proposerUserId ||
+        globalCategory.createdByUserId === input.proposerUserId);
+    if (!isApproved && !isOwnPending) {
+      throw new AppError("Глобальная категория недоступна", 404, "NOT_FOUND");
     }
   }
 
   const last = await prisma.service.findFirst({
-    where: { studioId: studio.id, categoryId: input.categoryId },
+    where: {
+      studioId: studio.id,
+      ...(categoryId ? { categoryId } : { categoryId: null }),
+    },
     orderBy: { sortOrder: "desc" },
     select: { sortOrder: true },
   });
@@ -238,7 +268,7 @@ export async function createStudioService(input: {
       data: {
         providerId: studio.providerId,
         studioId: studio.id,
-        categoryId: input.categoryId,
+        categoryId,
         globalCategoryId,
         name: input.title.trim(),
         title: input.title.trim(),
@@ -412,13 +442,13 @@ export async function assignMasterToService(input: {
   }
 
   const studio = await getStudioContext(input.studioId);
-  const master = await prisma.provider.findFirst({
-    where: { id: input.masterId, type: "MASTER", studioId: studio.providerId },
-    select: { id: true },
+  // STUDIO-BUGS-FIX-A bug #5: gate assignment on ACTIVE master status.
+  // INVITED (ownerUserId IS NULL) or DISABLED (isPublished=false) masters
+  // throw 409 MASTER_NOT_ACTIVE.
+  await requireActiveStudioMaster({
+    studioProviderId: studio.providerId,
+    masterId: input.masterId,
   });
-  if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
-  }
 
   await prisma.masterService.upsert({
     where: { masterProviderId_serviceId: { masterProviderId: input.masterId, serviceId: input.serviceId } },
@@ -439,4 +469,62 @@ export async function assignMasterToService(input: {
   return { serviceId: input.serviceId, masterId: input.masterId };
 }
 
+/**
+ * Soft-removes a master from a service by setting `MasterService.isEnabled
+ * = false`. Mirrors the `assignMasterToService` pattern (upsert with
+ * `isEnabled` flag) so the link record survives for analytics — the
+ * master simply stops offering this service. Used by the studio
+ * services page detail panel.
+ */
+export async function unassignMasterFromService(input: {
+  studioId: string;
+  serviceId: string;
+  masterId: string;
+}): Promise<{ serviceId: string; masterId: string }> {
+  const service = await prisma.service.findUnique({
+    where: { id: input.serviceId },
+    select: { id: true, studioId: true },
+  });
+  if (!service) {
+    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+  }
+  if (service.studioId && service.studioId !== input.studioId) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+
+  await prisma.masterService.updateMany({
+    where: {
+      masterProviderId: input.masterId,
+      serviceId: input.serviceId,
+    },
+    data: { isEnabled: false },
+  });
+
+  return { serviceId: input.serviceId, masterId: input.masterId };
+}
+
+/**
+ * Deletes a service from the studio catalogue. The Service row is
+ * removed entirely; cascading FKs handle MasterService cleanup. Hard
+ * delete is acceptable for catalogue items (no business retention need
+ * — analytics use `BookingServiceItem.priceSnapshot` snapshots, which
+ * survive service deletion).
+ */
+export async function deleteStudioService(input: {
+  studioId: string;
+  serviceId: string;
+}): Promise<{ id: string }> {
+  const service = await prisma.service.findUnique({
+    where: { id: input.serviceId },
+    select: { id: true, studioId: true },
+  });
+  if (!service) {
+    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+  }
+  if (service.studioId !== input.studioId) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+  await prisma.service.delete({ where: { id: service.id } });
+  return { id: service.id };
+}
 

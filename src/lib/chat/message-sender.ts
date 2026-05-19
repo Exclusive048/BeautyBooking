@@ -9,6 +9,10 @@ import {
   type ConversationKey,
 } from "@/lib/chat/conversation-slug";
 import type { ConversationParticipant } from "@/lib/chat/conversation-access";
+import {
+  markAttachmentUsed,
+  validateChatAttachmentAsset,
+} from "@/lib/chat/attachment";
 
 const MAX_BODY_LENGTH = 1000;
 
@@ -34,6 +38,8 @@ export type SendMessageInput = {
   perspective: ConversationParticipant;
   userId: string;
   body: string;
+  /** Optional image attachment (CHAT-FOUNDATION-A-MIGRATION). */
+  attachmentMediaAssetId?: string | null;
 };
 
 export type SendMessageResult = {
@@ -45,6 +51,7 @@ export type SendMessageResult = {
     readAt: string | null;
     createdAt: string;
     bookingId: string;
+    attachmentMediaAssetId: string | null;
   };
   conversationSlug: string;
 };
@@ -84,7 +91,9 @@ export async function sendConversationMessage(
   }
 
   const body = input.body.trim();
-  if (!body) {
+  // CHAT-FOUNDATION-A-MIGRATION: a message must carry at least
+  // body text OR an attachment (attachment-only messages are valid).
+  if (!body && !input.attachmentMediaAssetId) {
     throw new AppError("Сообщение пустое.", 400, "VALIDATION_ERROR");
   }
   if (body.length > MAX_BODY_LENGTH) {
@@ -155,12 +164,24 @@ export async function sendConversationMessage(
     select: { id: true },
   });
 
+  // CHAT-FOUNDATION-A-MIGRATION: validate the attachment before
+  // creating the message so we never persist a row pointing at an
+  // unowned / already-used / wrong-kind asset.
+  const attachmentMediaAssetId = input.attachmentMediaAssetId ?? null;
+  if (attachmentMediaAssetId) {
+    await validateChatAttachmentAsset({
+      assetId: attachmentMediaAssetId,
+      senderUserId: input.userId,
+    });
+  }
+
   const message = await prisma.chatMessage.create({
     data: {
       chatId: chat.id,
       senderType,
       senderName,
       body,
+      attachmentMediaAssetId,
     },
     select: {
       id: true,
@@ -169,8 +190,13 @@ export async function sendConversationMessage(
       body: true,
       readAt: true,
       createdAt: true,
+      attachmentMediaAssetId: true,
     },
   });
+
+  if (attachmentMediaAssetId) {
+    await markAttachmentUsed({ assetId: attachmentMediaAssetId, messageId: message.id });
+  }
 
   // Notify the other side via the existing CHAT_MESSAGE_RECEIVED
   // path — SSE + push + telegram all still work. Conversation-aware
@@ -213,6 +239,7 @@ export async function sendConversationMessage(
       readAt: message.readAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
       bookingId: booking.id,
+      attachmentMediaAssetId: message.attachmentMediaAssetId ?? null,
     },
     conversationSlug: input.slug,
   };

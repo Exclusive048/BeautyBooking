@@ -2,10 +2,14 @@ import { ok, fail } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+import {
+  clampVisibleSlotsHorizon,
+  earliestBookableUtc,
+} from "@/lib/bookings/policy-enforcement";
 
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -98,7 +102,15 @@ export async function GET(
 
   const provider = await resolveProviderBySlugOrId({
     key: p.providerId,
-    select: { id: true, type: true, timezone: true },
+    select: {
+      id: true,
+      type: true,
+      timezone: true,
+      // BOOKING-WIDGET-A: policy fields are needed for the visible-window
+      // clamp + min-hours filter below. Keep selection narrow.
+      minBookingHoursAhead: true,
+      visibleSlotDays: true,
+    },
     requirePublished: true,
   });
   if (!provider || provider.type !== "MASTER") {
@@ -116,9 +128,19 @@ export async function GET(
   });
   if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
 
+  // BOOKING-WIDGET-A: clamp the requested horizon to
+  // `Provider.visibleSlotDays`. The cabinet-side schedule editor stores
+  // this value as the "catalog visibility" knob — without enforcement
+  // here, the public surface ignored it.
+  const nowForPolicy = new Date();
+  const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy);
+  const effectiveToKeyExclusive = clampedToKey
+    ? addDaysToDateKey(clampedToKey, 1)
+    : toKey || undefined;
+
   const result = await listAvailabilitySlotsPaginated(provider.id, serviceId, duration.data, {
     fromKey,
-    toKeyExclusive: toKey || undefined,
+    toKeyExclusive: effectiveToKeyExclusive,
     limit,
   });
   if (!result.ok) {
@@ -215,9 +237,16 @@ export async function GET(
     return fallback;
   };
 
+  // BOOKING-WIDGET-A: anything before `now + minBookingHoursAhead` is
+  // non-bookable. Drop those slots server-side so the catalog/widget
+  // never advertise an unbookable window — closes the long-standing
+  // enforcement gap on this surface.
+  const earliestBookable = earliestBookableUtc(provider, nowForPolicy);
+
   const baseSlots = result.data.slots.filter((slot) => {
     const startsAt = toDate(slot.startAtUtc);
     if (!startsAt) return false;
+    if (startsAt.getTime() < earliestBookable.getTime()) return false;
     const dateKey = toLocalDateKey(startsAt, provider.timezone);
     const effective = getEffective(dateKey);
 

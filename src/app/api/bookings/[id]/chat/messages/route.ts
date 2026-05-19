@@ -5,6 +5,10 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/access";
 import { resolveChatAccess } from "@/lib/chat/access";
+import {
+  markAttachmentUsed,
+  validateChatAttachmentAsset,
+} from "@/lib/chat/attachment";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
 import { deliverNotification } from "@/lib/notifications/delivery";
@@ -12,9 +16,16 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
 
-const bodySchema = z.object({
-  body: z.string().trim().min(1).max(1000),
-});
+const bodySchema = z
+  .object({
+    // CHAT-FOUNDATION-A-MIGRATION: body OR attachment required.
+    body: z.string().trim().max(1000).optional().default(""),
+    attachmentMediaAssetId: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine(
+    (value) => (value.body && value.body.length > 0) || Boolean(value.attachmentMediaAssetId),
+    { message: "Сообщение пустое.", path: ["body"] },
+  );
 
 function resolveUserName(input: {
   displayName?: string | null;
@@ -83,12 +94,22 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
       });
     })();
 
+    // CHAT-FOUNDATION-A-MIGRATION: validate attachment before persist.
+    const attachmentMediaAssetId = body.attachmentMediaAssetId ?? null;
+    if (attachmentMediaAssetId) {
+      await validateChatAttachmentAsset({
+        assetId: attachmentMediaAssetId,
+        senderUserId: user.userId,
+      });
+    }
+
     const message = await prisma.chatMessage.create({
       data: {
         chatId: chat.id,
         senderType: access.senderType,
         senderName,
         body: body.body,
+        attachmentMediaAssetId,
       },
       select: {
         id: true,
@@ -97,8 +118,13 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
         body: true,
         readAt: true,
         createdAt: true,
+        attachmentMediaAssetId: true,
       },
     });
+
+    if (attachmentMediaAssetId) {
+      await markAttachmentUsed({ assetId: attachmentMediaAssetId, messageId: message.id });
+    }
 
     const recipientUserId =
       access.senderType === "CLIENT"

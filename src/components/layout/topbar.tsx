@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { Scissors, Building2 } from "lucide-react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { AuthMobileMenu } from "@/components/layout/auth-mobile-menu";
 import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 import { NavLink } from "@/components/layout/nav-link";
@@ -152,17 +153,19 @@ export async function Topbar() {
   return (
     <TopbarShell>
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 lg:h-16 lg:px-6">
-        {/* Brand block: glyph · CitySelector · textmark.
-            Glyph and textmark each link to "/", selector is a self-contained
-            dropdown between them. On narrow screens (<sm) the textmark hides;
-            below ~380px the selector itself can wrap if needed. */}
+        {/* Brand block: iconmark · CitySelector · wordmark.
+            NAVBAR-REDESIGN-A: replaced the duplicated inline gradient
+            "М" + inline wordmark with the shared `<BrandLogo>` (same
+            component used by the footer — FOOTER-REDESIGN-A). Admin
+            site-logo upload still wins via `siteLogo` lookup; the
+            BrandLogo is the fallback. */}
         <div className="flex min-w-0 shrink items-center gap-2.5">
-          <Link
-            href="/"
-            aria-label={UI_TEXT.nav.siteLogoAlt}
-            className="shrink-0"
-          >
-            {siteLogo?.url ? (
+          {siteLogo?.url ? (
+            <Link
+              href="/"
+              aria-label={UI_TEXT.nav.siteLogoAlt}
+              className="shrink-0"
+            >
               <FocalImage
                 src={siteLogo.url}
                 alt={UI_TEXT.nav.siteLogoAlt}
@@ -170,17 +173,10 @@ export async function Topbar() {
                 height={36}
                 className="rounded-xl object-cover"
               />
-            ) : (
-              <span
-                aria-hidden
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient"
-              >
-                <span className="font-display text-lg font-semibold italic leading-none text-white">
-                  М
-                </span>
-              </span>
-            )}
-          </Link>
+            </Link>
+          ) : (
+            <BrandLogo variant="iconOnly" size="md" href="/" className="shrink-0" />
+          )}
 
           <span aria-hidden className="hidden select-none text-text-sec/40 sm:inline">
             {UI_TEXT.cities.selector.separator}
@@ -192,12 +188,7 @@ export async function Topbar() {
             {UI_TEXT.cities.selector.separator}
           </span>
 
-          <Link
-            href="/"
-            className="hidden truncate font-display text-base font-medium text-text-main lg:inline"
-          >
-            Мастер<em className="not-italic font-display italic text-primary">Рядом</em>
-          </Link>
+          <BrandLogo variant="monoText" size="sm" href="/" className="hidden lg:inline-flex" />
         </div>
 
         {/* Center nav (desktop) */}

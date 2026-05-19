@@ -10,7 +10,6 @@ function buildStaticRoutes(baseUrl: string): MetadataRoute.Sitemap {
   return [
     { url: `${baseUrl}/`, changeFrequency: "daily", priority: 1.0 },
     { url: `${baseUrl}/catalog`, changeFrequency: "daily", priority: 0.9 },
-    { url: `${baseUrl}/hot`, changeFrequency: "daily", priority: 0.7 },
     { url: `${baseUrl}/models`, changeFrequency: "daily", priority: 0.7 },
     { url: `${baseUrl}/pricing`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${baseUrl}/become-master`, changeFrequency: "monthly", priority: 0.5 },

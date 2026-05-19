@@ -50,13 +50,22 @@ export async function createBooking(input: {
   silentMode?: boolean;
   referencePhotoAssetId?: string | null;
   bookingAnswers?: BookingAnswerPayload[] | null;
-  clientUserId: string;
+  // BOOKING-WIDGET-FOUNDATION-A: null for guest bookings. When null,
+  // idempotency + rate-limit keys are namespaced by `clientPhone`
+  // instead. Booking row stores `clientUserId: null` (column is already
+  // nullable in schema, matching the `link-guest-bookings` post-signup
+  // linking flow).
+  clientUserId: string | null;
   idempotencyKey?: string | null;
 }): Promise<BookingDto> {
+  // For guests, the phone is the stable identifier we namespace against.
+  // `clientPhone` is required by validation upstream; treat empty as
+  // unreachable so we don't blow up on an empty namespace.
+  const namespaceKey = input.clientUserId ?? `guest:${input.clientPhone}`;
   let idempotencyKey: string | null = null;
   let idempotencyLockAcquired = false;
   if (input.idempotencyKey) {
-    const key = buildCreateBookingIdempotencyKey(input.clientUserId, input.idempotencyKey);
+    const key = buildCreateBookingIdempotencyKey(namespaceKey, input.idempotencyKey);
     const idempotency = await resolveBookingIdempotency({
       key,
       ttlSeconds: CREATE_BOOKING_IDEMPOTENCY_TTL_SECONDS,
@@ -73,7 +82,7 @@ export async function createBooking(input: {
   let createdBookingId: string | null = null;
   try {
     const allowed = await checkRateLimit(
-      `rate:createBooking:${input.clientUserId}`,
+      `rate:createBooking:${namespaceKey}`,
       CREATE_BOOKING_RATE_LIMIT.limit,
       CREATE_BOOKING_RATE_LIMIT.windowSeconds
     );
@@ -136,23 +145,31 @@ export async function createBooking(input: {
     }
     if (hotPricing.isHot && hotPricing.discountedPrice !== null) {
       bookedServicePrice = hotPricing.discountedPrice;
-      const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
-      const recentCancel = await prisma.booking.findFirst({
-        where: {
-          providerId: input.providerId,
-          clientUserId: input.clientUserId,
-          status: { in: ["REJECTED", "CANCELLED"] },
-          startAtUtc,
-          cancelledAtUtc: { gt: cutoff },
-        },
-        select: { id: true, cancelledAtUtc: true },
-      });
-      if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
-        throw new AppError(
-          "Cannot rebook the same discounted hot slot after cancellation. Please choose another time.",
-          409,
-          "BOOKING_CONFLICT"
-        );
+      // BOOKING-WIDGET-FOUNDATION-A: anti-fraud rebook check is
+      // userId-scoped (matches by past cancellations). For guests we
+      // can't run this safely (no stable userId across attempts), so
+      // we skip — the ordinary rate-limit + idempotency guards still
+      // apply, and the discounted price is still honoured. Tracked
+      // backlog: phone-based anti-fraud for guests.
+      if (input.clientUserId) {
+        const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
+        const recentCancel = await prisma.booking.findFirst({
+          where: {
+            providerId: input.providerId,
+            clientUserId: input.clientUserId,
+            status: { in: ["REJECTED", "CANCELLED"] },
+            startAtUtc,
+            cancelledAtUtc: { gt: cutoff },
+          },
+          select: { id: true, cancelledAtUtc: true },
+        });
+        if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
+          throw new AppError(
+            "Cannot rebook the same discounted hot slot after cancellation. Please choose another time.",
+            409,
+            "BOOKING_CONFLICT"
+          );
+        }
       }
     }
   }
@@ -195,6 +212,9 @@ export async function createBooking(input: {
             silentMode: input.silentMode ?? false,
             referencePhotoAssetId: bookingExtras.referencePhotoAssetId,
             bookingAnswers: bookingExtras.bookingAnswers ?? undefined,
+            // BOOKING-WIDGET-FOUNDATION-A: null for guest. The
+            // `link-guest-bookings` post-signup helper will attach
+            // this row to a user when the same phone signs up.
             clientUserId: input.clientUserId,
             status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
             actionRequiredBy: shouldAutoConfirm ? null : "MASTER",

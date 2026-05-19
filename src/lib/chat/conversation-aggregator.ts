@@ -371,6 +371,9 @@ export async function getConversationThread(input: {
               body: true,
               readAt: true,
               createdAt: true,
+              // CHAT-FOUNDATION-A-MIGRATION: surface attachment id
+              // for client renderer (image fetched via media path).
+              attachmentMediaAssetId: true,
               referencedBooking: {
                 select: {
                   id: true,
@@ -417,6 +420,7 @@ export async function getConversationThread(input: {
         readAt: message.readAt,
         createdAt: message.createdAt,
         bookingId: booking.id,
+        attachmentMediaAssetId: message.attachmentMediaAssetId ?? null,
         bookingCard: ref
           ? {
               id: ref.id,

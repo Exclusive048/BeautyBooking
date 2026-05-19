@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 
 export type CalendarView = "day" | "week" | "month";
 
@@ -187,6 +188,13 @@ export async function createStudioBlock(input: {
     },
   });
 
+  // STUDIO-GAPS-FIX-A: invalidate the master's slot cache so the public
+  // booking widget reflects the new block. Pre-existing endpoints did
+  // not do this; breaks/blocks created via the legacy editor relied on
+  // the master cabinet's own invalidation pass. Surgical fix kept here
+  // to avoid leaving stale slot availability after the new admin UI.
+  await invalidateSlotsForMaster(input.masterId);
+
   return {
     id: created.id,
     masterId: created.masterId,
@@ -232,6 +240,8 @@ export async function updateStudioBlock(input: {
     },
   });
 
+  await invalidateSlotsForMaster(updated.masterId);
+
   return {
     id: updated.id,
     masterId: updated.masterId,
@@ -248,7 +258,7 @@ export async function deleteStudioBlock(input: {
 }): Promise<{ id: string }> {
   const block = await prisma.timeBlock.findUnique({
     where: { id: input.blockId },
-    select: { id: true, studioId: true },
+    select: { id: true, studioId: true, masterId: true },
   });
   if (!block) {
     throw new AppError("Block not found", 404, "BLOCK_NOT_FOUND");
@@ -257,5 +267,6 @@ export async function deleteStudioBlock(input: {
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
   await prisma.timeBlock.delete({ where: { id: block.id } });
+  await invalidateSlotsForMaster(block.masterId);
   return { id: block.id };
 }

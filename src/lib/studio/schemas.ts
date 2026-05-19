@@ -57,9 +57,17 @@ export const reorderStudioCategoriesSchema = z.object({
 
 export const createStudioServiceSchema = z.object({
   studioId: z.string().trim().min(1),
-  categoryId: z.string().trim().min(1),
+  // CATEGORY-UNIFICATION-A: legacy ServiceCategory FK relaxed to optional.
+  // New flow attaches services to GlobalCategory via globalCategoryId —
+  // that is what the public catalog filters on. The legacy
+  // `studio-settings-page.tsx` services tab still supplies categoryId
+  // and keeps working.
+  categoryId: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(1000).optional(),
+  // Required for catalog visibility (approved global OR own-pending).
+  // When absent the service stays creatable but invisible to public
+  // category filters.
   globalCategoryId: z.string().trim().min(1).optional(),
   basePrice: z.number().int().min(0).transform((value) => normalizeStudioServicePrice(value)),
   baseDurationMin: z

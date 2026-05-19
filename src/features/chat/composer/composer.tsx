@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
+import { Paperclip, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { QuickReplies } from "@/features/chat/composer/quick-replies";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -10,6 +17,8 @@ import type { ChatPerspective } from "@/features/chat/types";
 const T = UI_TEXT.chat;
 const QUICK_HIDE_KEY = "chat.quickReplies.hidden";
 const MAX_TEXTAREA_HEIGHT = 120;
+const ALLOWED_ATTACHMENT_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 type Props = {
   perspective: ChatPerspective;
@@ -18,6 +27,12 @@ type Props = {
   disabledHint: string | null;
   onSent: () => void;
 };
+
+type AttachmentState =
+  | { phase: "idle" }
+  | { phase: "uploading"; previewUrl: string }
+  | { phase: "ready"; previewUrl: string; assetId: string }
+  | { phase: "error"; message: string };
 
 export function Composer({
   perspective,
@@ -30,7 +45,9 @@ export function Composer({
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showQuick, setShowQuick] = useState(true);
+  const [attachment, setAttachment] = useState<AttachmentState>({ phase: "idle" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Per-session hide preference for quick replies.
   useEffect(() => {
@@ -51,16 +68,90 @@ export function Composer({
     el.style.height = `${next}px`;
   }, [draft]);
 
-  // Reset draft when active conversation flips.
+  // Reset draft + attachment when active conversation flips.
   useEffect(() => {
     setDraft("");
     setErrorMessage(null);
+    setAttachment((current) => {
+      if (current.phase === "uploading" || current.phase === "ready") {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return { phase: "idle" };
+    });
   }, [conversationSlug]);
+
+  // Cleanup any object URL on unmount.
+  useEffect(() => {
+    return () => {
+      setAttachment((current) => {
+        if (current.phase === "uploading" || current.phase === "ready") {
+          URL.revokeObjectURL(current.previewUrl);
+        }
+        return current;
+      });
+    };
+  }, []);
+
+  async function handleAttachmentPick(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    // Reset native input so picking the same file again re-fires onChange.
+    event.target.value = "";
+    if (!file) return;
+
+    if (!ALLOWED_ATTACHMENT_MIME.has(file.type)) {
+      setAttachment({ phase: "error", message: T.composer.attachInvalidType });
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachment({ phase: "error", message: T.composer.attachTooLarge });
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAttachment({ phase: "uploading", previewUrl });
+
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const res = await fetch("/api/chat/upload-attachment", {
+        method: "POST",
+        body: formData,
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok: true; data: { assetId: string } }
+        | { ok: false; error: { message: string } }
+        | null;
+      if (!res.ok || !json || !json.ok) {
+        const message =
+          json && !json.ok ? json.error.message : T.composer.attachUploadFailed;
+        URL.revokeObjectURL(previewUrl);
+        setAttachment({ phase: "error", message });
+        return;
+      }
+      setAttachment({ phase: "ready", previewUrl, assetId: json.data.assetId });
+    } catch {
+      URL.revokeObjectURL(previewUrl);
+      setAttachment({ phase: "error", message: T.composer.attachUploadFailed });
+    }
+  }
+
+  function handleAttachmentRemove() {
+    setAttachment((current) => {
+      if (current.phase === "uploading" || current.phase === "ready") {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return { phase: "idle" };
+    });
+  }
 
   async function handleSubmit(event?: FormEvent) {
     event?.preventDefault();
     const trimmed = draft.trim();
-    if (!trimmed || sending || !canSend) return;
+    const readyAssetId =
+      attachment.phase === "ready" ? attachment.assetId : null;
+    // Either text or a ready attachment is required. While the asset
+    // is uploading the submit button is disabled (see below).
+    if ((!trimmed && !readyAssetId) || sending || !canSend) return;
     setSending(true);
     setErrorMessage(null);
     try {
@@ -69,7 +160,10 @@ export function Composer({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: trimmed }),
+          body: JSON.stringify({
+            body: trimmed,
+            attachmentMediaAssetId: readyAssetId,
+          }),
         },
       );
       const json = (await res.json().catch(() => null)) as
@@ -83,6 +177,10 @@ export function Composer({
         return;
       }
       setDraft("");
+      if (attachment.phase === "ready" || attachment.phase === "uploading") {
+        URL.revokeObjectURL(attachment.previewUrl);
+      }
+      setAttachment({ phase: "idle" });
       onSent();
     } catch {
       setErrorMessage(T.composer.sendFailed);
@@ -112,6 +210,18 @@ export function Composer({
       ? T.composer.placeholderClient
       : T.composer.placeholderMaster;
 
+  const attachmentPreviewUrl =
+    attachment.phase === "uploading" || attachment.phase === "ready"
+      ? attachment.previewUrl
+      : null;
+  const isAttachmentUploading = attachment.phase === "uploading";
+  const hasReadyAttachment = attachment.phase === "ready";
+  const canSubmit =
+    canSend &&
+    !sending &&
+    !isAttachmentUploading &&
+    (draft.trim().length > 0 || hasReadyAttachment);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -128,6 +238,35 @@ export function Composer({
         />
       ) : null}
 
+      {attachmentPreviewUrl ? (
+        <div className="mb-2 inline-flex max-w-full items-center gap-2 rounded-xl border border-border-subtle bg-bg-input/60 px-2 py-1.5">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-bg-page">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={attachmentPreviewUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+            {isAttachmentUploading ? (
+              <div className="absolute inset-0 grid place-items-center bg-black/40 text-[10px] font-medium text-white">
+                …
+              </div>
+            ) : null}
+          </div>
+          <span className="text-xs text-text-sec">
+            {isAttachmentUploading ? T.composer.attachUploading : "Фото"}
+          </span>
+          <button
+            type="button"
+            onClick={handleAttachmentRemove}
+            aria-label={T.composer.attachRemoveAria}
+            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-text-sec hover:text-text-main"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
       <div
         className={cn(
           "flex items-end gap-2 rounded-2xl border px-3 py-2 transition",
@@ -136,6 +275,25 @@ export function Composer({
             : "border-border-subtle bg-bg-input/40",
         )}
       >
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!canSend || sending || isAttachmentUploading}
+          aria-label={T.composer.attachAria}
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-text-sec transition hover:bg-bg-page hover:text-text-main",
+            (!canSend || isAttachmentUploading) && "cursor-not-allowed opacity-50",
+          )}
+        >
+          <Paperclip className="h-4 w-4" aria-hidden strokeWidth={1.8} />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleAttachmentPick}
+          className="hidden"
+        />
         <textarea
           ref={textareaRef}
           value={draft}
@@ -150,11 +308,11 @@ export function Composer({
         />
         <button
           type="submit"
-          disabled={!canSend || sending || draft.trim().length === 0}
+          disabled={!canSubmit}
           aria-label={T.composer.send}
           className={cn(
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition",
-            draft.trim().length > 0 && canSend
+            canSubmit
               ? "bg-brand-gradient text-white shadow-sm hover:opacity-95"
               : "bg-bg-page text-text-sec/40",
           )}
@@ -166,6 +324,11 @@ export function Composer({
       {errorMessage ? (
         <p role="alert" className="mt-1.5 text-xs text-rose-600 dark:text-rose-300">
           {errorMessage}
+        </p>
+      ) : null}
+      {attachment.phase === "error" ? (
+        <p role="alert" className="mt-1.5 text-xs text-rose-600 dark:text-rose-300">
+          {attachment.message}
         </p>
       ) : null}
 

@@ -3,6 +3,7 @@ import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
+import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
@@ -45,13 +46,11 @@ export async function createStudioBooking(input: {
     throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
   }
 
-  const master = await prisma.provider.findFirst({
-    where: { id: input.masterId, type: "MASTER", studioId: studio.providerId },
-    select: { id: true },
+  // STUDIO-BUGS-FIX-A bug #5: only ACTIVE master can accept bookings.
+  const master = await requireActiveStudioMaster({
+    studioProviderId: studio.providerId,
+    masterId: input.masterId,
   });
-  if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
-  }
 
   const override = await prisma.masterService.findUnique({
     where: {
@@ -151,6 +150,19 @@ export async function moveStudioBooking(input: {
   if (booking.studioId && booking.studioId !== input.studioId) {
     throw new AppError("Forbidden", 403, "FORBIDDEN");
   }
+
+  // STUDIO-BUGS-FIX-A bug #5: target master must be ACTIVE.
+  const studio = await prisma.studio.findUnique({
+    where: { id: input.studioId },
+    select: { providerId: true },
+  });
+  if (!studio) {
+    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+  }
+  await requireActiveStudioMaster({
+    studioProviderId: studio.providerId,
+    masterId: input.targetMasterId,
+  });
 
   const durationMin = booking.serviceItems.reduce(
     (sum, item) => sum + Math.max(0, item.durationSnapshotMin),

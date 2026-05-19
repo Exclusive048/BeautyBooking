@@ -30,6 +30,57 @@
  * (@test.masterryadom.local) — phone-маркер не нужен.
  *
  * ============================================================
+ * SHOWCASE STUDIO — visual validation для всего studio cabinet
+ * ============================================================
+ *
+ * Phone (login):       +7 999 200 00 00
+ * Studio:              Vision Beauty Studio
+ * Owner:               Виктория Алмазова
+ * Plan:                STUDIO PREMIUM
+ * Studio username:     vision-studio
+ * Cabinet entry:       /cabinet/studio
+ *
+ * Что показывает:
+ *  • Dashboard — KPI с реальными числами (выручка / записи / загрузка /
+ *    рейтинг), топ-мастера, attention (2 PENDING заявки на расписание +
+ *    PENDING bookings + неотвеченные отзывы), популярные услуги,
+ *    revenue chart.
+ *  • Masters — 7 ACTIVE мастеров (Provider.ownerUserId + isPublished,
+ *    invariant #24), все со своими метриками и расписанием.
+ *  • Schedule — заполненная day-grid с записями всех мастеров (today
+ *    8 bookings разных статусов), week-view с occupancy.
+ *  • Bookings journal — ~56 записей с фильтрами (сегодня / неделя /
+ *    все), все 11 BookingStatus, WEB + MANUAL источники, VIP / new
+ *    клиенты с badges.
+ *  • Services — 35 услуг распределены по 8 APPROVED категориям +
+ *    2 PENDING (scope студии — invariant #23). 3 ServicePackage.
+ *  • Reviews — 15 отзывов разных мастеров, 4-5★ + 1 критический 3★.
+ *  • Clients — 7 ClientCard, 3 VIP (LTV ≥ 5 000 000 копеек через
+ *    реальные FINISHED bookings).
+ *  • Notifications — 8 типов, 4 непрочитано.
+ *  • Schedule-requests — 2 PENDING заявки (badge в sidebar).
+ *
+ * Idempotency: deterministic IDs (`seed-vision-*`) + upsert по
+ * email/publicUsername/composite uniques. Reset через email-маркер.
+ *
+ * ============================================================
+ * SHOWCASE PHONES (SEED-CONSOLIDATION-A schema 100/200/300/400)
+ * ============================================================
+ *
+ *  +7 999 100 00 00  → /cabinet/master   Анна Соколова (solo)
+ *  +7 999 200 00 00  → /cabinet/studio   Виктория (Vision owner)
+ *  +7 999 300 00 00  → /cabinet/master   Марина (member of Vision)
+ *  +7 999 400 00 00  → /admin            Platform admin
+ *
+ * OTP code: server logs (logInfo "OTP requested"). SMS-шлюз не
+ * подключён (см. P1 в context).
+ *
+ * Idempotency: each showcase uses `ensureUserByPhone` (phone-first
+ * upsert with shadow release) — повторный `npm run seed:test` без
+ * reset не падает P2002 даже если canonical email/publicUsername
+ * сдвигались между прогонами.
+ *
+ * ============================================================
  */
 
 import { prisma } from "./helpers/prisma";
@@ -45,6 +96,8 @@ import { seedHotSlots } from "./seed-hot-slots";
 import { seedModelOffers } from "./seed-model-offers";
 import { seedFavorites } from "./seed-favorites";
 import { seedShowcaseMaster } from "./seed-showcase-master";
+import { seedShowcaseStudio } from "./seed-showcase-studio";
+import { seedShowcaseAdmin } from "./seed-showcase-admin";
 
 async function main() {
   if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
@@ -71,9 +124,13 @@ async function main() {
   const offerCount = await seedModelOffers({ masters });
   const favCount = await seedFavorites({ clients, masters, studios });
 
-  // Showcase master comes last — it depends on the seeded clients pool
-  // and on the resolved billing plans.
+  // Showcase rigs come last — they depend on the seeded clients pool
+  // and on the resolved billing plans. The four showcase phones
+  // (+7 999 100/200/300/400 00 00) cover solo master / studio owner /
+  // master-in-studio (Марина из Vision) / admin respectively.
   await seedShowcaseMaster({ clients, plans });
+  await seedShowcaseStudio({ clients, plans });
+  await seedShowcaseAdmin();
 
   logSeed.summary({
     cities: cities.length,

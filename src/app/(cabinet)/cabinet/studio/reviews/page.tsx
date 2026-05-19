@@ -1,43 +1,51 @@
 import { redirect } from "next/navigation";
-import { StudioReviewsPage } from "@/features/studio/components/studio-reviews-page";
+import { StudioReviewsPage } from "@/features/studio-cabinet/reviews/components/studio-reviews-page";
+import { isStudioReviewFilter } from "@/features/studio-cabinet/reviews/lib/types";
+import { loadStudioReviewsList } from "@/features/studio-cabinet/reviews/server/reviews-data.service";
+import { loadStudioReviewsStats } from "@/features/studio-cabinet/reviews/server/reviews-stats.service";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { UI_TEXT } from "@/lib/ui/text";
 
-type ReviewFilter = "all" | "new" | "unanswered";
-
-type Props = {
-  searchParams?: Promise<{ filter?: string }> | { filter?: string };
+type SearchParams = {
+  filter?: string;
+  master?: string;
+  cursor?: string;
 };
 
-function normalizeFilter(value: string | undefined): ReviewFilter {
-  if (value === "new" || value === "unanswered" || value === "all") {
-    return value;
-  }
-  return "all";
-}
+type Props = {
+  searchParams?: Promise<SearchParams> | SearchParams;
+};
+
+export const dynamic = "force-dynamic";
 
 export default async function StudioReviewsRoute({ searchParams }: Props) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  let providerId: string;
+  let studioId: string;
   try {
-    ({ providerId } = await resolveCurrentStudioAccess(user.id));
+    ({ studioId } = await resolveCurrentStudioAccess(user.id));
   } catch {
     redirect("/403");
   }
 
   const params = searchParams instanceof Promise ? await searchParams : searchParams;
-  const initialFilter = normalizeFilter(params?.filter);
+  const filter = isStudioReviewFilter(params?.filter) ? params!.filter : "all";
+  const masterId = params?.master?.trim() ?? "all";
+  const cursor = params?.cursor?.trim() || undefined;
+
+  const [data, stats] = await Promise.all([
+    loadStudioReviewsList({
+      studioId,
+      currentUserId: user.id,
+      filter,
+      masterId,
+      cursor,
+    }),
+    loadStudioReviewsStats(studioId),
+  ]);
 
   return (
-    <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold">{UI_TEXT.studioCabinet.dashboard.cards.reviews}</h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.studioCabinet.reviews.subtitle}</p>
-      </header>
-      <StudioReviewsPage providerId={providerId} initialFilter={initialFilter} />
-    </section>
+    <StudioReviewsPage data={data} stats={stats} filter={filter} masterId={masterId} />
   );
 }

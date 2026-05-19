@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { serverApiFetch } from "@/lib/api/server-fetch";
-import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
 import { StudioSidebar } from "@/features/studio-cabinet/components/studio-sidebar";
 import { StudioBottomNav } from "@/features/studio-cabinet/components/studio-bottom-nav";
+import { getStudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
+import { getStudioShellInfo } from "@/features/studio-cabinet/server/studio-info.service";
 import { TrialEndingBanner } from "@/features/cabinet/components/trial-ending-banner";
 import { TrialStatusBadge } from "@/features/cabinet/components/trial-status-badge";
 import {
@@ -14,7 +14,6 @@ import {
   isActiveTrial,
   trialDaysLeft,
 } from "@/lib/billing/get-current-subscription-row";
-import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export default async function StudioCabinetLayout({
@@ -35,58 +34,72 @@ export default async function StudioCabinetLayout({
     redirect("/403");
   }
 
-  const providerRes = await serverApiFetch<{
-    provider: { id: string; name: string; publicUsername: string | null } | null;
-  }>(`/api/providers/me?studioId=${encodeURIComponent(studioId)}`);
+  const [studioInfo, sidebarCounts, subscription] = await Promise.all([
+    getStudioShellInfo(studioId),
+    getStudioSidebarCounts({
+      studioId,
+      userId: user.id,
+      phone: user.phone ?? null,
+    }),
+    getCurrentSubscriptionRow(user.id, SubscriptionScope.STUDIO),
+  ]);
 
-  const provider = providerRes.ok ? providerRes.data.provider : null;
-  const studioName = provider?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
-  const publicHref = provider?.publicUsername
-    ? providerPublicUrl({ id: provider.id, publicUsername: provider.publicUsername }, "studio-cabinet") ?? "/cabinet/studio/settings"
-    : "/cabinet/studio/settings";
-  const publicHint = provider?.publicUsername
-    ? null
-    : UI_TEXT.studioCabinet.layout.publicUsernameHint;
-
-  // Trial status — read once at layout level; React.cache shares the row.
-  const subscription = await getCurrentSubscriptionRow(user.id, SubscriptionScope.STUDIO);
   const trialActive = isActiveTrial(subscription);
   const daysLeft = trialActive ? trialDaysLeft(subscription.trialEndsAt) : 0;
   const showBanner = trialActive && daysLeft > 0 && daysLeft <= 3;
 
+  const userName =
+    user.displayName?.trim() ||
+    user.firstName?.trim() ||
+    studioInfo?.name ||
+    UI_TEXT.studioCabinet.layout.studioFallbackName;
+
+  const studioForShell = {
+    name: studioInfo?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName,
+    publicHref: studioInfo?.publicHref ?? null,
+  };
+
   return (
     <>
       {showBanner ? <TrialEndingBanner daysLeft={daysLeft} /> : null}
-      <div className="flex min-h-screen bg-bg-base">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block lg:shrink-0 border-r border-border-subtle">
-        <div className="sticky top-0 h-screen overflow-y-auto">
-          <StudioSidebar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
-        </div>
-      </div>
-
-      {/* Main content column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile topbar */}
-        <div className="lg:hidden">
-          <StudioNavbar studioName={studioName} publicHref={publicHref} publicHint={publicHint} />
-        </div>
-
-        <main className="min-w-0 flex-1 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
-          <div className="mx-auto w-full max-w-6xl">
-            {trialActive && daysLeft > 0 ? (
-              <div className="mb-4 flex justify-end">
-                <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />
-              </div>
-            ) : null}
-            {children}
+      {/* STUDIO-POLISH-A: mirror master cabinet layout — sidebar column +
+          full-width main with padding. The intermediate centered max-w-6xl
+          wrapper was removed so studio content fills the available width
+          (matching `/cabinet/master/*` ergonomics on wide displays). The
+          per-cabinet topbar was also removed: theme toggle lives in the
+          global public header, public-studio link lives in the sidebar —
+          a sticky studio chrome row was duplicate noise. */}
+      <div className="flex min-h-screen bg-bg-page">
+        {/* Desktop sidebar */}
+        <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
+          <div className="sticky top-0 h-screen overflow-y-auto">
+            <StudioSidebar
+              counts={sidebarCounts}
+              user={{
+                name: userName,
+                avatarUrl: studioInfo?.avatarUrl ?? null,
+              }}
+              studio={{
+                name: studioForShell.name,
+                publicHref: studioForShell.publicHref,
+              }}
+            />
           </div>
-        </main>
-      </div>
+        </div>
 
-      {/* Mobile bottom nav */}
-      <StudioBottomNav />
-    </div>
+        {/* Main content column — full width, padding only */}
+        <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-6 lg:px-8 lg:pb-8">
+          {trialActive && daysLeft > 0 ? (
+            <div className="mb-4 flex justify-end">
+              <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />
+            </div>
+          ) : null}
+          {children}
+        </main>
+
+        {/* Mobile bottom nav */}
+        <StudioBottomNav counts={sidebarCounts} />
+      </div>
     </>
   );
 }

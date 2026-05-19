@@ -425,6 +425,88 @@ export async function uploadBookingReferenceAsset(
   return { id: created.id };
 }
 
+/**
+ * Upload a chat-attachment image (CHAT-FOUNDATION-A-MIGRATION).
+ *
+ * Byte-for-byte mirror of `uploadBookingReferenceAsset` — the only
+ * differences are `entityType=CHAT_MESSAGE` and `kind=CHAT_ATTACHMENT`.
+ * Same `pending:<userId>` entityId convention, same owner-scoped
+ * createdByUserId, same status flow (PENDING during put → READY on
+ * success, row deleted on storage failure).
+ *
+ * The asset is "claimed" by the chat-message sender flow when it
+ * persists the link (see `attachChatAttachment` in `message-sender`).
+ * Until then it lives as PENDING + entityId starting with `pending:`,
+ * which is what the validator checks to enforce one-shot use.
+ */
+export async function uploadChatAttachmentAsset(
+  user: UserProfile,
+  input: {
+    mimeType: string;
+    sizeBytes: number;
+    bytes: Uint8Array;
+    originalFilename: string;
+  },
+): Promise<{ id: string }> {
+  const entityId = `pending:${user.id}`;
+  validateUploadBasics({
+    entityType: MediaEntityType.CHAT_MESSAGE,
+    entityId,
+    kind: MediaKind.CHAT_ATTACHMENT,
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+    bytes: input.bytes,
+    originalFilename: input.originalFilename,
+  });
+
+  const storage = getStorageProvider();
+  const storageKey = buildStorageKey({
+    entityType: MediaEntityType.CHAT_MESSAGE,
+    entityId,
+    kind: MediaKind.CHAT_ATTACHMENT,
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+    bytes: input.bytes,
+    originalFilename: input.originalFilename,
+  });
+  const created = await prisma.mediaAsset.create({
+    data: {
+      entityType: MediaEntityType.CHAT_MESSAGE,
+      entityId,
+      kind: MediaKind.CHAT_ATTACHMENT,
+      storageProvider: storage.name,
+      storageKey,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      originalFilename: input.originalFilename,
+      createdByUserId: user.id,
+      status: MediaAssetStatus.PENDING,
+    },
+    select: { id: true },
+  });
+  try {
+    await storage.putObject({
+      key: storageKey,
+      bytes: input.bytes,
+      contentType: input.mimeType,
+    });
+    await prisma.mediaAsset.update({
+      where: { id: created.id },
+      data: { status: MediaAssetStatus.READY },
+    });
+  } catch (error) {
+    await prisma.mediaAsset.delete({ where: { id: created.id } }).catch((cleanupError) => {
+      logError("Failed to rollback chat attachment asset after upload failure", {
+        assetId: created.id,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    });
+    throw error;
+  }
+
+  return { id: created.id };
+}
+
 export async function deleteMediaAsset(user: UserProfile, assetId: string): Promise<{ id: string }> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },

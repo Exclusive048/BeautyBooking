@@ -56,10 +56,16 @@ import {
   type UserProfile,
 } from "@prisma/client";
 import { logSeed } from "./helpers/log";
-import { seedEmail } from "./helpers/markers";
+import { ensureUserByPhone } from "./helpers/ensure-user";
+import { SHOWCASE_PHONE_MASTER, seedEmail } from "./helpers/markers";
 import { prisma } from "./helpers/prisma";
 
-const PHONE = "+79991000009";
+// SEED-CONSOLIDATION-A: showcase phone aligned to the +7 999 X00 00 00
+// schema. Previous value (+79991000009) is migrated by the phone-first
+// upsert (it finds the existing row by the OLD phone? No — it doesn't.
+// That's why reset.ts now also catches +79991xxxxx as a fallback). Run
+// `npm run seed:test:reset` once after pulling this change.
+const PHONE = SHOWCASE_PHONE_MASTER;
 const EMAIL = seedEmail("master", "anna-sokolova");
 const PUBLIC_USERNAME = "anna-sokolova";
 const FIRST_NAME = "Анна";
@@ -117,25 +123,17 @@ function findPlan(plans: BillingPlan[], code: string): BillingPlan {
 }
 
 async function ensureUser(): Promise<UserProfile> {
-  return prisma.userProfile.upsert({
-    where: { email: EMAIL },
-    update: {
-      phone: PHONE,
-      firstName: FIRST_NAME,
-      lastName: LAST_NAME,
-      displayName: DISPLAY_NAME,
-      publicUsername: PUBLIC_USERNAME,
-      roles: [AccountType.CLIENT, AccountType.MASTER],
-    },
-    create: {
-      email: EMAIL,
-      phone: PHONE,
-      firstName: FIRST_NAME,
-      lastName: LAST_NAME,
-      displayName: DISPLAY_NAME,
-      publicUsername: PUBLIC_USERNAME,
-      roles: [AccountType.CLIENT, AccountType.MASTER],
-    },
+  // SEED-CONSOLIDATION-A: phone-first upsert + shadow release. Replaces
+  // the upsert-by-email pattern that triggered P2002 on `phone` when
+  // canonical identifiers had drifted between seed generations.
+  return ensureUserByPhone({
+    phone: PHONE,
+    email: EMAIL,
+    publicUsername: PUBLIC_USERNAME,
+    firstName: FIRST_NAME,
+    lastName: LAST_NAME,
+    displayName: DISPLAY_NAME,
+    roles: [AccountType.CLIENT, AccountType.MASTER],
   });
 }
 

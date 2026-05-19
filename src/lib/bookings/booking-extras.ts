@@ -90,7 +90,12 @@ async function validateReferenceAsset(input: {
 
 export async function resolveBookingExtras(input: {
   serviceId: string;
-  clientUserId: string;
+  // BOOKING-WIDGET-FOUNDATION-A: null for guest bookings. When the
+  // service requires a reference photo, guests are rejected — uploads
+  // are auth-only (asset is owner-scoped via createdByUserId), so
+  // anonymous booking with a reference is structurally impossible
+  // today. Phone-scoped guest uploads → backlog.
+  clientUserId: string | null;
   referencePhotoAssetId?: string | null;
   bookingAnswers?: BookingAnswerPayload[] | null;
 }): Promise<BookingExtrasResult> {
@@ -125,12 +130,19 @@ export async function resolveBookingExtras(input: {
     throw new AppError("Необходимо прикрепить референс.", 400, "REFERENCE_PHOTO_REQUIRED");
   }
 
-  const referencePhotoAssetId = input.referencePhotoAssetId
-    ? await validateReferenceAsset({
-        assetId: input.referencePhotoAssetId,
-        clientUserId: input.clientUserId,
-      })
-    : null;
+  // Guest cannot attach a reference (uploads are auth-only). If a guest
+  // submits an asset id, reject with FORBIDDEN — they should log in.
+  if (input.referencePhotoAssetId && !input.clientUserId) {
+    throw new AppError("Forbidden", 403, "FORBIDDEN");
+  }
+
+  const referencePhotoAssetId =
+    input.referencePhotoAssetId && input.clientUserId
+      ? await validateReferenceAsset({
+          assetId: input.referencePhotoAssetId,
+          clientUserId: input.clientUserId,
+        })
+      : null;
 
   const bookingAnswers = buildNormalizedAnswers(service.bookingQuestions, answersById);
 
