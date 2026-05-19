@@ -71,6 +71,7 @@
  *  +7 999 200 00 00  → /cabinet/studio   Виктория (Vision owner)
  *  +7 999 300 00 00  → /cabinet/master   Марина (member of Vision)
  *  +7 999 400 00 00  → /admin            Platform admin
+ *  +7 999 500 00 00  → /cabinet (CLIENT) Елена Петрова (active client — bookings/reviews/notifications для QA)
  *
  * OTP code: server logs (logInfo "OTP requested"). SMS-шлюз не
  * подключён (см. P1 в context).
@@ -98,6 +99,7 @@ import { seedFavorites } from "./seed-favorites";
 import { seedShowcaseMaster } from "./seed-showcase-master";
 import { seedShowcaseStudio } from "./seed-showcase-studio";
 import { seedShowcaseAdmin } from "./seed-showcase-admin";
+import { seedShowcaseClient } from "./seed-showcase-client";
 
 async function main() {
   if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
@@ -131,6 +133,10 @@ async function main() {
   await seedShowcaseMaster({ clients, plans });
   await seedShowcaseStudio({ clients, plans });
   await seedShowcaseAdmin();
+  // Client showcase depends on the showcase master being already seeded
+  // (creates bookings/reviews against Anna's services). MUST run AFTER
+  // seedShowcaseMaster.
+  await seedShowcaseClient();
 
   logSeed.summary({
     cities: cities.length,

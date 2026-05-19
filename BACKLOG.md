@@ -147,6 +147,7 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 ## 🔴 PRE-LAUNCH BLOCKERS
 
 ### Безопасность
+- **🔴 #1 Email change unique-collision = 500** (вскрыто client cabinet QA, аудировано в CLIENT-SHOWCASE-SEED-A 2026-05-20). [`src/app/api/cabinet/user/profile/email/request-verify/route.ts:72-75`](src/app/api/cabinet/user/profile/email/request-verify/route.ts#L72-L75) пишет `email` **сразу** в `UserProfile.email` (`@unique`) НА ЭТАПЕ ЗАПРОСА КОДА, до подтверждения. Если адрес занят (другой юзер, или released-`*` seed-row, или сам себе в другой записи) — Prisma бросает P2002 → handler возвращает 500. UX-провал: user видит 500 на бизнес-операцию. **Root cause**: схема не имеет `pendingEmail` placeholder — `email` колонка одновременно «текущий email» и «целевой email подтверждения». **Fix options** (отдельный промпт EMAIL-VERIFY-FIX): (a) добавить `pendingEmail String?` колонку (schema migration) — писать туда на request, переносить в `email` после verify; (b) **без migration**: catch P2002 и вернуть 409 `EMAIL_ALREADY_USED` с user-friendly сообщением + НЕ обновлять `email`/`emailVerifiedAt` до verify (использовать OtpCode как единственный носитель target-email, читать оттуда в verify-endpoint). Не правлено сейчас — задача после полного QA клиентского
 - **OTP в логах (P1)** — sms gateway не подключён, OTP code пишется в console.log. Подключить SMS-шлюз и убрать `code` из логирования
 - **VAPID `!` non-null assertion (P2)** — push initialization упадёт если ключи не заданы
 - **OTP rate-limit fail-closed (P3)** — sensitive routes должны быть fail-closed при недоступности Redis
@@ -176,6 +177,9 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ### Из ADMIN-DASH-A audit
 - **Модель жалоб (Complaint/ReviewReport)** — для admin модерации отзывов. Если её нет в схеме сейчас, нужна перед launch чтобы admin мог модерировать жалобы (Phase 6)
+
+### Из CLIENT-SHOWCASE-SEED-A (2026-05-20)
+- **🟠 #2 OAuth login messenger путаница** — user во время QA клиентского кабинета сообщил: ВК-кнопка «пустышка», ТГ-кнопка ведёт на ВК-флоу. **Static-audit (НЕ runtime, не подтверждено окончательно):** `src/components/auth/vk-login-button.tsx:22-23` рендерит `null` если `NEXT_PUBLIC_VK_ENABLED !== "true"` — кнопка не должна вообще отображаться, но user видит «пустышку» → возможно есть wrapper в `login-client.tsx` который рендерит контейнер даже когда дочерний компонент null. `src/components/auth/telegram-login-button.tsx:48` правильно подключает `telegram.org/js/telegram-widget` script (не ВК). Если ТГ-клик ведёт на ВК — это возможно visual overlap / iconOnly mode рендеринг конфликт / event handler bubble. **Точная природа не подтверждается статикой** — нужен runtime-аудит на login page для точного root cause. **Fix**: отдельный промпт OAUTH-FIX-A после полного QA клиентского. Локация для разбора: `src/app/login/login-client.tsx` + `src/components/auth/{vk,telegram}-login-button.tsx`
 
 ### Из ADMIN-BILLING-FIX-A (2026-05-15)
 - **Запустить `cleanup-duplicate-billing-plans.ts --confirm` на production** — без этого `/admin/billing` показывает 12 plan cards вместо 6, и lowercase rows остаются dead data. Run flow: dry-run → review → `--confirm`. Runbook: `docs/runbooks/cleanup-duplicate-billing-plans.md`. Idempotent — повторный запуск после success = no-op
@@ -958,6 +962,10 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 > Хронологический индекс sprint'а (новое сверху). **Детальный changelog каждого коммита** — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (audit findings / FEATURE PRESERVATION / per-commit changes / validation / backlog spawned).
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
+
+### 2026-05-20 — Post-redesign QA support + аудиты
+
+- **CLIENT-SHOWCASE-SEED-A** — showcase активного клиента (Елена Петрова, +7 999 500 00 00 → `/cabinet` CLIENT) для QA клиентского кабинета. Содержит: User+UserProfile, 9 bookings разных статусов у Анны Соколовой (CONFIRMED/PENDING/CHANGE_REQUESTED/3×FINISHED/2×CANCELLED/NO_SHOW), 3 reviews (5★+5★+4★) на FINISHED брони (2 с ответом мастера / 1 без), favorite Анны (rebook surface), 5 notifications (3 unread + 2 read, разные NotificationType), 1 PENDING ModelApplication если у Анны есть ACTIVE offer. Идемпотентность: phone-first upsert через `ensureUserByPhone` + deterministic seed IDs (`seed-bk-showcase-client-NN`, `seed-notif-showcase-client-NN`). Расширен `SHOWCASE_PHONE_PREFIXES` (+`+79995`) + новый константный `SHOWCASE_PHONE_CLIENT` → `reset.ts` подхватывает client showcase автоматически. **Аудит #1 email-500** (НЕ исправлено): root cause = `request-verify/route.ts:72-75` пишет `email` сразу в `@unique` колонку до подтверждения, P2002 при коллизии → 500. **Заметка #2 OAuth путаница** (НЕ исправлено): static-audit не подтверждает root cause, нужен runtime-аудит на login page. Оба бага занесены в BACKLOG (🔴 #1 / 🟠 #2) с детальными fix options для отдельных промптов EMAIL-VERIFY-FIX и OAUTH-FIX-A. **Рабочий код 0 изменений** — только seed (markers.ts + index.ts + новый seed-showcase-client.ts) + BACKLOG + AI_CONTEXT (CLIENT-SHOWCASE-SEED-A)
 
 ### 2026-05-19 — Финальный sprint (платформа достроена)
 
