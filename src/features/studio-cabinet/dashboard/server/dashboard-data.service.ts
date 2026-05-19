@@ -379,7 +379,7 @@ async function buildAttentionItems(
     {
       id: "reviews-unanswered",
       count: unansweredReviews,
-      href: "/cabinet/studio/reviews?filter=unanswered",
+      href: "/cabinet/studio/reviews?filter=no_reply",
       urgent: false,
     },
     {

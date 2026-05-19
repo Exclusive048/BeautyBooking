@@ -16,9 +16,20 @@
 
 ---
 
-## 🗺 КАРТА REDESIGN РАБОТЫ
+## 🎯 ТЕКУЩИЙ ФОКУС
 
-> Полный roadmap визуальной переработки. Один взгляд на то что осталось.
+**Платформа достроена** — redesign-фаза завершена (CHAT-UI-A 2026-05-19 закрыл sprint). Сейчас:
+- 🧪 **Ручной QA pass** по 4 поверхностям (master cabinet / studio cabinet / client cabinet / public surfaces & widgets) — НЕ трогать тестируемый код
+- 🔬 **Фоновый трек:** TEST-COVERAGE-A завершён (358/358 tests; +84 новых). Следующее фоновое — BOOKING-ENFORCEMENT после QA Этапа 2.1, потом multi-recipient notif после notif QA
+- 🚀 **Перед launch:** проработать 🔴 PRE-LAUNCH BLOCKERS ниже (SMS gateway, deployment, monitoring, complaint model)
+
+> Детальный changelog всех 50+ коммитов — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15**. История выполненного в этом файле — внизу, в виде краткого хронологического индекса.
+
+---
+
+## 🗺 ЗАВЕРШЁННЫЕ WORKSTREAMS (краткая карта)
+
+> Полная карта sprint'а — выполненные направления. Детали по каждому коммиту в AI_CONTEXT раздел 15.
 
 ### ✅ Завершено
 - [x] **Catalog** — каталог мастеров + favorites (22a/b)
@@ -115,18 +126,21 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 - **Footer** ✅ FOOTER-REDESIGN-A
 - **Navbar/Topbar** ✅ NAVBAR-REDESIGN-A — закрыло redesign-фазу
 
+### ✅ Chat workstream — ЗАКРЫТ (3 коммита 2026-05-19)
+- **Image attachments** ✅ (CHAT-FOUNDATION-A-MIGRATION schema + CHAT-UI-A picker UI)
+- **Read receipts ✓✓** ✅ (CHAT-FOUNDATION-A — backend wired; UI tick rendering)
+- **Two-panel layout + system booking cards + quick-reply chips** ✅ (CHAT-UI-A — audit показал что 4 из 5 уже были в коде)
+- **Остаётся (см. 🟡/🔵 ниже):** typing indicators, BookingChat ↔ universal chat consolidation, studio admin chat auth gap (decision deferred — privacy 152-ФЗ), online presence, image lightbox UI
+
 ### ⏳ Public surfaces — остатки (нет блокеров)
 - [ ] **Models offer page** `/models` — есть functional UI, redesign можно отложить
 - [ ] **Pricing page** `/pricing` — остальные marketing pages (`/about`, `/how-it-works`, `/how-to-book`, `/become-master`) ✅ сделаны
 
-### ⏳ Chat enhancements (следующий крупный workstream)
-- [ ] **Image attachments** в chat
-- [ ] **Read receipts** + typing indicators
-- [ ] **Booking chat ↔ universal chat** consolidation — сейчас BookingChat и universal chat живут отдельно; рассмотреть слияние
-- [ ] **Studio admin chat auth gap** — gap from STUDIO-GAPS-FIX-A (resolveChatAccess не пропускает studio admin)
-
-### ⏳ После всех redesigns — статус
-- [x] **🧹 Legacy cleanup sweep** ✅ ЧАСТИЧНО ЗАКРЫТО (PHASE7-CLEANUP-A: 8 orphan files / ~2.5K LOC; DELETE-HOT-INSPIRATION-A: 6 page+isolated files + sitemap entry). Остаточная Phase 7 работа: FORMDIALOG-MIGRATION (60 form-dialogs → FormDialog «при касании»), 837-LOC `studio-settings-page.tsx` retire (после portfolio + profile sub-route redesigns), stories cluster coordinated retire, `FocalImage` → `<Image>` migration (40+ usages), `getPushEnabled` consolidation, pre-existing minor lint warnings micro-sweep
+### ✅ Legacy cleanup sweep — ЧАСТИЧНО ЗАКРЫТО
+- **Phase 7 #1** ✅ PHASE7-CLEANUP-A (2026-05-13 admin Phase 2 cleanup, ~3 810 LOC)
+- **Phase 7 #2** ✅ PHASE7-CLEANUP-A (2026-05-19 — 8 orphan files / ~2.5K LOC including `master-schedule-editor.tsx` 1488 LOC)
+- **DELETE-HOT-INSPIRATION-A** (2026-05-19 — 6 page+isolated files + sitemap entry)
+- **Остаточная работа:** FORMDIALOG-MIGRATION остаток (~33 dialogs не мигрированы), 837-LOC `studio-settings-page.tsx` retire (после portfolio + profile sub-route redesigns), stories cluster coordinated retire, `FocalImage` → `<Image>` migration (40+ usages), `getPushEnabled` consolidation, pre-existing minor lint warnings micro-sweep
 
 ---
 
@@ -140,7 +154,7 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ### Инфраструктура
 - **Middleware (T6)** — нет глобального Next.js middleware для проверки авторизации на уровне роутов
-- **CI tests (T7)** — quality-gates.yml НЕ запускает `npm run test`
+- ~~**CI tests (T7)**~~ ✅ **закрыт ранее** (верифицировано TEST-COVERAGE-A 2026-05-19): `quality-gates.yml` уже содержит `Run tests: npm run test -- --reporter=verbose --bail 1` между Typecheck и Mojibake — был стейл-таска в snapshot
 - **Supervisor для воркера** — при падении воркера задачи накапливаются без обработки
 - **Production env vars** — checklist (DATABASE_URL pgbouncer, REDIS_URL TLS, S3 keys, all secrets generated, VAPID keys)
 - **Yandex Cloud deployment** — DEPLOY_GUIDE.md существует, нужно пройти его до конца
@@ -207,13 +221,12 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 - `Provider.visibleSlotDays` — NOT consumed in the card (no horizon UI to clamp; will matter once `nextSlot` snapshot pipeline lands)
 - Remaining: catalog availability pre-computation snapshot (cheap nearest-slot per provider, computed off the booking write path) — enables `exact` / `date_only` paths fully and gives `visibleSlotDays` a meaningful clamp point
 
-### Test coverage
-- **Тесты для billing** — `src/lib/billing/*` без тестов (платежи!)
-- **Тесты для bookings** — частично покрыты, нужны для createBooking, cancellation
-- **Тесты для visual-search** — нет
-- **Тесты для deletion** — нет
-- **E2E тесты** — Playwright/Cypress отсутствуют
-- **Тесты в CI** — добавить `npm run test` в quality-gates.yml
+### Test coverage 🟢 БЕЗОПАСНО ПАРАЛЛЕЛЬНО QA (фоновый трек)
+- ✅ **Billing pure helpers** покрыты (TEST-COVERAGE-A 2026-05-19): `utils.test.ts` 15 / `marketing-pricing.test.ts` 19 / `guards.test.ts` 6 + existing `features.test.ts`/`mrr.test.ts`/`mrr-snapshot.test.ts`/`trial.test.ts`
+- ✅ **Bookings flow + idempotency key** покрыты (TEST-COVERAGE-A 2026-05-19): `flow.test.ts` 32 / `idempotency-key.test.ts` 6 + existing `reminders`/`link-guest-bookings`/`policy-enforcement`
+- ✅ **CI tests step** уже работает (T7 был стейл)
+- **Остаётся (backlog для integration-tests когда infrastructure появится):** createBooking integration (deep Prisma mock chain или test DB), cancelBooking integration, `marketing-pricing.load` SSR path (Prisma + cache), `idempotency.ts` Prisma-touching paths, `getCurrentPlan` chain, deletion/`*.ts`, visual-search openai+pgvector integration
+- **E2E тесты** — Playwright/Cypress отсутствуют (отдельная большая задача — Phase 6+)
 
 ### Yandex maps integration
 - **Geocoder/Suggest API keys** — настроены, но какие лимиты quota у Yandex?
@@ -940,9 +953,92 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 ---
 
-## ✅ ВЫПОЛНЕНО (для истории)
+## 📜 ИСТОРИЯ ВЫПОЛНЕННОГО
 
-> Перенос задач сюда происходит при их завершении, с datestamp.
+> Хронологический индекс sprint'а (новое сверху). **Детальный changelog каждого коммита** — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (audit findings / FEATURE PRESERVATION / per-commit changes / validation / backlog spawned).
+>
+> Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
+
+### 2026-05-19 — Финальный sprint (платформа достроена)
+
+- **BACKLOG-RESTRUCTURE-A** — реструктуризация BACKLOG + синхрон с AI_CONTEXT changelog. Документная задача, 0 изменений рабочего кода
+- **TEST-COVERAGE-A** — фоновый трек: billing pure helpers (utils/marketing-pricing/guards) + bookings flow + idempotency-key. 5 новых test-файлов, +84 теста (274 → 358). CI tests уже работают (T7 был стейл). 0 изменений рабочего кода
+- **CHAT-UI-A** 🎉 **ПЛАТФОРМА ДОСТРОЕНА** — финальный большой коммит редизайн-спринта. Attachment picker + render UI поверх CHAT-FOUNDATION-A-MIGRATION backend. 4 из 5 элементов уже были в коде (two-panel / receipts / system cards / quick-reply chips); реальный gap — только attachments
+- **CHAT-FOUNDATION-A-MIGRATION** — schema migration для chat attachments (`MediaEntityType.CHAT_MESSAGE` + `MediaKind.CHAT_ATTACHMENT` + `ChatMessage.attachmentMediaAssetId?` + index). Mirrors booking-reference upload pattern verbatim. Endpoint `/api/chat/upload-attachment` + `validateChatAttachmentAsset` + `markAttachmentUsed`
+- **CHAT-FOUNDATION-A** — audit-only коммит (0 code changes). Установил что SSE real-time + read receipts уже production-grade; attachments требует schema migration → STOP per spec rule
+- **FORMDIALOG-V2-A** — `submitVariant: "secondary"` поддержка + 2 unblocked migrations (`pause-master-dialog`, `invite-master-dialog`)
+- **FORMDIALOG-MIGRATION-A** — первая волна `<FormDialog>` adoption: 12 of 49 form-dialogs мигрированы (Phase 1-3 studio/admin/general). 37 структурно outside FormDialog scope (multi-step/picker/file-upload/OAuth/retype-confirm/non-standard variant)
+- **DELETE-HOT-INSPIRATION-A** — удаление `/hot` + `/inspiration` страниц по решению user'а. HotSlot feature core preserved (anti-fraud / pricing / runtime / subscriptions / job — booking-критично). Removed 6 isolated files + sitemap entry
+- **PHASE7-CLEANUP-A** (v2 sweep) — 8 orphan/legacy files + 1 unused import. ~2.5K LOC удалено: `team-tabs.tsx`, `team-member-card.tsx`, `dashboard-nav-cards.tsx`, `studio-team-page.tsx`, `studio-calendar-page.tsx`, `master-schedule-editor.tsx` (1 488 LOC), `category-pills.tsx`, `studio/dashboard.service.ts`, `REVIEW_WINDOW_DAYS` import. Audit-driven (verified 0 external consumers)
+- **NAVBAR-REDESIGN-A** 🎉 **Redesign phase OFFICIALLY COMPLETE** — последний redesign-коммит. Reality-check показал что все 5 role-driven states уже существуют в Topbar.tsx. Surgical: brand-logo alignment + `.claude/**` в globalIgnores (lint drift 858/134 → 1/4)
+- **FOOTER-REDESIGN-A** — узкий редизайн: 1 CTA → 2 CTA карточки («Для мастеров» / «Для моделей»), inline brand-логотип → shared `<BrandLogo>`. Aspirational контент (metrics tiles, app-store, expanded legal) backlogged как fabrication risk
+- **CATALOG-ENHANCEMENTS-A** — `Provider.slotPrecision` + `Provider.availableToday` интеграция в catalog card. `visibleSlotDays` отложен (требует pre-computation snapshot). Pure helper `formatAvailability` для 3 режимов
+
+### 2026-05-18 — Public surfaces + modal unification + Cabinet Studio sprint finale
+
+- **MODAL-UNIFY-IMPL-A** — ModalSurface extended backwards-compat + new `FormDialog` wrapper + unified `<Drawer>` primitive + 5 drawer миграции (`mobile-filter-drawer`, `booking-bottom-sheet`, `master-card-drawer`, `booking-detail-drawer`, `client-card-drawer`)
+- **BOOKING-WIDGET-UI-A** 🎉 **Booking widget workstream COMPLETE** — full wizard UX redesign поверх FOUNDATION. Animated 4/3-step flow + framer-motion + sticky summary + per-error inline UI + silentMode toggle
+- **BOOKING-WIDGET-FOUNDATION-A** — guest booking enabled (`clientUserId: null` + namespaced idempotency + policy enforcement applies to guest). Server-side `aggregateStudioSlots` helper + 9 unit tests. Surgical adaptation, NOT createBooking rewrite
+- **BOOKING-WIDGET-A** — booking policy enforcement (minBookingHoursAhead / maxBookingDaysAhead / acceptNewClients / visibleSlotDays). 3 new ErrorCodes + 18 unit tests. Defense in depth at slots endpoint + resolveBookingCore
+- **STUDIO-PUBLIC-PROFILE-A** — Public studio profile редизайн (drops inline booking flow + slot-bar CTA + section reorder)
+- **STUDIO-SETTINGS-A** 🎉 **Cabinet Studio sprint FINALE 19/19** — 5-section SSR settings page (General / Team / Notifications / Policy / Danger)
+- **STUDIO-FINANCE-REMOVE-A** — Finance page удалён (дубликат Analytics без payout/commission/expense)
+- **STUDIO-ANALYTICS-A** — 4 view tabs над 15 reused `/api/analytics/*` endpoints, plan-gated via existing feature catalog
+- **STUDIO-NOTIFICATIONS-A** — `/cabinet/studio/notifications` route + reuses `getNotificationCenterData` filtered by `channel === "STUDIO"`
+
+### 2026-05-17 — Cabinet Studio sprint (продолжение)
+
+- **STUDIO-REVIEWS-A** — `/cabinet/studio/reviews` rewrite с stats + 4 filter chips + scoped reply через extended `ensureMasterReviewAccess`
+- **SEED-CONSOLIDATION-A** — `ensureUserByPhone` helper устраняет P2002 + 4 showcase phones 100/200/300/400 + new admin showcase
+- **STUDIO-CLIENTS-A** — `/cabinet/studio/clients` rewrite с derived segments через `classifyClient` reuse
+- **STUDIO-SHOWCASE-SEED** — Vision Beauty Studio rich fixture (7 ACTIVE masters / 35 services / 56 bookings / 15 reviews / 3 VIP clients / 2 PENDING categories / 3 packages / 12 notifications)
+- **STUDIO-POLISH-A** — visual polish (full-width layout / hero text contrast / publicUsername в team URL / studio topbar удалён)
+- **STUDIO-BUGS-FIX-A** — Prisma NULL-aware `not` filter fix в 4 sites + INVITED master eligibility guard
+- **STUDIO-PACKAGES-A** — strict mirror master ServicePackage pattern, no schema migration
+
+### 2026-05-16 — Cabinet Studio sprint (середина)
+
+- **🔴 CATEGORY-UNIFICATION-A** — pre-launch product-critical blocker resolved. Studio-created services → `globalCategoryId` → catalog filter работает. Forward-only strategy, no schema migration
+- **STUDIO-GAPS-FIX-A** — chat icon removed (resolveChatAccess privacy by-design) + break management dialog + cache invalidation fix
+- **STUDIO-SERVICES-A** — `/cabinet/studio/services` 3-col rewrite (categories / list / detail с CRUD + master assign)
+- **STUDIO-BOOKINGS-A** — `/cabinet/studio/bookings` новая страница (table journal с VIP/new badges + action menu reuse + phone required fix)
+- **STUDIO-SCHEDULE-A** — `/cabinet/studio/calendar` multi-master rewrite (день grid + неделя occupancy + action menus, NO D&D / NO Месяц)
+
+### 2026-05-15 — Cabinet Studio sprint (начало)
+
+- **STUDIO-MASTERS-A** — `/cabinet/studio/team` 2-col rewrite (list+detail с filters + Pause/Activate + Invite)
+- **STUDIO-DASHBOARD-A** — rich dashboard mirroring master pattern (KPIs + attention + revenue chart)
+- **SYMMETRIC-SWITCHER-A** — rollback duplicate switcher (cabinet UI без duplicate, cross-cabinet nav exclusively через public header)
+- **STUDIO-SHELL-A** — Studio cabinet shell foundation (sidebar/topbar/UserChip/bottom-nav + nav config + counts service)
+- **STUDIO-SCHEDULE-REQUEST-APPROVAL-A** — closed functional gap: UI для approve/reject API
+- **ADMIN-BILLING-FIX-B** — features editor 1:1 reconstruction (29 unit tests). 🎉 Admin Billing CLOSED
+- **ADMIN-BILLING-FIX-A** — diagnostic script + seed consolidation (12 plans → 6 канонических UPPERCASE)
+
+### 2026-05-13/14 — Pre-launch foundation + Admin Panel finale
+
+- **REVIEW-SOFT-DELETE-A** 🎉 Pre-launch batch 4/4 — hard delete → soft delete (Review.deletedAt + ACTIVE_REVIEW_FILTER в 18+ sites)
+- **NOTIFICATION-TYPES-A** — 6 новых NotificationType + 3-канальный dispatcher (in-app + push + Telegram) + mass fan-out queue
+- **ADMIN-AUDIT-INTEGRATION** — все 16 admin mutations пишут в `AdminAuditLog` через shared helper
+- **MIGRATIONS-PRELAUNCH-A** — foundation: AdminAuditLog model + Review soft-delete fields + UserProfile block fields
+- **PHASE-7-CLEANUP-A** (admin Phase 2 cleanup, ~3 810 LOC) — 7 legacy admin UI + 4 endpoints + 463 dead UI_TEXT keys
+- **ADMIN-SETTINGS-A** 🎉 Phase 2 Admin Panel CLOSED — logo+hero / 3 system flags / SEO / queue / visual search / media cleanup
+- **ADMIN-REVIEWS-A** — модерация отзывов с approve/delete + audit logging
+- **ADMIN-BILLING-B** — Subscriptions + Payments tabs (cancel/refund)
+- **MRR-SNAPSHOTS-A** — `MrrSnapshot` модель + daily worker job + cron endpoint
+- **ADMIN-BILLING-A** — Plans tab с features editor (KPIs)
+- **ADMIN-USERS-A** — 5 role tiles + plan change через audit-logged endpoint
+- **ADMIN-CITIES-UI** — управление городами с algorithmic duplicate detection + auto-grow модерация
+- **CONTEXT-REFRESH-V2** — snapshot обновлён до текущего состояния (7 мая → 13 мая)
+
+### Ранее (Cabinet Master + Cabinet Client + Public master profile + Chat foundation + Multi-city + Admin начало)
+
+Перенесено в исходный «✅ ВЫПОЛНЕНО» список ниже (сохранены раcширенные описания для истории).
+
+---
+
+## ✅ ВЫПОЛНЕНО (legacy список — сохраняется для истории, переходит в архив)
+
+> Перенос задач сюда происходил при их завершении, с datestamp. Новые коммиты с 2026-05-13 учитываются в индексе выше + детально в AI_CONTEXT р.15.
 
 ### 2026-05-XX — Cabinet Master sprint (массивная работа)
 - 22a Catalog Part 1 + Part 2 + 22b favorites
@@ -1252,79 +1348,65 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 ---
 
-## 📊 РЕАЛИСТИЧНЫЙ ПЛАН ДО PRODUCTION (обновлено 2026-05-13)
+## 📊 РЕАЛИСТИЧНЫЙ ПЛАН ДО PRODUCTION (обновлено 2026-05-19)
 
-### Phase 1 — Cabinet Master ✅ ЗАВЕРШЕН
-### Phase 1.5 — Cabinet Client + Public profile + Chat + Multi-city ✅ ЗАВЕРШЕН (merged main)
+### Phase 1 — Cabinet Master ✅ ЗАВЕРШЁН
+### Phase 1.5 — Cabinet Client + Public master profile + Chat foundation + Multi-city ✅ ЗАВЕРШЁН (merged main)
+### Phase 2 — Admin Panel ✅ ЗАВЕРШЁН (8 коммитов: SHELL-A → DASH-A → CATALOG-A → CITIES-UI → USERS-A → BILLING-A+MRR+B → REVIEWS-A → SETTINGS-A)
+### Phase 3 — Cabinet Studio redesign ✅ ЗАВЕРШЁН (19 коммитов 2026-05-15 → 2026-05-18, sprint finale STUDIO-SETTINGS-A)
+### Phase 4 — Public surfaces remaining ✅ В ОСНОВНОМ ЗАКРЫТ
+- Studio public profile ✅ STUDIO-PUBLIC-PROFILE-A
+- Booking widget foundation + UI ✅ BOOKING-WIDGET-FOUNDATION-A + BOOKING-WIDGET-UI-A
+- Booking policy enforcement ✅ BOOKING-WIDGET-A
+- Catalog enhancements ✅ ЧАСТИЧНО (CATALOG-ENHANCEMENTS-A — `slotPrecision` consumed; `visibleSlotDays` снапшот pre-computation отложен в backlog)
+- Hot slots `/hot` ✅ УДАЛЕНА (DELETE-HOT-INSPIRATION-A — функциональность переехала в `/catalog?hot=true` фильтр)
+- Inspiration feed `/inspiration` ✅ УДАЛЕНА
+- Footer ✅ FOOTER-REDESIGN-A · Navbar ✅ NAVBAR-REDESIGN-A
+- **Остаётся (нет блокеров):** Models offer page редизайн, Pricing page редизайн — отложены без срочности
 
-### Phase 2 — Admin Panel ✅ ЗАВЕРШЁН
-- ADMIN-SHELL-A ✅
-- ADMIN-DASH-A ✅
-- ADMIN-CATALOG-A ✅
-- ADMIN-CITIES-UI ✅
-- ADMIN-USERS-A ✅
-- ADMIN-BILLING-A + MRR-SNAPSHOTS-A + ADMIN-BILLING-B ✅
-- ADMIN-REVIEWS-A ✅
-- ADMIN-SETTINGS-A ✅
-- **Все 8 коммитов выполнены. Следующая фаза:** Cabinet Studio redesign (Phase 3)
+### Phase 5 — Chat enhancements ✅ ОСНОВНОЕ ЗАВЕРШЕНО
+- Image attachments ✅ CHAT-FOUNDATION-A-MIGRATION + CHAT-UI-A
+- Read receipts ✓✓ ✅ CHAT-FOUNDATION-A + bubble UI
+- **Остаётся (backlog):** typing indicators, BookingChat ↔ universal chat consolidation, studio admin chat auth gap (privacy 152-ФЗ decision deferred), online presence, image lightbox, multiple attachments, voice messages
 
-### Phase 3 — Cabinet Studio redesign (не начат)
-- Studio shell + dashboard
-- Calendar (multi-master view)
-- Team management (invites, roles, permissions)
-- Studio bookings list
-- Studio services & portfolio
-- Studio analytics & finance
-- Studio notifications integration
-- **При завершении:** удалить `master-schedule-editor.tsx` (legacy)
-- **Итого:** 7-9 коммитов, 2-3 недели
-
-### Phase 4 — Public surfaces remaining
-- Studio public profile (`/providers/[id]`)
-- Catalog enhancements (slotPrecision / visibleSlotDays integration)
-- Hot slots `/hot` redesign
-- Models offer pages
-- Inspiration feed `/inspiration`
-- Pricing page redesign
-- **Итого:** 4-5 коммитов, 1-2 недели
-
-### Phase 5 — Chat enhancements (foundation уже ✅)
-- Image attachments
-- Read receipts + typing indicators
-- BookingChat ↔ universal chat consolidation
-- **Итого:** 2-3 коммита, 1 неделя
-
-### Phase 6 — Pre-launch infrastructure
-- SMS gateway integration (P1, см. блокеры)
-- Yandex Cloud full deployment (DEPLOY_GUIDE.md done — нужен test pass)
-- Monitoring + alerts (APM для admin dashboard — uptime + p95)
-- Backups testing
-- Test coverage expansion (billing!)
-- CI tests integration (`npm run test` в quality-gates.yml)
-- Email HTML templates с branding
-- RBAC аудит /api/admin/*
-- Booking flow enforcement (minBookingHoursAhead / maxBookingDaysAhead / acceptNewClients)
-- Модель жалоб (Review.moderationResolvedAt или ReviewReport table)
-- **Итого:** 5-7 коммитов, 2-3 недели
+### Phase 6 — Pre-launch infrastructure (в работе)
+- ✅ Booking flow enforcement (BOOKING-WIDGET-A 2026-05-18: minBookingHoursAhead / maxBookingDaysAhead / acceptNewClients / visibleSlotDays)
+- ✅ CI tests integration (`npm run test` в quality-gates.yml уже работает, верифицировано TEST-COVERAGE-A)
+- ✅ Test coverage expansion для billing pure + bookings flow (TEST-COVERAGE-A 2026-05-19; 274 → 358 tests)
+- **Остаётся:**
+  - SMS gateway integration (P1 блокер) — без SMS launch impossible
+  - Email HTML templates с branding (сейчас только raw text для support)
+  - Yandex Cloud deployment test pass (DEPLOY_GUIDE.md есть, нужен прогон до конца)
+  - Monitoring + alerts (APM с uptime + p95 для admin dashboard)
+  - Backups restore testing
+  - RBAC аудит /api/admin/*
+  - Test coverage остаток (createBooking integration + cancelBooking + getCurrentPlan + deletion/visual-search — integration tests когда infra появится)
+  - ReviewReport модель (multi-reporter — сейчас denormalized fields на Review)
+  - Multi-recipient notifications (фоновый — после notif QA)
 
 ### Phase 7 — Legacy cleanup sweep
-- **Admin Phase 2 cleanup** ✅ PHASE-7-CLEANUP-A (2026-05-13) — удалены 7 legacy admin UI components + 4 legacy API endpoints + 463 dead UI_TEXT keys (~3 810 LOC)
-- **Остаточная работа:**
-  - Cascade-delete `SiteLogoManager` (orphan после Phase 7 cleanup #1) + `UI_TEXT.admin.media.siteLogo*` keys
-  - Migrate `LoginHeroImageManager` UI_TEXT с `admin.media.*` → `adminPanel.settings.sections.loginHero.*` + удалить всю `admin.media.*` ветку
-  - `master-schedule-editor.tsx` (1 488 LOC) — только после Cabinet Studio redesign (зависит от migration оставшихся callsites)
+- ✅ PHASE-7-CLEANUP-A admin (2026-05-13, ~3 810 LOC: 7 legacy admin UI + 4 endpoints + 463 dead UI_TEXT keys)
+- ✅ PHASE7-CLEANUP-A v2 (2026-05-19, ~2.5K LOC: 8 orphan files including `master-schedule-editor.tsx` 1 488 LOC + REVIEW_WINDOW_DAYS lint warning)
+- ✅ DELETE-HOT-INSPIRATION-A (2026-05-19, 6 page+isolated files)
+- ✅ MODAL-UNIFY-IMPL-A + FORMDIALOG-MIGRATION-A + FORMDIALOG-V2-A (модальная унификация: 14 of 49 form-dialogs мигрированы; ~33 структурно outside FormDialog scope)
+- **Остаётся:**
+  - Cascade-delete `SiteLogoManager` (orphan) + `UI_TEXT.admin.media.siteLogo*` keys
+  - Migrate `LoginHeroImageManager` UI_TEXT с `admin.media.*` → `adminPanel.settings.sections.loginHero.*` + удалить `admin.media.*`
+  - 837-LOC `studio-settings-page.tsx` retire (после portfolio + profile sub-route redesigns)
+  - Stories cluster coordinated retire (`listStoriesMasters` + `/api/home/stories` + `/api/home/feed` + `<PortfolioStoriesBar>`)
+  - `FocalImage` → `<Image>` migration (40+ usages, long-term)
+  - `getPushEnabled` consolidation (refactor)
+  - Pre-existing minor lint warnings (3 warnings + 1 error не от этих коммитов)
   - Дубликат `wouldCreateCycle` (ADMIN-CATALOG-A) → `src/lib/catalog/cycle-detection.ts`
-  - Прочие @deprecated находки (FeatureGate prop, focal-image wrapper, home/stories+feed legacy endpoints) — отдельные audits, не в scope админского cleanup
-- **Итого:** 1 коммит после Cabinet Studio sprint завершится, ~1-2 дня
 
 ### Phase 8 — Onboarding & docs
 - Master onboarding flow
-- Видео/screenshots гайды
+- Видео / screenshots гайды
 - Support документация
 - FAQ
 - **Итого:** 2-3 коммита, 1 неделя
 
-**Итого до production: ~20-25 коммитов, 8-10 недель работы** (с учётом ~146 коммитов завершено с 25 марта).
+**Итого до production: SMS gateway + deployment test pass + monitoring + backups restore test + ReviewReport model + email templates + small Phase 7 cleanups + Phase 8 docs (~10-15 коммитов, 3-5 недель работы).**
 
 ---
 
