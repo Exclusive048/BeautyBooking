@@ -12,7 +12,6 @@ import { canLeaveReview } from "@/lib/reviews/can-leave";
 import {
   REVIEW_PRIVATE_TAGS_MAX,
   REVIEW_PUBLIC_TAGS_MAX,
-  REVIEW_WINDOW_DAYS,
 } from "@/lib/reviews/constants";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { toReviewDto, type ReviewDto, type ReviewTagDto } from "@/lib/reviews/types";

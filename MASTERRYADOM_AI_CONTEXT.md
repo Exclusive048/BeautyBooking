@@ -1144,6 +1144,46 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-19 — PHASE7-CLEANUP-A** (commit on `designStudioCabinet`). Pre-QA safe cleanup. **Audit-driven, NOT bulk-delete** per the category-dual-system precedent (where @deprecated symbols were actively imported). Every candidate verified via static + dynamic + re-export grep before removal.
+  - **Audit findings:**
+    - 13 `@deprecated` markers found across the codebase. Per-file usage check resolved each into one of 3 buckets: (a) **dead cluster — safe to delete**, (b) **deprecated but actively consumed — must leave**, (c) **deprecated prop on live component — must leave**
+    - **Bucket (a) — verified 0 external consumers, deleted:** `team-tabs.tsx` + `team-member-card.tsx` + `studio-team-page.tsx` (dead 3-file cluster from STUDIO-MASTERS-A — team-tabs and team-member-card were only used by studio-team-page; studio-team-page itself had 0 consumers). `dashboard-nav-cards.tsx` (STUDIO-DASHBOARD-A, 0 consumers). `studio-calendar-page.tsx` + `master-schedule-editor.tsx` (dead 2-file cluster from STUDIO-SCHEDULE-A; master-schedule-editor was 1488 LOC, only consumed by studio-calendar-page; comment-mentions in `schedule/settings/page.tsx` and `schedule-settings-page.tsx` were just doc strings, not imports). `category-pills.tsx` (22a-fix-1, 0 consumers). `lib/studio/dashboard.service.ts` entire file (both exports `StudioDashboardStats` type + `getStudioDashboardStats` function had 0 external consumers — STUDIO-DASHBOARD-A replaced with `loadStudioDashboardData`). Empty `src/features/cabinet/master/schedule/` parent dir also removed
+    - **Bucket (b) — kept, has active consumers:** `studio-settings-page.tsx` (837 LOC, effectively-deprecated since STUDIO-SETTINGS-A) is imported by 3 live sub-routes (`/cabinet/studio/settings/general`, `/portfolio`, `/profile`) — cannot retire until those redesign. `lib/feed/stories.service.ts:listStoriesMasters` is consumed by `/api/home/stories/route.ts`; together with `/api/home/feed/route.ts` + `<PortfolioStoriesBar>` they form a coordinated retirement cluster whose @deprecated note explicitly says «Remove together» — out of scope here. `FocalImage` has 40+ active consumers — long-term migration to `<Image>` not in scope
+    - **Bucket (c) — left:** `FeatureGate` deprecated prop (prop-level marker on a live component)
+    - **`@aws-sdk/lib-storage` NOT in `package.json`** — audit memo was incorrect. Only `@aws-sdk/client-s3` is installed (actively used). Nothing to remove
+    - **Lint:** 1 pre-existing error from NAVBAR-REDESIGN-A baseline (`REVIEW_WINDOW_DAYS` unused import in `src/lib/reviews/service.ts:15`) — surgical fix: dropped from the import group. Remaining 1 error + 3 warnings are unrelated to this commit (setState-in-effect in email-verify-modal, `_onAvatarChanged` placeholder in client-profile-page, 2 unused eslint-disable directives in use-active-role) — out of scope, marked as Phase 7 follow-up
+    - **NOT in scope per spec:** legacy ~60 form-dialogs → `<FormDialog>` (separate FORMDIALOG-MIGRATION commit, post-QA + post-Chat), `getPushEnabled` consolidation (refactor, not cleanup)
+  - **Раздел 3 (Архитектура):**
+    - **DELETED 8 files (verified 0 external consumers):**
+      - `src/features/studio-cabinet/components/team-tabs.tsx`
+      - `src/features/studio-cabinet/components/team-member-card.tsx`
+      - `src/features/studio-cabinet/components/dashboard-nav-cards.tsx`
+      - `src/features/studio/components/studio-team-page.tsx`
+      - `src/features/studio/components/studio-calendar-page.tsx`
+      - `src/features/cabinet/master/schedule/master-schedule-editor.tsx` (1488 LOC)
+      - `src/features/catalog/components/category-pills.tsx`
+      - `src/lib/studio/dashboard.service.ts` (155 LOC; full file — both exports orphan)
+      - **Total: ~2.5K LOC of dead code removed.** Empty parent dir `src/features/cabinet/master/schedule/` also removed
+    - **MODIFIED:** `src/lib/reviews/service.ts` — dropped unused `REVIEW_WINDOW_DAYS` from the constants import group (3 imports → 2)
+  - **Раздел 5 (Бизнес-логика):** не затронута. Auth / createBooking / schedule engine / booking widget / modal system / footer / navbar — all untouched. Only orphan code paths removed. No semantic changes
+  - **Раздел 6 (Маршруты):** не затронуты — all dead files were non-route components
+  - **Раздел 8 (Проблемы и риски):**
+    - Mass-of-@deprecated cruft trimmed (~2.5K LOC). The «13 @deprecated markers» count is now down to 5 (those with active consumers or prop-level markers, all documented above)
+    - **Pre-existing lint issues catalogued** in backlog for future cleanup (not introduced here, not from this commit): 1 error (`setState synchronously within an effect` in `email-verify-modal.tsx`), 3 warnings (`_onAvatarChanged` placeholder, 2 unused eslint-disable directives)
+  - **Раздел 9 (Тестирование):** не затронут — 274/274 tests pass. None of the deleted code was covered by tests (verified via the test suite still passing identically)
+  - **Раздел 11 (Производительность):** marginal positive — smaller bundle (no more 1488-line `master-schedule-editor.tsx` shipped). No runtime change
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** (down from 1/4 pre-cleanup — REVIEW_WINDOW_DAYS closed; remaining issues all pre-existing and out of scope), encoding/mojibake/prisma ✅, **274/274 tests** (no test surface changed), **`npm run build` ✅** (production build green — orphan-heuristic deletions did NOT touch any Next.js convention file or implicit dependency)
+  - **Goal achieved:** clean working base for the upcoming QA pass. Cleanup itself did NOT introduce regressions — every deletion was verified safe, the build passes, and tests stay green. **Seed / showcase / 4 demo phone accounts (100/200/300/400)** all functional — none of the deleted code was on any user-reachable path
+  - **Backlog spawned / preserved:**
+    - 🟡 FORMDIALOG-MIGRATION — legacy ~60 form-dialogs migrate to `<FormDialog>` (deliberate separate commit, post-QA, post-Chat — own test surface)
+    - 🟡 `studio-settings-page.tsx` 837-LOC retirement — after portfolio + profile sub-route redesigns land
+    - 🟡 Stories cluster coordinated retirement — `listStoriesMasters` + `/api/home/stories` + `/api/home/feed` + `<PortfolioStoriesBar>` together
+    - 🟡 `getPushEnabled` consolidation — refactor, not cleanup
+    - 🔵 `FocalImage` → `<Image>` migration (40+ usages, long-term)
+    - 🔵 Pre-existing minor lint warnings (3 warnings + 1 error unrelated to this commit) — Phase 7 micro-sweep
+  - **Next: QA-CHECKLIST pass** against the clean base — accumulated test coverage for Cabinet Studio 19 / booking widget guest path / seed P2002 / 5 drawer migrations / footer / navbar in both themes + mobile, before moving into Chat redesign
+
 - **2026-05-19 — NAVBAR-REDESIGN-A** (commit on `designStudioCabinet`). **🎉 ПОСЛЕДНИЙ redesign-коммит. Redesign phase OFFICIALLY COMPLETE.** Reality-check per FOOTER-REDESIGN-A lesson turned out to apply even harder here — most of what the spec described as «нужно построить» already exists in `src/components/layout/topbar.tsx`. Two surgical changes shipped: brand-logo alignment + lint-drift closure.
   - **Reality-check audit findings (the most important section):**
     - The actual navbar component is `Topbar` (`src/components/layout/topbar.tsx`), NOT `Navbar`. Rendered by `<AppShell>` (`src/components/layout/app-shell.tsx`) — globally on every page (public + cabinets)
