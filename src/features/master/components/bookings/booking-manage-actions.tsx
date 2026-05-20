@@ -14,6 +14,14 @@ type Props = {
   bookingId: string;
   startAtUtc: string;
   durationMin: number;
+  /**
+   * MASTER-RESCHEDULE-FIX-A: kanban shows confirmed/today cards, but
+   * a booking can transition into CHANGE_REQUESTED right after the
+   * card was rendered. Pass status so the Reschedule button hides
+   * while another change request is awaiting a response (avoids the
+   * 409 "already has a pending change request" backend error).
+   */
+  status?: string;
 };
 
 /**
@@ -26,7 +34,8 @@ type Props = {
  * On success the server tree refreshes — the card disappears from
  * its current column and shows up in `cancelled`.
  */
-export function BookingManageActions({ bookingId, startAtUtc, durationMin }: Props) {
+export function BookingManageActions({ bookingId, startAtUtc, durationMin, status }: Props) {
+  const isAwaitingChangeResponse = status === "CHANGE_REQUESTED";
   const router = useRouter();
   const [busy, setBusy] = useState<"reschedule" | "cancel" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +75,8 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin }: Pro
             type="button"
             variant="secondary"
             size="sm"
-            disabled={disabled}
+            disabled={disabled || isAwaitingChangeResponse}
+            title={isAwaitingChangeResponse ? T.card.rescheduleAwaitingTooltip : undefined}
             onClick={() => setRescheduleOpen(true)}
             className="flex-1 gap-1"
           >

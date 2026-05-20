@@ -157,8 +157,18 @@ export function BookingCardActionsMenu({
     setRescheduleOpen(true);
   };
 
-  const isPending = rawStatus === "PENDING" || rawStatus === "CHANGE_REQUESTED";
+  // MASTER-RESCHEDULE-FIX-A: split PENDING vs CHANGE_REQUESTED so the
+  // reschedule menu item disappears while a previous change request is
+  // still awaiting a response. The old combined `isPending` was the #5а
+  // bug: it offered «Перенести» on a CHANGE_REQUESTED booking → submit
+  // hit the backend's "already has a pending change request" 409.
+  // Confirm/Decline remain in CHANGE_REQUESTED so the master can accept
+  // or reject the OTHER side's proposed move.
+  const isPendingNew = rawStatus === "PENDING";
+  const isAwaitingResponse = rawStatus === "CHANGE_REQUESTED";
   const isConfirmed = rawStatus === "CONFIRMED" || rawStatus === "PREPAID";
+  const canReschedule = isPendingNew || isConfirmed;
+  const canConfirmOrDecline = isPendingNew || isAwaitingResponse;
 
   const menuContent =
     open && coords ? (
@@ -169,7 +179,7 @@ export function BookingCardActionsMenu({
         style={{ top: coords.top, left: coords.left }}
         onClick={(event) => event.stopPropagation()}
       >
-        {isPending ? (
+        {canConfirmOrDecline ? (
           <>
             <MenuItem icon={Check} onClick={handleConfirm} disabled={busy !== null}>
               {T.confirm}
@@ -179,7 +189,7 @@ export function BookingCardActionsMenu({
             </MenuItem>
           </>
         ) : null}
-        {isPending || isConfirmed ? (
+        {canReschedule ? (
           <MenuItem icon={Calendar} onClick={handleReschedule} disabled={busy !== null}>
             {T.reschedule}
           </MenuItem>

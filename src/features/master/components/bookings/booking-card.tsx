@@ -105,6 +105,7 @@ export function BookingCard({ booking, column }: Props) {
               (booking.endAtUtc.getTime() - booking.startAtUtc.getTime()) / 60_000,
             ),
           )}
+          status={booking.rawStatus}
         />
       ) : null}
 

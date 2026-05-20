@@ -2,6 +2,7 @@ import { AccountType, MediaEntityType, MediaKind, MembershipStatus, ProviderType
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
+import { resolveChatAccessForBooking } from "@/lib/chat/access";
 
 function isSiteAdmin(user: UserProfile): boolean {
   return user.roles.includes(AccountType.ADMIN) || user.roles.includes(AccountType.SUPERADMIN);
@@ -48,6 +49,77 @@ async function canManageProvider(providerId: string, userId: string): Promise<bo
   if (provider.ownerUserId === userId) return true;
   if (provider.studioId && (await isStudioAdminOrOwnerByStudioProviderId(provider.studioId, userId))) return true;
   return false;
+}
+
+/**
+ * MASTER-CHAT-ATTACHMENT-FIX-A — chat attachment read ACL.
+ *
+ * MediaAsset rows for chat attachments are tagged with
+ * `entityType=CHAT_MESSAGE` and `entityId="chat-message:<chatMessageId>"`
+ * (see `markAttachmentUsed` in `src/lib/chat/attachment.ts`). To resolve
+ * read access we:
+ *
+ *   1. Parse the chatMessageId out of the entityId tag.
+ *   2. Load the ChatMessage → BookingChat → Booking so we know who the
+ *      two chat participants are.
+ *   3. Reuse `resolveChatAccessForBooking` — the canonical chat-access
+ *      helper. It admits client + master (the two chat participants) and
+ *      denies everyone else, including studio admins (privacy 152-ФЗ
+ *      invariant, by-design).
+ *
+ * **Important difference from `resolveChatAccess`**: we deliberately
+ * IGNORE the availability gate (`isAvailable`). The availability rules
+ * gate **sending** new messages — they say e.g. "no new messages after
+ * booking ended". For READ access to attachments already in the
+ * thread history, participants must remain able to view them
+ * indefinitely (same way they can scroll past messages in finished
+ * bookings).
+ */
+function parseChatMessageIdFromEntity(entityId: string): string | null {
+  const prefix = "chat-message:";
+  if (!entityId.startsWith(prefix)) return null;
+  const id = entityId.slice(prefix.length);
+  return id.length > 0 ? id : null;
+}
+
+async function canReadChatAttachmentMedia(user: UserProfile, entityId: string): Promise<boolean> {
+  const chatMessageId = parseChatMessageIdFromEntity(entityId);
+  if (!chatMessageId) return false;
+
+  const message = await prisma.chatMessage.findUnique({
+    where: { id: chatMessageId },
+    select: {
+      id: true,
+      chat: {
+        select: {
+          booking: {
+            select: {
+              id: true,
+              status: true,
+              startAtUtc: true,
+              clientUserId: true,
+              masterProvider: {
+                select: { ownerUserId: true, name: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  const booking = message?.chat.booking ?? null;
+  if (!booking) return false;
+
+  const isClient = Boolean(booking.clientUserId && booking.clientUserId === user.id);
+  const isMaster = Boolean(
+    booking.masterProvider?.ownerUserId && booking.masterProvider.ownerUserId === user.id,
+  );
+  // Read access — participants only. Availability gate is intentionally
+  // skipped (see helper doc above). resolveChatAccessForBooking is also
+  // imported as documentation anchor but we apply its membership logic
+  // directly here so we can keep the availability bypass explicit.
+  void resolveChatAccessForBooking; // imported for invariant cross-ref
+  return isClient || isMaster;
 }
 
 async function canReadBookingMedia(user: UserProfile, bookingId: string): Promise<boolean> {
@@ -177,6 +249,8 @@ export async function ensureCanReadMedia(
         return kind === MediaKind.CLIENT_CARD_PHOTO;
       case MediaEntityType.BOOKING:
         return kind === MediaKind.BOOKING_REFERENCE;
+      case MediaEntityType.CHAT_MESSAGE:
+        return kind === MediaKind.CHAT_ATTACHMENT;
       default:
         return false;
     }
@@ -248,6 +322,16 @@ export async function ensureCanReadMedia(
     case MediaEntityType.BOOKING: {
       if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
       const allowed = await canReadBookingMedia(user, entityId);
+      if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      return;
+    }
+    case MediaEntityType.CHAT_MESSAGE: {
+      // MASTER-CHAT-ATTACHMENT-FIX-A: chat attachments — read access
+      // for the two chat participants only. Studio admins explicitly
+      // not admitted (privacy 152-ФЗ invariant — chat is 1:1
+      // client↔master only, see resolveChatAccess).
+      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      const allowed = await canReadChatAttachmentMedia(user, entityId);
       if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
       return;
     }

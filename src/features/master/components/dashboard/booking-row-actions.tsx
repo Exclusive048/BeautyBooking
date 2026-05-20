@@ -54,6 +54,11 @@ export function BookingRowActions({ booking }: Props) {
   const isTerminal = TERMINAL_STATUSES.has(
     booking.status as (typeof TERMINAL_STATUSES extends Set<infer V> ? V : never),
   );
+  // MASTER-RESCHEDULE-FIX-A: hide Reschedule when a previous change
+  // request is awaiting a response. Backend rejects with 409 "already
+  // has a pending change request" — UI should not even offer the
+  // action. The other side resolves the proposal first.
+  const isAwaitingChangeResponse = booking.status === "CHANGE_REQUESTED";
   const chatHref = booking.chatSlug
     ? `/cabinet/master/messages?c=${encodeURIComponent(booking.chatSlug)}`
     : null;
@@ -100,7 +105,7 @@ export function BookingRowActions({ booking }: Props) {
           </Link>
         ) : null}
 
-        {!isTerminal ? (
+        {!isTerminal && !isAwaitingChangeResponse ? (
           <button
             type="button"
             aria-label={T.rescheduleAction}

@@ -9,6 +9,8 @@ import {
   type BookingActor,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
+import { assertBookingWindow } from "@/lib/bookings/policy-enforcement";
+import { AppError } from "@/lib/api/errors";
 
 type RescheduleRecord = BookingDto;
 
@@ -118,6 +120,19 @@ export async function rescheduleBooking(input: {
       endAtUtc: true,
       clientChangeRequestsCount: true,
       masterChangeRequestsCount: true,
+      // MASTER-RESCHEDULE-FIX-A: provider policy fields surfaced so the
+      // reschedule path applies the same `assertBookingWindow` rules as
+      // booking creation (BOOKING-WIDGET-A invariant). A reschedule
+      // picks a NEW time — same rules apply: can't move too close to
+      // now, can't move too far ahead. `acceptNewClients` is NOT
+      // re-checked here — the client already has a booking with this
+      // provider, by definition they're a returning client.
+      provider: {
+        select: {
+          minBookingHoursAhead: true,
+          maxBookingDaysAhead: true,
+        },
+      },
     },
   });
   if (!booking) return { ok: false, status: 404, message: "Booking not found", code: "BOOKING_NOT_FOUND" };
@@ -177,6 +192,30 @@ export async function rescheduleBooking(input: {
   }
 
   ensureBookingActionWindow(booking.startAtUtc);
+
+  // MASTER-RESCHEDULE-FIX-A: enforce provider's booking-window policy
+  // on the NEW time. Mirrors BOOKING-WIDGET-A which applies the same
+  // helper to `createBooking`. Defends against direct-API callers
+  // bypassing the slot-picker UI on the master/client/cabinet sides.
+  try {
+    assertBookingWindow(input.startAtUtc, booking.provider, new Date());
+  } catch (error) {
+    if (error instanceof AppError) {
+      // `assertBookingWindow` only throws 400 (BOOKING_TOO_SOON /
+      // BOOKING_TOO_FAR) — fits into the StatusCode union. The cast
+      // keeps the Result type happy without widening the union.
+      const status = (error.status === 400 || error.status === 403
+        ? error.status
+        : 409) as 400 | 403 | 409;
+      return {
+        ok: false,
+        status,
+        message: error.message,
+        code: error.code,
+      };
+    }
+    throw error;
+  }
 
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
   const conflict = await ensureNoConflictsExcluding(

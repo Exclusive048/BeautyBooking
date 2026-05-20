@@ -31,11 +31,15 @@ export type ThreadMessage = {
   /** Booking referenced by a SYSTEM message (lifecycle card). Null otherwise. */
   bookingCard: ThreadBookingCard | null;
   /**
-   * Optional image attachment (CHAT-FOUNDATION-A-MIGRATION).
-   * Renderer fetches the file via `/api/media/file/{id}` — the
-   * existing media-delivery path used by portfolio + avatars.
+   * Server-built signed URL for the image attachment, or `null` when the
+   * message has no image. MASTER-CHAT-ATTACHMENT-FIX-A: replaced the
+   * previously-emitted raw `attachmentMediaAssetId` (cuid). The new URL
+   * carries an opaque 15-min token in the path — no prisma cuid leaks
+   * to the client (per user requirement «никаких ID в запросе»).
+   * Renderer just sets `<img src={attachmentUrl}>`; the route at
+   * `/api/chat/attachment/[token]` runs the chat-membership ACL.
    */
-  attachmentMediaAssetId: string | null;
+  attachmentUrl: string | null;
 };
 
 export type ThreadDaySeparator = {
@@ -56,7 +60,8 @@ type RawMessage = {
   createdAt: Date;
   bookingId: string;
   bookingCard?: ThreadBookingCard | null;
-  attachmentMediaAssetId?: string | null;
+  /** Server-built signed URL (chat-attachment token). Null when no image. */
+  attachmentUrl?: string | null;
 };
 
 export function injectDaySeparators(
@@ -85,7 +90,7 @@ export function injectDaySeparators(
       createdAt: message.createdAt.toISOString(),
       bookingId: message.bookingId,
       bookingCard: message.bookingCard ?? null,
-      attachmentMediaAssetId: message.attachmentMediaAssetId ?? null,
+      attachmentUrl: message.attachmentUrl ?? null,
     });
   }
   return out;

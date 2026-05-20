@@ -10,6 +10,7 @@ import {
   type ThreadItem,
 } from "@/lib/chat/thread-grouping";
 import type { ConversationParticipant } from "@/lib/chat/conversation-access";
+import { buildChatAttachmentUrl } from "@/lib/media/private-delivery";
 
 /**
  * Per-pair conversation aggregator (33a, updated by chat-url-fix).
@@ -420,7 +421,14 @@ export async function getConversationThread(input: {
         readAt: message.readAt,
         createdAt: message.createdAt,
         bookingId: booking.id,
-        attachmentMediaAssetId: message.attachmentMediaAssetId ?? null,
+        // MASTER-CHAT-ATTACHMENT-FIX-A: emit a signed opaque URL
+        // (15-min token in path) instead of the raw asset cuid. The
+        // client never sees the prisma id and the route at
+        // `/api/chat/attachment/[token]` runs the chat-membership ACL
+        // via `ensureCanReadMedia(CHAT_MESSAGE)`.
+        attachmentUrl: message.attachmentMediaAssetId
+          ? buildChatAttachmentUrl(message.attachmentMediaAssetId)
+          : null,
         bookingCard: ref
           ? {
               id: ref.id,
