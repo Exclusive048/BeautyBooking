@@ -1148,6 +1148,48 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-22 — STUDIO-RESCHEDULE-VALIDATION-A** (commit on `designStudioCabinet`). **2/8 commit studio cabinet QA-волны.** 3 связанные validation gaps в `moveStudioBooking` flow закрыты pure helpers + DB-aware resolver. NO schema migration.
+  - **Audit findings:**
+    - Existing `moveStudioBooking` ([bookings.service.ts:126](src/lib/studio/bookings.service.ts)) had ACTIVE-master check (STUDIO-BUGS-FIX-A) but **none of**: master↔service compatibility, slot conflict detection, work-hours boundary. Bookings could be moved to 4 AM or onto an incompatible master silently.
+    - **#1а KEEP_SERVICE strategy never reads MasterService** — only CHANGE_SERVICE branch does, and only for duration/price overrides (silently skips when not found, allowing move to incompatible master).
+    - **#1б** No `ensureNoConflicts` call — direct double-booking possible.
+    - **#1в** No work-hours data source consulted — admin can set any datetime.
+    - **`policy-enforcement.ts`** has BOOKING-WIDGET-A precedent (`assertBookingWindow` / `assertAcceptsNewClient`) — natural place for `assertMasterPerformsService` + `assertWithinMasterWorkHours`.
+    - **Work hours storage**: per-master `WeeklyScheduleConfig` + `WeeklyScheduleDay.template{startLocal,endLocal}` + per-date `ScheduleOverride` (data already populated by STUDIO-APPROVE-400-FIX-A's seed canonical EDITOR_V1 payloads).
+    - **Defaults**: Mon-Sat 10-19 / Sun off (matches Vision template; matches user's «9-20 default» intuition close enough — 10-19 is the actual seeded template).
+  - **Раздел 3 (Архитектура):** 1 new test file + 5 modified files:
+    - **MODIFIED** [`src/lib/bookings/policy-enforcement.ts`](src/lib/bookings/policy-enforcement.ts) — 2 new pure helpers + new type `MasterWorkWindow`. `assertMasterPerformsService` throws `AppError(422, "MASTER_SERVICE_MISMATCH", "Этот мастер не выполняет выбранную услугу.")`. `assertWithinMasterWorkHours` throws `AppError(422, "OUTSIDE_WORK_HOURS", ...)` with distinct copy for day-off vs out-of-window. Inclusive boundaries (start ≥ open, end ≤ close).
+    - **MODIFIED** [`src/lib/api/errors.ts`](src/lib/api/errors.ts) — 2 new ErrorCode values added to literal union.
+    - **MODIFIED** [`src/lib/studio/bookings.service.ts`](src/lib/studio/bookings.service.ts) — new `resolveMasterWorkWindow(masterProviderId, dateUTC)` helper reads `ScheduleOverride` (per-date, precedence) + `WeeklyScheduleDay` + template hours in parallel; falls back to project defaults. `moveStudioBooking` extended with 3 gates: (a) enabled `MasterService` lookup for all booking serviceIds → `assertMasterPerformsService`; (b) `resolveMasterWorkWindow` + `assertWithinMasterWorkHours` against new local time; (c) inline `findMany` conflicts excluding self → 409 `SLOT_CONFLICT`. All run **before** the mutation transaction.
+    - **MODIFIED** [`src/features/studio-cabinet/schedule/server/types.ts`](src/features/studio-cabinet/schedule/server/types.ts) — `ScheduleMasterColumn` extended with `serviceIds: string[]`. JSDoc cites the UI consumer.
+    - **MODIFIED** [`src/features/studio-cabinet/schedule/server/schedule-data.service.ts`](src/features/studio-cabinet/schedule/server/schedule-data.service.ts) — day-view + week-view loaders select `masterServices` filtered by `isEnabled: true`, map to `serviceIds[]`. Single extra include per master row — no additional round-trips.
+    - **MODIFIED** [`src/app/(cabinet)/cabinet/studio/bookings/page.tsx`](src/app/(cabinet)/cabinet/studio/bookings/page.tsx) — `loadShellExtras` reuses existing `masterServices` join to build inverse `servicesByMaster` map, populates `serviceIds[]` on each scheduleMaster.
+    - **MODIFIED** [`src/features/studio-cabinet/schedule/components/dialogs/move-booking-dialog.tsx`](src/features/studio-cabinet/schedule/components/dialogs/move-booking-dialog.tsx) — new `bookingServiceId` prop. Master `<option>` rendered with `disabled={!performsService}` + suffix label «не выполняет эту услугу»; warning hint below the select when current selection doesn't perform the service. Visibility-over-hiding per spec rule.
+    - **MODIFIED** [`booking-action-menu.tsx`](src/features/studio-cabinet/schedule/components/dialogs/booking-action-menu.tsx) — threads `booking.serviceId` (already on `ScheduleBookingCell` DTO) into MoveBookingDialog.
+    - **MODIFIED** [`src/lib/ui/text.ts`](src/lib/ui/text.ts) — extended `studioCabinet.scheduleV2.moveDialog.*` with `masterIncompatibleSuffix` + `masterIncompatibleHint`.
+    - **NEW** [`src/lib/bookings/reschedule-policy.test.ts`](src/lib/bookings/reschedule-policy.test.ts) — 11 unit tests pinning: `assertMasterPerformsService` accept/reject with correct code/message; `assertWithinMasterWorkHours` boundary cases (start at open, end at close, **4 AM rejection — exact #1в bug regression**, end after close, inactive day, corrupt minutes, partial overlap both sides); distinct error codes for two rules. Pure-functional — no Prisma in tests.
+  - **Раздел 5 (Бизнес-логика):**
+    - **Studio reschedule now enforces 3 rules**: master compatibility + work hours + slot uniqueness. Defense-in-depth: backend validates server-side, UI master picker filters at source (incompatible masters shown disabled + tooltip). Mirrors MASTER-RESCHEDULE-FIX-A defense layering.
+    - **`assertMasterPerformsService`** covers multi-service bookings — every line on `booking.serviceItems` must have an enabled MasterService row. Studio admin moving a combo booking onto a master who only does one of the two services correctly rejected.
+    - **`assertWithinMasterWorkHours`** consults per-date override before weekly config — Marina with `ScheduleOverride` для конкретной date (e.g. day-off seeded by STUDIO-APPROVE-400-FIX-A) correctly rejects a move onto that date.
+    - **Inline conflict check** uses self-exclusion semantics (`id: { not: booking.id }`) so a no-op «move to same slot» doesn't conflict with itself. Mirrors `usecases.ts:ensureNoConflictsExcluding` from master-волны.
+    - **Defaults fallback** (Mon-Sat 10-19) активна когда master has no `WeeklyScheduleConfig` rows. Brand-new studio master cannot accept arbitrary times silently.
+  - **Раздел 6 (Маршруты):** `PATCH /api/studio/bookings/[id]/move` semantics extended (3 new validation gates) — same `{ id }` payload on success. New 422 errors surface for invalid moves.
+  - **Раздел 10 (Безопасность):** работающие часы enforcement closes the 4 AM gap. Master-service compatibility prevents studio admin from accidentally moving a booking to a master who cannot perform it. Both enforced at backend (last-resort) with UI providing preemptive feedback (defense-in-depth).
+  - **Раздел 12 (Инварианты):** не затронуты в формулировке. `assertMasterPerformsService` enforces a soft invariant («every booking line has an active MasterService for its provider») that previously was structural-possibility only.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **473/473 tests** ✅ (was 462; +11), `npm run build` ✅.
+  - **What was NOT changed (per strict constraints):**
+    - Schema (no migration — reuses existing MasterService / WeeklyScheduleConfig / ScheduleOverride)
+    - flow.ts state-machine (32 tests preserved)
+    - `ensureNoConflicts` / `createBooking` / `approveChangeRequest` / `rejectChangeRequest` (untouched)
+    - MASTER-RESCHEDULE-FIX-A master-side patterns (preserved, reused)
+    - STUDIO-APPROVE-400-FIX-A approve flow (separate plane — schedule request vs booking reschedule)
+    - Master cabinet 91 regression tests + studio #1 13 tests (all pass)
+    - Other studio cabinet bugs (#3-#9 carryover)
+    - chat / media / booking widget / client cabinet
+  - **Pre-launch risks (новых не обнаружено):** the 4 AM gap closure means production-time bookings can't be silently misplaced. Default work hours (Mon-Sat 10-19) reasonable fallback when a master is brand-new. **Note about STUDIO-SCHEDULE-SETTINGS-A (#8 future)**: when the studio admin can set per-studio default hours via UI, the resolver here should consult that store first. Backward-compatible since current resolver reads master-level config which UI #8 will write to.
+  - **Open questions for user:** нет — Сценарий А unambiguous, audit-driven enforcement, defaults match Vision seed. Remaining 6 studio cabinet QA fixes (#3 privacy URL / #4 bookings / #5 client write / #6 cleanup / #7 services sort / #8 schedule settings large) await separate prompts.
+
 - **2026-05-22 — STUDIO-APPROVE-400-FIX-A** (commit on `designStudioCabinet`). **1/8 commit studio cabinet QA-волны** (start). User обнаружил при QA studio cabinet: подтверждение schedule request падает с 400 «Некорректное тело запроса» в 2 UI entry-points (dedicated schedule-requests page + notifications inline approve). Reject работает. **Audit-zero-code 10-й case** — backend correct, seed bug.
   - **Audit findings:**
     - **Reject endpoint validates body correctly** ([reject/route.ts](src/app/api/studio/schedule/requests/[id]/reject/route.ts)): reads `{ comment }`, requires non-empty, updates status to REJECTED. Working pattern, preserved.

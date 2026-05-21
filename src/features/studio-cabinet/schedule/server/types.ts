@@ -9,6 +9,14 @@ export type ScheduleMasterColumn = {
   reviewsCount: number;
   /** False when the master is paused (`Provider.isPublished = false`). */
   isAvailable: boolean;
+  /**
+   * STUDIO-RESCHEDULE-VALIDATION-A: serviceIds the master has enabled
+   * via `MasterService`. Consumed by the move-booking dialog's master
+   * picker to gate (disabled + tooltip) masters who cannot perform the
+   * booking's service. Defense-in-depth — backend's
+   * `assertMasterPerformsService` still validates server-side.
+   */
+  serviceIds: string[];
 };
 
 export type ScheduleBookingCell = {

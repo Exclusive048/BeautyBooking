@@ -88,6 +88,14 @@ async function buildDayData(
         ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,
+        // STUDIO-RESCHEDULE-VALIDATION-A: surface enabled MasterService
+        // ids so the move dialog can gate the master picker. Disabled
+        // rows are excluded — same predicate the backend uses for
+        // `assertMasterPerformsService`.
+        masterServices: {
+          where: { isEnabled: true },
+          select: { serviceId: true },
+        },
       },
       orderBy: { name: "asc" },
     }),
@@ -164,6 +172,7 @@ async function buildDayData(
     rating: master.ratingAvg ?? 0,
     reviewsCount: master.ratingCount ?? 0,
     isAvailable: isStudioMasterActive(master),
+    serviceIds: master.masterServices.map((row) => row.serviceId),
   }));
 
   const bookingCells: ScheduleBookingCell[] = bookings
@@ -266,6 +275,10 @@ async function buildWeekData(
         ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,
+        masterServices: {
+          where: { isEnabled: true },
+          select: { serviceId: true },
+        },
       },
       orderBy: { name: "asc" },
     }),
@@ -322,6 +335,7 @@ async function buildWeekData(
         rating: master.ratingAvg ?? 0,
         reviewsCount: master.ratingCount ?? 0,
         isAvailable: active,
+        serviceIds: master.masterServices.map((row) => row.serviceId),
       },
       cells: days.map((day) => {
         const booked = byDay.get(day.dateKey) ?? 0;

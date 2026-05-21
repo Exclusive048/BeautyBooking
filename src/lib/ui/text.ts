@@ -6015,6 +6015,13 @@ export const UI_TEXT = {
         titleToMaster: "Перенести на другого мастера",
         titleTime: "Перенести по времени",
         masterLabel: "Мастер",
+        // STUDIO-RESCHEDULE-VALIDATION-A: appended in the master
+        // picker option label when the master can't perform the
+        // booking's service. Option is `disabled`; this suffix
+        // explains why.
+        masterIncompatibleSuffix: "не выполняет эту услугу",
+        masterIncompatibleHint:
+          "Этот мастер не выполняет выбранную услугу — выберите другого.",
         timeLabel: "Новое время",
         cancel: "Отмена",
         confirm: "Перенести",

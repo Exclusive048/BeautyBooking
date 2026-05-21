@@ -104,6 +104,7 @@ export function BookingActionMenu({
           bookingId={booking.id}
           currentMasterId={booking.masterId}
           currentStartAtUtc={booking.startAtUtc}
+          bookingServiceId={booking.serviceId}
           masters={masters}
           mode={moveMode}
           open

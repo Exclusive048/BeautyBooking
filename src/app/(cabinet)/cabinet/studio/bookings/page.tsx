@@ -88,10 +88,19 @@ async function loadShellExtras(studioId: string): Promise<{
   ]);
 
   const mastersByService = new Map<string, string[]>();
+  // STUDIO-RESCHEDULE-VALIDATION-A: invert the same join so each
+  // master row in `scheduleMasters` can carry its `serviceIds[]`. The
+  // move-booking dialog's master picker reads this to mark
+  // incompatible masters disabled.
+  const servicesByMaster = new Map<string, string[]>();
   for (const link of masterServices) {
     const arr = mastersByService.get(link.serviceId) ?? [];
     arr.push(link.masterProviderId);
     mastersByService.set(link.serviceId, arr);
+
+    const services = servicesByMaster.get(link.masterProviderId) ?? [];
+    services.push(link.serviceId);
+    servicesByMaster.set(link.masterProviderId, services);
   }
 
   // STUDIO-BUGS-FIX-A bug #5: scheduleMasters reuse drives the
@@ -105,6 +114,7 @@ async function loadShellExtras(studioId: string): Promise<{
       rating: m.ratingAvg ?? 0,
       reviewsCount: m.ratingCount ?? 0,
       isAvailable: isStudioMasterActive(m),
+      serviceIds: servicesByMaster.get(m.id) ?? [],
     })),
     services: services.map((s) => ({
       id: s.id,
