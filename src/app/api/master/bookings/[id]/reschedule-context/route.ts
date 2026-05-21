@@ -56,6 +56,7 @@ export async function GET(req: Request, ctx: RouteContext) {
         serviceId: true,
         providerId: true,
         masterProviderId: true,
+        actionRequiredBy: true,
         service: { select: { durationMin: true, baseDurationMin: true } },
       },
     });
@@ -87,6 +88,12 @@ export async function GET(req: Request, ctx: RouteContext) {
       serviceId: booking.serviceId,
       durationMin,
       status: runtimeStatus,
+      // MASTER-BOOKING-UI-FIX-A: surfacing actionRequiredBy lets the
+      // reschedule modal distinguish initiator vs awaited side for
+      // CHANGE_REQUESTED bookings — the «В ожидании» guard already
+      // renders for both, but future enhancements (e.g. «Отозвать
+      // запрос» button for the initiator only) can use this.
+      actionRequiredBy: booking.actionRequiredBy ?? null,
     });
   } catch (error) {
     const appError = toAppError(error);

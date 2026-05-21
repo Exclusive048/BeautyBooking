@@ -41,13 +41,30 @@ export function ManualBookingModal({ services, isSolo }: Props) {
   const isOpen = searchParams.get("manual") === "1";
   const prefillTime = searchParams.get("prefillTime");
 
-  const [startAt, setStartAt] = useState(`${todayDateKey()}T10:00`);
+  // MASTER-DASHBOARD-FIX-A #1б: initial value must NOT depend on
+  // `new Date()` — server renders the SSR HTML at server-local time,
+  // client hydrates at client-local time, and the two date strings
+  // differ around midnight or in different timezones. That trips
+  // React's hydration check and surfaces as a console warning on
+  // dashboard load. Start empty, then seed from the mount effect
+  // below so the initial render is deterministic.
+  const [startAt, setStartAt] = useState("");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Client-only default for `startAt`. Runs after hydration so the
+  // initial SSR/CSR markup matches (see #1б note above). Skips when
+  // the user has already edited the field or `?prefillTime=` will
+  // seed it via the next effect.
+  useEffect(() => {
+    if (!startAt && !prefillTime) {
+      setStartAt(`${todayDateKey()}T10:00`);
+    }
+  }, [startAt, prefillTime]);
 
   // When the modal opens fresh, default the service to the first available
   // option if the user previously cleared it.

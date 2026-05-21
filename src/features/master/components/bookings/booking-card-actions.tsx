@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { usePrompt } from "@/hooks/use-prompt";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -10,6 +11,16 @@ const T = UI_TEXT.cabinetMaster.bookings;
 
 type Props = {
   bookingId: string;
+  /**
+   * MASTER-BOOKING-UI-FIX-A: the kanban "pending" column groups both
+   * PENDING and CHANGE_REQUESTED bookings. For CHANGE_REQUESTED ones
+   * where the master is the initiator (actionRequiredBy === "CLIENT"),
+   * confirm/decline must NOT render — backend rejects with «Action is
+   * required from another side» 409. Defaults preserve the old
+   * behaviour for PENDING bookings.
+   */
+  rawStatus?: string;
+  actionRequiredBy?: "CLIENT" | "MASTER" | null;
 };
 
 /**
@@ -22,11 +33,14 @@ type Props = {
  * for non-CHANGE_REQUESTED rejections, and the customer message reads
  * better with one anyway.
  */
-export function BookingCardActions({ bookingId }: Props) {
+export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = null }: Props) {
   const router = useRouter();
+  const { prompt, modal: promptModal } = usePrompt();
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isInitiatorWaitingResponse =
+    rawStatus === "CHANGE_REQUESTED" && actionRequiredBy === "CLIENT";
 
   async function patch(status: "CONFIRMED" | "REJECTED", comment?: string) {
     setBusy(status === "CONFIRMED" ? "confirm" : "decline");
@@ -55,41 +69,61 @@ export function BookingCardActions({ bookingId }: Props) {
     }
   }
 
-  const handleDecline = () => {
-    const comment = window.prompt(T.declineReasonPrompt, "")?.trim();
+  const handleDecline = async () => {
+    const comment = await prompt({
+      title: T.card.declineTitle,
+      label: T.card.declineLabel,
+      placeholder: T.card.declinePlaceholder,
+      confirmLabel: T.card.declineConfirmLabel,
+      variant: "danger",
+    });
     if (!comment) return;
     void patch("REJECTED", comment);
   };
 
   const disabled = busy !== null;
 
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={disabled}
-          onClick={handleDecline}
-          className="flex-1"
-        >
-          {T.card.decline}
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={disabled}
-          onClick={() => void patch("CONFIRMED")}
-          className="flex-1"
-        >
-          {T.card.confirm}
-        </Button>
+  // MASTER-BOOKING-UI-FIX-A #2а: master IS the initiator of a pending
+  // change request — render the guard hint instead of the action
+  // buttons so the click doesn't hit the backend's «another side» 409.
+  if (isInitiatorWaitingResponse) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-200">
+        {T.card.awaitingClientResponse}
       </div>
-      {error ? (
-        <p className="text-[11px] text-red-600">{error}</p>
-      ) : null}
-    </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-1">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            onClick={handleDecline}
+            className="flex-1"
+          >
+            {T.card.decline}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={disabled}
+            onClick={() => void patch("CONFIRMED")}
+            className="flex-1"
+          >
+            {T.card.confirm}
+          </Button>
+        </div>
+        {error ? (
+          <p className="text-[11px] text-red-600">{error}</p>
+        ) : null}
+      </div>
+      {promptModal}
+    </>
   );
 }

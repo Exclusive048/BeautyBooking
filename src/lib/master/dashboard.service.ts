@@ -26,6 +26,13 @@ export type DashboardBooking = {
   isCurrent: boolean;
   isNext: boolean;
   changeComment: string | null;
+  /**
+   * MASTER-BOOKING-UI-FIX-A: surfaces who must respond when the booking
+   * is in CHANGE_REQUESTED. The dashboard action-buttons gate
+   * approve/reject visibility on this so the initiator side sees
+   * «Ожидаем ответа» instead of buttons that the backend will reject.
+   */
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type DashboardServiceLite = {
@@ -246,6 +253,9 @@ export const getMasterDashboardData = cache(
           clientName: true,
           clientUserId: true,
           changeComment: true,
+          // MASTER-BOOKING-UI-FIX-A: needed for initiator-aware
+          // dashboard action buttons on CHANGE_REQUESTED bookings (#2а).
+          actionRequiredBy: true,
           service: {
             select: { name: true, title: true, durationMin: true, price: true },
           },
@@ -315,6 +325,7 @@ export const getMasterDashboardData = cache(
         isCurrent,
         isNext: false,
         changeComment: row.changeComment,
+        actionRequiredBy: row.actionRequiredBy ?? null,
       };
     });
 

@@ -26,6 +26,13 @@ export type KanbanBookingItem = {
   changeComment: string | null;
   /** When the booking has a published review, contains its rating; null otherwise. */
   reviewRating: number | null;
+  /**
+   * MASTER-BOOKING-UI-FIX-A: who must respond when CHANGE_REQUESTED.
+   * Used by `<BookingManageActions>` to surface the «Ожидаем ответа»
+   * guard to the initiator instead of an action button that the
+   * backend would reject.
+   */
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type KanbanFilters = {
@@ -148,6 +155,7 @@ export const getMasterBookingsForKanban = cache(
           clientName: true,
           clientUserId: true,
           changeComment: true,
+          actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true } },
           serviceItems: { select: { priceSnapshot: true } },
         },
@@ -173,6 +181,7 @@ export const getMasterBookingsForKanban = cache(
           clientName: true,
           clientUserId: true,
           changeComment: true,
+          actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true } },
           serviceItems: { select: { priceSnapshot: true } },
         },
@@ -266,6 +275,7 @@ export const getMasterBookingsForKanban = cache(
         price: bookingPrice(row),
         changeComment: row.changeComment,
         reviewRating,
+        actionRequiredBy: row.actionRequiredBy ?? null,
       };
     });
 

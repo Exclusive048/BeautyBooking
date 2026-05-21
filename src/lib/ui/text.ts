@@ -24,6 +24,7 @@ export const UI_TEXT = {
     confirmDefaultTitle: "Подтвердите действие",
     confirmDefaultLabel: "Подтвердить",
     confirmPending: "Подождите...",
+    commentLabel: "Комментарий",
   },
   brand: {
     name: "МастерРядом",
@@ -3048,6 +3049,16 @@ export const UI_TEXT = {
         declinePrompt: "Укажите причину отказа — она будет отправлена клиенту:",
         cancelPrompt: "Укажите причину отмены — она будет отправлена клиенту:",
         actionError: "Не удалось обновить запись. Попробуйте ещё раз.",
+        awaitingClientResponse:
+          "Запрос переноса отправлен — ждём ответ клиента.",
+        declineTitle: "Отклонить запись",
+        declineLabel: "Причина отказа",
+        declinePlaceholder: "Например: «Конфликт по времени»",
+        declineConfirmLabel: "Отклонить",
+        cancelTitle: "Отменить запись",
+        cancelLabel: "Причина отмены",
+        cancelPlaceholder: "Например: «Заболела, переношу на следующую неделю»",
+        cancelConfirmLabel: "Отменить запись",
       },
       reschedule: {
         modalTitle: "Перенести запись",
@@ -3101,8 +3112,18 @@ export const UI_TEXT = {
         reschedule: "Перенести",
         rescheduleAwaitingTooltip:
           "Уже есть запрос переноса в ожидании ответа — новый отправить нельзя.",
+        awaitingClientResponse:
+          "Запрос переноса отправлен — ждём ответ клиента.",
         cancel: "Отменить",
         cancelPrompt: "Укажите причину отмены — она будет отправлена клиенту:",
+        cancelTitle: "Отменить запись",
+        cancelLabel: "Причина отмены",
+        cancelPlaceholder: "Например: «Заболела, переношу на следующую неделю»",
+        cancelConfirmLabel: "Отменить запись",
+        declineTitle: "Отклонить запись",
+        declineLabel: "Причина отказа",
+        declinePlaceholder: "Например: «Конфликт по времени»",
+        declineConfirmLabel: "Отклонить",
         cancelError: "Не удалось отменить запись. Попробуйте ещё раз.",
         reviewLabelTemplate: "★ {rating} · отзыв оставлен",
         guestClient: "Без аккаунта",
@@ -3157,6 +3178,14 @@ export const UI_TEXT = {
           "Клиент получит уведомление об отмене. Действие нельзя отменить.",
         cancelConfirmCta: "Отменить запись",
         cancelFailed: "Не удалось отменить запись. Попробуйте ещё раз.",
+        // MASTER-DASHBOARD-FIX-A #3: tooltips for disabled actions
+        // whose time window has passed. Backend rejects with 409
+        // "less than 60 minutes before start" — UI surfaces the same
+        // rule preemptively via tooltip on the disabled button.
+        modifyWindowExpiredTooltip:
+          "Перенос и отмена доступны не позже чем за 60 минут до начала.",
+        confirmWindowExpiredTooltip:
+          "Время записи уже наступило — подтверждение больше неактуально.",
       },
       attention: {
         title: "Требуют внимания",
@@ -3209,6 +3238,10 @@ export const UI_TEXT = {
         declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
         declineReasonPrompt:
           "Укажите причину отказа — она будет отправлена клиенту:",
+        declineTitle: "Отклонить запись",
+        declineLabel: "Причина отказа",
+        declinePlaceholder: "Например: «Конфликт по времени»",
+        declineConfirmLabel: "Отклонить",
       },
     },
     /**

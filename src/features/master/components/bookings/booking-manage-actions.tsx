@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
+import { usePrompt } from "@/hooks/use-prompt";
+import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -36,14 +38,28 @@ type Props = {
  */
 export function BookingManageActions({ bookingId, startAtUtc, durationMin, status }: Props) {
   const isAwaitingChangeResponse = status === "CHANGE_REQUESTED";
+  // MASTER-DASHBOARD-FIX-A #3: kanban «today» column shows bookings
+  // whose start may already be within 60 min — backend rejects both
+  // reschedule and cancel with 409 in that window. Disable both
+  // buttons preemptively (visibility-over-hiding) with an explanatory
+  // tooltip. Uses the same `BOOKING_ACTION_WINDOW_MINUTES = 60` rule
+  // as `ensureBookingActionWindow`.
+  const isPastModifyWindow = isBookingPastModifyWindow(new Date(startAtUtc));
   const router = useRouter();
+  const { prompt, modal: promptModal } = usePrompt();
   const [busy, setBusy] = useState<"reschedule" | "cancel" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   const handleCancel = async () => {
-    const comment = window.prompt(T.card.cancelPrompt, "")?.trim();
+    const comment = await prompt({
+      title: T.card.cancelTitle,
+      label: T.card.cancelLabel,
+      placeholder: T.card.cancelPlaceholder,
+      confirmLabel: T.card.cancelConfirmLabel,
+      variant: "danger",
+    });
     if (!comment) return;
     setBusy("cancel");
     setError(null);
@@ -75,8 +91,14 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
             type="button"
             variant="secondary"
             size="sm"
-            disabled={disabled || isAwaitingChangeResponse}
-            title={isAwaitingChangeResponse ? T.card.rescheduleAwaitingTooltip : undefined}
+            disabled={disabled || isAwaitingChangeResponse || isPastModifyWindow}
+            title={
+              isAwaitingChangeResponse
+                ? T.card.rescheduleAwaitingTooltip
+                : isPastModifyWindow
+                  ? UI_TEXT.cabinetMaster.dashboard.bookings.modifyWindowExpiredTooltip
+                  : undefined
+            }
             onClick={() => setRescheduleOpen(true)}
             className="flex-1 gap-1"
           >
@@ -87,7 +109,12 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
             type="button"
             variant="secondary"
             size="sm"
-            disabled={disabled}
+            disabled={disabled || isPastModifyWindow}
+            title={
+              isPastModifyWindow
+                ? UI_TEXT.cabinetMaster.dashboard.bookings.modifyWindowExpiredTooltip
+                : undefined
+            }
             onClick={handleCancel}
             className="flex-1 gap-1 border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30"
           >
@@ -107,6 +134,8 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
         durationMin={durationMin}
         onClose={() => setRescheduleOpen(false)}
       />
+
+      {promptModal}
     </>
   );
 }

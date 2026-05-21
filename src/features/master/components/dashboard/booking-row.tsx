@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { BookingActionButtons } from "@/features/master/components/dashboard/booking-action-buttons";
 import { BookingRowActions } from "@/features/master/components/dashboard/booking-row-actions";
+import { isBookingPastConfirmWindow } from "@/lib/bookings/action-state";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -89,8 +90,23 @@ export function BookingRow({ booking }: Props) {
 
         <div className="mt-3 flex items-center justify-between gap-2">
           <BookingRowActions booking={booking} />
-          {booking.isPending ? (
-            <BookingActionButtons bookingId={booking.id} />
+          {/* MASTER-BOOKING-UI-FIX-A #2а: confirm/decline visible only when
+              the master is the actionable side. For PENDING that's always
+              true (no change-request in flight). For CHANGE_REQUESTED the
+              master needs `actionRequiredBy === "MASTER"` — otherwise
+              we're the initiator and must wait for the client's reply.
+              MASTER-DASHBOARD-FIX-A #3: when the booking's start time has
+              already passed the buttons remain visible but disabled with
+              a tooltip — confirming after start is no longer meaningful
+              (the booking should have happened by now). */}
+          {booking.isPending &&
+          (booking.status === "PENDING" ||
+            (booking.status === "CHANGE_REQUESTED" &&
+              booking.actionRequiredBy === "MASTER")) ? (
+            <BookingActionButtons
+              bookingId={booking.id}
+              isPastConfirmWindow={isBookingPastConfirmWindow(booking.startAtUtc)}
+            />
           ) : null}
         </div>
       </div>

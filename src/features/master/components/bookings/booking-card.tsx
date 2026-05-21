@@ -90,7 +90,11 @@ export function BookingCard({ booking, column }: Props) {
       ) : null}
 
       {column === "pending" ? (
-        <BookingCardActions bookingId={booking.id} />
+        <BookingCardActions
+          bookingId={booking.id}
+          rawStatus={booking.rawStatus}
+          actionRequiredBy={booking.actionRequiredBy}
+        />
       ) : null}
 
       {(column === "confirmed" || column === "today") &&

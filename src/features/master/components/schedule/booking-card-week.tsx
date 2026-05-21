@@ -88,6 +88,7 @@ export function BookingCardWeek({ booking, topPx, heightPx }: Props) {
         rawStatus={booking.rawStatus}
         startAtUtc={booking.startAtUtc.toISOString()}
         durationMin={booking.durationMin}
+        actionRequiredBy={booking.actionRequiredBy ?? null}
       />
     </article>
   );
