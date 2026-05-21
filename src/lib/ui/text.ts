@@ -1072,6 +1072,14 @@ export const UI_TEXT = {
       hint: "Получайте уведомления о записях в VK",
       connect: "Подключить",
       connected: "Подключено",
+      // VK-NOTIFICATIONS-FLAG-A: copy shown when
+      // `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED` is off. Subsystem is in
+      // development — login flow keeps working but push delivery is
+      // gated. Surfaced as a soft hint inside the existing card so
+      // users understand why the toggle is locked.
+      temporarilyUnavailable: "Уведомления через ВКонтакте временно недоступны.",
+      temporarilyUnavailableHint:
+        "Мы дорабатываем доставку. Подключение к VK сохранится — уведомления включатся автоматически, когда канал заработает.",
     },
     autoConfirm: {
       title: "Автоподтверждение записей",

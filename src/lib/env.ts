@@ -63,6 +63,12 @@ const envSchema = z.object({
   VK_CLIENT_SECRET: z.string().optional(),
   VK_REDIRECT_URI: z.string().optional(),
   NEXT_PUBLIC_VK_ENABLED: boolFlag,
+  // VK-NOTIFICATIONS-FLAG-A: independent flag for the VK push-notifications
+  // subsystem. VK login (`NEXT_PUBLIC_VK_ENABLED`) and VK notifications
+  // are deliberately split — existing users still log in via VK, but
+  // push delivery stays off until the subsystem ships. Defaults to false
+  // (off). Public flag because the cabinet UI gates the toggle client-side.
+  NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: boolFlag,
 
   // ── YooKassa ─────────────────────────────────────────────────────────────
   YOOKASSA_SHOP_ID: z.string().optional(),
@@ -172,6 +178,24 @@ export const isPushEnabled = Boolean(
 export const isPaymentsEnabled = Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
 export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
 export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
+/**
+ * VK-NOTIFICATIONS-FLAG-A: VK push-notifications subsystem is incomplete
+ * (no delivery path in `notifications/delivery.ts`). The flag gates the
+ * cabinet UI toggle + the settings-write endpoint so a user can't enable
+ * a no-op subscription. Default = off. Set
+ * `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=true` once the delivery channel
+ * lands (queue handler + VK send API) — no code change required to flip it.
+ *
+ * Independent of `isVkAuthEnabled` — login keeps working when this is off.
+ *
+ * String-coerced comparison: on the server `env` is Zod-parsed → boolean;
+ * on the client the Zod parse fails (non-public secrets are missing) and
+ * `env` falls back to raw `process.env` where the value is still a string.
+ * `String(x) === "true"` normalises both to a real boolean so client-side
+ * gating works in `vk-notifications.tsx`.
+ */
+export const isVkNotificationsEnabled =
+  String(env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED) === "true";
 export const isEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 export const isS3Enabled = env.STORAGE_PROVIDER === "s3";
 export const isVisualSearchEnabled = env.VISUAL_SEARCH_ENABLED;
