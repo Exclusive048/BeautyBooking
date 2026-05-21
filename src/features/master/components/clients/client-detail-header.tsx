@@ -1,4 +1,4 @@
-import { ChevronLeft, Crown, Mail, Phone, Plus, Send } from "lucide-react";
+import { ChevronLeft, Crown, Mail, Phone, Plus, Send, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ClientStatus } from "@/lib/master/clients-classifier";
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
@@ -22,6 +22,17 @@ const SOURCE_LABEL_MAP = {
   manual: T.sourceManual,
   unknown: T.sourceUnknown,
 } as const;
+
+// MASTER-MODELS-FIX-A: Russian plural form for "раз" / "раза" / "раз"
+// used inside the «Откликался на модельные» tooltip.
+function pluralizeApplications(count: number): string {
+  const abs = Math.abs(count) % 100;
+  const lastDigit = abs % 10;
+  if (abs >= 11 && abs <= 14) return T.modelApplicantPluralMany;
+  if (lastDigit === 1) return T.modelApplicantPluralOne;
+  if (lastDigit >= 2 && lastDigit <= 4) return T.modelApplicantPluralFew;
+  return T.modelApplicantPluralMany;
+}
 
 const STATUS_TONES: Record<ClientStatus, string> = {
   new: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
@@ -136,6 +147,28 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
                 {tag}
               </span>
             ))}
+            {/* MASTER-MODELS-FIX-A: «откликался на модельные»
+                marker — visible when the client has ≥1 non-confirmed
+                ModelApplication to this master's offers. Distinct
+                visual (gradient + Sparkles icon) so it doesn't merge
+                with the auto-classified status badges above. Tooltip
+                explains the count + invites re-engagement — the whole
+                point of preserving rejected siblings instead of
+                deleting them. */}
+            {client.modelApplicationsCount > 0 ? (
+              <span
+                className="inline-flex cursor-help items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[11px] font-medium text-white"
+                title={T.modelApplicantTooltipTemplate
+                  .replace("{count}", String(client.modelApplicationsCount))
+                  .replace(
+                    "{plural}",
+                    pluralizeApplications(client.modelApplicationsCount),
+                  )}
+              >
+                <Sparkles className="h-3 w-3" aria-hidden />
+                {T.modelApplicantBadge}
+              </span>
+            ) : null}
             {/* MASTER-CLIENTS-FIX-A #7в: tag-editor stays disabled.
                 Auto-tagging via `classifyClient` already covers all 4
                 buckets (VIP / Постоянная / Новая / Спящая) — manual

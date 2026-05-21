@@ -120,6 +120,20 @@ describe("MASTER-PRIVACY-FIX-A — DTO type shape", () => {
     expect(_t).toBe(false);
     expect(_c).toBe(false);
   });
+
+  it("ClientBookingDTO has no master-CRM signal fields (incl. modelApplicationsCount)", () => {
+    // MASTER-MODELS-FIX-A: the «откликался на модельные» counter lives
+    // on the master CRM detail view only. Catching the leak via type-
+    // level assertion gives the same compile-time barrier as the
+    // existing notes/tags/clientCard checks above.
+    type HasModelCount =
+      "modelApplicationsCount" extends keyof ClientBookingDTO ? true : false;
+    type HasHistoryToken = "historyToken" extends keyof ClientBookingDTO ? true : false;
+    const _m: HasModelCount = false;
+    const _h: HasHistoryToken = false;
+    expect(_m).toBe(false);
+    expect(_h).toBe(false);
+  });
 });
 
 describe("MASTER-PRIVACY-FIX-A — Source-level boundary checks", () => {

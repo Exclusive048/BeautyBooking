@@ -57,7 +57,12 @@ function normalizeStatus(status: RawStatus): NormalizedStatus {
   return "PENDING";
 }
 
-function statusMeta(status: RawStatus, proposedTimeLocal: string | null, confirmedStartAt: string | null): {
+function statusMeta(
+  status: RawStatus,
+  proposedTimeLocal: string | null,
+  confirmedStartAt: string | null,
+  offerStatus: string,
+): {
   badge: string;
   badgeVariant: "warning" | "muted" | "info" | "success";
   description: string;
@@ -71,10 +76,17 @@ function statusMeta(status: RawStatus, proposedTimeLocal: string | null, confirm
     };
   }
   if (normalized === "REJECTED") {
+    // MASTER-MODELS-FIX-A: soften wording when the rejection came from
+    // the confirm-cascade (the offer is CLOSED because another model
+    // confirmed). Direct rejection by the master keeps the original
+    // copy. Derivation is data-only — no schema change required.
+    const isCascadeReject = offerStatus === "CLOSED";
     return {
-      badge: "Отклонена",
+      badge: isCascadeReject ? "Не выбран" : "Отклонена",
       badgeVariant: "muted",
-      description: "Мастер не принял заявку",
+      description: isCascadeReject
+        ? "Мастер выбрал другого участника"
+        : "Мастер не принял заявку",
     };
   }
   if (normalized === "TIME_PROPOSED") {
@@ -210,7 +222,12 @@ export function ClientModelApplicationsPage() {
       ) : null}
 
       {sortedItems.map((item) => {
-        const meta = statusMeta(item.status, item.proposedTimeLocal, item.confirmedStartAt);
+        const meta = statusMeta(
+          item.status,
+          item.proposedTimeLocal,
+          item.confirmedStartAt,
+          item.offer.status,
+        );
         const normalizedStatus = normalizeStatus(item.status);
         const isHighlighted = highlightedId === item.id;
         const isConfirming = confirmingId === item.id;

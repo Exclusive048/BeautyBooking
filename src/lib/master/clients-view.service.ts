@@ -89,6 +89,17 @@ export type ClientDetailView = {
    * means the master has no historic bookings (link is hidden in UI).
    */
   historyToken: string;
+  /**
+   * MASTER-MODELS-FIX-A: number of times this client has applied to
+   * this master's ModelOffers without being selected (anything other
+   * than CONFIRMED). Surfaces the «откликался на Модельные
+   * предложения» CRM marker — the master keeps a soft contact with
+   * interested but not-selected clients instead of losing them once
+   * an offer closes. Master-private field — scoped via Prisma to
+   * `clientUserId` + the master's own offers; never appears in any
+   * client-facing DTO (privacy invariant #25).
+   */
+  modelApplicationsCount: number;
 };
 
 export type ClientsKpi = {
@@ -541,6 +552,23 @@ async function buildSelectedClient(input: {
     select: { source: true },
   });
 
+  // MASTER-MODELS-FIX-A: count non-confirmed ModelApplications by
+  // this client to THIS master's offers — the master CRM marker
+  // «откликался на Модельные предложения». Only registered clients
+  // (with a `clientUserId`) can apply; phone-only bookings have no
+  // model applications. Master-private signal (scoped by
+  // `offer.masterId`) — never threaded into client DTOs.
+  const modelApplicationsCount =
+    aggregate.clientUserId !== null
+      ? await prisma.modelApplication.count({
+          where: {
+            clientUserId: aggregate.clientUserId,
+            offer: { masterId: input.providerId },
+            status: { not: "CONFIRMED" },
+          },
+        })
+      : 0;
+
   const recentVisits = cardData.history
     .filter((row) => row.status === BookingStatus.FINISHED)
     .slice(0, 3);
@@ -571,5 +599,6 @@ async function buildSelectedClient(input: {
       clientKey: aggregate.key,
       masterProviderId: input.providerId,
     }),
+    modelApplicationsCount,
   };
 }

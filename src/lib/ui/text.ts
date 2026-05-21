@@ -2307,6 +2307,17 @@ export const UI_TEXT = {
         sourceManual: "Добавлен вручную",
         sourceUnknown: "—",
         sinceTemplate: "с {date}",
+        // MASTER-MODELS-FIX-A: CRM marker — visible only когда у клиента
+        // есть >=1 неподтверждённый отклик на модельный оффер этого
+        // мастера. Параллельный indicator к auto-classified `statuses`
+        // badges. Tooltip объясняет смысл «они в моём pool но не были
+        // выбраны — можно повторно пригласить».
+        modelApplicantBadge: "Откликался на модельные",
+        modelApplicantTooltipTemplate:
+          "Клиент откликался на ваши модельные предложения {count} {plural}, но не был выбран. Контакт сохранён — можно пригласить снова.",
+        modelApplicantPluralOne: "раз",
+        modelApplicantPluralFew: "раза",
+        modelApplicantPluralMany: "раз",
         copyAria: "Скопировать контакт",
         copySuccess: "Скопировано",
         // MASTER-CLIENTS-FIX-A #7в: manual tag-editor is parked in

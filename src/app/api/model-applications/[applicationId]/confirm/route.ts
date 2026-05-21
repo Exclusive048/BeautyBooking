@@ -3,7 +3,11 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { confirmApplicationSchema, isTimeWithinRange } from "@/lib/model-offers/schemas";
-import { loadApplicationWithRelations, notifyModelTimeConfirmed } from "@/lib/notifications/model-notifications";
+import {
+  loadApplicationWithRelations,
+  notifyModelApplicationRejected,
+  notifyModelTimeConfirmed,
+} from "@/lib/notifications/model-notifications";
 import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
@@ -78,6 +82,14 @@ export async function POST(req: Request, ctx: RouteContext) {
     if (!applicationId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
 
     await parseBody(req, confirmApplicationSchema);
+
+    // MASTER-MODELS-FIX-A: reason text used for sibling applications
+    // cascade-rejected when this client confirms. Mirrors the pattern
+    // already used by `closeOfferWithCascade` ("Оффер закрыт") so
+    // notifyModelApplicationRejected dispatch stays uniform. Distinct
+    // string keeps the client-side UI honest — siblings learn another
+    // model was chosen, not that the master actively turned them down.
+    const SIBLING_CASCADE_REASON = "Выбран другой отклик";
 
     const application = await prisma.modelApplication.findUnique({
       where: { id: applicationId },
@@ -203,6 +215,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const priceValue = application.offer.price ? Number(application.offer.price) : 0;
     const safePrice = Number.isFinite(priceValue) && priceValue > 0 ? priceValue : 0;
 
+    let siblingCascadeIds: string[] = [];
     const bookingId = await prismaDirect.$transaction(
       async (tx) => {
         const [offerRow, appRow] = await Promise.all([
@@ -307,6 +320,40 @@ export async function POST(req: Request, ctx: RouteContext) {
           },
         });
 
+        // MASTER-MODELS-FIX-A: cascade-reject siblings.
+        // Previously the offer flipped to CLOSED but sibling
+        // applications were left in stale PENDING /
+        // APPROVED_WAITING_CLIENT on a closed offer — they
+        // remained as ghost rows for the master (and as
+        // "still waiting" for the client). Mirroring the
+        // `closeOfferWithCascade` pattern: move them to REJECTED
+        // with no `proposedTimeLocal` / `confirmedStartAt`, then
+        // fire the existing rejection notification with a neutral
+        // reason. REJECTED is the right semantic slot (enum already
+        // has it; client UX softens the wording when this REJECTED
+        // is a cascade — see `statusMeta` in
+        // `client-model-applications-page.tsx`). NO schema
+        // migration — Сценарий A in the audit decision.
+        const siblings = await tx.modelApplication.findMany({
+          where: {
+            offerId: application.offer.id,
+            id: { not: application.id },
+            status: { in: ["PENDING", "APPROVED_WAITING_CLIENT"] },
+          },
+          select: { id: true },
+        });
+        if (siblings.length > 0) {
+          await tx.modelApplication.updateMany({
+            where: { id: { in: siblings.map((row) => row.id) } },
+            data: {
+              status: "REJECTED",
+              proposedTimeLocal: null,
+              confirmedStartAt: null,
+            },
+          });
+        }
+        siblingCascadeIds = siblings.map((row) => row.id);
+
         await tx.modelOffer.update({
           where: { id: application.offer.id },
           data: { status: "CLOSED" },
@@ -320,6 +367,16 @@ export async function POST(req: Request, ctx: RouteContext) {
     const fullApplication = await loadApplicationWithRelations(application.id);
     if (fullApplication) {
       await notifyModelTimeConfirmed(fullApplication);
+    }
+
+    // MASTER-MODELS-FIX-A: notify cascade-rejected siblings outside
+    // the transaction so a flaky notifier doesn't roll the booking
+    // back. Same pattern as `closeOfferWithCascade`.
+    for (const siblingId of siblingCascadeIds) {
+      const sibling = await loadApplicationWithRelations(siblingId);
+      if (sibling) {
+        await notifyModelApplicationRejected(sibling, SIBLING_CASCADE_REASON);
+      }
     }
 
     await invalidateSlotsForBookingRange({
