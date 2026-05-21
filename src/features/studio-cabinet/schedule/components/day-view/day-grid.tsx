@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -38,6 +38,14 @@ type Props = {
     priceKopeks: number;
     masterIds: string[];
   }>;
+  /**
+   * STUDIO-MASTERS-PRIVACY-FIX-A: decoded master id from the
+   * `?master=<token>` deep-link (verified server-side). When set, the
+   * grid scrolls horizontally so this master's column is in view and
+   * the column header gets a soft accent ring. Null/undefined means
+   * "no deep-link" — grid renders normally.
+   */
+  focusMasterId?: string;
 };
 
 function localTimeShort(iso: string): string {
@@ -49,7 +57,7 @@ function localTimeShort(iso: string): string {
   });
 }
 
-export function DayGrid({ studioId, day, services }: Props) {
+export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
   const [createSlot, setCreateSlot] = useState<{
     masterId: string;
     startAtUtc: string;
@@ -58,6 +66,20 @@ export function DayGrid({ studioId, day, services }: Props) {
     useState<ScheduleBookingCell | null>(null);
 
   const slotMinutes = Array.from(iterateSlotMinutes());
+
+  // STUDIO-MASTERS-PRIVACY-FIX-A: scroll the focused master's column
+  // into view when the page arrives with a verified `?master=<token>`.
+  // Mount-gated useEffect — runs once after hydration, no
+  // SSR/CSR mismatch risk.
+  const focusedColumnRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!focusMasterId || !focusedColumnRef.current) return;
+    focusedColumnRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [focusMasterId]);
 
   const handleEmptyClick = (masterId: string, slotMinutesValue: number) => {
     const dayStart = new Date(day.dayStartIso);
@@ -94,10 +116,15 @@ export function DayGrid({ studioId, day, services }: Props) {
                 (b) => b.masterId === column.id,
               );
               const dayStart = new Date(day.dayStartIso);
+              const isFocused = focusMasterId === column.id;
               return (
                 <div
                   key={column.id}
-                  className="relative w-[200px] shrink-0 border-r border-border-subtle"
+                  ref={isFocused ? focusedColumnRef : undefined}
+                  className={cn(
+                    "relative w-[200px] shrink-0 border-r border-border-subtle",
+                    isFocused && "ring-2 ring-primary/40 ring-inset",
+                  )}
                 >
                   <div className="sticky top-0 z-20 h-12">
                     <MasterColumnHeader master={column} />

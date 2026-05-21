@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { signStudioMasterViewToken } from "@/lib/studio/master-view-token";
 import type { StudioMasterDisplayStatus } from "../lib/status-display";
 import { getMasterWeekOccupancy } from "../lib/week-occupancy";
 import type { StudioMasterDetail, StudioMasterListItem } from "./types";
@@ -230,5 +231,15 @@ export async function loadStudioMasterDetail(input: {
     clientsCount: allTimeClients.length,
     averageCheckKopeks: averageCheck,
     weekSchedule,
+    // STUDIO-MASTERS-PRIVACY-FIX-A: pre-sign the calendar deep-link
+    // token here. The provider row was resolved by cuid OR
+    // publicUsername (see comment above), so `provider.id` is the
+    // canonical id we sign — verifier decodes it back at the
+    // calendar route. Studio scope is baked in so cross-studio
+    // share-links don't work.
+    viewToken: signStudioMasterViewToken({
+      masterId: provider.id,
+      studioId: input.studioId,
+    }),
   };
 }

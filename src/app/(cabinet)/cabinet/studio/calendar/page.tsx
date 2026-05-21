@@ -8,10 +8,18 @@ import {
 import { loadStudioScheduleData } from "@/features/studio-cabinet/schedule/server/schedule-data.service";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
+import { verifyStudioMasterViewToken } from "@/lib/studio/master-view-token";
 
 type SearchParams = {
   view?: string;
   date?: string;
+  /**
+   * STUDIO-MASTERS-PRIVACY-FIX-A: opaque HMAC token from the masters
+   * page deep-links. Decoded server-side against the current studio
+   * scope; invalid / cross-studio / expired tokens fall through
+   * silently to the full studio calendar.
+   */
+  master?: string;
 };
 
 type Props = {
@@ -40,7 +48,23 @@ export default async function StudioCalendarRoute({ searchParams }: Props) {
       ? params.date
       : toDateKey(new Date());
 
+  // STUDIO-MASTERS-PRIVACY-FIX-A: verify the deep-link token against
+  // the current studio scope before threading it to the page. Invalid
+  // / cross-studio / expired tokens silently fall through (no
+  // focusMasterId) — the URL is shareable-within-cabinet, not a
+  // security boundary; failure modes go to the full calendar view.
+  const focusMasterId = params?.master
+    ? verifyStudioMasterViewToken({ token: params.master, studioId })
+    : null;
+
   const data = await loadStudioScheduleData({ studioId, dateKey, view });
 
-  return <StudioSchedulePage studioId={studioId} view={view} data={data} />;
+  return (
+    <StudioSchedulePage
+      studioId={studioId}
+      view={view}
+      data={data}
+      focusMasterId={focusMasterId ?? undefined}
+    />
+  );
 }

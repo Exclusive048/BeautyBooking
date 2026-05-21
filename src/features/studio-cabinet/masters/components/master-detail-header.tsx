@@ -101,8 +101,12 @@ export function MasterDetailHeader({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* STUDIO-MASTERS-PRIVACY-FIX-A: opaque HMAC token replaces
+              the raw master cuid in the URL. Calendar route verifies
+              against the current studio scope. Same pattern as the
+              client-history token in MASTER-CLIENTS-FIX-A. */}
           <Link
-            href={`/cabinet/studio/calendar?masterId=${detail.id}`}
+            href={`/cabinet/studio/calendar?master=${encodeURIComponent(detail.viewToken)}`}
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border-subtle bg-bg-card px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input"
           >
             <CalendarDays className="h-3.5 w-3.5" aria-hidden />
