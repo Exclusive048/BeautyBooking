@@ -2282,6 +2282,18 @@ export const UI_TEXT = {
         regular: "Постоянная",
         vip: "VIP",
         sleeping: "Спящая",
+        // MASTER-CLIENTS-FIX-A #7в: tooltip texts explaining the
+        // auto-classification rules. Statuses come from
+        // `classifyClient` — derived from booking history, not
+        // manually assigned. Tooltip surfaces the underlying rule so
+        // the master understands why a client landed in this bucket.
+        autoHint: "Категория назначается автоматически — наведите для подробностей.",
+        tooltips: {
+          new: "Первый визит в течение 30 дней или ещё нет завершённых записей.",
+          regular: "5 или больше завершённых записей у вас.",
+          vip: "Сумма расходов клиента от 50 000 ₽.",
+          sleeping: "Был хотя бы один визит, но более 90 дней назад.",
+        },
       },
       detail: {
         emptyTitle: "Выберите клиента",
@@ -2297,7 +2309,13 @@ export const UI_TEXT = {
         sinceTemplate: "с {date}",
         copyAria: "Скопировать контакт",
         copySuccess: "Скопировано",
-        addTagDisabled: "Скоро",
+        // MASTER-CLIENTS-FIX-A #7в: manual tag-editor is parked in
+        // backlog — auto-tagging already covers VIP/Постоянная/Новая/
+        // Спящая via `classifyClient` (badges above). Surface this in
+        // the tooltip so the master understands why the button is
+        // disabled (it's not «работа в процессе», it's «уже есть
+        // автоматическое»).
+        addTagDisabled: "Категории назначаются автоматически по истории визитов.",
         addTagLabel: "тег",
         stats: {
           visits: "Визитов",
@@ -2309,7 +2327,19 @@ export const UI_TEXT = {
           heading: "Заметки мастера",
           empty: "Заметок пока нет",
           editLabel: "Редактировать",
+          // MASTER-CLIENTS-FIX-A #6: realised in this commit — kept
+          // for backwards-compatibility but no longer shown.
           editComingSoon: "Доступно скоро",
+          // MASTER-CLIENTS-FIX-A #6: edit-mode UI text. Keeps the
+          // tone consistent with other master cabinet edit forms
+          // (settings auto-save / schedule edit etc.). Notes are
+          // master-private (privacy invariant #25) — surfaced only
+          // inside this master CRM card.
+          editPlaceholder: "Запишите всё важное о клиенте — предпочтения, аллергии, особенности.",
+          saveLabel: "Сохранить",
+          saving: "Сохраняем…",
+          cancelLabel: "Отменить",
+          saveError: "Не удалось сохранить заметку. Попробуйте ещё раз.",
         },
         history: {
           heading: "История визитов",

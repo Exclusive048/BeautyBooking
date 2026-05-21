@@ -1,5 +1,6 @@
 import { ChevronLeft, Crown, Mail, Phone, Plus, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
+import type { ClientStatus } from "@/lib/master/clients-classifier";
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { CopyButton } from "./copy-button";
@@ -22,7 +23,7 @@ const SOURCE_LABEL_MAP = {
   unknown: T.sourceUnknown,
 } as const;
 
-const STATUS_TONES: Record<keyof typeof STATUS_T, string> = {
+const STATUS_TONES: Record<ClientStatus, string> = {
   new: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
   regular: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   vip: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
@@ -111,13 +112,18 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {/* MASTER-CLIENTS-FIX-A #7в: surface the underlying
+                classifyClient rule via native `title` tooltip so the
+                master understands why a client landed in this bucket
+                (auto-derived from booking history, not manual). */}
             {client.statuses.map((status) => (
               <span
                 key={status}
                 className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  "inline-flex cursor-help items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
                   STATUS_TONES[status]
                 )}
+                title={STATUS_T.tooltips[status]}
               >
                 {STATUS_T[status]}
               </span>
@@ -130,10 +136,15 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
                 {tag}
               </span>
             ))}
+            {/* MASTER-CLIENTS-FIX-A #7в: tag-editor stays disabled.
+                Auto-tagging via `classifyClient` already covers all 4
+                buckets (VIP / Постоянная / Новая / Спящая) — manual
+                tag assignment is parked in backlog per user decision
+                «tags только если нет других вариантов появления». */}
             <button
               type="button"
               disabled
-              title={T.notes.editComingSoon}
+              title={T.addTagDisabled}
               className="inline-flex cursor-not-allowed items-center gap-0.5 rounded-full border border-dashed border-border-subtle px-2 py-0.5 text-[11px] text-text-sec/60"
             >
               <Plus className="h-3 w-3" aria-hidden />

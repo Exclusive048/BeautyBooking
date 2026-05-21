@@ -20,6 +20,13 @@ export default async function MasterBookingsRoute({ searchParams }: RouteProps) 
       searchParams={{
         q: pickString(params.q),
         tab: pickString(params.tab),
+        // MASTER-CLIENTS-FIX-A #7а: opaque HMAC token from the «Вся
+        // история» link. Decoded server-side against the current
+        // master's provider id. Previously this param was silently
+        // ignored — that was the «грубая ошибка»: link looked
+        // functional but the page showed every booking instead of
+        // the selected client's.
+        client: pickString(params.client),
       }}
     />
   );

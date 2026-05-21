@@ -15,6 +15,7 @@ import {
   classifyClient,
   type ClientStatus,
 } from "@/lib/master/clients-classifier";
+import { signClientKeyToken } from "@/lib/master/client-key-token";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -80,6 +81,14 @@ export type ClientDetailView = {
   statuses: ClientStatus[];
   recentVisits: ClientHistoryItem[];
   totalHistoryCount: number;
+  /**
+   * MASTER-CLIENTS-FIX-A #7а: HMAC-signed token used for the «Вся
+   * история» link in `/cabinet/master/bookings?client=…`. Replaces the
+   * cuid that previously leaked into the URL. Decoded server-side by
+   * the bookings page handler against the current master's scope; null
+   * means the master has no historic bookings (link is hidden in UI).
+   */
+  historyToken: string;
 };
 
 export type ClientsKpi = {
@@ -558,5 +567,9 @@ async function buildSelectedClient(input: {
     statuses: input.statuses,
     recentVisits,
     totalHistoryCount: cardData.history.length,
+    historyToken: signClientKeyToken({
+      clientKey: aggregate.key,
+      masterProviderId: input.providerId,
+    }),
   };
 }
