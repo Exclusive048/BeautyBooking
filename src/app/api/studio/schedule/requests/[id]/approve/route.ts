@@ -1,6 +1,6 @@
 import { StudioRole } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
-import { toAppError } from "@/lib/api/errors";
+import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
@@ -43,11 +43,35 @@ export async function POST(
       return jsonFail(400, "Запрос уже обработан.", "VALIDATION_ERROR");
     }
 
-    if (isScheduleEditorRequestPayload(request.payloadJson)) {
-      const normalized = normalizeScheduleEditorRequestPayload(request.payloadJson);
-      await applyScheduleSnapshot(request.providerId, normalized);
-    } else {
-      await applySchedulePayload(request.providerId, request.payloadJson as unknown as SchedulePayload);
+    // STUDIO-APPROVE-400-FIX-A: rewrap INVALID_BODY failures from the
+    // schedule appliers into a friendlier message. The default
+    // "Некорректное тело запроса" is honest from the server side but
+    // confusing for the studio admin — they did not author the
+    // payload, the master did. Surface a 422 with actionable copy
+    // explaining what to do (ask the master to resend) and preserve
+    // the original code for log/debug. This is defensive: with the
+    // seed fix in place a properly-formed payload won't trip it, but
+    // legacy or migration-corrupted rows still might.
+    try {
+      if (isScheduleEditorRequestPayload(request.payloadJson)) {
+        const normalized = normalizeScheduleEditorRequestPayload(request.payloadJson);
+        await applyScheduleSnapshot(request.providerId, normalized);
+      } else {
+        await applySchedulePayload(
+          request.providerId,
+          request.payloadJson as unknown as SchedulePayload,
+        );
+      }
+    } catch (error) {
+      const inner = error instanceof AppError ? error : toAppError(error);
+      if (inner.status === 400 && inner.code === "INVALID_BODY") {
+        throw new AppError(
+          "Не удалось применить расписание: данные запроса повреждены или устарели. Попросите мастера отправить заявку заново.",
+          422,
+          "INVALID_REQUEST_PAYLOAD",
+        );
+      }
+      throw inner;
     }
 
     await prisma.scheduleChangeRequest.update({
