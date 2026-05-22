@@ -1148,6 +1148,42 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-22 — STUDIO-CLIENT-WRITE-DIALOG-A** (commit on `designStudioCabinet`). **5/8 commit studio cabinet QA-волны.** Replace redirect → in-context booking dialog with client prefill + close STUDIO-RESCHEDULE-VALIDATION-A regression-gap in `createStudioBooking`. NO schema migration.
+  - **Audit findings:**
+    - **«Записать» button** in [client-row.tsx:83-90](src/features/studio-cabinet/clients/components/client-row.tsx) was a `<Link href="/cabinet/studio/calendar">` with zero context — user had to find the same client again in the calendar after redirect.
+    - **`CreateBookingDialog` (from STUDIO-BOOKINGS-FIX-A) doesn't support client prefill** — `clientName`/`clientPhone` are local state with no external seeding. **Option A — extend** chosen (DRY): single `prefilledClient?: { name; phone } | null` prop, dialog handles both anonymous + prefilled flows.
+    - **Regression-gap in `createStudioBooking`**: master-service compatibility enforced (`SERVICE_INVALID 409` at line 159-161) but **work-hours + slot conflict NOT enforced**. STUDIO-RESCHEDULE-VALIDATION-A applied all three rules to `moveStudioBooking` but the parallel create path was missed. Same data-integrity invariant — closing this is scope-extension, not scope-creep.
+    - **`loadShellExtras` was inline** in the bookings page route — needed shared form for the clients page too.
+  - **Раздел 3 (Архитектура):** 1 new helper module + 1 new client island + 1 new test file + 4 modified files:
+    - **NEW** [`shell-extras.service.ts`](src/features/studio-cabinet/schedule/server/shell-extras.service.ts) — `loadStudioCabinetShellExtras(studioId)` extracted from `cabinet/studio/bookings/page.tsx`. Single source of truth for `scheduleMasters[].serviceIds[]` + `services[].masterIds[]` master-services join. Exported types `StudioCabinetServiceOption` + `StudioCabinetShellExtras` for downstream prop typing.
+    - **NEW** [`client-book-button.tsx`](src/features/studio-cabinet/clients/components/client-book-button.tsx) — small client island per row owning its own dialog state. Replaces the `<Link>` with a `<button>` that opens `CreateBookingDialog` inline with `prefilledClient` seeded from row data.
+    - **MODIFIED** [`create-booking-dialog.tsx`](src/features/studio-cabinet/schedule/components/dialogs/create-booking-dialog.tsx) — `prefilledClient?: { name; phone } | null` prop. Initial state seeds from prop; `useEffect` reset on open re-seeds (no stale state when reopening on a different client). Fields stay **editable** (admin can correct stale phone/name without losing other picker state).
+    - **MODIFIED** [`cabinet/studio/bookings/page.tsx`](src/app/(cabinet)/cabinet/studio/bookings/page.tsx) — inline `loadShellExtras` removed; route now imports `loadStudioCabinetShellExtras` instead.
+    - **MODIFIED** [`cabinet/studio/clients/page.tsx`](src/app/(cabinet)/cabinet/studio/clients/page.tsx) — parallel-loads shell extras alongside clients data; threads `studioId` + `scheduleMasters` + `services` to `StudioClientsPage`.
+    - **MODIFIED** `studio-clients-page.tsx` + `clients-table.tsx` + `client-row.tsx` — props chained through to `ClientBookButton`.
+    - **MODIFIED** [`studio/bookings.service.ts`](src/lib/studio/bookings.service.ts) `createStudioBooking` — mirror reschedule shell: `resolveMasterWorkWindow` + `assertWithinMasterWorkHours` + inline `findMany` slot-conflict check (no self-exclusion at create time). Same `SLOT_CONFLICT 409` + `OUTSIDE_WORK_HOURS 422` codes as `moveStudioBooking`.
+    - **NEW** [`create-booking-enforcement.test.ts`](src/lib/studio/create-booking-enforcement.test.ts) — 7 unit tests pinning rule-reuse between create + reschedule paths (same error codes, boundary semantics, inactive-day rejection) + prefilled-client display rules (seed name/phone, null=blank, empty-phone tolerance).
+  - **Раздел 5 (Бизнес-логика):**
+    - **«Записать» now opens dialog in-context** — admin stays on client page; name + phone pre-filled; admin picks time + service + master + submits → confirmation → dialog closes.
+    - **Create + reschedule share identical enforcement rules.** Master-service compatibility + work hours + slot conflicts apply to both paths via the same `policy-enforcement.ts` helpers + shared `resolveMasterWorkWindow` resolver.
+    - **`loadStudioCabinetShellExtras` is now the canonical helper** for any studio cabinet surface that needs to open `CreateBookingDialog` (bookings page + clients page today, future surfaces by symmetry).
+  - **Раздел 6 (Маршруты):** `POST /api/studio/bookings` semantics extended with the two new gates (closes regression-gap). No new endpoints. `/cabinet/studio/clients` route now parallel-loads shell-extras.
+  - **Раздел 8 (Проблемы):** #6 (client write redirect) closed via single dialog extension + button island. Regression-gap in `createStudioBooking` closed alongside.
+  - **Раздел 12 (Инварианты):** не затронуты formally, but **invariant extended in practice**: «studio booking mutation (create OR reschedule) enforces master-service compatibility + work-hours boundary + slot-conflict-free». A 3rd booking-mutation endpoint (if ever added) should reuse the same helpers — could be formalized in a future commit when N=3.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **502/502 tests** ✅ (was 495; +7), `npm run build` ✅.
+  - **What was NOT changed (per strict constraints):**
+    - Schema (no migration)
+    - `createBooking` core + flow.ts state-machine (untouched)
+    - MASTER manual-booking-modal (reference only, not modified)
+    - MASTER-BOOKING-UI primitives (PromptModal / FormDialog) — reused, not modified
+    - STUDIO-APPROVE / RESCHEDULE / MASTERS-PRIVACY / BOOKINGS — reused without modification
+    - `CreateBookingDialog` standalone path (anonymous + header-button flows preserved by existing 11 STUDIO-BOOKINGS-FIX-A tests)
+    - Calendar page (no longer redirect target, but navigation works)
+    - Other studio cabinet bugs (#6 cleanup / #7 sort / #8 settings)
+    - Master cabinet 91 + studio #1-#4 57 regression tests
+  - **Pre-launch risks (новых не обнаружено):** the regression-gap discovery is a useful process insight — when adding policy enforcement, audit ALL parallel paths (create + reschedule + cancel + reassign) for the same rules, not just the path the original ticket described. Backlog'able: «booking mutation policy reuse audit when a 3rd mutation endpoint is added».
+  - **Open questions for user:** нет — Option A unambiguously fit (extension < fork), regression-gap closure is well-defined consistency work, prefilled fields are editable (no UX trade-off to resolve). Remaining 3 studio cabinet QA fixes (#6 cleanup, #7 services sort, #8 schedule settings large) await separate prompts.
+
 - **2026-05-22 — STUDIO-BOOKINGS-FIX-A** (commit on `designStudioCabinet`). **4/8 commit studio cabinet QA-волны.** 3 связанные studio bookings surface bugs (#3а UI inherited, #3б new-booking button broken, #3в phone validation). 1 of 3 audit-zero-code — 12th case across both waves. NO schema migration. NO backend changes.
   - **Audit findings:**
     - **#3а UI inherited — AUDIT-ZERO-CODE (12th case)**. Studio bookings table reuses `BookingActionMenu` from `schedule/components/dialogs/` (per import on [booking-row.tsx:13](src/features/studio-cabinet/bookings/components/booking-row.tsx)). That shared menu uses `ModalSurface` throughout, no `window.confirm`/`window.prompt`, and exposes a fundamentally studio-admin-driven action set: Move / Move time / Details / Cancel. **Different action surface from master cabinet** (where the state machine has confirm/decline as initiator-vs-awaited side per invariant #22 / `actionRequiredBy` semantics). Studio admin acts directly — no two-sided pending state, so no role-aware UI needed. The problems MASTER-BOOKING-UI-FIX-A fixed (initiator-aware visibility + ModalSurface-vs-confirm) don't apply to the studio action surface model.

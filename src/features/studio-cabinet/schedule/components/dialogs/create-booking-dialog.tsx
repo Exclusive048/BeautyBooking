@@ -29,6 +29,15 @@ type Props = {
   services: ServiceOption[];
   open: boolean;
   onClose: () => void;
+  /**
+   * STUDIO-CLIENT-WRITE-DIALOG-A: seed client name + phone from a
+   * known client record (studio cabinet «Записать» button). Fields
+   * remain editable — admin can correct a stale phone or name typo
+   * without losing the rest of the picker state. Default null =
+   * anonymous-create flow (existing calendar empty-slot + header
+   * «Новая запись» behaviours).
+   */
+  prefilledClient?: { name: string; phone: string } | null;
 };
 
 function formatTimeLocal(iso: string): string {
@@ -76,10 +85,11 @@ export function CreateBookingDialog({
   services,
   open,
   onClose,
+  prefilledClient = null,
 }: Props) {
   const router = useRouter();
-  const [clientName, setClientName] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
+  const [clientName, setClientName] = useState(prefilledClient?.name ?? "");
+  const [clientPhone, setClientPhone] = useState(prefilledClient?.phone ?? "");
   const [serviceId, setServiceId] = useState("");
   const [selectedMasterId, setSelectedMasterId] = useState(masterId ?? "");
   // STUDIO-BOOKINGS-FIX-A #3б: when the dialog opens via the «Новая
@@ -102,13 +112,17 @@ export function CreateBookingDialog({
 
   useEffect(() => {
     if (!open) return;
-    setClientName("");
-    setClientPhone("");
+    // STUDIO-CLIENT-WRITE-DIALOG-A: when the dialog opens from the
+    // «Записать» button on a client row, seed name + phone from the
+    // known record. Other entry points (calendar empty-slot / header
+    // button) pass `prefilledClient: null` and reset to blank.
+    setClientName(prefilledClient?.name ?? "");
+    setClientPhone(prefilledClient?.phone ?? "");
     setServiceId("");
     setSelectedMasterId(masterId ?? "");
     setStartAtLocal(startAtUtc ? utcIsoToLocalInput(startAtUtc) : "");
     setError(null);
-  }, [open, masterId, startAtUtc]);
+  }, [open, masterId, startAtUtc, prefilledClient]);
 
   const availableServices = useMemo(() => {
     if (!selectedMasterId) return services;

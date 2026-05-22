@@ -1,4 +1,8 @@
 import { Users } from "lucide-react";
+import type {
+  StudioCabinetServiceOption,
+  StudioCabinetShellExtras,
+} from "@/features/studio-cabinet/schedule/server/shell-extras.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioClientRow } from "../lib/types";
 import { ClientTableRow } from "./client-row";
@@ -7,9 +11,14 @@ const T = UI_TEXT.studioCabinet.clientsV2;
 
 type Props = {
   rows: StudioClientRow[];
+  /** STUDIO-CLIENT-WRITE-DIALOG-A: passed through to each row's
+   *  «Записать» button island so the dialog can render in-context. */
+  studioId: string;
+  scheduleMasters: StudioCabinetShellExtras["scheduleMasters"];
+  services: StudioCabinetServiceOption[];
 };
 
-export function ClientsTable({ rows }: Props) {
+export function ClientsTable({ rows, studioId, scheduleMasters, services }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle bg-bg-card p-10 text-center">
@@ -35,7 +44,13 @@ export function ClientsTable({ rows }: Props) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <ClientTableRow key={row.key} row={row} />
+            <ClientTableRow
+              key={row.key}
+              row={row}
+              studioId={studioId}
+              scheduleMasters={scheduleMasters}
+              services={services}
+            />
           ))}
         </tbody>
       </table>

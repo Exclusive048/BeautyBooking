@@ -1,15 +1,28 @@
-import Link from "next/link";
-import { CalendarPlus } from "lucide-react";
 import { FocalImage } from "@/components/ui/focal-image";
+import type {
+  StudioCabinetServiceOption,
+  StudioCabinetShellExtras,
+} from "@/features/studio-cabinet/schedule/server/shell-extras.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioClientRow } from "../lib/types";
 import { formatDaysAgo, initialsOf } from "../lib/format";
+import { ClientBookButton } from "./client-book-button";
 import { ClientSegmentBadge } from "./client-segment-badge";
 
 const T = UI_TEXT.studioCabinet.clientsV2;
 
-export function ClientTableRow({ row }: { row: StudioClientRow }) {
+type RowProps = {
+  row: StudioClientRow;
+  /** STUDIO-CLIENT-WRITE-DIALOG-A: shell-extras drive the dialog
+   *  opened by the row's «Записать» button (was a redirect-to-
+   *  calendar Link pre-fix). */
+  studioId: string;
+  scheduleMasters: StudioCabinetShellExtras["scheduleMasters"];
+  services: StudioCabinetServiceOption[];
+};
+
+export function ClientTableRow({ row, studioId, scheduleMasters, services }: RowProps) {
   return (
     <tr className="border-t border-border-subtle hover:bg-bg-input/30">
       <td className="px-3 py-3 align-top">
@@ -80,14 +93,16 @@ export function ClientTableRow({ row }: { row: StudioClientRow }) {
         )}
       </td>
       <td className="px-2 py-3 align-top">
-        <Link
-          href="/cabinet/studio/calendar"
-          className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
-          aria-label={T.actions.book}
-          title={T.actions.book}
-        >
-          <CalendarPlus className="h-4 w-4" aria-hidden />
-        </Link>
+        {/* STUDIO-CLIENT-WRITE-DIALOG-A: in-context dialog
+            (CreateBookingDialog with prefilled client name + phone)
+            replaces the previous `<Link href="/cabinet/studio/calendar">`
+            that lost the client context completely. */}
+        <ClientBookButton
+          studioId={studioId}
+          client={{ name: row.displayName, phone: row.phone ?? "" }}
+          masters={scheduleMasters}
+          services={services}
+        />
       </td>
     </tr>
   );

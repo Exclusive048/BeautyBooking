@@ -164,6 +164,67 @@ export async function createStudioBooking(input: {
   const price = override.priceOverride ?? service.basePrice ?? service.price;
   const endAt = new Date(input.startAt.getTime() + durationMin * 60 * 1000);
 
+  // STUDIO-CLIENT-WRITE-DIALOG-A — close the regression-gap from
+  // STUDIO-RESCHEDULE-VALIDATION-A: `moveStudioBooking` enforces work
+  // hours + slot conflict; `createStudioBooking` had neither. The
+  // master-service compatibility was already checked above; the two
+  // remaining rules apply identically to create-time.
+  //
+  //   #1в work-hours: new local time must fit master's window for
+  //                   the booking weekday (per-date override > weekly
+  //                   config > project defaults).
+  //   #1б conflict:   no overlap with another active booking on the
+  //                   target master (buffer-aware).
+  //
+  // Mirrors the reschedule shell — same `resolveMasterWorkWindow`
+  // resolver + `assertWithinMasterWorkHours` predicate + inline
+  // findMany conflict check (no self-exclusion needed at create
+  // time — booking doesn't exist yet).
+  const workWindow = await resolveMasterWorkWindow(master.id, input.startAt);
+  const startMinutesLocal =
+    input.startAt.getUTCHours() * 60 + input.startAt.getUTCMinutes();
+  const endMinutesLocal = startMinutesLocal + durationMin;
+  assertWithinMasterWorkHours({
+    bookingStartMinutes: startMinutesLocal,
+    bookingEndMinutes: endMinutesLocal,
+    window: workWindow,
+  });
+
+  // `requireActiveStudioMaster` only returns ownership/published flags;
+  // the buffer column lives on the provider row directly.
+  const masterRow = await prisma.provider.findUnique({
+    where: { id: master.id },
+    select: { bufferBetweenBookingsMin: true },
+  });
+  const buffer = normalizeBufferMinutes(masterRow?.bufferBetweenBookingsMin);
+  const conflicts = await prisma.booking.findMany({
+    where: {
+      providerId: studio.providerId,
+      masterProviderId: master.id,
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+      startAtUtc: { not: null },
+      endAtUtc: { not: null },
+    },
+    select: { startAtUtc: true, endAtUtc: true },
+  });
+  const hasConflict = conflicts.some((row) => {
+    if (!row.startAtUtc || !row.endAtUtc) return false;
+    const itemStart = buffer
+      ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
+      : row.startAtUtc;
+    const itemEnd = buffer
+      ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
+      : row.endAtUtc;
+    return input.startAt < itemEnd && endAt > itemStart;
+  });
+  if (hasConflict) {
+    throw new AppError(
+      "Окошко уже занято у выбранного мастера. Выберите другое время.",
+      409,
+      "SLOT_CONFLICT",
+    );
+  }
+
   const created = await prisma.$transaction(async (tx) => {
     const booking = await tx.booking.create({
       data: {
