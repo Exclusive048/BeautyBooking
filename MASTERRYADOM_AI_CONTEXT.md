@@ -1148,6 +1148,37 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-22 — STUDIO-BOOKINGS-FIX-A** (commit on `designStudioCabinet`). **4/8 commit studio cabinet QA-волны.** 3 связанные studio bookings surface bugs (#3а UI inherited, #3б new-booking button broken, #3в phone validation). 1 of 3 audit-zero-code — 12th case across both waves. NO schema migration. NO backend changes.
+  - **Audit findings:**
+    - **#3а UI inherited — AUDIT-ZERO-CODE (12th case)**. Studio bookings table reuses `BookingActionMenu` from `schedule/components/dialogs/` (per import on [booking-row.tsx:13](src/features/studio-cabinet/bookings/components/booking-row.tsx)). That shared menu uses `ModalSurface` throughout, no `window.confirm`/`window.prompt`, and exposes a fundamentally studio-admin-driven action set: Move / Move time / Details / Cancel. **Different action surface from master cabinet** (where the state machine has confirm/decline as initiator-vs-awaited side per invariant #22 / `actionRequiredBy` semantics). Studio admin acts directly — no two-sided pending state, so no role-aware UI needed. The problems MASTER-BOOKING-UI-FIX-A fixed (initiator-aware visibility + ModalSurface-vs-confirm) don't apply to the studio action surface model.
+    - **#3б root cause**: «Новая запись» header button ([bookings-header.tsx:44](src/features/studio-cabinet/bookings/components/bookings-header.tsx)) opens `CreateBookingDialog` with `startAtUtc={null}`. The form had **no time picker** — only rendered a read-only «time card» when `startAtUtc !== null` (calendar-click flow). Header-button flow → form silently fell through to generic `E.create` error at submit. User couldn't pick time; calendar click was the only working path.
+    - **#3в** `normalizeRussianPhone` already used at submit ([create-booking-dialog.tsx:101](src/features/studio-cabinet/schedule/components/dialogs/create-booking-dialog.tsx)) — same helper auth/OTP flows use. Missing piece: **real-time UI feedback** (red border + inline hint + submit-disable while typing). Existing validation is server-side last-resort; UX was «type → submit → silent error → fix → submit again».
+    - **Smoke check other fields**: clientName has `clientNameRequired` check on submit. Service select is a dropdown (no free-text). No email field in this form. No serious gaps to backlog.
+  - **Раздел 3 (Архитектура):** 1 new test file + 2 modified files:
+    - **MODIFIED** [`create-booking-dialog.tsx`](src/features/studio-cabinet/schedule/components/dialogs/create-booking-dialog.tsx) — **#3б**: 2 new pure helpers (`utcIsoToLocalInput` / `localInputToUtcIso`) + new `startAtLocal` state. The time card swaps to `<Input type="datetime-local">` when `startAtUtc === null`. Submit reads `startAtUtc ?? localInputToUtcIso(startAtLocal)` — either flow produces a valid ISO. New explicit error `startAtRequired` instead of generic `E.create`. **#3в**: real-time validation predicate `phoneIsValid = trimmed.length === 0 || normalizeRussianPhone(trimmed) !== null` (empty = neutral, invalid-typed = red). Phone input gets `aria-invalid` + red border class when invalid + inline `<p role="alert">` with `clientPhoneInvalid` text. Submit button `disabled={!phoneIsValid}` + `title` tooltip.
+    - **MODIFIED** [`src/lib/ui/text.ts`](src/lib/ui/text.ts) — new key `studioCabinet.scheduleV2.errors.startAtRequired`.
+    - **NEW** [`create-booking-validation.test.ts`](src/features/studio-cabinet/bookings/create-booking-validation.test.ts) — 11 unit tests pinning two predicates: phone acceptance (empty/canonical/8-prefix/incomplete/garbage/formatted with separators) + effective-start resolution (pre-fill / picker / null / malformed / pre-fill-wins-over-local — the exact pre-fix bug as a regression).
+  - **Раздел 5 (Бизнес-логика):**
+    - **#3а — no behavior change.** Documented inheritance with concrete proof (import path + shared `ModalSurface`-based menu). Studio action surface is by-design admin-driven; the master state-machine semantics (`actionRequiredBy`) don't apply.
+    - **#3б — header button now functional.** Studio admin can create a booking via the header without first clicking the calendar. Calendar-click flow preserved (read-only time card renders when pre-fill present). Backend signature unchanged — both flows POST the same `startAt` ISO.
+    - **#3в — defense-in-depth.** Server-side validation (was already there) + client-side immediate feedback. User no longer waits for the round-trip to discover an invalid phone.
+  - **Раздел 6 (Маршруты):** не затронуты. `POST /api/studio/bookings` contract unchanged.
+  - **Раздел 8 (Проблемы):** #3а / #3б / #3в closed via single dialog file.
+  - **Раздел 12 (Инварианты):** не затронуты. The studio-admin-direct-action invariant (#22) is reaffirmed by #3а's no-action outcome — confirms the role-action separation has no leak into studio surface.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **495/495 tests** ✅ (was 484; +11), `npm run build` ✅.
+  - **What was NOT changed (per strict constraints):**
+    - Schema (no migration)
+    - `createBooking` backend (UI fix only — both new picker + real-time validation feed existing API)
+    - flow.ts state-machine (32 tests untouched)
+    - `BookingActionMenu` shared primitive (would be cross-cabinet modification — out of scope)
+    - MASTER-BOOKING-UI-FIX-A primitives (PromptModal / role-aware DTOs / FormDialog) — confirmed not needed for studio, untouched
+    - STUDIO-APPROVE-400 / STUDIO-RESCHEDULE-VALIDATION / STUDIO-MASTERS-PRIVACY (separate surfaces)
+    - `normalizeRussianPhone` (reused, not modified)
+    - Master cabinet 91 + studio #1-#3 35 regression tests (all pass)
+    - Booking widget / catalog / client cabinet
+  - **Pre-launch risks (новых не обнаружено):** smoke check of other form fields found no serious validation gaps. Phone real-time pattern (red border + inline hint + submit-disable) is reusable — could be templated into a shared `<PhoneInput>` primitive in the future when a second site needs it. Backlog-able.
+  - **Open questions for user:** нет — audit-driven (#3а audit-zero-code unambiguous via import graph + ModalSurface usage), #3б option (a) chosen because the header button's purpose IS standalone creation (option c would be a "this button is a shortcut" reframe that doesn't match its label), #3в reuse-only (no new helper). Remaining 4 studio cabinet QA fixes (#5 client write / #6 cleanup / #7 services sort / #8 schedule settings large) await separate prompts.
+
 - **2026-05-22 — STUDIO-MASTERS-PRIVACY-FIX-A** (commit on `designStudioCabinet`). **3/8 commit studio cabinet QA-волны.** Third application of the HMAC opaque-URL pattern (after CHAT-FOUNDATION attachment + MASTER-CLIENTS-FIX-A history-filter). Closes dual privacy + functional bug on studio cabinet master deep-links. NO schema migration.
   - **Audit findings:**
     - **2 URL leak sites**: «Расписание мастера» button ([master-detail-header.tsx:105](src/features/studio-cabinet/masters/components/master-detail-header.tsx)) + «В календарь» link ([master-detail-week-schedule.tsx:25](src/features/studio-cabinet/masters/components/master-detail-week-schedule.tsx)) both used `?masterId=${detail.id}` — raw prisma cuid in URL bar.

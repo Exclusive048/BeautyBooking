@@ -6054,6 +6054,11 @@ export const UI_TEXT = {
         clientNameRequired: "Укажите имя клиента.",
         clientPhoneRequired: "Укажите телефон клиента.",
         clientPhoneInvalid: "Некорректный номер телефона.",
+        // STUDIO-BOOKINGS-FIX-A #3б: explicit error when the header
+        // «Новая запись» button is used but the studio admin didn't
+        // pick a time. Pre-fix the form fell back to generic «create»
+        // — confusing because there was nothing visible to fix.
+        startAtRequired: "Укажите дату и время записи.",
         breakMasterRequired: "Выберите мастера для перерыва.",
         breakTimeRange: "Время окончания должно быть позже начала.",
         breakCreate: "Не удалось создать перерыв. Попробуйте ещё раз.",
