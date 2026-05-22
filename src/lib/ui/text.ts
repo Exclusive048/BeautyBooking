@@ -6097,6 +6097,12 @@ export const UI_TEXT = {
         empty: "Создайте первую категорию",
         pendingBadge: "PENDING",
         pendingHint: "Категория на модерации — видна только вам, пока админ не одобрит",
+        // STUDIO-SERVICES-SORT-A: «Скрыть пустые» toggle label +
+        // actionable hint when every category is hidden by the
+        // filter (admin can switch off, or add services).
+        hideEmptyLabel: "Скрыть пустые",
+        allEmptyHint:
+          "Все категории пустые. Отключите фильтр или добавьте услуги.",
       },
       list: {
         searchPlaceholder: "Поиск услуги",

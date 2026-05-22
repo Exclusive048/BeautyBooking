@@ -1148,6 +1148,36 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-22 — STUDIO-SERVICES-SORT-A** (commit on `designStudioCabinet`). **7/8 commit studio cabinet QA-волны.** Narrow UI fix on services page — sort categories by services count desc + toggle «Скрыть пустые». NO schema migration.
+  - **Audit findings:**
+    - **Current sort** in `buildCategoriesSidebar` was «APPROVED first then PENDING, alphabetical within each tier». PENDING tier is already visually surfaced via amber badge → tier ordering was redundant primary signal.
+    - **`Switch` primitive exists** at [src/components/ui/switch.tsx](src/components/ui/switch.tsx) — `size="sm"` + `checked`/`onCheckedChange` API; reused as-is.
+    - **`CategoriesSidebar`** is already a client component; adding one `useState` is consistent.
+  - **Раздел 3 (Архитектура):** 1 new test file + 3 modified files:
+    - **MODIFIED** [`services-data.service.ts`](src/features/studio-cabinet/services/server/services-data.service.ts) `buildCategoriesSidebar` — replaced tier-comparator with `b.servicesCount - a.servicesCount` primary + `localeCompare(..., "ru")` secondary. Empty categories naturally land at the bottom. Uncategorized bucket still appended after the sorted list (preserves positioning).
+    - **MODIFIED** [`categories-sidebar.tsx`](src/features/studio-cabinet/services/components/categories-sidebar.tsx) — new `hideEmpty: boolean` component state (default `false`); `useMemo` derives `visibleCategories`; `<Switch size="sm">` rendered in a label row between header and list. Conditional render: toggle hidden when no categories at all; separate empty-state hint when filter is on + every category has 0 services.
+    - **MODIFIED** [`src/lib/ui/text.ts`](src/lib/ui/text.ts) — 2 new keys under `studioCabinet.servicesV2.categories.*`: `hideEmptyLabel` + `allEmptyHint` (actionable «Отключите фильтр или добавьте услуги»).
+    - **NEW** [`categories-sort.test.ts`](src/features/studio-cabinet/services/categories-sort.test.ts) — 11 unit tests: sort comparator (count desc, alpha secondary, stability, no in-place mutation, preserved when presorted) + filter predicate (off=all, on=non-empty, compose with sort, all-empty edge case, no mutation).
+  - **Раздел 5 (Бизнес-логика):**
+    - **Most-populated categories surface first** — primary count-desc ordering matches the user's product instinct «больше услуг → выше в списке».
+    - **Stable alphabetical secondary** — predictable order when counts tie (no flickering on re-sort).
+    - **Hide-empty default off** — first visit shows full taxonomy including empty buckets (admin can see what's missing). Toggle off the noise when working with the populated subset.
+    - **Edge cases handled gracefully** — no categories → toggle hidden; all empty + filter on → actionable hint instead of blank box.
+  - **Раздел 6 (Маршруты):** не затронуты.
+  - **Раздел 8 (Проблемы):** #5 closed.
+  - **Раздел 12 (Инварианты):** не затронуты.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **512/512 tests** ✅ (was 502; +10), `npm run build` ✅.
+  - **What was NOT changed (per strict constraints):**
+    - Schema (no migration)
+    - Categories model + ServiceCategory / GlobalCategory queries
+    - Services CRUD (create/edit/delete)
+    - STUDIO-APPROVE / RESCHEDULE / MASTERS-PRIVACY / BOOKINGS / CLIENT-WRITE / CLEANUP — separate surfaces
+    - Master cabinet 91 + studio #1-#6 64 regression tests (all pass)
+    - Public services / booking widget services dropdown — independent data paths
+    - Search/filter functionality (none existed; toggle composes with sort cleanly if search lands later)
+  - **Pre-launch risks (новых не обнаружено):** narrow UI fix; pattern reusable elsewhere if «hide empty» concept comes up for masters list / clients list / etc.
+  - **Open questions for user:** нет — sort approach unambiguous (count desc + alpha secondary), toggle default off matches the «show me everything first» discovery expectation, state management minimal (component-state). Remaining 1 studio cabinet QA fix — **#8 STUDIO-SCHEDULE-SETTINGS-A БОЛЬШАЯ фича (port master schedule/settings 5 tabs)** — awaits its own prompt.
+
 - **2026-05-22 — STUDIO-CLEANUP-FIX-A** (commit on `designStudioCabinet`). **6/8 commit studio cabinet QA-волны.** 3 independent cleanups of misleading/broken UI elements. NO schema migration. NO new tests (cleanup-only).
   - **Audit findings:**
     - **#4а «Написать» button** at [master-detail-header.tsx:127-133](src/features/studio-cabinet/masters/components/master-detail-header.tsx) — `<Link href="/cabinet/(user)/messages?with=${userId}">` pointing at the client-cabinet messages page. Studio admin isn't a chat participant (invariant #26: chat ACL = client↔master, 152-ФЗ privacy) → destination page rendered empty. Per user's start-of-wave decision: remove button, defer feature to backlog.
