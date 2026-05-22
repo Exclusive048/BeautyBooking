@@ -5590,6 +5590,11 @@ export const UI_TEXT = {
         reviews: "Отзывы",
         notifications: "Уведомления",
         analytics: "Аналитика",
+        // STUDIO-CLEANUP-FIX-A #9: `publicPage` sidebar label kept
+        // for backwards-compat (other consumers may reference it) but
+        // its sidebar entry was removed — the page was a misleading
+        // `redirect("/cabinet/studio/settings")`. `publicPageExternal`
+        // remains in active use for the «Open studio page» link.
         publicPage: "Публичная страница",
         publicPageExternal: "Открыть страницу студии",
         settings: "Настройки",
@@ -5991,7 +5996,8 @@ export const UI_TEXT = {
       },
       actions: {
         menuTitle: "Действия с записью",
-        details: "Детали записи",
+        // STUDIO-CLEANUP-FIX-A #1г: `details` key removed alongside
+        // the «Детали записи» Button it labelled (was a pure no-op).
         moveToMaster: "Перенести на другого мастера",
         moveTime: "Перенести по времени",
         cancel: "Отменить запись",
@@ -6733,7 +6739,11 @@ export const UI_TEXT = {
         joinedTemplate: "в студии с {date}",
         clientsTemplate: "{count} клиентов",
         actions: {
-          message: "Написать",
+          // STUDIO-CLEANUP-FIX-A #4а: `message` key removed — the
+          // «Написать» button it labelled was a misleading Link to
+          // the client-cabinet messages page (studio admin isn't a
+          // chat participant per invariant #26). Feature deferred to
+          // backlog. Other actions preserved.
           schedule: "Расписание",
           publicProfile: "Публичный профиль",
           pause: "Поставить на паузу",

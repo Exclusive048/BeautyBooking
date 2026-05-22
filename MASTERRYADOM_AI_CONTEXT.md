@@ -1148,6 +1148,39 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-22 — STUDIO-CLEANUP-FIX-A** (commit on `designStudioCabinet`). **6/8 commit studio cabinet QA-волны.** 3 independent cleanups of misleading/broken UI elements. NO schema migration. NO new tests (cleanup-only).
+  - **Audit findings:**
+    - **#4а «Написать» button** at [master-detail-header.tsx:127-133](src/features/studio-cabinet/masters/components/master-detail-header.tsx) — `<Link href="/cabinet/(user)/messages?with=${userId}">` pointing at the client-cabinet messages page. Studio admin isn't a chat participant (invariant #26: chat ACL = client↔master, 152-ФЗ privacy) → destination page rendered empty. Per user's start-of-wave decision: remove button, defer feature to backlog.
+    - **#1г «Детали записи» button** at [booking-action-menu.tsx:84-91](src/features/studio-cabinet/schedule/components/dialogs/booking-action-menu.tsx) — pure no-op (`onClick={handleClose}` + `title={clientPhone}` browser tooltip but no dialog content). Per-booking info card above already showed all available info — button added zero value.
+    - **#9 profile page** at [`/cabinet/studio/profile/page.tsx`](src/app/(cabinet)/cabinet/studio/profile/page.tsx) — single-line `redirect("/cabinet/studio/settings?tab=main")`. Sidebar entry labelled «Публичная страница» — both label AND destination misleading (label suggests external public profile, destination is settings). Studio cabinet new feature → no bookmark-compat concern → full removal preferred.
+  - **Раздел 3 (Архитектура):** 4 modified files + 1 file deleted + 1 empty parent dir removed:
+    - **MODIFIED** [`master-detail-header.tsx`](src/features/studio-cabinet/masters/components/master-detail-header.tsx) — removed Link block, removed `MessageCircle` lucide import, replaced with explanatory comment citing invariant #26 + backlog reference.
+    - **MODIFIED** [`booking-action-menu.tsx`](src/features/studio-cabinet/schedule/components/dialogs/booking-action-menu.tsx) — removed Button block, removed `Info` lucide import, replaced with explanatory comment.
+    - **DELETED** [`src/app/(cabinet)/cabinet/studio/profile/page.tsx`](src/app/(cabinet)/cabinet/studio/profile/page.tsx) + empty parent dir.
+    - **MODIFIED** [`studio-nav.ts`](src/features/studio-cabinet/config/studio-nav.ts) — removed `"publicPage"` from `StudioNavItemLabelKey` union, removed sidebar entry from `studio-meta` group, removed orphan `Eye` lucide import.
+    - **MODIFIED** [`src/lib/ui/text.ts`](src/lib/ui/text.ts) — removed `mastersV2.detail.actions.message` key, removed `scheduleV2.actions.details` key. Kept `nav.items.publicPage` for backwards-compat (used by `auth-mobile-menu`, `auth-user-menu` etc) with explanatory comment.
+  - **Раздел 5 (Бизнес-логика):**
+    - **3 misleading UI elements removed** — UX honesty wins. Users no longer click buttons that route nowhere useful.
+    - **Settings is now the single entry from studio-meta sidebar group** — clean, predictable navigation.
+    - **No business logic changes** — pure UI cleanup. Backend chat/schedule/booking flows unchanged.
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/profile` route removed (was just a redirect). No new routes. Existing redirects elsewhere unaffected.
+  - **Раздел 8 (Проблемы):** #4а / #1г / #9 closed.
+  - **Раздел 10 (Безопасность):** **Invariant #26 strengthened in practice** — the «Написать» button was a UX implication that studio admin could chat with masters; removing it aligns surface with the by-design denial. No actual ACL changes (ACL was already correct; UI was misleading).
+  - **Раздел 12 (Инварианты):** **#26 not modified formally**, **strengthened through alignment of UI with backend semantics**.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **502/502 tests** ✅ (no orphan tests removed — none of the 3 features had dedicated test coverage; CHAT-FOUNDATION tests cover unchanged chat infra), `npm run build` ✅.
+  - **What was NOT changed (per strict constraints):**
+    - Schema (no migration)
+    - CHAT-FOUNDATION (SSE/receipts/sendConversationMessage) — untouched, chat infra preserved verbatim
+    - Invariant #26 — strengthened through UI alignment, not weakened
+    - STUDIO-APPROVE / RESCHEDULE / MASTERS-PRIVACY / BOOKINGS / CLIENT-WRITE patterns — untouched
+    - `CreateBookingDialog` / `policy-enforcement.ts` / HMAC token helpers — untouched
+    - Master cabinet 91 + studio #1-#5 64 regression tests — all pass
+    - Sidebar / navigation consistency (studio-meta still renders «Settings»; layout intact)
+    - Other studio cabinet bugs (#7 services sort / #8 schedule settings large — carryover)
+    - Booking widget / catalog / auth / client cabinet
+  - **Pre-launch risks (новых не обнаружено):** the discovery pattern (button promises feature, points elsewhere) is worth a process note — **when adding a UI element claim, audit its destination matches the claim**. Backlog entries with explicit activation conditions for both deferred features (studio-admin chat + public-page sidebar entry).
+  - **Open questions for user:** нет — all 3 cleanups had unambiguous removal cases (per user's start-of-wave decision for #4а, pure noop for #1г, misleading both-ends for #9). Remaining 2 studio cabinet QA fixes (#7 services sort, #8 schedule settings large) await separate prompts.
+
 - **2026-05-22 — STUDIO-CLIENT-WRITE-DIALOG-A** (commit on `designStudioCabinet`). **5/8 commit studio cabinet QA-волны.** Replace redirect → in-context booking dialog with client prefill + close STUDIO-RESCHEDULE-VALIDATION-A regression-gap in `createStudioBooking`. NO schema migration.
   - **Audit findings:**
     - **«Записать» button** in [client-row.tsx:83-90](src/features/studio-cabinet/clients/components/client-row.tsx) was a `<Link href="/cabinet/studio/calendar">` with zero context — user had to find the same client again in the calendar after redirect.

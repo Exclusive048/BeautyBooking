@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRightLeft, Clock, Info, X } from "lucide-react";
+import { ArrowRightLeft, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -81,14 +81,14 @@ export function BookingActionMenu({
                 <Clock className="h-3.5 w-3.5" aria-hidden />
                 {T.actions.moveTime}
               </Button>
-              <Button
-                variant="ghost"
-                onClick={handleClose}
-                title={booking.clientPhone ?? undefined}
-              >
-                <Info className="h-3.5 w-3.5" aria-hidden />
-                {T.actions.details}
-              </Button>
+              {/* STUDIO-CLEANUP-FIX-A #1г: «Детали записи» Button
+                  removed. It was a pure no-op (`onClick={handleClose}`
+                  + clientPhone in browser tooltip but no dialog
+                  content) — user complained it was «пустышка». The
+                  per-booking info card above already shows client,
+                  service, time, and price, so the button added zero
+                  value. If a richer detail view is needed later,
+                  it's a separate feature. */}
               <Button variant="danger" onClick={() => setCancelOpen(true)}>
                 <X className="h-3.5 w-3.5" aria-hidden />
                 {T.actions.cancel}

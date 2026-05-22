@@ -3,7 +3,6 @@ import {
   Bell,
   CalendarClock,
   CalendarDays,
-  Eye,
   Home,
   ListChecks,
   Scissors,
@@ -41,7 +40,6 @@ export type StudioNavItem = {
     | "reviews"
     | "notifications"
     | "analytics"
-    | "publicPage"
     | "settings";
   icon: LucideIcon;
   badgeKey?: StudioNavBadgeKey;
@@ -157,12 +155,14 @@ export const STUDIO_NAV: StudioNavGroup[] = [
     id: "studio-meta",
     labelKey: "studioMeta",
     items: [
-      {
-        id: "public-page",
-        href: "/cabinet/studio/profile",
-        labelKey: "publicPage",
-        icon: Eye,
-      },
+      // STUDIO-CLEANUP-FIX-A #9: «Публичная страница» entry removed.
+      // It linked to `/cabinet/studio/profile` which was just a
+      // `redirect("/cabinet/studio/settings?tab=main")` — sidebar
+      // label promised a public profile view but routed to settings,
+      // making both the label and the destination misleading. Page
+      // file deleted alongside this entry. A real public-page entry
+      // (pointing at the studio's external `/u/<publicUsername>`
+      // profile) is parked in backlog as a future feature.
       {
         id: "settings",
         href: "/cabinet/studio/settings",
