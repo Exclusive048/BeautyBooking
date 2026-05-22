@@ -32,6 +32,7 @@ export type StudioNavItem = {
   labelKey:
     | "dashboard"
     | "schedule"
+    | "scheduleSettings"
     | "scheduleRequests"
     | "bookings"
     | "masters"
@@ -86,6 +87,15 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         labelKey: "scheduleRequests",
         icon: CalendarClock,
         badgeKey: "scheduleRequestsPending",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase A: schedule-settings entry —
+      // Phase A surfaces Hours + Rules tabs; Phase B adds Exceptions /
+      // Breaks / Visibility. Per-master picker inside the page.
+      {
+        id: "schedule-settings",
+        href: "/cabinet/studio/schedule/settings",
+        labelKey: "scheduleSettings",
+        icon: Settings,
       },
       {
         id: "bookings",

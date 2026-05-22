@@ -5582,6 +5582,8 @@ export const UI_TEXT = {
       items: {
         dashboard: "Главная",
         schedule: "Расписание",
+        // STUDIO-SCHEDULE-SETTINGS-A: schedule-settings sidebar label.
+        scheduleSettings: "Настройки расписания",
         scheduleRequests: "Заявки",
         bookings: "Записи",
         masters: "Мастера",
@@ -5937,6 +5939,121 @@ export const UI_TEXT = {
         },
         empty: "Нет данных за выбранный период.",
         error: "Не удалось загрузить данные. Попробуйте ещё раз.",
+      },
+    },
+    // STUDIO-SCHEDULE-SETTINGS-A Phase A — page text. Phase B will
+    // add `breaks` / `exceptions` / `visibility` subtrees alongside.
+    scheduleSettings: {
+      breadcrumb: "Настройки расписания",
+      title: "Настройки расписания",
+      studioSubtitle:
+        "Часы работы, правила бронирования и исключения — отдельно для каждого мастера студии.",
+      noMastersTitle: "Нет активных мастеров",
+      noMastersHint:
+        "Чтобы настроить расписание, добавьте хотя бы одного мастера в студию и активируйте его.",
+      tabs: {
+        hours: "Часы",
+        rules: "Правила",
+        exceptions: "Исключения",
+        breaks: "Перерывы",
+        visibility: "Видимость",
+      },
+      masterPicker: {
+        label: "Мастер",
+        hint: "Все настройки ниже применяются к выбранному мастеру.",
+      },
+      hours: {
+        workdayAriaTemplate: "Рабочий день: {day}",
+        fromLabel: "с",
+        toLabel: "до",
+        dayOffLabel: "выходной",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Расписание сохранено.",
+      },
+      rules: {
+        minHoursTitle: "Минимум за",
+        minHoursHint:
+          "Через сколько часов до записи клиенту нужно её создать (в часах).",
+        maxDaysTitle: "Максимум за",
+        maxDaysHint: "На сколько дней вперёд открыта запись.",
+        autoConfirmTitle: "Автоподтверждение",
+        autoConfirmHint:
+          "Запись подтверждается автоматически без участия мастера.",
+        freeCancelTitle: "Бесплатная отмена за",
+        freeCancelHint:
+          "За сколько часов до записи клиент может отменить без условий (в часах).",
+        freeCancelToggleAria: "Включить бесплатную отмену",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Правила сохранены.",
+      },
+      errors: {
+        save: "Не удалось сохранить. Попробуйте ещё раз.",
+        // STUDIO-SCHEDULE-SETTINGS-A Phase B — exception validation.
+        exceptionDatePast: "Дата исключения не может быть в прошлом.",
+        exceptionEndBeforeStart:
+          "Время окончания должно быть позже времени начала.",
+        exceptionDuplicateDate:
+          "Исключение на эту дату уже добавлено. Измените существующее.",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase B — Exceptions tab.
+      exceptions: {
+        emptyTitle: "Исключений пока нет",
+        emptyHint:
+          "Добавьте дату, если в этот день мастер не работает или работает по другому графику.",
+        addLabel: "Добавить исключение",
+        addFormTitle: "Новое исключение",
+        dateLabel: "Дата",
+        workdayToggle: "Мастер работает",
+        fromLabel: "с",
+        toLabel: "до",
+        noteLabel: "Заметка",
+        notePlaceholder: "Например: отпуск, особый график",
+        confirmAddLabel: "Сохранить",
+        cancelLabel: "Отмена",
+        savingLabel: "Сохраняем…",
+        savedHint: "Исключения сохранены.",
+        deleteAria: "Удалить исключение",
+        cardDayOff: "выходной",
+        cardWorkingHoursTemplate: "работа {from}–{to}",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase B — Breaks tab. Mirrors the
+      // master cabinet's «just buffer» version (the recurring-breaks
+      // editor was rolled back — single source of truth is the
+      // schedule editor itself).
+      breaks: {
+        bufferTitle: "Перерыв между записями",
+        bufferHint:
+          "Минут после каждой записи, в которые не примем следующую.",
+        minutesSuffix: "мин",
+        recurringBreaksHint:
+          "Регулярные перерывы (например, обед) задаются прямо в расписании на вкладке «Часы». Здесь — только буфер между записями.",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Настройка сохранена.",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase B — Visibility tab.
+      visibility: {
+        publishedTitle: "Виден в каталоге",
+        publishedHint:
+          "Если выключить, мастер не появится в публичном поиске и каталоге.",
+        slotPrecisionTitle: "Точность слотов",
+        slotPrecisionHint:
+          "Что видит клиент в каталоге — конкретное время / занятость дня / только даты.",
+        slotPrecisionLabels: {
+          exact: "Точное время",
+          today_free: "Сегодня свободно",
+          date_only: "Только дата",
+        },
+        visibleSlotDaysTitle: "Горизонт слотов",
+        visibleSlotDaysHint: "Сколько дней вперёд клиент видит свободные слоты.",
+        acceptNewClientsTitle: "Принимает новых клиентов",
+        acceptNewClientsHint:
+          "Если выключить, новые клиенты не смогут записаться. Существующие — смогут.",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Настройки видимости сохранены.",
       },
     },
     scheduleV2: {

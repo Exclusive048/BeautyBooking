@@ -1148,6 +1148,80 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-23 — STUDIO-SCHEDULE-SETTINGS-A-PHASE-B** (commit on `designStudioCabinet`). 🎉 **Studio cabinet QA-волны FULLY COMPLETE (8/8 Phase A + B).** All 3 remaining schedule-settings tabs (Exceptions / Breaks / Visibility) shipped in one medium prompt. NO schema migration. NO new endpoint.
+  - **Audit findings:**
+    - **Master cabinet Breaks tab = just `bufferBetweenBookingsMin`** — the «recurring breaks» editor was rolled back in master cabinet 25-FIX-A (single source of truth on `ScheduleTemplateBreak` is the schedule editor itself, not a separate Breaks tab). Studio Breaks mirrors this minimal state.
+    - **All 3 tabs use same endpoint** `/api/cabinet/master/schedule?studioId&masterId` with respective body slices (`bookingExceptions[]` / `bufferBetweenBookingsMin` / `visibility`) — `PatchBody` type already supports them per Phase A audit.
+    - **Master Exceptions tab uses modal + consecutive-day grouping**; studio simplified to flat list + inline form + per-row delete (less code, equivalent functionality).
+    - **Visibility = 4 fields** (smallest tab).
+  - **Раздел 3 (Архитектура):** 3 new tab components + body update + 1 file deleted + 1 new test file:
+    - **NEW** [`visibility-tab.tsx`](src/features/studio-cabinet/schedule-settings/components/visibility-tab.tsx) — 4 fields (isPublished Switch, slotPrecision Select with 3 labelled options, visibleSlotDays Input clamped 1-90, acceptNewClients Switch). PATCH `{ visibility }` slice.
+    - **NEW** [`breaks-tab.tsx`](src/features/studio-cabinet/schedule-settings/components/breaks-tab.tsx) — buffer minutes Input (0-120) + hint that per-day breaks are managed via schedule editor (matches master cabinet post-25-FIX-A). PATCH `{ bufferBetweenBookingsMin }` slice.
+    - **NEW** [`exceptions-tab.tsx`](src/features/studio-cabinet/schedule-settings/components/exceptions-tab.tsx) — flat list (past hidden, upcoming ascending) + inline add form (date / workday Switch / custom hours when workday / note Input) + per-row delete. Each save PATCHes full `{ bookingExceptions: [...] }` array. Validation: not-past + end>start + no-duplicate-date.
+    - **MODIFIED** [`studio-schedule-settings-body.tsx`](src/features/studio-cabinet/schedule-settings/components/studio-schedule-settings-body.tsx) — body renders 3 real tab bodies instead of `<PlaceholderTab>`. All 5 tabs (Hours / Rules / Exceptions / Breaks / Visibility) now functional.
+    - **DELETED** `placeholder-tab.tsx` — orphan after all 5 tabs went live.
+    - **MODIFIED** [`src/lib/ui/text.ts`](src/lib/ui/text.ts) — ~55 new keys (exceptions.*, breaks.*, visibility.* subtrees) + 3 new error keys; removed orphan `placeholder.*` subtree.
+    - **NEW** [`schedule-settings-phase-b.test.ts`](src/features/studio-cabinet/schedule-settings/schedule-settings-phase-b.test.ts) — 15 unit tests: Exceptions validation (PAST / END_BEFORE_START / DUPLICATE rules + upcoming-filter) + Breaks buffer clamp (negative / above-max / non-numeric → defaults) + Visibility (slot-precision allowed set + visibleSlotDays clamp).
+  - **Раздел 5 (Бизнес-логика):**
+    - **Studio admin can now configure all aspects of a master's schedule from cabinet** — Hours / Rules / Exceptions / Breaks / Visibility — without touching the master endpoint or schema. Settings are per-master; master picker gates which one is being edited.
+    - **All 5 tabs produce canonical EDITOR_V1 payload** when applicable (Hours / Exceptions go through `applyScheduleSnapshot`); Rules / Breaks / Visibility update Provider columns. Validation passes through STUDIO-APPROVE-400 normalizers (no new validation layer).
+    - **Save UX consistent across all 5 tabs** — explicit «Сохранить» button (Phase A decision; better than auto-save for studio admin's multi-master sessions).
+  - **Раздел 6 (Маршруты):** `/cabinet/studio/schedule/settings` now exposes 5 functional tabs via `?tab=hours|rules|exceptions|breaks|visibility`. **NO new API endpoint** — single endpoint serves all slices.
+  - **Раздел 8 (Проблемы):** #8 100% closed (Phase A + B complete).
+  - **Раздел 12 (Инварианты):** не затронуты. EDITOR_V1 canonical payload (STUDIO-APPROVE-400 invariant) preserved across all save paths. `isStudioMasterActive` (invariant #24) enforced upstream in master list filter.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **538/538 tests** ✅ (was 523; +15), `npm run build` ✅.
+  - **What was NOT changed:**
+    - Schema (no migration)
+    - Master cabinet schedule-settings (reference only — Breaks rolled-back state observed and mirrored)
+    - Backend endpoint + validators + helpers — all reused
+    - Phase A foundation (page / sidebar / master picker / tabs shell / Hours / Rules) — preserved end-to-end
+    - STUDIO #1-#7 fixes — preserved
+    - Master cabinet 91 + studio Phase A 85 regression tests (all pass)
+  - **Pre-launch risks (новых не обнаружено):** Studio cabinet wave is now functionally complete. Process insight: the Phase A/B split paid off — Phase A discovered the actor-mode backend reuse (collapsing scope from «new endpoint + helpers + tabs» to «UI mirrors»), Phase B leveraged that foundation for trivial tab additions (3 tabs in one medium prompt).
+  - **Open questions for user:** нет. **🎉 STUDIO CABINET QA-волны 100% COMPLETE.** Carryover workstreams (parallel, independent): (B) master cabinet re-QA, (C) client cabinet QA on showcase Елена Петрова, (D) Phase 6 hardening (SMS gateway, VAPID, monitoring, deploy), (E) sprint retrospective doc.
+
+- **2026-05-22 — STUDIO-SCHEDULE-SETTINGS-A-PHASE-A** (commit on `designStudioCabinet`). 🎉 **8/8 (финальный) commit studio cabinet QA-волны — Phase A.** Foundation + Hours + Rules tabs of «Настройки расписания» for studio cabinet. **Major audit win: backend already supports studio-admin actor mode** → Phase A is UI-only. NO new endpoint. NO schema migration.
+  - **Audit findings:**
+    - Master endpoint `/api/cabinet/master/schedule` exposes a `STUDIO_ADMIN` actor mode via `?studioId&masterId` query params (lines 250-299 in [route.ts](src/app/api/cabinet/master/schedule/route.ts)). Auth via `ensureStudioRole` + master-belongs-to-studio verification. Backend is **already studio-aware**.
+    - Master cabinet schedule-settings: 35 files, 5 tabs, `<Tabs>` primitive + `useAutoSave` debounced PATCH + `buildScheduleSnapshot` reader.
+    - Storage **per-master** (factом из схемы — no studio-level settings table). Studio admin picks which master to configure.
+    - `buildScheduleSnapshot(providerId)` works for any Provider including studio masters — reused as-is.
+    - Per spec: Phase A = Foundation + 2-3 tabs default. Phase A scope = Hours + Rules (skip Exceptions/Breaks/Visibility to Phase B).
+  - **Раздел 3 (Архитектура):** 1 new test file + 6 new files + 2 modified files:
+    - **NEW** [`src/app/(cabinet)/cabinet/studio/schedule/settings/page.tsx`](src/app/(cabinet)/cabinet/studio/schedule/settings/page.tsx) — server route. Loads active masters via `isStudioMasterActive` (invariant #24), resolves `selectedMasterId` from `?master=<cuid>` with fallback to first active, calls `buildScheduleSnapshot`, hands off to client tabs. Empty state when no active masters.
+    - **NEW** [`studio-schedule-settings-page.tsx`](src/features/studio-cabinet/schedule-settings/components/studio-schedule-settings-page.tsx) — server orchestrator: header + body OR empty-state.
+    - **NEW** [`studio-schedule-settings-body.tsx`](src/features/studio-cabinet/schedule-settings/components/studio-schedule-settings-body.tsx) — client tabs shell with `<Tabs>` primitive + URL state for `?tab=` + master picker.
+    - **NEW** [`master-picker.tsx`](src/features/studio-cabinet/schedule-settings/components/master-picker.tsx) — `<Select>`-based picker; updates `?master=<id>` URL param.
+    - **NEW** [`hours-tab.tsx`](src/features/studio-cabinet/schedule-settings/components/hours-tab.tsx) — per-day workday toggle + start/end time inputs; PATCHes `/api/cabinet/master/schedule?studioId&masterId` with `{ weekSchedule }` slice. Explicit «Сохранить» button (not auto-save — clearer intent in multi-master sessions). Mon-Sat-Sun reading order.
+    - **NEW** [`rules-tab.tsx`](src/features/studio-cabinet/schedule-settings/components/rules-tab.tsx) — Provider-level booking rules (minHoursAhead / maxDaysAhead / autoConfirm / freeCancelHours). Form with number inputs + `<Switch>`. Same endpoint with `{ bookingRules }` slice. Free-cancel has nested toggle.
+    - **NEW** [`placeholder-tab.tsx`](src/features/studio-cabinet/schedule-settings/components/placeholder-tab.tsx) — «Доступно в следующей фазе» for Exceptions / Breaks / Visibility (Phase B).
+    - **MODIFIED** [`studio-nav.ts`](src/features/studio-cabinet/config/studio-nav.ts) — new `"scheduleSettings"` labelKey in union + sidebar entry under «Студия» group between Schedule and Schedule-Requests.
+    - **MODIFIED** [`src/lib/ui/text.ts`](src/lib/ui/text.ts) — new `studioCabinet.scheduleSettings.*` subtree (~30 keys) + `nav.items.scheduleSettings`.
+    - **NEW** [`schedule-settings-foundation.test.ts`](src/features/studio-cabinet/schedule-settings/schedule-settings-foundation.test.ts) — 11 unit tests covering master picker resolution (requested-in-list / no-request / requested-not-in-list / empty-active / empty-string) + tab URL state (default / valid / typo-defence) + weekday reading-order sort.
+  - **Раздел 4 (Модель):** не затронут. Per-master storage confirmed by audit; no schema additions.
+  - **Раздел 5 (Бизнес-логика):**
+    - **Studio admin per-master settings workflow ready.** Schedule + booking rules of each master can be edited from studio cabinet in two clicks (sidebar entry → master picker → tab).
+    - **Settings produce canonical EDITOR_V1 payload** consistent with STUDIO-APPROVE-400-FIX-A (validation passes through the existing endpoint's normalizers).
+    - **Backend enforcement automatic** — `assertBookingWindow` (BOOKING-WIDGET-A) reads `Provider.minBookingHoursAhead`/`maxBookingDaysAhead` at booking time; updating these via Rules tab takes effect immediately for new bookings.
+  - **Раздел 6 (Маршруты):** new `/cabinet/studio/schedule/settings` page route. `?master=<cuid>&tab=<tabId>` URL state. **NO new API endpoint** — reuses existing `/api/cabinet/master/schedule` with studio actor mode.
+  - **Раздел 8 (Проблемы):** #8 closed (Phase A). Phase B remaining tabs in HIGH PRIORITY backlog.
+  - **Раздел 12 (Инварианты):** не затронуты. `isStudioMasterActive` (invariant #24) enforced in master list filter. EDITOR_V1 canonical payload (STUDIO-APPROVE-400-FIX-A invariant) preserved.
+  - **Validation:** typecheck ✅, lint **1/3 baseline preserved**, encoding/mojibake/prisma ✅, **523/523 tests** ✅ (was 512; +11), `npm run build` ✅.
+  - **What was NOT changed (per strict constraints):**
+    - Schema (no migration)
+    - Master cabinet schedule/settings (reference only, untouched)
+    - `policy-enforcement.ts` / `applyScheduleSnapshot` / `buildScheduleSnapshot` (reused, not modified)
+    - STUDIO-APPROVE-400 validators (#1) — reused (settings produce canonical EDITOR_V1)
+    - STUDIO-RESCHEDULE-VALIDATION-A policy helpers (#2) — reused
+    - STUDIO-MASTERS-PRIVACY HMAC tokens (#3) — separate plane
+    - STUDIO-BOOKINGS / CLIENT-WRITE / CLEANUP / SERVICES-SORT (#4-#7) — untouched
+    - flow.ts state-machine, createBooking, chat, media, booking widget, catalog — untouched
+    - Master cabinet 91 + studio #1-#7 74 regression tests (all pass)
+  - **Pre-launch risks (новых не обнаружено):** Phase A surface ready; Phase B can extend incrementally without foundation changes. **Process insight**: discovering the master endpoint's existing `STUDIO_ADMIN` actor mode collapsed Phase A scope from «new endpoint + new helpers + new tabs» to «UI mirrors only». Audit-before-duplicate paid off again.
+  - **Open questions for user:** нет. Phase A is foundation-complete; Phase B (Exceptions / Breaks / Visibility) is independent tab-by-tab work that can ship in subsequent prompts. Each tab body PATCHes the same endpoint with a different slice — no architectural blockers.
+
+  🎉 **STUDIO CABINET QA-волны COMPLETE (8/8).** Per-commit summary in BACKLOG `2026-05-22 — Studio cabinet QA волна (start)`. 165 regression tests накоплены (358 → 523 across both master and studio waves; studio alone contributed 84 tests in 8 commits). Audit-first methodology yielded 13+ audit-zero-code / scope-collapse outcomes across waves — saved estimated 40-60% of nominal work. Carryover: Phase B for schedule settings remains a multi-prompt continuation; user proceeds with QA on shipped Phase A scope first.
+
 - **2026-05-22 — STUDIO-SERVICES-SORT-A** (commit on `designStudioCabinet`). **7/8 commit studio cabinet QA-волны.** Narrow UI fix on services page — sort categories by services count desc + toggle «Скрыть пустые». NO schema migration.
   - **Audit findings:**
     - **Current sort** in `buildCategoriesSidebar` was «APPROVED first then PENDING, alphabetical within each tier». PENDING tier is already visually surfaced via amber badge → tier ordering was redundant primary signal.
