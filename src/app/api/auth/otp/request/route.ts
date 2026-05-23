@@ -7,6 +7,7 @@ import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpRequestRateLimit } from "@/lib/auth/otp-rate-limit";
 import { otpRequestSchema } from "@/lib/auth/schemas";
 import { logInfo } from "@/lib/logging/logger";
+import { sendOtpSms } from "@/lib/sms";
 
 function extractClientIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -48,12 +49,30 @@ export async function POST(req: Request) {
       },
     });
 
-    // MVP: no SMS gateway yet, keep OTP logging for local validation.
+    // SMS-GATEWAY-A: real SMS via configured provider (SMSC.ru in prod).
+    // When `SMS_PROVIDER_ENABLED=false` the factory selects the mock
+    // provider, which logs the code locally — preserving the dev workflow
+    // documented in CONTEXT P1 («OTP в логах», `MVP: no SMS gateway yet`).
     logInfo("OTP requested", {
       phone,
-      code,
       expiresAt: expiresAt.toISOString(),
     });
+
+    const smsResult = await sendOtpSms(phone, code);
+    if (!smsResult.success) {
+      // Fail-soft: provider outage never 500-s the auth route. The OTP row
+      // is already persisted, so a successful retry within 5 min re-delivers
+      // (rate-limit governs retry pacing).
+      return NextResponse.json(
+        {
+          error: "SMS_DELIVERY_FAILED",
+          reason: smsResult.error,
+          message:
+            "Не удалось отправить SMS. Попробуйте ещё раз через минуту.",
+        },
+        { status: 503 },
+      );
+    }
 
     return ok({});
   });

@@ -98,6 +98,13 @@ const envSchema = z.object({
   // Partnership inquiries from /partners. Falls back to SUPPORT_TO when unset.
   SUPPORT_TO_PARTNERSHIP: z.string().optional(),
 
+  // ── SMS provider (SMSC.ru — https://smsc.ru/api/) ─────────────────────────
+  SMS_PROVIDER_ENABLED: boolFlag,
+  SMS_PROVIDER_LOGIN: z.string().optional(),
+  SMS_PROVIDER_PASSWORD: z.string().optional(),
+  SMS_PROVIDER_SENDER: z.string().optional(),
+  SMS_LOW_BALANCE_THRESHOLD: z.coerce.number().nonnegative().default(500),
+
   // ── Monitoring ────────────────────────────────────────────────────────────
   MONITORING_TELEGRAM_BOT_TOKEN: z.string().optional(),
   MONITORING_TELEGRAM_CHAT_ID: z.string().optional(),
@@ -142,6 +149,12 @@ const refinedSchema = envSchema
   .refine(
     (e) => !e.AI_FEATURES_ENABLED || Boolean(e.OPENAI_API_KEY),
     "OPENAI_API_KEY is required when AI_FEATURES_ENABLED=true"
+  )
+  .refine(
+    (e) =>
+      !e.SMS_PROVIDER_ENABLED ||
+      (Boolean(e.SMS_PROVIDER_LOGIN) && Boolean(e.SMS_PROVIDER_PASSWORD)),
+    "SMS_PROVIDER_LOGIN and SMS_PROVIDER_PASSWORD are required when SMS_PROVIDER_ENABLED=true"
   );
 
 // ── Parse ─────────────────────────────────────────────────────────────────────
@@ -197,6 +210,19 @@ export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIE
 export const isVkNotificationsEnabled =
   String(env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED) === "true";
 export const isEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+/**
+ * SMS-GATEWAY-A: SMSC.ru provider gate. Both the toggle and the
+ * credentials must be present — otherwise the factory in `src/lib/sms`
+ * falls back to the mock provider (OTP-in-logs) so dev login keeps
+ * working without an SMS account. Set `SMS_PROVIDER_ENABLED=true` plus
+ * `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` in prod to start sending
+ * real SMS. The Zod refine above enforces the credential pair when the
+ * flag is on, so misconfiguration fails fast at startup in production.
+ */
+export const isSmsConfigured =
+  env.SMS_PROVIDER_ENABLED &&
+  Boolean(env.SMS_PROVIDER_LOGIN) &&
+  Boolean(env.SMS_PROVIDER_PASSWORD);
 export const isS3Enabled = env.STORAGE_PROVIDER === "s3";
 export const isVisualSearchEnabled = env.VISUAL_SEARCH_ENABLED;
 export const isAiFeaturesEnabled = env.AI_FEATURES_ENABLED;

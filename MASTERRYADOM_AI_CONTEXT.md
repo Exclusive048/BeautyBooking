@@ -738,11 +738,12 @@ src/
 
 ### 🔴 Критичные
 
-**P1: OTP-код пишется в логи (SMS не интегрирован)** — Сделано: НЕТ. **Pre-launch task**.
-- Файл: `src/app/api/auth/otp/request/route.ts:52-56`
-- Проблема: `logInfo("OTP requested", { phone, code, expiresAt })` — код OTP попадает в логи. Комментарий "MVP: no SMS gateway yet".
-- Риск: В production любой, кто читает логи, видит OTP-коды всех пользователей.
-- Действие: Подключить SMS-шлюз (например, SMSC, SMS.ru, SmsC.ru) и удалить `code` из логирования.
+**P1: OTP-код пишется в логи (SMS не интегрирован)** — ✅ **Сделано (SMS-GATEWAY-A 2026-05-23)**.
+- Файл: `src/app/api/auth/otp/request/route.ts` — `code` удалён из `logInfo("OTP requested", ...)`. Теперь `code` уходит в `sendOtpSms(phone, code)` → SMSC.ru при `SMS_PROVIDER_ENABLED=true`, mock-fallback (логирует локально для dev) при off.
+- Архитектура: `src/lib/sms/` — abstract `SmsProvider` interface + `createSmscProvider` (SMSC.ru HTTP) + `createMockSmsProvider` (dev) + factory `getSmsProvider()` + `sendOtpSms` helper.
+- Fail-soft: provider outage → 503 `SMS_DELIVERY_FAILED` (не 500); OtpCode row persisted → retry через rate-limit (3/5min per-phone) работает.
+- Cost+balance logged on every successful send (`messageId`, `cost`, `balanceLeft`) для retrospective monitoring.
+- **Pre-launch ops:** установить `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` в prod env, пополнить SMSC баланс, smoke-test (Beeline/MTS/Megafon RU + KZ). SMS-MONITORING-A (admin balance widget + daily low-balance cron) — отдельный 🟡 backlog.
 
 **P2: VAPID ключи использованы с `!` (non-null assertion) — crash при старте если не заданы** — Сделано: НЕТ. **Pre-launch task**.
 - Файл: `src/lib/notifications/push/vapid.ts:5-6`
@@ -1147,6 +1148,78 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — CLEANUP-BILLING-PROD-A** (commit on `QAfix1`). **Phase 6.1 item 2/6 — verification + runbook hardening only.** No code changes. Cleanup script `scripts/cleanup-duplicate-billing-plans.ts` re-audited end-to-end, FK behaviour confirmed sound, runbook extended with the prod-safety gaps. **Production execution remains user manual ops** (not closeable from this commit — done = execution-log row appended).
+  - **Audit findings (script logic):**
+    - **Cleanup target:** 6 lowercase rows (`master_free`/`master_pro`/`master_premium`/`studio_free`/`studio_pro`/`studio_premium`) from the deprecated `prisma/seed-test.sql` (BillingPlan inserts already removed in ADMIN-BILLING-FIX-A; existing rows survive in any DB that ran that seed). Canonical UPPERCASE set (`MASTER_*` / `STUDIO_*`) — preserved.
+    - **Per-plan transaction** — `prisma.$transaction(async tx => { ... }, { timeout: 10_000 })`. Order: (1) `userSubscription.updateMany` re-point `planId` lowercase → UPPERCASE; (2) `billingPlan.updateMany` re-point `inheritsFromPlanId`; (3) `billingPlan.delete` for the lowercase row. Isolation per-plan — one failure doesn't block siblings.
+    - **Idempotency** — first query is `findMany({ where: { code: in <lowercase-set> } })`. Empty result → `Nothing to clean.` + exit, no writes. Re-run after success is a no-op.
+    - **Dry-run default** — `--confirm` flag required to mutate. Dry-run prints planned migrations + attachment counts (subscriptions/prices/inheritedBy) per plan.
+    - **Short-code leftovers** (`free`/`pro`/`premium`/`studio_pro` from older `prisma/seed.sql`) — **reported but NOT auto-touched.** `scripts/migrate-billing-plans.ts` handles those in-place rename. Documented order: short-code migrate → then cleanup. Mixing rename+delete in one script would conflict with UPPERCASE-already-exists case.
+    - **Edge case handling:** if lowercase row exists but UPPERCASE counterpart missing (e.g. `seed:plans` never ran), script skips with `SKIP (UPPERCASE counterpart ... not found)` and reports the gap — no silent delete.
+  - **Audit findings (FK behaviour from `prisma/schema/billing.prisma`):**
+    - `BillingPlanPrice.planId` → `onDelete: Cascade` (line 40). Prices follow plan delete automatically. UPPERCASE counterpart keeps its own (separate row, separate prices) — no cross-contamination.
+    - `UserSubscription.planId` → `onDelete: Cascade` (line 103). **THIS IS THE FOOTGUN** — naive delete would silently drop paid subscriptions. Script correctly handles via the migrate step (1) above, *inside* the transaction so atomicity holds.
+    - `BillingPlan.inheritsFromPlanId` self-ref (line 20) — no explicit `onDelete`, defaults to Prisma `NO ACTION` (DB-level RESTRICT). Script re-points before delete, so the FK never enters the failure path.
+    - **No other FK references** to `BillingPlan.id` exist. `BillingPayment` references `UserSubscription`, not `BillingPlan` — payments follow when subscriptions are migrated.
+  - **Local dry-run attempt:** failed at first DB call with `PrismaClientInitializationError: Can't reach database server at localhost:5432` — expected, no local Postgres in dev env (known state since ADMIN-BILLING-FIX-A landed). Reached far enough to confirm args parsing + Prisma client construction + schema/types compile against the script's `tx.userSubscription.updateMany` / `tx.billingPlan.delete` calls. Runtime verification deferred to prod execution.
+  - **Раздел 3 (Архитектура):** no source code changes. Single doc edit:
+    - **MODIFIED** [`docs/runbooks/cleanup-duplicate-billing-plans.md`](docs/runbooks/cleanup-duplicate-billing-plans.md) — new top-level «Production execution checklist (Phase 6.1)» section before the existing «What is duplicated» content (preserved verbatim). Three sub-checklists: pre-execution (low-traffic window, team notification, **DB backup with snapshot/pg_dump + verify before continuing**, short-code pre-check via `migrate-billing-plans.ts`), execution (dry-run first, review counts, then `--confirm`, **read summary line `Total BillingPlan rows now: 6`**), post-verification (admin UI 6 cards, SQL spot-check active subs, sample billing flow on showcase phones, log inspection for `PrismaClientKnownRequestError`), rollback (restore backup + incident-log entry + re-audit for SKIP-no-counterpart case). New «Where to run» section: ssh-to-Compute-Instance (recommended — Node/Prisma version parity) vs local-with-prod-`DATABASE_URL` (developer workstation, after backup). New «Execution log» table at the bottom (operator/backup-id/plans-before/after/notes) for audit history. Existing «How to run» / «Idempotency» / «Short-code leftovers» / «Verification» / «Failure modes» / «Why this matters» sections preserved unchanged.
+  - **Раздел 5 (Бизнес-логика):** no business logic change. Confirms canonical billing plan code set = 6 UPPERCASE (`MASTER_FREE` / `MASTER_PRO` / `MASTER_PREMIUM` / `STUDIO_FREE` / `STUDIO_PRO` / `STUDIO_PREMIUM`) from `prisma/seeds/test-data/seed-billing-plans.ts`. Production runtime (`ensure-free-subscription.ts`, `get-current-plan.ts`, admin/billing) reads by exact UPPERCASE code — lowercase set is dead leftover.
+  - **Раздел 6 (Маршруты):** не затронуты.
+  - **Раздел 11 (Деплой):** runbook extended with concrete prod-safety steps (backup, low-traffic window, where to run, rollback). Script confirmed safe under per-plan transaction + cascade-aware delete order.
+  - **Раздел 12 (Инварианты):** не затронуты. Implicit invariant reinforced: **billing plan codes are UPPERCASE**, lowercase or short-code rows are migration artifacts to be cleaned (not data to preserve).
+  - **Validation:** typecheck ✅, lint baseline 1/3 preserved, encoding/mojibake/prisma ✅, **562/562 tests** ✅ (no source code touched — doc-only commit), `npm run build` not re-run (no source change → no build delta possible).
+  - **What was NOT changed:**
+    - Cleanup script logic — verification only, no rewrite
+    - Seed source of truth (`seed-billing-plans.ts`) — preserved
+    - Schema (NO migration — cleanup is data ops)
+    - Billing logic / admin UI / subscriptions / payments
+    - SMS-GATEWAY-A / CHAT-FOUNDATION / master + studio + redesign
+    - **NO production execution attempted** — user manual ops scope
+  - **Pre-launch risks (новых не обнаружено):** the «Cascade on UserSubscription» footgun was a real risk, but the script correctly mitigates it inside a per-plan transaction. No additional risks surfaced by this audit.
+  - **Open questions for user:**
+    - Готов выполнить production execution когда удобно — runbook `docs/runbooks/cleanup-duplicate-billing-plans.md` имеет concrete actionable checklist. Estimated 30 min including backup, dry-run review, confirm, verify, log row.
+    - Если на prod есть short-code leftovers (`free`/`pro`/`premium`/`studio_pro` из старого `seed.sql`) — запустить `scripts/migrate-billing-plans.ts` **перед** cleanup. Dry-run cleanup сам их report'нет в ℹ️ block.
+  - **Item status:** ⚠️ **Verified ready for prod execution.** NOT closed — done = execution-log row appended после успешного prod run.
+  - **Next Phase 6.1 (3 of 6 remaining after this verify):** CHAT-ATTACHMENT-MIGRATE-DEPLOY (15 min — `prisma migrate deploy`), YANDEX-DEPLOY-A (1-2 day ops+smoke), VAPID-PUSH-VERIFY (5 min env check after deploy), MRR-CRON-SCHEDULE (30 min after deploy).
+
+- **2026-05-23 — SMS-GATEWAY-A** (commit on `QAfix1`). **First Phase 6.1 implementation prompt closes CONTEXT P1 launch blocker** «OTP в логах». SMSC.ru integration replacing the `logInfo("OTP requested", { code })` stub with real SMS delivery. NO schema migration. NO modifications к OtpCode/email/notification/master/studio/redesign work.
+  - **Audit findings:**
+    - **No prior SMS work** — `src/lib/sms/` directory did not exist; built from scratch following the proven `src/lib/email/sender.ts` provider-abstraction pattern but cleaner (typed interface + factory + dev mock fallback rather than ad-hoc nodemailer wrapper)
+    - **Rate-limit per-phone already exists** — `checkOtpRequestRateLimit` in [`src/lib/auth/otp-rate-limit.ts`](src/lib/auth/otp-rate-limit.ts) enforces both per-IP (5/min) и per-phone (3/5min) via Redis. NO additions needed; preserved verbatim
+    - **OtpCode model = `{ phone, email, channel, codeHash, expiresAt }`** ([`prisma/schema/auth.prisma`](prisma/schema/auth.prisma)) — SMS provider is stateless (no schema changes needed; codeHash already in DB)
+    - **`isVkAuthEnabled`/`isPushEnabled` computed flag pattern** in env.ts:175-203 — mirrored by new `isSmsConfigured`
+  - **Раздел 3 (Архитектура):** new module `src/lib/sms/`:
+    - **NEW** [`types.ts`](src/lib/sms/types.ts) — `SmsProvider` interface (`name`, `send`, `checkBalance`) + `SmsSendResult` discriminated union + `SmsBalanceResult` + `SmsErrorCode` literal union (INVALID_PHONE / INSUFFICIENT_BALANCE / PROVIDER_UNAVAILABLE / RATE_LIMITED / AUTH_FAILED / IP_BLOCKED / MESSAGE_REJECTED / UNKNOWN)
+    - **NEW** [`smsc-provider.ts`](src/lib/sms/smsc-provider.ts) — `createSmscProvider(config)` HTTP-based impl. `buildSmscSendUrl` constructs `send.php?login=...&psw=...&phones=...&mes=...&fmt=3&charset=utf-8&cost=3`. `parseSmscSendResponse` maps SMSC error codes per https://smsc.ru/api/code/ (1/5/7→INVALID_PHONE, 2→AUTH_FAILED, 3→INSUFFICIENT_BALANCE, 4→IP_BLOCKED, 6→MESSAGE_REJECTED, 8→PROVIDER_UNAVAILABLE, 9→RATE_LIMITED). `buildSmscBalanceUrl` + `parseSmscBalanceResponse` для `checkBalance()`. Optional `sender` (registered alpha-sender). Optional `fetchImpl` injection для testability
+    - **NEW** [`mock-provider.ts`](src/lib/sms/mock-provider.ts) — `createMockSmsProvider()` returns synthetic success + logs OTP locally via `logInfo("[MOCK SMS] would deliver", { phone, message })`. Preserves pre-SMS-GATEWAY dev workflow when `SMS_PROVIDER_ENABLED=false`
+    - **NEW** [`index.ts`](src/lib/sms/index.ts) — lazy singleton factory `getSmsProvider()` selects SMSC when `isSmsConfigured`, mock otherwise. Exports `sendOtpSms(phone, code)` convenience helper + `buildOtpMessage(code)` (Russian: «Код подтверждения МастерРядом: NNNN\nНикому не сообщайте код.») + test helpers `resetSmsProvider()` / `setSmsProviderForTesting(provider)`. Logs delivery metadata (`messageId`/`cost`/`balanceLeft`) on success для retrospective monitoring
+    - **MODIFIED** [`src/lib/env.ts`](src/lib/env.ts) — 5 new fields в «SMS provider» section: `SMS_PROVIDER_ENABLED: boolFlag`, `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` (optional strings), `SMS_PROVIDER_SENDER` (optional alpha-sender override), `SMS_LOW_BALANCE_THRESHOLD` (default 500 ₽ for future SMS-MONITORING-A). New Zod refine enforces `LOGIN`+`PASSWORD` required when `SMS_PROVIDER_ENABLED=true` (misconfiguration fails fast at prod startup). New `isSmsConfigured` computed flag JSDoc-documented consistent с `isVkAuthEnabled`/`isPushEnabled` pattern
+    - **MODIFIED** [`src/app/api/auth/otp/request/route.ts`](src/app/api/auth/otp/request/route.ts) — replaced `logInfo("OTP requested", { phone, code, expiresAt })` with `logInfo("OTP requested", { phone, expiresAt })` (code removed!) followed by `await sendOtpSms(phone, code)`. Fail-soft: when `!smsResult.success` returns 503 `{ error: "SMS_DELIVERY_FAILED", reason: SmsErrorCode, message: "Не удалось отправить SMS. Попробуйте ещё раз через минуту." }` — auth route never 500-s, OtpCode row persisted so rate-limit-paced retry re-delivers
+    - **MODIFIED** [`.env.example`](.env.example) — new «SMS provider (SMSC.ru — https://smsc.ru/api/)» section с 5 vars + comments. Default `SMS_PROVIDER_ENABLED=false` preserves dev OTP-via-logs workflow
+    - **NEW tests** [`src/lib/sms/__tests__/smsc-provider.test.ts`](src/lib/sms/__tests__/smsc-provider.test.ts) (17 tests: URL builders, send/balance response parsers, error code mapping for codes 2/3/4/7/9/999, HTTP integration via mocked fetch), [`mock-provider.test.ts`](src/lib/sms/__tests__/mock-provider.test.ts) (3 tests: synthetic success / balance stub / name identifier), [`sender.test.ts`](src/lib/sms/__tests__/sender.test.ts) (4 tests: OTP message format с brand/code/safety hint, `sendOtpSms` delegation + error propagation via `setSmsProviderForTesting` injection). 538 → **562 tests** (+24)
+  - **Раздел 5 (Бизнес-логика):** OTP delivery теперь идёт через configured provider. Dev workflow (mock OTP-в-логах для seed accounts +79991000000 / +79992000000 / +79993000000 / +79994000000) preserved при `SMS_PROVIDER_ENABLED=false`. Prod workflow с SMSC: signing → SMS arrives → user enters code → existing verify flow unchanged (codeHash compare). Fail-soft architecture means SMSC outage doesn't break auth — user gets «попробуйте через минуту», rate-limit gates retry. Cost+balance logged on every send для downstream monitoring widget
+  - **Раздел 6 (Маршруты):** `/api/auth/otp/request` POST behavior changed — added 503 response code когда SMS delivery fails (previously only 200 / 400 / 429). Existing 200/400/429 paths preserved verbatim
+  - **Раздел 10 (Безопасность):** **CONTEXT P1 risk closed** — production OTP больше не leak через logs (152-ФЗ exposure removed). Rate-limit per-phone (3/5min) уже существовавший защищает от same-phone SMS spam. SMSC credentials читаются ТОЛЬКО через `env.SMS_PROVIDER_LOGIN`/`PASSWORD` (рul 11 ENV-DISCIPLINE)
+  - **Раздел 11 (Деплой):** new env vars required в prod: `SMS_PROVIDER_ENABLED=true`, `SMS_PROVIDER_LOGIN`, `SMS_PROVIDER_PASSWORD`. Optional: `SMS_PROVIDER_SENDER` (registered alpha-sender) + `SMS_LOW_BALANCE_THRESHOLD` (для future cron). Zod refine enforces credential pair at startup — startup-fail when flag on без creds
+  - **Раздел 12 (Инварианты):** не затронуты formally. Implicit invariant: «SMS provider failure NEVER 500-s `/api/auth/otp/request`» — enforced through fail-soft 503 branch. Если в будущем добавится 2nd SMS-sending site, тот же fail-soft pattern должен повторяться
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** preserved (PHASE7-CLEANUP-A baseline), encoding/mojibake/prisma ✅, **562/562 tests** ✅ (was 538; +24), `npm run build` ✅ compile successfully
+  - **What was NOT changed (per strict constraints):**
+    - OtpCode model + generation/validation (`generateOtpCode`, `hashOtpCode`) — untouched
+    - Email infrastructure (`src/lib/email/sender.ts`) — reference pattern only
+    - Notification system non-OTP paths — untouched
+    - `checkOtpRequestRateLimit` rate-limiting — preserved verbatim (already had per-phone)
+    - Master cabinet 8 fixes + studio 8 fixes (565 prior tests untouched) — all preserved
+    - CHAT-FOUNDATION / booking widget / catalog / cabinets — untouched
+    - Schema (NO migration)
+    - VAPID push (P2) / supervisor / monitoring / deploy — separate Phase 6.1 follow-up items
+  - **Pre-launch risks (новых не обнаружено):** SMSC.ru IP whitelist requirement для production accounts (если SMSC enforce'ит) — note backlog as Yandex Cloud deploy task (provision static IP + register с SMSC dashboard). NO new blockers introduced
+  - **Open questions for user:**
+    - **SMSC IP whitelist** — нужен ли в их аккаунт type'е? Может потребовать static IP при YANDEX-DEPLOY-A
+    - **`SMS_LOW_BALANCE_THRESHOLD` default 500 ₽** — sensible или другое значение для нашего expected SMS volume?
+    - **SMS-MONITORING-A timing** — deferred to separate prompt (admin balance widget + daily cron). When SMSC live в prod → priority increases
+  - **Next:** Phase 6.1 remaining items (5 of 6 — CLEANUP-BILLING-PROD-A / CHAT-ATTACHMENT-MIGRATE-DEPLOY / YANDEX-DEPLOY-A / VAPID-PUSH-VERIFY / MRR-CRON-SCHEDULE), Phase 6.2 (JWT/ADMIN-PLAN-CAPS/MIDDLEWARE-T6)
 
 - **2026-05-23 — STUDIO-SCHEDULE-SETTINGS-A-PHASE-B** (commit on `designStudioCabinet`). 🎉 **Studio cabinet QA-волны FULLY COMPLETE (8/8 Phase A + B).** All 3 remaining schedule-settings tabs (Exceptions / Breaks / Visibility) shipped in one medium prompt. NO schema migration. NO new endpoint.
   - **Audit findings:**
