@@ -94,7 +94,10 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                       <div className="truncate text-sm font-semibold">{service.name}</div>
                       <div className="mt-1 text-xs opacity-80">
                         {service.durationMin
-                          ? `${service.durationMin} мин`
+                          ? UI_TEXT.bookingWidget.serviceStep.duration.replace(
+                              "{min}",
+                              String(service.durationMin),
+                            )
                           : ""}
                         {service.durationMin && service.price > 0 ? " · " : ""}
                         {service.price > 0

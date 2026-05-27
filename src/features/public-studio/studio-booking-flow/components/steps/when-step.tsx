@@ -18,8 +18,8 @@ type DayCell = {
   isWeekend: boolean;
 };
 
-const DOW = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
-const MONTH = ["янв", "фев", "мар", "апр", "мая", "июня", "июля", "авг", "сен", "окт", "ноя", "дек"];
+const DOW = UI_TEXT.bookingWidget.whenStep.daysOfWeek;
+const MONTH = UI_TEXT.bookingWidget.whenStep.months;
 
 function buildStrip(daysAhead: number): DayCell[] {
   const out: DayCell[] = [];
