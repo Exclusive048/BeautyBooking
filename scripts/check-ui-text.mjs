@@ -7,10 +7,6 @@ const ROOTS = [
   "src/features/booking",
   "src/features/reviews",
   "src/features/media",
-  "src/features/schedule/components/schedule-builder.tsx",
-  "src/features/admin/components/admin-billing.tsx",
-  "src/features/admin/components/admin-settings.tsx",
-  "src/features/master/components/master-advisor-section.tsx",
   "src/app/(public)/u/[username]/page.tsx",
 ];
 
