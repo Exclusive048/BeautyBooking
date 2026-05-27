@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ExternalLink, MessageCircle, Pause, Play } from "lucide-react";
+import { CalendarDays, ExternalLink, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FocalImage } from "@/components/ui/focal-image";
 import { cn } from "@/lib/cn";
@@ -101,8 +101,12 @@ export function MasterDetailHeader({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* STUDIO-MASTERS-PRIVACY-FIX-A: opaque HMAC token replaces
+              the raw master cuid in the URL. Calendar route verifies
+              against the current studio scope. Same pattern as the
+              client-history token in MASTER-CLIENTS-FIX-A. */}
           <Link
-            href={`/cabinet/studio/calendar?masterId=${detail.id}`}
+            href={`/cabinet/studio/calendar?master=${encodeURIComponent(detail.viewToken)}`}
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border-subtle bg-bg-card px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input"
           >
             <CalendarDays className="h-3.5 w-3.5" aria-hidden />
@@ -119,15 +123,14 @@ export function MasterDetailHeader({
               {T.actions.publicProfile}
             </Link>
           ) : null}
-          {detail.userId ? (
-            <Link
-              href={`/cabinet/(user)/messages?with=${detail.userId}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border-subtle bg-bg-card px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input"
-            >
-              <MessageCircle className="h-3.5 w-3.5" aria-hidden />
-              {T.actions.message}
-            </Link>
-          ) : null}
+          {/* STUDIO-CLEANUP-FIX-A #4а: «Написать» button removed.
+              The Link routed to `/cabinet/(user)/messages?with=...`
+              — the client-cabinet messages page — but studio admin
+              is not a chat participant (invariant #26: chat ACL =
+              client↔master only, 152-ФЗ privacy). The thread didn't
+              exist and the page rendered empty. Studio-admin chat is
+              parked в backlog as a deferred feature requiring
+              product + legal decision on the invariant evolution. */}
           <div className="ml-auto">
             <Button
               variant={mode === "pause" ? "secondary" : "primary"}

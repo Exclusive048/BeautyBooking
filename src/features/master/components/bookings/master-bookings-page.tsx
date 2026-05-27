@@ -9,13 +9,14 @@ import {
   getMasterBookingsForKanban,
   type KanbanFilters,
 } from "@/lib/master/bookings.service";
+import { verifyClientKeyToken } from "@/lib/master/client-key-token";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
 
 type Props = {
   /** URL query already extracted by the page-level route component. */
-  searchParams: { q?: string; tab?: string };
+  searchParams: { q?: string; tab?: string; client?: string };
 };
 
 function parseTab(value: string | undefined): KanbanFilters["tab"] {
@@ -40,9 +41,18 @@ export async function MasterBookingsPage({ searchParams }: Props) {
   if (!userId) redirect("/login");
 
   const masterId = await getCurrentMasterProviderId(userId);
+  // MASTER-CLIENTS-FIX-A #7а: verify the client-history token against
+  // the current master scope. Invalid/expired/cross-master tokens fall
+  // through silently — UI then shows the full kanban with no filter
+  // (matches pre-fix behaviour) instead of erroring. The link's
+  // primary purpose is shareable-within-cabinet, not enforcement.
+  const clientKey = searchParams.client
+    ? verifyClientKeyToken({ token: searchParams.client, masterProviderId: masterId })
+    : null;
   const filters: KanbanFilters = {
     search: searchParams.q ?? "",
     tab: parseTab(searchParams.tab),
+    clientKey: clientKey ?? undefined,
   };
   const data = await getMasterBookingsForKanban({ masterId, filters });
 

@@ -32,6 +32,15 @@ export type ScheduleBookingItem = {
   /** Minutes from midnight for the end. */
   endMinuteOfDay: number;
   price: number;
+  /**
+   * MASTER-BOOKING-UI-FIX-A: who must respond when the booking is in
+   * `CHANGE_REQUESTED`. The action-menu uses this to show
+   * approve/reject only to the awaited side and a «Ожидаем ответа»
+   * guard to the initiator — without it, both sides saw the actions
+   * and the initiator click hit the backend's «Action is required
+   * from another side» 409.
+   */
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type ScheduleTimeBlockItem = {
@@ -230,6 +239,9 @@ export const getMasterScheduleWeek = cache(
           endAtUtc: true,
           clientName: true,
           clientUserId: true,
+          // MASTER-BOOKING-UI-FIX-A: needed for initiator-aware
+          // actions on CHANGE_REQUESTED bookings (#2а).
+          actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true, durationMin: true } },
           serviceItems: { select: { priceSnapshot: true } },
         },
@@ -303,6 +315,7 @@ export const getMasterScheduleWeek = cache(
         startMinuteOfDay: minuteOfDay(row.startAtUtc),
         endMinuteOfDay: minuteOfDay(row.endAtUtc),
         price: bookingPrice(row),
+        actionRequiredBy: row.actionRequiredBy ?? null,
       };
       const list = bookingsByDay.get(iso) ?? [];
       list.push(item);

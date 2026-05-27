@@ -28,7 +28,7 @@ export function MasterDetailPanel({
     <div className="space-y-4">
       <MasterDetailHeader studioId={studioId} detail={detail} />
       <MasterDetailKpis detail={detail} />
-      <MasterDetailWeekSchedule cells={detail.weekSchedule} masterId={detail.id} />
+      <MasterDetailWeekSchedule cells={detail.weekSchedule} viewToken={detail.viewToken} />
     </div>
   );
 }

@@ -102,3 +102,88 @@ export function buildPrivateMediaDeliveryUrl(assetId: string, token: string): st
   const params = new URLSearchParams({ [PRIVATE_MEDIA_TOKEN_QUERY_PARAM]: token });
   return `/api/media/file/${assetId}?${params.toString()}`;
 }
+
+/**
+ * MASTER-CHAT-ATTACHMENT-FIX-A — opaque chat-attachment delivery tokens.
+ *
+ * Distinct from the generic private-media token above (different
+ * `purpose` claim) so the two paths can't be cross-replayed:
+ *
+ *   - generic `media-read` token → `/api/media/file/{id}?mt=...` (assetId
+ *     visible in URL; still in active use for booking-reference + admin
+ *     download surfaces).
+ *
+ *   - chat-attachment `chat-attachment-read` token → `/api/chat/attachment/{token}`
+ *     (NO assetId in URL — the cuid is encoded inside the token payload
+ *     and never leaks to the client). Per user requirement «никаких ID в
+ *     запросе» these tokens are the only thing the chat-bubble renderer
+ *     sees.
+ *
+ * Token TTL is longer (15 minutes) than the generic `media-read` default
+ * because chat threads stay open for extended sessions. When the user
+ * refreshes the thread the DTO emits fresh tokens — no manual rotation
+ * needed.
+ */
+
+const CHAT_ATTACHMENT_TOKEN_PURPOSE = "chat-attachment-read";
+const CHAT_ATTACHMENT_TOKEN_TTL_SECONDS = 15 * 60;
+
+type ChatAttachmentTokenPayload = {
+  aid: string;
+  exp: number;
+  purpose: typeof CHAT_ATTACHMENT_TOKEN_PURPOSE;
+};
+
+function parseChatAttachmentPayload(token: string): ChatAttachmentTokenPayload | null {
+  const [encodedPayload, signature] = token.split(".");
+  if (!encodedPayload || !signature) return null;
+  if (!verifySignature(encodedPayload, signature)) return null;
+
+  let payload: ChatAttachmentTokenPayload;
+  try {
+    payload = JSON.parse(fromBase64url(encodedPayload)) as ChatAttachmentTokenPayload;
+  } catch {
+    return null;
+  }
+
+  if (
+    typeof payload.aid !== "string" ||
+    payload.aid.length === 0 ||
+    typeof payload.exp !== "number" ||
+    payload.purpose !== CHAT_ATTACHMENT_TOKEN_PURPOSE
+  ) {
+    return null;
+  }
+
+  return payload;
+}
+
+export function createChatAttachmentToken(assetId: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: ChatAttachmentTokenPayload = {
+    aid: assetId,
+    exp: now + CHAT_ATTACHMENT_TOKEN_TTL_SECONDS,
+    purpose: CHAT_ATTACHMENT_TOKEN_PURPOSE,
+  };
+  const encodedPayload = base64url(JSON.stringify(payload));
+  return `${encodedPayload}.${sign(encodedPayload)}`;
+}
+
+/**
+ * Verify a chat-attachment token and return the embedded assetId or null
+ * when the token is invalid/expired. The caller must additionally check
+ * that the current user is allowed to view the asset via
+ * `ensureCanReadMedia` (chat membership ACL).
+ */
+export function verifyChatAttachmentToken(token: string): { assetId: string } | null {
+  const payload = parseChatAttachmentPayload(token);
+  if (!payload) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp <= now) return null;
+  return { assetId: payload.aid };
+}
+
+export function buildChatAttachmentUrl(assetId: string): string {
+  const token = createChatAttachmentToken(assetId);
+  return `/api/chat/attachment/${token}`;
+}

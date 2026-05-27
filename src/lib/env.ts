@@ -63,6 +63,12 @@ const envSchema = z.object({
   VK_CLIENT_SECRET: z.string().optional(),
   VK_REDIRECT_URI: z.string().optional(),
   NEXT_PUBLIC_VK_ENABLED: boolFlag,
+  // VK-NOTIFICATIONS-FLAG-A: independent flag for the VK push-notifications
+  // subsystem. VK login (`NEXT_PUBLIC_VK_ENABLED`) and VK notifications
+  // are deliberately split — existing users still log in via VK, but
+  // push delivery stays off until the subsystem ships. Defaults to false
+  // (off). Public flag because the cabinet UI gates the toggle client-side.
+  NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: boolFlag,
 
   // ── YooKassa ─────────────────────────────────────────────────────────────
   YOOKASSA_SHOP_ID: z.string().optional(),
@@ -91,6 +97,13 @@ const envSchema = z.object({
   SUPPORT_TO: z.string().optional(),
   // Partnership inquiries from /partners. Falls back to SUPPORT_TO when unset.
   SUPPORT_TO_PARTNERSHIP: z.string().optional(),
+
+  // ── SMS provider (SMSC.ru — https://smsc.ru/api/) ─────────────────────────
+  SMS_PROVIDER_ENABLED: boolFlag,
+  SMS_PROVIDER_LOGIN: z.string().optional(),
+  SMS_PROVIDER_PASSWORD: z.string().optional(),
+  SMS_PROVIDER_SENDER: z.string().optional(),
+  SMS_LOW_BALANCE_THRESHOLD: z.coerce.number().nonnegative().default(500),
 
   // ── Monitoring ────────────────────────────────────────────────────────────
   MONITORING_TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -136,6 +149,12 @@ const refinedSchema = envSchema
   .refine(
     (e) => !e.AI_FEATURES_ENABLED || Boolean(e.OPENAI_API_KEY),
     "OPENAI_API_KEY is required when AI_FEATURES_ENABLED=true"
+  )
+  .refine(
+    (e) =>
+      !e.SMS_PROVIDER_ENABLED ||
+      (Boolean(e.SMS_PROVIDER_LOGIN) && Boolean(e.SMS_PROVIDER_PASSWORD)),
+    "SMS_PROVIDER_LOGIN and SMS_PROVIDER_PASSWORD are required when SMS_PROVIDER_ENABLED=true"
   );
 
 // ── Parse ─────────────────────────────────────────────────────────────────────
@@ -172,7 +191,38 @@ export const isPushEnabled = Boolean(
 export const isPaymentsEnabled = Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
 export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
 export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
+/**
+ * VK-NOTIFICATIONS-FLAG-A: VK push-notifications subsystem is incomplete
+ * (no delivery path in `notifications/delivery.ts`). The flag gates the
+ * cabinet UI toggle + the settings-write endpoint so a user can't enable
+ * a no-op subscription. Default = off. Set
+ * `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=true` once the delivery channel
+ * lands (queue handler + VK send API) — no code change required to flip it.
+ *
+ * Independent of `isVkAuthEnabled` — login keeps working when this is off.
+ *
+ * String-coerced comparison: on the server `env` is Zod-parsed → boolean;
+ * on the client the Zod parse fails (non-public secrets are missing) and
+ * `env` falls back to raw `process.env` where the value is still a string.
+ * `String(x) === "true"` normalises both to a real boolean so client-side
+ * gating works in `vk-notifications.tsx`.
+ */
+export const isVkNotificationsEnabled =
+  String(env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED) === "true";
 export const isEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+/**
+ * SMS-GATEWAY-A: SMSC.ru provider gate. Both the toggle and the
+ * credentials must be present — otherwise the factory in `src/lib/sms`
+ * falls back to the mock provider (OTP-in-logs) so dev login keeps
+ * working without an SMS account. Set `SMS_PROVIDER_ENABLED=true` plus
+ * `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` in prod to start sending
+ * real SMS. The Zod refine above enforces the credential pair when the
+ * flag is on, so misconfiguration fails fast at startup in production.
+ */
+export const isSmsConfigured =
+  env.SMS_PROVIDER_ENABLED &&
+  Boolean(env.SMS_PROVIDER_LOGIN) &&
+  Boolean(env.SMS_PROVIDER_PASSWORD);
 export const isS3Enabled = env.STORAGE_PROVIDER === "s3";
 export const isVisualSearchEnabled = env.VISUAL_SEARCH_ENABLED;
 export const isAiFeaturesEnabled = env.AI_FEATURES_ENABLED;

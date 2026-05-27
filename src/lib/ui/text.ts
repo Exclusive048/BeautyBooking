@@ -24,6 +24,7 @@ export const UI_TEXT = {
     confirmDefaultTitle: "Подтвердите действие",
     confirmDefaultLabel: "Подтвердить",
     confirmPending: "Подождите...",
+    commentLabel: "Комментарий",
   },
   brand: {
     name: "МастерРядом",
@@ -1071,6 +1072,14 @@ export const UI_TEXT = {
       hint: "Получайте уведомления о записях в VK",
       connect: "Подключить",
       connected: "Подключено",
+      // VK-NOTIFICATIONS-FLAG-A: copy shown when
+      // `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED` is off. Subsystem is in
+      // development — login flow keeps working but push delivery is
+      // gated. Surfaced as a soft hint inside the existing card so
+      // users understand why the toggle is locked.
+      temporarilyUnavailable: "Уведомления через ВКонтакте временно недоступны.",
+      temporarilyUnavailableHint:
+        "Мы дорабатываем доставку. Подключение к VK сохранится — уведомления включатся автоматически, когда канал заработает.",
     },
     autoConfirm: {
       title: "Автоподтверждение записей",
@@ -2281,6 +2290,18 @@ export const UI_TEXT = {
         regular: "Постоянная",
         vip: "VIP",
         sleeping: "Спящая",
+        // MASTER-CLIENTS-FIX-A #7в: tooltip texts explaining the
+        // auto-classification rules. Statuses come from
+        // `classifyClient` — derived from booking history, not
+        // manually assigned. Tooltip surfaces the underlying rule so
+        // the master understands why a client landed in this bucket.
+        autoHint: "Категория назначается автоматически — наведите для подробностей.",
+        tooltips: {
+          new: "Первый визит в течение 30 дней или ещё нет завершённых записей.",
+          regular: "5 или больше завершённых записей у вас.",
+          vip: "Сумма расходов клиента от 50 000 ₽.",
+          sleeping: "Был хотя бы один визит, но более 90 дней назад.",
+        },
       },
       detail: {
         emptyTitle: "Выберите клиента",
@@ -2294,9 +2315,26 @@ export const UI_TEXT = {
         sourceManual: "Добавлен вручную",
         sourceUnknown: "—",
         sinceTemplate: "с {date}",
+        // MASTER-MODELS-FIX-A: CRM marker — visible only когда у клиента
+        // есть >=1 неподтверждённый отклик на модельный оффер этого
+        // мастера. Параллельный indicator к auto-classified `statuses`
+        // badges. Tooltip объясняет смысл «они в моём pool но не были
+        // выбраны — можно повторно пригласить».
+        modelApplicantBadge: "Откликался на модельные",
+        modelApplicantTooltipTemplate:
+          "Клиент откликался на ваши модельные предложения {count} {plural}, но не был выбран. Контакт сохранён — можно пригласить снова.",
+        modelApplicantPluralOne: "раз",
+        modelApplicantPluralFew: "раза",
+        modelApplicantPluralMany: "раз",
         copyAria: "Скопировать контакт",
         copySuccess: "Скопировано",
-        addTagDisabled: "Скоро",
+        // MASTER-CLIENTS-FIX-A #7в: manual tag-editor is parked in
+        // backlog — auto-tagging already covers VIP/Постоянная/Новая/
+        // Спящая via `classifyClient` (badges above). Surface this in
+        // the tooltip so the master understands why the button is
+        // disabled (it's not «работа в процессе», it's «уже есть
+        // автоматическое»).
+        addTagDisabled: "Категории назначаются автоматически по истории визитов.",
         addTagLabel: "тег",
         stats: {
           visits: "Визитов",
@@ -2308,7 +2346,19 @@ export const UI_TEXT = {
           heading: "Заметки мастера",
           empty: "Заметок пока нет",
           editLabel: "Редактировать",
+          // MASTER-CLIENTS-FIX-A #6: realised in this commit — kept
+          // for backwards-compatibility but no longer shown.
           editComingSoon: "Доступно скоро",
+          // MASTER-CLIENTS-FIX-A #6: edit-mode UI text. Keeps the
+          // tone consistent with other master cabinet edit forms
+          // (settings auto-save / schedule edit etc.). Notes are
+          // master-private (privacy invariant #25) — surfaced only
+          // inside this master CRM card.
+          editPlaceholder: "Запишите всё важное о клиенте — предпочтения, аллергии, особенности.",
+          saveLabel: "Сохранить",
+          saving: "Сохраняем…",
+          cancelLabel: "Отменить",
+          saveError: "Не удалось сохранить заметку. Попробуйте ещё раз.",
         },
         history: {
           heading: "История визитов",
@@ -3048,10 +3098,21 @@ export const UI_TEXT = {
         declinePrompt: "Укажите причину отказа — она будет отправлена клиенту:",
         cancelPrompt: "Укажите причину отмены — она будет отправлена клиенту:",
         actionError: "Не удалось обновить запись. Попробуйте ещё раз.",
+        awaitingClientResponse:
+          "Запрос переноса отправлен — ждём ответ клиента.",
+        declineTitle: "Отклонить запись",
+        declineLabel: "Причина отказа",
+        declinePlaceholder: "Например: «Конфликт по времени»",
+        declineConfirmLabel: "Отклонить",
+        cancelTitle: "Отменить запись",
+        cancelLabel: "Причина отмены",
+        cancelPlaceholder: "Например: «Заболела, переношу на следующую неделю»",
+        cancelConfirmLabel: "Отменить запись",
       },
       reschedule: {
         modalTitle: "Перенести запись",
         currentLabel: "Текущее время",
+        durationLabel: "Длительность услуги — {N} мин",
         newDateLabel: "Новая дата",
         newTimeLabel: "Новое время",
         cancel: "Отмена",
@@ -3061,6 +3122,14 @@ export const UI_TEXT = {
         submitting: "Переносим…",
         conflictError: "Это время занято — выберите другое.",
         genericError: "Не удалось перенести запись.",
+        contextLoading: "Загружаем данные брони…",
+        contextError: "Не удалось загрузить данные брони. Попробуйте обновить страницу.",
+        slotsLoading: "Загружаем свободные окна…",
+        slotsError: "Не удалось загрузить свободные окна.",
+        noSlots: "Свободных окон в этот день нет. Попробуйте другую дату.",
+        pendingTitle: "На запись уже отправлен запрос переноса",
+        pendingBody:
+          "Дождитесь ответа второй стороны — пока запрос в ожидании, новый перенос отправить нельзя.",
       },
       emptyCellHint: "+ Запись",
     },
@@ -3090,8 +3159,20 @@ export const UI_TEXT = {
         confirm: "Подтвердить",
         decline: "Отклонить",
         reschedule: "Перенести",
+        rescheduleAwaitingTooltip:
+          "Уже есть запрос переноса в ожидании ответа — новый отправить нельзя.",
+        awaitingClientResponse:
+          "Запрос переноса отправлен — ждём ответ клиента.",
         cancel: "Отменить",
         cancelPrompt: "Укажите причину отмены — она будет отправлена клиенту:",
+        cancelTitle: "Отменить запись",
+        cancelLabel: "Причина отмены",
+        cancelPlaceholder: "Например: «Заболела, переношу на следующую неделю»",
+        cancelConfirmLabel: "Отменить запись",
+        declineTitle: "Отклонить запись",
+        declineLabel: "Причина отказа",
+        declinePlaceholder: "Например: «Конфликт по времени»",
+        declineConfirmLabel: "Отклонить",
         cancelError: "Не удалось отменить запись. Попробуйте ещё раз.",
         reviewLabelTemplate: "★ {rating} · отзыв оставлен",
         guestClient: "Без аккаунта",
@@ -3146,6 +3227,14 @@ export const UI_TEXT = {
           "Клиент получит уведомление об отмене. Действие нельзя отменить.",
         cancelConfirmCta: "Отменить запись",
         cancelFailed: "Не удалось отменить запись. Попробуйте ещё раз.",
+        // MASTER-DASHBOARD-FIX-A #3: tooltips for disabled actions
+        // whose time window has passed. Backend rejects with 409
+        // "less than 60 minutes before start" — UI surfaces the same
+        // rule preemptively via tooltip on the disabled button.
+        modifyWindowExpiredTooltip:
+          "Перенос и отмена доступны не позже чем за 60 минут до начала.",
+        confirmWindowExpiredTooltip:
+          "Время записи уже наступило — подтверждение больше неактуально.",
       },
       attention: {
         title: "Требуют внимания",
@@ -3198,6 +3287,10 @@ export const UI_TEXT = {
         declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
         declineReasonPrompt:
           "Укажите причину отказа — она будет отправлена клиенту:",
+        declineTitle: "Отклонить запись",
+        declineLabel: "Причина отказа",
+        declinePlaceholder: "Например: «Конфликт по времени»",
+        declineConfirmLabel: "Отклонить",
       },
     },
     /**
@@ -5489,6 +5582,8 @@ export const UI_TEXT = {
       items: {
         dashboard: "Главная",
         schedule: "Расписание",
+        // STUDIO-SCHEDULE-SETTINGS-A: schedule-settings sidebar label.
+        scheduleSettings: "Настройки расписания",
         scheduleRequests: "Заявки",
         bookings: "Записи",
         masters: "Мастера",
@@ -5497,6 +5592,11 @@ export const UI_TEXT = {
         reviews: "Отзывы",
         notifications: "Уведомления",
         analytics: "Аналитика",
+        // STUDIO-CLEANUP-FIX-A #9: `publicPage` sidebar label kept
+        // for backwards-compat (other consumers may reference it) but
+        // its sidebar entry was removed — the page was a misleading
+        // `redirect("/cabinet/studio/settings")`. `publicPageExternal`
+        // remains in active use for the «Open studio page» link.
         publicPage: "Публичная страница",
         publicPageExternal: "Открыть страницу студии",
         settings: "Настройки",
@@ -5841,6 +5941,121 @@ export const UI_TEXT = {
         error: "Не удалось загрузить данные. Попробуйте ещё раз.",
       },
     },
+    // STUDIO-SCHEDULE-SETTINGS-A Phase A — page text. Phase B will
+    // add `breaks` / `exceptions` / `visibility` subtrees alongside.
+    scheduleSettings: {
+      breadcrumb: "Настройки расписания",
+      title: "Настройки расписания",
+      studioSubtitle:
+        "Часы работы, правила бронирования и исключения — отдельно для каждого мастера студии.",
+      noMastersTitle: "Нет активных мастеров",
+      noMastersHint:
+        "Чтобы настроить расписание, добавьте хотя бы одного мастера в студию и активируйте его.",
+      tabs: {
+        hours: "Часы",
+        rules: "Правила",
+        exceptions: "Исключения",
+        breaks: "Перерывы",
+        visibility: "Видимость",
+      },
+      masterPicker: {
+        label: "Мастер",
+        hint: "Все настройки ниже применяются к выбранному мастеру.",
+      },
+      hours: {
+        workdayAriaTemplate: "Рабочий день: {day}",
+        fromLabel: "с",
+        toLabel: "до",
+        dayOffLabel: "выходной",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Расписание сохранено.",
+      },
+      rules: {
+        minHoursTitle: "Минимум за",
+        minHoursHint:
+          "Через сколько часов до записи клиенту нужно её создать (в часах).",
+        maxDaysTitle: "Максимум за",
+        maxDaysHint: "На сколько дней вперёд открыта запись.",
+        autoConfirmTitle: "Автоподтверждение",
+        autoConfirmHint:
+          "Запись подтверждается автоматически без участия мастера.",
+        freeCancelTitle: "Бесплатная отмена за",
+        freeCancelHint:
+          "За сколько часов до записи клиент может отменить без условий (в часах).",
+        freeCancelToggleAria: "Включить бесплатную отмену",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Правила сохранены.",
+      },
+      errors: {
+        save: "Не удалось сохранить. Попробуйте ещё раз.",
+        // STUDIO-SCHEDULE-SETTINGS-A Phase B — exception validation.
+        exceptionDatePast: "Дата исключения не может быть в прошлом.",
+        exceptionEndBeforeStart:
+          "Время окончания должно быть позже времени начала.",
+        exceptionDuplicateDate:
+          "Исключение на эту дату уже добавлено. Измените существующее.",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase B — Exceptions tab.
+      exceptions: {
+        emptyTitle: "Исключений пока нет",
+        emptyHint:
+          "Добавьте дату, если в этот день мастер не работает или работает по другому графику.",
+        addLabel: "Добавить исключение",
+        addFormTitle: "Новое исключение",
+        dateLabel: "Дата",
+        workdayToggle: "Мастер работает",
+        fromLabel: "с",
+        toLabel: "до",
+        noteLabel: "Заметка",
+        notePlaceholder: "Например: отпуск, особый график",
+        confirmAddLabel: "Сохранить",
+        cancelLabel: "Отмена",
+        savingLabel: "Сохраняем…",
+        savedHint: "Исключения сохранены.",
+        deleteAria: "Удалить исключение",
+        cardDayOff: "выходной",
+        cardWorkingHoursTemplate: "работа {from}–{to}",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase B — Breaks tab. Mirrors the
+      // master cabinet's «just buffer» version (the recurring-breaks
+      // editor was rolled back — single source of truth is the
+      // schedule editor itself).
+      breaks: {
+        bufferTitle: "Перерыв между записями",
+        bufferHint:
+          "Минут после каждой записи, в которые не примем следующую.",
+        minutesSuffix: "мин",
+        recurringBreaksHint:
+          "Регулярные перерывы (например, обед) задаются прямо в расписании на вкладке «Часы». Здесь — только буфер между записями.",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Настройка сохранена.",
+      },
+      // STUDIO-SCHEDULE-SETTINGS-A Phase B — Visibility tab.
+      visibility: {
+        publishedTitle: "Виден в каталоге",
+        publishedHint:
+          "Если выключить, мастер не появится в публичном поиске и каталоге.",
+        slotPrecisionTitle: "Точность слотов",
+        slotPrecisionHint:
+          "Что видит клиент в каталоге — конкретное время / занятость дня / только даты.",
+        slotPrecisionLabels: {
+          exact: "Точное время",
+          today_free: "Сегодня свободно",
+          date_only: "Только дата",
+        },
+        visibleSlotDaysTitle: "Горизонт слотов",
+        visibleSlotDaysHint: "Сколько дней вперёд клиент видит свободные слоты.",
+        acceptNewClientsTitle: "Принимает новых клиентов",
+        acceptNewClientsHint:
+          "Если выключить, новые клиенты не смогут записаться. Существующие — смогут.",
+        saveLabel: "Сохранить",
+        savingLabel: "Сохраняем…",
+        savedHint: "Настройки видимости сохранены.",
+      },
+    },
     scheduleV2: {
       header: {
         captionTemplate: "{weekday} · {day} {month} {year}",
@@ -5898,7 +6113,8 @@ export const UI_TEXT = {
       },
       actions: {
         menuTitle: "Действия с записью",
-        details: "Детали записи",
+        // STUDIO-CLEANUP-FIX-A #1г: `details` key removed alongside
+        // the «Детали записи» Button it labelled (was a pure no-op).
         moveToMaster: "Перенести на другого мастера",
         moveTime: "Перенести по времени",
         cancel: "Отменить запись",
@@ -5922,6 +6138,13 @@ export const UI_TEXT = {
         titleToMaster: "Перенести на другого мастера",
         titleTime: "Перенести по времени",
         masterLabel: "Мастер",
+        // STUDIO-RESCHEDULE-VALIDATION-A: appended in the master
+        // picker option label when the master can't perform the
+        // booking's service. Option is `disabled`; this suffix
+        // explains why.
+        masterIncompatibleSuffix: "не выполняет эту услугу",
+        masterIncompatibleHint:
+          "Этот мастер не выполняет выбранную услугу — выберите другого.",
         timeLabel: "Новое время",
         cancel: "Отмена",
         confirm: "Перенести",
@@ -5954,6 +6177,11 @@ export const UI_TEXT = {
         clientNameRequired: "Укажите имя клиента.",
         clientPhoneRequired: "Укажите телефон клиента.",
         clientPhoneInvalid: "Некорректный номер телефона.",
+        // STUDIO-BOOKINGS-FIX-A #3б: explicit error when the header
+        // «Новая запись» button is used but the studio admin didn't
+        // pick a time. Pre-fix the form fell back to generic «create»
+        // — confusing because there was nothing visible to fix.
+        startAtRequired: "Укажите дату и время записи.",
         breakMasterRequired: "Выберите мастера для перерыва.",
         breakTimeRange: "Время окончания должно быть позже начала.",
         breakCreate: "Не удалось создать перерыв. Попробуйте ещё раз.",
@@ -5986,6 +6214,12 @@ export const UI_TEXT = {
         empty: "Создайте первую категорию",
         pendingBadge: "PENDING",
         pendingHint: "Категория на модерации — видна только вам, пока админ не одобрит",
+        // STUDIO-SERVICES-SORT-A: «Скрыть пустые» toggle label +
+        // actionable hint when every category is hidden by the
+        // filter (admin can switch off, or add services).
+        hideEmptyLabel: "Скрыть пустые",
+        allEmptyHint:
+          "Все категории пустые. Отключите фильтр или добавьте услуги.",
       },
       list: {
         searchPlaceholder: "Поиск услуги",
@@ -6628,7 +6862,11 @@ export const UI_TEXT = {
         joinedTemplate: "в студии с {date}",
         clientsTemplate: "{count} клиентов",
         actions: {
-          message: "Написать",
+          // STUDIO-CLEANUP-FIX-A #4а: `message` key removed — the
+          // «Написать» button it labelled was a misleading Link to
+          // the client-cabinet messages page (studio admin isn't a
+          // chat participant per invariant #26). Feature deferred to
+          // backlog. Other actions preserved.
           schedule: "Расписание",
           publicProfile: "Публичный профиль",
           pause: "Поставить на паузу",

@@ -1,7 +1,9 @@
-import { BookingStatus, ReviewTargetType } from "@prisma/client";
+import { BookingStatus, ReviewTargetType, type Prisma } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import { parseClientKeyIdentity } from "@/lib/crm/card-service";
+import { buildPhoneVariants } from "@/lib/crm/card-utils";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 export type ColumnId = "pending" | "confirmed" | "today" | "done" | "cancelled";
@@ -26,12 +28,26 @@ export type KanbanBookingItem = {
   changeComment: string | null;
   /** When the booking has a published review, contains its rating; null otherwise. */
   reviewRating: number | null;
+  /**
+   * MASTER-BOOKING-UI-FIX-A: who must respond when CHANGE_REQUESTED.
+   * Used by `<BookingManageActions>` to surface the «Ожидаем ответа»
+   * guard to the initiator instead of an action button that the
+   * backend would reject.
+   */
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type KanbanFilters = {
   search?: string;
   /** "all" — no filter, "new" — клиенты без предыдущих visits, "regular" — 3+ visits. */
   tab?: "all" | "new" | "regular";
+  /**
+   * MASTER-CLIENTS-FIX-A #7а: optional client filter set by the «Вся
+   * история» deep-link. Format: `user:<cuid>` (registered client) or
+   * `phone:<phone>` (legacy/manual). Decoded server-side from the
+   * signed token in the URL before reaching this service.
+   */
+  clientKey?: string;
 };
 
 export type KanbanData = {
@@ -116,6 +132,29 @@ export const getMasterBookingsForKanban = cache(
     const search = filters.search?.trim().toLowerCase() ?? "";
     const tab = filters.tab ?? "all";
 
+    // MASTER-CLIENTS-FIX-A #7а: build the client filter once (if any),
+    // reuse on both buckets. Token verification happens at the route
+    // layer — by the time we're here, the key is trusted and scoped
+    // to this master. Phone variants cover normalized + snapshot
+    // formats so legacy bookings still match.
+    const clientFilter: Prisma.BookingWhereInput | null = filters.clientKey
+      ? (() => {
+          const { identity } = parseClientKeyIdentity(filters.clientKey);
+          if (identity.clientUserId) {
+            return { clientUserId: identity.clientUserId };
+          }
+          const variants = identity.clientPhone
+            ? buildPhoneVariants(identity.clientPhone)
+            : [];
+          return {
+            OR: [
+              { clientPhone: { in: variants } },
+              { clientPhoneSnapshot: { in: variants } },
+            ],
+          };
+        })()
+      : null;
+
     const cancelledCutoff = new Date(now.getTime() - CANCELLED_WINDOW_DAYS * 24 * 60 * 60_000);
     const futureCutoff = new Date(now.getTime() + FUTURE_WINDOW_DAYS * 24 * 60 * 60_000);
     const doneCutoff = new Date(now.getTime() - FUTURE_WINDOW_DAYS * 24 * 60 * 60_000);
@@ -138,6 +177,7 @@ export const getMasterBookingsForKanban = cache(
             { startAtUtc: { gte: doneCutoff, lt: futureCutoff } },
             { startAtUtc: null },
           ],
+          ...(clientFilter ? { AND: [clientFilter] } : {}),
         },
         orderBy: { startAtUtc: "asc" },
         select: {
@@ -148,6 +188,7 @@ export const getMasterBookingsForKanban = cache(
           clientName: true,
           clientUserId: true,
           changeComment: true,
+          actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true } },
           serviceItems: { select: { priceSnapshot: true } },
         },
@@ -162,6 +203,7 @@ export const getMasterBookingsForKanban = cache(
             { cancelledAtUtc: { gte: cancelledCutoff } },
             { cancelledAtUtc: null, updatedAt: { gte: cancelledCutoff } },
           ],
+          ...(clientFilter ? { AND: [clientFilter] } : {}),
         },
         orderBy: { updatedAt: "desc" },
         take: 50,
@@ -173,6 +215,7 @@ export const getMasterBookingsForKanban = cache(
           clientName: true,
           clientUserId: true,
           changeComment: true,
+          actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true } },
           serviceItems: { select: { priceSnapshot: true } },
         },
@@ -266,6 +309,7 @@ export const getMasterBookingsForKanban = cache(
         price: bookingPrice(row),
         changeComment: row.changeComment,
         reviewRating,
+        actionRequiredBy: row.actionRequiredBy ?? null,
       };
     });
 

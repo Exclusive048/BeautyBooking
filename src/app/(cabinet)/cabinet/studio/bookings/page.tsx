@@ -1,4 +1,4 @@
-import { BookingStatus, ProviderType } from "@prisma/client";
+import { BookingStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { StudioBookingsPage } from "@/features/studio-cabinet/bookings/components/studio-bookings-page";
 import {
@@ -10,10 +10,8 @@ import {
   loadStudioBookingsKpis,
   loadStudioMasterOptions,
 } from "@/features/studio-cabinet/bookings/server/bookings-kpis.service";
-import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
+import { loadStudioCabinetShellExtras } from "@/features/studio-cabinet/schedule/server/shell-extras.service";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/prisma";
-import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 
 type SearchParams = {
@@ -37,84 +35,10 @@ function parseStatus(value: string | undefined): BookingStatus | "all" {
     : "all";
 }
 
-async function loadShellExtras(studioId: string): Promise<{
-  scheduleMasters: ScheduleMasterColumn[];
-  services: Array<{
-    id: string;
-    name: string;
-    durationMin: number;
-    priceKopeks: number;
-    masterIds: string[];
-  }>;
-}> {
-  const studio = await prisma.studio.findUnique({
-    where: { id: studioId },
-    select: { id: true, providerId: true },
-  });
-  if (!studio) return { scheduleMasters: [], services: [] };
-
-  const [masters, services, masterServices] = await Promise.all([
-    prisma.provider.findMany({
-      where: { type: ProviderType.MASTER, studioId: studio.providerId },
-      select: {
-        id: true,
-        name: true,
-        avatarUrl: true,
-        isPublished: true,
-        ownerUserId: true,
-        ratingAvg: true,
-        ratingCount: true,
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.service.findMany({
-      where: { studioId, isEnabled: true },
-      select: {
-        id: true,
-        name: true,
-        title: true,
-        durationMin: true,
-        price: true,
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.masterService.findMany({
-      where: {
-        isEnabled: true,
-        masterProvider: { type: ProviderType.MASTER, studioId: studio.providerId },
-      },
-      select: { masterProviderId: true, serviceId: true },
-    }),
-  ]);
-
-  const mastersByService = new Map<string, string[]>();
-  for (const link of masterServices) {
-    const arr = mastersByService.get(link.serviceId) ?? [];
-    arr.push(link.masterProviderId);
-    mastersByService.set(link.serviceId, arr);
-  }
-
-  // STUDIO-BUGS-FIX-A bug #5: scheduleMasters reuse drives the
-  // CreateBookingDialog / MoveBookingDialog master pickers — keep
-  // isAvailable aligned with the schedule grid's eligibility predicate.
-  return {
-    scheduleMasters: masters.map((m) => ({
-      id: m.id,
-      name: m.name,
-      avatarUrl: m.avatarUrl ?? null,
-      rating: m.ratingAvg ?? 0,
-      reviewsCount: m.ratingCount ?? 0,
-      isAvailable: isStudioMasterActive(m),
-    })),
-    services: services.map((s) => ({
-      id: s.id,
-      name: s.title?.trim() || s.name,
-      durationMin: s.durationMin,
-      priceKopeks: s.price,
-      masterIds: mastersByService.get(s.id) ?? [],
-    })),
-  };
-}
+// STUDIO-CLIENT-WRITE-DIALOG-A: the inline `loadShellExtras` here was
+// extracted to `shell-extras.service.ts` so the clients page can reuse
+// the same shape (CreateBookingDialog needs `scheduleMasters[]` +
+// `services[]` with master-services join). Single source of truth.
 
 export default async function StudioBookingsRoute({ searchParams }: Props) {
   const user = await getSessionUser();
@@ -142,7 +66,7 @@ export default async function StudioBookingsRoute({ searchParams }: Props) {
     }),
     loadStudioBookingsKpis(studioId),
     loadStudioMasterOptions(studioId),
-    loadShellExtras(studioId),
+    loadStudioCabinetShellExtras(studioId),
   ]);
 
   return (

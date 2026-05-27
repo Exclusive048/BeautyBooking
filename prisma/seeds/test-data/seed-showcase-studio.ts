@@ -1083,6 +1083,53 @@ async function ensureNotifications(ownerUserId: string, bookings: Booking[]) {
 
 // ---------------- Schedule change requests ----------------
 
+/**
+ * STUDIO-APPROVE-400-FIX-A: build a valid `EDITOR_V1` request payload
+ * mirroring Vision's standard weekly schedule (Mon-Sat 10-19, Sun off).
+ * Previously the seed produced placeholder shapes
+ * (`{ kind: "WEEKLY", delta: "..." }`) that didn't match either the
+ * legacy `SchedulePayload` or the canonical `EDITOR_V1` validator —
+ * approving such a request raised 400 "Некорректное тело запроса" from
+ * `validateSchedulePayload` deep in `applySchedulePayload`. The fix
+ * produces an applyable snapshot so the QA admin can actually click
+ * Approve. Optional `extraException` lets a request also propose a
+ * specific day-off so the «recent» list shows a meaningful diff.
+ */
+function buildVisionSchedulePayload(extraException?: {
+  date: string;
+  note: string;
+}): Prisma.InputJsonValue {
+  const weekSchedule = Array.from({ length: 7 }).map((_, weekday) => ({
+    dayOfWeek: weekday,
+    // Sunday off, the rest mirror Vision's master template hours.
+    isWorkday: weekday !== 0,
+    scheduleMode: "FLEXIBLE" as const,
+    startTime: "10:00",
+    endTime: "19:00",
+    breaks: [],
+    fixedSlotTimes: [],
+  }));
+  const exceptions = extraException
+    ? [
+        {
+          date: extraException.date,
+          isWorkday: false,
+          scheduleMode: "FLEXIBLE" as const,
+          startTime: null,
+          endTime: null,
+          breaks: [],
+          fixedSlotTimes: [],
+          note: extraException.note,
+        },
+      ]
+    : [];
+  return {
+    format: "EDITOR_V1",
+    weekSchedule,
+    exceptions,
+  } as unknown as Prisma.InputJsonValue;
+}
+
 async function ensureScheduleChangeRequests(args: {
   studioId: string;
   masters: SeededMaster[];
@@ -1099,27 +1146,32 @@ async function ensureScheduleChangeRequests(args: {
         id: `${idPrefix}01`,
         studioId: args.studioId,
         providerId: marina.provider.id,
-        comment: "Прошу поставить +5 в субботу, нужно поменять расписание из-за поездки.",
-        payloadJson: {
-          kind: "WEEKLY",
-          delta: "shift +5 minutes Saturday",
-        } as Prisma.InputJsonValue,
+        comment:
+          "Прошу подтвердить актуальное расписание — хочу синхронизировать неделю.",
+        // No-op-style payload: approving re-applies Marina's current
+        // weekly pattern. Demonstrates the approve flow without
+        // mutating real availability.
+        payloadJson: buildVisionSchedulePayload(),
         status: ScheduleChangeRequestStatus.PENDING,
       },
     });
   }
   if (elena) {
+    // Pick a date one week ahead — far enough that the «extra day off»
+    // is plausible but does not collide with already-seeded bookings.
+    const exceptionDate = new Date();
+    exceptionDate.setUTCDate(exceptionDate.getUTCDate() + 7);
+    const exceptionDateKey = exceptionDate.toISOString().slice(0, 10);
     await prisma.scheduleChangeRequest.create({
       data: {
         id: `${idPrefix}02`,
         studioId: args.studioId,
         providerId: elena.provider.id,
-        comment: "Дополнительный выходной 25-го числа — семейные обстоятельства.",
-        payloadJson: {
-          kind: "OVERRIDE",
-          dateOffsetDays: 7,
-          isDayOff: true,
-        } as Prisma.InputJsonValue,
+        comment: `Дополнительный выходной ${exceptionDateKey} — семейные обстоятельства.`,
+        payloadJson: buildVisionSchedulePayload({
+          date: exceptionDateKey,
+          note: "Семейные обстоятельства",
+        }),
         status: ScheduleChangeRequestStatus.PENDING,
       },
     });

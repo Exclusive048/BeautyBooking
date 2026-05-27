@@ -7,10 +7,17 @@ const T = UI_TEXT.studioCabinet.mastersV2.detail.weekSchedule;
 
 export function MasterDetailWeekSchedule({
   cells,
-  masterId,
+  viewToken,
 }: {
   cells: WeekScheduleCell[];
-  masterId: string;
+  /**
+   * STUDIO-MASTERS-PRIVACY-FIX-A: opaque HMAC token replaces the
+   * master cuid that used to be threaded into the URL via
+   * `masterId={detail.id}`. Same token reused across both deep-links
+   * («Расписание мастера» button in the header + this «В календарь»
+   * link), pre-signed server-side on `StudioMasterDetail.viewToken`.
+   */
+  viewToken: string;
 }) {
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
@@ -22,7 +29,7 @@ export function MasterDetailWeekSchedule({
           <p className="mt-0.5 text-[11px] text-text-sec">{T.subtitle}</p>
         </div>
         <Link
-          href={`/cabinet/studio/calendar?masterId=${masterId}`}
+          href={`/cabinet/studio/calendar?master=${encodeURIComponent(viewToken)}`}
           className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
         >
           {T.seeCalendar}

@@ -53,11 +53,15 @@ export type ThreadMessageDto = {
   /** Card rendered alongside a SYSTEM message. Null for plain text. */
   bookingCard: ThreadBookingCardDto | null;
   /**
-   * Optional image attachment id (CHAT-FOUNDATION-A-MIGRATION + CHAT-UI-A).
-   * Renderer fetches the file via `/api/media/file/{id}` — the same
-   * auth-aware media-delivery path portfolio + avatars use.
+   * Server-built signed URL for the image attachment, or `null` when
+   * the message has no image. MASTER-CHAT-ATTACHMENT-FIX-A: replaced
+   * the raw `attachmentMediaAssetId` (cuid) with a token-only opaque
+   * URL — no prisma cuid in URL bar (per user requirement «никаких ID
+   * в запросе»). The route `/api/chat/attachment/[token]` runs the
+   * chat-membership ACL (admits only the two chat participants;
+   * studio admins denied, outsiders 403).
    */
-  attachmentMediaAssetId: string | null;
+  attachmentUrl: string | null;
 };
 
 export type ThreadDaySeparatorDto = {

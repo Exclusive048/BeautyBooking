@@ -17,6 +17,13 @@ type Props = {
   bookingId: string;
   currentMasterId: string;
   currentStartAtUtc: string;
+  /**
+   * STUDIO-RESCHEDULE-VALIDATION-A #1а: the booking's serviceId is
+   * used to gate (disabled + tooltip) masters who don't perform this
+   * service. Defense-in-depth — backend's
+   * `assertMasterPerformsService` still rejects server-side.
+   */
+  bookingServiceId: string;
   masters: ScheduleMasterColumn[];
   mode: "master" | "time";
   open: boolean;
@@ -43,6 +50,7 @@ export function MoveBookingDialog({
   bookingId,
   currentMasterId,
   currentStartAtUtc,
+  bookingServiceId,
   masters,
   mode,
   open,
@@ -110,6 +118,12 @@ export function MoveBookingDialog({
             <span className="mb-1 block text-xs font-medium text-text-main">
               {T.masterLabel}
             </span>
+            {/* STUDIO-RESCHEDULE-VALIDATION-A #1а: gate masters who
+                don't perform this service. Per spec visibility-over-
+                hiding — render the option but `disabled` so the
+                studio admin understands why it's locked. Backend
+                still validates with `assertMasterPerformsService`
+                in case a stale UI sends a forbidden value. */}
             <Select
               value={masterId}
               onChange={(e) => setMasterId(e.target.value)}
@@ -117,12 +131,28 @@ export function MoveBookingDialog({
             >
               {masters
                 .filter((m) => m.isAvailable)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
+                .map((m) => {
+                  const performsService = m.serviceIds.includes(bookingServiceId);
+                  return (
+                    <option
+                      key={m.id}
+                      value={m.id}
+                      disabled={!performsService}
+                    >
+                      {performsService
+                        ? m.name
+                        : `${m.name} · ${T.masterIncompatibleSuffix}`}
+                    </option>
+                  );
+                })}
             </Select>
+            {!masters
+              .find((m) => m.id === masterId)
+              ?.serviceIds.includes(bookingServiceId) ? (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                {T.masterIncompatibleHint}
+              </p>
+            ) : null}
           </label>
         ) : null}
 

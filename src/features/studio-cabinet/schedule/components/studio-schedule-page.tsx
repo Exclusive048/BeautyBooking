@@ -10,6 +10,14 @@ type Props = {
   studioId: string;
   view: StudioScheduleView;
   data: StudioScheduleData;
+  /**
+   * STUDIO-MASTERS-PRIVACY-FIX-A: master id decoded from the
+   * `?master=<token>` deep-link. The day grid uses it to scroll the
+   * grid horizontally so the master's column is in view. Null when
+   * the URL has no token, or the token failed verification (silent
+   * fall-through — page still renders the full studio calendar).
+   */
+  focusMasterId?: string;
 };
 
 /**
@@ -17,7 +25,7 @@ type Props = {
  * pre-fetched schedule payload and lays out: header → KPI row →
  * legend → day or week grid (driven by `?view`).
  */
-export function StudioSchedulePage({ studioId, view, data }: Props) {
+export function StudioSchedulePage({ studioId, view, data, focusMasterId }: Props) {
   return (
     <div className="space-y-5 lg:space-y-6">
       <ScheduleHeader
@@ -39,6 +47,7 @@ export function StudioSchedulePage({ studioId, view, data }: Props) {
           studioId={studioId}
           day={data.day}
           services={data.services}
+          focusMasterId={focusMasterId}
         />
       )}
     </div>

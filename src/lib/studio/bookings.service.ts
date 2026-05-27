@@ -1,10 +1,101 @@
 import { AppError } from "@/lib/api/errors";
+import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import {
+  assertMasterPerformsService,
+  assertWithinMasterWorkHours,
+  type MasterWorkWindow,
+} from "@/lib/bookings/policy-enforcement";
 import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
+import { timeToMinutes } from "@/lib/schedule/time";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+
+/**
+ * STUDIO-RESCHEDULE-VALIDATION-A defaults — used when a master has no
+ * `WeeklyScheduleConfig` configured yet. Mirrors the standard
+ * Vision-template hours (Mon-Sat 10:00-19:00) so a brand-new studio
+ * master doesn't accept arbitrary times silently.
+ */
+const DEFAULT_WORK_START_MIN = 10 * 60; // 10:00
+const DEFAULT_WORK_END_MIN = 19 * 60; // 19:00
+/** Sunday off, Mon-Sat working. JS Date.getUTCDay() / getDay(): 0 = Sun. */
+const DEFAULT_ACTIVE_DAYS = new Set([1, 2, 3, 4, 5, 6]);
+
+/**
+ * STUDIO-RESCHEDULE-VALIDATION-A — resolves the target master's work
+ * window for a given weekday by reading the `WeeklyScheduleConfig` +
+ * `ScheduleOverride` for the requested date. Returns a normalized
+ * `MasterWorkWindow` consumed by the pure
+ * `assertWithinMasterWorkHours` helper.
+ *
+ * Override semantics:
+ *   - if a `ScheduleOverride` row exists for `dateKey`, use it
+ *     (handles holidays / one-off day-offs / different hours that
+ *     day);
+ *   - else fall back to the `WeeklyScheduleDay` for `weekday`;
+ *   - else fall back to the project-wide defaults above.
+ *
+ * Per-day overrides take precedence over the weekly config — matches
+ * what the schedule engine does at slot-build time.
+ */
+async function resolveMasterWorkWindow(
+  masterProviderId: string,
+  newStartLocal: Date,
+): Promise<MasterWorkWindow> {
+  const weekday = newStartLocal.getUTCDay();
+  const dateKey = `${newStartLocal.getUTCFullYear()}-${String(newStartLocal.getUTCMonth() + 1).padStart(2, "0")}-${String(newStartLocal.getUTCDate()).padStart(2, "0")}`;
+
+  const [override, weeklyDay] = await Promise.all([
+    prisma.scheduleOverride.findFirst({
+      where: { providerId: masterProviderId, date: dateKey },
+      include: { template: { select: { startLocal: true, endLocal: true } } },
+    }),
+    prisma.weeklyScheduleDay.findFirst({
+      where: { config: { providerId: masterProviderId }, weekday },
+      include: { template: { select: { startLocal: true, endLocal: true } } },
+    }),
+  ]);
+
+  if (override) {
+    if (override.isDayOff) {
+      return { isActive: false, startMinutes: null, endMinutes: null };
+    }
+    const startStr = override.startLocal ?? override.template?.startLocal ?? null;
+    const endStr = override.endLocal ?? override.template?.endLocal ?? null;
+    if (startStr && endStr) {
+      return {
+        isActive: true,
+        startMinutes: timeToMinutes(startStr),
+        endMinutes: timeToMinutes(endStr),
+      };
+    }
+  }
+
+  if (weeklyDay) {
+    if (!weeklyDay.isActive) {
+      return { isActive: false, startMinutes: null, endMinutes: null };
+    }
+    const startStr = weeklyDay.template?.startLocal ?? null;
+    const endStr = weeklyDay.template?.endLocal ?? null;
+    if (startStr && endStr) {
+      return {
+        isActive: true,
+        startMinutes: timeToMinutes(startStr),
+        endMinutes: timeToMinutes(endStr),
+      };
+    }
+  }
+
+  // No config — fall back to project-wide default (Mon-Sat 10-19).
+  return {
+    isActive: DEFAULT_ACTIVE_DAYS.has(weekday),
+    startMinutes: DEFAULT_ACTIVE_DAYS.has(weekday) ? DEFAULT_WORK_START_MIN : null,
+    endMinutes: DEFAULT_ACTIVE_DAYS.has(weekday) ? DEFAULT_WORK_END_MIN : null,
+  };
+}
 
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
@@ -72,6 +163,67 @@ export async function createStudioBooking(input: {
   const durationMin = override.durationOverrideMin ?? service.baseDurationMin ?? service.durationMin;
   const price = override.priceOverride ?? service.basePrice ?? service.price;
   const endAt = new Date(input.startAt.getTime() + durationMin * 60 * 1000);
+
+  // STUDIO-CLIENT-WRITE-DIALOG-A — close the regression-gap from
+  // STUDIO-RESCHEDULE-VALIDATION-A: `moveStudioBooking` enforces work
+  // hours + slot conflict; `createStudioBooking` had neither. The
+  // master-service compatibility was already checked above; the two
+  // remaining rules apply identically to create-time.
+  //
+  //   #1в work-hours: new local time must fit master's window for
+  //                   the booking weekday (per-date override > weekly
+  //                   config > project defaults).
+  //   #1б conflict:   no overlap with another active booking on the
+  //                   target master (buffer-aware).
+  //
+  // Mirrors the reschedule shell — same `resolveMasterWorkWindow`
+  // resolver + `assertWithinMasterWorkHours` predicate + inline
+  // findMany conflict check (no self-exclusion needed at create
+  // time — booking doesn't exist yet).
+  const workWindow = await resolveMasterWorkWindow(master.id, input.startAt);
+  const startMinutesLocal =
+    input.startAt.getUTCHours() * 60 + input.startAt.getUTCMinutes();
+  const endMinutesLocal = startMinutesLocal + durationMin;
+  assertWithinMasterWorkHours({
+    bookingStartMinutes: startMinutesLocal,
+    bookingEndMinutes: endMinutesLocal,
+    window: workWindow,
+  });
+
+  // `requireActiveStudioMaster` only returns ownership/published flags;
+  // the buffer column lives on the provider row directly.
+  const masterRow = await prisma.provider.findUnique({
+    where: { id: master.id },
+    select: { bufferBetweenBookingsMin: true },
+  });
+  const buffer = normalizeBufferMinutes(masterRow?.bufferBetweenBookingsMin);
+  const conflicts = await prisma.booking.findMany({
+    where: {
+      providerId: studio.providerId,
+      masterProviderId: master.id,
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+      startAtUtc: { not: null },
+      endAtUtc: { not: null },
+    },
+    select: { startAtUtc: true, endAtUtc: true },
+  });
+  const hasConflict = conflicts.some((row) => {
+    if (!row.startAtUtc || !row.endAtUtc) return false;
+    const itemStart = buffer
+      ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
+      : row.startAtUtc;
+    const itemEnd = buffer
+      ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
+      : row.endAtUtc;
+    return input.startAt < itemEnd && endAt > itemStart;
+  });
+  if (hasConflict) {
+    throw new AppError(
+      "Окошко уже занято у выбранного мастера. Выберите другое время.",
+      409,
+      "SLOT_CONFLICT",
+    );
+  }
 
   const created = await prisma.$transaction(async (tx) => {
     const booking = await tx.booking.create({
@@ -170,6 +322,98 @@ export async function moveStudioBooking(input: {
   );
   const safeDuration = durationMin > 0 ? durationMin : 60;
   const endAt = new Date(input.targetStartAt.getTime() + safeDuration * 60 * 1000);
+
+  // STUDIO-RESCHEDULE-VALIDATION-A — three guards before mutating:
+  //   #1а master ↔ service compatibility
+  //   #1в work-hours boundary
+  //   #1б slot conflict (excluding self)
+  // All three throw `AppError` with explicit codes/messages so the
+  // studio admin UI can surface targeted feedback. Backend stays the
+  // last-resort defense — UI also filters where possible.
+
+  // #1а: target master must have an enabled MasterService for every
+  // serviceId on the booking. KEEP_SERVICE leaves the booking on the
+  // current service so the new master MUST be able to perform it;
+  // CHANGE_SERVICE was the only branch reading MasterService before
+  // but only for duration/price update (silently skipped when
+  // missing, which let the move proceed onto an incompatible master).
+  const bookingServiceIds = Array.from(
+    new Set(
+      booking.serviceItems
+        .map((item) => item.serviceId)
+        .filter((sid): sid is string => Boolean(sid)),
+    ),
+  );
+  if (bookingServiceIds.length > 0) {
+    const enabledRows = await prisma.masterService.findMany({
+      where: {
+        masterProviderId: input.targetMasterId,
+        serviceId: { in: bookingServiceIds },
+        isEnabled: true,
+      },
+      select: { serviceId: true },
+    });
+    const enabledSet = new Set(enabledRows.map((row) => row.serviceId));
+    const allMatched = bookingServiceIds.every((sid) => enabledSet.has(sid));
+    assertMasterPerformsService({ hasEnabledMasterService: allMatched });
+  }
+
+  // #1в: new time must lie within target master's work window for
+  // that weekday (per-date override > weekly config > defaults).
+  const workWindow = await resolveMasterWorkWindow(
+    input.targetMasterId,
+    input.targetStartAt,
+  );
+  const startMinutesLocal =
+    input.targetStartAt.getUTCHours() * 60 + input.targetStartAt.getUTCMinutes();
+  const endMinutesLocal = startMinutesLocal + safeDuration;
+  assertWithinMasterWorkHours({
+    bookingStartMinutes: startMinutesLocal,
+    bookingEndMinutes: endMinutesLocal,
+    window: workWindow,
+  });
+
+  // #1б: ensure no overlap with another active booking on the target
+  // master, EXCLUDING this booking itself (so a move-to-same-time
+  // no-op doesn't conflict with self).
+  const masterRow = await prisma.provider.findUnique({
+    where: { id: input.targetMasterId },
+    select: { bufferBetweenBookingsMin: true },
+  });
+  const buffer = normalizeBufferMinutes(masterRow?.bufferBetweenBookingsMin);
+  const conflictWhere = {
+    providerId: booking.providerId,
+    masterProviderId: input.targetMasterId,
+  };
+  const conflicts = await prisma.booking.findMany({
+    where: {
+      ...conflictWhere,
+      id: { not: booking.id },
+      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+      startAtUtc: { not: null },
+      endAtUtc: { not: null },
+    },
+    select: { id: true, startAtUtc: true, endAtUtc: true },
+  });
+  const newStart = input.targetStartAt;
+  const newEnd = endAt;
+  const hasConflict = conflicts.some((row) => {
+    if (!row.startAtUtc || !row.endAtUtc) return false;
+    const itemStart = buffer
+      ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
+      : row.startAtUtc;
+    const itemEnd = buffer
+      ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
+      : row.endAtUtc;
+    return newStart < itemEnd && newEnd > itemStart;
+  });
+  if (hasConflict) {
+    throw new AppError(
+      "Окошко уже занято у выбранного мастера. Выберите другое время.",
+      409,
+      "SLOT_CONFLICT",
+    );
+  }
   const previousStartAtUtc = booking.startAtUtc;
   const previousEndAtUtc = booking.endAtUtc;
   const previousMasterProviderId = booking.masterProviderId;

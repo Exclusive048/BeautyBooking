@@ -19,6 +19,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
+import { usePrompt } from "@/hooks/use-prompt";
+import {
+  isBookingPastConfirmWindow,
+  isBookingPastModifyWindow,
+} from "@/lib/bookings/action-state";
 import { cn } from "@/lib/cn";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -30,6 +35,16 @@ type Props = {
   rawStatus: string;
   startAtUtc: string;
   durationMin: number;
+  /**
+   * MASTER-BOOKING-UI-FIX-A: when `rawStatus === "CHANGE_REQUESTED"`
+   * the action-menu must distinguish initiator (gets «Ожидаем ответа»
+   * guard) from the awaited side (gets confirm/decline buttons).
+   * Determined by `Booking.actionRequiredBy` — for the master the
+   * actionable side is `"MASTER"`. `null` means no pending change
+   * (booking is in plain PENDING/CONFIRMED), `"CLIENT"` means we're
+   * the initiator and waiting for client response.
+   */
+  actionRequiredBy?: "CLIENT" | "MASTER" | null;
 };
 
 type ActionId = "confirm" | "decline" | "reschedule" | "cancel";
@@ -50,8 +65,10 @@ export function BookingCardActionsMenu({
   rawStatus,
   startAtUtc,
   durationMin,
+  actionRequiredBy = null,
 }: Props) {
   const router = useRouter();
+  const { prompt, modal: promptModal } = usePrompt();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<ActionId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -142,13 +159,27 @@ export function BookingCardActionsMenu({
   const handleConfirm = () => {
     void patchStatus("confirm", "CONFIRMED");
   };
-  const handleDecline = () => {
-    const comment = window.prompt(T.declinePrompt, "")?.trim();
+  const handleDecline = async () => {
+    setOpen(false);
+    const comment = await prompt({
+      title: T.declineTitle,
+      label: T.declineLabel,
+      placeholder: T.declinePlaceholder,
+      confirmLabel: T.declineConfirmLabel,
+      variant: "danger",
+    });
     if (!comment) return;
     void patchStatus("decline", "REJECTED", comment);
   };
-  const handleCancel = () => {
-    const comment = window.prompt(T.cancelPrompt, "")?.trim();
+  const handleCancel = async () => {
+    setOpen(false);
+    const comment = await prompt({
+      title: T.cancelTitle,
+      label: T.cancelLabel,
+      placeholder: T.cancelPlaceholder,
+      confirmLabel: T.cancelConfirmLabel,
+      variant: "danger",
+    });
     if (!comment) return;
     void patchStatus("cancel", "CANCELLED", comment);
   };
@@ -157,8 +188,36 @@ export function BookingCardActionsMenu({
     setRescheduleOpen(true);
   };
 
-  const isPending = rawStatus === "PENDING" || rawStatus === "CHANGE_REQUESTED";
+  // MASTER-RESCHEDULE-FIX-A: split PENDING vs CHANGE_REQUESTED so the
+  // reschedule menu item disappears while a previous change request is
+  // still awaiting a response. The old combined `isPending` was the #5а
+  // bug: it offered «Перенести» on a CHANGE_REQUESTED booking → submit
+  // hit the backend's "already has a pending change request" 409.
+  // Confirm/Decline remain in CHANGE_REQUESTED so the master can accept
+  // or reject the OTHER side's proposed move.
+  const isPendingNew = rawStatus === "PENDING";
+  const isAwaitingResponse = rawStatus === "CHANGE_REQUESTED";
   const isConfirmed = rawStatus === "CONFIRMED" || rawStatus === "PREPAID";
+  const canReschedule = isPendingNew || isConfirmed;
+  // MASTER-BOOKING-UI-FIX-A #2а: confirm/decline for CHANGE_REQUESTED
+  // only when the master is the awaited side. If the master is the
+  // initiator (`actionRequiredBy === "CLIENT"`), the menu shows a
+  // «Ожидаем ответа» hint instead — preventing the «Action is
+  // required from another side» 409 backend error.
+  const canConfirmOrDecline =
+    isPendingNew || (isAwaitingResponse && actionRequiredBy === "MASTER");
+  const isInitiatorWaitingResponse =
+    isAwaitingResponse && actionRequiredBy === "CLIENT";
+  // MASTER-DASHBOARD-FIX-A #3: time-window guards mirror the backend's
+  // `ensureBookingActionWindow` (60 min before start) and the runtime
+  // promotion in `resolveBookingRuntimeStatus` (start passed → no
+  // longer confirmable). Disable (visibility-over-hiding) so the menu
+  // structure stays predictable while pre-empting 409 responses.
+  const startDate = new Date(startAtUtc);
+  const isPastModifyWindow = isBookingPastModifyWindow(startDate);
+  const isPastConfirmWindow = isBookingPastConfirmWindow(startDate);
+  const modifyTooltip = UI_TEXT.cabinetMaster.dashboard.bookings.modifyWindowExpiredTooltip;
+  const confirmTooltip = UI_TEXT.cabinetMaster.dashboard.bookings.confirmWindowExpiredTooltip;
 
   const menuContent =
     open && coords ? (
@@ -169,26 +228,47 @@ export function BookingCardActionsMenu({
         style={{ top: coords.top, left: coords.left }}
         onClick={(event) => event.stopPropagation()}
       >
-        {isPending ? (
+        {canConfirmOrDecline ? (
           <>
-            <MenuItem icon={Check} onClick={handleConfirm} disabled={busy !== null}>
+            <MenuItem
+              icon={Check}
+              onClick={handleConfirm}
+              disabled={busy !== null || isPastConfirmWindow}
+              title={isPastConfirmWindow ? confirmTooltip : undefined}
+            >
               {T.confirm}
             </MenuItem>
-            <MenuItem icon={X} onClick={handleDecline} disabled={busy !== null}>
+            <MenuItem
+              icon={X}
+              onClick={handleDecline}
+              disabled={busy !== null || isPastConfirmWindow}
+              title={isPastConfirmWindow ? confirmTooltip : undefined}
+            >
               {T.decline}
             </MenuItem>
           </>
         ) : null}
-        {isPending || isConfirmed ? (
-          <MenuItem icon={Calendar} onClick={handleReschedule} disabled={busy !== null}>
+        {canReschedule ? (
+          <MenuItem
+            icon={Calendar}
+            onClick={handleReschedule}
+            disabled={busy !== null || isPastModifyWindow}
+            title={isPastModifyWindow ? modifyTooltip : undefined}
+          >
             {T.reschedule}
           </MenuItem>
+        ) : null}
+        {isInitiatorWaitingResponse ? (
+          <p className="border-t border-border-subtle bg-bg-input/30 px-3 py-2 text-[11px] leading-snug text-text-sec">
+            {T.awaitingClientResponse}
+          </p>
         ) : null}
         {isConfirmed ? (
           <MenuItem
             icon={X}
             onClick={handleCancel}
-            disabled={busy !== null}
+            disabled={busy !== null || isPastModifyWindow}
+            title={isPastModifyWindow ? modifyTooltip : undefined}
             variant="danger"
           >
             {T.cancel}
@@ -229,6 +309,8 @@ export function BookingCardActionsMenu({
         durationMin={durationMin}
         onClose={() => setRescheduleOpen(false)}
       />
+
+      {promptModal}
     </>
   );
 }
@@ -238,12 +320,14 @@ function MenuItem({
   onClick,
   disabled,
   variant = "default",
+  title,
   children,
 }: {
   icon: LucideIcon;
   onClick: () => void;
   disabled?: boolean;
   variant?: "default" | "danger";
+  title?: string;
   children: ReactNode;
 }) {
   return (
@@ -251,6 +335,7 @@ function MenuItem({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       role="menuitem"
       className={cn(
         "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-bg-input/70 disabled:cursor-not-allowed disabled:opacity-60",

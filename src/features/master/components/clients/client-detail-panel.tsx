@@ -10,7 +10,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { ClientDetailHeader } from "./client-detail-header";
 import { ClientDetailSkeleton } from "./client-detail-skeleton";
 import { ClientDetailStats } from "./client-detail-stats";
-import { ClientNotesDisplay } from "./client-notes-display";
+import { ClientNotesEditor } from "./client-notes-editor";
 import { ClientVisitHistory } from "./client-visit-history";
 import { EmptyDetailState } from "./empty-detail-state";
 
@@ -116,7 +116,13 @@ export function ClientDetailPanel({ selectedKey, onBack }: Props) {
     <article className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <ClientDetailHeader client={client} onBack={onBack} now={now} />
       <ClientDetailStats client={client} now={now} />
-      <ClientNotesDisplay notes={client.notes} />
+      {/* MASTER-CLIENTS-FIX-A #6: notes editor replaces the «Скоро»
+          placeholder. Backend already exposes
+          `PATCH /api/master/clients/[clientKey]/card` with master auth
+          + provider-scoped ownership — pure UI work to surface it.
+          Privacy invariant #25 preserved: notes never leave the
+          master DTO. */}
+      <ClientNotesEditor clientKey={client.key} initialNotes={client.notes} />
       <ClientVisitHistory visits={client.recentVisits} />
 
       {(client.activeBookingId || client.totalHistoryCount > 5) && (
@@ -132,9 +138,16 @@ export function ClientDetailPanel({ selectedKey, onBack }: Props) {
             </Button>
           ) : null}
           {client.totalHistoryCount > 5 ? (
+            // MASTER-CLIENTS-FIX-A #7а: URL used to carry the raw cuid
+            // via `client.key`. Now we pass an HMAC-signed opaque token
+            // (`historyToken`) scoped to the current master. The
+            // bookings page route verifies it before applying the
+            // filter. Two bugs were closed: the URL no longer leaks
+            // internal ids, and the route handler now actually reads
+            // the param (previously ignored it → wrong destination).
             <Button asChild variant="secondary" size="md" className="rounded-xl">
               <Link
-                href={`/cabinet/master/bookings?client=${encodeURIComponent(client.key)}`}
+                href={`/cabinet/master/bookings?client=${encodeURIComponent(client.historyToken)}`}
               >
                 <History className="mr-1.5 h-4 w-4" aria-hidden />
                 {T.allHistory}

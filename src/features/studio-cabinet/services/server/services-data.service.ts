@@ -180,9 +180,16 @@ async function buildCategoriesSidebar(
       servicesCount: countByCategory.get(g.id) ?? 0,
       status: g.status === CategoryStatus.APPROVED ? "APPROVED" : "PENDING",
     }))
-    // APPROVED first then PENDING, alphabetical within each tier.
+    // STUDIO-SERVICES-SORT-A: primary by services count (desc — the
+    // most-populated categories surface first), secondary alphabetical
+    // for stable, predictable ordering when counts tie. Replaces the
+    // previous APPROVED-tier-first sort — APPROVED vs PENDING is
+    // already visually distinguishable via the amber «PENDING» badge,
+    // so the tier no longer needs to drive primary ordering.
     .sort((a, b) => {
-      if (a.status !== b.status) return a.status === "APPROVED" ? -1 : 1;
+      if (a.servicesCount !== b.servicesCount) {
+        return b.servicesCount - a.servicesCount;
+      }
       return a.title.localeCompare(b.title, "ru");
     });
 

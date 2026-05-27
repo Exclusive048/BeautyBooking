@@ -44,6 +44,15 @@ export type StudioMasterDetail = StudioMasterListItem & {
   clientsCount: number;
   averageCheckKopeks: number;
   weekSchedule: WeekScheduleCell[];
+  /**
+   * STUDIO-MASTERS-PRIVACY-FIX-A: HMAC-signed opaque token consumed
+   * by the «Расписание мастера» / «В календарь» Links. Replaces the
+   * raw master cuid that previously leaked into the URL. Verified
+   * server-side at the calendar route against the current studio
+   * scope. Third application of the opaque-URL pattern (after
+   * chat-attachment-token + client-key-token).
+   */
+  viewToken: string;
 };
 
 export type StudioMasterFilter = "all" | "active" | "invited" | "disabled";

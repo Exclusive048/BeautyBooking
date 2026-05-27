@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { MessageSquare, CalendarClock, X } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
+import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -54,6 +55,17 @@ export function BookingRowActions({ booking }: Props) {
   const isTerminal = TERMINAL_STATUSES.has(
     booking.status as (typeof TERMINAL_STATUSES extends Set<infer V> ? V : never),
   );
+  // MASTER-RESCHEDULE-FIX-A: hide Reschedule when a previous change
+  // request is awaiting a response. Backend rejects with 409 "already
+  // has a pending change request" — UI should not even offer the
+  // action. The other side resolves the proposal first.
+  const isAwaitingChangeResponse = booking.status === "CHANGE_REQUESTED";
+  // MASTER-DASHBOARD-FIX-A #3: cancel/reschedule are forbidden by
+  // the backend's `ensureBookingActionWindow` within 60 min of start.
+  // Disable (don't hide) the buttons in that window so the master
+  // can still see they exist — surfaced via tooltip explaining the
+  // 60-min rule. Visibility-over-hiding per the design system.
+  const isPastModifyWindow = isBookingPastModifyWindow(booking.startAtUtc);
   const chatHref = booking.chatSlug
     ? `/cabinet/master/messages?c=${encodeURIComponent(booking.chatSlug)}`
     : null;
@@ -100,13 +112,14 @@ export function BookingRowActions({ booking }: Props) {
           </Link>
         ) : null}
 
-        {!isTerminal ? (
+        {!isTerminal && !isAwaitingChangeResponse ? (
           <button
             type="button"
             aria-label={T.rescheduleAction}
-            title={T.rescheduleAction}
-            className={ICON_BUTTON}
+            title={isPastModifyWindow ? T.modifyWindowExpiredTooltip : T.rescheduleAction}
+            className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-sec`}
             onClick={() => setRescheduleOpen(true)}
+            disabled={isPastModifyWindow}
           >
             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
           </button>
@@ -116,10 +129,10 @@ export function BookingRowActions({ booking }: Props) {
           <button
             type="button"
             aria-label={T.cancelAction}
-            title={T.cancelAction}
-            className={ICON_BUTTON}
+            title={isPastModifyWindow ? T.modifyWindowExpiredTooltip : T.cancelAction}
+            className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-sec`}
             onClick={() => void handleCancel()}
-            disabled={cancelling}
+            disabled={cancelling || isPastModifyWindow}
           >
             <X className="h-3.5 w-3.5" aria-hidden />
           </button>

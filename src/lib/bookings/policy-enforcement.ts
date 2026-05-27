@@ -131,3 +131,82 @@ function toDateKeyUtc(date: Date): string {
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * STUDIO-RESCHEDULE-VALIDATION-A — reschedule-specific pure helpers
+ * extending the same policy file as the booking-window guards above.
+ * Both helpers are side-effect-free (no Prisma) so unit tests can
+ * exhaustively cover the rule semantics without database setup. The
+ * DB-aware caller in `studio/bookings.service.ts:moveStudioBooking`
+ * fetches the rows once and feeds them in.
+ *
+ * Why these live here:
+ *   - `assertMasterPerformsService` rule says "the target master must
+ *     have an enabled MasterService for the booking's serviceId". The
+ *     check itself is one boolean — keeping it here aligns the studio
+ *     reschedule enforcement style with the rest of policy-enforcement.
+ *   - `assertWithinMasterWorkHours` rule says "the new local time must
+ *     fall inside the target master's working window for that
+ *     weekday". The pure helper takes a normalised window shape
+ *     (`startMinutes`/`endMinutes`/`isActive`) plus the booking's
+ *     local minutes, returning explicit error codes.
+ *
+ * Both throw `AppError(422, ...)` mirroring STUDIO-APPROVE-400-FIX-A's
+ * "data understood but unprocessable" pattern — clearer than a bare 400
+ * for the studio admin trying to move a booking onto an incompatible
+ * master or outside hours.
+ */
+
+export type MasterWorkWindow = {
+  /** True when the master works that weekday at all. */
+  isActive: boolean;
+  /** Minutes-from-midnight, inclusive. Null when the day is off. */
+  startMinutes: number | null;
+  endMinutes: number | null;
+};
+
+export function assertMasterPerformsService(input: {
+  hasEnabledMasterService: boolean;
+}): void {
+  if (!input.hasEnabledMasterService) {
+    throw new AppError(
+      "Этот мастер не выполняет выбранную услугу.",
+      422,
+      "MASTER_SERVICE_MISMATCH",
+    );
+  }
+}
+
+export function assertWithinMasterWorkHours(input: {
+  bookingStartMinutes: number;
+  bookingEndMinutes: number;
+  window: MasterWorkWindow;
+}): void {
+  if (!input.window.isActive) {
+    throw new AppError(
+      "Мастер не работает в выбранный день.",
+      422,
+      "OUTSIDE_WORK_HOURS",
+    );
+  }
+  if (input.window.startMinutes === null || input.window.endMinutes === null) {
+    throw new AppError(
+      "Мастер не работает в выбранный день.",
+      422,
+      "OUTSIDE_WORK_HOURS",
+    );
+  }
+  // Booking must start at or after the window opens, AND end at or
+  // before the window closes. Equality is allowed at both edges —
+  // matches how the schedule engine treats inclusive boundaries.
+  if (
+    input.bookingStartMinutes < input.window.startMinutes ||
+    input.bookingEndMinutes > input.window.endMinutes
+  ) {
+    throw new AppError(
+      "Выбранное время вне рабочих часов мастера.",
+      422,
+      "OUTSIDE_WORK_HOURS",
+    );
+  }
+}

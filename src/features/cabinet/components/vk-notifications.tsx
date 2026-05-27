@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { isVkNotificationsEnabled } from "@/lib/env";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -111,13 +112,21 @@ export function VkNotificationsSection({
           <p className="mt-0.5 text-xs text-text-sec">{linked ? vkText.connected : legacyVkText.notConnected}</p>
         </div>
         {linked ? (
+          // VK-NOTIFICATIONS-FLAG-A: disable the toggle (visibility-over-
+          // hiding) when the subsystem is off. Linked status is still
+          // shown — login/connection stays intact. Tooltip explains
+          // the temporary lock so the user doesn't think it's broken.
           <Switch
-            checked={enabled}
+            checked={isVkNotificationsEnabled ? enabled : false}
             onCheckedChange={(next) => void onToggle(next)}
-            disabled={saving}
+            disabled={saving || !isVkNotificationsEnabled}
+            title={!isVkNotificationsEnabled ? vkText.temporarilyUnavailable : undefined}
             className="shrink-0"
           />
         ) : (
+          // The connect button stays enabled regardless of the flag —
+          // VK login is a separate concern and must keep working for
+          // users who want to link their account.
           <Button
             variant="secondary"
             onClick={onConnect}
@@ -131,6 +140,11 @@ export function VkNotificationsSection({
 
       <p className="mt-2 text-xs text-text-sec">{hintText}</p>
       {linked ? <p className="mt-2 text-xs text-text-sec">{enabled ? legacyVkText.enabled : legacyVkText.disabled}</p> : null}
+      {!isVkNotificationsEnabled ? (
+        <p className="mt-2 rounded-lg bg-bg-input/60 px-2.5 py-2 text-xs text-text-sec">
+          {vkText.temporarilyUnavailableHint}
+        </p>
+      ) : null}
       {error ? <p className="mt-2 text-xs text-rose-400">{error}</p> : null}
     </div>
   );
