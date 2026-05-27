@@ -779,6 +779,15 @@ src/
 
 ### 🟡 Технический долг
 
+**T0: Legacy orphan inventory (LEGACY-CLEANUP-AUDIT-A 2026-05-23)** — read-only audit. **~3 694 LOC removable across ~23 files (LARGE scope, 2-phase EXEC pending).**
+- **21 orphan components (0 static import-hits, verified):** `features/schedule/components/{schedule-builder.tsx (1434), schedule-requests-panel.tsx (528)}` (whole dead dir — pre-redesign schedule editor superseded by master/studio cabinet); `features/cabinet/components/{client-dashboard.tsx (360), cabinet-nav-tabs.tsx (34), cabinet-side-nav.tsx (38)}`; `features/master/components/{connected-accounts-section.tsx (165), master-advisor-section.tsx (139), auto-publish-stories-toggle.tsx (111), schedule-settings/breaks/{break-modal.tsx (184), recurring-breaks-section.tsx (52)}}`; `features/home/components/{portfolio-preview-modal.tsx (121), portfolio-stories-bar.tsx (108), home-filters.tsx (42), tag-chips.tsx (31)}`; `features/catalog/components/{search-capsule.tsx (56), map-placeholder.tsx (41)}`; `features/studio-cabinet/components/studio-settings-sidebar.tsx (41)`; `features/media/components/site-logo-manager.tsx (17)`; `components/ui/{dynamic-icon.tsx (65), date-picker.tsx (25), tooltip-hint.tsx (21)}`.
+- **2 dead API routes:** `/api/home/feed/route.ts` (54, no caller), `/api/home/stories/route.ts` (27, only called by orphan `portfolio-stories-bar.tsx`).
+- **1 partial-file edit:** `listStoriesMasters` fn + V1 comment block in `src/lib/feed/stories.service.ts` (file keeps live `getActiveStoriesGroups`/`invalidateStoriesCache`/types).
+- **Stories V1 cluster** (coherent): orphan bar + 2 routes + service fn. Live V2 path (`/api/feed/stories` + `/api/feed/portfolio` via `stories-rail.tsx` + `home-feed.tsx`) untouched.
+- **NOT removable (still imported):** `studio-settings-page.tsx` (837 LOC, 4 route importers — blocked until sub-route redesigns), `focal-image` (38 importers — migration project), FeatureGate deprecated prop (prop-level marker on live component).
+- **Clean:** 0 commented-out code blocks; ~7 TODO/FIXME all legit-recent (3 «inline after migration 20260411180000» now actionable as separate functional micro-task); `.env.example` no stale vars.
+- **EXEC note:** EXEC must also remove 2 allowlist entries from `scripts/check-ui-text.mjs` (`schedule-builder.tsx` + `master-advisor-section.tsx`) + per-file confirm no dynamic `import()` (grep is static-only). 2-phase plan in BACKLOG «🟠 LEGACY-CLEANUP-EXEC».
+
 **T1: Устаревший путь бронирования через slotLabel**
 - Файл: `src/lib/bookings/createClientBooking.ts`
 - Комментарий в коде "legacy slotLabel-path". Два метода (`createBooking` и `createClientBooking`) усложняют код.
@@ -1148,6 +1157,24 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — LEGACY-CLEANUP-AUDIT-A** (commit on `QAfix1`). **Read-only inventory** of remaining deprecated/orphan code — 1st item of whole-platform audit-волна, closing the long-promised legacy-cleanup backlog item. NO code changes, NO deletions. Only doc updates (BACKLOG marker + AI_CONTEXT раздел 8 T0 entry + this changelog).
+  - **Method:** 9-category sweep + bonus. Orphan detection via two passes — basename-word grep (broad) then precise `from "...basename"` import-statement grep (confirmation, 0 hits = orphan). Cross-checked outside-src refs (scripts/prisma).
+  - **Findings — removable (~3 694 LOC / ~23 files, LARGE scope):**
+    - **21 orphan components, 3 613 LOC**, all 0 import-hits verified. Biggest: dead `features/schedule/components/` dir (`schedule-builder.tsx` 1434 + `schedule-requests-panel.tsx` 528 = 1962 LOC — pre-redesign schedule editor, superseded by master/studio cabinet schedule). Then `client-dashboard.tsx` 360, `connected-accounts-section.tsx` 165, `break-modal.tsx` 184, `master-advisor-section.tsx` 139, `portfolio-preview-modal.tsx` 121, `auto-publish-stories-toggle.tsx` 111, `portfolio-stories-bar.tsx` 108, + 13 smaller (`dynamic-icon` 65, `search-capsule` 56, `recurring-breaks-section` 52, `home-filters` 42, `map-placeholder` 41, `studio-settings-sidebar` 41, `cabinet-side-nav` 38, `cabinet-nav-tabs` 34, `tag-chips` 31, `date-picker` 25, `tooltip-hint` 21, `site-logo-manager` 17 — last was PHASE7-CLEANUP-A flagged orphan-candidate, now confirmed).
+    - **2 dead API routes, 81 LOC:** `/api/home/feed/route.ts` (54, zero callers — only self-ref in own error logging), `/api/home/stories/route.ts` (27, only called by orphan `portfolio-stories-bar.tsx`).
+    - **1 partial-file edit:** `listStoriesMasters` fn + V1 comment in `src/lib/feed/stories.service.ts` (file keeps live `getActiveStoriesGroups`/`invalidateStoriesCache`/types).
+  - **Stories V1 cluster** = `portfolio-stories-bar.tsx` (orphan) + `/api/home/stories` + `/api/home/feed` + `listStoriesMasters`. Coherent dead-together unit. **Live V2 stories path** (`page.tsx` → `home-page.tsx` → `home-feed.tsx` → `stories-rail.tsx` → `/api/feed/stories` + `/api/feed/portfolio`) confirmed untouched.
+  - **NOT removable (still imported):** `studio-settings-page.tsx` (837 LOC, imported by 4 settings sub-routes — blocked until those redesign), `focal-image` (38 importers — `<Image>` migration is a project not cleanup), `FeatureGate` deprecated prop (prop-level marker, component live in 10+ files), `booking.prisma` legacy-fields comment (fields referenced).
+  - **Clean categories:** 0 commented-out code blocks; ~7 TODO/FIXME markers all legit-recent (none stale-abandoned) — 3 of them («inline `$queryRaw`/select after `npx prisma generate` for migration 20260411180000» in `catalog.service.ts` + `model-offers/public.service.ts` ×2) now actionable since that migration exists, flagged as separate functional micro-task (NOT dead code); `.env.example` has no stale vars (all present in `env.ts`).
+  - **EXEC follow-up notes:** EXEC must also remove 2 allowlist entries from `scripts/check-ui-text.mjs` (`schedule-builder.tsx` + `master-advisor-section.tsx` — both there as text-check skip entries, not real consumers); per-file confirm no dynamic `import()` (grep is static-only — false-negative risk for dynamically-loaded components); run typecheck after each deletion batch.
+  - **Раздел 8 (Проблемы) — T0 entry added** with full orphan file list + LOC.
+  - **EXEC plan: 2 phases** (BACKLOG «🟠 LEGACY-CLEANUP-EXEC»): Phase 1 = 21 orphan components + check-ui-text allowlist (pure deletion, zero-risk — no importers); Phase 2 = stories V1 backend cluster (2 routes + service-fn partial edit). Could merge to single EXEC given zero-risk, but split keeps pure-deletion separate from partial-file-edit.
+  - **Validation:** typecheck ✅ (no code changes), tests 562/562 untouched, NO deletions, NO source changes. Doc-only commit.
+  - **Pre-launch risks:** NONE security-relevant. No dead auth/billing/payment code in the orphan set. `connected-accounts-section.tsx` (OAuth-adjacent) is a UI section, not auth logic — safe.
+  - **Process insight:** redesign sprints consistently leave orphan pre-redesign components on disk (PHASE7 found 8, this audit finds 21 more). Worth a per-redesign-commit checklist item: «grep new component basename, confirm 0 importers of the superseded one, delete in same commit». Captured for future redesign workflow.
+  - **Open questions for user:** EXEC phasing — 2 phases recommended (or merge to 1 given zero-risk pure-deletion). `ts-prune` install deferred to backlog (Cat 5 unused-exports was heuristic-only — exhaustive needs tooling).
+  - **Next:** LEGACY-CLEANUP-EXEC-A (Phase 1 orphan deletion) when user approves, OR continue audit-волна with next item.
 
 - **2026-05-23 — CLEANUP-BILLING-PROD-A** (commit on `QAfix1`). **Phase 6.1 item 2/6 — verification + runbook hardening only.** No code changes. Cleanup script `scripts/cleanup-duplicate-billing-plans.ts` re-audited end-to-end, FK behaviour confirmed sound, runbook extended with the prod-safety gaps. **Production execution remains user manual ops** (not closeable from this commit — done = execution-log row appended).
   - **Audit findings (script logic):**
