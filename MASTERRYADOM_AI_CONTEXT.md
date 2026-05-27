@@ -952,9 +952,21 @@ src/
 - YooKassa webhook: HMAC-SHA256 подпись + IP allowlist
 
 ### Потенциальные уязвимости
-- OTP в логах (критично, см. P1)
+- ~~OTP в логах (P1, phone)~~ ✅ closed SMS-GATEWAY-A — **но email-канал ещё логирует `code` на send-fail** (SEC-1, см. ниже)
 - Нет явного middleware для auth (каждый handler сам проверяет)
 - JWT без rotation секрета — компрометация AUTH_JWT_SECRET инвалидирует все токены
+
+### SECURITY-AUDIT-A posture (2026-05-23, read-only application-level audit)
+> Complements PHASE6-HARDENING-AUDIT-A (which covered infrastructure: SMS/JWT/rate-limit/deploy). This audit covered application logic: authorization scope, privacy invariants, DTO leaks, PII-in-logs, input validation, injection, cross-tenant isolation, sensitive operations. **6 of 8 categories CLEAN — sprint security patterns held consistently.**
+- **✅ Authorization scope:** 277 API routes; every cabinet/admin/master/studio mutation has an auth guard. 3 guard-less mutations (`log-error`, `search/by-photo`, `support/partnership`) are intentionally public + each rate-limited + Zod-validated.
+- **✅ Cross-tenant isolation:** `ensureStudioRole({ studioId, userId, allowed })` verifies owner-or-active-membership for the *requested* studio (throws 403) — client-supplies-ID-server-authorizes done right. Master scoped by session `providerId`, client by `userId`. No leaks found.
+- **✅ Privacy invariants #25/#26 + HMAC:** regression-tested (`client-privacy.test.ts`, `chat-attachment-acl.test.ts`); 3 HMAC token apps cover sensitive URLs; **no 4th cuid-in-URL case** → HMAC-factory extraction not yet triggered.
+- **✅ DTO leaks:** no hashes/tokens in responses (`vk accessToken` selected internal-only for `logoutVkSession`, not returned); public catalog/feed/provider DTOs carry no phone/email; `link-guest` log uses `maskPhone`.
+- **✅ Input validation:** mutations use `parseBody(req, zodSchema)`; file uploads validate MIME-allowlist + size + magic-byte (`fileTypeFromBuffer`, not trusting Content-Type) + Sharp re-encode.
+- **✅ Sensitive ops:** YooKassa webhook = HMAC-SHA256 signature + IP allowlist + 401-reject (invariant #5); booking state machine `flow.ts` tested; cookies `httpOnly`+`sameSite=lax`+`secure`.
+- **🟠 SEC-1 (High, regression-gap):** email OTP `code` logged on send-fail branch — `auth/otp/email/request:70` + `cabinet/user/profile/email/request-verify:101`, no NODE_ENV guard (fires in prod). Email equivalent of the closed P1 phone issue. Trivial fix (drop `code` from log). Conditional (send-failure-only) → 🟠 not 🔴.
+- **🟡 SEC-2 (Medium, defense-in-depth):** JSON-LD `dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}` on `/u/[username]` (+ faq/layout) embeds user-controlled strings without `<`-escaping. CSP (prod-only, nonce + `strict-dynamic` + no `unsafe-inline`) blocks breakout execution → not script-exec-exploitable in prod. Add `.replace(/</g, "\\u003c")`.
+- **🔵 SEC-3 (Low, ops):** `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` should be domain-restricted in Yandex console.
 
 ---
 
@@ -1157,6 +1169,19 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — SECURITY-AUDIT-A** (commit on `QAfix1`). **Read-only application-level security audit — audit-волна item 2/11.** NO code changes (verified — git surface only `.md` docs). Complements PHASE6-HARDENING-AUDIT-A (infrastructure). 8 categories + bonus swept.
+  - **Result: strong posture — 6 of 8 categories CLEAN.** Confirms the sprint's security patterns (auth guards, #25/#26 privacy invariants, 3 HMAC token apps, Zod validation, `ensureStudioRole` cross-tenant) were applied consistently. **3 findings total: 1 🟠 High, 1 🟡 Medium, 1 🔵 Low** — no 🔴 Critical.
+  - **Method:** endpoint inventory (277 routes) + guard-presence grep on all cabinet/admin/master/studio mutations; raw-SQL + `dangerouslySetInnerHTML` sweep; `log(Info|Error|Warn)` PII grep cross-referenced vs SMS-GATEWAY-A; DTO hash/token leak grep; cross-tenant scope spot-checks; webhook + file-upload + cookie + CSP + NEXT_PUBLIC verification.
+  - **Findings:**
+    - **🟠 SEC-1 (High, regression-gap):** email OTP `code` logged on send-failure branch — `auth/otp/email/request/route.ts:70` + `cabinet/user/profile/email/request-verify/route.ts:101`, `logInfo("... (send failed)", { email, code, expiresAt })` with no NODE_ENV guard (fires in prod). Email-channel equivalent of the phone P1 closed by SMS-GATEWAY-A. Conditional on send-failure + needs log access → 🟠. **Fix:** drop `code` from both logs (trivial). Recommended immediate `SEC-EMAIL-OTP-LOG-FIX-A`. Category: applies-pattern-but-missed-surface.
+    - **🟡 SEC-2 (Medium, defense-in-depth):** JSON-LD on `/u/[username]` (+ faq/layout) embeds user-controlled fields via raw `JSON.stringify` without `<`-escaping → `</script>` breakout structurally possible but **CSP-mitigated in prod** (nonce + strict-dynamic + no unsafe-inline blocks execution). **Fix:** `.replace(/</g, "\\u003c")`. Category: new-gap-not-yet-patterned.
+    - **🔵 SEC-3 (Low, ops):** `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` should be domain-restricted in Yandex console. Category: best-practice.
+  - **Clean categories (explicit):** Authorization scope (3 public endpoints all rate-limited+validated by design); DTO leaks (vk accessToken internal-only, public DTOs no phone/email, link-guest masks phone); Input validation (Zod + magic-byte file checks); Cross-tenant isolation (`ensureStudioRole` verifies membership-for-requested-resource); Privacy invariants #25/#26 (regression-tested) + HMAC (3 apps, no 4th cuid-in-URL case); Sensitive ops (webhook HMAC+IP-allowlist, booking state machine, cookie flags).
+  - **Раздел 10 (Безопасность):** full SECURITY-AUDIT-A posture summary added (per-category CLEAN/finding status + the 3 findings).
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 562/562 tests untouched.
+  - **Recommended next:** `SEC-EMAIL-OTP-LOG-FIX-A` (immediate, ~15 min, mirrors SMS-GATEWAY-A) → optionally `SEC-JSONLD-ESCAPE-FIX` (Medium, schedule) → audit-волна item 3.
+  - **Process insight:** the audit validated that the sprint's invariant-application discipline (#25/#26 + HMAC + Zod + ensureStudioRole) produces consistently-secure surfaces — the only High finding (SEC-1) is itself a *missed surface* of an already-established pattern (SMS-GATEWAY-A's log-hygiene), reinforcing the «trace ALL parallel channels when applying a fix» lesson (phone OTP fixed, email OTP missed — same as the booking create/reschedule parallel-path lesson from STUDIO-CLIENT-WRITE-DIALOG-A).
 
 - **2026-05-23 — UI-TEXT-HARDCODE-FIX-A** (commit on `QAfix1`). **Closed pre-existing hardcoded-Cyrillic debt + restored `check:ui-text` to green.** Debt was masked for ~10 days: `check:ui-text` crashed since PHASE7-CLEANUP-A (stale admin allowlist `statSync`), LEGACY-CLEANUP-EXEC-A fixed the crash, and the now-running checker surfaced findings accumulated across prior booking-widget/public-studio/reviews/media commits — NOT introduced by any single commit.
   - **Audit:** 15 findings, categorized — **9 real hardcoded strings (category A)** + **6 false positives (category B, all Cyrillic prose inside JSDoc/block/JSX comments)**. No category-C (no test-file / console.log / error-throw strings).
