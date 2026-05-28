@@ -211,6 +211,17 @@ export const isVkNotificationsEnabled =
   String(env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED) === "true";
 export const isEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 /**
+ * Runtime mode flag. Used by log-discipline call sites (e.g. OTP routes) to
+ * gate dev-only payload fields like the raw OTP code behind a production
+ * check — so the code is visible in logs locally / on staging (testing
+ * convenience, also saves SMSC.ru credits) but never lands in production
+ * logs (152-ФЗ / secret-in-logs hygiene; see invariant about OTP-in-logs).
+ *
+ * Pattern at call site:
+ *   `logInfo("...", { ..., ...(isProduction ? {} : { code }) });`
+ */
+export const isProduction = env.NODE_ENV === "production";
+/**
  * SMS-GATEWAY-A: SMSC.ru provider gate. Both the toggle and the
  * credentials must be present — otherwise the factory in `src/lib/sms`
  * falls back to the mock provider (OTP-in-logs) so dev login keeps

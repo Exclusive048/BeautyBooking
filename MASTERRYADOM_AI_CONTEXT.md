@@ -952,7 +952,7 @@ src/
 - YooKassa webhook: HMAC-SHA256 подпись + IP allowlist
 
 ### Потенциальные уязвимости
-- ~~OTP в логах (P1, phone)~~ ✅ closed SMS-GATEWAY-A — **но email-канал ещё логирует `code` на send-fail** (SEC-1, см. ниже)
+- ~~OTP в логах (P1 phone + SEC-1 email)~~ ✅ **fully closed** — SMS-GATEWAY-A (phone) + OTP-LOG-DEV-GUARD-A (email + NODE_ENV guard across all 3 surfaces). Production logs strip `code`; dev/staging retain it for testing convenience via shared `isProduction` flag (env.ts) + `maskPhone`/`maskEmail` (`src/lib/logging/masking.ts`).
 - Нет явного middleware для auth (каждый handler сам проверяет)
 - JWT без rotation секрета — компрометация AUTH_JWT_SECRET инвалидирует все токены
 
@@ -964,7 +964,7 @@ src/
 - **✅ DTO leaks:** no hashes/tokens in responses (`vk accessToken` selected internal-only for `logoutVkSession`, not returned); public catalog/feed/provider DTOs carry no phone/email; `link-guest` log uses `maskPhone`.
 - **✅ Input validation:** mutations use `parseBody(req, zodSchema)`; file uploads validate MIME-allowlist + size + magic-byte (`fileTypeFromBuffer`, not trusting Content-Type) + Sharp re-encode.
 - **✅ Sensitive ops:** YooKassa webhook = HMAC-SHA256 signature + IP allowlist + 401-reject (invariant #5); booking state machine `flow.ts` tested; cookies `httpOnly`+`sameSite=lax`+`secure`.
-- **🟠 SEC-1 (High, regression-gap):** email OTP `code` logged on send-fail branch — `auth/otp/email/request:70` + `cabinet/user/profile/email/request-verify:101`, no NODE_ENV guard (fires in prod). Email equivalent of the closed P1 phone issue. Trivial fix (drop `code` from log). Conditional (send-failure-only) → 🟠 not 🔴.
+- ~~**🟠 SEC-1**~~ ✅ **closed by OTP-LOG-DEV-GUARD-A (2026-05-23)** with stricter+broader scope: NODE_ENV guard pattern across all 3 OTP log surfaces (phone + 2 email), `isProduction` flag + shared `maskPhone`/`maskEmail`. Production strips `code`; dev/staging keep it for testing convenience.
 - **🟡 SEC-2 (Medium, defense-in-depth):** JSON-LD `dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}` on `/u/[username]` (+ faq/layout) embeds user-controlled strings without `<`-escaping. CSP (prod-only, nonce + `strict-dynamic` + no `unsafe-inline`) blocks breakout execution → not script-exec-exploitable in prod. Add `.replace(/</g, "\\u003c")`.
 - **🔵 SEC-3 (Low, ops):** `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` should be domain-restricted in Yandex console.
 
@@ -1059,6 +1059,11 @@ src/
 - `toAppError()` — конвертация любой ошибки в AppError
 - Логирование: `logInfo()` / `logError()` из `src/lib/logging/logger.ts` (НЕ `console.log`)
 - `recordSurfaceEvent()` из `src/lib/monitoring/status.ts` — трекинг метрик
+
+**Логирование PII / secrets:**
+- Phone/email в log payloads — через `maskPhone` / `maskEmail` из `src/lib/logging/masking.ts`. Raw PII в production logs = 152-ФЗ exposure
+- OTP codes / tokens / любые **secrets** — НИКОГДА в production logs. Pattern для dev-convenience: `logInfo("...", { ..., ...(isProduction ? {} : { code }) })` где `isProduction` из `src/lib/env.ts`. Production payload strips the field; dev/staging keep it for testing
+- Reference: OTP-LOG-DEV-GUARD-A (2026-05-23) применил pattern к 3 OTP log surfaces; SMS-GATEWAY-A precedent
 
 **API routes:**
 - Паттерн: `withRequestContext(req, async () => { ... })` или прямой try/catch
@@ -1169,6 +1174,24 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — OTP-LOG-DEV-GUARD-A** (commit on `QAfix1`). **Closes SEC-1 (SECURITY-AUDIT-A) with a stricter+broader fix than originally scoped.** Per user decision, applied NODE_ENV guard across all 3 OTP log surfaces (phone + 2 email) instead of just dropping `code` from email logs. Net result: production logs never carry the OTP code, dev/staging keep it for testing convenience (saves SMSC.ru credits + helps QA reproduce flows).
+  - **Pattern:** new shared `isProduction` flag in `src/lib/env.ts` (computed alongside `isVkAuthEnabled`/`isPushEnabled`/`isSmsConfigured`) + new shared `src/lib/logging/masking.ts` (`maskPhone` + `maskEmail`). Call sites use `logInfo("...", { ..., ...(isProduction ? {} : { code }) })`. Mask helpers reused inside the same payloads for `phone`/`email` so the masked surface is consistent.
+  - **3 routes edited:**
+    - `src/app/api/auth/otp/request/route.ts` — phone OTP. After SMS-GATEWAY-A had stripped `code` entirely, this commit adds it back **only in dev/staging**; phone is masked.
+    - `src/app/api/auth/otp/email/request/route.ts` — email OTP request. Send-fail branch's `code` now guarded; both branches mask email.
+    - `src/app/api/cabinet/user/profile/email/request-verify/route.ts` — cabinet email verify. Same: send-fail `code` guarded, email masked in both branches.
+  - **Mock provider untouched** (`src/lib/sms/mock-provider.ts`): it always logs in mock mode (only active when `SMS_PROVIDER_ENABLED=false`, i.e. local dev) — independent of the production guard, by design.
+  - **Existing file-local mask copies preserved** (`maskPhone` in `link-guest-bookings.ts`, `maskEmailAddress` in `support/smtp.ts`) — not modified; new shared exports are the going-forward path. Deduplication is a separate 🔵 refactor candidate.
+  - **Раздел 7 (env discipline):** `NODE_ENV` consumption via the new `isProduction` flag respects rule 11 (env.ts is the single source for env-derived flags). Call sites import `isProduction` from `@/lib/env`, not `process.env.NODE_ENV` directly.
+  - **Раздел 10 (Безопасность):** OTP-in-logs marked **fully closed** (phone via SMS-GATEWAY-A + email via this commit). SEC-1 entry in SECURITY-AUDIT-A posture struck through.
+  - **Раздел 13 (Правила):** new **«Логирование PII / secrets»** sub-rule added — `maskPhone`/`maskEmail` for PII, `isProduction` guard for secrets like OTP codes.
+  - **Tests:** new `src/lib/logging/masking.test.ts` — 10 unit tests. Pins phone masking (format + verbatim-on-short + trim + middle-not-exposed), email masking (format + single-char-local + malformed → `***` + middle-not-exposed), conditional-spread call-site shape (`code` present when `isProduction=false`, absent when `=true`). 562 → **572 tests** (+10).
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), **572/572 tests** ✅, `check:ui-text` ✅ exit 0, `npm run build` ✅ Compiled successfully in 39.7s.
+  - **What was NOT changed:** OTP generation/validation (`generateOtpCode`, `hashOtpCode`, validation flow); SMS provider core; mock provider; email infrastructure; rate-limit; OtpCode schema; existing mask file-locals (link-guest, smtp); other unrelated logging; master + studio + redesign + Phase 6 + LEGACY + UI-TEXT + SMS-GATEWAY work; EMAIL-VERIFY-FIX (P2002, lives in the same cabinet email-verify file but is deferred — only the log statement was touched).
+  - **Pre-launch risks (новых не обнаружено):** the success-branch email logs in the 2 email routes log a masked email (consistent with this fix) but no code (so no SEC-1 class issue). No further unguarded OTP/secret logs uncovered.
+  - **Open questions for user:** нет. Carryover: EMAIL-VERIFY-FIX (P2002 → 500 in cabinet email-verify) remains a pre-launch blocker (🔴 #1 in BACKLOG), separate prompt.
+  - **Process insight (for SPRINT-RETROSPECTIVE-DOC):** the rule «trace ALL parallel channels when applying a security fix» surfaced again — phone OTP fix (SMS-GATEWAY-A) didn't propagate to email channels, surfaced by SECURITY-AUDIT-A, closed here with broader pattern. Same shape as STUDIO-CLIENT-WRITE-DIALOG-A (create + reschedule parallel-path gap). **Pre-launch invariant candidate:** «production logs never contain OTP/passwords/tokens/secrets» — could be added to Раздел 12 if a 4th secret-in-logs site is ever flagged (rule of N=4).
 
 - **2026-05-23 — SECURITY-AUDIT-A** (commit on `QAfix1`). **Read-only application-level security audit — audit-волна item 2/11.** NO code changes (verified — git surface only `.md` docs). Complements PHASE6-HARDENING-AUDIT-A (infrastructure). 8 categories + bonus swept.
   - **Result: strong posture — 6 of 8 categories CLEAN.** Confirms the sprint's security patterns (auth guards, #25/#26 privacy invariants, 3 HMAC token apps, Zod validation, `ensureStudioRole` cross-tenant) were applied consistently. **3 findings total: 1 🟠 High, 1 🟡 Medium, 1 🔵 Low** — no 🔴 Critical.

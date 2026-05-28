@@ -12,6 +12,8 @@ import {
   buildOtpEmailText,
 } from "@/lib/email/templates/otp-code";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
+import { maskEmail } from "@/lib/logging/masking";
+import { isProduction } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
 
@@ -94,17 +96,19 @@ export async function POST(req: Request) {
       text: buildOtpEmailText(code),
     });
 
+    // OTP-LOG-DEV-GUARD-A: `code` only in dev/staging (closes SEC-1
+    // regression-gap vs SMS-GATEWAY-A — production logs never carry it).
     if (!sent) {
       logInfo("Cabinet email OTP requested (send failed)", {
         userId: user.id,
-        email: normalizedEmail,
-        code,
+        email: maskEmail(normalizedEmail),
         expiresAt: expiresAt.toISOString(),
+        ...(isProduction ? {} : { code }),
       });
     } else {
       logInfo("Cabinet email OTP requested", {
         userId: user.id,
-        email: normalizedEmail,
+        email: maskEmail(normalizedEmail),
         expiresAt: expiresAt.toISOString(),
       });
     }
