@@ -293,6 +293,20 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟡 MEDIUM PRIORITY
 
+### FEED-PORTFOLIO-N1-FIX-A (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-1) 🔴 launch-concern
+- **What**: refactor 4 sites in [`src/lib/feed/portfolio.service.ts`](src/lib/feed/portfolio.service.ts) (`listPortfolioFeed`, `listHomePortfolioFeed`, `getPortfolioDetail`, `similarItems` loader) to avoid loading ALL `MasterService` rows per service.
+- **Why**: hot path home feed. 50-item feed × ~2 services × hundreds of masters offering popular services = ~10K rows fetched for ~100 matching. Cache-MISS path + per-user authenticated path hit every request.
+- **Approach**: (a) remove `masterServices` from nested service include; (b) collect `(masterProviderId, serviceId)` tuples from the loaded rows; (c) batch-fetch matching `MasterService` rows in one query (`WHERE (masterProviderId, serviceId) IN tuples`); (d) build lookup `Map<masterId-serviceId, MasterService>`; (e) `resolveServiceOption` consumes the map instead of inline filtering. Same query count (2 instead of 1 nested), but no over-fetch.
+- **Scope**: ~half-day. 4 sites share the same `services.include.service.masterServices` pattern → can refactor once, reuse.
+- **Risk**: medium — touching hot path; comprehensive testing needed. Mitigated by existing pagination/caching + existing `buildPortfolioSnapshot` test coverage.
+- **Trigger**: schedule pre-launch — risk-reward favors fixing before traffic.
+
+### PRISMA-INCLUDE-WHERE-CI-CHECK (structural prevention for PERF-1 class)
+- **What**: `scripts/check-prisma-include-where.mjs` — AST walk over `src/` looking for `prisma.X.findMany({ include: { Y: { include: { Z: { select: {...}, ... } } } } })` patterns where inner `Z` has no `where` clause. Flag for manual review (false positives possible when over-fetch is intentional).
+- **Why**: PERF-1 wasn't caught at PR time because no automation flagged it. Adding this script prevents new instances + can sweep existing code.
+- **Scope**: ~half-day — AST parsing via `typescript` compiler API or `acorn` + Prisma pattern recognition. Add to `quality-gates.yml` after typecheck.
+- **Output**: list of file:line + suggestion to add `where` or explicit `// over-fetch-ok: <reason>` annotation.
+
 ### MONEY-BRAND-TYPE-A (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23)
 - **What**: introduce `type Kopeks = number & { readonly __brand: "Kopeks" }` brand type + factory `kopeks(n: number): Kopeks` + propagate through ~20 sites that currently use bare `number` for money (`MarketingPlanPrice.priceKopeks`, `BillingPayment.amountKopeks`, `MrrInput.priceKopeks`, `Service.price` / `priceOverride`, `bookedServicePrice`, etc).
 - **Why**: bare `number` means TypeScript can't catch «accidentally subtract rubles from kopeks» or «pass duration to a price field». Brand type forces explicit cast at boundaries (Prisma read → `kopeks(row.priceKopeks)`), compile-time guard everywhere else. Pattern proven in TypeScript ecosystem (e.g. `tsbrand`).
@@ -978,6 +992,29 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 ## 🔵 NICE-TO-HAVE
 
+### STORIES-TAKE-CAP (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-2)
+- **What**: add `take: STORIES_MAX_GROUPS * STORIES_MAX_ITEMS_PER_MASTER * 2` safety cap to `prisma.portfolioItem.findMany` in [`stories.service.ts:62`](src/lib/feed/stories.service.ts).
+- **Why**: query currently unbounded; relies on time horizon + provider filter + in-memory cap. If many providers post in 24h, query returns more than needed.
+- **Scope**: ~5 min — single edit. No test impact.
+- **Trigger**: opportunistic, low priority (cached 60s mitigates).
+
+### FINDMANY-TAKE-CI-CHECK (structural prevention for PERF-2 class)
+- **What**: `scripts/check-findmany-take.mjs` — flag `prisma.X.findMany({...})` calls without `take` and without `// known-small: <reason>` annotation. Allowlist for boundedness-by-where (e.g. `id: { in: ids }` pattern is bounded by `ids` length).
+- **Why**: unbounded findMany is a recurring perf risk. Catching at PR time prevents new instances.
+- **Scope**: ~1 hr — pattern recognition + annotation parsing. Add to `quality-gates.yml`.
+
+### BUNDLE-SIZE-BASELINE (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-6)
+- **What**: run `ANALYZE=true npm run build` to generate `@next/bundle-analyzer` baseline report after first prod deploy. Document baseline + thresholds. Optional CI diff check on PR.
+- **Why**: no recorded baseline today. Future bundle-size regressions invisible until user impact (TTFB/LCP).
+- **Scope**: ~1 hr setup + reporting infra (~half-day if CI diff added).
+- **Trigger**: after first prod deploy + first month of real user metrics.
+
+### PORTFOLIO-EDITOR-NEXT-IMAGE (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-4)
+- **What**: convert 2 raw `<img>` in [`src/features/media/components/portfolio-editor.tsx`](src/features/media/components/portfolio-editor.tsx) to `next/image`.
+- **Why**: admin-only flow, not user-facing hot path. Low priority but consistency.
+- **Scope**: ~15 min — both `<img>` are simple `<img src={url} alt="" className="..." />` patterns; `next/image` needs `width`/`height` props (or `fill` for preview lightbox).
+- **Trigger**: opportunistic when touching media editor.
+
 ### BOOKING-PARTIAL-UNIQUE-INDEX-A (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23 — BL-3)
 - **What**: add Postgres partial unique index `CREATE UNIQUE INDEX booking_active_slot_idx ON "Booking"(providerId, masterProviderId, startAtUtc) WHERE status NOT IN ('REJECTED', 'CANCELLED', 'NO_SHOW')` via Prisma raw migration (Prisma schema doesn't have first-class partial unique support yet, so `migration.sql` direct edit).
 - **Why**: defense-in-depth. Current conflict prevention works (Serializable tx + double `ensureNoConflicts` + P2002/P2034 catch — `mapPrismaBookingConflict` already maps both codes). DB-level constraint would catch any future bug in `ensureNoConflicts` rule (e.g. someone forgets to apply buffer minutes correctly). Belt-and-suspenders.
@@ -1081,6 +1118,79 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 > Хронологический индекс sprint'а (новое сверху). **Детальный changelog каждого коммита** — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (audit findings / FEATURE PRESERVATION / per-commit changes / validation / backlog spawned).
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
+
+### 2026-05-23 — PERF-1 N+1 closure
+
+- **FEED-PORTFOLIO-N1-FIX-A** — 🎉 **closes PERF-1 (the single 🔴 from a 9-audit wave)**. Refactored 4 sites in [`src/lib/feed/portfolio.service.ts`](src/lib/feed/portfolio.service.ts) to eliminate nested-include N+1 over-fetch on home feed hot path. **Delivered via 2-phase workflow** (audit Explore subagent + implement+verify subagent). **NO schema migration**, **NO API contract changes** — public DTOs (`PortfolioFeedItem`, `PortfolioDetail`) identical to consumers. **Pattern 2 (5th occurrence) + Pattern 14 (shared helper) + Pattern 5 architectural variant closed.**
+  - **Audit (Phase 1 — Explore subagent):** 4 sites mapped: `listPortfolioFeed` (lines 170-308), `listHomePortfolioFeed` (310-433), `getPortfolioDetail` main query (439-481), `getPortfolioDetail` similarRows query (490-533). All 4 used identical `services.include.service.select.masterServices` pattern with NO `where` filter. `resolveServiceOption` JS predicate: `ms.masterProviderId === input.masterId && ms.isEnabled`. **sharedHelperCandidate = true**, **complexityWarning = empty**, **apiContractRisk = empty** — mechanical refactor safe. STOP-gate cleared.
+  - **Implementation (Phase 2 — implement+verify subagent):**
+    - Stripped `masterServices` from nested include in all 4 Prisma queries.
+    - NEW helper `loadMasterServiceOverridesMap(pairs)` (Pattern 14 — explicit batched lookup): `(masterProviderId, serviceId)` tuples → `Map<string, MasterServiceOverride>` keyed by `${masterProviderId}:${serviceId}`.
+    - NEW helper `collectMasterServicePairs(rows)` dedupes pairs from page rows.
+    - `resolveServiceOption` + `buildPortfolioSnapshot` refactored to consume the precomputed map.
+    - Single batched `prisma.masterService.findMany({ where: { masterProviderId: { in }, serviceId: { in }, isEnabled: true } })` per call site (2 batches for `getPortfolioDetail` — main + similar).
+    - Empty inputs short-circuit (no query fired).
+    - Cuid keys can't collide (both cuids contain no colons; `${masterId}:${serviceId}` joiner unambiguous).
+  - **Performance impact (conceptual, no prod data):**
+    - **Before**: 50-item feed × ~2 services × N masters who ever touched any of those services = ~10K MasterService rows fetched to find ~100 matching. Cross-product over-fetch.
+    - **After**: 50 items + 1 batched query of ≤~100 rows (only relevant master×service pairs that exist + enabled). Cross-product N factor eliminated.
+  - **Tests (+8):** [`src/lib/feed/portfolio.service.test.ts`](src/lib/feed/portfolio.service.test.ts) NEW file — helper short-circuit, key-collision absence, all 4 site behaviors (override application, fallback to service.price/durationMin per existing fallback semantics, empty-page zero-query, exactly-2-queries for detail, similar-rows short-circuit). 603 → **611 tests** ✅.
+  - **Validation (all 8 gates green):** typecheck ✅ / lint baseline 1/3 preserved (no new findings in modified files) / encoding ✅ / mojibake ✅ / check:ui-text ✅ / prisma validate ✅ (NO migration) / build ✅ (Compiled successfully in 30.3s) / 611/611 tests ✅.
+  - **What was NOT changed:** Prisma schema (NO migration). `PortfolioFeedItem` / `PortfolioDetail` DTO shapes. Cache TTL constants (`FEED_PORTFOLIO_CACHE_TTL_SECONDS = 60` in `route.ts`). Cache invalidation discipline (time-based TTL only). Public exports of `portfolio.service.ts`. Other sprint waves.
+  - **Pattern occurrences advanced:**
+    - **Pattern 2 (trace-all-parallel-channels) — 5th occurrence.** 4 sites all needed identical refactor; all fixed in one commit. Prior 4: STUDIO-CLIENT-WRITE-DIALOG-A, SEC-1 via OTP-LOG-DEV-GUARD-A across 3 OTP surfaces, EMAIL-VERIFY-FIX-A (1 of 2 email-write surfaces fixed, second deferred as different fix shape).
+    - **Pattern 14 (explicit helper) — applied.** `loadMasterServiceOverridesMap` + `collectMasterServicePairs` are explicit, side-effect-free helpers. Same shape as `assertBookingWindow` / `assertMasterPerformsService` / `safeJsonLd` family.
+    - **Pattern 5 (coverage-tail) architectural closure.** Sprint discipline «filter-at-query-time, not in-memory» now applied to legacy code that pre-dated the pattern. Same shape as ENV-DISCIPLINE-SWEEP-A (45 inline `process.env.*` reads). Coverage-tail-via-fix-prompt remains valid remediation when gap is bounded (4 sites here, 45 for ENV).
+  - **🎉 0 🔴 findings remaining from audit-волна** (was 1 — PERF-1, now closed).
+  - **Workflow execution:** 2-phase pipeline. 50 tool uses, 12 min elapsed, 363K tokens. Audit Explore agent returned structured JSON; implement subagent consumed audit verbatim + applied refactor + wrote 8 tests + ran all 8 gates inline. **Workflow STOP-gate worked as designed** — if audit had flagged complexity, workflow would have returned `phase: "audit-only"` for user decision before any file changes.
+  - **Carryover (structural prevention deferred to Шаг 3):**
+    - 🟡 `PRISMA-INCLUDE-WHERE-CI-CHECK` — `scripts/check-prisma-include-where.mjs` (~half-day) to flag new instances of nested-include over-fetch at PR-time.
+    - 🔵 `FINDMANY-TAKE-CI-CHECK` — `scripts/check-findmany-take.mjs` (~1 hr) to flag unbounded findMany.
+    - Both reaffirmed in BACKLOG for STRUCTURAL-PREVENTION-AUDIT (Шаг 3, post-волна).
+  - **Audit-волна status:** 9/11 audits + 2 fix-prompts done (DEPLOYMENT-READINESS DR-1 closed via PROD-ENV-SYNC; PERFORMANCE PERF-1 closed via this commit). 2 audits remaining (UI-UX item 10 / DOCUMENTATION item 11).
+
+### 2026-05-23 — Performance static-analysis audit
+
+- **PERFORMANCE-AUDIT-A** — read-only static analysis, **audit-волна item 9/11 (Tier 2)**. Caveat: **static analysis ≠ load testing** — production traffic data needed for full picture (slow-query log / real hot-path / bundle-size user impact). This audit identifies code-readable patterns. **Result: mostly well-tuned — 7 of 8 categories strong; 1 🔴 N+1-shape over-fetch on home feed (pre-sprint legacy pattern, cache-mitigated but launch concern) + 1 🟡 + 4 🔵.** Sprint's caching + pagination + index discipline strong on new code; PERF-1 is pre-sprint pattern that wasn't refactored.
+  - **Method:** 8 categories swept. Hot paths inventoried: `/api/feed/*` (cached home feed), `/api/catalog/*`, `/api/health/*`. Read `feed/portfolio.service.ts`, `feed/stories.service.ts`, `catalog/catalog.service.ts:566+`, `master/clients-view.service.ts`, `billing/trial-cron.ts`. Inventoried Prisma `@@index` declarations across `booking.prisma` (9 indexes) / `provider.prisma` (8 indexes incl. 3 composites for catalog sort+filter) / `service.prisma` (3 covering indexes) / `billing.prisma`. Verified Prisma + Redis singletons, lazy init, `output: "standalone"`, `serverExternalPackages`, 22 `next/image` usages, 1 admin-only raw `<img>`.
+  - **Categories well-tuned (7 of 8):**
+    - **Indexes** — strong coverage. Booking: `(providerId, startAtUtc, endAtUtc)` + `(status, startAtUtc)` covers conflict-check + filter. Provider: 3 composite indexes for catalog (`(isPublished, rating DESC, reviews DESC)`, etc). Service: `(providerId, isEnabled, isActive)` + `(globalCategoryId, isEnabled, isActive)` covering. MasterService: `(masterProviderId, isEnabled)` + `(serviceId, isEnabled)`. Denormalized `ratingAvg/ratingCount/reviews` on Provider avoids aggregation on every catalog query.
+    - **Caching** — `/api/feed/portfolio` Redis 60s TTL (anonymous + unfiltered only — correctly skips per-user/filtered to avoid keyspace explosion), `/api/feed/stories` Redis 60s, advisor cache, catalog smart-tag cache, billing plan cache. Explicit invalidation on writes (ERROR-HANDLING-AUDIT confirmed discipline).
+    - **Pagination** — cursor on feed/portfolio (`take: pageSize + 1`), catalog page-mode with parallel `count`, master clients view cursor + page. Default limits reasonable (`Math.min(50, input.limit)`).
+    - **Cold start / singletons** — Prisma `globalThis.__beautyhubPrisma` HMR-safe singleton, Redis lazy + separate command/subscriber, env.ts startup validation with fail-fast in prod.
+    - **Bundle config** — `output: "standalone"` + heavy server deps in `serverExternalPackages` (redis / @prisma/client / sharp / @aws-sdk/client-s3) excluded from client.
+    - **Image discipline** — 22 files use `next/image`; only 1 raw `<img>` in admin-only `portfolio-editor.tsx`.
+    - **Cron batching** — trial-cron `BATCH_SIZE = 100` with explicit «raise if outgrows» comment. MRR snapshot single-query.
+    - **Hot path cache strategy** — feed correctly caches anonymous-only (per-user `isFavorited` would explode keyspace).
+  - **Findings:**
+    - ~~**🔴 PERF-1 N+1-shape over-fetch**~~ ✅ **CLOSED — FEED-PORTFOLIO-N1-FIX-A (2026-05-23)** via 2-phase workflow. 4 sites refactored, Pattern 14 shared helper `loadMasterServiceOverridesMap` extracted, 8 regression tests added (603→611), no API contract changes, no schema migration. Below: historical entry.
+    - **🔴 PERF-1 (historical, closed)** N+1-shape over-fetch in feed/portfolio `listPortfolioFeed` — [`portfolio.service.ts:228-248`](src/lib/feed/portfolio.service.ts) `services.include.service.masterServices` has **NO `where` filter** → loads ALL `MasterService` rows for each service in the feed, then `resolveServiceOption` filters in JS by `masterProviderId`. For 50-item feed × ~2 services/item × hundreds of masters offering popular services = **~10K MasterService rows fetched to find ~100 matching**. Same pattern in 4 places: `listPortfolioFeed`, `listHomePortfolioFeed` (lines 360-371), `getPortfolioDetail` (lines 459-470), `similarItems` loader (lines 516-527). **Hot path** (home feed). Cache-MISS path + per-user authenticated path hit every request. Fix: refactor to fetch `MasterService` rows by `(masterProviderId, serviceId)` tuple in second batched query, build lookup map, resolve in-memory. Estimate ~half-day. Fix-prompt: `FEED-PORTFOLIO-N1-FIX-A`. Severity **🔴 launch-concern** (cache-mitigated but cache-MISS + auth-path can spike under load).
+    - **🟡 PERF-2 stories `findMany` without `take`** — [`stories.service.ts:62`](src/lib/feed/stories.service.ts) selects all portfolioItems matching time + provider filters, groups in-memory + caps to `STORIES_MAX_GROUPS × STORIES_MAX_ITEMS_PER_MASTER`. Query itself unbounded. Pragmatic at current scale; if many providers post in 24h, query returns more than needed. Cached 60s mitigates per-request load. Fix: `take: STORIES_MAX_GROUPS * STORIES_MAX_ITEMS_PER_MASTER * 2` safety cap. ~5 min. Backlog 🟡 `STORIES-TAKE-CAP`.
+    - **🔵 PERF-3 catalog provider list nested `masters.portfolioItems`** — [`catalog.service.ts:625-634`](src/lib/catalog/catalog.service.ts) studio rows include `masters` → each master's `portfolioItems take: 4`. For studio with N masters, generates N nested queries via Prisma. Not strictly N+1 (single nested-JOIN SQL through Prisma's relation loader) but plan complexity scales with team size. Acceptable at studio scale (typically ≤10 masters); revisit if studios get large. 🔵 monitoring item.
+    - **🔵 PERF-4 raw `<img>` in admin portfolio editor** — [`portfolio-editor.tsx`](src/features/media/components/portfolio-editor.tsx) 2 raw `<img>`. Admin-only, not user-facing. Low priority — could fix opportunistically. Backlog 🔵 `PORTFOLIO-EDITOR-NEXT-IMAGE`.
+    - **🔵 PERF-5 lazy loading underused** — single `next/dynamic` usage in `landing-home.tsx`. Heavy client components (booking widget steps, schedule editors) could be route-split or lazy-loaded. Not blocking — Next.js route-based code-splitting covers most cases.
+    - **🔵 PERF-6 no `@next/bundle-analyzer` baseline** — wired in `next.config.ts:3` but no recorded baseline. Backlog 🔵 `BUNDLE-SIZE-BASELINE` after first prod deploy.
+  - **🛡 Structural Prevention candidates (NEW Шаг 1 demonstrated):**
+
+    | Finding class | Prevention candidate | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | PERF-1 nested-include over-fetch | `scripts/check-prisma-include-where.mjs` — AST walk flagging `findMany({ include: { Y: { include: { Z: { ... no where ... } } } } })` patterns | ~half-day | High (catches new instances at PR-time) | Backlog 🟡 `PRISMA-INCLUDE-WHERE-CI-CHECK` |
+    | PERF-2 unbounded findMany | `scripts/check-findmany-take.mjs` — flag `findMany({...})` without `take` and without «// known-small» annotation | ~1 hr | Medium | Backlog 🔵 `FINDMANY-TAKE-CI-CHECK` |
+    | (general) missing-index detection | manual audit at schema-PR time + QUALITY-GATES checklist addition | manual | Medium | Add to QUALITY-GATES if recurring |
+    | (general) bundle size regression | `npm run analyze` baseline + CI diff check | ~1 hr setup | Low | Backlog 🔵 `BUNDLE-SIZE-CI` |
+    | PERF-3 nested studio queries | runtime spy in dev (Prisma middleware logging slow queries) | ~half-day | Low | Existing dev `prisma log: warn` sufficient |
+    | PERF-4 raw `<img>` discipline | ESLint rule `@next/next/no-img-element` | ~5 min config check | Medium | Verify rule active in eslint config; enable if not |
+
+  - **NO code/schema changes verified** — typecheck ✅ / 603/603 tests preserved / `git status` clean. Read-only discipline preserved.
+  - **Production data needed for**:
+    - PERF-1 actual impact magnitude (depends on portfolio × service × master cardinality in prod)
+    - Real hot-path traffic distribution (req/s per endpoint)
+    - PostgreSQL slow-query log analysis
+    - Bundle size impact on TTFB / LCP (web vitals)
+    - Redis cache hit rate
+  - **Pre-launch risks обнаруженные:** PERF-1 🔴 is real but mitigated by 60s cache on anonymous path. Cache-MISS + authenticated requests hit the over-fetch. Under high traffic + popular services + many masters, can manifest as latency spike. **Recommendation:** schedule `FEED-PORTFOLIO-N1-FIX-A` pre-launch (~half-day refactor; risk-reward favors it).
+  - **Open questions for user:** **(1)** PERF-1 fix — schedule pre-launch (~half-day) or post-launch (riskier but cached path dominates)? **(2)** Structural prevention CI scripts — proactively add now or wait for second occurrence?
+  - **Process insight:** PERF-1 is **pre-sprint legacy pattern** that wasn't refactored during sprint (sprint focused on new features + correctness, not perf refactors). Sprint discipline is strong on **new code** but didn't sweep existing. **Pattern 5 (coverage-tail) shape at architectural level**: «filter-at-query-time, not in-memory» exists conceptually but not enforced retroactively. Same shape as CC-1 (env helpers exist, 45 sites not migrated). **Recommendation:** add structural prevention CI checks (**Pattern 7** tooling-absence remediation) rather than relying on developer discipline alone. The 2 proposed CI scripts (~half-day total) prevent regressions across both legacy + new code. **Combined audit-волна aggregate:** SECURITY 6/8 + 3 findings, CODE-CONSISTENCY 6/8 + 2, TEST-COVERAGE 0 critical + 5 minor, ERROR-HANDLING 8/8 + 1 tooling-gap, DEPLOYMENT-READINESS 7/8 + 1 high-impact closed, BUSINESS-LOGIC 8/8 + 4 design-choice (no bugs), **PERFORMANCE 7/8 + 1 🔴 (pre-sprint legacy) + minor**. Performance is the 2nd-weakest after CODE-CONSISTENCY — both have «sprint code clean, legacy code unmigrated» shape.
 
 ### 2026-05-23 — Business logic correctness audit
 
