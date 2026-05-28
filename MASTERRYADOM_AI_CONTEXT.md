@@ -1065,6 +1065,19 @@ src/
 - OTP codes / tokens / любые **secrets** — НИКОГДА в production logs. Pattern для dev-convenience: `logInfo("...", { ..., ...(isProduction ? {} : { code }) })` где `isProduction` из `src/lib/env.ts`. Production payload strips the field; dev/staging keep it for testing
 - Reference: OTP-LOG-DEV-GUARD-A (2026-05-23) применил pattern к 3 OTP log surfaces; SMS-GATEWAY-A precedent
 
+### CODE-CONSISTENCY-AUDIT-A posture (2026-05-23, read-only audit)
+> Complements SECURITY-AUDIT-A (security patterns) — audited non-security architectural conventions. **6 of 8 categories CLEAN.** Sprint discipline confirmed strong.
+- **✅ Server/client boundary:** no client component imports server-only modules (Prisma/Redis/Node APIs) directly. Memory note about `editor.ts → slotsCache.ts → redisClient.ts` chain pattern holds — separation respected.
+- **✅ HMAC token consistency:** 3 known applications (`chat-attachment`, `client-history`, `studio-master-view`); no 4th cuid-in-URL case found → factory extraction not yet triggered (rule of N=4). The one cuid-in-URL site (`/api/bookings/[id]/ics`) is auth-gated server-side, design-choice not gap.
+- **✅ Phone validation:** centralized via `normalizeRussianPhone`; 2 phone-input components (`booking-flow/phone-input`, `public-studio/you-step`) delegate normalization to parents — legit parent-normalizes design.
+- **✅ Policy enforcement parallel-paths:** `assertBookingWindow` applied in both `createBooking` (`booking-core.ts:323`) and `rescheduleBooking` (`usecases.ts:201`); `moveStudioBooking` applies `assertWithinMasterWorkHours` + `assertMasterPerformsService` (closed by STUDIO-RESCHEDULE-VALIDATION-A + MASTER-RESCHEDULE-FIX-A).
+- **✅ Naming / deep imports:** no `../../../..` 4-level relative imports — `@/` alias used consistently.
+- **✅ Zod parseBody coverage:** 114 mutation files use `parseBody`/`safeParse` — strong coverage, no obvious gaps.
+- **✅ import type discipline:** 619 files use `import type` — strong type-only-import hygiene (supports client/server boundary).
+- **🟡 CC-1 process.env.* discipline (rule 11):** **45 sites** outside the allowed list (env.ts / startup / middleware / proxy / prisma / tests). Mostly mechanical-migration debt — `process.env.NODE_ENV === "production"` (16 sites, now coverable by `isProduction`) + `AUTH_COOKIE_NAME` (3 sites) + various direct env reads (already defined in env.ts schema). Single sweep fix-prompt `ENV-DISCIPLINE-SWEEP-A` (~1-2 hr).
+- **🟡 CC-2 UI_TEXT broader-scope debt:** **306 Cyrillic-containing lines** across 4 cabinet feature dirs (master/studio-cabinet/admin-cabinet/client-cabinet) outside check:ui-text ROOTS. Sample confirms real hardcode (e.g. `plan-card.tsx` month-name array — same pattern UI-TEXT-HARDCODE-FIX-A centralized for booking-widget). Estimated ~30-100 real strings to centralize. Multi-prompt sweep `UI-TEXT-CABINET-SWEEP` (not launch-blocking).
+- **Design-choice note (not findings):** `fixed inset-0` overlays in 10 files are mostly mobile-nav drawers / story viewer / city-prompt overlay — non-modal positioning, different convention from `ModalSurface`. No pseudo-modals masquerading detected on spot-check.
+
 **API routes:**
 - Паттерн: `withRequestContext(req, async () => { ... })` или прямой try/catch
 - Валидация: `parseBody(req, schema)` или `schema.safeParse(body)`
@@ -1174,6 +1187,17 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — CODE-CONSISTENCY-AUDIT-A** (commit on `QAfix1`). **Read-only audit of non-security patterns — audit-волна item 3/11.** Complementary to SECURITY-AUDIT-A. NO code changes (verified — git surface only `.md` docs). 8 categories + bonus swept.
+  - **Result: strong posture — 6 of 8 categories CLEAN.** Sprint's architectural conventions held: server/client boundary (0 client-imports-server violations), HMAC token coverage (3/3 apps + no 4th case), policy enforcement parallel-paths (createBooking + rescheduleBooking + moveStudioBooking all apply asserts), phone validation (parent-normalizes design), naming (no deep relative imports), Zod (114 mutation files), import type (619 files).
+  - **2 findings, both 🟡 Medium (debt-class, not security/runtime):**
+    - **🟡 CC-1 process.env.* discipline (rule 11) — 45 sites** outside allowed list. Mostly mechanical-migration debt: 16 `process.env.NODE_ENV === "production"` (fully covered by new `isProduction` flag from OTP-LOG-DEV-GUARD-A) + 3 `AUTH_COOKIE_NAME` + ~26 direct env reads (TELEGRAM_BOT_TOKEN, WORKER_SECRET, BILLING_RENEW_SECRET, YANDEX_GEOCODER_API_KEY — all already in env.ts schema). Single `ENV-DISCIPLINE-SWEEP-A` fix-prompt (~1-2 hr, mechanical line-replace).
+    - **🟡 CC-2 UI_TEXT broader-scope debt — 306 Cyrillic-containing lines** across 4 cabinet feature dirs outside check:ui-text ROOTS. Sample shows real hardcode (e.g. `plan-card.tsx` month array, same pattern UI-TEXT-HARDCODE-FIX-A centralized for booking-widget). Estimated ~30-100 real strings to centralize. Multi-prompt `UI-TEXT-CABINET-SWEEP` (not launch-blocking — cabinet UI works; debt is consistency + i18n readiness).
+  - **Clean categories explicit:** server/client boundary, HMAC consistency, phone validation, policy enforcement parallel-paths, naming/deep-imports, Zod parseBody coverage, import type discipline, design-choice raw-overlay positioning (10 `fixed inset-0` sites all confirmed mobile-nav/story-viewer/city-prompt — not pseudo-modals).
+  - **Раздел 13 (Правила):** full CODE-CONSISTENCY-AUDIT-A posture summary appended.
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 572/572 tests untouched.
+  - **Recommended next:** `ENV-DISCIPLINE-SWEEP-A` (Medium, mechanical, fast win — closes CC-1 and consumes the just-added `isProduction` helper across 16 sites) → audit-волна item 4. `UI-TEXT-CABINET-SWEEP` is the larger multi-prompt project (defer or schedule per priority).
+  - **Process insight:** CODE-CONSISTENCY validates that the sprint's pattern-application discipline produces consistently architecture-correct surfaces — the 2 findings are both *known-pattern-but-incomplete-coverage* debt classes (env helpers exist but inline reads remain; UI_TEXT exists but cabinet dirs not in check gate). Pattern-existence is strong; pattern-coverage has tail. Same shape as SEC-1 (existing-pattern-missed-surface) but architectural rather than security-class.
 
 - **2026-05-23 — OTP-LOG-DEV-GUARD-A** (commit on `QAfix1`). **Closes SEC-1 (SECURITY-AUDIT-A) with a stricter+broader fix than originally scoped.** Per user decision, applied NODE_ENV guard across all 3 OTP log surfaces (phone + 2 email) instead of just dropping `code` from email logs. Net result: production logs never carry the OTP code, dev/staging keep it for testing convenience (saves SMSC.ru credits + helps QA reproduce flows).
   - **Pattern:** new shared `isProduction` flag in `src/lib/env.ts` (computed alongside `isVkAuthEnabled`/`isPushEnabled`/`isSmsConfigured`) + new shared `src/lib/logging/masking.ts` (`maskPhone` + `maskEmail`). Call sites use `logInfo("...", { ..., ...(isProduction ? {} : { code }) })`. Mask helpers reused inside the same payloads for `phone`/`email` so the masked surface is consistent.
