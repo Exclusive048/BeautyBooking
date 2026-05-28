@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
 import { UI_TEXT } from "@/lib/ui/text";
+import { isProduction } from "@/lib/env";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -104,7 +105,7 @@ export function PWAInstallPrompt() {
     setDeferredPrompt(null);
   };
 
-  if (process.env.NODE_ENV !== "production") return null;
+  if (!isProduction) return null;
 
   return (
     <AnimatePresence>

@@ -4,8 +4,9 @@ import type { RedisClientType } from "redis";
 import { getRedisConnection, getRedisSubscriberConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import type { NotificationEvent } from "@/lib/notifications/types";
+import { isProduction } from "@/lib/env";
 
-const allowMemoryNotifierFallback = process.env.NODE_ENV !== "production";
+const allowMemoryNotifierFallback = !isProduction;
 
 export type NotifierRuntimeStatus = {
   mode: "redis" | "memory" | "unavailable";

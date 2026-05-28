@@ -15,6 +15,7 @@ import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { alertDeadJobs } from "@/lib/monitoring/api-alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { env, isProduction } from "@/lib/env";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
@@ -152,20 +153,20 @@ async function enqueueRetry(job: Job, delayMs: number): Promise<void> {
 
 function resolveHealthcheckUrl(): string {
   const appUrl = (
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.APP_PUBLIC_URL ??
+    env.NEXT_PUBLIC_APP_URL ??
+    env.APP_PUBLIC_URL ??
     "http://127.0.0.1:3000"
   ).trim();
   return `${appUrl.replace(/\/+$/, "")}/api/health/worker`;
 }
 
 function resolveWorkerSecret(): string | null {
-  const secret = process.env.WORKER_SECRET?.trim();
+  const secret = env.WORKER_SECRET?.trim();
   return secret && secret.length > 0 ? secret : null;
 }
 
 async function ensureWorkerRedisReady(): Promise<void> {
-  if (process.env.NODE_ENV !== "production") return;
+  if (!isProduction) return;
 
   const redis = await getRedisConnection();
   if (!redis) {

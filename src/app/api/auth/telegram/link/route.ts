@@ -6,6 +6,7 @@ import { verifyTelegramLogin } from "@/lib/auth/telegram";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
 
     const body = await parseBody(req, telegramLoginSchema);
 
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
       return jsonFail(503, "Telegram not configured", "SYSTEM_FEATURE_DISABLED");
     }

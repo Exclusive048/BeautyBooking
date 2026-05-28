@@ -2,11 +2,11 @@ import { createHash } from "crypto";
 import { alertWarning } from "@/lib/monitoring";
 import { logError } from "@/lib/logging/logger";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
+import { isProduction } from "@/lib/env";
 
 const ERROR_WINDOW_MS = 60_000;
 const DEFAULT_ALERT_COOLDOWN_MS = 5 * 60_000;
 const ALERT_COOLDOWN_KEY_PREFIX = "mon:alert:cooldown:";
-const isProduction = process.env.NODE_ENV === "production";
 const COOLDOWN_DEGRADED_LOG_INTERVAL_MS = 60_000;
 
 const errorCounts = new Map<string, number[]>();

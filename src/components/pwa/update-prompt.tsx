@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
+import { isProduction } from "@/lib/env";
 
 export function PWAUpdatePrompt() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    if (!isProduction) return;
     if (!("serviceWorker" in navigator)) return;
 
     let mounted = true;
@@ -51,7 +52,7 @@ export function PWAUpdatePrompt() {
     };
   }, []);
 
-  if (process.env.NODE_ENV !== "production" || !visible) return null;
+  if (!isProduction || !visible) return null;
 
   return (
     <div className="fixed left-3 right-3 top-3 z-50 pt-safe">

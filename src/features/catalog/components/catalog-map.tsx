@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { providerPublicUrl } from "@/lib/public-urls";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { UI_TEXT } from "@/lib/ui/text";
+import { env } from "@/lib/env";
 
 type MapSearchPayload = {
   bbox: string;
@@ -147,7 +148,7 @@ const FALLBACK_STUDIO_AVATAR = svgDataUri(
 );
 
 function getYmapsUrl(): string {
-  const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
+  const apiKey = env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
   const keyQuery = apiKey ? `&apikey=${apiKey}` : "";
   return `https://api-maps.yandex.ru/2.1/?lang=ru_RU${keyQuery}`;
 }

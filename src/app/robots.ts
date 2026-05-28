@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { resolvePublicAppUrl } from "@/lib/app-url";
+import { isProduction } from "@/lib/env";
 
 const FALLBACK_BASE_URL = "https://мастеррядом.online";
 
@@ -7,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
   const baseUrl = resolvePublicAppUrl() ?? FALLBACK_BASE_URL;
   const sitemap = `${baseUrl}/sitemap.xml`;
 
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
     return {
       rules: [{ userAgent: "*", disallow: ["/"] }],
       sitemap,

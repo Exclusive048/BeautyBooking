@@ -1,6 +1,7 @@
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
+import { isProduction } from "@/lib/env";
 
 export type RateLimitConfig = {
   windowSeconds: number;
@@ -17,7 +18,6 @@ type MemoryBucket = {
 };
 
 const memoryBuckets = new Map<string, MemoryBucket>();
-const isProduction = process.env.NODE_ENV === "production";
 const MEMORY_FALLBACK_MAX_BUCKETS = 20_000;
 const SENSITIVE_ROUTE_PREFIXES = [
   "/api/auth",

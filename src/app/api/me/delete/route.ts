@@ -5,6 +5,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { deleteUserAccount } from "@/lib/deletion/delete-account";
+import { env, isProduction } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -40,11 +41,11 @@ export async function DELETE(req: Request) {
     await deleteUserAccount(auth.user.id);
 
     const res = ok({ deleted: true });
-    const name = process.env.AUTH_COOKIE_NAME ?? "bh_session";
+    const name = env.AUTH_COOKIE_NAME;
     res.cookies.set(name, "", {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       path: "/",
       maxAge: 0,
     });

@@ -1,0 +1,257 @@
+# Sprint Process Patterns
+
+> Synthesized 2026-05-23 from the 16-fix-wave + 5-audit redesign sprint.
+> Audience: future Claude Code sessions, second developer, post-launch maintainers.
+> Companion to [`QUALITY-GATES.md`](./QUALITY-GATES.md) — gates cover **per-commit checks**, this doc covers **how-we-work meta-lessons**.
+>
+> Each pattern: **Trigger** (when it applies) → **Action** (what to do) → **Evidence** (sprint sources). Patterns are evidence-grounded, not abstract — every one cites at least one concrete commit.
+
+---
+
+## 1. Audit-first scope-collapse
+
+**Trigger:** About to build a feature, fix, or new infrastructure.
+
+**Action:** Read existing code first. Grep for related infrastructure (helpers, endpoints, types, actor modes). Confirm scope against reality before writing a plan. Be ready to collapse the plan if the audit reveals existing solutions.
+
+**Evidence:** ~17 sprint outcomes where audit revealed scope smaller than spec assumed. Examples:
+- `STUDIO-SCHEDULE-SETTINGS-A Phase A` — audit found `/api/cabinet/master/schedule` already exposes `STUDIO_ADMIN` actor mode (via `?studioId&masterId`). Scope collapsed from «new endpoint + helpers + tabs» to «UI mirrors only».
+- `PHASE6-HARDENING-AUDIT-A` — 4 status-flips (EMAIL-INFRA, VAPID-PUSH, YANDEX-DEPLOY, CHAT-ATTACHMENT-MIGRATE) revealed prior work already partly/fully done.
+- `SMS-GATEWAY-A` — audit found per-phone rate-limit already in `otp-rate-limit.ts:3` (per-IP + per-phone via Redis). No new rate-limit needed.
+- `STUDIO-MASTERS-FIX-A` — audit found `isStudioMasterActive` predicate already centralized (invariant #24). New endpoint avoided.
+
+**Estimated savings:** 40-60% of nominal work across the sprint.
+
+**Anti-pattern:** writing a fresh implementation without reading the existing module's exports first.
+
+---
+
+## 2. Trace-ALL-parallel-channels (regression-gap)
+
+**Trigger:** Fixing a class of issue (validation, logging, policy enforcement, security check, error handling) on one surface.
+
+**Action:** Grep for ALL surfaces of that class — booking-create + booking-reschedule, phone-OTP + email-OTP, master-cancel + studio-cancel, etc. Apply the fix to every parallel path in the same commit. Don't ship a partial fix and rely on a future audit to catch the rest.
+
+**Evidence:** 3 occurrences in this sprint, each surfaced by a later audit:
+- `STUDIO-CLIENT-WRITE-DIALOG-A` — booking-create endpoint validated, **reschedule path missed** initially; caught + closed in same commit after audit.
+- `SEC-1` (in `SECURITY-AUDIT-A`) — phone-OTP `code` removed from logs by `SMS-GATEWAY-A`, **email-OTP `code` still logged** on send-failure branches. Phone fix did not propagate to the parallel channel.
+- `OTP-LOG-DEV-GUARD-A` — discovered and closed the gap, applying NODE_ENV guard to all 3 OTP log surfaces (phone + 2 email).
+
+**Checklist:** when fixing a `logInfo(...)`, search for similar `logInfo` lines across phone/email/SMS paths. When fixing a validation, search for similar mutations across create/update/move/cancel.
+
+---
+
+## 3. Cascade-orphan re-scan
+
+**Trigger:** After deleting a file (especially as part of legacy cleanup or a redesign superseding old code).
+
+**Action:** Re-run the orphan-detection scan. A removed file's exclusive imports may newly orphan — orphan-ness cascades through the dependency chain. Don't assume a single sweep catches everything.
+
+**Evidence:**
+- `LEGACY-CLEANUP-EXEC-A` Phase 1 deleted `portfolio-stories-bar.tsx` → Phase 2 audit discovered `story-viewer.tsx` was now a cascade-orphan (its sole importer just gone) → `LEGACY-CLEANUP-EXEC-C` closed it.
+- The cascade went 2 hops: `portfolio-stories-bar.tsx` (Phase 1) → `story-viewer.tsx` (Phase 3 EXEC-C) → `StoryMaster`/`StoryPhoto` types (also Phase 3, partial-file edit).
+
+**Detection:** after `git rm <file>`, grep for the file's basename across the codebase. Then grep for any module the deleted file was the *sole* importer of.
+
+---
+
+## 4. Quality-gate health monitoring
+
+**Trigger:** Any quality gate (`check:ui-text`, `lint`, `typecheck`, `test`) shows a non-zero exit status.
+
+**Action:** Distinguish between **exit-1-by-findings** (gate works; findings are actionable) and **exit-1-by-crash** (gate is broken; missing-file `statSync` throw, parser error, missing dependency). Read the actual error message. Don't treat «exit 1» as an opaque «expected failure».
+
+**Evidence:**
+- `check:ui-text` crashed for **~10 days** (since PHASE7-CLEANUP-A 2026-05-13) on stale allowlist entries pointing to deleted files. The exit-1-by-crash was misread as exit-1-by-findings → debt silently accumulated.
+- `LEGACY-CLEANUP-EXEC-A` removed the stale entries → checker actually ran → surfaced 15 pre-existing hardcoded-Cyrillic findings → `UI-TEXT-HARDCODE-FIX-A` closed them and refined the comment-skip pass.
+
+**Periodic check:** during full-gate runs (`npm run check`), inspect each gate's actual output, not just the exit code. Schedule a quarterly «gate health review».
+
+---
+
+## 5. Pattern-coverage-tail («known-pattern-but-incomplete-coverage»)
+
+**Trigger:** When establishing a new pattern (helper, invariant, security rule) in one wave.
+
+**Action:** Recognise that pattern *creation* ≠ pattern *coverage*. The wave that creates a pattern typically applies it to ~1-3 surfaces; pre-pattern code that needs migration remains. **Schedule a separate migration sweep** rather than assuming the pattern auto-applies.
+
+**Evidence (4 of 5 audits hit this shape):**
+- `CC-1` — `env.ts` helpers exist; 45 sites still read `process.env.*` directly (inline `secure: process.env.NODE_ENV === "production"`, etc).
+- `CC-2` — `UI_TEXT` exists; 4 cabinet feature dirs outside `check:ui-text` ROOTS contain ~306 Cyrillic-containing lines.
+- `SEC-1` — `isProduction` log-guard pattern existed in spirit (mock provider only logs in dev); email-OTP paths missed the explicit guard.
+- `TEST-COVERAGE` — regression-test-per-fix discipline strong; baseline-flow integration tests lighter (no DB-test infra).
+
+**Remediation:** after a pattern wave, file a `*-SWEEP-A` backlog item with concrete file count (e.g. `ENV-DISCIPLINE-SWEEP-A` for 45 sites).
+
+---
+
+## 6. Regression-test-per-fix discipline
+
+**Trigger:** Closing any bug or implementing a new invariant.
+
+**Action:** Add a regression test in the same commit. The test pins the rule the bug violated (or the invariant introduced). Test count grows alongside the codebase, not behind it.
+
+**Evidence (positive pattern, confirmed by `TEST-COVERAGE-AUDIT-A`):** sprint added 214 tests across 22 files (358 → 572). Tests cluster around files that received fixes:
+- `flow.test.ts` (28 state-machine tests after `MASTER-BOOKING-UI-FIX-A`)
+- `policy-enforcement.test.ts` + variants (after `STUDIO-RESCHEDULE-VALIDATION-A`)
+- `chat-attachment-acl.test.ts` (after `MASTER-CHAT-ATTACHMENT-FIX-A`)
+- `client-privacy.test.ts` (after `MASTER-PRIVACY-FIX-A`)
+- `masking.test.ts` (after `OTP-LOG-DEV-GUARD-A`)
+
+**Outcome:** the same bug cannot ship twice. The audit map confirms 8/8 categories in `ERROR-HANDLING-AUDIT-A` were strong, attributable largely to this discipline.
+
+**Anti-pattern:** shipping a fix with «manual verification only» — works for the immediate change but provides no future-regression guarantee.
+
+---
+
+## 7. Tooling-absence vs coverage-gap distinction
+
+**Trigger:** When categorising a gap from an audit.
+
+**Action:** Distinguish two gap classes:
+- **Coverage-tail** — pattern exists; remediation is migrating pre-pattern code (one mechanical sweep).
+- **Tooling-absence** — the tool/infrastructure doesn't exist yet; remediation is building it from scratch.
+
+Different effort, different scheduling, different risk.
+
+**Evidence:**
+- Coverage-tail examples: CC-1 (env helpers exist, sweep 45 sites), CC-2 (UI_TEXT exists, sweep cabinet dirs), SEC-1 (log-guard pattern existed, apply to email).
+- Tooling-absence example: `EH-1` (no Sentry/APM at all — can't migrate to a non-existent tool; must add it first). Different remediation, different effort.
+
+**Anti-pattern:** lumping both as «consistency debt» and underestimating tooling-absence as «just migrate».
+
+---
+
+## 8. Redesign-commit checklist (5-step)
+
+**Trigger:** Redesigning a component / route / area, when the new implementation supersedes existing code.
+
+**Action:** Apply this 5-step checklist in the same commit:
+1. **Grep new component basename** — confirm name doesn't collide with existing.
+2. **Confirm 0 importers** of the superseded component — verify what you're about to delete is actually dead.
+3. **Trace backend dependencies** of the removed UI — routes/services/functions that existed only for that UI. They become orphans together.
+4. **Re-scan for cascade-orphans** after deletion (see Pattern 3).
+5. **Delete all in same commit:** UI + routes + services + cascade tail. Don't leave stories-V1-backend orphan for months.
+
+**Evidence:**
+- `LEGACY-CLEANUP-AUDIT-A` discovered 21 orphan components across cabinets — most from prior redesign waves that deleted new UI but left superseded UI on disk.
+- Stories V1 cluster (LEGACY EXEC-A/B/C) became a 3-phase cleanup that should have been one commit at the original redesign.
+- PHASE7-CLEANUP-A (May 13) + LEGACY-CLEANUP-AUDIT-A (May 23) collectively found ~50 orphan files (~6 200 LOC) that should have been deleted at their original redesign commits.
+
+**Cost of skipping:** months of dead code on disk, broken quality gates (stale allowlist entries — see Pattern 4), confusion about what's live.
+
+---
+
+## 9. HMAC opaque tokens for privacy-sensitive URLs (rule of N=4)
+
+**Trigger:** Building a URL that exposes a privacy-sensitive identifier (cuid, master id, client id) to the client.
+
+**Action:** Use an HMAC-signed opaque token instead of raw `${cuid}` in the URL. The signed token encodes the id + scope + expiry + purpose claim.
+
+**Evidence (3 applications, rule-of-N=4 for factory extraction):**
+- `chat-attachment` — `src/lib/media/chat-attachment-token.ts` (MASTER-CHAT-ATTACHMENT-FIX-A)
+- `client-history` — `src/lib/master/client-key-token.ts` (MASTER-CLIENTS-FIX-A)
+- `studio-master-view` — `src/lib/studio/master-view-token.ts` (STUDIO-MASTERS-PRIVACY-FIX-A)
+
+Each has a distinct `purpose` claim preventing cross-replay. Each is auth-aware (verifies the calling user's scope matches the token's payload).
+
+**Factory-extraction trigger:** at N=4 sites, extract a shared `createHmacUrlToken({ payload, purpose, ttl })` factory. Until then, three near-identical implementations are acceptable per the project's «small repetition over premature abstraction» preference.
+
+**Anti-pattern:** raw `/api/clients/${cuid}` in client-rendered URLs — exposes internal identifiers to log scrapers, browser history, third parties.
+
+**Exception (design-choice, not gap):** auth-gated endpoints where the cuid is the natural REST identifier and the server-side authorization check enforces ownership (e.g. `/api/bookings/[id]/ics` — `getSessionUser()` verifies the booking belongs to the caller).
+
+---
+
+## 10. Visibility-over-hiding UX
+
+**Trigger:** Building an action button whose enablement depends on state (e.g. cancel button when within deadline, reschedule when booking is confirmed).
+
+**Action:** Render the button **disabled with a tooltip explaining why**, rather than hiding it. User learns the capability exists + understands the current blocker.
+
+**Evidence:**
+- `MASTER-BOOKING-UI-FIX-A` — action buttons (Confirm/Decline/Reschedule/Cancel) render disabled+tooltip when the action's preconditions aren't met (initiator already waiting / outside 60-min window / wrong status).
+- `STUDIO-MASTERS-FIX-A` — INVITED masters render disabled+tooltip on assignment pickers instead of being filtered out, so studio admin sees the master exists but needs to accept the invite first.
+
+**Anti-pattern:** hiding the button entirely → user thinks the action isn't available at all → support tickets.
+
+---
+
+## 11. Defense-layering
+
+**Trigger:** Implementing a rule (validation, security check, policy enforcement, conflict detection).
+
+**Action:** Apply the rule at multiple layers — UI prevents most violations (validation, disable, hide invalid options), backend enforces always (last-resort source of truth). Don't rely on a single layer.
+
+**Evidence:**
+- `STUDIO-RESCHEDULE-VALIDATION-A` — UI master picker filters at source (incompatible masters shown disabled+tooltip); backend `assertMasterPerformsService` + `assertWithinMasterWorkHours` enforces always.
+- SMS upload — Sharp re-encoding + MIME allowlist + magic-byte sniff + size guard (3 layers + the upload route's per-user rate limit).
+- Booking conflict — UI doesn't show conflicting slots; backend `ensureNoConflicts` enforces always (race-handles via Prisma P2002).
+- Rate-limit — sensitive routes fail-closed at gate level even if client misses retry-after handling.
+
+**Anti-pattern:** «backend validates so UI can skip» — UX suffers (users click and discover failure); or «UI filters so backend doesn't need to» — server is the only trusted boundary.
+
+---
+
+## 12. Two-sided pushback (constructive disagreement)
+
+**Trigger:** User issues a directive that the agent sees as a likely-regression risk.
+
+**Action:** Push back with the specific concern and propose a compromise that satisfies both the user's goal and the constraint the user may have missed. Don't blindly comply if you have evidence the request will break something.
+
+**Evidence:**
+- `OTP-LOG-DEV-GUARD-A` — user proposed conditionally restoring OTP `code` in logs for dev convenience. Agent confirmed the goal was sound but pushed for NODE_ENV guard pattern (rather than naive revert), AND extended scope to the 2 email surfaces that had the same class issue. Result: closes SEC-1 + serves dev convenience + maintains production security.
+- `LEGACY-CLEANUP-EXEC-C` — when user asked «what's next after EXEC-B», agent flagged the cascade-orphan `story-viewer.tsx` that the strict EXEC-B scope had left + recommended closing it for clean stories-V1 removal. Compromise: stay in scope for EXEC-B + spawn EXEC-C immediately rather than backlog.
+
+**Anti-pattern:** «user wants X, ship X exactly» when X breaks an invariant. The user values being told «here's a risk in X, here's Y that gives you the same outcome without the risk» — and explicitly invited this stance via the «if you see risk, say so» rule.
+
+---
+
+## 13. «Verified ready» vs «выполнено» status discipline
+
+**Trigger:** Closing a backlog item that depends on an action you cannot perform from the agent context (production execution, external cron registration, third-party console config).
+
+**Action:** Mark status «⚠️ verified ready for prod execution» — NOT «✅ выполнено» — until the action actually happened in production. «Done» means done-end-to-end, not «code is ready to run».
+
+**Evidence:**
+- `CLEANUP-BILLING-PROD-A` — script verified + runbook hardened, but **not run on prod** (Postgres unavailable in dev env). Marked «verified ready», stays open until execution-log row appended.
+- `CHAT-ATTACHMENT-MIGRATE` — migration file committed, but `prisma migrate deploy` deferred until Phase 6 deploy window. Stays open.
+- `MRR-CRON` — endpoint + worker handler + runbook ready; external cron registration deferred to YANDEX-DEPLOY-A. Stays open.
+
+**Anti-pattern:** marking «done» based on code-ready state. Misleads future planning + creates surprises when prod state diverges from the closed backlog.
+
+---
+
+## Audit-волна consolidated stats (post-item-5)
+
+| Audit item | Result | New findings | Process insight captured |
+|---|---|---|---|
+| 1. `LEGACY-CLEANUP` | done + 3 EXEC phases (~3 700 LOC removed) | 0 | Patterns 3, 8 |
+| 2. `SECURITY-AUDIT` | 6/8 clean → +1 fix ship (`OTP-LOG-DEV-GUARD-A`) | 1 🟠→fixed, 1 🟡, 1 🔵 | Patterns 2, 5 |
+| 3. `CODE-CONSISTENCY` | 6/8 clean | 2 🟡 | Patterns 5, 7 |
+| 4. `TEST-COVERAGE` | 0 critical, 5 minor | 3 🟡, 2 🔵 | Pattern 6 |
+| 5. `ERROR-HANDLING` | 8/8 strong | 1 🟡 (tooling) | Pattern 7 |
+
+**Repeating shapes:** «known-pattern-but-incomplete-coverage» (Pattern 5) — 4 of 5 audits hit this; the 5th (ERROR-HANDLING) revealed a new shape — «tooling-absence» (Pattern 7), the first non-coverage gap class surfaced.
+
+**Pattern-application discipline produced highly-resilient surfaces.** The audit-волна validates that the sprint's invariant-application + regression-test-per-fix + defense-layering yields code that survives scrutiny.
+
+---
+
+## Framework alignment note
+
+The user uploaded an `ai-dev-framework` codifying ~80% of these patterns externally. Decision was to **defer framework adoption post-launch** — these patterns evolved organically during the sprint and are documented here as project-internal lessons. If/when the framework is adopted post-launch, this document maps cleanly to most of its sections — no rewrite needed, just cross-reference.
+
+---
+
+## When to consult this doc
+
+- **Before designing a fix:** patterns 1, 2 (audit-first; trace parallel channels).
+- **Before a redesign commit:** pattern 8 (5-step checklist).
+- **After deletion:** patterns 3, 4 (cascade re-scan; gate health).
+- **When adding tests:** pattern 6 (regression-per-fix).
+- **When closing a backlog item:** pattern 13 (verified-ready vs выполнено).
+- **When user pushes a request you see risk in:** pattern 12 (constructive pushback).
+- **When the audit-волна yields a gap:** patterns 5, 7 (coverage-tail vs tooling-absence).
+
+For per-commit checks (typecheck, lint, encoding, tests, prisma, context updates), see [`QUALITY-GATES.md`](./QUALITY-GATES.md).

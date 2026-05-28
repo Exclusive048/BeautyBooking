@@ -24,6 +24,7 @@ import { SWRProvider } from "@/components/providers/swr-provider";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
+import { env } from "@/lib/env";
 
 ensureVisualSearchStartupConfig();
 
@@ -75,7 +76,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"),
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"),
   title: {
     default: UI_TEXT.meta.title,
     template: `%s | ${UI_TEXT.brand.name}`,

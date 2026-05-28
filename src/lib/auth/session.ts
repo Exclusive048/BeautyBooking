@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
+import { env, isProduction } from "@/lib/env";
 import {
   REFRESH_TOKEN_TTL_SECONDS,
   signAccessToken,
@@ -26,7 +26,7 @@ export function getRefreshCookieName(): string {
 }
 
 function isSecureCookie(): boolean {
-  return process.env.NODE_ENV === "production";
+  return isProduction;
 }
 
 type SessionCookiePayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti" | "sid">;

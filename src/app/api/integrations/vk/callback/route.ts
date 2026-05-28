@@ -8,6 +8,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { exchangeVkCodeForToken, fetchVkProfile, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { readSignedVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
 import { nextRedirect } from "@/lib/http/origin";
+import { isProduction } from "@/lib/env";
 
 const payloadSchema = z.object({
   code: z.string().trim().min(1),
@@ -19,14 +20,14 @@ function clearVkCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   cookieStore.set(VK_ID_STATE_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     path: "/",
     maxAge: 0,
   });
   cookieStore.set(VK_ID_VERIFIER_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     path: "/",
     maxAge: 0,
   });
