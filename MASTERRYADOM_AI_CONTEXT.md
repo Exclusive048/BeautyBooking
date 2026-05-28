@@ -863,7 +863,23 @@ src/
 - Environment: node
 - Plugins: vite-tsconfig-paths (поддержка `@/` алиасов)
 
-### Тестовые файлы (45 файлов / 358 тестов, актуально 2026-05-19)
+### TEST-COVERAGE-AUDIT-A posture (2026-05-23, read-only audit)
+> Updates the earlier «45 файлов / 358 тестов» snapshot. Current: **67 test files / 572 tests** (sprint added 214 across 22 files). Coverage strong on critical paths + invariants + regression scenarios; 2 moderate gaps (webhook signature + file upload validation) + tooling absence.
+- **Distribution:** heavy in `src/lib/` — booking (9 files), schedule (8), billing (7), sms (3), chat+media (6), cities (3); features lighter (regression-test pattern — tests follow fixes).
+- **✅ Booking lifecycle:** state machine (28 tests in `flow.test.ts`) + policy-enforcement + reschedule-policy + reschedule-enforcement + action-state + client-privacy + idempotency-key + reminders + link-guest. Illegal transitions blocked + 60-min cancel/reschedule window + cancellation deadline tested.
+- **✅ Billing pure helpers:** features (29) + marketing (19) + trial (15) + utils period-math (14) + guards (6) + mrr (6) + mrr-snapshot (6) = ~95 tests. **Known gap (documented backlog):** createBooking integration, cancelBooking, marketing-pricing.load SSR, idempotency Prisma-touching, getCurrentPlan, full subscribe/refund/proration integration — deferred until integration-test infra exists.
+- **✅ Invariants regression-tested:** #25 master CRM privacy (`client-privacy.test.ts` 13 tests, type-level + source-level guards) + #26 chat attachment ACL (`chat-attachment-acl.test.ts` 8 tests + `chat-attachment-token.test.ts` 11 tests). Policy helpers covered.
+- **✅ Auth pure helpers:** jwt sign/verify (7) + otp generation/hash (3) + otp-flow integration (3). Rate-limit + session + role guards are Prisma/Redis-bound — need integration infra to test (note as 🟡 below).
+- **✅ Test quality:** zero assertion-less files (all 67 use `expect()`). No smoke-only files.
+- **✅ Schedule pure logic:** slots (4) + slotsCache (5) + slots-range (2) + dateKey (4) + overlap (1) + publish-horizon (4) + booking-days (2) + studio-slot-aggregation (9) = 31 tests.
+- **✅ SMS + masking:** SMSC provider (17) + sender (4) + mock (3) + masking (10) = 34 tests (SMS-GATEWAY-A + OTP-LOG-DEV-GUARD-A waves).
+- **🟡 TC-1 Webhook signature verify gap:** `src/app/api/payments/yookassa/webhook/route.ts` has inline `verifySignature` (HMAC-SHA256) + IP allowlist (per invariant #5), but **no dedicated test file**. Pure-helper test feasible (mock fetch with known signature → assert verify/reject behavior). Security-critical (payment confirmation) — moderate severity.
+- **🟡 TC-2 File upload validation chain gap:** booking-reference + chat-attachment uploads validate MIME-allowlist + size + magic-byte sniff (`fileTypeFromBuffer`) + Sharp re-encode, but **no unit tests** for the validation predicates (`validateReferenceAsset`, `validateChatAttachmentAsset`). The shape is testable as pure functions independent of HTTP route.
+- **🟡 TC-3 Auth integration coverage:** rate-limit logic (Redis-bound), session creation/invalidation (Prisma-bound), role guards (Prisma-bound), OAuth flows (VK/Telegram), all currently uncovered. **Same root cause** as billing integration gap — needs integration-test infra. Same backlog item.
+- **🔵 TC-4 Coverage tooling absent:** no c8/vitest --coverage configured. Gap analysis is manual. Easy backlog: add `npm run test:coverage` with thresholds for critical paths.
+- **🔵 TC-5 E2E framework absent:** no Playwright/Cypress. **Expected for MVP.** Once production launches + integration confidence proven, add minimal critical-journey smoke E2E (master signup → publish; client browse → book → review).
+
+### Тестовые файлы (67 файлов / 572 тестов, актуально 2026-05-23 — обновлено TEST-COVERAGE-AUDIT-A)
 
 **Новое в TEST-COVERAGE-A (2026-05-19):** `src/lib/billing/utils.test.ts` (15) + `src/lib/billing/marketing-pricing.test.ts` (19) + `src/lib/billing/guards.test.ts` (6) + `src/lib/bookings/flow.test.ts` (32) + `src/lib/bookings/idempotency-key.test.ts` (6) — pure-helper coverage. `quality-gates.yml` уже запускает `npm run test` в CI (T7 закрыт).
 
@@ -1065,6 +1081,23 @@ src/
 - OTP codes / tokens / любые **secrets** — НИКОГДА в production logs. Pattern для dev-convenience: `logInfo("...", { ..., ...(isProduction ? {} : { code }) })` где `isProduction` из `src/lib/env.ts`. Production payload strips the field; dev/staging keep it for testing
 - Reference: OTP-LOG-DEV-GUARD-A (2026-05-23) применил pattern к 3 OTP log surfaces; SMS-GATEWAY-A precedent
 
+### ERROR-HANDLING-AUDIT-A posture (2026-05-23, read-only audit)
+> Audit-волна item 5. **8 of 8 categories strong** — sprint's error-handling discipline is the most consistently-applied pattern audited so far. Single moderate gap: no error-aggregation/APM instrumentation. NO new 🔴/🟠 findings beyond already-tracked items.
+- **✅ Typed error registry:** **112 error codes** centralized in `src/lib/api/errors.ts`; `AppError` class + `toAppError` catch-all converter used in 10+ files. No raw `Internal Server Error` / scattered string literals.
+- **✅ React error boundaries:** all 4 present and recoverable — `src/app/(admin)/error.tsx`, `(cabinet)/error.tsx`, `(public)/error.tsx`, `global-error.tsx`. Each renders retry-button via `onClick={reset}`. Per-route-group + global fallback.
+- **✅ Loading/empty/error states:** 18 `loading.tsx` route-level files; data-fetching components consistently expose `isLoading`/`error`/empty states.
+- **✅ Graceful degradation:**
+  - Redis cache miss → returns null, callers fall back to DB
+  - Prisma `P2002` (unique race) handled in 3+ booking sites + chat conversation-slug race + MRR snapshot race
+  - External APIs use `AbortController` (yookassa, telegram, Yandex maps suggest/geocode)
+  - SMS provider outage → 503 + retry guidance (SMS-GATEWAY-A fail-soft pattern)
+  - **Known un-mapped P2002 case:** `🔴 #1 EMAIL-VERIFY-FIX` (already in pre-launch blockers) — only such gap.
+- **✅ Logging level appropriateness:** zero `logInfo` calls inside `catch` blocks (errors correctly logged at error level). `error.stack` appears only in `logError` payloads (server logs), never in API response bodies.
+- **✅ Sensitive data в error paths:** `AppError.message` returned to client is the curated Russian user-friendly string (controlled by caller); raw Prisma/exception messages go to `logError` only. Stack traces never leak to client. PII masked via OTP-LOG-DEV-GUARD-A `maskPhone`/`maskEmail` where applicable.
+- **✅ Error code consistency:** single registry (112 codes, SCREAMING_SNAKE_CASE).
+- **✅ Fail-closed where needed:** `src/lib/rate-limit/index.ts:153` — sensitive auth/booking routes get `{ limited: true, retryAfter: 60 }` on Redis failure; line 170 — non-sensitive routes fail-open with `logError`. OTP rate-limit → 503 `RATE_LIMIT_UNAVAILABLE`. YooKassa webhook → 401 on invalid signature (not 500). Webhook auth + signature validation correct.
+- **🟡 EH-1 Observability — no Sentry/APM/error-aggregation tooling.** Zero `Sentry`/`@sentry`/`datadog`/`newrelic`/`posthog` instrumentation. Production debugging relies entirely on log scraping. Not launch-blocking (logs are structured + central error code registry helps grep) but significant quality gap for production triage. **Backlog:** add Sentry (or alternative) — well-defined ~half-day setup task.
+
 ### CODE-CONSISTENCY-AUDIT-A posture (2026-05-23, read-only audit)
 > Complements SECURITY-AUDIT-A (security patterns) — audited non-security architectural conventions. **6 of 8 categories CLEAN.** Sprint discipline confirmed strong.
 - **✅ Server/client boundary:** no client component imports server-only modules (Prisma/Redis/Node APIs) directly. Memory note about `editor.ts → slotsCache.ts → redisClient.ts` chain pattern holds — separation respected.
@@ -1187,6 +1220,32 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — ERROR-HANDLING-AUDIT-A** (commit on `QAfix1`). **Read-only audit of error handling + observability — audit-волна item 5/11.** NO code changes (verified — git surface only `.md` docs). 8 categories + bonus swept.
+  - **Result: STRONGEST audit-wave outcome yet — 8 of 8 categories strong.** Sprint's error-handling discipline is consistently applied across all surfaces. **1 🟡 Medium gap (observability tooling), no new 🔴/🟠 findings** beyond already-tracked 🔴 #1 email-verify P2002.
+  - **Method:** typed error registry inventory (`src/lib/api/errors.ts` — 112 codes); error boundary file inventory; loading.tsx route count; Redis/Prisma/external API degradation patterns; `logInfo` in catch-block detection (zero); `error.stack` in response-body detection (zero); webhook signature reject path; rate-limit fail-closed verification.
+  - **Findings — only 1:**
+    - **🟡 EH-1 No Sentry/APM/error-aggregation tooling.** Zero instrumentation found across `Sentry`, `@sentry`, `datadog`, `newrelic`, `posthog`. Production debugging would rely entirely on log scraping (logs are structured + 112 typed codes help grep, but no breadcrumbs, no aggregation, no stack-trace history, no error rate alerting). **Not launch-blocking** (logs exist and SECURITY+TEST-COVERAGE audits showed error paths well-handled) but significant gap for production triage quality. Well-defined backlog: add Sentry (or alternative) — ~half-day setup. Fix-prompt: `OBSERVABILITY-SENTRY-A`.
+  - **Strong categories (all 8 explicit):** typed error registry (112 codes, AppError class, toAppError converter widely used); 4 React error boundaries with reset() retry UI; 18 route-level loading.tsx files; graceful degradation across Redis (null fallback) + Prisma (P2002 race-handled in 3+ booking sites + chat slug + MRR snapshot) + external APIs (AbortController on yookassa/telegram/maps); fail-soft SMS 503; logging discipline (zero logInfo-in-catch, error.stack only in server logs); sensitive-data hygiene (curated Russian AppError.message to client, no Prisma verbatim leaks); fail-closed rate-limit on sensitive routes (line 153); webhook 401 on invalid signature (invariant #5).
+  - **Cross-reference (not new finding):** the single un-mapped P2002 case is `🔴 #1 EMAIL-VERIFY-FIX` already in pre-launch blockers — verified by this audit as the only such gap, otherwise P2002 handling is consistent.
+  - **Раздел 13 (Правила):** full ERROR-HANDLING-AUDIT-A posture appended with per-category breakdown.
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 572/572 tests untouched.
+  - **Recommended next:** `OBSERVABILITY-SENTRY-A` (Medium, ~half-day, well-defined) → audit-волна item 6 (PERF / SPRINT-RETROSPECTIVE / other) OR pivot to pending fix-prompts (WEBHOOK-VERIFY-TEST-A, UPLOAD-VALIDATION-TEST-A from TEST-COVERAGE, ENV-DISCIPLINE-SWEEP from CODE-CONSISTENCY).
+  - **Process insight:** ERROR-HANDLING audit yielded the strongest result of the audit-волна so far (zero new gaps beyond observability). Combined with: SECURITY 6/8 clean + 3 findings, CODE-CONSISTENCY 6/8 clean + 2 findings, TEST-COVERAGE 0 critical gaps + 5 minor, ERROR-HANDLING 8/8 strong + 1 gap — the **audit-волна collectively confirms the sprint's pattern-application discipline produced highly-resilient surfaces**. The repeating gap shape is «known-pattern-but-incomplete-coverage» (env discipline 45 sites, UI_TEXT cabinet sweep, OTP log surfaces — all migration-tail debts). The new gap class surfacing here (observability tooling) is the first **tooling-absence** finding rather than pattern-coverage finding.
+
+- **2026-05-23 — TEST-COVERAGE-AUDIT-A** (commit on `QAfix1`). **Read-only audit of test coverage — audit-волна item 4/11.** NO code changes (verified — git surface only `.md`). 67 test files / 572 tests sampled across 8 areas + bonus.
+  - **Result: strong posture — critical paths well-covered.** Sprint discipline (regression test per fix) yielded ~95 billing tests, 28 booking-flow tests, 31 schedule tests, 39 chat+ACL+token tests, 34 SMS+masking tests. Zero assertion-less files. Invariants #25/#26 + HMAC tokens regression-tested. No 🔴 critical gaps.
+  - **Distribution:** heavily lib-weighted (booking 9 files, schedule 8, billing 7, chat+media 6, SMS 3, cities 3 — features lighter, regression-test pattern). 
+  - **3 🟡 Medium gaps + 2 🔵 Low (tooling):**
+    - **🟡 TC-1 Webhook signature verify gap** — yookassa webhook `verifySignature` (HMAC-SHA256, security-critical for payment confirmation) has no dedicated test. Feasible as pure-helper test (mock fetch + known signature). Fix-prompt: `WEBHOOK-VERIFY-TEST-A` (~30 min, ~5 tests).
+    - **🟡 TC-2 File upload validation chain gap** — `validateReferenceAsset` / `validateChatAttachmentAsset` + MIME-allowlist + size + magic-byte sniff implemented but not unit-tested. Booking-reference + chat-attachment upload routes consume them. Fix-prompt: `UPLOAD-VALIDATION-TEST-A` (~30 min, ~6-8 tests).
+    - **🟡 TC-3 Auth integration coverage** — rate-limit (Redis-bound), session create/invalidate (Prisma-bound), role guards (Prisma-bound), OAuth flows (VK/Telegram) currently uncovered. Same root cause as billing integration gap. Single solve: stand up integration-test infra (db-test container + Redis-test). Larger backlog item, defers to post-launch.
+    - **🔵 TC-4 Coverage tooling absent** — no c8/vitest --coverage. Manual gap analysis only. Easy backlog: add `npm run test:coverage` with thresholds for critical paths (e.g. lib/bookings ≥80%, lib/billing pure helpers ≥75%).
+    - **🔵 TC-5 E2E framework absent** — Playwright/Cypress not present. **Expected for MVP** per project stage. Once production launches + integration coverage solid, add minimal critical-journey smoke E2E (master signup → publish; client browse → book → review).
+  - **Раздел 9 (Тестирование):** full TEST-COVERAGE-AUDIT-A posture appended with per-area breakdown. Test count updated 45/358 → 67/572.
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 572/572 tests untouched.
+  - **Recommended next:** small-scope wins first — `WEBHOOK-VERIFY-TEST-A` (TC-1, 30 min, security-critical helper) → `UPLOAD-VALIDATION-TEST-A` (TC-2, 30 min, defense-in-depth) → coverage-tooling setup (TC-4) when convenient → integration-test infra (TC-3) post-launch.
+  - **Process insight:** the coverage map confirms the sprint's **regression-test-per-fix discipline** — most tests cluster around files that received fixes (flow, policy, ACL, HMAC, masking, MRR snapshot). This is a **strong pattern for preventing the same bug twice**. Baseline-flow coverage is lighter (cleaner createBooking integration without DB-mocking infra is genuinely hard) — that's the integration-infra gap, not a discipline gap. The 2 moderate findings (TC-1/TC-2) are both *pure-helper test gaps* that don't need integration infra — easy fast-wins.
 
 - **2026-05-23 — CODE-CONSISTENCY-AUDIT-A** (commit on `QAfix1`). **Read-only audit of non-security patterns — audit-волна item 3/11.** Complementary to SECURITY-AUDIT-A. NO code changes (verified — git surface only `.md` docs). 8 categories + bonus swept.
   - **Result: strong posture — 6 of 8 categories CLEAN.** Sprint's architectural conventions held: server/client boundary (0 client-imports-server violations), HMAC token coverage (3/3 apps + no 4th case), policy enforcement parallel-paths (createBooking + rescheduleBooking + moveStudioBooking all apply asserts), phone validation (parent-normalizes design), naming (no deep relative imports), Zod (114 mutation files), import type (619 files).
