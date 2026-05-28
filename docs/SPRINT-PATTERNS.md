@@ -232,6 +232,30 @@ Each has a distinct `purpose` claim preventing cross-replay. Each is auth-aware 
 
 ---
 
+## 14. Explicit `assertX(...)` helpers for business invariants
+
+**Trigger:** When implementing a rule that must hold at multiple call sites (booking-time policy, master-service compatibility, work-hours window, etc).
+
+**Action:** Define a side-effect-free `assertX(...)` helper that throws `AppError(status, code, message)` on violation, place it in a domain-specific `policy-enforcement.ts` (or analogous module), and call from every entry point (create + reschedule + studio-move + slot-generation surfaces). The helper itself takes plain primitives (no Prisma deps) so unit tests cover the rule semantics exhaustively without DB setup.
+
+**Evidence (BUSINESS-LOGIC-AUDIT-A 2026-05-23 — strongest audit outcome, 0 critical / 0 high findings):**
+- `assertBookingWindow` (policy-enforcement.ts) — three surfaces: slot generation / `createBooking` / `rescheduleBooking`. Closed BOOKING-WIDGET-A gap (slot endpoints used to surface impossible-to-book times). Pattern 2 (trace-ALL-parallel-channels) reinforcement.
+- `assertMasterPerformsService` (policy-enforcement.ts) — applied at `createBooking` + `moveStudioBooking` + `createStudioBooking` (STUDIO-RESCHEDULE-VALIDATION-A + STUDIO-BUGS-FIX-A).
+- `assertWithinMasterWorkHours` (policy-enforcement.ts) — applied at studio reschedule + studio move.
+- `assertAcceptsNewClient` (policy-enforcement.ts) — applied at `createBooking` when `acceptNewClients=false`.
+- `ensureBookingActionWindow` + `ensureCancellationDeadline` (flow.ts) — applied at `cancelBooking` + `rescheduleBooking`.
+
+**Outcome:** the 6 `assertX` helpers above cover the booking system's core invariants. Unit tests in `flow.test.ts` (32 tests) + `policy-enforcement.test.ts` + `reschedule-policy.test.ts` (11 tests) + `create-booking-enforcement.test.ts` (7 tests) lock the rules. **0 critical / 0 high business-logic findings across 8 categories** in BUSINESS-LOGIC-AUDIT-A is strongly correlated with this pattern's adoption.
+
+**When NOT to use:**
+- For one-shot validation at a single call site, inline the check (no need for a helper).
+- For complex multi-table validation (e.g. «client's lifetime spending qualifies them for a discount»), use a domain service, not a one-line assertion.
+- For typed contract validation, use Zod schemas (`parseBody`) — `assertX` is for runtime invariants AFTER parsing succeeds.
+
+**Composition with Pattern 2:** when a new domain entry point appears (e.g. a new admin booking-mutation endpoint), audit the `assertX` family — every one that applies must be wired. Same trace-all-parallel-channels discipline that found STUDIO-CLIENT-WRITE-DIALOG-A regression-gap (createStudioBooking missed work-hours guard).
+
+---
+
 ## Audit-волна consolidated stats (post-item-5)
 
 | Audit item | Result | New findings | Process insight captured |
@@ -263,5 +287,6 @@ The user uploaded an `ai-dev-framework` codifying ~80% of these patterns externa
 - **When closing a backlog item:** pattern 13 (verified-ready vs выполнено).
 - **When user pushes a request you see risk in:** pattern 12 (constructive pushback).
 - **When the audit-волна yields a gap:** patterns 5, 7 (coverage-tail vs tooling-absence).
+- **When implementing a multi-site business invariant:** pattern 14 (explicit `assertX` helper).
 
 For per-commit checks (typecheck, lint, encoding, tests, prisma, context updates), see [`QUALITY-GATES.md`](./QUALITY-GATES.md).

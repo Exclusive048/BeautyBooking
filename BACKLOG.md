@@ -293,6 +293,13 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟡 MEDIUM PRIORITY
 
+### MONEY-BRAND-TYPE-A (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23)
+- **What**: introduce `type Kopeks = number & { readonly __brand: "Kopeks" }` brand type + factory `kopeks(n: number): Kopeks` + propagate through ~20 sites that currently use bare `number` for money (`MarketingPlanPrice.priceKopeks`, `BillingPayment.amountKopeks`, `MrrInput.priceKopeks`, `Service.price` / `priceOverride`, `bookedServicePrice`, etc).
+- **Why**: bare `number` means TypeScript can't catch «accidentally subtract rubles from kopeks» or «pass duration to a price field». Brand type forces explicit cast at boundaries (Prisma read → `kopeks(row.priceKopeks)`), compile-time guard everywhere else. Pattern proven in TypeScript ecosystem (e.g. `tsbrand`).
+- **Scope**: ~half-day. (1) Define `Kopeks` brand + factory in `src/lib/types/money.ts`; (2) propagate through `marketing-pricing.ts` / `mrr.ts` / `mrr-snapshot.ts` / `booking-core.ts effectivePrice` / `createBooking.ts bookedServicePrice` / `webhook-processor.ts` (~20 sites); (3) `Service.price` Prisma type stays `Int` but read-time cast `kopeks(row.price)`. No schema migration.
+- **Cost vs value**: ~half-day cost. Value: compile-time guard against entire bug class. No current bug — proactive.
+- **Trigger**: schedule when next major billing/pricing surface change happens — opportunistic with that work.
+
 ### OTP-EMAIL-LOGIN-RACE (spawned from EMAIL-VERIFY-FIX-A 2026-05-23)
 - **Что**: [`src/app/api/auth/otp/email/verify/route.ts:71-82`](src/app/api/auth/otp/email/verify/route.ts) does `findUnique({email})` then conditional `create({email})` — between read and create two parallel first-time logins for the same email could both miss `existingProfile`, both call `create`, one P2002s. Currently un-handled → 500 на one of the two parallel users.
 - **Why deferred (different shape from EMAIL-VERIFY-FIX-A)**: this is a **registration first-time-login race**, NOT an «email already used by another account» scenario. The right fix is **recover-by-re-read** (mirror the [`conversation-slug.ts`](src/lib/chat/conversation-slug.ts) + [`detect-city.ts`](src/lib/cities/detect-city.ts) + [`mrr-snapshot.ts`](src/lib/billing/mrr-snapshot.ts) pattern): on P2002 → re-fetch by email, return the row created by the race winner. NOT a 409 to user (they did nothing wrong — both are legitimately trying to log in with their own email).
@@ -971,6 +978,24 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 ## 🔵 NICE-TO-HAVE
 
+### BOOKING-PARTIAL-UNIQUE-INDEX-A (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23 — BL-3)
+- **What**: add Postgres partial unique index `CREATE UNIQUE INDEX booking_active_slot_idx ON "Booking"(providerId, masterProviderId, startAtUtc) WHERE status NOT IN ('REJECTED', 'CANCELLED', 'NO_SHOW')` via Prisma raw migration (Prisma schema doesn't have first-class partial unique support yet, so `migration.sql` direct edit).
+- **Why**: defense-in-depth. Current conflict prevention works (Serializable tx + double `ensureNoConflicts` + P2002/P2034 catch — `mapPrismaBookingConflict` already maps both codes). DB-level constraint would catch any future bug in `ensureNoConflicts` rule (e.g. someone forgets to apply buffer minutes correctly). Belt-and-suspenders.
+- **Scope**: ~1 hr — single raw SQL migration + verify `mapPrismaBookingConflict` already handles P2002 from this index (it does — generic catch). NO app code change.
+- **Risk**: if existing data violates the index (improbable but possible if old rows exist with overlapping start times in non-terminal status), migration fails. Pre-migration check via `SELECT (providerId, masterProviderId, startAtUtc), count(*) FROM "Booking" WHERE status NOT IN (...) GROUP BY 1 HAVING count(*) > 1`.
+
+### BOOKING-STATUS-PROMOTION-CRON (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23 — BL-2)
+- **What**: optional periodic worker job that promotes `Booking.status` PENDING/CONFIRMED → IN_PROGRESS/FINISHED based on `startAtUtc + duration + grace`. Mirrors what `resolveBookingRuntimeStatus` computes at runtime.
+- **Why**: only matters if/when analytics queries need DB-level filter on these statuses (e.g. `SELECT count(*) WHERE status = 'FINISHED' AND startAtUtc BETWEEN x AND y`). Currently UI uses runtime helper — no need.
+- **Scope**: ~2 hr — queue job (mirror MRR-snapshot pattern) + periodic cron trigger + worker handler updating rows matching the computed criteria. Idempotent (no-op if status already FINISHED).
+- **Trigger**: only if analytics surface needs it post-launch.
+
+### BOOKING-AUDIT-LOG-A (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23 — BL-4)
+- **What**: dedicated `BookingAuditLog` Prisma model + service for booking create/cancel/reschedule events. Captures actor (client/master/admin) + before/after state + reason + timestamp + IP/UA.
+- **Why**: when first dispute arises («who cancelled my booking and when?»), current investigation relies on `logInfo` app logs — searchable but not queryable. Compliance posture stronger with structured table.
+- **Scope**: ~1 day — schema migration + service + integration at 3 sites (createBooking / cancelBooking / rescheduleBooking) + admin UI to surface log in booking detail view.
+- **Trigger**: post-launch when first dispute or compliance request surfaces. Not urgent — `logInfo` app logs cover most needs.
+
 ### ENV-TEMPLATES-CI-CHECK (spawned from PROD-ENV-EXAMPLE-SYNC-A 2026-05-23)
 - **What**: `scripts/check-env-templates.mjs` that walks `src/lib/env.ts` schema → greps both `.env.example` and `.env.production.example` → fails CI on missing var. Add to `quality-gates.yml` after `Prisma validate`.
 - **Why**: structural prevention of DR-1-shape drift (Pattern 5 variant 3 — drifted mirror artifact). PROD-ENV-EXAMPLE-SYNC-A was reactive; this is proactive — CI catches a missing var the moment env.ts gets a new field. Same protection class as `check:ui-text` (UI hardcode) and `check:mojibake` (encoding).
@@ -1056,6 +1081,40 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 > Хронологический индекс sprint'а (новое сверху). **Детальный changelog каждого коммита** — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (audit findings / FEATURE PRESERVATION / per-commit changes / validation / backlog spawned).
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
+
+### 2026-05-23 — Business logic correctness audit
+
+- **BUSINESS-LOGIC-AUDIT-A** — read-only audit, **audit-волна item 8/11 (Tier 2)**. Complementary с предыдущими (TEST-COVERAGE / SECURITY / ERROR-HANDLING / CODE-CONSISTENCY / DEPLOYMENT-READINESS). Этот covers **business logic correctness** (pricing math / booking lifecycle / subscription flows / schedule rules / idempotency / audit log integrity / cross-cutting invariants). **Result: STRONGEST audit-wave outcome yet — 0 🔴 critical, 0 🟠 high, 4 🟡 design-choice/gap (not bugs), 8 of 8 categories well-implemented.** Sprint's business logic discipline is the most consistently-applied pattern in the codebase.
+  - **Method:** 8 categories + bonus swept. Inventoried `src/lib/billing/*` (15 files), `src/lib/bookings/*` (24 files), `src/lib/payments/yookassa/*`, `src/lib/schedule/*`, `src/lib/audit/*`, key prisma schema models. Read `flow.ts` + `policy-enforcement.ts` + `createBooking.ts` + `cancelBooking.ts` + `booking-core.ts` + `idempotency.ts` + `webhook-processor.ts` + `marketing-pricing.ts` + `mrr.ts` + `utils.ts addMonthsUtc` + `trial.ts` + `guards.ts` end-to-end. Cross-referenced prior audit findings (not re-reported).
+  - **Categories well-implemented (8 of 8):**
+    - **Pricing correctness** — kopeks (integer) used throughout (marketing-pricing.MarketingPlanPrice.priceKopeks: number, BillingPayment.amountKopeks: Int, MrrInput.priceKopeks: number). `calcSavingsPercent` guards null/zero/negative + period=1; `Math.round` enforces integer. `mrr.calculateMRR` guards divide-by-zero. `utils.addMonthsUtc` day-clamps (Jan 31 + 1mo → Feb 28). `yookassa formatAmount` uses `(kopeks / 100).toFixed(2)` — kopeks at billing scale safely within Float exact-representation.
+    - **Booking lifecycle** — 11 statuses (NEW/PENDING/CONFIRMED/CHANGE_REQUESTED/REJECTED/IN_PROGRESS/PREPAID/STARTED/FINISHED/CANCELLED/NO_SHOW) consolidated to 6 runtime via `normalizeBookingStatus`. `resolveBookingRuntimeStatus` computes IN_PROGRESS/FINISHED via `startAtUtc + duration + 60min grace`. `ensureBookingActionWindow` 60-min cancel cutoff. `ensureCancellationDeadline` honours provider's `cancellationDeadlineHours` + special-case `<= 0` = «cancellation forbidden». `cancelBooking` handles «client declines master's reschedule» edge case (CONFIRMED stays). 32 tests in `flow.test.ts`.
+    - **Subscription flows** — `trial.activateTrialForNewProvider` transaction-wrapped + 3-step eligibility check (existing active / ever-had-PREMIUM / plan exists). UTC math, no DST traps. YooKassa webhook: terminal-state early-return prevents reprocessing, `alreadySucceeded` flag prevents duplicate audit/notification on retry, atomic tx for payment + subscription. `idempotenceKey @unique` + `yookassaPaymentId @unique` DB-level. Plan cache invalidation wired.
+    - **Schedule/work hours** — `assertWithinMasterWorkHours` inclusive boundaries. `assertMasterPerformsService` enforced on create + reschedule + studio move (Pattern 2 closure). `assertBookingWindow` applied at three surfaces (slots / createBooking / rescheduleBooking — Pattern 2). Timezone-aware via `toUtcFromLocalDateTime` / `toLocalDateKey`.
+    - **Master/service correctness** — `resolveBookingCore` validates 10 conditions; `isStudioMasterActive` (invariant #24) enforced.
+    - **Idempotency/race** — 5 of 6 P2002 sites mapped (booking 409, chat/cities/MRR silent re-read, email-verify 409). Last latent: OTP-EMAIL-LOGIN-RACE (low probability backlog 🟡). Booking creation: Redis idempotency 600s + Serializable tx + double `ensureNoConflicts` + P2002/P2034 catch.
+    - **Audit log integrity** — AdminAuditLog + BillingAuditLog have no `updatedAt`; service exports only `create`/`createSafe` (no update/delete); `adminUserId onDelete: Restrict` (invariant #16). Effectively immutable. Strict/safe variants documented (#18/#19).
+    - **Cross-cutting invariants** — all 26 documented invariants enforced; #25/#26 regression-tested.
+  - **Findings (all 🟡 — design-choice or gap, not bugs):**
+    - **🟡 BL-1 Kopeks bare `number` type** (style/compile-time). No brand type `type Kopeks = number & { __brand: "Kopeks" }`. Misuse possible: dev accidentally subtracts rubles from kopeks. Backlog 🟡 `MONEY-BRAND-TYPE-A` (~half-day, single type def + propagate).
+    - **🟡 BL-2 Runtime booking status not persisted** (documented design choice). `resolveBookingRuntimeStatus` computes IN_PROGRESS/FINISHED at-runtime, doesn't write to DB. UI/admin uses runtime helper consistently. Acceptable for current scale; periodic cron promotion possible if analytics need DB-level filter. Backlog 🔵 `BOOKING-STATUS-PROMOTION-CRON`.
+    - **🟡 BL-3 No DB-level booking-conflict unique constraint** (design choice). `Booking` has no partial unique index on `(providerId, masterProviderId, startAtUtc) WHERE status NOT IN (REJECTED, CANCELLED, NO_SHOW)`. Conflict prevention via Serializable tx + double `ensureNoConflicts` + P2034 catch. Works correctly; partial unique index would add belt-and-suspenders. Schema migration. Backlog 🔵 `BOOKING-PARTIAL-UNIQUE-INDEX-A`.
+    - **🟡 BL-4 Booking lifecycle NOT in audit log** (gap by design). Booking events via `logInfo` (operational), not audit. Rationale: high-volume + user-initiated, different compliance class than admin actions. If dispute «who cancelled my booking» — investigation relies on app logs. Could add `BookingAuditLog` model. Backlog 🔵 `BOOKING-AUDIT-LOG-A` (post-launch when needed).
+  - **🛡 Structural Prevention candidates (NEW Шаг 1 demonstrated):**
+
+    | Finding class | Prevention | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | BL-1 kopeks misuse | Brand type `Kopeks = number & { __brand }` + propagate ~20 sites | ~half-day | High (compile-time) | Backlog 🟡 `MONEY-BRAND-TYPE-A` |
+    | BL-3 conflict race | Partial unique index migration | ~1 hr + migration | Medium (defense-in-depth; current works) | Backlog 🔵 schema |
+    | (general) state-machine illegal transitions | `assertValidTransition(from, to)` helper + apply at all status writes | ~half-day | Medium (future-proofing) | Backlog 🔵 |
+    | (general) Pattern 2 parallel-channel discipline | Manual code-review checklist + SPRINT-PATTERNS awareness | manual | Strong already | No additional infra needed — sprint discipline working |
+    | (general) DB-immutability for audit logs | TypeScript guard: audit-service exports `create`/`createSafe` only (no update/delete API) | already done | Strong | Preserved by code review |
+
+  - **NO new invariants needed** — existing 26 enforced. Possible future invariant once OTP-EMAIL-LOGIN-RACE closed: «каждый P2002 → user-friendly error либо silent recovery, никогда 500» (currently 5 of 6 mapped).
+  - **NO code/schema changes verified** — typecheck ✅ / 603/603 tests preserved / `git status` clean (this audit adds only docs). Read-only discipline preserved.
+  - **Pre-launch risks обнаруженные:** **0 🔴 critical, 0 🟠 high.** All 4 findings 🟡 design-choice/gap (not bugs). Pre-launch deployment readiness unaffected.
+  - **Open questions for user:** **(1)** BL-1 brand type — schedule now (~half-day refactor) vs post-launch? **(2)** BL-3 partial unique index — schedule now (schema migration) vs post-launch? **(3)** BL-4 booking audit log — likely post-launch when first dispute surfaces.
+  - **Process insight:** sprint's business logic discipline was the **strongest of any audit category swept**. Combined audit-волна aggregate: SECURITY 6/8 clean + 3 findings, CODE-CONSISTENCY 6/8 clean + 2 findings, TEST-COVERAGE 0 critical + 5 minor, ERROR-HANDLING 8/8 strong + 1 gap, DEPLOYMENT-READINESS 7/8 strong + 1 high-impact (closed), **BUSINESS-LOGIC 8/8 well-implemented + 4 🟡 design-choice (no bugs)**. The «regression-test-per-fix» + «Pattern 2 parallel-channel» + «atomic catch / explicit invariants» disciplines visibly produce business-correct code. **0 critical / 0 high findings across 8 categories** is exceptional for a system with this much business surface area. **Pattern emerged:** «explicit assertion helpers» (`assertX(...)`) approach is strongly correlated with low business-logic bug density. SPRINT-PATTERNS addendum candidate.
 
 ### 2026-05-23 — Deployment template sync
 
