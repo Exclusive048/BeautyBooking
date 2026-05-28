@@ -222,6 +222,24 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟠 HIGH PRIORITY (после core master cabinet)
 
+### CONTEXT-REFRESH-V3 (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 — DOC-1+DOC-2 process) 🟠 pre-sprint recommended
+- **What**: full holistic refresh of `MASTERRYADOM_AI_CONTEXT.md` (sections 1-15) — header date update, audit-волна completion summary, integration of all 13 fix-prompts + 11 audits results. NOT per-commit append (rule 15 per-commit discipline working); this is the «raз в 4-6 коммитов / ~2 недели» full walk.
+- **Why**: header reads «13 мая 2026» but today 2026-05-29 (16 days drift + ~70 commits + 5 audits since CONTEXT-REFRESH-V2). Rule 15 trigger (4-6 commits OR ~2 weeks) reached. Per-commit «### Context updates» sections present in every entry, but cross-section coherence + header date need refresh. Next session reading header trusts «May 13» as audit baseline when 70 commits happened after.
+- **Scope**: ~2-4 hr. (a) Re-walk sections 1-15 against current code state; (b) update header date + commit + branch markers; (c) consolidate audit-волна findings into Раздел 8/12 narratives; (d) prune stale entries from Раздел 8 that fix-prompts closed; (e) verify cross-references functional; (f) add Pattern 15 entry if SPRINT-PATTERNS gets it.
+- **Trigger**: pre-launch recommended OR before next sprint starts (whichever first). Block further large feature commits until refresh completes to prevent additional drift accumulation.
+
+### RUNBOOK-INDEX-A (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 — OP-1) 🟠 pre-launch ops
+- **What**: convert `docs/runbooks/README.md` from API reference into a runbook index. Add «Quick Index» section listing all 10 runbooks with 1-line symptom triggers (e.g. «redis-down.md — Redis unavailable OR health shows readiness.redis=false»). Add «Quick Diagnosis Matrix» table mapping Symptom → Endpoint(s) → Runbook.
+- **Why**: new ops staff opening README only finds health endpoint API reference — cannot discover which file applies to which incident. Currently must `ls docs/runbooks/` + open each file to learn topology.
+- **Scope**: ~30-45 min one-time edit. Existing API reference stays as «Technical Reference» subsection.
+- **Trigger**: pre-launch — high ROI for ops discoverability.
+
+### DRILL-PASS-CRITERIA-A (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 — OP-3) 🟡
+- **What**: enhance `docs/runbooks/incident-drill-checklist.md` with explicit PASS/FAIL criteria per drill + a result template (Date / Drill / Duration / PASS-FAIL / Issues / Follow-up).
+- **Why**: 4 drills (Redis down / Queue backlog / YooKassa webhook / Auth outage) reference recovery procedures but lack measurable success metric. On-call cannot reliably declare drill pass/fail without external guidance. No audit trail of drills run.
+- **Scope**: ~45 min one-time edit. Pattern per drill: «PASS: /api/health 200, readiness.redis=true, worker heartbeat <60s».
+- **Trigger**: before first on-call shift. Pair with RUNBOOK-INDEX-A for maximum guidance clarity.
+
 ### MODAL-FOCUS-TRAP-FIX-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-1) 🟠 pre-launch recommended
 - **What**: extend `src/components/ui/modal-surface.tsx` (79+ callers) to add: (1) **focus trap** — Tab cycles within modal contents; (2) **initial focus** — first focusable child gets focus on open (or explicit `initialFocusRef` prop for opt-in); (3) **return focus** — focus restores to the trigger element on close.
 - **Why**: WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus) — keyboard + screen-reader users currently can Tab out of modal to background page elements. Russian accessibility law (152-ФЗ + ГОСТ Р 52872-2019) gaining enforcement weight. Single fix → 79 callers hardened.
@@ -1052,6 +1070,19 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 - **Scope**: ~15 min — both `<img>` are simple `<img src={url} alt="" className="..." />` patterns; `next/image` needs `width`/`height` props (or `fill` for preview lightbox).
 - **Trigger**: opportunistic when touching media editor.
 
+### CONTEXT-FRESHNESS-CI-CHECK (spawned from DOCUMENTATION-AUDIT-A 2026-05-29)
+- **What**: `scripts/check-context-freshness.mjs` — fail CI if `MASTERRYADOM_AI_CONTEXT.md` header date is older than the commit date OR older than 14 days from current date. Catches drift like the one DOC-1+DOC-2 found in this audit.
+- **Why**: per-commit «### Context updates» sections worked (entries present in every fix-prompt) but holistic header date drifted invisibly. Structural prevention closes the per-commit-vs-full-refresh gap.
+- **Scope**: ~30 min one-time script + add to `quality-gates.yml`. Read header regex (`Дата аудита:|last_verified:`), compare to `git log -1 --format=%ai`, fail with actionable message.
+- **Exception**: skip for read-only audits (which may append section 15 without touching header per Pattern 4 quality-gate health pattern).
+- **Trigger**: low priority — pair with CONTEXT-REFRESH-V3 closure (script catches re-occurrence).
+
+### RUNBOOK-COVERAGE-CI (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 + DEPLOYMENT-READINESS DR-2/3/6)
+- **What**: deploy.yml or quality-gates.yml CI step that fails if expected critical runbooks missing OR <100 LOC stubs (`docs/runbooks/{prisma-migration-rollback,database-backup,tls-setup}.md`).
+- **Why**: prevents shipping without ops procedures. DR-2/3/6 are pre-launch backlog; CI gate ensures they don't quietly slip past launch.
+- **Scope**: ~20-30 lines shell in deploy.yml. Quarterly audit of runbooks/ against release-checklist sections.
+- **Trigger**: pair with DR-2/3/6 closure (the runbooks need to exist first; then CI keeps them existing).
+
 ### STORIES-VIEWER-A11Y-CONSOLIDATE (spawned from MODAL-A11Y-BATCH-A 2026-05-23, carryover from UI-UX-AUDIT-A)
 - **What**: extract a richer overlay primitive that handles arrow-key nav + swipe + progress bars in addition to the focus-trap + reduced-motion + return-focus discipline. Replace `stories-viewer-overlay.tsx` manual focus-trap (line 115) with shared primitive.
 - **Why**: Pattern 5 coverage-tail. Currently `stories-viewer-overlay` duplicates focus-trap logic that now lives in `use-modal-a11y.ts`. Cosmetic gap — both implementations correct, just two sources of truth.
@@ -1167,6 +1198,59 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 > Хронологический индекс sprint'а (новое сверху). **Детальный changelog каждого коммита** — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (audit findings / FEATURE PRESERVATION / per-commit changes / validation / backlog spawned).
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
+
+### 2026-05-29 — Documentation completeness audit (audit-волна 11/11 COMPLETE)
+
+- **DOCUMENTATION-AUDIT-A** — 🎉 **LAST audit (item 11/11). Audit-волна 100% COMPLETE.** Read-only audit across 6 parallel streams via workflow (onboarding / operations / internal / process / code+schema / API). **NO code/docs changes.** 31 findings total: **0 🔴 / 3 🟠 / 13 🟡 / 15 🔵.** No findings block production deploy or new developer onboarding.
+  - **Workflow execution:** 6 Explore subagents in `parallel()`, 228 tool uses, ~4 min, 427K tokens. Each returned structured JSON via schema → main-context synthesis. **Pattern validated**: parallel-fan-out audit with structured returns is the right shape for «inspect N disjoint surfaces» work.
+  - **🟠 High-severity (3):**
+    - **OP-1**: `docs/runbooks/README.md` is API reference, NOT runbook index. Ops can't discover which file handles which symptom. Backlog 🟠 `RUNBOOK-INDEX-A` (~30 min — add «Quick Index» + «Quick Diagnosis Matrix» tables).
+    - **OP-2**: 3 critical runbooks missing — already in backlog from DEPLOYMENT-READINESS audit as DR-2 (deploy-rollback), DR-3 (db-backup), DR-6 (TLS-setup). User decisions pending (Q1 TLS strategy, Q2 backup target, Q3 rollback policy). Confirmed by independent reader.
+    - **DOC-1+DOC-2 (process)**: `MASTERRYADOM_AI_CONTEXT.md` header «13 мая 2026» — 16 days drift + 70 commits + 5 audits since CONTEXT-REFRESH-V2. Per rule 15, full CONTEXT-REFRESH-V3 overdue. Backlog 🟠 `CONTEXT-REFRESH-V3` (~2-4 hr — full sections 1-15 walk + header date + audit-волна summary).
+  - **🟡 Medium-severity (13):**
+    - **OP-3**: incident-drill-checklist lacks PASS/FAIL criteria per drill — `DRILL-PASS-CRITERIA-A` (~45 min)
+    - **OP-4**: `docs/runbooks/README.md` doesn't reference `release-go-no-go-checklist.md` connection — ~10 min edit
+    - **OP-5**: cleanup-duplicate-billing-plans execution log empty — clarify «commit log row after each run»
+    - **OP-6**: mrr-snapshot-cron.md doesn't specify how to choose Yandex Scheduler vs GitHub Actions vs cron — add «Implementation» section (~20 min)
+    - **OP-7**: README health endpoint doc lacks cross-references to runbooks using each endpoint — `QUICK-DIAGNOSIS-MATRIX-A` (~30 min)
+    - **DOC-2 (internal)**: P2 VAPID partial mitigation not reflected in section 8 — update «Сделано: НЕТ» → «ЧАСТИЧНО»
+    - **DOC-3 (internal)**: P3 REDIS_URL placeholder verification in .env.example
+    - **DOC-3 (process)**: SPRINT-PATTERNS audit-волна stats table reflects May-23 snapshot only — add post-item-5 updates OR note table is snapshot
+    - **DOC-4 (process)**: QUALITY-GATES trigger table lacks «audit-wave completion» explicit row
+    - **DOC-5 (process)**: QUALITY-GATES context-updates section needs «partial vs full refresh» guidance paragraph
+    - **DOC-4 (code+schema)**: schedule resolution engine-core.ts lacks WEEKLY/CYCLE narrative comment
+    - **API-DOC-2**: analytics module (40+ routes) absent from OpenAPI spec
+    - **API-DOC-3**: studio/master cabinet routes largely absent from OpenAPI (15-20 most-used would close)
+    - **API-DOC-4**: 113 error code registry not indexed by endpoint
+  - **🔵 Low-severity (15):** primarily polish — README version specificity, individual TSDoc additions, formatting, invariant numbering quirk (#25/#26 added out-of-order in section 12 table; content correct). Batched as opportunistic cleanup.
+  - **🛡 Structural Prevention candidates (cross-category):**
+
+    | Finding class | Prevention | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | Context staleness (DOC-1/DOC-2 process) | `scripts/check-context-freshness.mjs` — fail CI if AI_CONTEXT header date < commit date OR >14 days old | ~30 min | High | Backlog 🟡 `CONTEXT-FRESHNESS-CI-CHECK` |
+    | Missing runbooks (OP-2 / DR-2/3/6) | Deploy checklist enforcement: CI fails if `docs/runbooks/{prisma-migration-rollback,database-backup,tls-setup}.md` missing OR <100 LOC | ~1 hr | High | Backlog 🟡 `RUNBOOK-COVERAGE-CI` |
+    | Env var drift (Pattern 5 closed for env via PROD-ENV-SYNC but no CI gate) | `scripts/check-env-templates.mjs` (already filed as `ENV-TEMPLATES-CI-CHECK` from PROD-ENV-SYNC) | ~3 hr | High | Reaffirm 🔵 backlog (existing item) |
+    | API doc gap (40+ analytics routes undocumented) | PR check: fail if new `src/app/api/**/route.ts` without `src/lib/openapi/spec.ts` entry | ~30 min | Medium | Backlog 🔵 `OPENAPI-ROUTE-CI` (defer post-MVP; design-choice acknowledged) |
+    | JSDoc on critical helpers (DOC-1/DOC-2 code+schema) | ESLint `require-jsdoc` for `export function` in `src/lib/{auth,billing,bookings,crm,hot-slots}/*.ts` | ~2 hr | Medium | Backlog 🔵 |
+    | Schema docs (`/// ` comments) | Pre-commit grep check: warn if new `^model` line lacks `/// ` comment within 2 lines | ~30 min | Low | Backlog 🔵 |
+    | Drill template PASS/FAIL audit trail (OP-3) | Add drill-result template + per-drill explicit PASS criteria | ~45 min one-time | Medium | Backlog 🟡 `DRILL-PASS-CRITERIA-A` |
+
+  - **Production-handover readiness:**
+    - **Ready**: README + CLAUDE.md + AI_CONTEXT (modulo refresh) + 10 runbooks for known incidents + release-go-no-go-checklist comprehensive + SPRINT-PATTERNS + env templates synced + per-commit updates show active maintenance
+    - **Needs work**: (1) Runbook index for ops discoverability (OP-1, ~30 min); (2) 3 missing runbooks (DR-2/3/6 — user decisions pending); (3) CONTEXT-REFRESH-V3 before next sprint
+  - **NO code/docs changes verified** — typecheck ✅ / 629/629 tests preserved / `git status` clean before audit / only 2 docs modified
+  - **Open questions for user (consolidated post-волна):**
+    - **(1)** `CONTEXT-REFRESH-V3` — pre-launch (recommended, ~2-4 hr) or post-launch?
+    - **(2)** Runbook index + 3 missing runbooks (pre-launch ops priority)?
+    - **(3)** STRUCTURAL-PREVENTION-AUDIT (Шаг 3) — consolidate ALL prevention candidates from 11 audits into single review (~half-day)?
+  - **🎉 АУДИТ-ВОЛНА 11/11 COMPLETE:**
+    - **Tier 1 (items 1-6)**: LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / SPRINT-RETROSPECTIVE-DOC
+    - **Tier 2 (items 7-11)**: DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION
+    - **Fix-prompts spawned + closed during волна**: PROD-ENV-EXAMPLE-SYNC-A (DR-1), FEED-PORTFOLIO-N1-FIX-A (PERF-1), MODAL-A11Y-BATCH-A (UI-1+UI-3), EMAIL-VERIFY-FIX-A (🔴 #1), OTP-LOG-DEV-GUARD-A (SEC-1), ENV-DISCIPLINE-SWEEP-A (CC-1), FAST-WINS-BATCH-A (TC-2+SEC-2+proxy.ts), SECURITY-SURFACE-TESTS-A (TC-1)
+    - **Test count growth**: 358 → **629** (+271 across the wave)
+    - **0 🔴 / 0 🟠 unaddressed** (all closed OR clear next step in backlog with user decision pending)
+    - **Process pattern matured**: workflow tool for parallel-fan-out audits (this one) + sequential audit-then-implement for fixes (FEED-PORTFOLIO-N1-FIX-A) — both shapes proven across 13 commits in the волна
+  - **Process insight — workflow shape generalizes:** parallel-fan-out audit with structured-JSON returns + main-context synthesis works well for survey-class read-only tasks. Future audit-волна-class work should default to this pattern. Workflow tool's `parallel()` with schema validation + Explore agentType combined cleanly. 6 categories × 1 agent each = 24 agent-minutes done in 4 min wall-clock. Each agent returned 4-7 findings with concrete file:line evidence. **Recommendation for SPRINT-PATTERNS:** capture as Pattern 15 «Workflow-orchestrated parallel survey audit» if future audit-волны use the pattern.
 
 ### 2026-05-23 — Modal a11y batch (UI-1 + UI-3 closure)
 

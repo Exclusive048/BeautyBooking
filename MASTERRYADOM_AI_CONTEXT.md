@@ -1223,6 +1223,54 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-29 — DOCUMENTATION-AUDIT-A** (commit on `auditandaction`). **🎉 LAST audit (item 11/11). Audit-волна 100% complete.** Read-only documentation completeness audit across 6 parallel streams via workflow (onboarding / operations / internal / process / code+schema / API). **NO code/docs changes — discovery only.** Workflow execution: 6 Explore subagents in `parallel()`, 228 tool uses, ~4 min, 427K tokens. **Result: STRONG documentation discipline overall — sprint rule 15 (per-commit context updates) clearly working. 2 high-severity operational gaps + 1 high-severity refresh-cadence gap discovered by sub-agents that this audit itself reveals as «process needs CONTEXT-REFRESH-V3 before next sprint».**
+  - **Workflow design:** 6 parallel agents (Explore type) inspected disjoint surfaces — Onboarding/README, Operational runbooks, Internal AI_CONTEXT, Process docs (QUALITY-GATES + SPRINT-PATTERNS + CLAUDE.md), Code+Schema TSDoc, API documentation. Each returned structured findings + structural-prevention candidates via JSON schema. Synthesis happens in main context (this entry).
+  - **Aggregate stats:** **31 findings total** across 6 categories. **0 🔴 critical / 3 🟠 high / 13 🟡 medium / 15 🔵 low.** No findings block production deploy or new developer onboarding. Categories: 4 well-documented (internal AI_CONTEXT, process docs, code+schema with TSDoc on critical helpers), 2 with minor gaps (onboarding, operations), 0 with significant gaps. API documentation = moderate gaps but **design-choice** (MVP scope; internal-only routes use Zod types as docs).
+  - **🟠 High-severity findings (3):**
+    - **OP-1 (operations)**: `docs/runbooks/README.md` is API reference (health endpoint fields) — **NOT a runbook index**. New ops staff cannot discover which file handles which symptom. Fix: add «Quick Index» section listing all 10 runbooks with 1-line symptom triggers. ~30 min. Backlog 🟠 `RUNBOOK-INDEX-A`.
+    - **OP-2 (operations)**: 3 critical runbooks missing — **DR-2 deploy-rollback / DR-3 db-backup / DR-6 TLS-setup** (cross-ref DEPLOYMENT-READINESS-AUDIT-A). Already in backlog from prior audit; this audit reconfirms via independent reader's perspective. Backlog 🟠 (already filed; user decisions pending on Q1/Q2/Q3 from DEPLOYMENT-READINESS).
+    - **DOC-1+DOC-2 (process)**: **MASTERRYADOM_AI_CONTEXT.md header dated «13 мая 2026»** but today is 2026-05-29 (16 days drift) with ~70 commits + 5 audits since CONTEXT-REFRESH-V2. **Per rule 15 trigger** (4-6 commits OR ~2 weeks), full CONTEXT-REFRESH-V3 is overdue. Per-commit updates still happened diligently (rule 15 «### Context updates» section present in every fix-prompt entry per audit-волна), but holistic header + cross-section refresh not done. Backlog 🟠 `CONTEXT-REFRESH-V3` (~2-4 hr — full sections 1-15 rewalk + header date + audit-волна completion summary).
+  - **🟡 Medium-severity findings (13)** — full breakdown in BACKLOG entry. Highlights:
+    - **OP-3**: incident-drill-checklist lacks explicit PASS/FAIL criteria per drill
+    - **OP-6**: mrr-snapshot-cron.md doesn't say how to choose Yandex Scheduler vs GitHub Actions vs cron
+    - **OP-7**: README health endpoint doc lacks cross-references к runbooks using each endpoint (proposed: «Quick Diagnosis Matrix»)
+    - **DOC-3 (process)**: SPRINT-PATTERNS audit-волна stats table reflects May-23 snapshot; May 28-29 audits (DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / MODAL-A11Y) not yet integrated
+    - **DOC-4 (process)**: QUALITY-GATES trigger table doesn't list «audit-wave completion» as explicit refresh trigger (implicit via «~2 недели»)
+    - **DOC-2 (internal AI_CONTEXT)**: P2 VAPID keys partially mitigated (isPushEnabled guard exists at line 11-18 of vapid.ts) but section 8 still says «Сделано: НЕТ»
+    - **DOC-4 (code+schema)**: schedule resolution engine-core.ts lacks narrative block-comment on WEEKLY/CYCLE precedence
+    - **API-DOC-2** (api): analytics module (40+ routes) absent from OpenAPI spec
+    - **API-DOC-3** (api): studio/master cabinet routes largely absent from OpenAPI spec (~15-20 most-used would close)
+    - **API-DOC-4** (api): 113-code error registry not indexed by endpoint
+  - **🔵 Low-severity findings (15)** — primarily polish (typos, version-number specificity in README, TSDoc additions on individual helpers, formatting). Backlog 🔵 batch.
+  - **Раздел 8 (UI/UX), Раздел 11 (Деплой), Раздел 12 (Инварианты):** strong baseline confirmed by independent reader. Sub-agents found NO broken cross-references (rule 15 → QUALITY-GATES.md / SPRINT-PATTERNS.md / .claude/references/ all functional). 26 invariants — only minor numbering quirk (#25/#26 added out-of-order in section 12 table; functional content correct). Internal AI_CONTEXT discipline rated «well-documented» (overall assessment from internal-doc subagent — strongest result of the 6).
+  - **Production-handover readiness (key deliverable per prompt):**
+    - **Ready**: README + CLAUDE.md + AI_CONTEXT (modulo refresh) + 10 runbooks for known incidents + release-go-no-go-checklist comprehensive + SPRINT-PATTERNS for future Claude sessions + env templates synced (PROD-ENV-SYNC-A closed DR-1) + per-commit context updates demonstrate active maintenance.
+    - **Needs work before handover**: (1) Runbook index for ops discoverability (OP-1, ~30 min); (2) 3 missing runbooks (OP-2 / DR-2 + DR-3 + DR-6 — user decisions pending on TLS strategy + DB backup target + rollback policy from DEPLOYMENT-READINESS audit); (3) CONTEXT-REFRESH-V3 (DOC-1 + DOC-2) before next sprint or 2nd developer onboarding.
+  - **Аудит-волна 11/11 COMPLETE — milestone:**
+    - **Tier 1 (items 1-6)**: LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / SPRINT-RETROSPECTIVE-DOC (synthesis)
+    - **Tier 2 (items 7-11)**: DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION
+    - **Fix-prompts spawned + closed during волна**: PROD-ENV-EXAMPLE-SYNC-A (DR-1), FEED-PORTFOLIO-N1-FIX-A (PERF-1), MODAL-A11Y-BATCH-A (UI-1 + UI-3), EMAIL-VERIFY-FIX-A (pre-launch 🔴 #1), OTP-LOG-DEV-GUARD-A (SEC-1), ENV-DISCIPLINE-SWEEP-A (CC-1), FAST-WINS-BATCH-A (TC-2 + SEC-2 + proxy.ts), SECURITY-SURFACE-TESTS-A (TC-1)
+    - **Test count growth**: 358 → **629** (+271 across the wave, ~+57 per ~3 fix-prompts batch)
+    - **Pattern occurrences captured in SPRINT-PATTERNS**: Pattern 2 (5 occurrences), Pattern 5 (5 evidence points), Pattern 14 (scaling demonstration with leverage table)
+  - **Combined audit-волна aggregate (all 11 audits):**
+    - SECURITY 6/8 + 3 findings (closed via FAST-WINS for SEC-2 + OTP-LOG-DEV-GUARD for SEC-1; SEC-3 backlog)
+    - CODE-CONSISTENCY 6/8 + 2 findings (ENV-DISCIPLINE-SWEEP closed CC-1; CC-2 backlog)
+    - TEST-COVERAGE 0 critical + 5 minor (TC-1 + TC-2 closed via SECURITY-SURFACE-TESTS + FAST-WINS)
+    - ERROR-HANDLING 8/8 + 1 tooling-gap (EH-1 OBSERVABILITY-SENTRY backlog)
+    - DEPLOYMENT-READINESS 7/8 + 1 closed (DR-1 via PROD-ENV-SYNC; DR-2/3/6 pending user decisions)
+    - BUSINESS-LOGIC 8/8 + 4 design-choice (no bugs)
+    - PERFORMANCE 7/8 + 1 🔴 closed (PERF-1 via FEED-PORTFOLIO-N1-FIX)
+    - UI-UX 6/8 + 1 🟠 closed (UI-1 via MODAL-A11Y-BATCH) + 1 🟡 closed (UI-3 same batch) + remaining backlog
+    - **DOCUMENTATION 4/6 well-documented + 3 🟠 + 13 🟡 + 15 🔵 (no 🔴; all gaps non-blocking)**
+    - **🎉 0 🔴 + 0 🟠 unaddressed (all 🟠 either closed or backlog'd with clear next step)**.
+  - **Process insight — workflow shape validates:** parallel-fan-out audit with structured-JSON returns + main-context synthesis works well for survey-class read-only tasks. 6 agents × 4 min wall-clock = ~24 agent-minutes done in parallel. Each agent returned 4-7 findings with concrete evidence. Synthesis pulled into single coherent picture. **Same shape would work for any «inspect N disjoint surfaces, report findings» task** — future audit-волна-class work should default to this pattern. Workflow tool's `parallel()` with schema-validated returns + Explore agentType combined cleanly.
+  - **NO code/docs changes (read-only):** typecheck ✅ / 629/629 tests preserved / `git status` clean / only this entry + BACKLOG entry written.
+  - **Open questions for user (consolidated post-волна):**
+    - **(1)** `CONTEXT-REFRESH-V3` — schedule before next sprint or now? Half-day investment closes DOC-1 + DOC-2 and gives clean baseline.
+    - **(2)** Runbook index + 3 missing runbooks (OP-1, OP-2) — pre-launch ops priority?
+    - **(3)** STRUCTURAL-PREVENTION-AUDIT (Шаг 3 from earlier discussion) — consolidate ALL prevention candidates from 11 audits into single review? Estimated ~half-day.
+  - **🎉 11/11 audit-волна complete. Sprint validated through 11 comprehensive lenses; pre-launch critical path clear.**
+
 - **2026-05-23 — MODAL-A11Y-BATCH-A** (commit on `auditandaction`). **🎉 Closes UI-1 (🟠 modal focus management) + UI-3 (🟡 reduced motion) from UI-UX-AUDIT-A — 0 🟠 findings remaining in audit-волна.** WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus) + SC 2.3.3 (Animation from Interactions) compliance. Pattern 14 demonstrated at the largest scale yet — **single shared-primitive fix hardens 50+ ModalSurface callers + 5 Drawer migrations.** **NO API contract changes** — caller code untouched. **NO schema migration.**
   - **Audit findings:**
     - **`ModalSurface` (`src/components/ui/modal-surface.tsx`)** — 50 caller files via grep. Had `role="dialog"` + `aria-modal` + `aria-labelledby` + ESC + body scroll-lock ✅. Missing: focus trap, initial focus, return focus, reduced-motion handling.
