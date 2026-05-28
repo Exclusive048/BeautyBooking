@@ -58,7 +58,22 @@ function buildNormalizedAnswers(
   return normalized.length > 0 ? normalized : null;
 }
 
-async function validateReferenceAsset(input: {
+/**
+ * Exported for unit testing only (`booking-extras.test.ts`). Production
+ * callers consume it via `resolveBookingExtras` below — no other module
+ * imports it. Behavior unchanged; the `export` keyword is purely for
+ * test discoverability. Mirrors `validateChatAttachmentAsset` pattern
+ * (FAST-WINS-BATCH-A — TC-2 tail closure).
+ *
+ * Contract:
+ *   - Asset MUST exist + not be soft-deleted.
+ *   - Kind MUST be `BOOKING_REFERENCE`.
+ *   - Owner (`createdByUserId`) MUST match the client — no attaching
+ *     someone else's upload.
+ *   - Asset MUST be unused: `entityType=BOOKING` AND `entityId` starts
+ *     with `pending:` (one-shot claim).
+ */
+export async function validateReferenceAsset(input: {
   assetId: string;
   clientUserId: string;
 }): Promise<string> {

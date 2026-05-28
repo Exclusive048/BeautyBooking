@@ -54,5 +54,7 @@ docs/*
 docs/runbooks/
 # Shareable knowledge docs — tracked so a second developer / future Claude
 # session inherits sprint meta-lessons without needing the original sprint
-# context. See SPRINT-PATTERNS.md for the rationale.
+# context. SPRINT-PATTERNS references QUALITY-GATES as its companion, so
+# both must be visible for cross-doc links to work for fresh-clone readers.
 !docs/SPRINT-PATTERNS.md
+!docs/QUALITY-GATES.md

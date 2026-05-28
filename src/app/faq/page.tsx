@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FAQItem } from "@/features/faq/components/faq-item";
 import { FAQ_DATA } from "@/features/faq/content/faq-content";
+import { safeJsonLd } from "@/lib/seo/schema";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -32,7 +33,7 @@ export default function FaqPage() {
       {/* JSON-LD FAQPage schema for Rich Snippets in Google/Yandex search */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(FAQ_JSON_LD) }}
       />
 
       {/* Hero — utilitarian, much smaller than /about or /how-it-works */}
