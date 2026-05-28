@@ -222,6 +222,13 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟠 HIGH PRIORITY (после core master cabinet)
 
+### MODAL-FOCUS-TRAP-FIX-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-1) 🟠 pre-launch recommended
+- **What**: extend `src/components/ui/modal-surface.tsx` (79+ callers) to add: (1) **focus trap** — Tab cycles within modal contents; (2) **initial focus** — first focusable child gets focus on open (or explicit `initialFocusRef` prop for opt-in); (3) **return focus** — focus restores to the trigger element on close.
+- **Why**: WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus) — keyboard + screen-reader users currently can Tab out of modal to background page elements. Russian accessibility law (152-ФЗ + ГОСТ Р 52872-2019) gaining enforcement weight. Single fix → 79 callers hardened.
+- **Approach**: two options — (a) adopt `@radix-ui/react-focus-scope` (mature library, ~5KB gzip, used by shadcn/ui ecosystem); (b) implement utility internally (track previously-focused element on open, restore on cleanup; cycle Tab via `keydown` handler matching first/last focusable child). `stories-viewer-overlay.tsx:115` already has manual implementation — could consolidate.
+- **Scope**: ~half-day. Modify ModalSurface body + add 4-6 a11y regression tests (Tab traps inside, ESC closes + restores focus, initial-focus on first focusable, opt-in `initialFocusRef`).
+- **Trigger**: pre-launch (recommended) — accessibility law enforcement trend + 79-caller blast radius.
+
 ### STUDIO-SCHEDULE-SETTINGS-A-PHASE-B — ✅ ЗАКРЫТ (2026-05-23)
 - Shipped all 3 remaining tabs in one medium prompt: Exceptions / Breaks / Visibility
 - Master cabinet «Breaks» rolled-back state confirmed by audit: studio Breaks tab mirrors it (buffer-only + hint that per-day breaks are managed via schedule editor itself)
@@ -292,6 +299,36 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 ---
 
 ## 🟡 MEDIUM PRIORITY
+
+### EMPTY-STATE-COMPONENT-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-2)
+- **What**: extract shared `src/components/ui/empty-state.tsx` per the UI-UX-PRO-MAX skill pattern («Centered icon + title + description + secondary CTA»). Migrate ~10-15 existing callers across `client-cabinet/*`, `admin-cabinet/catalog`, `master/model-offers/{application-empty-state,offer-empty-state}`, `chat`, `studio` features.
+- **Why**: Pattern 14 (explicit primitive). Without shared component, visual drift possible (icon size / spacing / typography differing). Skill documents the pattern but each feature reinvents it.
+- **Scope**: ~half-day — define component with `{ icon, title, description, action? }` props + migrate callers + delete inline duplicates.
+- **Trigger**: opportunistic when next cabinet redesign happens, OR proactive sweep if drift becomes visible.
+
+### REDUCED-MOTION-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-3)
+- **What**: respect OS-level `prefers-reduced-motion` preference. Apply `useReducedMotion()` hook (framer-motion native) to `ModalSurface` + page transitions + any other animated surface.
+- **Why**: WCAG SC 2.3.3 (Animation from Interactions). Users with vestibular disorders need reduced motion. Also saves battery on mobile.
+- **Scope**: ~1 hr — `ModalSurface` modify (set `transition.duration: 0` when reduced); audit other framer-motion surfaces.
+- **Trigger**: pre-launch if pairing with MODAL-FOCUS-TRAP-FIX-A (both touch ModalSurface).
+
+### TAP-TARGET-AUDIT-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-4)
+- **What**: audit usage of `Button size="sm"` (h-9=36px) and `Button size="icon"` (h-10 w-10=40px) on mobile-primary critical paths (booking submit, OTP entry, etc). Either (a) migrate critical to `md` (h-11=44px), or (b) document `sm`/`icon` as desktop-only convention.
+- **Why**: WCAG SC 2.5.5 (Target Size — AAA, recommended) suggests ≥44×44px. Apple HIG 44pt + Material 48dp. Current `md`/`lg` compliant; `sm`/`icon` below.
+- **Scope**: ~2 hr — grep usages, classify mobile-critical vs desktop-only, fix critical or document convention in skill.
+- **Trigger**: post-launch unless mobile-first audit reveals issue.
+
+### TAILWIND-COLOR-LINT (spawned from UI-UX-AUDIT-A 2026-05-23 — general)
+- **What**: ESLint rule blocking `bg-\[#...\]` / `text-\[#...\]` / `border-\[#...\]` Tailwind arbitrary-value color literals outside an allowlist (external brand colors only: `#2AABEE` Telegram, `#4C75A3` VK, etc).
+- **Why**: prevent new hardcoded colors. Current legacy hardcodes will retire with Phase 7 cleanup; preventing reintroduction needs CI.
+- **Scope**: ~half-day — custom ESLint rule OR scripts/check-hardcoded-colors.mjs.
+- **Trigger**: low priority; current discipline strong via ui-ux-pro-max skill.
+
+### STORYBOOK-SETUP (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-7)
+- **What**: add Storybook + chromatic visual regression testing for shared components (`src/components/ui/*`).
+- **Why**: visual regression undetected at PR-time. As component count grows, drift compounds.
+- **Scope**: ~1 day — setup Storybook 8 + chromatic integration + write initial stories for `Button`, `Input`, `Select`, `ModalSurface`, etc.
+- **Trigger**: post-launch — opportunistic improvement.
 
 ### FEED-PORTFOLIO-N1-FIX-A (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-1) 🔴 launch-concern
 - **What**: refactor 4 sites in [`src/lib/feed/portfolio.service.ts`](src/lib/feed/portfolio.service.ts) (`listPortfolioFeed`, `listHomePortfolioFeed`, `getPortfolioDetail`, `similarItems` loader) to avoid loading ALL `MasterService` rows per service.
@@ -1015,6 +1052,18 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 - **Scope**: ~15 min — both `<img>` are simple `<img src={url} alt="" className="..." />` patterns; `next/image` needs `width`/`height` props (or `fill` for preview lightbox).
 - **Trigger**: opportunistic when touching media editor.
 
+### STORIES-VIEWER-A11Y-CONSOLIDATE (spawned from MODAL-A11Y-BATCH-A 2026-05-23, carryover from UI-UX-AUDIT-A)
+- **What**: extract a richer overlay primitive that handles arrow-key nav + swipe + progress bars in addition to the focus-trap + reduced-motion + return-focus discipline. Replace `stories-viewer-overlay.tsx` manual focus-trap (line 115) with shared primitive.
+- **Why**: Pattern 5 coverage-tail. Currently `stories-viewer-overlay` duplicates focus-trap logic that now lives in `use-modal-a11y.ts`. Cosmetic gap — both implementations correct, just two sources of truth.
+- **Scope**: ~1 day. Either (a) extend `use-modal-a11y.ts` hooks to accept story-viewer's additional concerns (likely OK — arrow nav + swipe are orthogonal to focus management); (b) extract richer overlay primitive that composes a11y + nav + swipe; (c) leave as-is (current — two sources of truth but both working).
+- **Trigger**: post-launch. Not blocking; cosmetic refactor.
+
+### FRAMER-MOTION-REDUCED-MOTION-SWEEP (spawned from MODAL-A11Y-BATCH-A 2026-05-23, carryover from UI-3)
+- **What**: apply `useReducedMotion()` to remaining 56 framer-motion surfaces (only 2 shared primitives covered in MODAL-A11Y-BATCH-A).
+- **Why**: Pattern 5 coverage-tail. Shared primitives respect preference now; per-surface application opportunistic. Vestibular-sensitive users + battery-conscious mobile users get full coverage when sweep completes.
+- **Scope**: ~half-day if mechanical (most surfaces likely have similar simple variants). Audit first to confirm before estimating.
+- **Trigger**: opportunistic — apply when next touching each surface. OR proactive sweep if a11y compliance push happens.
+
 ### BOOKING-PARTIAL-UNIQUE-INDEX-A (spawned from BUSINESS-LOGIC-AUDIT-A 2026-05-23 — BL-3)
 - **What**: add Postgres partial unique index `CREATE UNIQUE INDEX booking_active_slot_idx ON "Booking"(providerId, masterProviderId, startAtUtc) WHERE status NOT IN ('REJECTED', 'CANCELLED', 'NO_SHOW')` via Prisma raw migration (Prisma schema doesn't have first-class partial unique support yet, so `migration.sql` direct edit).
 - **Why**: defense-in-depth. Current conflict prevention works (Serializable tx + double `ensureNoConflicts` + P2002/P2034 catch — `mapPrismaBookingConflict` already maps both codes). DB-level constraint would catch any future bug in `ensureNoConflicts` rule (e.g. someone forgets to apply buffer minutes correctly). Belt-and-suspenders.
@@ -1118,6 +1167,74 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 > Хронологический индекс sprint'а (новое сверху). **Детальный changelog каждого коммита** — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (audit findings / FEATURE PRESERVATION / per-commit changes / validation / backlog spawned).
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
+
+### 2026-05-23 — Modal a11y batch (UI-1 + UI-3 closure)
+
+- **MODAL-A11Y-BATCH-A** — 🎉 **closes UI-1 (🟠 modal focus management) + UI-3 (🟡 reduced motion). 0 🟠 outstanding across entire audit-волна (UI-1 was the only one).** WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus) + SC 2.3.3 (Animation from Interactions) compliance. Pattern 14 demonstrated at the largest scale yet — **single shared-primitive fix hardens 50 ModalSurface callers + 5 Drawer migrations = 55+ enforcement points** without per-caller code change.
+  - **Audit findings:** `ModalSurface` had `role="dialog"` + `aria-modal` + `aria-labelledby` + ESC + body scroll-lock ✅; missing focus trap / initial focus / return focus / reduced-motion. `Drawer` (5 migrated drawers via MODAL-UNIFY-IMPL-A) had same gaps. `@radix-ui/react-focus-scope` NOT in deps → custom implementation (~50 LOC). `stories-viewer-overlay.tsx` has manual focus-trap at line 115 — preserved (different concerns: arrow nav, swipe, progress bars). framer-motion in 58 files — conservative scope: applied `useReducedMotion` only to 2 shared primitives (avoids scope-creep per prompt STOP condition).
+  - **Implementation:**
+    - **NEW** [`src/components/ui/use-modal-a11y.ts`](src/components/ui/use-modal-a11y.ts) — 3 hooks + 1 pure decision helper:
+      - `useReturnFocus(open)` — captures `document.activeElement` on open, restores on close. Guards opener-removed-from-DOM edge case.
+      - `useInitialFocus(open, containerRef, initialFocusRef?)` — focuses explicit ref OR first focusable child OR container itself. rAF-deferred so framer-motion mount animation doesn't fight.
+      - `useFocusTrap(containerRef, enabled)` — Tab/Shift+Tab cycle via `decideFocusTrap` pure helper.
+      - `decideFocusTrap(...)` — **pure** decision returning `{kind: "ignore"|"block"|"wrap"; target?}`. Extracted for unit testing (Pattern 14 — pure helper + thin wrapper).
+      - `FOCUSABLE_SELECTOR` — WAI-ARIA Authoring Practices standard set.
+    - **MODIFIED** [`src/components/ui/modal-surface.tsx`](src/components/ui/modal-surface.tsx) — added `initialFocusRef?` prop, `panelRef` for focus management, 3 hook calls (return + initial + trap), `useReducedMotion()` collapses entrance/exit to opacity-only when user prefers reduced motion. `tabIndex={-1}` on panel (container-focus fallback).
+    - **MODIFIED** [`src/components/ui/drawer.tsx`](src/components/ui/drawer.tsx) — same 3 hook calls + `initialFocusRef?` prop + `useReducedMotion` on backdrop + panel motion (replaces side-slide with opacity-only when reduced).
+  - **API contract preserved:** new `initialFocusRef?: RefObject<HTMLElement | null>` prop is **optional** (defaults to first focusable). 50 ModalSurface callers + 5 Drawer callers **untouched**. Mouse-user behavior identical. Default-user animations preserved.
+  - **Tests (+18):** [`use-modal-a11y.test.ts`](src/components/ui/use-modal-a11y.test.ts) — 6 `FOCUSABLE_SELECTOR` lock + 4 Tab-forward + 3 Shift+Tab + 5 edge cases (empty list, single-focusable wrap-to-self, mid-list ignore, outside-container, null active). Pure decision-helper testing via mock element factory (no jsdom — matches project's environment=node + `prompt-modal.test.tsx` precedent). React lifecycle integration deferred until TC-3 (jsdom + @testing-library) lands. 611 → **629 tests** ✅.
+  - **Validation:** typecheck ✅, lint baseline 1/3 preserved (zero new findings), encoding/mojibake/check:ui-text/prisma (NO migration)/build ✅, **629/629 tests** ✅.
+  - **What was NOT changed:** ModalSurface/Drawer API contract (added optional prop only); `role="dialog"` / `aria-modal` / `aria-labelledby` / ESC / body scroll-lock preserved verbatim; `stories-viewer-overlay.tsx` untouched (carryover); framer-motion default animations preserved (only reduced-motion branch added); schema (NO migration); all sprint waves; 50 ModalSurface callers + 5 Drawer callers.
+  - **Pattern 14 scale demonstrated:**
+    - Booking `assertX` family: 6 helpers × ~14 enforcement points
+    - Portfolio shared helper (`loadMasterServiceOverridesMap`): 1 helper × 4 sites
+    - **MODAL-A11Y shared hooks: 3 hooks × 55+ enforcement points** — **largest fan-out to date**
+    - Pattern 14 **scales with primitive adoption**. Earlier primitives = narrow fan-out (assertX in single-function paths); shared UI primitives = orders-of-magnitude larger fan-out. **Earlier a pattern lands in shared primitive = larger latent leverage** for future fixes. Confirms MODAL-UNIFY-IMPL-A investment paid off at the a11y axis without per-caller work.
+  - **Pre-launch risks обнаруженные:** none new. UI-1 + UI-3 closed. Russian accessibility law (152-ФЗ + ГОСТ Р 52872-2019) alignment improved for 55+ modal surfaces.
+  - **Open questions for user:** none — refactor mechanical, all gates green, behavior identical for default users. Carryover: **(1)** `stories-viewer-overlay` consolidation deferred (different concerns — `STORIES-VIEWER-A11Y-CONSOLIDATE` 🔵 post-launch); **(2)** framer-motion exhaustive `useReducedMotion` sweep across remaining 56 surfaces — opportunistic per Pattern 5 coverage-tail.
+  - **🎉 0 🔴 + 0 🟠 remaining across entire 10-audit wave.** Pre-launch critical path clear.
+  - **Audit-волна status: 10/11 audits + 4 fix-prompts done** (DR-1 PROD-ENV-SYNC, PERF-1 FEED-PORTFOLIO-N1-FIX, UI-1+UI-3 MODAL-A11Y-BATCH, plus EMAIL-VERIFY-FIX closed pre-launch 🔴 #1). Item 11 DOCUMENTATION-AUDIT — last remaining.
+
+### 2026-05-23 — UI/UX/a11y systematic audit
+
+- **UI-UX-AUDIT-A** — read-only sample-based audit, **audit-волна item 10/11**. Complementary to manual cabinet QA (functional flows); this audit covers a11y / responsive / states / theme / forms / navigation systematically. Reference: `.claude/skills/ui-ux-pro-max/SKILL.md` design authority. **Result: STRONG sprint discipline across 6 of 8 categories. 0 🔴 unusable surfaces. 1 🟠 modal-focus-trap (touches 79 callers via shared primitive). 4 🟡 + 3 🔵.**
+  - **Method:** 8 categories + bonus swept. Read `eslint.config.mjs` (jsx-a11y rules active via `eslint-config-next/core-web-vitals` — lint baseline 1/3 means no a11y violations), `src/components/ui/modal-surface.tsx`, `button.tsx` end-to-end. Grepped 132 `aria-*` usages. Sampled photo carousel, admin tabs, legacy studio profile, master cabinet sidebar. Inventoried EmptyState (no shared component), loading.tsx (18), error.tsx (3), `prefers-reduced-motion` (0).
+  - **Categories well-implemented (6 of 8):**
+    - **Component consistency** — CODE-CONSISTENCY-AUDIT-A verified; 79+ ModalSurface callers + Button/Input/Select shared
+    - **Theme support** — light+dark via next-themes; only hardcoded hex are external brand colors (Telegram/VK) in @deprecated legacy
+    - **Navigation** — MasterPageHeader breadcrumbs, sidebar `aria-current="page"`, mobile bottom-nav
+    - **Form UX** — `required` validation in PromptModal, error messages in UI_TEXT (Russian), submit-disabled state
+    - **Image discipline** — all `<Image>` have `alt`, only 1 raw `<img>` in admin-only file (PERF-4 cross-ref)
+    - **ARIA basics** — 132 aria-* usages, `aria-modal`/`aria-labelledby`/`aria-current` patterns consistent
+  - **Findings:**
+    - ~~**🟠 UI-1 ModalSurface a11y gaps**~~ ✅ **CLOSED — MODAL-A11Y-BATCH-A (2026-05-23).** Shared `use-modal-a11y.ts` hooks (useReturnFocus + useInitialFocus + useFocusTrap) applied to ModalSurface AND Drawer = 55+ enforcement points. Pattern 14 largest fan-out to date. 18 regression tests. WCAG SC 2.4.3 + 3.2.1 compliant. Below: historical.
+    - **🟠 UI-1 (historical, closed)** ModalSurface lacks focus trap + initial-focus + return-focus — [`src/components/ui/modal-surface.tsx:86-182`](src/components/ui/modal-surface.tsx) has `role="dialog"` + `aria-modal` + ESC + body scroll-lock ✅, but **missing**: (1) focus trap (Tab escapes to background — WCAG SC 2.4.3); (2) initial focus on open (keyboard users Tab from page-start); (3) return focus on close (WCAG SC 2.4.3 + 3.2.1). **79+ callers** via shared primitive — single fix hardens all. Note: `stories-viewer-overlay.tsx:115` implements manual focus-trap independently (could consolidate). Fix-prompt: `MODAL-FOCUS-TRAP-FIX-A` (~half-day; add focus-scope utility OR adopt `@radix-ui/react-focus-scope`, return-focus on cleanup, initial-focus on first focusable child).
+    - **🟡 UI-2 No shared `<EmptyState>` component** — 10+ features (`client-cabinet/*`, `admin-cabinet/catalog`, `master/model-offers/{application-empty-state,offer-empty-state}`, `chat`, `studio`) define own markup. UI-UX-PRO-MAX skill documents the pattern. Without shared component, visual drift possible. Fix: extract `src/components/ui/empty-state.tsx`, migrate ~10-15 callers (Pattern 14). Backlog 🟡 `EMPTY-STATE-COMPONENT-A` (~half-day).
+    - ~~**🟡 UI-3 No `prefers-reduced-motion` handling**~~ ✅ **CLOSED — MODAL-A11Y-BATCH-A (2026-05-23)** for the 2 shared primitives (ModalSurface + Drawer). Exhaustive sweep across remaining 56 framer-motion surfaces deferred — opportunistic per Pattern 5 coverage-tail. Below: historical.
+    - **🟡 UI-3 (historical, closed for shared primitives)** No `prefers-reduced-motion` handling — framer-motion animations ignore OS-level «reduce motion» preference. WCAG SC 2.3.3. Fix: `useReducedMotion()` hook (framer-motion native) applied to ModalSurface + page transitions. Backlog 🟡 `REDUCED-MOTION-A` (~1 hr).
+    - **🟡 UI-4 Button sizes `sm` (h-9=36px) + `icon` (h-10 w-10=40px) below 44px tap-target** ([`button.tsx:28-34`](src/components/ui/button.tsx)). WCAG SC 2.5.5 (AAA, recommended) + Apple HIG 44pt + Material 48dp. `md` (44) + `lg` (48) compliant. **Concern only if used on mobile-primary critical paths** (booking/OTP submit). Backlog 🔵 `TAP-TARGET-AUDIT-A` — audit `sm`/`icon` usage on mobile-critical, document desktop-only convention.
+    - **🟡 UI-5 Legacy studio profile/settings hardcoded Telegram/VK brand colors** — `#2AABEE` (Telegram), `#4C75A3` (VK), `#c6a97e` (accent) in `studio-profile-page.tsx` + `studio-settings-page.tsx`. External brand colors = **design-choice** (Telegram/VK guidelines require exact). BUT broader file is `@deprecated` per Phase 7 cleanup — hex literals retire with file. No standalone fix needed; cross-ref Phase 7.
+    - **🔵 UI-6 Skeleton accuracy not systematically verified** — 18 loading.tsx files exist; per-page visual check needed to confirm each skeleton matches actual layout. Opportunistic improvement.
+    - **🔵 UI-7 No Storybook / visual regression** — visual drift undetected at PR-time. Backlog 🔵 `STORYBOOK-SETUP` post-launch.
+    - **🔵 UI-8 1 raw `<img>` in admin portfolio editor** — cross-ref PERF-4 (`PORTFOLIO-EDITOR-NEXT-IMAGE`).
+  - **🛡 Structural Prevention candidates (NEW Шаг 1 demonstrated):**
+
+    | Finding class | Prevention candidate | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | UI-1 modal focus trap | Add @radix-ui/react-focus-scope OR utility; apply to ModalSurface | ~half-day | High (single fix → 79 callers + WCAG 2.4.3 closure) | Backlog 🟠 `MODAL-FOCUS-TRAP-FIX-A` |
+    | UI-2 EmptyState drift | Extract shared component + migrate ~10-15 callers (Pattern 14) | ~half-day | High (primitive prevents future drift) | Backlog 🟡 `EMPTY-STATE-COMPONENT-A` |
+    | UI-3 reduced motion | `useReducedMotion()` hook + apply to animation surfaces | ~1 hr | Medium (a11y + battery) | Backlog 🟡 `REDUCED-MOTION-A` |
+    | UI-4 tap targets | Audit `sm`/`icon` usage on mobile + document convention | ~2 hr | Medium (mobile-first) | Backlog 🔵 `TAP-TARGET-AUDIT-A` |
+    | (general) hardcoded colors | ESLint rule blocking `bg-\[#`/`text-\[#`/`border-\[#` outside allowlist | ~half-day | Medium | Backlog 🔵 `TAILWIND-COLOR-LINT` |
+    | (general) visual regression | Storybook + chromatic | ~1 day setup | High | Backlog 🔵 `STORYBOOK-SETUP` post-launch |
+    | (general) a11y systematic | `eslint-plugin-jsx-a11y` active via core-web-vitals | already done | High | Verified 0 violations in baseline |
+
+  - **NO code/CSS changes verified** — typecheck ✅ / 611/611 tests preserved / `git status` clean before. Read-only discipline preserved.
+  - **Pre-launch risks обнаруженные:** **UI-1 modal-focus-trap is the only 🟠.** Not blocker for mouse users; screen-reader + keyboard-only users hit the gap. Russian accessibility law (152-ФЗ + ГОСТ Р 52872-2019) gaining enforcement — pre-launch fix recommended. ~half-day. Other findings 🟡 polish / 🔵 nice-to-have.
+  - **Open questions for user:** **(1)** `MODAL-FOCUS-TRAP-FIX-A` — pre-launch (recommended) or post-launch? **(2)** `EMPTY-STATE-COMPONENT-A` (Pattern 14 extraction) — opportunistic with next cabinet redesign or proactive sweep now? **(3)** `REDUCED-MOTION-A` — small (~1 hr); worth pre-launch?
+  - **Process insight:** sprint's UI discipline strong on **structural patterns** (shared components, theme tokens, UI_TEXT централизация, mobile-first) but **a11y depth varies**: ARIA basics consistent (`aria-modal`/`aria-labelledby`/`aria-current`) but **focus management overlooked at shared-primitive level**. Single fix to ModalSurface = 79 callers hardened — same Pattern 14 «shared primitive» shape applied at the a11y axis. **Manual-QA-vs-systematic-audit differential**: manual verifies «modal opens, ESC closes»; systematic catches «keyboard user can't Tab inside cleanly». Sample-based audit found 8 findings in ~30 min; comprehensive sweep with axe-core/pa11y would find more polish.
+  - **Combined audit-волна aggregate (10 of 11 done):** SECURITY 6/8+3, CODE-CONSISTENCY 6/8+2, TEST-COVERAGE 0 critical+5 minor, ERROR-HANDLING 8/8+1 tooling, DEPLOYMENT-READINESS 7/8+1 closed, BUSINESS-LOGIC 8/8+4 design-choice, PERFORMANCE 7/8+1 🔴 closed, **UI-UX 6/8 strong+1 🟠+4 🟡+3 🔵 (no 🔴)**. Sprint baseline strong across all 10 categories. Consistent pattern: «strong on new code + shared primitives, gaps in legacy code + structural-prevention CI scripts as deferred backlog accumulation».
+  - **Audit-волна 10/11 done. Item 11 DOCUMENTATION-AUDIT — last remaining.**
 
 ### 2026-05-23 — PERF-1 N+1 closure
 

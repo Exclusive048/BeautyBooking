@@ -254,6 +254,16 @@ Each has a distinct `purpose` claim preventing cross-replay. Each is auth-aware 
 
 **Composition with Pattern 2:** when a new domain entry point appears (e.g. a new admin booking-mutation endpoint), audit the `assertX` family — every one that applies must be wired. Same trace-all-parallel-channels discipline that found STUDIO-CLIENT-WRITE-DIALOG-A regression-gap (createStudioBooking missed work-hours guard).
 
+**Scale-with-adoption (Pattern 14 leverage curve):** the fan-out of a single shared-primitive fix scales with the primitive's adoption surface. Evidence:
+
+| Primitive | Helpers / hooks | Enforcement points | Single-fix leverage |
+|---|---|---|---|
+| Booking `assertX` family | 6 | ~14 | medium |
+| Portfolio `loadMasterServiceOverridesMap` | 1 | 4 | small |
+| **`use-modal-a11y` hooks** | **3** | **55+ (50 ModalSurface + 5 Drawer)** | **largest** |
+
+**Implication:** the earlier a pattern lands in a shared primitive, the larger the latent leverage for future fixes at any axis (security / a11y / performance / business correctness). MODAL-UNIFY-IMPL-A investment paid off at the a11y axis without per-caller work in MODAL-A11Y-BATCH-A. **Counter-example / when NOT to extract:** don't extract a primitive prematurely for 1-2 callers — wait for ≥3 to confirm the pattern. Premature extraction has the inverse cost (carry of unused abstraction).
+
 ---
 
 ## Audit-волна consolidated stats (post-item-5)
