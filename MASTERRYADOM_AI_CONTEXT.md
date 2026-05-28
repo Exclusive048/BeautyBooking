@@ -1062,6 +1062,8 @@ src/
 
 ## 13. ПРАВИЛА ПРИ РАБОТЕ С КОДОМ
 
+> **Process meta-lessons:** [`docs/SPRINT-PATTERNS.md`](../docs/SPRINT-PATTERNS.md) — 13 evidence-grounded patterns synthesized from the 16-fix-wave + 5-audit sprint. Consult **before designing a fix** (audit-first, trace-ALL-parallel-channels, cascade-orphan re-scan, redesign-commit 5-step checklist, HMAC-token rule of N=4, defense-layering, visibility-over-hiding UX, constructive pushback, verified-ready vs выполнено status discipline). The rules below cover **per-commit conventions** (naming/errors/auth/UTC/Prisma); SPRINT-PATTERNS covers **planning + execution discipline**.
+
 ### Конвенции из кода
 
 **Именование:**
@@ -1220,6 +1222,33 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-23 — SPRINT-RETROSPECTIVE-DOC-A** (commit on `QAfix1`). **Synthesis + formalization of sprint meta-patterns. Audit-волна item 6/11 — first non-discovery item, documentation deliverable.** NO code changes (verified — git surface only `.md` docs). Audience: future Claude Code sessions + second developer + post-launch maintainers.
+  - **New file:** [`docs/SPRINT-PATTERNS.md`](../docs/SPRINT-PATTERNS.md) — 13 evidence-grounded patterns. Each in **Trigger → Action → Evidence** format with concrete prompt-name citations. Companion to QUALITY-GATES.md (gates = per-commit checks; patterns = how-we-work meta-lessons).
+  - **13 patterns formalized** (one per section):
+    1. Audit-first scope-collapse (~17 sprint examples, ~40-60% nominal work saved)
+    2. Trace-ALL-parallel-channels (3 occurrences: STUDIO-CLIENT-WRITE-DIALOG, SEC-1, OTP-LOG-DEV-GUARD)
+    3. Cascade-orphan re-scan (LEGACY EXEC-B → EXEC-C; 2-hop cascade for stories V1)
+    4. Quality-gate health monitoring (check:ui-text crashed 10 days, misread as exit-1-by-findings)
+    5. Pattern-coverage-tail (4 of 5 audits hit this shape: CC-1, CC-2, SEC-1, TEST-COVERAGE)
+    6. Regression-test-per-fix discipline (+214 tests, clustered around fixed files)
+    7. Tooling-absence vs coverage-gap distinction (EH-1 Sentry vs CC-1/CC-2 sweeps — different remediation classes)
+    8. Redesign-commit checklist (5-step — grep + 0-importers + backend deps + cascade re-scan + delete-all-in-one-commit; PHASE7+LEGACY found ~50 orphans / ~6.2K LOC that should have been deleted at original redesign)
+    9. HMAC opaque tokens (rule of N=4 — 3 apps shipped, factory deferred until 4th case)
+    10. Visibility-over-hiding UX (disable+tooltip vs hide; MASTER-BOOKING-UI + STUDIO-MASTERS examples)
+    11. Defense-layering (UI + backend + infra; STUDIO-RESCHEDULE / SMS upload / booking conflict examples)
+    12. Two-sided pushback / constructive disagreement (OTP-LOG-DEV-GUARD compromise example — agent pushed for NODE_ENV guard pattern instead of naive revert)
+    13. «Verified ready» vs «выполнено» status discipline (CLEANUP-BILLING-PROD-A precedent — code ready ≠ executed)
+  - **Audit-волна consolidated stats table** included (items 1-5 outcomes + new findings counts + linked patterns).
+  - **Framework alignment note** — user uploaded `ai-dev-framework` codifying ~80% of these patterns externally; decision was to defer framework adoption post-launch. This doc maps cleanly to most framework sections if/when adopted.
+  - **«When to consult this doc» quick-reference** at the end — task-type → relevant pattern numbers.
+  - **`docs/QUALITY-GATES.md` touch:** single 2-line companion-doc reference added at top (minimal touch — existing per-commit-checks rules preserved verbatim, NO rewrite).
+  - **Раздел 13 (Правила) reference added** — points to SPRINT-PATTERNS for planning/execution discipline; existing per-commit conventions (naming/errors/auth/UTC/Prisma) preserved as-is.
+  - **Validation:** typecheck ✅, encoding/mojibake ✅, **572/572 tests** untouched, git surface = 1 new doc + 1 QUALITY-GATES line + AI_CONTEXT updates + BACKLOG (no code/schema/test changes).
+  - **What was NOT changed:** existing QUALITY-GATES.md rules (only the companion-doc reference line added), existing AI_CONTEXT раздел 13 conventions (only reference added at top), code/schema/tests/sprint work — all preserved.
+  - **Pre-launch risks:** none — documentation task. The act of synthesizing patterns surfaced no new gaps; it confirmed that the sprint's pattern-application discipline is well-evidenced and codifiable.
+  - **Process insight (meta):** **this retrospective itself demonstrates Pattern 6 («capture knowledge while fresh»)** — sprint patterns could have been lost post-launch as memory faded. Doc preserves them for a hypothetical second developer joining the project without sprint context. Recommended **future cadence:** re-run SPRINT-RETROSPECTIVE-DOC at major milestones (post-launch first-month, post-payments-integration, etc) to keep patterns current.
+  - **Next:** audit-волна item 7 (PERF / DEPLOYMENT / DOCS / UI-UX / BUSINESS-LOGIC — user pick) OR pivot to pending fix-prompts (WEBHOOK-VERIFY-TEST, UPLOAD-VALIDATION-TEST, ENV-DISCIPLINE-SWEEP, OBSERVABILITY-SENTRY, SEC-JSONLD-ESCAPE).
 
 - **2026-05-23 — ERROR-HANDLING-AUDIT-A** (commit on `QAfix1`). **Read-only audit of error handling + observability — audit-волна item 5/11.** NO code changes (verified — git surface only `.md` docs). 8 categories + bonus swept.
   - **Result: STRONGEST audit-wave outcome yet — 8 of 8 categories strong.** Sprint's error-handling discipline is consistently applied across all surfaces. **1 🟡 Medium gap (observability tooling), no new 🔴/🟠 findings** beyond already-tracked 🔴 #1 email-verify P2002.
