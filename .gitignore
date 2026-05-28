@@ -32,6 +32,15 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Public env templates — tracked so fresh clones inherit the full var list
+# operators need to fill in. Both files contain only `replace-with-*` /
+# placeholder values, no real secrets (verified by SECURITY-AUDIT-A +
+# PROD-ENV-EXAMPLE-SYNC-A). Real `.env` / `.env.production` stays ignored
+# above. Without these re-includes, the DEPLOYMENT-READINESS-AUDIT-A DR-1
+# fix (synced prod template) lives only on the maintainer's disk —
+# defeating the purpose of a checked-in template.
+!.env.example
+!.env.production.example
 
 # vercel
 .vercel

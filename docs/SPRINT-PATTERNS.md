@@ -75,13 +75,23 @@
 
 **Action:** Recognise that pattern *creation* ≠ pattern *coverage*. The wave that creates a pattern typically applies it to ~1-3 surfaces; pre-pattern code that needs migration remains. **Schedule a separate migration sweep** rather than assuming the pattern auto-applies.
 
-**Evidence (4 of 5 audits hit this shape):**
+**Evidence (5 of 6 audits hit this shape):**
 - `CC-1` — `env.ts` helpers exist; 45 sites still read `process.env.*` directly (inline `secure: process.env.NODE_ENV === "production"`, etc).
 - `CC-2` — `UI_TEXT` exists; 4 cabinet feature dirs outside `check:ui-text` ROOTS contain ~306 Cyrillic-containing lines.
 - `SEC-1` — `isProduction` log-guard pattern existed in spirit (mock provider only logs in dev); email-OTP paths missed the explicit guard.
 - `TEST-COVERAGE` — regression-test-per-fix discipline strong; baseline-flow integration tests lighter (no DB-test infra).
+- `DR-1` — `env.ts` schema + dev `.env.example` actively maintained; `.env.production.example` drifted ~5 weeks behind (missing entire `SMS_PROVIDER_*` block + 6 other vars added in May sprint). **Same mechanic, third variant**: canonical (env.ts) + active-mirror (dev example) maintained; passive-mirror (prod example) touched only at deploy time → silently rots.
+- `DR-1 secondary discovery` — when PROD-ENV-EXAMPLE-SYNC-A ran, the sync edits didn't appear in `git status`. Investigation: `.gitignore:34` `.env*` matched both templates; neither was ever committed. The gitignore re-include exception pattern was **established by ENV-DISCIPLINE-SWEEP-A for `!docs/SPRINT-PATTERNS.md`** but **never applied to env templates**. Same Pattern 5 shape at the gitignore-rule level: convention exists, exception not extended to a sibling case. Closed by adding `!.env.example` + `!.env.production.example` exceptions. **Lesson**: when establishing a re-include exception for one tracked-template class, audit ALL adjacent classes that should be tracked the same way.
 
-**Remediation:** after a pattern wave, file a `*-SWEEP-A` backlog item with concrete file count (e.g. `ENV-DISCIPLINE-SWEEP-A` for 45 sites).
+**Variant taxonomy (DR-1 surfaced the 3rd):**
+1. **Stale allowlists** — admin allowlist references files removed during a refactor (PHASE7-CLEANUP-A precedent).
+2. **Inline reads of a centralized helper** — `process.env.*` after env.ts established (CC-1).
+3. **Drifted mirror artifact** — prod env template, prod runbook, prod README, etc — out of sync with canonical source because nothing forces sync on the canonical side (DR-1).
+
+**Remediation:**
+- After a pattern wave, file a `*-SWEEP-A` backlog item with concrete file count (e.g. `ENV-DISCIPLINE-SWEEP-A` for 45 sites).
+- **When env schema / config canonical changes, sync ALL templates (dev `.env.example` AND prod `.env.production.example`)** in the same commit. Treating prod-mirror as a deploy-time-only artifact is what produces DR-1-shape drift. Audit the prod template at every `*-AUDIT-A` deployment item, not at deploy time (too late).
+- Pattern 5 prevention is structural: a `scripts/check-env-templates.mjs` walking env.ts → grep both `.env*.example` → fail CI on missing var would catch this class entirely. Backlog 🔵.
 
 ---
 
