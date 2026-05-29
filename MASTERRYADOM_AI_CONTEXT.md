@@ -1,10 +1,19 @@
 # МастерРядом — Контекст проекта для ИИ
-> Дата аудита: **13 мая 2026** (refresh — CONTEXT-REFRESH-V2; предыдущий snapshot был 7 мая 2026)
-> Файлов проверено: **1407 TypeScript-файлов** в `src/` (271 API route.ts + 89 page.tsx)
-> Коммит/ветка: `designStudioCabinet`. Последний коммит main: `b3eedaf` (Merge PR #71 — Admin Cabinet).
-> Моделей: **65**, enum'ов: **36**, миграций: **16** (последняя — `20260514000936_add_admin_initiated_notification_types`).
+> Дата аудита: **29 мая 2026** (refresh — CONTEXT-REFRESH-V3; предыдущий snapshot был 13 мая 2026 — V2)
+> Файлов проверено: **621 features tsx + 65 components tsx + 277 route.ts + 90 page.tsx + 74 test files** (counts verified by parallel inspectors)
+> Коммит/ветка: `auditandaction`. Последний значимый: MODAL-A11Y-BATCH-A (a11y закрытие 55+ модалов через shared use-modal-a11y hooks).
+> Моделей: **65**, enum'ов: **36**, миграций: **16** (без новых миграций за всю audit-волну — design discipline maintained).
+> Тестов: **629** (рост 358 → 629 за audit-волну, +271).
+> Error codes: **113** typed (`EMAIL_ALREADY_USED` добавлен по EMAIL-VERIFY-FIX-A).
 >
-> **Active sprint:** редизайн кабинета студии в ветке `designStudioCabinet`.
+> **🎉 Sprint phase: AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness.**
+> Tier 1 audits (items 1-6): LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / SPRINT-RETROSPECTIVE-DOC
+> Tier 2 audits (items 7-11): DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION
+> Fix-prompts закрывшие критические находки во время волны: PROD-ENV-EXAMPLE-SYNC-A (DR-1), FEED-PORTFOLIO-N1-FIX-A (PERF-1), MODAL-A11Y-BATCH-A (UI-1 + UI-3), EMAIL-VERIFY-FIX-A (🔴 #1), OTP-LOG-DEV-GUARD-A (SEC-1), ENV-DISCIPLINE-SWEEP-A (CC-1), FAST-WINS-BATCH-A (TC-2 + SEC-2 + proxy.ts), SECURITY-SURFACE-TESTS-A (TC-1).
+> **0 🔴 + 0 🟠 unaddressed** — pre-launch критический путь чист.
+> Next phase: STRUCTURAL-PREVENTION-AUDIT (Шаг 3) consolidate all prevention candidates → production execution batch.
+>
+> **Predecessor active sprint** (preserved для context): редизайн кабинета студии в ветке `designStudioCabinet`.
 > - ✅ Schedule request approval UI (STUDIO-SCHEDULE-REQUEST-APPROVAL-A — closed functional gap)
 > - ✅ Shell foundation (STUDIO-SHELL-A — sidebar/topbar/UserChip/bottom-nav + nav config + counts service)
 > - ✅ Symmetric switcher rollback (SYMMETRIC-SWITCHER-A — cabinet UI без duplicate switcher)
@@ -140,7 +149,7 @@ src/
 │   ├── (public)/           # Группа роутов: публичные страницы
 │   ├── api/                # REST API (route.ts)
 │   └── [страницы]/         # Публичные страницы (login, catalog, etc.)
-├── components/             # Переиспользуемые UI-компоненты (60 tsx-файлов)
+├── components/             # Переиспользуемые UI-компоненты (65 tsx-файлов — verified 2026-05-29)
 │   ├── auth/
 │   ├── billing/
 │   ├── blocks/
@@ -150,7 +159,7 @@ src/
 │   ├── providers/
 │   ├── pwa/
 │   └── ui/
-├── features/               # Feature-слайсы (271 tsx-файла)
+├── features/               # Feature-слайсы (621 tsx-файла — verified 2026-05-29; рост от 271 за audit-волну)
 │   ├── admin/
 │   ├── analytics/
 │   ├── auth/
@@ -252,21 +261,21 @@ src/
 - **RBAC**: `requireAuth()`, `requireRole()`, `hasAnyRole()` в `src/lib/auth/guards.ts`
 - **Централизованные UI-тексты**: `src/lib/ui/text.ts` экспортирует константу `UI_TEXT`
 
-### Количество файлов
-| Тип | Количество |
-|-----|-----------|
-| route.ts (API handlers) | 240 |
-| page.tsx (страницы) | 78 |
-| test-файлов | 29 |
-| tsx-файлов в components/ | 60 |
-| tsx-файлов в features/ | 271 |
-| Всего TS/TSX в src/ | 1094 |
+### Количество файлов (verified 2026-05-29 by CONTEXT-REFRESH-V3 parallel inspectors)
+| Тип | Количество | Δ от V2 (13 мая) |
+|-----|-----------|---|
+| route.ts (API handlers) | 277 | +37 |
+| page.tsx (страницы) | 90 | +12 |
+| test-файлов | 74 | +45 (audit-волна added regression tests) |
+| tsx-файлов в components/ | 65 | +5 |
+| tsx-файлов в features/ | 621 | +350 (sprint redesign + studio cabinet wave) |
+| Тестов (count) | 629 | +271 (358 → 629) |
 
 ---
 
 ## 4. МОДЕЛЬ ДАННЫХ
 
-### Enums (35 штук, актуально на 2026-05-13)
+### Enums (36 штук, verified 2026-05-29 by CONTEXT-REFRESH-V3 — list current; AdminAuditAction was the 36th, added 2026-05-13 MIGRATIONS-PRELAUNCH-A)
 
 Полный список из `prisma/schema/enums.prisma`: OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole, StudioMemberStatus, MembershipStatus, CategoryStatus, BookingStatus, BookingCancelledBy, BookingRequestedBy, BookingActionRequiredBy, BookingSource, ChatSenderType, ScheduleMode, ScheduleBreakKind, ScheduleOverrideKind, ScheduleChangeRequestStatus, TimeBlockType, PlanTier, SubscriptionScope, SubscriptionStatus, BillingPaymentStatus, NotificationType, MediaEntityType, MediaKind, MediaAssetStatus, ReviewTargetType, ReviewTagType, ReviewReportReason, DiscountType, DiscountApplyMode, ModelOfferStatus, ModelApplicationStatus, **AdminAuditAction**.
 
@@ -312,7 +321,7 @@ src/
 | ConsentType | TERMS, PRIVACY, MARKETING, PUBLIC_PROFILE |
 | ChatSenderType | CLIENT, MASTER |
 
-### Модели данных (64 модели, актуально на 2026-05-13)
+### Модели данных (65 моделей, verified 2026-05-29 — content current; +1 от V2 = AdminAuditLog added by MIGRATIONS-PRELAUNCH-A 2026-05-13 same wave)
 
 **Изменения с предыдущего snapshot:**
 - ➕ **`MrrSnapshot`** (MRR-SNAPSHOTS-A, миграция `20260513115124_add_mrr_snapshot`) — `id`, `snapshotDate` (`@db.Date @unique`), `mrrKopeks` (`BigInt`), `activeSubscriptionsCount`, `breakdownJson?`, `createdAt`. Daily snapshot platform-wide MRR + active subs count. Записывается worker'ом через `mrr.snapshot.daily` job (triggered внешним cron через `/api/billing/mrr/snapshot/run`). Используется admin/billing для вычисления MRR delta vs ~30 дней назад. `BigInt` для overflow safety; `breakdownJson` зарезервирован под future per-tier/per-scope drill-down.
@@ -640,7 +649,7 @@ src/
 | `/api/provider/schedule/templates` | GET, POST | Шаблоны |
 | `/api/provider/schedule/status` | GET | Статус расписания |
 
-### API — остальные группы (актуально 2026-05-13; всего 271 route.ts)
+### API — остальные группы (verified 2026-05-29; всего 277 route.ts)
 | Группа | Количество handlers | Примечание |
 |--------|-------------------|---|
 | /api/admin/* | ~35 | + новые `/admin/dashboard/{kpis,charts,events,health}` (ADMIN-DASH-A), `/admin/cities/*` + `/admin/cities/duplicates` (ADMIN-CITIES-UI), `/admin/users/[id]/plan` (ADMIN-USERS-A — audit-logged plan change), `/admin/billing/kpis` + `/admin/billing/plans/[id]` (ADMIN-BILLING-A — audit-logged plan edit), `/admin/billing/subscriptions/[id]/cancel` (ADMIN-BILLING-B — audit-logged cancel), `/admin/reviews/[id]/{approve,delete}` (ADMIN-REVIEWS-A — audit-logged moderation), `/admin/reviews/*` (legacy GET/PATCH/DELETE), `/admin/catalog/categories/*`. ADMIN-SETTINGS-A: расширены `/admin/system-config` (добавлен `legalDraftMode` + audit logging) и `/admin/settings` (audit logging для SEO changes). PHASE-7-CLEANUP-A: удалены `/admin/metrics`, `/admin/users` (GET + PATCH; `/[id]/plan` сохранён), `/admin/catalog/global-categories/*` всё дерево |
@@ -745,7 +754,7 @@ src/
 - Cost+balance logged on every successful send (`messageId`, `cost`, `balanceLeft`) для retrospective monitoring.
 - **Pre-launch ops:** установить `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` в prod env, пополнить SMSC баланс, smoke-test (Beeline/MTS/Megafon RU + KZ). SMS-MONITORING-A (admin balance widget + daily low-balance cron) — отдельный 🟡 backlog.
 
-**P2: VAPID ключи использованы с `!` (non-null assertion) — crash при старте если не заданы** — Сделано: НЕТ. **Pre-launch task**.
+**P2: VAPID ключи использованы с `!` (non-null assertion) — crash при старте если не заданы** — Сделано: **ЧАСТИЧНО** (verified by CONTEXT-REFRESH-V3 2026-05-29). `isPushEnabled` computed flag в `src/lib/env.ts` теперь guards module-level usage. Residual risk: file-internal `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!` (vapid.ts:5-6) crashes если **только один** ключ задан (non-null assertion fires per-key). Fix: guard individual key assignments OR replace `!` с conditional return. **Backlog 🟡 — VAPID-NON-NULL-FIX** (~20 min).
 - Файл: `src/lib/notifications/push/vapid.ts:5-6`
 - `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!`, `process.env.VAPID_PRIVATE_KEY!`
 - Если ключи не заданы, инициализация vapid упадёт с TypeError в production.
@@ -863,8 +872,8 @@ src/
 - Environment: node
 - Plugins: vite-tsconfig-paths (поддержка `@/` алиасов)
 
-### TEST-COVERAGE-AUDIT-A posture (2026-05-23, read-only audit)
-> Updates the earlier «45 файлов / 358 тестов» snapshot. Current: **67 test files / 572 tests** (sprint added 214 across 22 files). Coverage strong on critical paths + invariants + regression scenarios; 2 moderate gaps (webhook signature + file upload validation) + tooling absence.
+### TEST-COVERAGE-AUDIT-A posture + post-волна refresh (verified 2026-05-29 by CONTEXT-REFRESH-V3)
+> **Current: 74 test files / 629 tests** (358 → 629 across audit-волна 11/11, +271 tests). Post audit-волна additions: SECURITY-SURFACE-TESTS-A (TC-1+TC-2 webhook + chat-attachment validators), FAST-WINS-BATCH-A (validateReferenceAsset + safeJsonLd), EMAIL-VERIFY-FIX-A (mapEmailAlreadyUsedConflict), FEED-PORTFOLIO-N1-FIX-A (portfolio batched-lookup regression tests +8), MODAL-A11Y-BATCH-A (use-modal-a11y focus-trap predicate +18). Coverage strong on critical paths + invariants + regression scenarios; 2 moderate gaps remain (TC-3 integration test infra + TC-4 coverage tooling) — deferred к Шаг 3 STRUCTURAL-PREVENTION-AUDIT.
 - **Distribution:** heavy in `src/lib/` — booking (9 files), schedule (8), billing (7), sms (3), chat+media (6), cities (3); features lighter (regression-test pattern — tests follow fixes).
 - **✅ Booking lifecycle:** state machine (28 tests in `flow.test.ts`) + policy-enforcement + reschedule-policy + reschedule-enforcement + action-state + client-privacy + idempotency-key + reminders + link-guest. Illegal transitions blocked + 60-min cancel/reschedule window + cancellation deadline tested.
 - **✅ Billing pure helpers:** features (29) + marketing (19) + trial (15) + utils period-math (14) + guards (6) + mrr (6) + mrr-snapshot (6) = ~95 tests. **Known gap (documented backlog):** createBooking integration, cancelBooking, marketing-pricing.load SSR, idempotency Prisma-touching, getCurrentPlan, full subscribe/refund/proration integration — deferred until integration-test infra exists.
@@ -1057,6 +1066,8 @@ src/
 | 23 | **Category visibility: APPROVED = public; PENDING = creator scope only** | `src/features/studio-cabinet/services/server/services-data.service.ts` (`listAvailableCategoriesForStudio`) + `src/lib/master/services-view.service.ts` (`listAvailableGlobalCategories`) + `/api/catalog/global-categories` GET + `catalog.service.ts` filter (CATEGORY-UNIFICATION-A) | `GlobalCategory.status = APPROVED` AND `visibleToAll = true` → visible everywhere (public catalog, all studios, all masters). `GlobalCategory.status = PENDING` → visible ТОЛЬКО to creator (`createdByUserId` / `proposedBy` match `auth.user.id`) in their own service/portfolio picker. Public catalog (`/api/catalog/global-categories`) **строго** filters `status: APPROVED, visibleToAll: true` — pending drafts never leak. Master `service-modal.tsx` + studio `add-service-dialog.tsx` propose new categories via `POST /api/categories/propose` → создаёт `status: PENDING, visibleToAll: false`. Категория становится globally visible только после admin approval. **Никогда не filter catalog/public surfaces by `OR: [APPROVED, own-PENDING]`** — это сломает invariant (см. `catalog/global-categories/route.ts` services-category-creation-restore comment про prior bug). |
 | 26 | **Chat attachment ACL = chat participants only (1:1 client↔master); studio admins/outsiders denied** | `src/lib/media/access.ts` (`ensureCanReadMedia` CHAT_MESSAGE case + `canReadChatAttachmentMedia` helper). Route `/api/chat/attachment/[token]` (MASTER-CHAT-ATTACHMENT-FIX-A) | MediaAsset rows tagged `entityType=CHAT_MESSAGE` + `entityId="chat-message:<msgId>"` могут читать ТОЛЬКО два участника беседы — `booking.clientUserId` (client) и `booking.masterProvider.ownerUserId` (master). Studio admin/owner — НЕТ (privacy 152-ФЗ, same boundary as `resolveChatAccess`). Outsiders → 403. Availability gate intentionally skipped для read (участники видят историю и после окончания брони — как сообщения). URL pattern: opaque token-only (`/api/chat/attachment/[token]`) — assetId cuid не в URL (signed payload embeds `aid`, `exp`, `purpose:"chat-attachment-read"`). Distinct purpose claim предотвращает cross-replay с generic `media-read` токенами. Защищён tests: `chat-attachment-acl.test.ts` (8 boundary scenarios) + `chat-attachment-token.test.ts` (11 token contract + URL-no-cuid). |
 | 25 | **Master CRM private fields никогда не появляются в client-facing API/DTO/SSR** | `src/lib/bookings/dto.ts` (`BookingDto` / `BookingClientDto` без `notes`/`tags`/`clientCard`), `src/lib/bookings/list.ts` (`listClientBookings` explicit-list select), `src/lib/client-cabinet/bookings.service.ts` (`ClientBookingDTO` + `listClientBookings`), `/api/cabinet/user/*`, `/api/bookings/my`, `/api/bookings/[id]/chat` — все explicit-list select без CRM-полей. Guarded by `src/lib/bookings/client-privacy.test.ts` (13 tests: type-level + source-level regex) (MASTER-PRIVACY-FIX-A) | Master CRM private поля — `Booking.notes` (мастер пишет при manual booking), `ClientCard.notes` / `ClientCard.tags` / `ClientCard.photos` (CRM-карточка клиента у мастера, providerId-scoped), `ClientNote.text` (отдельная модель notes by master) — **никогда не возвращаются клиенту** через API/DTO/SSR. Это 152-ФЗ-критичное: мастер обрабатывает персональные данные клиента для CRM-цели, в руки клиенту они не должны попадать (модель данных мастера, не клиента). **Что НЕ master-private** и легитимно в client DTO: `Booking.comment` (client-to-master comment, клиент сам написал), `Booking.changeComment` (bilateral reschedule communication), `ClientNote` model — приватна полностью, **никогда** не include в client paths. **Boundary защищается двумя слоями**: (1) TypeScript type-level — `extends keyof` assertions в `client-privacy.test.ts` fail at compile time если поле просочится в DTO type; (2) Source-level regex — тот же test читает байты 6 client-facing файлов и матчит `notes: true` / `clientCard:` / `clientNote:` паттерны (ловит даже `as`-cast обходы types). Расширение privacy-полей в схеме → расширить оба массива в test. |
+| 27 | **ModalSurface + Drawer enforce WCAG SC 2.4.3 + 2.3.3 + 3.2.1 для всех callers через `use-modal-a11y` hooks** | `src/components/ui/use-modal-a11y.ts` (`useReturnFocus` + `useInitialFocus` + `useFocusTrap` + `decideFocusTrap` pure helper) — applied в `src/components/ui/modal-surface.tsx` + `src/components/ui/drawer.tsx`. 50+ ModalSurface callers + 5 Drawer migrations inherit без per-caller code change (MODAL-A11Y-BATCH-A 2026-05-23). | Каждый модал / drawer enforced для WCAG: (1) **focus trap** — Tab cycles внутри modal panel; (2) **initial focus** — first focusable child OR explicit `initialFocusRef` prop OR container fallback с `tabIndex={-1}`; (3) **return focus** — opener element restored at close (guard against opener-removed-from-DOM); (4) **`useReducedMotion`** — animations collapse to opacity-only когда user prefers reduced motion. Custom focus trap (~50 LOC) вместо `@radix-ui/react-focus-scope` (не в deps). Mouse-user behavior identical (focus trap invisible). Default-user animations preserved. **Защищён tests**: `use-modal-a11y.test.ts` (18 tests — `FOCUSABLE_SELECTOR` discipline + `decideFocusTrap` pure helper across Tab/Shift+Tab × position × outside-container edge cases). React lifecycle integration deferred until TC-3 (jsdom + @testing-library infra). Pattern 14 largest fan-out leverage: 1 primitive fix → 55+ callers hardened. **Stories-viewer-overlay** keeps independent focus-trap (different concerns: arrow nav + swipe + progress bars — `STORIES-VIEWER-A11Y-CONSOLIDATE` 🔵 carryover). |
+| 28 | **Все Booking state-change endpoints idempotent через `x-idempotency-key` + Redis lock** | `src/lib/bookings/idempotency.ts` (`resolveBookingIdempotency` + `storeBookingIdempotency` + `clearBookingIdempotency`) — applied в `createBooking.ts` + `createClientBooking.ts` (rescheduleBooking + confirmBooking inherit via shared transaction patterns). TTL 600s. (BUSINESS-LOGIC-AUDIT-A confirmed) | Booking creation accepts optional `idempotencyKey` параметр — построение Redis key via `buildCreateBookingIdempotencyKey(namespaceKey, requestId)` namespaced by `clientUserId ?? \`guest:${clientPhone}\``. Lock-then-create pattern + on-failure cleanup (`clearBookingIdempotency`). Duplicate POST returns cached booking (если completed) OR throws `DUPLICATE_REQUEST 409` (если parallel insert race). **5-я P2002 surface** (booking + chat conversation-slug + cities + MRR snapshot + email-verify) mapped к user-friendly errors; OTP-EMAIL-LOGIN-RACE 6th site remains latent (low-probability — backlog 🟡 `OTP-EMAIL-LOGIN-RACE`). **Защищён tests**: `idempotency-key.test.ts` (6 tests pinning key composition + determinism + guest namespace + TTL constant). **Эмерджентный смежный invariant candidate** (formalize если 6th site OTP login race closes): «every P2002 → user-friendly error либо silent recovery, никогда 500». |
 
 ---
 
@@ -1085,7 +1096,7 @@ src/
 
 ### ERROR-HANDLING-AUDIT-A posture (2026-05-23, read-only audit)
 > Audit-волна item 5. **8 of 8 categories strong** — sprint's error-handling discipline is the most consistently-applied pattern audited so far. Single moderate gap: no error-aggregation/APM instrumentation. NO new 🔴/🟠 findings beyond already-tracked items.
-- **✅ Typed error registry:** **112 error codes** centralized in `src/lib/api/errors.ts`; `AppError` class + `toAppError` catch-all converter used in 10+ files. No raw `Internal Server Error` / scattered string literals.
+- **✅ Typed error registry:** **113 error codes** centralized in `src/lib/api/errors.ts` (`EMAIL_ALREADY_USED` добавлен EMAIL-VERIFY-FIX-A 2026-05-23, MASTER_NOT_ACTIVE / OUTSIDE_WORK_HOURS / MASTER_SERVICE_MISMATCH / INVALID_REQUEST_PAYLOAD за audit-волну); `AppError` class + `toAppError` catch-all converter used in 10+ files. No raw `Internal Server Error` / scattered string literals.
 - **✅ React error boundaries:** all 4 present and recoverable — `src/app/(admin)/error.tsx`, `(cabinet)/error.tsx`, `(public)/error.tsx`, `global-error.tsx`. Each renders retry-button via `onClick={reset}`. Per-route-group + global fallback.
 - **✅ Loading/empty/error states:** 18 `loading.tsx` route-level files; data-fetching components consistently expose `isLoading`/`error`/empty states.
 - **✅ Graceful degradation:**
@@ -1222,6 +1233,48 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-29 — CONTEXT-REFRESH-V3** (commit on `auditandaction`). **🎉 Closes DOC-1 + DOC-2 from DOCUMENTATION-AUDIT-A (16-day header drift + holistic refresh overdue).** Delivered via 2-phase workflow: 3 parallel inspector subagents (Explore type) covering sections 1-7 / 8-14 / 15-changelog × 273K tokens / 132 tool uses / 14 min wall-clock + main-context sequential edit (this entry). NO code/schema/test changes — documentation only.
+  - **Workflow result: STOP-gate triggered** by section 15 inspector flagging strategic-decision deferral on changelog compaction strategy. Inspector itself classified status as «minor-update» + defended current full-chronological format («defensible given high audit velocity; 2344 lines manageable»). All other 14 section assessments returned non-blocking. Decision: applied safe minor edits в main context (header refresh + numeric drift + invariants); preserved full-chronological changelog per inspector's defense. Compaction strategy filed as soft-decision backlog item for user revisit.
+  - **Section-by-section walk (14 sections + 15 changelog):**
+    - **Sections 1, 2, 5, 7**: **current** — no edits needed. Product overview / tech stack / business logic / env discipline all match реальность.
+    - **Section 3 (Architecture)** — minor-update: file counts drifted (`features/` 271 → **621**, `components/` 60 → **65**, `route.ts` 240 → **277**, `page.tsx` 78 → **90**, tests 29 → **74**). Updated with «verified 2026-05-29» annotations + Δ-from-V2 column added к counts table.
+    - **Section 4 (Data Model)** — minor-update: enum count claimed 35 → actual **36** (AdminAuditAction was the 36th added 2026-05-13 MIGRATIONS-PRELAUNCH-A); models claimed 64 → actual **65** (same wave). Headers refreshed.
+    - **Section 6 (Routes)** — minor-update: API group header «271 route.ts» → **277**.
+    - **Section 8 (Security)** — minor-update: **P2 VAPID** status reclassified «Сделано: НЕТ» → **«Сделано: ЧАСТИЧНО»** (verified by inspectors: `isPushEnabled` computed flag in env.ts guards module-level usage; residual risk = file-internal `!` non-null assertion на отдельные ключи). New backlog item 🟡 `VAPID-NON-NULL-FIX` (~20 min).
+    - **Section 9 (Тестирование)** — minor-update: snapshot 67 files / 572 tests → **74 files / 629 tests** (post-волна additions documented: SECURITY-SURFACE-TESTS / FAST-WINS / EMAIL-VERIFY / FEED-PORTFOLIO-N1 / MODAL-A11Y).
+    - **Section 11 (Production Deploy posture)** — text current per DEPLOYMENT-READINESS-AUDIT-A + PROD-ENV-SYNC closing DR-1. Other DR-2/3/6 still pending user decisions; no rewrite.
+    - **Section 12 (Invariants)** — **2 new invariants formalized** (per ready-to-formalize emergent candidates from inspectors):
+      - **#27 ModalSurface + Drawer enforce WCAG SC 2.4.3 + 2.3.3 + 3.2.1** via `use-modal-a11y` hooks (50+ ModalSurface + 5 Drawer callers inherit без per-caller change; tested via `use-modal-a11y.test.ts` 18 tests; stories-viewer-overlay independent — carryover backlog)
+      - **#28 Booking state-change endpoints idempotent** via `x-idempotency-key` + Redis lock (TTL 600s; namespace-by-userId-or-phone; lock-then-create + on-failure cleanup; 5th of 6 P2002 surfaces mapped; 6th = OTP-EMAIL-LOGIN-RACE remains latent backlog)
+      - Numbering #25/#26 quirk (added out-of-order during prior sprint) preserved — content correct, renumbering cosmetic; «invariant 25 enforced» citations work via search.
+      - **Deferred candidates**: «every P2002 → user-friendly error never 500» (5/6 sites — wait for 6th OTP-EMAIL-LOGIN-RACE closure); «all env reads through env.ts» (already enforced via CLAUDE.md rule 11 + ENV-DISCIPLINE-SWEEP-A — already-formalized как rule, не нужно дублировать как invariant).
+    - **Section 13 (Rules)** — error code count 112 → **113** (`EMAIL_ALREADY_USED` + 4 audit-волна codes documented).
+    - **Section 14** — current.
+    - **Section 15 (Changelog)** — preserved full-chronological per inspector's defense. Strategy decision deferred to user (backlog item — compaction recommended IF section grows > 4000 lines OR onboarding feedback indicates issue; current 2344 lines manageable).
+  - **Header refresh (the canonical surface that triggered V3):**
+    - Date: «13 мая 2026» → **«29 мая 2026»** (CONTEXT-REFRESH-V3)
+    - Sprint phase: «Active sprint: studio cabinet redesign» → **«AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness»** + full audit + fix-prompt inventory + 0 🔴/🟠 outstanding confirmation + next phase declaration
+    - Tests: 358 → **629** (+271 audit-волна growth) ; Error codes: **113** ; Migrations: **16** (0 new за audit-волну — design discipline maintained throughout)
+  - **Cross-references verified by inspectors:** 22 cross-refs checked. **0 broken** (8 numeric drifts in sections 3/4/6 — now fixed). File path refs (e.g. `src/components/ui/modal-surface.tsx:86-182` in MODAL-A11Y-BATCH-A entry) all valid. SPRINT-PATTERNS.md / QUALITY-GATES.md / BACKLOG.md cross-doc links all functional.
+  - **Раздел 8/11/12/15 + header touched** (per rule 15 «### Context updates» discipline maintained by this V3 commit itself):
+    - Section 3: file-count table refreshed
+    - Section 4: enum + model counts + dates
+    - Section 6: route count header
+    - Section 8: P2 VAPID status
+    - Section 9: tests count + snapshot
+    - Section 11: text current (per prior DEPLOYMENT-READINESS audit)
+    - Section 12: +2 invariants (#27, #28)
+    - Section 13: error codes 113
+    - Section 15: this entry
+    - Header: date + sprint phase + inventory
+  - **Validation:** typecheck ✅, encoding/mojibake ✅, **629/629 tests** preserved.
+  - **What was NOT changed:** sprint code, schema (NO migration — 16 migrations preserved), SPRINT-PATTERNS.md (separate doc; Pattern 15 «Workflow-orchestrated parallel survey audit» candidate now has 2 evidence instances — DOCUMENTATION-AUDIT-A + CONTEXT-REFRESH-V3 — but Pattern 14 «Scale-with-adoption» already covers similar leverage; deferred к Шаг 3 STRUCTURAL-PREVENTION-AUDIT for consolidation decision), CLAUDE.md / docs/QUALITY-GATES.md / docs/runbooks/* (untouched per scope), BACKLOG.md updates (separate phase below).
+  - **Workflow execution stats:** 3 parallel Explore inspector agents (sections 1-7 / 8-14 / 15-changelog), each returned structured JSON via schema (`stopGateReason` field guards user-decision points). **STOP-gate triggered correctly** — workflow design surfaced section 15 compaction strategy as user-decision before silent change. Main context resolved via «inspector itself defended full chronological» reasoning. Time: 14 min wall-clock for 3 parallel inspections vs estimated ~30 min if sequential. Pattern 15 candidate strengthens: 2 instances now (DOCUMENTATION-AUDIT + CONTEXT-REFRESH-V3) — both used parallel-fan-out with main-context synthesis. Both succeeded. **Eligible для formalization in SPRINT-PATTERNS Pattern 15 после Шаг 3 review.**
+  - **Pre-launch risks обнаруженные:** none new. DOC-1 + DOC-2 closed (header date + holistic refresh). VAPID P2 partial mitigation acknowledged + 🟡 backlog `VAPID-NON-NULL-FIX` filed для full closure.
+  - **Open questions for user:** (1) Changelog compaction strategy (current full-chronological defended by inspector — keep OR schedule split-to-archive)? (2) Pattern 15 formalization (workflow-orchestrated parallel survey — 2 instances now: DOCUMENTATION-AUDIT + CONTEXT-REFRESH-V3) — add к SPRINT-PATTERNS now OR wait для Шаг 3?
+  - **Process insight — V3 itself demonstrates Pattern 4 (quality-gate health monitoring) at meta-level**: «document maintenance gate periodically reset». Rule 15 per-commit «### Context updates» discipline worked diligently (every fix-prompt + audit entry had the section) but **holistic header + cross-section coherence required Шаг 3-class periodic reset**. Same shape as Pattern 4 «check:ui-text crashed-vs-passing distinction» — gate health needs monitoring, not just gate existence. **Recommendation:** `CONTEXT-FRESHNESS-CI-CHECK` (already in backlog from DOCUMENTATION-AUDIT) — fail CI if AI_CONTEXT header date >14 days OR <commit date. Closes V1→V2→V3 cycle's recurring need by structural prevention.
+  - **🎉 V3 closes audit-волна 11/11 + foundation work.** Next: STRUCTURAL-PREVENTION-AUDIT (Шаг 3) consolidates ALL prevention candidates from 11 audits + 8 fix-prompts + Pattern 15 decision + remaining backlog grooming → production execution batch authorization.
 
 - **2026-05-29 — DOCUMENTATION-AUDIT-A** (commit on `auditandaction`). **🎉 LAST audit (item 11/11). Audit-волна 100% complete.** Read-only documentation completeness audit across 6 parallel streams via workflow (onboarding / operations / internal / process / code+schema / API). **NO code/docs changes — discovery only.** Workflow execution: 6 Explore subagents in `parallel()`, 228 tool uses, ~4 min, 427K tokens. **Result: STRONG documentation discipline overall — sprint rule 15 (per-commit context updates) clearly working. 2 high-severity operational gaps + 1 high-severity refresh-cadence gap discovered by sub-agents that this audit itself reveals as «process needs CONTEXT-REFRESH-V3 before next sprint».**
   - **Workflow design:** 6 parallel agents (Explore type) inspected disjoint surfaces — Onboarding/README, Operational runbooks, Internal AI_CONTEXT, Process docs (QUALITY-GATES + SPRINT-PATTERNS + CLAUDE.md), Code+Schema TSDoc, API documentation. Each returned structured findings + structural-prevention candidates via JSON schema. Synthesis happens in main context (this entry).

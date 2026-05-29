@@ -222,7 +222,13 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟠 HIGH PRIORITY (после core master cabinet)
 
-### CONTEXT-REFRESH-V3 (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 — DOC-1+DOC-2 process) 🟠 pre-sprint recommended
+### VAPID-NON-NULL-FIX (spawned from CONTEXT-REFRESH-V3 2026-05-29) 🟡 pre-launch
+- **What**: `src/lib/notifications/push/vapid.ts:5-6` uses `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!` + `process.env.VAPID_PRIVATE_KEY!` non-null assertions. If **only one** of the two keys set in production, runtime crashes with TypeError instead of gracefully disabling push. `isPushEnabled` computed flag (env.ts) guards module-level usage but doesn't protect file-internal `!` assertions.
+- **Fix**: replace `!` assertions with conditional return — early-return null when keys missing, OR guard per-key with explicit `if` check before assignment.
+- **Scope**: ~20 min — single file, replace 2 non-null assertions.
+- **Trigger**: pre-launch (cheap; closes residual VAPID risk noted by CONTEXT-REFRESH-V3 inspectors reclassifying P2 «Сделано: ЧАСТИЧНО»).
+
+### ~~CONTEXT-REFRESH-V3~~ ✅ DONE 2026-05-29 (spawned from DOCUMENTATION-AUDIT-A — DOC-1+DOC-2 process)
 - **What**: full holistic refresh of `MASTERRYADOM_AI_CONTEXT.md` (sections 1-15) — header date update, audit-волна completion summary, integration of all 13 fix-prompts + 11 audits results. NOT per-commit append (rule 15 per-commit discipline working); this is the «raз в 4-6 коммитов / ~2 недели» full walk.
 - **Why**: header reads «13 мая 2026» but today 2026-05-29 (16 days drift + ~70 commits + 5 audits since CONTEXT-REFRESH-V2). Rule 15 trigger (4-6 commits OR ~2 weeks) reached. Per-commit «### Context updates» sections present in every entry, but cross-section coherence + header date need refresh. Next session reading header trusts «May 13» as audit baseline when 70 commits happened after.
 - **Scope**: ~2-4 hr. (a) Re-walk sections 1-15 against current code state; (b) update header date + commit + branch markers; (c) consolidate audit-волна findings into Раздел 8/12 narratives; (d) prune stale entries from Раздел 8 that fix-prompts closed; (e) verify cross-references functional; (f) add Pattern 15 entry if SPRINT-PATTERNS gets it.
@@ -1199,6 +1205,33 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
 
+### 2026-05-29 — CONTEXT-REFRESH-V3 (holistic AI_CONTEXT refresh)
+
+- **CONTEXT-REFRESH-V3** — 🎉 **closes DOC-1 + DOC-2 from DOCUMENTATION-AUDIT-A** (16-day header drift + holistic refresh overdue per rule 15). Delivered via 2-phase workflow: 3 parallel inspector subagents (Explore type) × main-context sequential edit. **NO code/schema/test changes.** Holistic walk of all 15 sections + 2 new invariants formalized (#27 ModalSurface a11y, #28 Booking idempotency).
+  - **Workflow execution:** 3 parallel inspectors covering sections 1-7 / 8-14 / 15-changelog (273K tokens, 132 tool uses, 14 min wall-clock). STOP-gate triggered by section 15 inspector deferring changelog compaction strategy к user; main-context resolved per inspector's own defense («defensible at current audit velocity»). All other 14 section assessments returned non-blocking minor-update / current classification.
+  - **Sections current (no edits):** 1 (Product), 2 (Tech Stack), 5 (Business Logic), 7 (Env Vars). Verified против реальность.
+  - **Sections minor-update applied:**
+    - **Section 3 (Architecture)**: file counts refreshed — features/ 271 → **621**, components/ 60 → **65**, route.ts 240 → **277**, page.tsx 78 → **90**, tests 29 → **74**. Δ-from-V2 column added.
+    - **Section 4 (Data Model)**: enum count 35 → **36** (AdminAuditAction), models 64 → **65** (AdminAuditLog), dates refreshed.
+    - **Section 6 (Routes)**: API group header 271 → **277**.
+    - **Section 8 (Security)**: P2 VAPID «Сделано: НЕТ» → **«Сделано: ЧАСТИЧНО»** (isPushEnabled guard present; residual non-null assertion risk per-key — new backlog 🟡 `VAPID-NON-NULL-FIX`).
+    - **Section 9 (Tests)**: 67 files / 572 tests → **74 files / 629 tests** + post-волна additions documented.
+    - **Section 13 (Rules)**: error codes 112 → **113** (EMAIL_ALREADY_USED + 4 audit-волна codes).
+    - **Header**: «13 мая 2026» → **«29 мая 2026»**. Sprint phase «studio cabinet redesign» → **«AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness»** + full inventory.
+  - **Invariants formalized (2 new — #27, #28):**
+    - **#27 ModalSurface + Drawer enforce WCAG SC 2.4.3 + 2.3.3 + 3.2.1** via `use-modal-a11y` hooks (50+ ModalSurface + 5 Drawer callers; 18 a11y tests; stories-viewer-overlay independent — carryover). Ready-to-formalize per MODAL-A11Y-BATCH-A evidence.
+    - **#28 Booking state-change endpoints idempotent** via `x-idempotency-key` + Redis lock (TTL 600s; namespace-by-userId-or-phone; lock-then-create + on-failure cleanup). 5th of 6 P2002 surfaces mapped; 6th = OTP-EMAIL-LOGIN-RACE remains latent.
+  - **Invariants deferred:**
+    - «every P2002 → user-friendly error never 500» — 5/6 sites, wait for 6th OTP-EMAIL-LOGIN-RACE closure
+    - «all env reads through env.ts» — already enforced via CLAUDE.md rule 11 + ENV-DISCIPLINE-SWEEP-A (already-formalized as rule, don't duplicate)
+  - **Cross-references**: 22 verified by inspectors. 0 broken (8 numeric drifts now fixed). All file-path refs valid.
+  - **Section 15 (Changelog) decision**: full-chronological preserved per inspector's defense («defensible at current audit velocity; 2344 lines manageable»). Compaction backlog item (split-to-archive) deferred until section grows > 4000 lines OR onboarding feedback indicates issue.
+  - **What was NOT changed:** sprint code, schema (NO migration — 16 preserved), SPRINT-PATTERNS.md (Pattern 15 candidate noted but defer formalization к Шаг 3), CLAUDE.md / runbooks / QUALITY-GATES.md (untouched per scope), tests (629/629 preserved).
+  - **Validation:** typecheck ✅ / encoding ✅ / mojibake ✅ / 629/629 tests ✅. No code changes.
+  - **Pre-launch risks обнаруженные:** none new. VAPID partial acknowledged + new 🟡 backlog `VAPID-NON-NULL-FIX` (~20 min — guard individual key assignments OR replace `!` with conditional).
+  - **🎉 V3 closes audit-волна 11/11 foundation work.** Next: STRUCTURAL-PREVENTION-AUDIT (Шаг 3) consolidates all 11-audit + 8-fix prevention candidates + Pattern 15 decision + remaining backlog grooming → production execution batch.
+  - **Process insight (Pattern 4 at meta-level):** V3 itself demonstrates «document maintenance gate periodically reset». Rule 15 per-commit «### Context updates» discipline worked diligently — но holistic header + cross-section coherence required Шаг 3-class periodic reset. Same shape as Pattern 4 «gate health monitoring» (check:ui-text crashed-vs-passing distinction). Structural prevention candidate: `CONTEXT-FRESHNESS-CI-CHECK` (already in backlog from DOCUMENTATION-AUDIT) — fail CI if AI_CONTEXT header date stale. Closes V1→V2→V3 recurring cycle through structural prevention. Pattern 15 candidate now has 2 evidence instances (DOCUMENTATION-AUDIT + this V3) — both used parallel-fan-out with structured-JSON returns + main-context synthesis. Eligible for formalization после Шаг 3.
+
 ### 2026-05-29 — Documentation completeness audit (audit-волна 11/11 COMPLETE)
 
 - **DOCUMENTATION-AUDIT-A** — 🎉 **LAST audit (item 11/11). Audit-волна 100% COMPLETE.** Read-only audit across 6 parallel streams via workflow (onboarding / operations / internal / process / code+schema / API). **NO code/docs changes.** 31 findings total: **0 🔴 / 3 🟠 / 13 🟡 / 15 🔵.** No findings block production deploy or new developer onboarding.
@@ -1206,7 +1239,7 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
   - **🟠 High-severity (3):**
     - **OP-1**: `docs/runbooks/README.md` is API reference, NOT runbook index. Ops can't discover which file handles which symptom. Backlog 🟠 `RUNBOOK-INDEX-A` (~30 min — add «Quick Index» + «Quick Diagnosis Matrix» tables).
     - **OP-2**: 3 critical runbooks missing — already in backlog from DEPLOYMENT-READINESS audit as DR-2 (deploy-rollback), DR-3 (db-backup), DR-6 (TLS-setup). User decisions pending (Q1 TLS strategy, Q2 backup target, Q3 rollback policy). Confirmed by independent reader.
-    - **DOC-1+DOC-2 (process)**: `MASTERRYADOM_AI_CONTEXT.md` header «13 мая 2026» — 16 days drift + 70 commits + 5 audits since CONTEXT-REFRESH-V2. Per rule 15, full CONTEXT-REFRESH-V3 overdue. Backlog 🟠 `CONTEXT-REFRESH-V3` (~2-4 hr — full sections 1-15 walk + header date + audit-волна summary).
+    - ~~**DOC-1+DOC-2 (process)**~~ ✅ **CLOSED — CONTEXT-REFRESH-V3 (2026-05-29).** Holistic walk completed via workflow (3 parallel inspectors + main-context edit). Header date refreshed + 2 invariants formalized (#27 ModalSurface a11y, #28 Booking idempotency) + 8 numeric drifts fixed + sprint phase updated. Full-chronological changelog preserved per inspector's defense.
   - **🟡 Medium-severity (13):**
     - **OP-3**: incident-drill-checklist lacks PASS/FAIL criteria per drill — `DRILL-PASS-CRITERIA-A` (~45 min)
     - **OP-4**: `docs/runbooks/README.md` doesn't reference `release-go-no-go-checklist.md` connection — ~10 min edit
