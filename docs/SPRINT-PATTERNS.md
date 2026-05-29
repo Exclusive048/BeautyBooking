@@ -266,6 +266,57 @@ Each has a distinct `purpose` claim preventing cross-replay. Each is auth-aware 
 
 ---
 
+## 15. Workflow-orchestrated parallel survey audit
+
+**Trigger:** When surveying N≥3 disjoint surfaces (code areas, documentation sections, system components, audit categories) for findings, coverage gaps, or coherence updates. Surfaces are independent (no blocking dependencies between them), and you need synthesized coherent results across all surfaces.
+
+**Action:** Decompose into N parallel Explore-type subagents via Workflow API `parallel()`. Each agent inspects one surface and returns findings via a shared JSON schema with fields: `findings` (list), `status` (categorical: ok / warning / critical), `stopGateReason` (optional string flagging user-decision points). Main context then sequentially synthesizes: read all agent outputs, apply safe structural edits, flag user-decisions, produce coherent narrative. If schema has `stopGateReason` field, treat it as an explicit gate — refuse silent changes until user confirms decision.
+
+**Composition:** Workflow API `parallel()` + Explore agentType + structured JSON schemas with optional STOP-gate field. Composes naturally with Pattern 1 (audit-first scoping) and Pattern 5 (coverage-tail vs new-discovery classification).
+
+**Evidence (2 instances, 2026-05-29):**
+- **DOCUMENTATION-AUDIT-A** — 6 parallel Explore subagents surveying onboarding / operations / internal / process / code+schema / API surfaces. **228 tool uses, ~4 min wall-clock, 427K tokens.** Returned 31 findings (0 critical / 3 high / 13 medium / 15 low) via structured JSON. Main context synthesized into a single audit entry. Speedup: ~24 agent-minutes done in 4 min wall-clock (6× parallelism). Schema-validated returns prevent synthesis errors.
+- **CONTEXT-REFRESH-V3** — 3 parallel Explore subagents surveying AI_CONTEXT sections 1-7 / 8-14 / 15-changelog. **132 tool uses, ~14 min wall-clock, 273K tokens.** Returned structured findings + cross-references + emergent invariant candidates via JSON schema with `stopGateReason`. **STOP-gate triggered correctly** — section 15 inspector flagged compaction strategy as user-decision; main-context resolved without silent change. Speedup: ~42 agent-minutes done in 14 min (3× parallelism).
+
+**Counter-example (when NOT to use):**
+1. Sequential survey where findings from surface-A must inform sampling/scope of surface-B (e.g. «audit routes first to decide which handlers to inspect»).
+2. Survey of <3 surfaces (below decomposition threshold — inline in main prompt).
+3. Highly interdependent work where agents need to negotiate scope (e.g. refactoring where agent-A's changes affect agent-B's scope).
+4. Real-time monitoring (use `tail -f` or `inotifywait` instead).
+5. Tasks requiring user interaction during survey.
+6. Decision points that don't cleanly express as structured JSON.
+
+**Cost / value:** Wall-clock reduction = (N × per-agent-time) / parallel-time. Breakeven at N=2 (parallel overhead > savings); default-parallel at N≥3. Token cost ≈ sequential (tokens flow either way), but wall-clock matters for user-perceived responsiveness. Schema-validated JSON prevents synthesis errors that plague free-text natural-language parsing. STOP-gate field surfaces decision points before silent changes.
+
+---
+
+## Patterns enforcement column (Шаг 2 of 3-step Structural Prevention plan)
+
+Honest tracking added 2026-05-29 (STRUCTURAL-PREVENTION-AUDIT, Capstone Шаг 3). **Most patterns rely on manual discipline** — this is a valid and intentional design choice for a small-team / agent-collaborated codebase. Structural enforcement is reserved for high-recurrence pattern classes where automation pays off (test suites, lint rules, CI scripts).
+
+| # | Pattern | Enforcement | Honest note |
+|---|---------|-------------|---|
+| 1 | Audit-first scope-collapse | manual | Meta-work pattern (pre-coding discipline); cannot be structurally enforced without agent-level hooks |
+| 2 | Trace-all-parallel-channels | partial | Tests catch post-facto (Pattern 6); no pre-commit linter for «did you trace all channels?» |
+| 3 | Cascade-orphan re-scan | manual | Requires file-dependency-graph tooling that doesn't exist; relies on grep + code review |
+| 4 | Quality-gate health monitoring | partial | Gates exist + run in CI; crash-vs-findings distinction is manual interpretation |
+| 5 | Pattern-coverage-tail | partial | `check:ui-text` covers some, `check-env-templates.mjs` backlogged not built; remediation = manual sweep |
+| 6 | Regression-test-per-fix | structural | Vitest infrastructure + `npm run test` CI gate; ~8125 LOC tests across 70+ files; required to pass |
+| 7 | Tooling-absence vs coverage-gap | manual | Meta-categorization for audit design; no automation |
+| 8 | Redesign-commit 5-step | manual | Requires «superseded component» detection at commit time; relies on code review |
+| 9 | HMAC opaque tokens (N=4 rule) | partial | 3 implementations + tests; no linter flags raw cuid-in-URL; N=4 factory deferred |
+| 10 | Visibility-over-hiding UX | manual | UI primitives ease compliance; no linter for `display:none` vs disabled+tooltip |
+| 11 | Defense-layering | partial | Multiple layers (UI + assertX + Prisma constraints) at domain level; no CI check enforces «UI gate ⇒ backend gate» |
+| 12 | Two-sided constructive pushback | manual | Behavioral pattern for agent sessions; not a codebase artifact |
+| 13 | «Verified ready» vs «выполнено» | manual | Backlog labeling discipline; no automation distinguishes code-ready from production-executed |
+| 14 | Explicit `assertX(...)` helpers | structural | 6 helpers × 14+ enforcement points, all tested; BUSINESS-LOGIC-AUDIT 0 critical/high findings strongly correlated |
+| 14 | Pattern 14 Scale-with-adoption | partial | Strong adoption of shared primitives (use-modal-a11y at 55+ sites); no linter forces new modals to adopt |
+| 15 | Workflow-orchestrated parallel survey | structural | Workflow API + parallel() + Explore + JSON schema; tooling complete, pattern formalized 2026-05-29 |
+
+**Aggregate (2026-05-29): 2 structural / 5 partial / 7 manual / 0 none.** Confirms organizing thesis from CONTEXT-REFRESH-V3: «strong on new code + shared primitives, gaps in legacy + structural-prevention CI scripts as deferred backlog accumulation». Pattern 7 (tooling-absence) recurs at every axis (security / perf / ui-ux / docs / process); STRUCTURAL-PREVENTION-AUDIT's prioritized enforcement plan addresses this.
+
+---
+
 ## Audit-волна consolidated stats (post-item-5)
 
 | Audit item | Result | New findings | Process insight captured |
@@ -298,5 +349,7 @@ The user uploaded an `ai-dev-framework` codifying ~80% of these patterns externa
 - **When user pushes a request you see risk in:** pattern 12 (constructive pushback).
 - **When the audit-волна yields a gap:** patterns 5, 7 (coverage-tail vs tooling-absence).
 - **When implementing a multi-site business invariant:** pattern 14 (explicit `assertX` helper).
+- **When surveying N≥3 disjoint surfaces:** pattern 15 (workflow-orchestrated parallel survey audit).
+- **When evaluating «what could prevent recurrence»** (post-audit, post-fix): consult Patterns enforcement column to honestly tag a candidate as manual / partial / structural / none.
 
 For per-commit checks (typecheck, lint, encoding, tests, prisma, context updates), see [`QUALITY-GATES.md`](./QUALITY-GATES.md).

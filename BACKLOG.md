@@ -1205,6 +1205,74 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 >
 > Этот раздел сохраняет: (a) хронологический индекс sprint'ов, (b) краткое описание чего касался коммит, (c) пункты-карточки переносятся сюда только после подтверждённой сверки с кодом.
 
+### 2026-05-29 — STRUCTURAL-PREVENTION-AUDIT (Capstone Шаг 3 — 3-step plan COMPLETE)
+
+- **STRUCTURAL-PREVENTION-AUDIT** — 🎉 **3-step Structural Prevention plan COMPLETE.** Capstone meta-synthesis across audit-волна 11/11 + 8 fixes + CONTEXT-REFRESH-V3. Delivered via 3 parallel inspector subagents (164K tokens / 61 tool uses / ~21 min). **Pattern 15 formalized** in SPRINT-PATTERNS («Workflow-orchestrated parallel survey audit») + **enforcement column added** to all 15 patterns (Шаг 2 execution). **NO code/schema/test changes** — synthesis + docs only.
+  - **3-step prevention plan execution summary:**
+    - ✅ **Шаг 1 (Template update)** — applied к 6+ fix/audit prompts since BUSINESS-LOGIC-AUDIT-A. Each got «🛡 Structural Prevention consideration» section (finding-class → candidate → cost/value → recommendation)
+    - ✅ **Шаг 2 (SPRINT-PATTERNS enforcement column)** — added 2026-05-29 (this commit) to all 15 patterns
+    - ✅ **Шаг 3 (this capstone)** — consolidated ALL candidates + Pattern 15 formalization + prioritized enforcement plan
+  - **Inventory (24 candidates across 24 sources):**
+    - **19 backlog, 1 closed (MODAL-FOCUS-TRAP-FIX-A via MODAL-A11Y-BATCH-A), 2 partially-implemented (REDUCED-MOTION-A + FRAMER-MOTION-REDUCED-MOTION-SWEEP), 0 never-filed** — every audit-found candidate made it to BACKLOG. Inspector confirmed: no «lost» candidates.
+  - **Pattern 15 formalized — 2 evidence instances:**
+    - DOCUMENTATION-AUDIT-A: 6 parallel Explore subagents / 228 tool uses / ~4 min / 31 findings via structured JSON
+    - CONTEXT-REFRESH-V3: 3 parallel Explore subagents / 132 tool uses / ~14 min / STOP-gate triggered correctly
+    - Specification clean (Trigger / Action / Composition / Counter-example / Cost-value); formalize-now decision unanimous from inspector
+    - Enforcement: **structural** (Workflow API + parallel() + Explore + JSON schema exist + pattern documented)
+  - **Enforcement column aggregate: 2 structural / 5 partial / 7 manual / 0 none.** Honest tracking confirms organizing thesis — most patterns rely on manual discipline (intentional design for small-team / agent-collaborated codebase). Structural enforcement reserved for high-recurrence classes (tests, Workflow tool).
+
+  - **🎯 Prioritized enforcement plan (Bucket A / B / C):**
+
+    **Bucket A — Implement now (pre-launch quick wins, ~1-3 hr each):**
+
+    | Candidate | Cost | Value | Rationale |
+    |---|---|---|---|
+    | `VAPID-NON-NULL-FIX` | ~30 min | High | Pre-launch — closes residual P2 VAPID risk; isolated 2-line fix; spawned from V3 |
+    | `CONTEXT-FRESHNESS-CI-CHECK` | ~30 min | High | Prevents V1→V2→V3 cycle drift; structural Pattern 4 reinforcement |
+    | `RUNBOOK-INDEX-A` | ~30-45 min | High | Pre-launch ops discoverability; OP-1 from DOCUMENTATION-AUDIT |
+    | `DRILL-PASS-CRITERIA-A` | ~45 min | Medium | Pre-launch ops first-on-call shift readiness |
+    | `OPENAPI-ROUTE-CI` | ~30 min | Medium | Cheap PR-time gate prevents undocumented routes accumulating |
+    | `PORTFOLIO-EDITOR-NEXT-IMAGE` | ~30 min | Medium | PERF-4 trivial closure; admin-only but consistent |
+
+    **Bucket B — Schedule for Sprint 2 / post-launch (~half-day to ~1 day):**
+
+    | Candidate | Cost | Value | Rationale |
+    |---|---|---|---|
+    | `PRISMA-INCLUDE-WHERE-CI-CHECK` | ~half-day | High | Prevents next PERF-1 class N+1 over-fetch; PR-time AST walk |
+    | `MONEY-BRAND-TYPE-A` | ~half-day | High | Compile-time guard against kopeks ↔ rubles mixup; opportunistic with billing work |
+    | `EMPTY-STATE-COMPONENT-A` | ~half-day | High | Pattern 14 shared primitive — extract once, migrate 10-15 callers |
+    | `ENV-TEMPLATES-CI-CHECK` | ~half-day | High | Reaffirmed from PROD-ENV-SYNC; closes env-drift class via CI |
+    | `RUNBOOK-COVERAGE-CI` | ~1 hr | High | Blocks on DR-2/3/6 closure first (the runbooks must exist before CI can enforce) |
+    | `FINDMANY-TAKE-CI-CHECK` | ~1 hr | Medium | Pairs with PRISMA-INCLUDE-WHERE — annotation-aware check |
+    | `TAILWIND-COLOR-LINT` | ~half-day | Medium | ESLint rule with external-brand-color allowlist |
+    | `JSDoc-REQUIRE` (core libs) | ~1 hr | Medium | ESLint rule for `export function` in critical libs |
+    | `REDUCED-MOTION-A` (full sweep) | ~1 hr | Medium | Extend MODAL-A11Y coverage to remaining 56 framer-motion surfaces |
+    | `STORYBOOK-SETUP` | ~1 day | High | Visual regression infrastructure; gates UI primitive drift |
+    | `FRAMER-MOTION-REDUCED-MOTION-SWEEP` | ~half-day | Medium | Pattern 5 coverage-tail closure; opportunistic |
+    | `TAP-TARGET-AUDIT-A` | ~1 hr | Medium | WCAG SC 2.5.5 mobile-critical button audit |
+    | `STORIES-VIEWER-A11Y-CONSOLIDATE` | ~1 day | Low | Carryover from MODAL-A11Y; two-sources-of-truth cosmetic |
+
+    **Bucket C — Accept manual / defer indefinitely:**
+
+    | Candidate | Reason |
+    |---|---|
+    | `BOOKING-PARTIAL-UNIQUE-INDEX-A` | Defense-in-depth; current Serializable tx + P2002/P2034 catch sufficient; revisit if conflict-storm under load |
+    | `BOOKING-AUDIT-LOG-A` | Activates when first dispute surfaces; `logInfo` app logs cover most needs today |
+    | `BOOKING-STATUS-PROMOTION-CRON` | Only if analytics queries need DB-level filter; runtime helper sufficient now |
+    | `BUNDLE-SIZE-BASELINE` | Post-launch only; needs first-deploy data + user metrics to set thresholds |
+    | Patterns 1, 3, 7, 8, 10, 12, 13 (manual) | Meta-work / behavioral / discipline-based — structural enforcement would require agent-level tooling outside scope |
+
+  - **Meta-insights captured:**
+    - **Pattern 4 generalization** (from V3): «periodic reset для long-running discipline gates» — addendum candidate. Quality-gate health monitoring applies to documentation too (rule 15 per-commit worked diligently; holistic refresh required periodic reset). Same shape as `check:ui-text` crashed-vs-passing distinction.
+    - **Organizing thesis confirmed**: «strong on new code + shared primitives, gaps in legacy + tooling-absence as deferred backlog accumulation». Pattern 7 (tooling-absence) recurs at every axis (security / perf / ui-ux / docs / process). Bucket A targets the highest-recurrence quick-win opportunities.
+    - **Pattern 14 + Pattern 15 are the only «structural» patterns** in enforcement column — both reflect investments in shared primitives + workflow tooling. **Implication for future sprints:** invest in primitives early (Pattern 14 leverage), invest in workflow patterns for survey-class work (Pattern 15 leverage), accept manual discipline elsewhere.
+    - **Шаг 1 application durability:** each fix/audit prompt now habit-includes structural-prevention consideration. Continues post-Шаг 3 — no degradation expected.
+
+  - **NO code/schema/test changes** — typecheck ✅ / 629/629 tests preserved / 0 migrations.
+  - **Files touched:** `docs/SPRINT-PATTERNS.md` (Pattern 15 + enforcement column + consult-list), `MASTERRYADOM_AI_CONTEXT.md` (section 13 reference + section 15 changelog entry), `BACKLOG.md` (this entry).
+  - **🎉 Audit-волна 11/11 + 8 fixes + V3 + 3-step prevention plan ALL COMPLETE.** Pre-launch critical path clear. Bucket A items (~3-4 hr total) close residual polish before production. Bucket B items (~Sprint 2 backlog, ~3-4 days total work) provide structural prevention for next-sprint discipline. Bucket C items honestly deferred с reasoning.
+  - **Next phase: ops polish** (Bucket A) → production execution batch (CLEANUP-BILLING-PROD `--confirm` / CHAT-ATTACHMENT-MIGRATE deploy / YANDEX-DEPLOY-A / VAPID-PUSH-VERIFY / MRR-CRON-SCHEDULE — all verified-ready awaiting ops window) → launch.
+
 ### 2026-05-29 — CONTEXT-REFRESH-V3 (holistic AI_CONTEXT refresh)
 
 - **CONTEXT-REFRESH-V3** — 🎉 **closes DOC-1 + DOC-2 from DOCUMENTATION-AUDIT-A** (16-day header drift + holistic refresh overdue per rule 15). Delivered via 2-phase workflow: 3 parallel inspector subagents (Explore type) × main-context sequential edit. **NO code/schema/test changes.** Holistic walk of all 15 sections + 2 new invariants formalized (#27 ModalSurface a11y, #28 Booking idempotency).
