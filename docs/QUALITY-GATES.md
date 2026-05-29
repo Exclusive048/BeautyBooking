@@ -112,9 +112,35 @@ npm run test        # если затронуты модули с тестами
 
 ### Если изменена схема
 ```bash
+npx prisma migrate dev --name <descriptive_name>   # обязательно: создаёт миграцию
 npx prisma validate
 npx prisma generate
+npm run check:schema-drift                          # обязательно: drift-гейт
 ```
+
+> 🚨 **`prisma db push` ЗАПРЕЩЁН** — обходит migration history и вызывает silent schema drift.
+> Проект попал на 24-операционный drift в мае 2026 (см. MIGRATION-RECONCILIATION-BATCH).
+> Полное правило — `CLAUDE.md` § ВАЖНЫЕ ПРАВИЛА #16.
+
+### check:schema-drift (MIGRATION-RECONCILIATION-BATCH 2026-05-30)
+
+**Назначение:** предотвращает повтор `db push` anti-pattern через CI-enforced gate.
+
+**Триггер:** любой commit меняющий `prisma/schema/*.prisma` (включается в `npm run check`).
+
+**Mechanism:** `prisma migrate diff` сравнивает migrations history vs schema.prisma. Любой non-empty diff = drift = fail.
+
+**Failure recovery:**
+1. Запустить `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url "<url>" --script` чтобы увидеть конкретные операции
+2. Manual review SQL (no DROP / no destructive expected — sprint discipline ADD-only)
+3. Создать миграцию: `mkdir prisma/schema/migrations/<timestamp>_descriptive_name/` + написать `migration.sql` (или использовать interactive `prisma migrate dev` если терминал поддерживает)
+4. Apply: `npx prisma migrate deploy` (then commit the migration file)
+5. Re-run `npm run check:schema-drift` — должен exit 0
+
+**Local mode:** если Postgres не запущен, скрипт graceful-skips с warning (не блокирует local dev).
+**CI mode:** при `CI=true` + Postgres unreachable script fails hard. Currently CI не имеет Postgres service — script запускается в local-skip mode и выдаёт warning в logs. Когда DevOps provisions shadow DB в CI workflow + sets `SHADOW_DATABASE_URL`, gate становится hard-enforcing automatically (no script change needed).
+
+**History:** added 2026-05-30 после MIGRATION-RECONCILIATION discovered 24-операционный sprint-long drift caused by README-instructed `db push`. Structural prevention для drift class.
 
 ### Smoke
 - [ ] Затронутая страница открывается

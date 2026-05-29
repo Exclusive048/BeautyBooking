@@ -60,3 +60,13 @@ jobs:
 
       - name: OpenAPI routes coverage
         run: npm run check:openapi-routes
+
+      - name: Schema drift check
+        # MIGRATION-RECONCILIATION-BATCH 2026-05-30: gate fails locally when schema.prisma
+        # diverges from migrations history (catches `db push` anti-pattern). Locally the
+        # check is hard-enforcing (developers run it via `npm run check` against Docker
+        # Postgres). In CI the script's no-Postgres branch fires and exits 0 with a
+        # warning — when DevOps provisions a shadow Postgres service for CI and sets
+        # SHADOW_DATABASE_URL, this step becomes hard-enforcing without code changes.
+        # TODO (DevOps): provision Postgres service in this workflow + set CI: "true".
+        run: npm run check:schema-drift

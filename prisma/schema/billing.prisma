@@ -107,9 +107,13 @@ model UserSubscription {
   @@unique([userId, scope])
   @@index([status, autoRenew, nextBillingAt])
   @@index([status, graceUntil])
-  // Partial index on active trial rows only — cron needs fast lookup of
-  // expiring/expired trials without scanning the whole subscriptions table.
-  @@index([isTrial, trialEndsAt])
+  // Partial index on active trial rows only — created by migration
+  // `20260430000000_add_trial_to_user_subscription` with `WHERE "isTrial" = true`,
+  // which Prisma's `@@index` decorator cannot express. Schema-level decorator
+  // intentionally OMITTED to keep `prisma migrate diff` clean (MIGRATION-
+  // RECONCILIATION-BATCH 2026-05-30); index lives in migration SQL only.
+  // DO NOT add `@@index([isTrial, trialEndsAt])` here — the drift checker
+  // will fire because the DB has a partial index of the same name.
 }
 
 model BillingPayment {

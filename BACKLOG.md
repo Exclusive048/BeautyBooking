@@ -155,6 +155,55 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🔴 PRE-LAUNCH BLOCKERS
 
+### Schema discipline
+
+### ~~🔴 MIGRATION-RECONCILIATION~~ ✅ CLOSED (MIGRATION-RECONCILIATION-BATCH 2026-05-30)
+- Reconciliation migration `prisma/schema/migrations/20260530000000_reconcile_drifted_schema/migration.sql` shipped: 1 enum value + 6 ALTER TABLE + 4 CREATE TABLE + 12 indexes + 6 foreign keys. All ADD-only, no DROP/destructive operations.
+- 1 conflicting CREATE INDEX deliberately skipped (`UserSubscription_isTrial_trialEndsAt_idx` — already exists in DB as partial index from migration `20260430000000`; Prisma `@@index` decorator cannot express WHERE clause; schema declaration also removed to align with reality + drift-checker passes).
+- Applied via `npx prisma migrate deploy` → 18/18 status clean. `prisma generate` regenerated client. Typecheck ✅. Seed succeeded: 8 cities / 12 categories / 6 plans / 28 masters / 6 studios / 15 clients / 63 bookings / 22 reviews / 4 hotSlots / 3 modelOffers / 11 favorites.
+- **Workflow policy fix shipped (Part 2):** `prisma/seeds/test-data/README.md` updated — `db push` instruction removed, replaced with `prisma migrate dev` + warning header. New CLAUDE.md rule 16 «Schema discipline» (in Russian) — forbids `db push`, requires `migrate dev` for any schema change, references CI gate + recovery procedure. AI_CONTEXT раздел 13 cross-references the rule.
+- **Structural prevention shipped (Part 3):** `scripts/check-schema-drift.mjs` + `npm run check:schema-drift` + wired into `npm run check` aggregate + added to `.github/workflows/quality-gates.yml`. Self-test verified: gate detects drift correctly (initially found the partial-index divergence, helped surface the schema fix needed before close).
+- **CI integration: PARTIAL** — script wired into workflow but CI doesn't currently have Postgres service; script's local-skip-with-warning branch fires gracefully. Hard-enforcing locally + on developer machines via `npm run check`. TODO (DevOps): provision Postgres service in quality-gates.yml + set `SHADOW_DATABASE_URL` → gate becomes hard-enforcing in CI without code changes.
+- **Production deploy unblocked** — schema-prisma now matches what `prisma migrate deploy` would apply. Production deploy of current code will result in a DB schema that fully matches runtime code expectations. CLEANUP-BILLING-PROD-A + CHAT-ATTACHMENT-MIGRATE-DEPLOY ops items unblocked.
+- **Spawned (defense-in-depth, deferred):** 🔵 `PRE-COMMIT-SCHEMA-MIGRATION-PAIR` — pre-commit hook fail if `prisma/schema/*.prisma` modified without matching migration file in same commit (~1 hr, defense-in-depth beyond CI check; not pre-launch).
+
+### Original MIGRATION-RECONCILIATION scope (historical — superseded by closure above):
+
+**Authoritative drift report** (`npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema`): **24 schema operations** missing from migrations history. Production deploy from current code would create a DB schema missing fields/tables/indexes/enum-values that runtime code expects → app crashes at first read of any drifted column.
+
+**Drift inventory (incomplete sample — full list via `migrate diff`):**
+- 1 enum value: `ChatSenderType.SYSTEM`
+- 6 ALTER TABLE: `ChatMessage` (+`referencedBookingId`, `systemEventKey`); `Notification` (+`deletedAt`); `PortfolioItem` (+`sortOrder`); `Provider` (+`acceptNewClients`, `slotPrecision`, `minBookingHoursAhead`, `maxBookingDaysAhead`, `visibleSlotDays`, `slotStepMin`, `lateCancelAction` — **all BOOKING-WIDGET-A enforcement fields**); `ScheduleTemplateBreak` (+`title`); `UserProfile` (+`hideAgeYear`, `emailVerifiedAt`)
+- 4 CREATE TABLE: `ConversationSlug`, `UserFavorite`, `ServicePackage`, +1 other
+- 13 CREATE INDEX
+
+**Root cause confirmed:** project's documented dev workflow uses `prisma db push` ([`prisma/seeds/test-data/README.md:9`](prisma/seeds/test-data/README.md#L9) — «Apply schema first (only needed once after a schema change): `npx prisma db push`»). `db push` syncs schema.prisma → DB without creating migration files. Developers edit schema → run db-push → run generate → code compiles + runs locally → migration files never get created. Drift accumulated silently across sprint.
+
+**Evidence — commit `b219864` (2026-05-13, «feat: add system messages for booking events»):** modified 4 schema files (`auth.prisma` + `booking.prisma` + `enums.prisma` + `notification.prisma`) including `UserProfile.hideAgeYear` + `UserProfile.emailVerifiedAt`. **No migration files added in that commit** — `git show --name-only b219864 | grep prisma/` lists only `prisma/schema/*.prisma`, zero `prisma/schema/migrations/*` files. The fields exist in schema and in generated client; never made it into a migration.
+
+**Production deploy discipline (Part 3 audit) is CLEAN:**
+- [`.github/workflows/deploy.yml:127`](.github/workflows/deploy.yml#L127) — `node_modules/.bin/prisma migrate deploy` ✅
+- `docker-compose.prod.yml` — no migration commands ✅
+- `docs/runbooks/release-go-no-go-checklist.md` — only `validate` + `migrate status` (read-only) ✅
+- **No** `db push` / `migrate dev` / `migrate reset` in any production path ✅
+
+The asymmetry is: production deploy command is correct, but the migration HISTORY it would apply is incomplete. `migrate deploy` would succeed (applies 17 existing migrations), but app at runtime would crash on first access to drifted columns.
+
+**Required actions (user-decision, NOT auto-applied per spec rule):**
+1. **Generate reconciliation migration** — `npx prisma migrate dev --name reconcile_drifted_schema` after the reset (this creates ONE migration file capturing all 24 operations). Review the generated SQL carefully before commit.
+2. **Update [`prisma/seeds/test-data/README.md`](prisma/seeds/test-data/README.md)** — replace `db push` line with `npx prisma migrate dev` (creates migrations as schema evolves; safe pattern).
+3. **Add CLAUDE.md rule** — new project invariant: «schema.prisma changes ONLY through `prisma migrate dev` — `db push` forbidden after Sprint 1». Enforce via CI gate (item 4).
+4. **CI gate: `scripts/check-schema-drift.mjs`** — fails CI if `prisma migrate diff` returns non-empty. Catches the drift class structurally. ~half-day to implement; **strongly recommended pre-launch** to prevent recurrence.
+
+**Cross-impacts:**
+- **Part 1 (seed local DB) is BLOCKED** — can't seed because `prisma.userProfile.upsert` fails with «column hideAgeYear does not exist». Local DB after reset is in the «migration-only» state; reseed needs either reconciliation migration applied OR `db push` (which would perpetuate the drift cycle).
+- **`UserSubscription.isTrial` original drift** (the trigger for user's earlier `migrate reset`) is in fact PROPERLY migrated (`20260430000000_add_trial_to_user_subscription/migration.sql` contains the ALTER). User's «already exists» error happened because local DB had been db-pushed to that field earlier than the migration apply, putting the migration history out of sync with the actual DB state. After reset + reapply, that field is now correctly present (verified — schema is up to date for those 17 migrations).
+- **CLEANUP-BILLING-PROD-A** + **CHAT-ATTACHMENT-MIGRATE-DEPLOY** ops backlog items are gated behind production-ready migration history — both blocked until MIGRATION-RECONCILIATION done.
+
+**Severity: 🔴 LAUNCH BLOCKER.** Must close before any production deploy. Without this, first deploy would apply 17 migrations cleanly, then app code would crash at runtime on first request touching any drifted column.
+
+**Scope estimate:** ~1-2 hr — generate migration, careful manual review of generated SQL (24 operations, verify no destructive change), test apply on local fresh DB + reseed, update README + CLAUDE.md rule. CI script separately (~half-day). Production-deploy validates the new migration applies cleanly.
+
 ### Безопасность
 
 > **SECURITY-AUDIT-A (2026-05-23)** — read-only application-level audit, 8 categories + bonus. **Result: strong posture — 6 of 8 categories CLEAN.** Sprint security patterns (auth guards, #25/#26 privacy invariants, HMAC tokens, Zod validation, cross-tenant `ensureStudioRole`) held consistently. **3 findings:** 1 🟠 High (email OTP code-in-logs regression-gap), 1 🟡 Medium (JSON-LD `<`-escaping, CSP-mitigated in prod), 1 🔵 Low (Yandex Maps key domain-restriction, ops). Full per-category breakdown in AI_CONTEXT раздел 10 + раздел 15.
@@ -221,6 +270,14 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 ---
 
 ## 🟠 HIGH PRIORITY (после core master cabinet)
+
+### 🟠 SCHEMA-DRIFT-CI-CHECK (spawned from LOCAL-DB-RECOVERY 2026-05-29 — structural prevention escalated to HIGH per Шаг 1)
+- **What**: `scripts/check-schema-drift.mjs` fails CI if `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --script` returns non-empty diff. Catches the drift class structurally — any `db push` invocation or schema-edit-without-migration would fail next PR check.
+- **Why**: 🔴 MIGRATION-RECONCILIATION proves this drift class is real and recurring (24 operations accumulated silently across sprint). Without structural enforcement, the next `db push` could re-introduce drift after the reconciliation migration ships. **Higher priority than typical Bucket B items per Шаг 1** because (a) production data loss risk; (b) silent failure mode (drift only surfaces on fresh DB deploy OR when DB doesn't match generated client); (c) cheap to implement (~half-day) with high downstream value.
+- **Scope**: ~half-day — script + npm script + add to `npm run check` batch + add to `quality-gates.yml`. Requires shadow database URL for `migrate diff` (Postgres alive in CI per existing `quality-gates.yml` setup). Allowlist mechanism if needed for transitional period.
+- **Trigger**: pair with MIGRATION-RECONCILIATION closure — implement immediately after the reconcile migration ships, so the CI gate locks down the schema-vs-migrations invariant before next sprint.
+
+
 
 ### ~~VAPID-NON-NULL-FIX~~ ✅ ЗАКРЫТ (BUCKET-A-BATCH 2026-05-29)
 - Replaced non-null assertions in `src/lib/notifications/push/vapid.ts` with trimmed-value guard at the side-effect site
@@ -327,7 +384,12 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟡 MEDIUM PRIORITY
 
-### LOCAL-DEV-MIGRATIONS-CATCHUP (spawned from LOCAL-DEV-CLEANUP 2026-05-29) 🟠 STOP-GATE
+### ~~LOCAL-DEV-MIGRATIONS-CATCHUP~~ ✅ ESCALATED (LOCAL-DB-RECOVERY 2026-05-29)
+- User attempted `prisma migrate deploy` → failed with P3018 / 42701 «column isTrial already exists». Root cause: local DB had `isTrial` from earlier `prisma db push`; migration apply collided. User performed `prisma migrate reset --force` to recover — successfully reapplied 17 migrations to clean DB. Data lost (63 Provider + 74 UserProfile + other dev fixtures), volume `pgdata` content replaced (volume itself preserved).
+- **Outcome — escalates to 🔴 MIGRATION-RECONCILIATION launch blocker** (see Pre-launch BLOCKERS section above). Reseed attempt confirmed broader drift: schema includes 24 operations not in migrations history. Seed cannot run until reconciliation migration generated.
+- This entry kept for traceability; actionable work moved to 🔴 above.
+
+### Original LOCAL-DEV-MIGRATIONS-CATCHUP scope (historical, superseded by 🔴 MIGRATION-RECONCILIATION):
 - **What**: local Docker DB `masterryadom-db` (volume `pgdata`) has **11 of 17** migrations applied. **6 migrations pending** on local dev:
   - `20260430000000_add_trial_to_user_subscription`
   - `20260430000100_add_trial_notification_types`
@@ -1086,6 +1148,18 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 ## 🔵 NICE-TO-HAVE
 
+### PRE-COMMIT-SCHEMA-MIGRATION-PAIR (spawned from MIGRATION-RECONCILIATION-BATCH 2026-05-30)
+- **What**: pre-commit hook (husky / simple-git-hooks / lefthook) — fail commit if `prisma/schema/*.prisma` modified but no new file under `prisma/schema/migrations/` in same commit.
+- **Why**: defense-in-depth beyond `check:schema-drift` CI gate. CI catches drift at PR time; pre-commit catches at commit time. Both layers = robust prevention. Without pre-commit, developer can commit schema-only changes locally then push (drift caught only on subsequent CI run).
+- **Scope**: ~1 hr — install hook framework, write check script, document in CLAUDE.md schema discipline rule.
+- **Trigger**: opportunistic post-launch. Not blocking — `check:schema-drift` + new CLAUDE.md rule 16 + updated seeds README provide sufficient first-line defense.
+
+### SW-SUPABASE-RULE-CLEANUP (spawned from AI-CONTEXT-FACT-CORRECTION 2026-05-29)
+- **What**: remove dead Service Worker caching rule в [`next.config.ts:34-37`](next.config.ts) — `urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/.*/i` + `cacheName: "supabase-storage"`. Orphan rule mirrored into `public/sw.js` on every build.
+- **Why**: Supabase confirmed not in use (per AI-CONTEXT-FACT-CORRECTION). Rule matches no live URLs, but creates a misleading cache namespace in clients' service workers.
+- **Scope**: ~5 min — delete the runtimeCaching block, run `npm run build` to regenerate `public/sw.js`. No test impact.
+- **Trigger**: opportunistic, low priority (dead config, not blocking).
+
 ### STORIES-TAKE-CAP (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-2)
 - **What**: add `take: STORIES_MAX_GROUPS * STORIES_MAX_ITEMS_PER_MASTER * 2` safety cap to `prisma.portfolioItem.findMany` in [`stories.service.ts:62`](src/lib/feed/stories.service.ts).
 - **Why**: query currently unbounded; relies on time horizon + provider filter + in-memory cap. If many providers post in 24h, query returns more than needed.
@@ -1575,6 +1649,7 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
 ### 2026-05-23 — Deployment readiness audit
 
+- **[AI-CONTEXT-FACT-CORRECTION 2026-05-29 annotation]** — User confirmed Supabase NOT in use (недоступен из РФ). DR-4 «pgbouncer / connection pooling» finding partially Supabase-tied (Supabase Pooler) — assumption invalidated; pgbouncer applicability now depends on hosting choice (managed provider may include it). DR-3 backup options re-scoped (no Supabase managed backups). DR-2 / DR-6 unaffected by this correction (rollback / TLS — hosting-agnostic). All 4 DR runbooks blocked on DevOps consultation per [Section 11 «Infrastructure decisions» in AI_CONTEXT].
 - **DEPLOYMENT-READINESS-AUDIT-A** — read-only audit, **audit-волна item 7/11 (Tier 2)**. Complementary с PHASE6-HARDENING-AUDIT-A (infrastructure components wired) — этот covers **deployment mechanics** (env/build/migration/health/runtime/operational). **Result: strong baseline + 1 high-impact fast fix + 4-5 operational gaps.** **0 🔴 deploy-blockers** confirmed — CI/CD pipeline complete (`deploy.yml` builds Docker images via `docker/build-push-action`, pushes to Yandex Container Registry, deploys via SSH; runs `prisma migrate deploy` BEFORE rolling restart on lines 122-127). env.ts startup validation fails-fast in production for missing required vars. Multi-stage Dockerfile с non-root user + standalone output. Health endpoints 3-tier (liveness `/api/health` / readiness `/api/health/status` / worker `/api/health/worker`). Graceful shutdown handlers wired (SIGTERM/SIGINT in worker.ts). 10 runbooks под `docs/runbooks/` (release-go-no-go-checklist is comprehensive 12-section GO/NO-GO template). Existing IP allowlists (YooKassa) + AbortController timeouts (per ERROR-HANDLING-AUDIT) preserved. **Findings:**
   - ~~**🟠 DR-1 `.env.production.example` is OUT OF SYNC**~~ ✅ **CLOSED — PROD-ENV-EXAMPLE-SYNC-A (2026-05-23).** 13 missing vars synced (5 SMS-block + MRR_SNAPSHOT_SECRET + VK_NOTIFICATIONS + EMAIL_AUTH + SUPPORT_TO_PARTNERSHIP + 2 Redis timeouts). Header refreshed с Pattern 5 invariant. NO code changes. SPRINT-PATTERNS.md addendum filed. Below: historical detail entry.
   - **🟠 DR-1 (historical, closed)**: `.env.production.example` was out of sync с env.ts schema — dated `Apr 16 00:17`, last updated before May sprint additions. **Missing critical vars** that env.ts declares: (a) `MRR_SNAPSHOT_SECRET` (May 13 — MRR-SNAPSHOTS-A); (b) **entire `SMS_PROVIDER_*` block** (May 23 — SMS-GATEWAY-A: `SMS_PROVIDER_ENABLED` / `SMS_PROVIDER_LOGIN` / `SMS_PROVIDER_PASSWORD` / `SMS_PROVIDER_SENDER` / `SMS_LOW_BALANCE_THRESHOLD`) — **without these set, prod SMS won't send → users can't OTP-login → P1 regression**; (c) `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED` (May 21); (d) `EMAIL_AUTH_ENABLED`; (e) `SUPPORT_TO_PARTNERSHIP`; (f) `REDIS_CONNECT_TIMEOUT_MS` / `REDIS_COMMAND_TIMEOUT_MS`. **Operator using this template misses 5+ required production vars.** Fix: 30-min sync of `.env.production.example` → match current env.ts schema (mirror `.env.example` recent additions). High impact (silent prod misconfiguration), trivial fix. Fix-prompt: `PROD-ENV-EXAMPLE-SYNC-A`.

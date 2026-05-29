@@ -4,9 +4,15 @@ Production-like fixtures for local dev and CI. Generates ~34 published providers
 
 ## Run
 
+> **⚠️ Schema discipline (added 2026-05-30 after MIGRATION-RECONCILIATION):**
+> `prisma db push` is **FORBIDDEN** — it bypasses migration history and causes silent
+> schema drift (the project hit a 24-operation drift in May 2026 that blocked launch
+> until reconciled). Schema changes go through `prisma migrate dev` exclusively.
+> See `CLAUDE.md` § Schema discipline for the full rule + recovery procedure.
+
 ```bash
-# Apply schema first (only needed once after a schema change):
-npx prisma db push
+# After a schema.prisma change: generate a migration (don't db push).
+npx prisma migrate dev --name <descriptive_name>
 
 # Seed (idempotent — safe to run repeatedly):
 npm run seed:test

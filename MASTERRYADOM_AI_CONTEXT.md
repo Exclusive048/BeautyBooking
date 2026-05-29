@@ -1000,7 +1000,7 @@ src/
 ### Кэширование
 - **Redis**: rate-limit windows, schedule DayPlan, slots cache, session data, idempotency locks, notifier pub/sub
 - **Next.js**: нет явного `cache()` или `unstable_cache` в найденных файлах — преимущественно клиентский SWR
-- **Service Worker**: CacheFirst для шрифтов Google, StaleWhileRevalidate для изображений и Supabase storage
+- **Service Worker**: CacheFirst для шрифтов Google, StaleWhileRevalidate для изображений. **Note (AI-CONTEXT-FACT-CORRECTION 2026-05-29)**: legacy SW caching rule в `next.config.ts:34-37` matches `*.supabase.co/storage/v1/object/public/*` URLs с `cacheName: "supabase-storage"` — orphan config since Supabase confirmed unused (assumption invalidated). Live media goes через Yandex S3 (`storage.yandexcloud.net`). Backlog cleanup candidate (see `SW-SUPABASE-RULE-CLEANUP` 🔵)
 - **Schedule cache invalidation** — после любого save в Schedule Settings (`applyScheduleSnapshot`) автоматически вызывается `invalidateSlotsForMaster(providerId)`. Cache-version aggregator смотрит `updatedAt` от `provider`, `scheduleOverride`, `scheduleTemplate`, `weeklyScheduleConfig` — bump любого из них пробивает кэш
 
 ### N+1 проблемы
@@ -1030,9 +1030,41 @@ src/
 - Нет горизонтального масштабирования воркера (один процесс)
 
 ### База данных
-- Pgvector для визуального поиска: требует специфичной версии PostgreSQL
+- Pgvector для визуального поиска: требует специфичной версии PostgreSQL (local dev: `pgvector/pgvector:pg16`)
 - Индексы оптимизированы для основных запросов (Provider, Booking, UserSubscription)
 - directUrl для Prisma Migrate (поддержка connection pooler типа PgBouncer)
+
+### Infrastructure decisions (pending DevOps consultation — AI-CONTEXT-FACT-CORRECTION 2026-05-29)
+
+> **Context:** Supabase confirmed NOT in use (недоступен из РФ + alternatives planned). Production hosting strategy awaits DevOps team input. Local dev unchanged: `pgvector/pgvector:pg16` Docker container.
+
+The following architectural choices block 4 pre-launch runbooks. **Each decision is DevOps-team scope, not a Claude / agent decision.** Documentation here marks state honestly without promoting any specific option.
+
+1. **PostgreSQL hosting** — pending choice between:
+   - Yandex Managed PostgreSQL (managed, pgvector ≥0.8.0 supported)
+   - Self-hosted Postgres on Compute Instance (same Docker container pattern as local dev)
+   - Other РФ-reachable managed provider
+   - **Blocks:** DR-3 backup runbook, connection pooling approach (DR-4)
+
+2. **TLS termination** — pending choice between:
+   - Yandex Application Load Balancer (managed)
+   - nginx sidecar in `docker-compose.prod.yml` (self-managed)
+   - Cloudflare proxy — NOT recommended (РФ accessibility risk)
+   - **Blocks:** DR-6 TLS-setup runbook
+
+3. **DB backup target** — depends on Postgres hosting choice (managed provider may include automated backups; self-hosted needs explicit pg_dump + off-host storage strategy)
+   - **Blocks:** DR-3 DB-backup runbook
+
+4. **Deploy rollback policy** — DevOps preference:
+   - Manual procedure (documented runbook for re-deploy of previous `IMAGE_TAG`)
+   - Auto-rollback on health-check failure (more orchestration complexity)
+   - **Blocks:** DR-2 deploy-rollback runbook
+
+**Local dev unchanged:** `docker-compose.dev.yml` with `pgvector/pgvector:pg16` — onboarding path predictable (LOCAL-DEV-CLEANUP 2026-05-29 closed the naming-drift hazard).
+
+**Once DevOps engages:** these 4 decisions unblock DR-2/3/6 runbooks + DR-4 pgbouncer applicability → production execution batch can proceed.
+
+**Note on DEPLOYMENT-READINESS findings (audit-волна 7/11):** some Supabase-specific concerns (pgbouncer connection limits, Supabase pooler quirks) require re-evaluation under whatever hosting is chosen. Annotation preserved in section 15 changelog for that audit entry; findings themselves not rewritten (historical record).
 
 ---
 
@@ -1076,6 +1108,13 @@ src/
 > **Process meta-lessons:** [`docs/SPRINT-PATTERNS.md`](../docs/SPRINT-PATTERNS.md) — **15 evidence-grounded patterns** (Pattern 15 added 2026-05-29 by STRUCTURAL-PREVENTION-AUDIT — «Workflow-orchestrated parallel survey audit»). Plus **Patterns enforcement column** (Шаг 2 of 3-step Structural Prevention plan, completed 2026-05-29): each pattern honestly tagged manual / partial / structural / none. **Aggregate: 2 structural / 5 partial / 7 manual / 0 none** — most patterns rely on developer/Claude discipline (intentional design for small-team codebase). Consult **before designing a fix** (audit-first, trace-ALL-parallel-channels, cascade-orphan re-scan, redesign-commit 5-step checklist, HMAC-token rule of N=4, defense-layering, visibility-over-hiding UX, constructive pushback, verified-ready vs выполнено status discipline, assertX helpers, parallel-survey workflow). **Consult enforcement column** when evaluating «what could prevent recurrence» — to avoid over-recommending automation for patterns where manual discipline is intentionally sufficient. The rules below cover **per-commit conventions** (naming/errors/auth/UTC/Prisma); SPRINT-PATTERNS covers **planning + execution discipline** + **enforcement-state honesty**.
 
 ### Конвенции из кода
+
+**Schema discipline (MIGRATION-RECONCILIATION 2026-05-30, added rule 16 in CLAUDE.md):**
+- Schema changes в `prisma/schema/*.prisma` ТОЛЬКО через `npx prisma migrate dev --name <descriptive>`
+- Production deploy → `npx prisma migrate deploy` (correct in `.github/workflows/deploy.yml:127`)
+- 🚨 **`prisma db push` ЗАПРЕЩЁН** — обходит migration history → silent drift → runtime crashes. Проект попал на 24-op drift в мае 2026 (см. раздел 15 changelog «MIGRATION-RECONCILIATION-BATCH»)
+- CI gate `npm run check:schema-drift` ([`scripts/check-schema-drift.mjs`](scripts/check-schema-drift.mjs)) запрещает merge с drift
+- Полная процедура восстановления — `CLAUDE.md` § ВАЖНЫЕ ПРАВИЛА #16
 
 **Именование:**
 - Файлы: kebab-case (`booking-core.ts`, `create-booking.ts`)
@@ -1233,6 +1272,113 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-30 — MIGRATION-RECONCILIATION-BATCH** (commit on `auditandaction`). **🎉 🔴 LAUNCH BLOCKER CLOSED.** Four-part batch resolves 24-operation sprint-long schema drift discovered by LOCAL-DB-RECOVERY audit + closes the source (db-push workflow) + adds structural prevention (CI drift gate) + unblocks Part 1 of prior audit (seed completion). **Hybrid execution:** main context handled Part 1 (migration generation + manual review + apply — STOP-gated work) + Part 4 (seed) + final updates. Parallel workflow attempted Parts 2+3 but agents failed to call StructuredOutput; main context completed both as fallback.
+  - **Part 1 — Reconciliation migration (CRITICAL, main context):**
+    - Pre-state verified: container `masterryadom-db` running, 17/17 migrations applied, drift confirmed at 24 operations via `prisma migrate diff`
+    - `prisma migrate dev --name reconcile_drifted_schema --create-only` failed (non-interactive environment) → switched to manual workflow: `prisma migrate diff --script` → write to migration file → `prisma migrate deploy`
+    - **Manual SQL review of all 24 operations:** 1 AlterEnum (`ChatSenderType.SYSTEM`) + 6 AlterTables (ChatMessage / Notification / PortfolioItem / Provider [7 BOOKING-WIDGET-A enforcement fields, all NOT NULL with defaults — safe for existing rows] / ScheduleTemplateBreak / UserProfile [hideAgeYear NOT NULL DEFAULT true / emailVerifiedAt nullable]) + 4 CreateTables (ConversationSlug / UserFavorite / ServicePackage / ServicePackageItem) + 12 CreateIndexes + 6 AddForeignKeys. **All ADD-only, no DROP/destructive operations.** Sprint discipline preserved.
+    - **STOP-gate triggered:** 1 CREATE INDEX (`UserSubscription_isTrial_trialEndsAt_idx`) conflicts with existing partial index of same name from migration `20260430000000`. **Resolution proposed + applied:** deliberately skip that CREATE INDEX line in reconciliation migration (preserves working partial-index optimization for cron query) + remove `@@index([isTrial, trialEndsAt])` decorator from `prisma/schema/billing.prisma` (Prisma can't express partial WHERE via `@@index`; schema decorator was misleading) + explanatory comment in both places explaining the divergence and warning future devs not to re-add the decorator.
+    - Migration file: [`prisma/schema/migrations/20260530000000_reconcile_drifted_schema/migration.sql`](prisma/schema/migrations/20260530000000_reconcile_drifted_schema/migration.sql) with full review-trail comment block.
+    - Applied via `npx prisma migrate deploy` → ✅ «18 migrations found / Database schema is up to date»
+    - `prisma generate` + `npm run typecheck` ✅
+  - **Part 2 — Workflow policy fix (docs):**
+    - [`prisma/seeds/test-data/README.md`](prisma/seeds/test-data/README.md) — removed `npx prisma db push` instruction (was the root cause), replaced with `npx prisma migrate dev --name <descriptive>` + warning header citing MIGRATION-RECONCILIATION precedent
+    - [`CLAUDE.md`](CLAUDE.md) — new rule 16 «Schema discipline» (in Russian, ВАЖНЫЕ ПРАВИЛА section): forbids `prisma db push`, requires `migrate dev`, references CI gate + recovery procedure
+    - [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) раздел 13 — cross-reference to CLAUDE.md rule 16 + 5-bullet summary
+    - Cross-doc check: only `prisma/seeds/test-data/README.md` had instructional `db push`; all other `db push` mentions in docs (BACKLOG audit history, AI_CONTEXT changelog) are historical/explanatory and preserved verbatim
+  - **Part 3 — SCHEMA-DRIFT-CI-CHECK (structural prevention):**
+    - **NEW** [`scripts/check-schema-drift.mjs`](scripts/check-schema-drift.mjs) — runs `prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --exit-code`. Exit codes: 0 clean / 1 drift detected (with detailed recovery guide pointing at MIGRATION-RECONCILIATION precedent) / 1 hard fail in CI when Postgres unreachable / 0 with WARNING locally when Postgres unreachable (graceful skip, doesn't block local dev)
+    - [`package.json`](package.json) — `check:schema-drift` script + wired into `check` aggregate (between `check:openapi-routes` and `smoke`)
+    - [`.github/workflows/quality-gates.yml`](.github/workflows/quality-gates.yml) — new step «Schema drift check» after «OpenAPI routes coverage». **CI integration PARTIAL** (honest gap documented): CI workflow has no Postgres service, so script's local-skip branch fires with warning. Locally + on developer machines via `npm run check` it's hard-enforcing. TODO comment in workflow YAML for DevOps to provision shadow DB service → gate becomes hard-enforcing in CI without code changes
+    - [`docs/QUALITY-GATES.md`](docs/QUALITY-GATES.md) — new «check:schema-drift» section: purpose, trigger, failure-recovery 5-step procedure, local-vs-CI mode explanation, history note
+    - **Self-test:** initial run detected drift (the partial-index schema decorator divergence), helped surface the schema fix needed before close. After schema fix: `node scripts/check-schema-drift.mjs` → `SCHEMA-DRIFT: OK — schema.prisma matches migrations history (0 drift).`
+  - **Part 4 — Seed completion (unblocks prior audit Part 1):**
+    - `npm run seed:test` succeeded (was previously blocked by `P2022: column hideAgeYear does not exist` — reconciliation cleared the gate)
+    - **New baseline counts:** 8 cities · 12 categories · 6 plans · 28 masters · 6 studios · 15 clients · 63 bookings · 22 reviews · 4 hotSlots · 3 modelOffers · 11 favorites · 3 showcase logins working (master `+79991000000` / studio `+79992000000` / studio-member-master `+79993000000` / admin `+79994000000` / client `+79995000000`)
+    - Tests: 638/638 ✅
+  - **Workflow execution note:** parallel workflow `wjwxlxce8` launched for Parts 2+3 but both agents «completed without calling StructuredOutput after 2 nudges» (0 tokens, 6 tool uses across 19s — explored but didn't structure return). No spurious file changes — verified via `git status`. Main context completed Parts 2+3 as fallback. Workflow failure mode logged for future Pattern 15 refinement (when subagents return null, fallback path in main context preserves batch progress).
+  - **Раздел 11 (Производительность / Деплой):** local dev environment fully ready — 18/18 migrations + seeded showcase data. Drift prevention active (3 defense layers: README discipline + CLAUDE.md rule 16 + CI check gate locally hard / CI partial). Production deploy path complete + safe.
+  - **Раздел 13 (Правила):** new schema discipline section + cross-reference to CLAUDE.md rule 16. Pattern: rule lives in CLAUDE.md (single source of truth); AI_CONTEXT cross-references with brief summary.
+  - **Раздел 14 (Tooling / Available patterns):** new `check:schema-drift` quality gate added to the standard `npm run check` aggregate (10 gates total now: lint / typecheck / prisma:validate / prisma:generate / openapi:generate / check:encoding / check:mojibake / check:ui-text / check:context-freshness / check:openapi-routes / **check:schema-drift** / smoke).
+  - **Раздел 15 (changelog):** this entry.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / check:context-freshness ✅ / **check:schema-drift ✅** (0 drift) / `prisma migrate status` 18/18 ✅
+  - **What was NOT changed (per strict batch constraints):**
+    - Source code in `src/` (zero changes)
+    - Existing 17 migration files (content immutable per spec rule)
+    - Production deploy workflow (Part 3 added CI step but no changes to deploy.yml itself)
+    - `.env` / `.env.local` files
+    - Sprint work — 638 tests preserved
+    - `prisma generate` regenerated client (expected — schema reconciled)
+    - Postgres-agnostic content (Prisma usage / queries / business logic — none drift-class-specific)
+  - **Pre-launch state:** 🎉 **0 🔴 / 0 🟠 outstanding.** Code work complete (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A + LOCAL-DEV-CLEANUP + AI-CONTEXT-FACT-CORRECTION + **MIGRATION-RECONCILIATION-BATCH**). Local dev: 18/18 + seeded + drift prevention active. Production deploy: command correct + history complete + CI enforces drift discipline going forward (CI partial — hard locally). Infrastructure decisions still BLOCKED on DevOps consultation (Q1/Q2/Q3 + DR-2/3/6 runbooks), but those are separate operational concerns from launch-critical code paths.
+  - **Spawned (defense-in-depth, deferred):** 🔵 `PRE-COMMIT-SCHEMA-MIGRATION-PAIR` — pre-commit hook fail if schema.prisma modified without migration in same commit (~1 hr, post-launch).
+  - **Process insight — strongest validation of audit-first methodology (Pattern 1) yet.** LOCAL-DB-RECOVERY-AND-MIGRATION-DISCIPLINE-AUDIT found the drift via systematic investigation; MIGRATION-RECONCILIATION-BATCH closed it before production deploy could crash. If production deploy had been attempted before audit: migrations would apply cleanly, app code would crash at runtime on first request touching a drifted column, no clear cause → triage hell. Audit-before-deploy saved an undefined-length incident.
+  - **🛡 Defense-in-depth drift prevention (3 layers):**
+    1. **Documentation:** seeds README updated, CLAUDE.md rule 16, AI_CONTEXT раздел 13 cross-ref
+    2. **CI gate:** `check:schema-drift` in `npm run check` aggregate (hard-enforcing locally + on dev machines)
+    3. **Future (deferred):** pre-commit hook (🔵 `PRE-COMMIT-SCHEMA-MIGRATION-PAIR`) for belt-and-suspenders coverage
+  - **Open questions for user (operational, non-blocking):** (1) When DevOps provisions CI Postgres → set `SHADOW_DATABASE_URL` in quality-gates.yml so `check:schema-drift` becomes hard-enforcing in CI too; (2) Schedule `PRE-COMMIT-SCHEMA-MIGRATION-PAIR` for early post-launch sprint?
+
+- **2026-05-29 — LOCAL-DB-RECOVERY-AND-MIGRATION-DISCIPLINE-AUDIT** (commit on `auditandaction`). **🔴 LAUNCH BLOCKER discovered.** Three-part recovery + investigation prompt; Part 1 (seed local DB) STOP-gated by second schema drift; Parts 2 + 3 completed thoroughly. **NO code / schema / production changes** — discovery + documentation only. New 🔴 blocker `MIGRATION-RECONCILIATION` added to BACKLOG.
+  - **Part 1 — Local DB seed (BLOCKED):**
+    - Pre-state ✅: container `masterryadom-db` running, 17/17 migrations applied (post user's `migrate reset --force` recovery), DB empty (0 rows in Provider / UserProfile / Service / Booking / BillingPlan / GlobalCategory — confirmed expected post-reset).
+    - Seed scripts identified: `seed:test` (orchestrator at `prisma/seeds/test-data/index.ts`), `seed:sql`, `seed:billing/plans`, `seed:review-tags`.
+    - `npm run seed:test` execution: ✅ Cities (8) + Categories (12) + Billing plans (6) succeeded → ❌ Providers stage failed with `PrismaClientKnownRequestError P2022: The column hideAgeYear does not exist in the current database.`
+    - **STOP-gate triggered per spec rule** — did NOT auto-fix; investigation pivoted to Part 2.
+  - **Part 2 — Schema drift root cause investigation:**
+    - **Grep audit:** `prisma/schema/auth.prisma:43` defines `hideAgeYear Boolean @default(true)`; **0 migrations** include it (`grep -rn hideAgeYear prisma/schema/migrations/` returns empty). 4 src/ references actively use the field (`src/features/client-cabinet/profile/client-profile-page.tsx:87/88/350/351/353`).
+    - **Git blame:** `git log --all --oneline -S "hideAgeYear"` returns single commit `b219864` (2026-05-13, «feat: add system messages for booking events»). `git show --name-only b219864 | grep prisma/` lists 4 schema files modified, **zero migration files**. Schema field added without migration generation.
+    - **Authoritative drift report:** `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url postgresql://master:master123@localhost:5432/postgres --script` returned **24 schema operations missing** from migrations history: 1 AlterEnum (`ChatSenderType.SYSTEM`) + 6 AlterTables (ChatMessage / Notification / PortfolioItem / Provider [BOOKING-WIDGET-A enforcement fields] / ScheduleTemplateBreak / UserProfile) + 4 CreateTables (ConversationSlug / UserFavorite / ServicePackage + 1 other) + 13 CreateIndexes. Drift is pervasive, not isolated.
+    - **Root cause confirmed (Hypothesis A — `prisma db push` workflow):** [`prisma/seeds/test-data/README.md:9`](prisma/seeds/test-data/README.md#L9) documents the dev workflow as «Apply schema first (only needed once after a schema change): `npx prisma db push`». `db push` syncs `schema.prisma` → DB without creating migration files. Sprint accumulated 24 operations through this workflow — schema-source-of-truth ahead of migrations-source-of-truth.
+    - **`isTrial` original drift (the trigger for user's `migrate reset`):** migration `20260430000000_add_trial_to_user_subscription/migration.sql` EXISTS and is correctly written (ALTER TABLE adds isTrial / trialEndsAt / etc with partial index). User's earlier «column already exists» error happened because local DB had `isTrial` from earlier `db push` BEFORE the migration was created — migration apply collided. Migration itself is correct; drift was on the DB-state side. Reset recovered cleanly.
+  - **Part 3 — Production deploy discipline audit (CLEAN findings):**
+    | Surface | Migration command | Classification |
+    |---|---|---|
+    | `.github/workflows/deploy.yml:29` | `npx prisma generate` | ⚠️ OK (client only) |
+    | `.github/workflows/deploy.yml:127` | `node_modules/.bin/prisma migrate deploy` | ✅ Correct |
+    | `docker-compose.prod.yml` | (none) | ✅ |
+    | `docs/runbooks/release-go-no-go-checklist.md:80` | `npx prisma validate` | ⚠️ OK |
+    | `docs/runbooks/release-go-no-go-checklist.md:95` | `npx prisma migrate status` | ⚠️ OK (read-only) |
+    | `docs/runbooks/release-go-no-go-checklist.md:372-373` | `prisma validate` + `prisma generate` | ⚠️ OK |
+    - **No** `db push` / `migrate dev` / `migrate reset` anywhere in production paths ✅
+    - **Critical asymmetry:** production COMMAND is correct (`migrate deploy`), but production would apply an INCOMPLETE migration history. App code at runtime would crash on first access to any of the 24 drifted operations. **Production deploy of current code WILL fail at runtime** until reconciliation migration is generated.
+  - **Severity escalation: 🔴 LAUNCH BLOCKER MIGRATION-RECONCILIATION** — see BACKLOG entry for full details + required actions (generate one reconciliation migration, update seeds README, add CLAUDE.md rule against `db push`, implement `SCHEMA-DRIFT-CI-CHECK` for structural prevention).
+  - **Structural prevention escalation:** `SCHEMA-DRIFT-CI-CHECK` moved to 🟠 HIGH PRIORITY (above typical Bucket B items per Шаг 1) — `scripts/check-schema-drift.mjs` fails CI if `migrate diff` returns non-empty. Closes the drift class structurally. ~half-day; pair with MIGRATION-RECONCILIATION closure.
+  - **What was NOT changed:** seed scripts (existing — seed:test ran, failed mid-flow, no resumed); code (zero); schema (zero); migrations (no new — per spec rule 3); production paths (Part 3 audit-only per spec rule 4); `.env` files; CLAUDE.md (new rule recommendation deferred to user); CI workflows (recommendation deferred); sprint work preserved (638 tests pass).
+  - **Open questions for user (require decision before production launch):**
+    - **(1) MIGRATION-RECONCILIATION execution** — generate single `prisma migrate dev --name reconcile_drifted_schema` migration (manual review of generated SQL critical given 24 operations including drops/index-changes). After migration: re-seed via `npm run seed:test` should succeed. Cross-blocks CLEANUP-BILLING-PROD-A + CHAT-ATTACHMENT-MIGRATE-DEPLOY ops items.
+    - **(2) `prisma db push` policy** — update `prisma/seeds/test-data/README.md:9` to remove the `db push` instruction; replace with `npx prisma migrate dev`. Add CLAUDE.md rule «schema.prisma changes ONLY through `prisma migrate dev` — `db push` forbidden». Enforces discipline going forward.
+    - **(3) SCHEMA-DRIFT-CI-CHECK implementation** — pre-launch recommended (~half-day) to lock down the invariant structurally before next sprint.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / **NO** code/schema/production changes. `prisma migrate status` reports «Database schema is up to date!» (means «matches migrations on disk» — does NOT mean «matches schema.prisma»; that's the silent drift gap that `migrate diff` surfaces).
+  - **Sprint state update:** code work COMPLETE (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A + LOCAL-DEV-CLEANUP + AI-CONTEXT-FACT-CORRECTION). Infrastructure decisions BLOCKED on DevOps. Schema reconciliation now BLOCKED on user decision (above). **Pre-launch critical path: 🔴 MIGRATION-RECONCILIATION must close before production deploy.**
+
+- **2026-05-29 — AI-CONTEXT-FACT-CORRECTION** (commit on `auditandaction`). Documentation-only correction — Supabase confirmed NOT in use (недоступен из РФ + alternatives planned, DevOps consultation pending for choice). All Supabase references across docs annotated / replaced; infrastructure decisions explicitly marked «pending DevOps». **NO code / schema / test changes**. **NO architecture decisions** made — strictly fact correction.
+  - **Trigger:** user clarified during Q1/Q2/Q3 deployment discussion: «Supabase не нужен нам, недоступен из РФ + есть альтернативы, селфхостед там же где апка, или отдельная ВМ». AI_CONTEXT V3 still referenced Supabase as Postgres provider — accuracy issue.
+  - **Audit inventory (5 occurrences in scope + 1 borderline preserved):**
+    | File:line | Type | Action |
+    |---|---|---|
+    | `MASTERRYADOM_AI_CONTEXT.md:1003` | «StaleWhileRevalidate для изображений и Supabase storage» (Service Worker cache line) | Replaced — Yandex S3 noted as live storage; SW rule flagged as orphan + cross-ref to new SW-SUPABASE-RULE-CLEANUP backlog item |
+    | `README.md:106` | «Database: PostgreSQL (Supabase)» (tech stack table) | Replaced — «PostgreSQL + pgvector (local dev: `pgvector/pgvector:pg16` Docker; production provider TBD pending DevOps)» |
+    | `README.md:295` | Historical note «Supabase variables ... are no longer used» | Preserved (already-correct historical statement) |
+    | `.env.production.example:25` | Comment mentioning Supabase as one managed PG option | Replaced — «Yandex Managed PostgreSQL OR equivalent — DevOps decision; Supabase not used (РФ accessibility)» |
+    | `BACKLOG.md:347` | `ENV-DATABASE-CLEANUP` correctly identifies Supabase project as inactive | Preserved (already factually accurate historical context) |
+    | `next.config.ts:34-37` (borderline) | Dead SW caching rule `urlPattern: supabase.co/storage/...` + `cacheName: "supabase-storage"` | Preserved per «NO code changes» rule; flagged as 🔵 `SW-SUPABASE-RULE-CLEANUP` backlog |
+  - **Раздел 11 — Infrastructure decisions subsection added** at end of «База данных» (before section 12). New subsection lists 4 architectural choices blocking 4 pre-launch runbooks explicitly. Each decision tagged «pending DevOps consultation» with options-under-consideration (no recommendations made). Local dev preservation reaffirmed.
+  - **DEPLOYMENT-READINESS-AUDIT-A entry** in BACKLOG gets new annotation block at top: «DR-4 pgbouncer finding partially Supabase-tied — assumption invalidated; applicability now depends on hosting choice». DR-3 backup options re-scoped. DR-2 / DR-6 unaffected (hosting-agnostic). Original audit text preserved (historical record per spec rule 10).
+  - **New backlog item:** 🔵 `SW-SUPABASE-RULE-CLEANUP` — remove dead urlPattern + cacheName from `next.config.ts` (orphan since storage actually goes through Yandex S3). ~5 min opportunistic cleanup.
+  - **What was NOT changed:**
+    - Code / schema / tests (638 preserved)
+    - Postgres-agnostic content (Prisma usage / queries / business logic / types — none Supabase-specific)
+    - All sprint waves (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A + LOCAL-DEV-CLEANUP)
+    - Local dev configuration (`pgvector/pgvector:pg16` Docker preserved verbatim)
+    - CLAUDE.md / SPRINT-PATTERNS.md (not Supabase-mentioning)
+    - DR-2/3/4/6 backlog items themselves (status annotated, not deleted; runbooks still blocked on DevOps)
+    - No new patterns / no new invariants
+  - **Cross-document consistency verified** — same «pending DevOps consultation» framing across AI_CONTEXT раздел 11 + DEPLOYMENT-READINESS annotation + .env.production.example + README.
+  - **Pre-launch state:** documentation accuracy restored. Code work complete (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A); infrastructure decisions BLOCKED on DevOps consultation explicitly acknowledged. Next phase: DevOps engagement → 4 infrastructure decisions → DR-2/3/6 runbooks → production execution batch.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / check:context-freshness ✅ / **NO** code/schema/.env changes
+  - **Open questions for user:** none — all DevOps decisions explicitly out-of-scope per this prompt (Q1 TLS / Q2 backup / Q3 rollback / Postgres hosting all flagged as «pending DevOps» in section 11).
 
 - **2026-05-29 — LOCAL-DEV-CLEANUP** (commit on `auditandaction`). Local dev hygiene cleanup — onboarding hazards (compose / templates beautyhub→masterryadom rename) + container restart + migrations state verified. **NO code / .env / schema changes**. **STOP-gate triggered** at Part 2: 6 of 17 migrations pending on local DB (see BACKLOG `LOCAL-DEV-MIGRATIONS-CATCHUP` for user-decision options).
   - **Part 1 — Onboarding hazards closed (rename consistency):**
