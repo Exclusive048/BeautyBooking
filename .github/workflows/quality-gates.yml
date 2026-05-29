@@ -54,3 +54,9 @@ jobs:
 
       - name: Encoding check
         run: npm run check:encoding
+
+      - name: Context freshness check
+        run: npm run check:context-freshness
+
+      - name: OpenAPI routes coverage
+        run: npm run check:openapi-routes

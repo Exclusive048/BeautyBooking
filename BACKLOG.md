@@ -222,11 +222,12 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🟠 HIGH PRIORITY (после core master cabinet)
 
-### VAPID-NON-NULL-FIX (spawned from CONTEXT-REFRESH-V3 2026-05-29) 🟡 pre-launch
-- **What**: `src/lib/notifications/push/vapid.ts:5-6` uses `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!` + `process.env.VAPID_PRIVATE_KEY!` non-null assertions. If **only one** of the two keys set in production, runtime crashes with TypeError instead of gracefully disabling push. `isPushEnabled` computed flag (env.ts) guards module-level usage but doesn't protect file-internal `!` assertions.
-- **Fix**: replace `!` assertions with conditional return — early-return null when keys missing, OR guard per-key with explicit `if` check before assignment.
-- **Scope**: ~20 min — single file, replace 2 non-null assertions.
-- **Trigger**: pre-launch (cheap; closes residual VAPID risk noted by CONTEXT-REFRESH-V3 inspectors reclassifying P2 «Сделано: ЧАСТИЧНО»).
+### ~~VAPID-NON-NULL-FIX~~ ✅ ЗАКРЫТ (BUCKET-A-BATCH 2026-05-29)
+- Replaced non-null assertions in `src/lib/notifications/push/vapid.ts` with trimmed-value guard at the side-effect site
+- Extracted pure predicate `isVapidConfigured(public, private, email): boolean` into `src/lib/notifications/push/vapid-config.ts` (testable without triggering import-time `webpush.setVapidDetails`)
+- **Refinement vs. spawn**: the actual hazard was wider than V3 inspectors reported — `env.isPushEnabled` (env.ts) checks raw truthiness, but a whitespace-only env value passes truthiness while `.trim()` yields `""` → `webpush.setVapidDetails(...,"","")` crashes with cryptic validation error. Non-null assertions only check `null/undefined`, not empty strings. Now exports `isPushEnabled` derived from the trimmed values themselves
+- New regression test `src/lib/notifications/push/vapid-config.test.ts` (9 tests covering all-set / single-missing × 3 / single-whitespace × 3 / all-undefined / all-empty) — pins the trimmed-empty edge case explicitly
+- Test count: 629 → 638. Validation: typecheck/encoding/mojibake/check:ui-text/lint(1-3 baseline preserved)/build ✅
 
 ### ~~CONTEXT-REFRESH-V3~~ ✅ DONE 2026-05-29 (spawned from DOCUMENTATION-AUDIT-A — DOC-1+DOC-2 process)
 - **What**: full holistic refresh of `MASTERRYADOM_AI_CONTEXT.md` (sections 1-15) — header date update, audit-волна completion summary, integration of all 13 fix-prompts + 11 audits results. NOT per-commit append (rule 15 per-commit discipline working); this is the «raз в 4-6 коммитов / ~2 недели» full walk.
@@ -234,17 +235,19 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 - **Scope**: ~2-4 hr. (a) Re-walk sections 1-15 against current code state; (b) update header date + commit + branch markers; (c) consolidate audit-волна findings into Раздел 8/12 narratives; (d) prune stale entries from Раздел 8 that fix-prompts closed; (e) verify cross-references functional; (f) add Pattern 15 entry if SPRINT-PATTERNS gets it.
 - **Trigger**: pre-launch recommended OR before next sprint starts (whichever first). Block further large feature commits until refresh completes to prevent additional drift accumulation.
 
-### RUNBOOK-INDEX-A (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 — OP-1) 🟠 pre-launch ops
-- **What**: convert `docs/runbooks/README.md` from API reference into a runbook index. Add «Quick Index» section listing all 10 runbooks with 1-line symptom triggers (e.g. «redis-down.md — Redis unavailable OR health shows readiness.redis=false»). Add «Quick Diagnosis Matrix» table mapping Symptom → Endpoint(s) → Runbook.
-- **Why**: new ops staff opening README only finds health endpoint API reference — cannot discover which file applies to which incident. Currently must `ls docs/runbooks/` + open each file to learn topology.
-- **Scope**: ~30-45 min one-time edit. Existing API reference stays as «Technical Reference» subsection.
-- **Trigger**: pre-launch — high ROI for ops discoverability.
+### ~~RUNBOOK-INDEX-A~~ ✅ ЗАКРЫТ (BUCKET-A-BATCH 2026-05-29)
+- `docs/runbooks/README.md` rewritten from 56-line API reference into ops-discoverable index
+- 10 runbooks inventoried, categorized into 4 groups: Incident response (4) / Routine operations (3) / Pre-launch & deployment (3) / Drills (1)
+- «Quick navigation» section + 4 categorized tables with «When-to-open» + «Primary signal» columns
+- **Zero content deletion**: original health/admin/surface/baseline API content preserved verbatim as «Technical reference» subsection at bottom
+- Done by parallel workflow agent within BUCKET-A-BATCH
 
-### DRILL-PASS-CRITERIA-A (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 — OP-3) 🟡
-- **What**: enhance `docs/runbooks/incident-drill-checklist.md` with explicit PASS/FAIL criteria per drill + a result template (Date / Drill / Duration / PASS-FAIL / Issues / Follow-up).
-- **Why**: 4 drills (Redis down / Queue backlog / YooKassa webhook / Auth outage) reference recovery procedures but lack measurable success metric. On-call cannot reliably declare drill pass/fail without external guidance. No audit trail of drills run.
-- **Scope**: ~45 min one-time edit. Pattern per drill: «PASS: /api/health 200, readiness.redis=true, worker heartbeat <60s».
-- **Trigger**: before first on-call shift. Pair with RUNBOOK-INDEX-A for maximum guidance clarity.
+### ~~DRILL-PASS-CRITERIA-A~~ ✅ ЗАКРЫТ (BUCKET-A-BATCH 2026-05-29)
+- `docs/runbooks/incident-drill-checklist.md` enhanced with explicit PASS/FAIL criteria + result template per drill
+- 4 drills covered (Redis down / Queue backlog / YooKassa webhook / Auth outage)
+- Result template appended (Date / Drill / Duration / PASS-FAIL / Issues / Follow-up) for audit trail
+- Existing drill scenarios preserved verbatim — PASS/FAIL sections added alongside
+- Done by parallel workflow agent within BUCKET-A-BATCH
 
 ### MODAL-FOCUS-TRAP-FIX-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-1) 🟠 pre-launch recommended
 - **What**: extend `src/components/ui/modal-surface.tsx` (79+ callers) to add: (1) **focus trap** — Tab cycles within modal contents; (2) **initial focus** — first focusable child gets focus on open (or explicit `initialFocusRef` prop for opt-in); (3) **return focus** — focus restores to the trigger element on close.
@@ -323,6 +326,36 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 ---
 
 ## 🟡 MEDIUM PRIORITY
+
+### LOCAL-DEV-MIGRATIONS-CATCHUP (spawned from LOCAL-DEV-CLEANUP 2026-05-29) 🟠 STOP-GATE
+- **What**: local Docker DB `masterryadom-db` (volume `pgdata`) has **11 of 17** migrations applied. **6 migrations pending** on local dev:
+  - `20260430000000_add_trial_to_user_subscription`
+  - `20260430000100_add_trial_notification_types`
+  - `20260513115124_add_mrr_snapshot`
+  - `20260513224252_pre_launch_audit_soft_delete_block`
+  - `20260514000936_add_admin_initiated_notification_types`
+  - `20260519120000_add_chat_attachment`
+- **Why deferred**: per LOCAL-DEV-CLEANUP STOP-gate rule 8 — diagnostic does NOT auto-run `prisma migrate deploy`. Schema migration is user-decision territory.
+- **Data state**: existing 11-migration data preserved (63 Provider / 74 UserProfile rows confirmed via read-only count). Container restart healthy; volume integrity ✅. Apply path will additively bring schema to 17/17 without data loss (all 6 pending are ADD-only ALTER TABLE / new model creations per prior audit-волна entries).
+- **User decisions needed**:
+  - (a) Apply locally now → `npx prisma migrate deploy` (production-style, safe — no schema diff, just applies the 6 pending in order). Re-seed via `npm run seed:test` if test data needs the new model fields populated.
+  - (b) Reset locally → `npx prisma migrate reset --force` (wipes + re-applies all 17 + re-runs seed). Loses any custom local data — but test fixtures get rebuilt cleanly.
+  - (c) Defer to production sprint → production target DB starts fresh from all 17 migrations anyway; local DB at 11 is sufficient for current dev work IF you don't touch features that depend on the 6 (trial subs, MRR snapshots, soft-delete review filter, admin notification types, chat attachments).
+- **Recommendation**: option (a) before production launch — guarantees local dev parity with what production will run. ~30 seconds wall-clock + optional re-seed.
+
+### ENV-DATABASE-CLEANUP (spawned from ENV-DATABASE-DIAGNOSTIC 2026-05-29)
+- **What**: 3 orphan database env vars в `.env` + `.env.local` — `DATABASE_URL_V6` / `SUPADIRECT_URL` / `SUPADATABASE_URL`. All point at Supabase project `gvattepvwvyegcvpgjpb` (user confirms inactive). All have **0 references** в codebase (verified via grep — not in env.ts, not in prisma schema, not in any source/script/config). Safe to remove from .env files без code change. **Other findings:** local `.env` `DATABASE_URL=postgresql://master:****@localhost:5432/masterryadom` connects к manually-created Docker container `masterryadom-db` (volume `pgdata`, currently **Exited 8 days ago**); this diverges from `docker-compose.dev.yml` which describes a different container (db=`beautyhub`, user=`beautyhub`, vol=`postgres_dev_data`) — the compose-defined setup has never run on this machine. **`DIRECT_URL`** in `.env` currently points at the same localhost DB; only consumer in code = `src/lib/prisma-direct.ts` (separate Prisma client; throws if missing).
+- **Why**: cleaner env files; removes confusion about which DB is canonical. Production hosting decision still pending (DevOps consultation) — but the 3 orphan vars are safe to retire now regardless of hosting direction.
+- **Scope**: ~10 min — remove 3 lines from `.env` + 3 lines from `.env.local`. Optionally align local setup с `docker-compose.dev.yml` (rename container OR update compose to match user's actual setup) — separate concern.
+- **Trigger**: any time. No code change required, no migration risk.
+- **NOT in scope here**: don't decide production hosting; don't change Docker setup; don't touch `.env.example` / `.env.production.example` templates (those follow their own freeze).
+
+### OPENAPI-COVERAGE-INCREMENTAL (spawned from BUCKET-A-BATCH 2026-05-29)
+- **What**: incrementally document the 216 routes currently in `scripts/openapi-route-allowlist.txt` (baseline freeze). Goal — drive allowlist count to zero by retiring entries as routes get proper `spec.ts` entries.
+- **Why**: BUCKET-A's `check:openapi-routes` gate prevents NEW undocumented routes shipping, but inherited 216-route gap remains. Need OpenAPI spec at 100% before any external API exposure (public API / partner integrations / SDK generation).
+- **Approach**: target high-traffic clusters first — admin (33 routes), master+studio cabinet (40), cabinet user (14), analytics (~14), public/booking (~8). Document one cluster per session/sprint; retire allowlist entries as you go (the gate counts allowlist = waived but visible).
+- **Scope**: ~10-20 hr cumulative — half-day per cluster of 20-30 routes. Each route entry follows existing `spec.ts` shape (parameters / requestBody / responses).
+- **Trigger**: post-launch — opportunistic when touching a cluster. Avoid in single big-bang commit; review burden would be enormous.
 
 ### EMPTY-STATE-COMPONENT-A (spawned from UI-UX-AUDIT-A 2026-05-23 — UI-2)
 - **What**: extract shared `src/components/ui/empty-state.tsx` per the UI-UX-PRO-MAX skill pattern («Centered icon + title + description + secondary CTA»). Migrate ~10-15 existing callers across `client-cabinet/*`, `admin-cabinet/catalog`, `master/model-offers/{application-empty-state,offer-empty-state}`, `chat`, `studio` features.
@@ -1070,18 +1103,22 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 - **Scope**: ~1 hr setup + reporting infra (~half-day if CI diff added).
 - **Trigger**: after first prod deploy + first month of real user metrics.
 
-### PORTFOLIO-EDITOR-NEXT-IMAGE (spawned from PERFORMANCE-AUDIT-A 2026-05-23 — PERF-4)
-- **What**: convert 2 raw `<img>` in [`src/features/media/components/portfolio-editor.tsx`](src/features/media/components/portfolio-editor.tsx) to `next/image`.
-- **Why**: admin-only flow, not user-facing hot path. Low priority but consistency.
-- **Scope**: ~15 min — both `<img>` are simple `<img src={url} alt="" className="..." />` patterns; `next/image` needs `width`/`height` props (or `fill` for preview lightbox).
-- **Trigger**: opportunistic when touching media editor.
+### ~~PORTFOLIO-EDITOR-NEXT-IMAGE~~ ✅ ЗАКРЫТ (BUCKET-A-BATCH 2026-05-29)
+- Both `<img>` in [`src/features/media/components/portfolio-editor.tsx`](src/features/media/components/portfolio-editor.tsx) replaced with `next/image`
+- Misleading file-level `eslint-disable @next/next/no-img-element` comment removed — its rationale «drag-and-drop editor needs direct DOM img for reordering» didn't apply: the only DnD in the file is file-upload drop-zone on a `<div>`, no image reordering
+- Thumbnails (`grid-cols-2 md:grid-cols-4` cells): `<Image fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover">` — gets full optimization pipeline (LCP improvement target from PERF-4)
+- Lightbox preview: wrapped in `relative h-[90vh] w-[90vw]` container + `<Image fill sizes="90vw" className="object-contain" unoptimized>` — bypasses optimization for full-size view
+- `next.config.ts` already had `storage.yandexcloud.net` in remotePatterns (DEPLOYMENT-READINESS); no config changes needed
 
-### CONTEXT-FRESHNESS-CI-CHECK (spawned from DOCUMENTATION-AUDIT-A 2026-05-29)
-- **What**: `scripts/check-context-freshness.mjs` — fail CI if `MASTERRYADOM_AI_CONTEXT.md` header date is older than the commit date OR older than 14 days from current date. Catches drift like the one DOC-1+DOC-2 found in this audit.
-- **Why**: per-commit «### Context updates» sections worked (entries present in every fix-prompt) but holistic header date drifted invisibly. Structural prevention closes the per-commit-vs-full-refresh gap.
-- **Scope**: ~30 min one-time script + add to `quality-gates.yml`. Read header regex (`Дата аудита:|last_verified:`), compare to `git log -1 --format=%ai`, fail with actionable message.
-- **Exception**: skip for read-only audits (which may append section 15 without touching header per Pattern 4 quality-gate health pattern).
-- **Trigger**: low priority — pair with CONTEXT-REFRESH-V3 closure (script catches re-occurrence).
+### ~~CONTEXT-FRESHNESS-CI-CHECK~~ ✅ ЗАКРЫТ (BUCKET-A-BATCH 2026-05-29)
+- `scripts/check-context-freshness.mjs` parses «Дата аудита: **\<day\> \<месяц\> \<year\>**» header from `MASTERRYADOM_AI_CONTEXT.md`, converts Russian month name to UTC Date, compares vs today
+- Fails CI when snapshot is more than **30 days** old (V2→V3 drift was 16 days; 30 days = 2× buffer so gate isn't noisy after every sprint; rationale inlined in script comment block for future maintainers)
+- Other fail conditions: header missing/malformed, date in future, day/year out of sanity range
+- Skips silently (exit 0) when file doesn't exist (brand-new projects without snapshot convention not penalized)
+- Edge cases tested: missing file / missing header / malformed regex / unknown Russian month / day or year out of range / future date / stale date — 9 conditions
+- Wired into BOTH `npm run check` (between `check:ui-text` and `smoke`) AND `.github/workflows/quality-gates.yml` (final step) — mirrors `check:encoding` / `check:mojibake` dual-integration
+- npm script: `check:context-freshness`. Self-test PASS on current snapshot (0 days old).
+- Done by parallel workflow agent within BUCKET-A-BATCH. Closes V1→V2→V3 cycle structurally (Pattern 4 reinforcement)
 
 ### RUNBOOK-COVERAGE-CI (spawned from DOCUMENTATION-AUDIT-A 2026-05-29 + DEPLOYMENT-READINESS DR-2/3/6)
 - **What**: deploy.yml or quality-gates.yml CI step that fails if expected critical runbooks missing OR <100 LOC stubs (`docs/runbooks/{prisma-migration-rollback,database-backup,tls-setup}.md`).
@@ -1223,16 +1260,16 @@ Master хочет mark FINISHED **до** endAt time. Сейчас endpoint тр�
 
   - **🎯 Prioritized enforcement plan (Bucket A / B / C):**
 
-    **Bucket A — Implement now (pre-launch quick wins, ~1-3 hr each):**
+    **Bucket A — ✅ ВСЕ 6 ЗАКРЫТЫ (BUCKET-A-BATCH 2026-05-29):**
 
-    | Candidate | Cost | Value | Rationale |
+    | Candidate | Cost | Value | Status |
     |---|---|---|---|
-    | `VAPID-NON-NULL-FIX` | ~30 min | High | Pre-launch — closes residual P2 VAPID risk; isolated 2-line fix; spawned from V3 |
-    | `CONTEXT-FRESHNESS-CI-CHECK` | ~30 min | High | Prevents V1→V2→V3 cycle drift; structural Pattern 4 reinforcement |
-    | `RUNBOOK-INDEX-A` | ~30-45 min | High | Pre-launch ops discoverability; OP-1 from DOCUMENTATION-AUDIT |
-    | `DRILL-PASS-CRITERIA-A` | ~45 min | Medium | Pre-launch ops first-on-call shift readiness |
-    | `OPENAPI-ROUTE-CI` | ~30 min | Medium | Cheap PR-time gate prevents undocumented routes accumulating |
-    | `PORTFOLIO-EDITOR-NEXT-IMAGE` | ~30 min | Medium | PERF-4 trivial closure; admin-only but consistent |
+    | `VAPID-NON-NULL-FIX` | ~30 min | High | ✅ DONE — extracted pure `isVapidConfigured` helper + 9 regression tests |
+    | `CONTEXT-FRESHNESS-CI-CHECK` | ~30 min | High | ✅ DONE — `scripts/check-context-freshness.mjs` wired into `check` + `quality-gates.yml` |
+    | `RUNBOOK-INDEX-A` | ~30-45 min | High | ✅ DONE — `docs/runbooks/README.md` rewritten as ops-discoverable index, API reference preserved |
+    | `DRILL-PASS-CRITERIA-A` | ~45 min | Medium | ✅ DONE — PASS/FAIL criteria + result template added per drill, scenarios preserved |
+    | `OPENAPI-ROUTE-CI` | ~30 min | Medium | ✅ DONE — `scripts/check-openapi-routes.mjs` with frozen baseline (72 documented + 216 allowlisted) |
+    | `PORTFOLIO-EDITOR-NEXT-IMAGE` | ~30 min | Medium | ✅ DONE — 2 `<img>` → `<Image>`, misleading eslint-disable comment removed |
 
     **Bucket B — Schedule for Sprint 2 / post-launch (~half-day to ~1 day):**
 

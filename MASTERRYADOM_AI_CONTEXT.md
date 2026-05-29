@@ -1234,6 +1234,74 @@ npm run smoke            # Smoke тесты
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-29 — LOCAL-DEV-CLEANUP** (commit on `auditandaction`). Local dev hygiene cleanup — onboarding hazards (compose / templates beautyhub→masterryadom rename) + container restart + migrations state verified. **NO code / .env / schema changes**. **STOP-gate triggered** at Part 2: 6 of 17 migrations pending on local DB (see BACKLOG `LOCAL-DEV-MIGRATIONS-CATCHUP` for user-decision options).
+  - **Part 1 — Onboarding hazards closed (rename consistency):**
+    - [`docker-compose.dev.yml`](docker-compose.dev.yml) — postgres service updated to match actual manually-created container: `container_name: masterryadom-db` + `POSTGRES_DB: masterryadom` + `POSTGRES_USER: master` + `POSTGRES_PASSWORD: master123` + `volumes: pgdata` (with explicit `volumes.pgdata.name: pgdata` so compose reuses the existing named volume if present rather than creating a separate `<project>_pgdata`). Redis service preserved as-is (had no pre-existing manual container to align with). Header comment explains the LOCAL-DEV-CLEANUP rationale.
+    - [`.env.example`](.env.example) — `DATABASE_URL` updated to match compose defaults (`master:master123@localhost:5432/masterryadom`). Comment notes the dev/compose alignment. `DIRECT_URL` guidance clarified (leave blank in dev, or set to same as DATABASE_URL).
+    - [`.env.production.example`](.env.production.example) — `POSTGRES_DB` / `POSTGRES_USER` / `DATABASE_URL` / `DIRECT_URL` (lines 18-27) renamed to `masterryadom`. Comment added: «Production hosting TBD (pending DevOps decision — managed Postgres OR self-hosted). pgvector extension required». Brand domain refs (`beautyhub.art` in NEXT_PUBLIC_APP_URL / VAPID_EMAIL / VK_REDIRECT_URI / SMTP_*) preserved — brand domain is unrelated to DB name.
+  - **Out of scope (preserved):**
+    - `.github/workflows/quality-gates.yml` — CI test env placeholder (vitest sets `DATABASE_URL=""` per workflow line 49, so the placeholder DB name doesn't actually connect; semantic is «non-empty for env.ts Zod validation only»)
+    - `.github/workflows/deploy.yml` — Docker registry image names (`beautyhub-app` / `beautyhub-worker`) — these are deploy artifact namespacing, separate concern from local dev DB hygiene
+    - `docker-compose.prod.yml` — production compose, separate DevOps concern
+    - `.env` / `.env.local` — env vars cleanup deferred to DevOps batch (`ENV-DATABASE-CLEANUP` 🟡 backlog item)
+    - `BACKLOG.md` / `MASTERRYADOM_AI_CONTEXT.md` — historical mentions of `beautyhub` in audit reports preserved as-is (history doesn't get rewritten)
+    - `docs/runbooks/release-go-no-go-checklist.md` — references are filesystem paths (`d:/BeautyBooking/beautyhub/`), not DB names
+  - **Part 2 — Container restart + migrations verify:**
+    - `docker start masterryadom-db` → ✅ `Up 4 seconds 0.0.0.0:5432->5432/tcp` (volume `pgdata` survived 8-day stop, no recreation needed)
+    - `npx prisma migrate status` → **17 found on disk / 11 applied / 6 pending**:
+      ```
+      Following migrations have not yet been applied:
+        20260430000000_add_trial_to_user_subscription
+        20260430000100_add_trial_notification_types
+        20260513115124_add_mrr_snapshot
+        20260513224252_pre_launch_audit_soft_delete_block
+        20260514000936_add_admin_initiated_notification_types
+        20260519120000_add_chat_attachment
+      ```
+    - **STOP-gate honored** — did NOT auto-run `prisma migrate deploy`. User-decision required (3 options documented in BACKLOG `LOCAL-DEV-MIGRATIONS-CATCHUP`)
+    - Data integrity sanity (read-only counts): **63 Provider rows / 74 UserProfile rows** present — volume `pgdata` preserved data through the 8-day container stop. Local DB is at the «28 April 2026» schema state (after `multi_city_foundation`); 6 sprint-late migrations not yet applied here
+  - **Раздел 11 (Деплой):** local dev compose now reflects actual `masterryadom-db` container setup. Onboarding path predictable: clone → `docker compose -f docker-compose.dev.yml up -d` → container named `masterryadom-db` with volume `pgdata` → `.env` matches defaults → `npm run dev` works. Compose explicitly uses `volumes.pgdata.name: pgdata` so existing manually-created volumes are reused without re-init.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / **NO code / schema / .env changes**
+  - **Open questions for user (resolve before production launch):**
+    - **(1) LOCAL-DEV-MIGRATIONS-CATCHUP STOP-gate:** apply 6 pending migrations locally now (recommended — `prisma migrate deploy`) or defer? Trade-offs documented in BACKLOG entry
+    - **(2)** `ENV-DATABASE-CLEANUP` (3 orphan vars in `.env` / `.env.local`) — still deferred to separate DevOps batch as agreed
+    - **(3)** `docker-compose.prod.yml` still has `${POSTGRES_DB:-beautyhub}` fallback defaults — pending DevOps batch update OR can be done with prod env hardening
+
+- **2026-05-29 — BUCKET-A-BATCH** (commit on `auditandaction`). **🎉 All 6 Bucket A quick-win items from STRUCTURAL-PREVENTION-AUDIT capstone shipped in one batch.** Hybrid execution: parallel workflow (`wnxsid0oh`, 2 agents, ~31 min wall-clock) for Items 2 + 3 + 4 (CI script + 2 docs — disjoint files, safe to parallelize) + main-context sequential for Items 1 + 5 + 6 (code fixes requiring careful audit-before-edit + Item 5 OpenAPI strategy STOP-gate clearance).
+  - **Раздел 3 (Архитектура):** 2 new pure helpers + 1 new test file + 2 new CI scripts + 1 new CI allowlist:
+    - **NEW** [`src/lib/notifications/push/vapid-config.ts`](src/lib/notifications/push/vapid-config.ts) — `isVapidConfigured(public, private, email): boolean` pure predicate. Extracted from `vapid.ts` so the trim-edge-case test surface doesn't trigger the import-time `webpush.setVapidDetails` side-effect
+    - **NEW** [`src/lib/notifications/push/vapid-config.test.ts`](src/lib/notifications/push/vapid-config.test.ts) — 9 regression tests covering all-set / 3× missing / 3× whitespace-only / all-undefined / all-empty (pins V3 inspectors' finding + the broader trim-edge that they didn't surface)
+    - **NEW** [`scripts/check-context-freshness.mjs`](scripts/check-context-freshness.mjs) — parses «Дата аудита: \*\*\<day\> \<месяц\> \<year\>\*\*» header from `MASTERRYADOM_AI_CONTEXT.md`, fails CI when snapshot is more than 30 days old / date in future / day/year out of range / malformed. Skips silently if file missing. Rationale comment block inlined (V2→V3 drift was 16 days; 30 = 2× buffer)
+    - **NEW** [`scripts/check-openapi-routes.mjs`](scripts/check-openapi-routes.mjs) — scans `src/app/api/**/route.ts`, normalizes to OpenAPI paths (`[id]` → `{id}`, drops route groups, handles catch-all), diffs against `src/lib/openapi/spec.ts` documented paths, fails CI when undocumented route not in allowlist
+    - **NEW** [`scripts/openapi-route-allowlist.txt`](scripts/openapi-route-allowlist.txt) — frozen baseline of 216 currently-undocumented routes. Header documents retirement rule (delete entry when route gets `spec.ts` coverage) + acceptable reasons for permanent allowlist (webhook owned by external service, internal cron, runtime debug)
+  - **Раздел 3 (модификации):** 5 files modified:
+    - [`src/lib/notifications/push/vapid.ts`](src/lib/notifications/push/vapid.ts) — non-null assertions removed; conditional guard `if (vapidPublicKey && vapidPrivateKey && vapidEmail)` runs side-effect only when trim yields non-empty; exports `isPushEnabled` derived from the trimmed values themselves via `isVapidConfigured`. JSDoc explains the V3 hazard + trim-edge nuance
+    - [`src/features/media/components/portfolio-editor.tsx`](src/features/media/components/portfolio-editor.tsx) — 2 raw `<img>` replaced with `next/image` (thumbnail uses `fill` + `object-cover` + responsive `sizes`; lightbox wraps `<Image fill unoptimized>` in sized container for `object-contain`). File-level `eslint-disable @next/next/no-img-element` comment removed — its rationale was misleading (only DnD in the file is upload drop-zone on a `<div>`)
+    - [`docs/runbooks/README.md`](docs/runbooks/README.md) — rewritten as ops-discoverable index. 4 categorized tables (Incident response / Routine operations / Pre-launch / Drills) with When-to-open + Primary signal columns. Original API reference preserved verbatim as «Technical reference» subsection
+    - [`docs/runbooks/incident-drill-checklist.md`](docs/runbooks/incident-drill-checklist.md) — explicit PASS/FAIL criteria + result template added per drill (Redis down / Queue backlog / YooKassa webhook / Auth outage). Existing scenarios preserved
+    - [`package.json`](package.json) + [`.github/workflows/quality-gates.yml`](.github/workflows/quality-gates.yml) — wired `check:context-freshness` + `check:openapi-routes` into both `npm run check` batch + CI workflow (mirrors `check:encoding` / `check:mojibake` dual-integration)
+  - **Раздел 5 (Бизнес-логика):** VAPID push initialization no longer crashes when a key is whitespace-only — broader fix than V3 inspectors flagged. The `!` non-null assertions only caught `null/undefined`; whitespace-only env values passed `Boolean(env.X)` in env.ts truthiness check while `.trim()` here yielded `""`, and `webpush.setVapidDetails(..., "", "")` rejected at runtime with cryptic web-push validation error. The local trimmed-value guard at the side-effect site is the canonical fix. Other modules continue to import `isPushEnabled` — semantics unchanged for all-set / all-missing cases, fixed for whitespace edge case
+  - **Раздел 6 (Маршруты):** no route changes. OPENAPI-ROUTE-CI is a build-time gate, doesn't add routes
+  - **Раздел 7 (Env vars):** no new env vars
+  - **Раздел 8 (Проблемы и риски):** P2 VAPID gap «Сделано: ЧАСТИЧНО» → **«Сделано: ДА»** (closed by VAPID-NON-NULL-FIX). Bucket A items all closed (6/6 from STRUCTURAL-PREVENTION-AUDIT capstone)
+  - **Раздел 9 (Тестирование):** 629 → **638 tests** (+9 from `vapid-config.test.ts`). Test files: 74 → 75. New CI gates: `check:context-freshness` + `check:openapi-routes`. Coverage: pre-launch hardening continues — pure-helper test density on critical helpers
+  - **Раздел 10 (Безопасность):** indirect improvement — VAPID misconfiguration now fails closed (push disabled) instead of crashing with cryptic error. CI gate against context staleness ensures future audit baselines reflect reality
+  - **Раздел 11 (Производительность):** PERF-4 closed (portfolio editor thumbnails now get next/image optimization pipeline — LCP improvement target). Lightbox uses `unoptimized` deliberately (full-size view, no resizing wanted)
+  - **Раздел 12 (Инварианты):** no new invariants. Existing #28 (Booking idempotency) + 26 others preserved
+  - **Раздел 14 (Workflow / patterns):** Pattern 15 (workflow-orchestrated parallel survey audit) demonstrated in execution mode this commit — 2 parallel inspector subagents writing disjoint files (CI script + 2 docs) in 31 min vs estimated 1.5 hr sequential
+  - **Validation:** typecheck ✅ / lint **1 error / 3 warnings baseline preserved** (pre-existing email-verify-modal setState-in-effect from PHASE7) / encoding ✅ / mojibake ✅ / check:ui-text ✅ / check:context-freshness ✅ (0 days old) / check:openapi-routes ✅ (72 documented + 216 allowlisted + 0 gap) / `npm run build` ✅ Compiled successfully in 18.2s / **638/638 tests** pass
+  - **What was NOT changed (per strict batch constraints):**
+    - Schema (NO migration — 16 preserved)
+    - API contracts (VAPID export `isPushEnabled` semantics preserved for all-set / all-missing; only whitespace edge changed)
+    - Existing runbook content (Item 3 only rewrote README.md index; 10 runbook files untouched; Item 4 only added PASS/FAIL sections alongside existing drill scenarios)
+    - Admin portfolio editor functionality (Item 6 cosmetic image migration, no business logic touched)
+    - All sprint waves preserved (Cabinet Master / Studio / Client / Admin / Public surfaces / booking widget / modal a11y / chat / categories — all intact)
+    - 629 baseline tests (all still pass + 9 new = 638 total)
+    - SPRINT-PATTERNS.md, CLAUDE.md, env.ts (no behavioral changes needed)
+  - **Pre-launch risks обнаруженные:** none new. 1 follow-up backlog item spawned: `OPENAPI-COVERAGE-INCREMENTAL` (🟡 — drive allowlist from 216 → 0 over post-launch sprints, cluster-by-cluster)
+  - **Open questions for user:** none — Item 5 OpenAPI strategy STOP-gate cleared automatically (audit found existing `src/lib/openapi/spec.ts` manual spec is the canonical strategy; gate uses baseline-freeze pattern same as eslint `--max-warnings`)
+  - **🎯 Pre-launch critical path:** Bucket A done (6/6). Verified-ready ops items remain (CLEANUP-BILLING-PROD `--confirm` / CHAT-ATTACHMENT-MIGRATE deploy / YANDEX-DEPLOY-A / VAPID-PUSH-VERIFY / MRR-CRON-SCHEDULE — all awaiting ops window). Launch path clear
+
 - **2026-05-29 — STRUCTURAL-PREVENTION-AUDIT (Capstone Шаг 3)** (commit on `auditandaction`). **🎉 3-step Structural Prevention plan COMPLETE.** Capstone meta-synthesis across audit-волна 11/11 + 8 fixes + CONTEXT-REFRESH-V3. Delivered via workflow (3 parallel inspector subagents — 164K tokens / 61 tool uses / ~21 min wall-clock). **NO code/schema/test changes** — synthesis + 3 doc edits (SPRINT-PATTERNS / AI_CONTEXT / BACKLOG).
   - **3-step plan execution complete:**
     - ✅ **Шаг 1 (Template update)** applied to 6+ fix/audit prompts since BUSINESS-LOGIC-AUDIT-A (each prompt habit-includes «🛡 Structural Prevention consideration»)
