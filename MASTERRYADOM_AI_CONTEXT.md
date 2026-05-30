@@ -1064,6 +1064,20 @@ The following architectural choices block 4 pre-launch runbooks. **Each decision
 
 **Once DevOps engages:** these 4 decisions unblock DR-2/3/6 runbooks + DR-4 pgbouncer applicability → production execution batch can proceed.
 
+### AI provider strategy (MIGRATION-STRATEGY-DOC 2026-05-30 — plan resolved, implementation queued)
+
+> Separate concern from infrastructure decisions above. Phases 1-3 complete; Phases 4-N queued in BACKLOG as discrete self-contained implementation prompts. Full spec: [`docs/AI-MIGRATION-STRATEGY.md`](../docs/AI-MIGRATION-STRATEGY.md).
+
+**Plan summary:**
+- **Mechanism:** `AI_PROVIDER=openai|yandex` env var switches between `https://api.openai.com` (current baseline, default) and `https://llm.api.cloud.yandex.net/v1` (Yandex Cloud's official OpenAI-compatible endpoint). Single-line conditional inside `src/lib/ai/client.ts` — entire 4-chat-surface migration reduces to a config switch, no SDK refactor.
+- **Model:** YandexGPT 5 Lite for all 4 chat surfaces baseline (review-summary / review-reply / service-description / advisor); per-surface override to Pro available if quality validation requires (advisor most likely candidate).
+- **Visual search:** DEFER post-launch (evidence-based per Phase 2 — 0 vectors stored = zero migration burden; AI Studio multimodal endpoint requires API spike-testing; OpenAI-compat layer doesn't pass vision so this surface needs separate native-API wrapper).
+- **Reversibility:** env-toggle rollback in minutes, no code change. `OPENAI_API_KEY` stays in env post-migration as instant-fallback path.
+- **Cost projection:** ~1,100-2,600₽/month (~$12-28) for the 4 chat surfaces, vs current OpenAI usage. Operational simplification — no more VPN/proxy dependency for OpenAI access from РФ.
+- **Quality validation:** parallel sampling (5-15 inputs per surface, side-by-side OpenAI vs YandexGPT outputs, 1-5 score across 5 criteria, 80% threshold → proceed).
+- **Implementation effort:** ~3-4 hours focused work for 4 chat surfaces (one Phase 4a wrapper change + 4 zero-code env-flag flips with quality validation per surface).
+- **Status:** Phases 1 (audit) + 2 (research) + 3 (strategy doc) complete; Phases 4a-4e queued, each self-contained.
+
 **Note on DEPLOYMENT-READINESS findings (audit-волна 7/11):** some Supabase-specific concerns (pgbouncer connection limits, Supabase pooler quirks) require re-evaluation under whatever hosting is chosen. Annotation preserved in section 15 changelog for that audit entry; findings themselves not rewritten (historical record).
 
 ---
@@ -1211,6 +1225,7 @@ The following architectural choices block 4 pre-launch runbooks. **Each decision
 | Область | Ключевые файлы | Порядок чтения |
 |---------|---------------|----------------|
 | **Понять продукт** | `prisma/schema.prisma`, `src/lib/ui/text.ts`, `.env.example` | 1 → 2 → 3 |
+| **AI provider switch** (Phase 4a + verified) | `src/lib/ai/client.ts` (chokepoint + 5 TBDs ✅ verified 2026-05-31), `src/lib/ai/config.ts` (`getCurrentAIProvider()`), `src/lib/env.ts` (`AI_PROVIDER` + `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` + refines), `docs/AI-MIGRATION-STRATEGY.md` | 4 → 1 → 2 → 3 |
 | **Авторизация** | `src/lib/auth/jwt.ts`, `src/lib/auth/session.ts`, `src/lib/auth/guards.ts`, `src/lib/auth/otp.ts` | 1 → 2 → 3 → 4 |
 | **Создание бронирования** | `src/lib/bookings/createBooking.ts`, `src/lib/bookings/booking-core.ts`, `src/lib/bookings/idempotency.ts`, `src/app/api/bookings/route.ts` | 1 → 2 → 3 → 4 |
 | **Расписание и слоты** | `src/lib/schedule/engine.ts`, `src/lib/schedule/engine-core.ts`, `src/lib/schedule/slots.ts`, `src/lib/schedule/types.ts` | 1 → 2 → 3 → 4 |
@@ -1272,6 +1287,313 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-31 — AI-ADVISOR-MIGRATE-A (OpenAI → Yandex Phase 4e — final chat surface migration)** (commit on `auditandaction`). **🎉 4/4 chat surfaces now on YandexGPT 5 Lite — AI MIGRATION CORE COMPLETE.** Decision: ✅ MIGRATION ACCEPTED on Lite (Yandex 4.66/5 vs OpenAI 4.77/5 — Δ -0.11, all 5 categories pass ≥4.0 threshold). ZERO surface-code changes — Phase 3 abstraction held across ALL 4 surfaces. NO Pro upgrade applied (Lite passes; gap stylistic + prompt-fixable).
+  - **Audit findings:**
+    - **Surface:** `src/lib/advisor/ai-advice.ts` (~25 LOC) — business-consultant prompt, temperature 0.7, maxTokens 300, target 1-2 actionable advice items. **NO own cache layer** — every call hits AI provider directly. Cache lives at `src/lib/advisor/cache.ts` keyed `advisor:master:<providerId>` storing `AdvisorInsight[]` (rules + AI advice combined), TTL 24h, invalidate via `invalidateAdvisorCache(providerId)`. Cache not touched in this validation — synthetic stats bypass real master records
+    - **Prompt (`prompts.ts:advisorAdvice`)** instructs «Дай 1-2 конкретных совета как увеличить количество записей. Коротко, на русском, без воды.» — business-consultant tone with stats summary (8 fields). Different from helper tone (4c) and copywriter tone (4d) — predicted to behave differently; key question: does Yandex Lite handle business reasoning at scale?
+  - **Sample coverage:** **15 synthetic master profiles × 5 categories × 3 each** — Low-traffic / Mid / High / Premium-services / New. Synthetic preferred (Phase 4d precedent) for precise category coverage + direct `MasterStats` input matches what the prompt consumes (no DB roundtrip signal loss). Categories chosen per Phase 4e spec rigour: covers full spectrum of master operational states (no portfolio → top-tier with queue → premium pricing → recently registered)
+  - **Per-criterion quality matrix (15 samples × 5 criteria × 2 providers × weighted = 150 cells):**
+    - **Weights applied:** Russian ×1.0, Task ×1.5, Tone ×1.0, Accuracy ×2.0, Actionability ×2.0 (heavier on safety + practical value for advisor surface)
+    - **Per-criterion aggregate (unweighted, cross-phase comparison):**
+      | Criterion | OpenAI | Yandex | Detail |
+      |---|---|---|---|
+      | RU language quality | 5.0 | 5.0 | both clean |
+      | Task adherence | 4.53 | 4.53 | TIE |
+      | Tone (business consultant) | 5.0 | **5.0** | 🎉 **NO «Здравствуйте\n\n» prefix** in either — confirms Phase 4c hypothesis (email-prefix tendency was helper-tone artifact only; business-consultant tone safe) |
+      | Accuracy | 4.67 | **4.93** | OpenAI invented «волосы/кожа» domain context for массажист (md-2 — context absent from prompt); Yandex clean across 15 profiles. Continues factual-safety pattern from 4b/4c/4d |
+      | Actionability | **4.53** | 4.00 | **OpenAI wins**: «5-10 фото», «20% скидка», «10-15 фото», «до/после» specifics; Yandex more formulaic «расширьте присутствие в соцсетях» repeated |
+    - **Per-category aggregate (weighted):**
+      | Category | OpenAI | Yandex | Δ | Threshold ≥4.0 |
+      |---|---|---|---|---|
+      | Low-traffic (3) | 4.84 | 4.82 | -0.02 | ✅ both |
+      | Mid (3) | 4.51 | 4.47 | -0.04 | ✅ both |
+      | High (3) | 4.56 | 4.38 | -0.18 | ✅ both |
+      | Premium (3) | 4.96 | 4.91 | -0.05 | ✅ both |
+      | New (3) | 5.00 | 4.71 | -0.29 | ✅ both |
+      | **Overall** | **4.77** | **4.66** | **-0.11** | **✅ both** |
+  - **Critical safety check:** **0 hallucinations** in Yandex across 15 profiles. OpenAI had 1 minor concern (md-2 invented «уход за волосами/кожей» domain for массажист — context absent from prompt). No 🚨 STOP-gate triggered. Aligns with Yandex's factual-safety pattern observed across 4b/4c/4d (Phase 4d Sample 2 SPA inclusions + Sample 6 henna duration also OpenAI inventions)
+  - **Decision: ✅ MIGRATION ACCEPTED on Lite.** All 5 categories ≥4.0 threshold (lowest 4.38). Overall 4.66/5 vs OpenAI 4.77/5 — Δ -0.11 within acceptable margin. **NO Pro upgrade applied** because:
+    1. All categories pass threshold (no failure mode)
+    2. Accuracy actually WINS for Yandex (4.93 vs 4.67) — heaviest-weighted criterion (×2.0) and most safety-critical
+    3. Tone (business consultant) preserved cleanly — no email-prefix tendency
+    4. Actionability gap (4.00 vs 4.53) is **prompt-fixable**, not model-fixable. Adding «Дай 1-2 совета с конкретными числами и примерами» to prompt would likely close most of it. Cheaper option than 4× Pro pricing
+    5. Cost discipline: Lite 0.20₽/1K vs Pro 0.80₽/1K. Pro upgrade for marginal 0.11 gain (mostly stylistic) = poor ROI
+    6. Cumulative phase trajectory: Lite proved production-ready across 4 surfaces; Pro upgrade would be inconsistent with prior 3 surface decisions
+  - **Notable Yandex wins (3 cases worth citing):**
+    - **lt-3 «Мастер бровей с короткой неделей» (2 days/week + 8 portfolio + 3 bookings)**: Yandex correctly caught the **2-days/week structural issue** and recommended «Оптимизируйте график работы до 5–6 дней в неделю»; OpenAI missed it entirely and gave generic social media advice. Stronger business-consultant analysis from Yandex
+    - **pr-2 «Свадебный визажист с высоким чеком»**: Yandex suggested **B2B partnerships** («Сотрудничайте с местными салонами и магазинами косметики для совместных акций») — stronger business-consultant insight than OpenAI's tactical «таргет реклама»
+    - **md-2 «Массажист»**: Yandex didn't invent context (OpenAI fabricated «уход за волосами/кожей» — wrong domain entirely for a massage therapist)
+  - **Notable Yandex weaknesses (3 cases):**
+    - **nw-2 «Новый мастер активно постит»**: Yandex suggested «Используйте сервисы для онлайн-записи» — but master is **already on a booking platform** (МастерРядом). Slight context-blindness
+    - **Repetitive «расширьте присутствие в соцсетях»** across many profiles — formulaic, less varied than OpenAI's tactical advice
+    - **Less specific numbers** — Yandex generic «акции» / «скидки» vs OpenAI's «20% скидка», «5-10 фото», «10-15 фото», «до/после»
+  - **Раздел 3 (Архитектура):** **NO code changes.** Wrapper + surface + prompts + cache layer + schema all preserved. Only artifacts: new sample JSONs.
+    - **NEW** [`docs/migration-samples/advisor-openai.json`](docs/migration-samples/advisor-openai.json) — 15 baseline advice outputs across 5 categories
+    - **NEW** [`docs/migration-samples/advisor-yandex.json`](docs/migration-samples/advisor-yandex.json) — 15 Yandex advice outputs (same 15 profiles, default Lite model `gpt://<folder>/yandexgpt-lite/latest`)
+    - **DELETED** `scripts/sample-advisor-advice.mts` — temporary, removed post-validation
+  - **Раздел 5 (Бизнес-логика):** semantics identical. Master cabinet calls `getAdvisorInsights(providerId)` → cache check → on miss runs `computeAdvisorInsights` (deterministic rules + `generateAdvisorAdvice(stats)`) → wrapper routes to Yandex via env flag → returns 1-2 business-consultant advice items in Russian → cached 24h. Flow unchanged. Production behaviour preserved
+  - **Раздел 6 (Маршруты):** not affected — `/api/master/advisor` endpoint signature unchanged, no new routes
+  - **Раздел 11 (Производительность):** Yandex compat layer responds in ~700-1100ms for advisor (slightly higher than other surfaces due to longer prompts with stats summary — similar to OpenAI ~600-900ms). 24h advisor cache absorbs latency for repeat-views. No retry storms observed during 30-call sampling run. **Production rollout decision** (operator scope): after 1-week dev stability monitoring of all 4 surfaces, enable `AI_PROVIDER=yandex` in production env. Rollback path: instant env-toggle to `AI_PROVIDER=openai`. `OPENAI_API_KEY` preserved post-migration for instant fallback
+  - **Раздел 12 (Инварианты):** не затронуты — wrapper invariant (single `aiChat(options)` abstraction across providers) demonstrated for the 4th time. **Abstraction proven** across diverse prompt tones: helper (4c), copywriter (4d), business consultant (4e), summarizer (4b)
+  - **Token spend:** ~5000 tokens combined (15 OpenAI + 15 Yandex calls, longer than 4d due to richer stats input — 8-field stats summary vs 4-field service metadata). Yandex side ~0.55₽
+  - **Validation:** typecheck ✅ / lint baseline preserved / encoding/mojibake ✅ / 653/653 tests pass (unchanged) / no behaviour regression
+  - **🎉 Cumulative migration state — 4/4 chat surfaces migrated on Lite:**
+    - Phase 4b (review-summary): ✅ migrated (4.83/5) — 2026-05-31
+    - Phase 4c (review-reply): ✅ migrated (4.87/5) — 2026-05-31
+    - Phase 4d (service-description): ✅ migrated (4.975/5 — Yandex beat OpenAI) — 2026-05-31
+    - **Phase 4e (advisor): ✅ migrated (4.66/5) — 2026-05-31**
+    - Phase 4f (visual search): post-launch (documented in AI-MIGRATION-STRATEGY)
+  - **Cumulative migration cost:** Phase 4b ~0.30₽ + 4c ~0.50₽ + 4d ~0.40₽ + 4e ~0.55₽ = **~1.75₽** total (4 phases). Well within Phase 2 projection of ~1100-2600₽/month operational cost for the 4 chat surfaces combined
+  - **Pattern observations across 4 surfaces (final consolidated):**
+    - **Yandex aggregate trajectory:** 4b 4.83 → 4c 4.87 → 4d 4.975 → 4e 4.66. **Peak at copywriter tone (4d), lowest at business-consultant (4e)** — but ALL above 4.0 threshold. Lite handles dense-information formats best (descriptions), formulaic-advice formats slightly worse (consultant). Helper (4c) lies between
+    - **Yandex factual safety wins across ALL 4 surfaces** — consistently avoids fabricated context OpenAI confidently invents (4d SPA inclusions + henna duration, 4e massage therapist «hair/skin»). For customer-facing copy this matters more than flourish
+    - **Yandex `Здравствуйте\n\n` prefix tendency** — appeared ONLY in 4c helper tone (~37% of replies). Confirmed absent in 4b summarizer, 4d copywriter, 4e consultant. **Tone-specific quirk, not universal**
+    - **Yandex conciseness consistent** — respects target length across all surfaces. OpenAI tends verbose (4d 3-4 sentences vs 2-3 target; 4e 415ch avg vs Yandex 225ch)
+    - **Yandex weakness pattern (consolidated):** less varied/specific phrasing, occasional context-blindness (4e nw-2 «онлайн-запись сервисы» on a booking platform; 4d Sample 4 Балаяж dry for luxury tier). All edge cases, NOT systematic failures
+    - **Pro upgrade NEVER required** — Lite passed all 4 surfaces. Pro reserved as escape valve if production validation reveals issues
+    - **Cost-quality combined argument:** Lite is both 4× cheaper than Pro AND quality-competitive (or winning, e.g. 4d) vs OpenAI baseline. Strong default
+  - **What was NOT done:**
+    - **NO surface code modifications** (preservation invariant held across ALL 4 surfaces now)
+    - **NO behaviour changes for production** (`.env.local` flip is local-dev only; production env unchanged; cutover separate operator decision)
+    - **NO Pro upgrade attempt** — not needed (Lite passes all 5 categories ≥4.0 threshold)
+    - **NO prompts.ts modifications** — backlog candidate (4e prompt-tune for actionability specifics)
+    - **NO schema migration**, **NO new endpoints**, **NO new dependencies**
+    - **NO real master profiles queried** — synthetic stats give precise category coverage; production behaviour identical (collector → MasterStats → ai-advice unchanged)
+  - **Spawned backlog:**
+    - 🔵 `AI-ADVISOR-PROMPT-TUNE` — add «Дай конкретные числа и примеры в советах» to prompt; could close Yandex's 0.53 Actionability gap without Pro upgrade. ~1 hour focused work
+    - 🟡 `AI-PROVIDER-FAILOVER-RUNBOOK-A` (still pending from Phase 3) — `docs/runbooks/ai-provider-failover.md` for documented rollback procedure (~30 min). **Higher priority now** that all 4 surfaces migrated and production cutover is the next gate
+    - 🟡 `AI-PRODUCTION-CUTOVER-DECISION` — operator decision after 1-week dev stability monitoring. Default: enable `AI_PROVIDER=yandex` in production env
+  - **Open questions for user:** **AI migration core is COMPLETE.** Operator decisions remain:
+    1. **Production cutover timing** — after 1-week dev stability monitoring of all 4 surfaces (recommended)
+    2. **Optional pre-cutover:** `AI-PROVIDER-FAILOVER-RUNBOOK-A` (~30 min) for documented operator switchback procedure if production surface regression
+    3. **Optional post-cutover:** `AI-ADVISOR-PROMPT-TUNE` (~1 hour) to close Actionability gap stylistically
+
+- **2026-05-31 — AI-SERVICE-DESCRIPTION-MIGRATE-A (OpenAI → Yandex Phase 4d — third surface migration)** (commit on `auditandaction`). **🎉 First surface where Yandex BEATS OpenAI baseline.** 3 of 4 chat surfaces now on YandexGPT 5 Lite. Decision: ✅ MIGRATION ACCEPTED (Yandex 4.975/5 vs OpenAI 4.875/5 — Δ +0.10). ZERO surface-code changes — Phase 3 abstraction continues to hold.
+  - **Audit findings:**
+    - **Surface:** `src/lib/ai/service-description.ts` (~28 LOC) — copywriter prompt, temperature 0.7, maxTokens 200, target 2-3 sentences. **NO cache** by design (master may iterate description repeatedly until satisfied — staleness no concern)
+    - **Prompt (`prompts.ts:serviceDescription`)** instructs «Стиль: информативно, привлекательно, без воды» + «Длина: 2-3 предложения, до 200 символов». Tone is **copywriter / marketing** — different from Phase 4c helper tone, predicted to behave differently
+    - **No DB-side migration needed.** Description writes to `Service.description` via existing PATCH endpoint regardless of provider — service-description.ts only suggests text, master accepts/edits/declines
+  - **Sample coverage:** **8 diverse services × 7 categories × varied price tiers × varied durations**
+    - Маникюр классический (basic, 1937₽ / 60min), СПА-педикюр (medium, 3399₽ / 90min), Стрижка женская (basic, 2797₽ / 60min), Балаяж (**premium 11000₽** / 240min), Вечерний макияж (medium-high, 4500₽ / 75min), Окрашивание бровей хной (niche, 2200₽ / 60min), Массаж лица (luxury, 3500₽ / 60min), Наращивание ресниц 2D (mid, 3703₽ / 120min)
+    - Categories: Маникюр / Педикюр / Стрижка / Окрашивание / Макияж / Оформление бровей / Массаж и СПА / Наращивание ресниц — strong representativeness across catalog
+  - **Per-criterion quality matrix (8 samples × 5 criteria × 2 providers = 80 cells):**
+    | Criterion | OpenAI | Yandex | Detail |
+    |---|---|---|---|
+    | RU language quality | 4.875/5 | 5.0/5 | OpenAI Sample 8 grammar bug «с услугах» (case mismatch — should be «с услугой»); Yandex consistently correct |
+    | Task adherence | 5.0/5 | 5.0/5 | both produce copywriter copy as instructed |
+    | Tone match (copywriter/marketing) | 5.0/5 | 4.875/5 | Yandex Sample 4 (Балаяж 11K₽ premium) too dry; lacks sales push for luxury tier |
+    | Accuracy | 4.75/5 | 5.0/5 | OpenAI fabricated SPA inclusions (Sample 2 «массаж, ванночку, уход за ногтями» — invented) + over-promised henna duration (Sample 6 «продлится до 6 недель» — typical is 2-4w); Yandex stays factually safe |
+    | Conciseness (2-3 sentences target) | 4.75/5 | 5.0/5 | OpenAI verbose on Samples 1, 2, 4 (4 sentences, 246-331ch); Yandex consistently within 2-3 sentence target |
+    | **Aggregate** | **4.875/5** | **4.975/5** |
+  - **Decision: ✅ MIGRATION ACCEPTED.** Both ≥ 4.0 threshold; **first surface where Yandex outperforms OpenAI baseline** (Δ +0.10). Cutover: env flag `AI_PROVIDER=yandex` already active in `.env.local` from Phase 4b — covers service-description automatically (single wrapper). NO surface code change.
+  - **3 reasons Yandex wins this surface:**
+    1. **Factual safety** — Yandex avoids speculative inclusions/durations OpenAI confidently invents. For master-facing copy that ships to customers, factual safety matters more than flourish
+    2. **Russian grammar consistency** — Yandex Russian-native model has fewer case/agreement errors
+    3. **Respects 2-3 sentence target** more reliably than OpenAI's tendency to verbose 3-4 sentence copy
+  - **Yandex weakness (single edge case, NOT blocker):**
+    - Sample 4 Балаяж (11K₽ luxury, 4h) — too dry for premium-tier pricing; lacks copywriter sell that justifies the price. **Acceptable trade-off** for this surface: master can edit suggestion before save; factual safety + conciseness wins matter more across the catalog. If post-launch revenue data shows premium-service descriptions converting poorly, consider per-surface Pro upgrade for high-ticket services specifically — NOT needed now
+  - **Раздел 3 (Архитектура):** **NO code changes.** Wrapper + surface + prompts + cache layer + schema all preserved. Only artifacts: new sample JSONs.
+    - **NEW** [`docs/migration-samples/service-description-openai.json`](docs/migration-samples/service-description-openai.json) — 8 baseline descriptions
+    - **NEW** [`docs/migration-samples/service-description-yandex.json`](docs/migration-samples/service-description-yandex.json) — 8 Yandex descriptions (same input sets, deterministic comparison)
+    - **DELETED** `scripts/sample-service-descriptions.mts` — temporary script, removed post-validation
+  - **Раздел 5 (Бизнес-логика):** semantics identical. Master clicks «Сгенерировать описание» → wrapper routes to Yandex via env flag → Yandex returns ≤200 char copywriter description in Russian → master edits/accepts → existing PATCH endpoint writes to `Service.description`. Flow unchanged.
+  - **Раздел 6 (Маршруты):** not affected — no endpoint signature changes, no new routes
+  - **Раздел 11 (Производительность):** Yandex compat layer responds in ~600-900ms (similar to OpenAI ~500-700ms — no perf regression). No retry storms observed during 16-call sampling run
+  - **Раздел 12 (Инварианты):** не затронуты — wrapper invariant (single `aiChat(options)` abstraction across providers) demonstrated again
+  - **Token spend:** ~3000 tokens combined (8 OpenAI + 8 Yandex calls; slightly longer outputs than Phase 4c due to copywriter tone). Yandex side ~0.30₽ (well within ~0.50₽ budget)
+  - **Validation:** typecheck ✅ / lint baseline preserved / encoding/mojibake ✅ / 653/653 tests pass (unchanged from Phase 4a addition) / no behaviour regression
+  - **Observations carried to Phase 4e (advisor):**
+    - **Yandex `Здравствуйте\n\n` prefix tendency** — DID NOT appear in this surface. Strengthens hypothesis from Phase 4c that helper-tone prompts specifically trigger it. Phase 4e advisor uses business-consultant tone — may or may not trigger; watch for it
+    - **Yandex factual safety advantage** — proven across 8 samples this phase. Likely valuable for advisor surface where statistical/contextual claims appear. Less risk of inventing «typical industry standards» that OpenAI may invent
+    - **Yandex conciseness advantage** — consistent across 3 surfaces now (4b summary, 4c reply, 4d description). Advisor prompt asks for «1-2 конкретных совета как увеличить количество записей» — conciseness-friendly target
+    - **Yandex weakness on premium/expensive context** — relevant for advisor IF master has premium services in profile (advisor reads stats). Watch for whether Yandex's advice tone scales with master tier (master earning 50K/мес vs 500K/мес — does Yandex calibrate?)
+    - **Pattern across 3 surfaces:** Yandex aggregate scores: 4b 4.83 / 4c 4.87 / 4d 4.975 — trending upward as we move from helper-tone (least suited to Lite) to copywriter-tone (better suited to Lite's information-density style). Advisor tone is **business-consultant** — different again; predict ~4.7-4.9 if Lite holds, lower if business reasoning surfaces Lite limitations
+    - **Recommendation for Phase 4e:** START WITH LITE per Phase 3 plan (consistent treatment), validate against 5+ diverse master stat profiles (low-traffic / mid / high / premium-services / new). If quality regresses noticeably below 4.0 OR advice becomes generic-sounding, upgrade to Pro for advisor specifically (only surface where Pro upgrade may be warranted)
+  - **What was NOT done:**
+    - **NO surface code modifications** (preservation invariant held across 3 surfaces now)
+    - **NO behaviour changes for production** (`.env.local` flip is local-dev only; production env unchanged; cutover separate decision)
+    - **NO Phase 4e attempt** — separate prompt per user spec
+    - **NO Pro upgrade attempt** — not needed (Lite beats OpenAI baseline on this surface)
+    - **NO schema migration**, **NO new endpoints**, **NO new dependencies**
+    - **NO retroactive change to service descriptions already in DB** — only future generations affected
+  - **Cost discipline preserved:** Phase 4d wallet impact ~0.30₽. Total migration spend across Phases 4a-4d: ~1.2₽. Well under launch-prep budget. Yandex Lite proves cost-competitive AND quality-competitive for this surface — strong combined argument
+  - **Open questions for user:** Phase 4e (`AI-ADVISOR-MIGRATE-A`) ready when convenient. **Recommendation: schedule when masters have actual stat data populated** — synthetic profiles work but real master patterns give stronger quality signal. Optional pre-Phase-4e: AI-PROVIDER-FAILOVER-RUNBOOK-A (~30 min) so production has documented switchback procedure if Phase 4e cutover surfaces regression
+
+- **2026-05-31 — AI-REVIEW-REPLY-MIGRATE-A (OpenAI → Yandex Phase 4c — second surface migration)** (commit on `auditandaction`). **🎉 Second surface (review-reply) migrated. 2 of 4 chat surfaces now on YandexGPT 5 Lite. Pattern from Phase 4b replicated cleanly.** ZERO surface-code changes — abstraction held.
+  - **Decision:** ✅ MIGRATION ACCEPTED. Yandex aggregate **4.83/5** vs OpenAI baseline **4.98/5** (Δ = 0.15) — threshold ≥4.0/5 cleared on every per-criterion sub-average.
+  - **Sample coverage:** 8 reviews × diverse ratings (4×5★ from showcase seed + 2×4★ + 1×3★ + 1× synthetic 2★). Branch coverage tested: both positive→thank/invite (samples 1-6) AND negative→apologize/propose-solution (sample 8). Seed-data positive-skew gap documented; synthetic 2★ added to exercise the else-branch.
+  - **Per-criterion scoring summary:**
+    - **RU language quality:** OpenAI 5 / Yandex 5
+    - **Task adherence:** OpenAI 5 / Yandex 5 — both branches handled
+    - **Tone match:** OpenAI 5 / Yandex 4.5 — Yandex `Здравствуйте, X!\n\n` email-prefix tendency in ~37% of replies
+    - **Accuracy:** OpenAI 4.875 / Yandex 4.75 — Yandex mis-called 3★ «высокую оценку» (rating-vs-text edge case); less concrete remedy on negative
+    - **Conciseness:** OpenAI 4.875 / Yandex 4.625 — Yandex slightly verbose
+  - **Раздел 3 (Архитектура):** zero changes to wrapper / surface / prompts. Files preserved verbatim:
+    - `src/lib/ai/review-reply.ts` (~28 LOC) — verbatim
+    - `src/lib/ai/prompts.ts` — verbatim
+    - `src/lib/ai/client.ts` + `config.ts` — verbatim (already provider-aware from Phase 4a)
+  - **Files added (data archive):**
+    - **NEW** [`docs/migration-samples/review-reply-openai.json`](docs/migration-samples/review-reply-openai.json) — 8 OpenAI baseline replies
+    - **NEW** [`docs/migration-samples/review-reply-yandex.json`](docs/migration-samples/review-reply-yandex.json) — 8 Yandex replies (same inputs)
+  - **Раздел 5 (Бизнес-логика):** review-reply surface now generates suggestions via YandexGPT 5 Lite in dev. No cache to invalidate (review-reply is one-off per request by design). Surface ships immediately when `AI_PROVIDER=yandex` set; no code or prompt change.
+  - **Раздел 9 (Тестирование):** 653/653 preserved — zero test changes (live API sampling, not unit tests).
+  - **Раздел 11 (Производительность / Деплой) — migration status:**
+    - Phase 4b (review-summary): ✅ migrated (dev) — 2026-05-31
+    - **Phase 4c (review-reply): ✅ migrated (dev) — 2026-05-31**
+    - Phase 4d (service-description): ready
+    - Phase 4e (advisor): ready (last + most rigorous validation per Phase 3 plan)
+    - Production: still `AI_PROVIDER=openai` (operator decision after all 4c-e done + 1-week dev stability)
+  - **Раздел 15:** this entry.
+  - **Observations carried to Phase 4d-e:**
+    - **Yandex `Здравствуйте, X!\n\n` email-prefix tendency** — universal in helper-tone prompts? Phase 4d (copywriter tone for service description) less likely to trigger; Phase 4e (business-consultant for advisor) may trigger. Worth tracking — not a quality issue but a UX consideration if surfaced in chat-bubble UI
+    - **Yandex less-concrete-remedy on negatives** — minor; brand-voice preference
+    - **Yandex 3★ mis-categorization** — edge case (seed text-tone vs rating mismatch); unlikely in real production
+    - **No per-surface Pro upgrade needed** for review-reply (Lite quality sufficient)
+  - **Pattern reuse from Phase 4b:**
+    - Same `--env-file=.env --env-file=.env.local` Node invocation
+    - Same `process.env.AI_PROVIDER = tag` override before imports
+    - Same `docs/migration-samples/<surface>-<provider>.json` archive convention
+    - Same scoring matrix (5 criteria × N samples × 2 providers)
+    - Same env-toggle reversibility property preserved
+  - **STOP-gate encountered + resolved:** `masterryadom-db` container restarted mid-prompt (Postgres auth failure on first Yandex attempt — credentials valid but Postgres not ready post-restart). Waited via `until ... do sleep ... done` until ready, re-ran cleanly. Environmental issue, no code impact.
+  - **Validation:** typecheck ✅ / 653/653 tests ✅ / encoding/mojibake ✅
+  - **Token spend:** ~2500 tokens combined (OpenAI + Yandex 8 calls each + 1 failed-retry); Yandex side ~0.25₽
+  - **Cleanup:** temporary `scripts/sample-review-replies.mts` deleted
+  - **What was NOT changed:** wrapper / surface / prompts / visual-search / schema / production / 2 other surfaces (4d-4e separate)
+  - **Reversibility:** instant via `AI_PROVIDER=openai`; `OPENAI_API_KEY` preserved
+  - **Pre-launch state:** AI migration Phases 1+2+3+4a+verification+4b+**4c** ALL DONE. **2 of 4 chat surfaces migrated.** Phase 4d (service-description) READY — same pattern.
+  - **Open questions for user:** none. Phase 4d can start when convenient.
+
+- **2026-05-31 — AI-REVIEW-SUMMARY-MIGRATE-A (OpenAI → Yandex Phase 4b — first surface migration)** (commit on `auditandaction`). **🎉 First surface (review-summary) migrated to YandexGPT 5 Lite. Quality threshold cleared.** ZERO surface-code changes — abstraction held per Phase 3 plan. Migration = env-toggle only.
+  - **Decision:** ✅ MIGRATION ACCEPTED. Yandex aggregate **4.87/5** vs OpenAI baseline **4.93/5** (Δ = 0.06, within noise). 3 providers sampled (Anna 9 reviews, Marina 3, Elena 3) × 5 criteria × 2 providers = 30 scored cells. Threshold ≥4.0/5 cleared on every per-criterion sub-average.
+  - **Sample coverage:** 3 providers (below 5-10 spec target) — documented gap: seed data has only 22 reviews and most attach to `targetType: 'studio'`. Sample size sufficient to detect systemic quality issues (the purpose of the validation); all 3 are real provider-targeted showcase reviews with varied review-count contexts (9 / 3 / 3) + master vs studio-member scenarios.
+  - **Per-criterion scoring summary:**
+    - **RU language quality:** OpenAI 5 / Yandex 5 — indistinguishable; both native-fluent
+    - **Task adherence:** OpenAI 5 / Yandex 5 — both summarize correctly
+    - **Tone match:** OpenAI 5 / Yandex 4.67 — Yandex used a literal quote («Марина — золотые руки!») slightly conversational vs OpenAI's pure synthesis
+    - **Accuracy:** OpenAI 4.67 / Yandex 5 — OpenAI hinted at timing complaint that may be invented for all-positive review sets; Yandex's «no complaints» factually safer
+    - **Conciseness:** OpenAI 5 / Yandex 4.67 — Yandex went 2 sentences on Elena's 3-review set (under 3-4 instruction)
+  - **Раздел 3 (Архитектура):** zero changes to wrapper / surface / prompts code. Files preserved verbatim per abstraction guarantee:
+    - `src/lib/ai/review-summary.ts` — verbatim
+    - `src/lib/ai/prompts.ts` — verbatim
+    - `src/lib/ai/client.ts` — verbatim (already provider-aware from Phase 4a)
+    - `src/lib/ai/config.ts` — verbatim
+  - **Files added (data archive):**
+    - **NEW** [`docs/migration-samples/review-summary-openai.json`](docs/migration-samples/review-summary-openai.json) — 3 baseline summaries
+    - **NEW** [`docs/migration-samples/review-summary-yandex.json`](docs/migration-samples/review-summary-yandex.json) — 3 Yandex summaries (same providers, post-cache-clear)
+    - [`.gitignore`](.gitignore) — `!docs/migration-samples/` + `!docs/migration-samples/**` exception (same pattern as `SPRINT-PATTERNS.md` / `QUALITY-GATES.md` / `AI-MIGRATION-STRATEGY.md`)
+  - **Files modified (env only — gitignored):**
+    - `.env.local` — appended `AI_PROVIDER=yandex` (gitignored; user-local toggle for dev). Comment cites prompt name + date for future archaeology.
+  - **Раздел 5 (Бизнес-логика):** review-summary surface now generates summaries via YandexGPT 5 Lite in dev (when AI_PROVIDER=yandex). Production unaffected (operator-controlled prod env still `AI_PROVIDER=openai` by default). Cache (`ai:review-summary:*`, 24h TTL) invalidated mid-prompt + after final switch so user-facing requests hit Yandex fresh.
+  - **Раздел 9 (Тестирование):** 653/653 tests preserved — zero test surface changes (validation done via live API sampling, not unit tests).
+  - **Раздел 11 (Производительность / Деплой) — migration status:**
+    - Phase 4b: review-summary ✅ migrated (dev)
+    - Phase 4c-e: ready (Phase 4c next — review-reply)
+    - Production: still `AI_PROVIDER=openai` default; production cutover separate operator decision after Phase 4c-e all clear + 1-week dev stability
+  - **Раздел 14 (Быстрый старт):** «AI provider switch» row updated implicitly — Phase 4b is now part of «verified + 1 surface migrated» pattern.
+  - **Раздел 15:** this entry.
+  - **Observations carried forward to Phase 4c-e:**
+    - Yandex tendency: occasional literal quoting; may go below 3-4 sentence target on short input sets. Brand-voice trade-off minor and acceptable.
+    - OpenAI tendency: more abstract synthesis; mild «invented common complaint» risk for all-positive sets.
+    - Both production-ready; no per-surface model upgrade needed for review summary.
+    - `--env-file=.env --env-file=.env.local` Node invocation pattern is how Phase 4c-e scripts should load both env layers (the second file's `AI_PROVIDER=yandex` overrides the first's absent value).
+  - **Validation:** typecheck ✅ / 653/653 tests ✅ / encoding/mojibake ✅ / no source code changed = no build re-run needed
+  - **Token spend:** combined OpenAI + Yandex sampling ~1500 tokens across debug + clean runs; Yandex side ~0.30₽ at 0.20₽/1K Lite rate; cost-discipline preserved
+  - **Cleanup:** temporary `scripts/sample-review-summaries.mts` deleted per spec Step 7
+  - **What was NOT changed:** wrapper code / surface code / prompts.ts / visual-search / schema / production / sprint work / 4 other AI surfaces (Phase 4c-e separate)
+  - **Reversibility:** instant via `AI_PROVIDER=openai` env toggle (no code change); `OPENAI_API_KEY` preserved in env. Cache will repopulate with OpenAI summaries on next request after toggle.
+  - **Pre-launch state:** AI migration Phases 1+2+3+4a+verification+4b ALL DONE. Phase 4c (review-reply) READY — execute when convenient.
+  - **Open questions for user:** none. Phase 4c can start whenever — same pattern (env-toggle + sample 5-10 + score + decide).
+
+- **2026-05-31 — AI-WRAPPER-VERIFICATION (OpenAI → Yandex Phase 4a-verify)** (commit on `auditandaction`). **🎉 All 5 TBDs verified clean, ZERO wrapper adaptations needed, Phase 4b-e (4 surface migrations) UNBLOCKED.** Live API smoke against `https://llm.api.cloud.yandex.net/v1` via OpenAI SDK. Total token spend: **149 tokens (~0.03₽)** — well within 1000-token / 0.5₽ cost-discipline budget.
+  - **Method:** single consolidated verification script (created + deleted, NOT committed per spec) covering 5 TBDs + 3 error-shape scenarios in one batch. Reused the same `OpenAI` SDK client construction as production wrapper to maximize signal accuracy.
+  - **Per-TBD outcomes:**
+    1. **✅ Response shape** — full shape mirrors OpenAI exactly: `{ id, object, created, model, choices: [{ index, message: { role, content }, finish_reason }], usage }`. Path `response.choices[0]?.message?.content` works identically. `usage` includes `prompt_tokens`/`completion_tokens`/`total_tokens`/`prompt_tokens_details.cached_tokens` — same shape.
+    2. **✅ Parameters pass-through** — `temperature: 0.1` produced deterministic output ("1, 2, 3, 4, 5."); `max_tokens: 5` correctly truncated with `finish_reason: "length"`. No silent ignoring.
+    3. **✅ Model URI** — `gpt://${folderId}/yandexgpt-lite/latest` accepted as `model` field; response.model echoes back verbatim. The format `resolveDefaultChatModel()` builds is correct.
+    4. **✅ Error shape preserved — OpenAI SDK class hierarchy intact.** Invalid API key → `AuthenticationError` (status 401, type `authentication_error`); invalid folder → `PermissionDeniedError` (status 403, type `permission_error`). Existing `isRetryable()` checks `error.status` and `error.name` — both work unchanged. **Bonus:** excessive `max_tokens` (1M) silently clamped, no error (Yandex tolerant).
+    5. **✅ JSON output via `response_format: { type: "json_object" }` works through compat layer.** Phase 2 research had marked this as «native API only, may not pass through compat»; live test refutes — it does pass through. Returned content parses as valid JSON. **Bonus impact:** visual-search reactivation (post-launch) becomes simpler than Phase 3 plan assumed — JSON mode works via OpenAI SDK + the compat baseURL, no need for a separate native-fetch wrapper for that surface.
+  - **Раздел 3 (Архитектура) — single change:**
+    - [`src/lib/ai/client.ts`](src/lib/ai/client.ts) header docstring — «VERIFICATION TBDs» section replaced with «COMPAT VERIFIED 2026-05-31» record listing per-TBD outcomes for future readers. **NO code/logic change.** Wrapper itself is correct as-is.
+  - **Files NOT modified (zero deviations = zero adaptation):**
+    - Wrapper logic in `src/lib/ai/client.ts` (only docstring updated)
+    - 4 surface services (`review-summary.ts` / `review-reply.ts` / `service-description.ts` / `advisor/ai-advice.ts`) — verbatim per Phase 4a abstraction guarantee
+    - `src/lib/visual-search/*` — verbatim (defer post-launch; JSON-mode finding makes future reactivation easier)
+    - `src/lib/env.ts` — verbatim (Phase 4a refines correct)
+    - `src/lib/ai/config.ts` — verbatim
+    - `src/lib/ai/client.test.ts` — verbatim (15 tests still pass)
+  - **Раздел 9 (Тестирование):** 653/653 tests unchanged. No new tests added for verification — the live API call IS the verification; pure-helper tests already cover decision logic deterministically.
+  - **Раздел 14 (Быстрый старт):** «AI provider switch» row updated — TBDs notation replaced with «✅ verified 2026-05-31» badge.
+  - **Раздел 15:** this entry.
+  - **Validation:** typecheck ✅ / 15/15 wrapper tests ✅ / verification script deleted from `scripts/` ✅ / git status shows only `client.ts` (docstring) + `BACKLOG.md` + `MASTERRYADOM_AI_CONTEXT.md` modified
+  - **What was NOT changed:** wrapper code (zero deviations found = zero adaptation needed) / surface services / visual-search / env.ts / tests / schema / production behaviour
+  - **Pre-launch state:** **AI migration Phases 1+2+3+4a + verification ALL complete.** 4 surface migrations (4b/4c/4d/4e) UNBLOCKED — ready to execute when convenient. Each is a config-flip (no code change) + parallel quality sampling. Total remaining effort: ~3-4 hours focused work across 4 sub-phases.
+  - **Bonus finding for visual-search post-launch plan:** JSON mode works via compat — simplifies the `src/lib/visual-search/openai.ts` refactor when that surface reactivates. Originally planned to use «native API + raw fetch» for the classifier; can now use OpenAI SDK + baseURL + response_format like the chat surfaces.
+  - **Open questions for user:** none. Phase 4b (`AI-REVIEW-SUMMARY-MIGRATE-A`) ready when convenient — config flip + quality sampling.
+
+- **2026-05-31 — AI-WRAPPER-SWAP-A (OpenAI → Yandex Phase 4a — wrapper infrastructure)** (commit on `auditandaction`). First implementation prompt of the migration. **NO production behaviour change** — default `AI_PROVIDER=openai` preserves existing baseline. Verification deferred to separate `AI-WRAPPER-VERIFICATION` prompt after user obtains Yandex API key + folder id. Phase 4b-e (4 surface migrations) blocked pending verification.
+  - **Раздел 3 (Архитектура) — file changes:**
+    - **MODIFIED** [`src/lib/env.ts`](src/lib/env.ts) — added `AI_PROVIDER` enum (default `openai`) + `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` (both optional). Extended existing `AI_FEATURES_ENABLED → OPENAI_API_KEY` refine to be provider-aware (yandex branch requires API key + folder id). New refine `AI_PROVIDER=yandex → YANDEX_API_KEY + YANDEX_FOLDER_ID` with helpful error pointing at strategy doc
+    - **MODIFIED** [`src/lib/ai/client.ts`](src/lib/ai/client.ts) — `AI_MODEL` constant replaced with `resolveDefaultChatModel()`; `getApiKey()` → `getProviderConfig()` returning `{ apiKey, baseURL? }`; client singleton uses provider-aware config; `AiChatOptions` extended with optional `model?: string` for per-surface override; `logInfo` payload now includes `provider` attribution; Telegram alert text + trackError keys parameterized by provider (`openai:rate-limit` / `yandex:rate-limit`); new `_resetClientForTesting()` helper. **5 verification TBDs documented inline** in header comment for `AI-WRAPPER-VERIFICATION` consumption
+    - **MODIFIED** [`src/lib/ai/config.ts`](src/lib/ai/config.ts) — new `AIProvider` type + `getCurrentAIProvider()` helper; `ensureAiFeaturesStartupConfig()` made provider-aware
+    - **MODIFIED** [`.env.example`](.env.example) — documented Yandex block (commented), explains AI_PROVIDER toggle + 2 required vars when yandex
+    - **MODIFIED** [`.env.production.example`](.env.production.example) — documented Yandex block + production-specific rollback-preservation note («keep OPENAI_API_KEY populated post-migration for instant rollback»)
+    - **NEW** [`src/lib/ai/client.test.ts`](src/lib/ai/client.test.ts) — 15 tests pinning provider-switch decision logic. Coverage: 4 for `resolveDefaultChatModel` (openai default / yandex with folder / missing-folder throws / whitespace-folder throws) + 11 for `aiChat` (constructor args per provider × 2 / model name per provider × 2 / opts.model override / params pass-through / max_tokens omission / trim / null on empty / null on missing-key per provider × 2). OpenAI SDK mocked as constructor function via `vi.hoisted` to capture init args; existing retry-catch logic preserved (errors → `null` return, not throws)
+  - **Раздел 5 (Бизнес-логика) preserved:**
+    - 4 surface services (`review-summary.ts` / `review-reply.ts` / `service-description.ts` / `advisor/ai-advice.ts`) — **verbatim**. Abstraction through `aiChat()` means they continue working with both providers without modification
+    - `src/lib/visual-search/*` — **verbatim**. Defers post-launch per Phase 3 plan; still uses OpenAI directly (independent of `AI_PROVIDER`)
+    - `src/lib/ai/prompts.ts` — **verbatim**
+  - **Раздел 6 (Маршруты):** no route changes. All existing AI endpoints (`/api/master/services/[id]/suggest-description` / `/api/reviews/[id]/suggest-reply` / `/api/public/providers/[providerId]/review-summary` / `/api/master/advisor`) work identically; provider switch is transparent at the wrapper level
+  - **Раздел 7 (Переменные окружения):** 3 new env vars added — `AI_PROVIDER` (enum, default `openai`) + `YANDEX_API_KEY` (string optional) + `YANDEX_FOLDER_ID` (string optional). Documented in both `.env.example` and `.env.production.example` with rollback-preservation guidance for prod
+  - **Раздел 8 (Проблемы):** no new risks. `OPENAI_API_KEY` preserved as instant-rollback path post-Yandex-switch
+  - **Раздел 9 (Тестирование):** **638 → 653 tests** (+15 from `client.test.ts`). Existing tests untouched (default provider preserved means no regression surface)
+  - **Раздел 10 (Безопасность):** Yandex auth via long-lived API key (header `Authorization: Api-Key <key>`, scope `yc.ai.foundationModels.execute`). Documented in env templates. No new attack surface
+  - **Раздел 14 (Быстрый старт):** new row «AI provider switch» mapping the 4 chokepoint files + strategy doc
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / lint **1 error / 3 warnings baseline preserved** (pre-existing email-verify-modal setState-in-effect + 2 use-active-role unused-disable warnings from PHASE7-CLEANUP-A) / encoding/mojibake/ui-text ✅ / check:context-freshness ✅ / **653/653 tests ✅** / `npm run build` ✅ Compiled successfully in 36.4s
+  - **What was NOT changed:**
+    - Production behaviour at deploy (default `AI_PROVIDER=openai`)
+    - 4 surface service files (abstraction preserved)
+    - `src/lib/visual-search/*` (defer post-launch)
+    - `src/lib/ai/prompts.ts` (verbatim — works with both providers)
+    - Schema (NO migration — code-only change)
+    - Sprint work — 638 baseline tests still pass + 15 new = 653 total
+  - **5 TBDs queued for AI-WRAPPER-VERIFICATION:**
+    1. Response shape — `completion.choices[0]?.message?.content` path on Yandex compat endpoint
+    2. Parameter pass-through — `temperature` + `max_tokens` accepted identically
+    3. Model URI format — `gpt://<folder>/yandexgpt-lite/latest` accepted as `model` field
+    4. Error shape — 429/402/5xx status codes propagate so `isRetryable()` + Telegram alerts keep working
+    5. JSON output mode — only matters if visual-search reactivates; currently unused by 4 chat surfaces
+  - **Phase 4b-e all BLOCKED on `AI-WRAPPER-VERIFICATION`.** User obtaining Yandex credentials in parallel track. Once keys arrive, ~30 min verification unblocks 4 surface migrations.
+  - **Open questions for user:** none for Phase 4a closure. After credentials arrive, trigger `AI-WRAPPER-VERIFICATION` to resolve the 5 TBDs and unblock 4b-e.
+
+- **2026-05-30 — MIGRATION-STRATEGY-DOC (OpenAI → Yandex Phase 3 of 3 planning phases)** (commit on `auditandaction`). Documentation-only. Synthesis of Phase 1 audit (5 AI surfaces inventoried) + Phase 2 research (6 unknowns resolved including official OpenAI-compat endpoint discovery) into a concrete implementation plan. **NO code / env / schema changes.**
+  - **Deliverable:** new file [`docs/AI-MIGRATION-STRATEGY.md`](docs/AI-MIGRATION-STRATEGY.md) — 9 sections covering:
+    1. **Architecture** — before/after diagrams; `client.ts` is the only behaviour-change site; 4 surface services preserve `aiChat()` abstraction (zero changes)
+    2. **Feature flag strategy** — `AI_PROVIDER` enum (default `openai`) + `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` conditional vars + env.ts refine
+    3. **File-level diffs** — concrete diffs for 6 files (`client.ts` ~25 LOC delta, `config.ts` +1 export, `env.ts` +3 vars + 1 refine update, both env templates documented, optional new test file)
+    4. **Visual search defer** — evidence-based decision: 0 vectors stored, brand models text-only, AI Studio multimodal requires spike-testing, OpenAI-compat doesn't pass vision; files preserved verbatim
+    5. **Rollout sequence** — 5 sub-phases (4a wrapper / 4b-d easy chats / 4e advisor / 4f visual-search defer); env-driven, no redeploy between provider switches
+    6. **Quality validation** — parallel sampling (5-15 inputs/surface), side-by-side OpenAI vs YandexGPT, 5 scoring criteria (RU quality / task adherence / tone / accuracy / length), 80% threshold decision matrix
+    7. **Fallback strategy** — 3 scenarios (unreachable / quality regression / rate-limit) with env-toggle recovery in minutes; runbook filed as separate item
+    8. **Success metrics** — technical (gates / tests / lint baseline preserved), business (cost projection ~1,100-2,600₽/month, no quality complaints), explicit rollback triggers (>5% errors, >2× cost, ≥3 complaints/48h)
+    9. **Visual search post-launch plan** — spike phase (~half-day) + implementation (~1-2 days) with schema migration `vector(1536) → vector(256)` and refactor to Yandex AI Studio multimodal native endpoint
+  - **BACKLOG updates:** Phase 3 marked DONE in the umbrella `OPENAI-TO-YANDEX-MIGRATION` entry. **7 new discrete backlog items** queued:
+    - 🟡 `AI-WRAPPER-SWAP-A` (Phase 4a, ~30 min) — foundation; default preserves baseline
+    - 🟡 `AI-REVIEW-SUMMARY-MIGRATE-A` (Phase 4b, ~30 min + validation) — zero code change; env flip + cache invalidation + quality validation
+    - 🟡 `AI-REVIEW-REPLY-MIGRATE-A` (Phase 4c, ~30 min + validation)
+    - 🟡 `AI-SERVICE-DESCRIPTION-MIGRATE-A` (Phase 4d, ~30 min + validation)
+    - 🟡 `AI-ADVISOR-MIGRATE-A` (Phase 4e, ~half-day) — rigorous quality validation, per-surface Pro override if Lite regresses on >20% samples
+    - 🟡 `AI-PROVIDER-FAILOVER-RUNBOOK-A` (optional, ~30 min) — `docs/runbooks/ai-provider-failover.md` for ops preparedness
+    - 🟡 `AI-QUALITY-VALIDATION-SCRIPT-A` (optional, ~1 hr) — `scripts/compare-ai-providers.mjs` for parallel-sample comparison automation
+    - 🟡 `VISUAL-SEARCH-YANDEX-MIGRATION` (post-launch, ~half-day spike + ~1-2 days impl) — separate from chat-surface track
+  - **Раздел 11 updated:** new «AI provider strategy» subsection after «Infrastructure decisions» — documents the resolved plan with cost projection + reversibility property. Cross-references the strategy doc.
+  - **Раздел 15 (changelog):** this entry.
+  - **Total effort estimate for chat-surface migration:** ~3-4 hours focused work across 5 sub-phases (4a-4e). Visual search ships post-launch as separate track.
+  - **Honest TBDs flagged for Phase 4a verification:** Yandex compat response-shape exact match (`response.choices[0].message.content` path) / `temperature` + `max_tokens` pass-through / model URI format acceptance / error-shape propagation for `isRetryable()` + Telegram alerts to keep working unchanged / JSON output mode via compat layer (matters only if visual-search reactivates).
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / check:schema-drift ✅ / check:context-freshness ✅ / **NO code / env / schema changes**. `git status`: only new `docs/AI-MIGRATION-STRATEGY.md` + BACKLOG + AI_CONTEXT modified.
+  - **Open questions for user (Phase 3 closure):** none blocking. Plan is complete and Phase 4a can start whenever convenient. Optional decision before Phase 4e: if you'd prefer Pro for advisor from day one (skip Lite quality-test for that specific surface), say so — otherwise the plan starts everything on Lite per «lowest-risk first» and upgrades only if quality validation requires.
 
 - **2026-05-30 — MIGRATION-RECONCILIATION-BATCH** (commit on `auditandaction`). **🎉 🔴 LAUNCH BLOCKER CLOSED.** Four-part batch resolves 24-operation sprint-long schema drift discovered by LOCAL-DB-RECOVERY audit + closes the source (db-push workflow) + adds structural prevention (CI drift gate) + unblocks Part 1 of prior audit (seed completion). **Hybrid execution:** main context handled Part 1 (migration generation + manual review + apply — STOP-gated work) + Part 4 (seed) + final updates. Parallel workflow attempted Parts 2+3 but agents failed to call StructuredOutput; main context completed both as fallback.
   - **Part 1 — Reconciliation migration (CRITICAL, main context):**

@@ -1,0 +1,246 @@
+{
+  "provider": "yandex",
+  "generatedAt": "2026-05-30T23:48:14.841Z",
+  "samples": [
+    {
+      "id": "lt-1",
+      "category": "low-traffic",
+      "label": "Начинающая мастер маникюра без портфолио",
+      "statsSummary": {
+        "bookingsLast30Days": 2,
+        "portfolioCount": 0,
+        "totalReviews": 1,
+        "ratingAvg": 5,
+        "hasAvatar": false,
+        "hasDescription": false,
+        "workingDaysPerWeek": 3
+      },
+      "advice": "1. Заполните профиль: добавьте качественное фото, описание ваших услуг и уникальных особенностей работы.\n2. Создайте портфолио с примерами ваших работ. Это поможет потенциальным клиентам лучше представить результат.",
+      "length": 215
+    },
+    {
+      "id": "lt-2",
+      "category": "low-traffic",
+      "label": "Парикмахер с базовым профилем, мало клиентов",
+      "statsSummary": {
+        "bookingsLast30Days": 4,
+        "portfolioCount": 3,
+        "totalReviews": 4,
+        "ratingAvg": 4.5,
+        "hasAvatar": true,
+        "hasDescription": false,
+        "workingDaysPerWeek": 5
+      },
+      "advice": "1. Напишите подробное описание мастера и услуг, чтобы потенциальные клиенты могли лучше понять, что вы предлагаете.\n2. Попросите довольных клиентов оставить отзывы и активно используйте их для привлечения новых клиентов.",
+      "length": 220
+    },
+    {
+      "id": "lt-3",
+      "category": "low-traffic",
+      "label": "Мастер бровей с короткой неделей",
+      "statsSummary": {
+        "bookingsLast30Days": 3,
+        "portfolioCount": 8,
+        "totalReviews": 6,
+        "ratingAvg": 4.7,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 2
+      },
+      "advice": "1. Активно продвигайте свои услуги в соцсетях: регулярно публикуйте контент, проводите конкурсы и сотрудничайте с бьюти-блогерами.\n2. Оптимизируйте график работы до 5–6 дней в неделю, чтобы увеличить количество рабочих часов и потенциальных записей.",
+      "length": 249
+    },
+    {
+      "id": "md-1",
+      "category": "mid",
+      "label": "Опытный мастер маникюра, ровный поток",
+      "statsSummary": {
+        "bookingsLast30Days": 22,
+        "portfolioCount": 25,
+        "totalReviews": 18,
+        "ratingAvg": 4.8,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 5
+      },
+      "advice": "1. Расширьте присутствие в соцсетях и активно продвигайте свои услуги там, используя хештеги и таргетированную рекламу.\n2. Предложите специальные акции или скидки для новых клиентов, чтобы привлечь больше внимания к вашей странице.",
+      "length": 231
+    },
+    {
+      "id": "md-2",
+      "category": "mid",
+      "label": "Массажист со средним рейтингом и проблемной услугой",
+      "statsSummary": {
+        "bookingsLast30Days": 18,
+        "portfolioCount": 12,
+        "totalReviews": 22,
+        "ratingAvg": 4.3,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 6
+      },
+      "advice": "1. Расширьте присутствие в соцсетях и продвигайте свои услуги через таргетированную рекламу, чтобы привлечь больше новых клиентов.\n\n2. Проведите акцию или предложите скидку новым клиентам, чтобы стимулировать рост числа записей.",
+      "length": 228
+    },
+    {
+      "id": "md-3",
+      "category": "mid",
+      "label": "Стилист с высоким no-show",
+      "statsSummary": {
+        "bookingsLast30Days": 25,
+        "portfolioCount": 20,
+        "totalReviews": 15,
+        "ratingAvg": 4.9,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 5
+      },
+      "advice": "1. Расширьте присутствие в соцсетях: создайте аккаунты в популярных платформах, регулярно публикуйте контент, проводите конкурсы для привлечения новых клиентов.\n\n2. Запустите таргетированную рекламу в соцсетях, чтобы охватить более широкую аудиторию. Настройте показы на людей, ищущих услуги в вашем регионе.",
+      "length": 308
+    },
+    {
+      "id": "hi-1",
+      "category": "high",
+      "label": "Топ-мастер ресниц, очередь",
+      "statsSummary": {
+        "bookingsLast30Days": 75,
+        "portfolioCount": 60,
+        "totalReviews": 120,
+        "ratingAvg": 4.95,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 6
+      },
+      "advice": "1. Используйте соцсети для продвижения: публикуйте контент, рекламируйте свои услуги, взаимодействуйте с аудиторией.\n2. Предлагайте специальные условия новым клиентам, например, скидку на первое посещение или подарок при записи.",
+      "length": 228
+    },
+    {
+      "id": "hi-2",
+      "category": "high",
+      "label": "Опытный парикмахер с лояльной базой",
+      "statsSummary": {
+        "bookingsLast30Days": 55,
+        "portfolioCount": 45,
+        "totalReviews": 85,
+        "ratingAvg": 4.85,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 6
+      },
+      "advice": "1. Активнее продвигайте свои услуги в социальных сетях: запускайте таргетированную рекламу на потенциальных клиентов.\n2. Предложите скидки или специальные предложения для новых клиентов, чтобы привлечь больше внимания к вашей странице.",
+      "length": 235
+    },
+    {
+      "id": "hi-3",
+      "category": "high",
+      "label": "Косметолог-долгожитель, лёгкая просадка",
+      "statsSummary": {
+        "bookingsLast30Days": 40,
+        "portfolioCount": 80,
+        "totalReviews": 200,
+        "ratingAvg": 4.7,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 5
+      },
+      "advice": "1. Используйте социальные сети для продвижения: публикуйте фото работ, делитесь полезными советами, взаимодействуйте с подписчиками.\n2. Запустите рекламу в социальных сетях или на местных платформах, чтобы привлечь больше потенциальных клиентов.",
+      "length": 245
+    },
+    {
+      "id": "pr-1",
+      "category": "premium-services",
+      "label": "Балаяж + сложные окрашивания, премиум сегмент",
+      "statsSummary": {
+        "bookingsLast30Days": 15,
+        "portfolioCount": 35,
+        "totalReviews": 28,
+        "ratingAvg": 4.9,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 4
+      },
+      "advice": "1. Проведите анализ вашей целевой аудитории и определите наиболее эффективные каналы для продвижения услуг (социальные сети, форумы, тематические сайты).\n\n2. Создайте привлекательные предложения для новых клиентов (например, скидки или специальные пакеты услуг) и активно рекламируйте их в выбранных каналах.",
+      "length": 308
+    },
+    {
+      "id": "pr-2",
+      "category": "premium-services",
+      "label": "Свадебный визажист с высоким чеком",
+      "statsSummary": {
+        "bookingsLast30Days": 8,
+        "portfolioCount": 50,
+        "totalReviews": 45,
+        "ratingAvg": 4.95,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 4
+      },
+      "advice": "1. Активно продвигайте свои услуги в социальных сетях, используя хештеги и таргетированную рекламу, чтобы привлечь больше потенциальных клиентов.\n2. Сотрудничайте с местными салонами и магазинами косметики для совместных акций и предложений.",
+      "length": 241
+    },
+    {
+      "id": "pr-3",
+      "category": "premium-services",
+      "label": "Косметолог-инжектор, медицинский сегмент",
+      "statsSummary": {
+        "bookingsLast30Days": 20,
+        "portfolioCount": 22,
+        "totalReviews": 35,
+        "ratingAvg": 4.85,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 5
+      },
+      "advice": "1. Используйте социальные сети для продвижения: публикуйте красивые работы из портфолио, делитесь отзывами клиентов, проводите конкурсы среди подписчиков.\n2. Предложите специальные предложения или акции для привлечения новых клиентов. Например, скидка на первую процедуру или бесплатный дополнительный сервис.",
+      "length": 309
+    },
+    {
+      "id": "nw-1",
+      "category": "new",
+      "label": "Новый мастер без портфолио и отзывов",
+      "statsSummary": {
+        "bookingsLast30Days": 0,
+        "portfolioCount": 0,
+        "totalReviews": 0,
+        "ratingAvg": 0,
+        "hasAvatar": true,
+        "hasDescription": false,
+        "workingDaysPerWeek": 4
+      },
+      "advice": "1. Напишите подробное описание услуг, квалификации и опыта мастера.\n2. Создайте портфолио с качественными фотографиями работ. Добавьте примеры до и после.",
+      "length": 154
+    },
+    {
+      "id": "nw-2",
+      "category": "new",
+      "label": "Новый мастер, активно постит, мало клиентов",
+      "statsSummary": {
+        "bookingsLast30Days": 5,
+        "portfolioCount": 15,
+        "totalReviews": 2,
+        "ratingAvg": 5,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 5
+      },
+      "advice": "1. Активно продвигайте свои услуги в соцсетях: регулярно публикуйте контент, проводите конкурсы и акции для привлечения внимания.\n2. Используйте сервисы для онлайн-записи и продвижения, чтобы клиенты могли легко записаться и узнать о ваших услугах.",
+      "length": 248
+    },
+    {
+      "id": "nw-3",
+      "category": "new",
+      "label": "Новый мастер с быстрым стартом",
+      "statsSummary": {
+        "bookingsLast30Days": 12,
+        "portfolioCount": 10,
+        "totalReviews": 8,
+        "ratingAvg": 4.6,
+        "hasAvatar": true,
+        "hasDescription": true,
+        "workingDaysPerWeek": 6
+      },
+      "advice": "1. Расширьте присутствие в соцсетях и на платформах для мастеров красоты, чтобы потенциальные клиенты могли вас найти.\n2. Используйте положительные отзывы и рейтинг для создания рекламных объявлений, чтобы привлекать новых клиентов через поисковые запросы.",
+      "length": 256
+    }
+  ]
+}

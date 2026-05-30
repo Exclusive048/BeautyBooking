@@ -88,6 +88,19 @@ const envSchema = z.object({
   // ── OpenAI ────────────────────────────────────────────────────────────────
   OPENAI_API_KEY: z.string().optional(),
 
+  // ── AI provider switch (MIGRATION-STRATEGY 2026-05-30 — Phase 4a) ────────
+  // Routes the 4 chat surfaces (review-summary / review-reply / service-
+  // description / advisor) to one of two backends via the single chokepoint
+  // in `src/lib/ai/client.ts`. Default `openai` preserves existing baseline.
+  // Set to `yandex` to route through Yandex Cloud's OpenAI-compatible
+  // endpoint (`https://llm.api.cloud.yandex.net/v1`). Reversible at any time
+  // via env toggle alone — see `docs/AI-MIGRATION-STRATEGY.md`. Visual
+  // search (`src/lib/visual-search/*`) ignores this flag — that surface
+  // still uses OpenAI directly and defers post-launch.
+  AI_PROVIDER: z.enum(["openai", "yandex"]).default("openai"),
+  YANDEX_API_KEY: z.string().optional(),
+  YANDEX_FOLDER_ID: z.string().optional(),
+
   // ── SMTP ──────────────────────────────────────────────────────────────────
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
@@ -147,8 +160,18 @@ const refinedSchema = envSchema
     "OPENAI_API_KEY is required when VISUAL_SEARCH_ENABLED=true"
   )
   .refine(
-    (e) => !e.AI_FEATURES_ENABLED || Boolean(e.OPENAI_API_KEY),
-    "OPENAI_API_KEY is required when AI_FEATURES_ENABLED=true"
+    (e) =>
+      !e.AI_FEATURES_ENABLED ||
+      (e.AI_PROVIDER === "yandex"
+        ? Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)
+        : Boolean(e.OPENAI_API_KEY)),
+    "AI_FEATURES_ENABLED=true requires the active provider's credentials (OPENAI_API_KEY when AI_PROVIDER=openai; YANDEX_API_KEY + YANDEX_FOLDER_ID when AI_PROVIDER=yandex). See docs/AI-MIGRATION-STRATEGY.md."
+  )
+  .refine(
+    (e) =>
+      e.AI_PROVIDER !== "yandex" ||
+      (Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)),
+    "AI_PROVIDER=yandex requires YANDEX_API_KEY + YANDEX_FOLDER_ID. See docs/AI-MIGRATION-STRATEGY.md."
   )
   .refine(
     (e) =>

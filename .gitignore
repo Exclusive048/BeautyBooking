@@ -67,3 +67,6 @@ docs/runbooks/
 # both must be visible for cross-doc links to work for fresh-clone readers.
 !docs/SPRINT-PATTERNS.md
 !docs/QUALITY-GATES.md
+!docs/AI-MIGRATION-STRATEGY.md
+!docs/migration-samples/
+!docs/migration-samples/**

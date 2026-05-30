@@ -4,25 +4,101 @@ import { env } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 
-const AI_MODEL = "gpt-4o-mini";
+/**
+ * AI chat wrapper — provider-aware (MIGRATION-STRATEGY 2026-05-30 Phase 4a).
+ *
+ * Supports two providers, selected via `env.AI_PROVIDER`:
+ * - `openai` (default) — direct `https://api.openai.com`, uses `OPENAI_API_KEY`
+ * - `yandex` — Yandex Cloud's OpenAI-compatible endpoint
+ *   (`https://llm.api.cloud.yandex.net/v1`), uses `YANDEX_API_KEY` +
+ *   `YANDEX_FOLDER_ID` for the model URI.
+ *
+ * Reversibility: switching `AI_PROVIDER` requires no code change. Keep
+ * `OPENAI_API_KEY` in env even after migration to Yandex — instant rollback.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * COMPAT VERIFIED (AI-WRAPPER-VERIFICATION 2026-05-31 — live API smoke):
+ *   1. ✅ Response shape — `choices[0].message.content` path works
+ *      identically; full shape (id/object/created/model/choices/usage)
+ *      mirrors OpenAI exactly. `usage` includes `prompt_tokens` /
+ *      `completion_tokens` / `total_tokens` / `prompt_tokens_details`.
+ *   2. ✅ `temperature` + `max_tokens` pass through cleanly. Low-temp call
+ *      produced deterministic output; `max_tokens=5` correctly truncated
+ *      with `finish_reason: "length"`.
+ *   3. ✅ Model URI `gpt://<folder>/yandexgpt-lite/latest` accepted as
+ *      `model` field; response.model echoes it back verbatim.
+ *   4. ✅ Error shape preserved — OpenAI SDK throws its standard error
+ *      classes regardless of compat backend: invalid key →
+ *      `AuthenticationError` (status 401, type `authentication_error`);
+ *      invalid folder → `PermissionDeniedError` (status 403, type
+ *      `permission_error`). Existing `isRetryable()` + `logAiFailure()`
+ *      work unchanged. Bonus: excessive `max_tokens` is silently clamped
+ *      (no error — Yandex tolerant).
+ *   5. ✅ JSON output via `response_format: { type: "json_object" }` works
+ *      through the compat layer (bonus — Phase 2 research had this as
+ *      «native API only»; Yandex's compat actually passes it through).
+ *      Returned content parses as valid JSON.
+ *
+ * Total verification token cost: 149 tokens (~0.03₽) — well within budget.
+ * ───────────────────────────────────────────────────────────────────────────
+ */
+
 const AI_TIMEOUT_MS = 15_000;
 const AI_MAX_RETRIES = 1;
 
 let client: OpenAI | null = null;
 
-function getApiKey(): string {
+type ProviderConfig = { apiKey: string; baseURL?: string };
+
+function getProviderConfig(): ProviderConfig {
+  if (env.AI_PROVIDER === "yandex") {
+    const apiKey = env.YANDEX_API_KEY?.trim();
+    if (!apiKey) {
+      throw new AppError("YANDEX_API_KEY is not configured", 500, "INTERNAL_ERROR");
+    }
+    return { apiKey, baseURL: "https://llm.api.cloud.yandex.net/v1" };
+  }
   const apiKey = env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new AppError("OPENAI_API_KEY is not configured", 500, "INTERNAL_ERROR");
   }
-  return apiKey;
+  return { apiKey };
+}
+
+/**
+ * Default chat model per provider. Per-surface override via `opts.model`
+ * (e.g. advisor can opt into YandexGPT 5 Pro if Lite quality regresses
+ * during Phase 4e validation).
+ */
+export function resolveDefaultChatModel(): string {
+  if (env.AI_PROVIDER === "yandex") {
+    const folderId = env.YANDEX_FOLDER_ID?.trim();
+    if (!folderId) {
+      throw new AppError("YANDEX_FOLDER_ID is not configured", 500, "INTERNAL_ERROR");
+    }
+    return `gpt://${folderId}/yandexgpt-lite/latest`;
+  }
+  return "gpt-4o-mini";
 }
 
 function getClient(): OpenAI {
   if (!client) {
-    client = new OpenAI({ apiKey: getApiKey() });
+    const config = getProviderConfig();
+    client = new OpenAI({
+      apiKey: config.apiKey,
+      ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+    });
   }
   return client;
+}
+
+/**
+ * Test-only: reset the cached client. Used by `client.test.ts` to verify
+ * provider-switch behaviour with different mocked env values. NOT for
+ * production code.
+ */
+export function _resetClientForTesting(): void {
+  client = null;
 }
 
 function isRetryable(error: unknown): boolean {
@@ -44,17 +120,24 @@ function logAiFailure(scope: string, error: unknown): void {
       ? ((error as { status: number }).status)
       : null;
 
+  const providerLabel = env.AI_PROVIDER === "yandex" ? "Yandex" : "OpenAI";
   if (status === 429) {
-    const count = trackError("openai:rate-limit");
+    const count = trackError(`${env.AI_PROVIDER}:rate-limit`);
     if (count === 5) {
-      void sendTelegramAlert("⚠️ OpenAI rate limit — AI features замедлены", "openai:rate-limit");
+      void sendTelegramAlert(
+        `⚠️ ${providerLabel} rate limit — AI features замедлены`,
+        `${env.AI_PROVIDER}:rate-limit`,
+      );
     }
-    logError("OpenAI rate limit hit", { scope, status, __skipAlert: true });
+    logError(`${providerLabel} rate limit hit`, { scope, status, __skipAlert: true });
     return;
   }
   if (status === 402) {
-    void sendTelegramAlert("🚨 OpenAI баланс исчерпан — AI features не работают", "openai:balance-exhausted");
-    logError("OpenAI balance exhausted", { scope, status, __skipAlert: true });
+    void sendTelegramAlert(
+      `🚨 ${providerLabel} баланс исчерпан — AI features не работают`,
+      `${env.AI_PROVIDER}:balance-exhausted`,
+    );
+    logError(`${providerLabel} balance exhausted`, { scope, status, __skipAlert: true });
     return;
   }
   logError("AI request failed", {
@@ -75,16 +158,24 @@ export type AiChatOptions = {
   userPrompt: string;
   temperature?: number;
   maxTokens?: number;
+  /**
+   * Optional per-surface model override. Use the provider's native model
+   * identifier — e.g. `"gpt-4o"` for OpenAI or
+   * `gpt://<folder>/yandexgpt/latest` for Yandex Pro. When unset, the
+   * provider's default chat model is used (see `resolveDefaultChatModel`).
+   */
+  model?: string;
 };
 
 export async function aiChat(options: AiChatOptions): Promise<string | null> {
-  const { scope, systemPrompt, userPrompt, temperature = 0.7, maxTokens } = options;
+  const { scope, systemPrompt, userPrompt, temperature = 0.7, maxTokens, model } = options;
+  const resolvedModel = model ?? resolveDefaultChatModel();
 
   for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
     try {
       const completion = await getClient().chat.completions.create(
         {
-          model: AI_MODEL,
+          model: resolvedModel,
           temperature,
           ...(maxTokens ? { max_tokens: maxTokens } : {}),
           messages: [
@@ -101,7 +192,12 @@ export async function aiChat(options: AiChatOptions): Promise<string | null> {
         return null;
       }
 
-      logInfo("AI generation completed", { scope, model: AI_MODEL, attempt });
+      logInfo("AI generation completed", {
+        scope,
+        provider: env.AI_PROVIDER,
+        model: resolvedModel,
+        attempt,
+      });
       return content.trim();
     } catch (error) {
       if (attempt < AI_MAX_RETRIES && isRetryable(error)) {
