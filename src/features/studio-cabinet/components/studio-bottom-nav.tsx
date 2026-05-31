@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal, X, type LucideIcon } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   STUDIO_NAV,
   isStudioNavItemActive,
@@ -93,6 +93,7 @@ function NavTab({
 export function StudioBottomNav({ counts }: Props) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const reduce = useReducedMotion();
 
   const primary = pickPrimaryTabs();
   const more = pickMoreItems();
@@ -105,20 +106,20 @@ export function StudioBottomNav({ counts }: Props) {
           <>
             <motion.div
               key="overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
+              initial={reduce ? false : { opacity: 0 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+              transition={reduce ? { duration: 0 } : { duration: 0.18 }}
               className="fixed inset-0 z-[49] bg-black/40 backdrop-blur-[2px] lg:hidden"
               onClick={() => setMoreOpen(false)}
               aria-hidden="true"
             />
             <motion.div
               key="drawer"
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 340 }}
+              initial={reduce ? false : { y: "100%" }}
+              animate={reduce ? { y: 0 } : { y: 0 }}
+              exit={reduce ? { y: "100%" } : { y: "100%" }}
+              transition={reduce ? { duration: 0 } : { type: "spring", damping: 30, stiffness: 340 }}
               className="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >

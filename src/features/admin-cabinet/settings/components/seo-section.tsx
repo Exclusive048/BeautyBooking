@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ export function SeoSection({ initial }: Props) {
   const [draft, setDraft] = useState<SeoValues>(initial);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const reduce = useReducedMotion();
 
   const dirty = useMemo(
     () =>
@@ -77,9 +78,9 @@ export function SeoSection({ initial }: Props) {
             {status === "saving" ? (
               <motion.span
                 key="saving"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={reduce ? false : { opacity: 0 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-text-sec"
               >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -88,9 +89,9 @@ export function SeoSection({ initial }: Props) {
             ) : status === "saved" ? (
               <motion.span
                 key="saved"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+                initial={reduce ? false : { opacity: 0, y: -4 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
               >
                 <Check className="h-3.5 w-3.5" aria-hidden />
@@ -99,9 +100,9 @@ export function SeoSection({ initial }: Props) {
             ) : status === "error" ? (
               <motion.span
                 key="error"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={reduce ? false : { opacity: 0 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
               >
                 <TriangleAlert className="h-3.5 w-3.5" aria-hidden />

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { fetchJson } from "@/lib/http/client";
 import { getCurrentCitySlug, setCurrentCitySlug } from "@/lib/cities/client-city";
@@ -27,6 +27,7 @@ export function CityPromptOverlay() {
   const pathname = usePathname();
   const [show, setShow] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const reduce = useReducedMotion();
   const { data, isLoading } = useSWR<CitiesResponse>("/api/cities", fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
@@ -68,20 +69,20 @@ export function CityPromptOverlay() {
     <AnimatePresence>
       {show ? (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          initial={reduce ? false : { opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="city-prompt-title"
         >
           <motion.div
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 12, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            initial={reduce ? false : { y: 16, opacity: 0 }}
+            animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1 }}
+            exit={reduce ? { opacity: 0 } : { y: 12, opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="relative w-full max-w-md rounded-2xl border border-border-subtle/40 bg-bg-card p-6 shadow-2xl sm:p-7"
             onClick={(e) => e.stopPropagation()}
           >

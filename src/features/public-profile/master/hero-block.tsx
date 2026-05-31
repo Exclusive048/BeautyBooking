@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ChevronRight, MapPin, Share2, Star } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -52,6 +52,7 @@ function formatExperience(months: number | null): string | null {
 export function HeroBlock({ view, isAuthenticated = false, initialFavorited = false }: Props) {
   const { provider, planTier, experienceMonths, availability } = view;
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const reduce = useReducedMotion();
   const isPremium = planTier === "PREMIUM";
   const mapsHref = buildYandexMapsUrl({
     address: provider.address,
@@ -98,9 +99,9 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
 
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
           <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            initial={reduce ? false : { opacity: 0, scale: 0.92 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="shrink-0"
           >
             <PremiumRing active={isPremium}>
@@ -123,9 +124,9 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
 
           <div className="min-w-0 flex-1">
             <motion.h1
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              transition={reduce ? { duration: 0 } : { duration: 0.35, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
               className="font-display text-3xl leading-tight text-text-main md:text-[40px]"
             >
               {provider.name}
@@ -133,9 +134,9 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
 
             {(provider.tagline || experienceLabel) && (
               <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                initial={reduce ? false : { opacity: 0, y: 6 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
                 className="mt-2 flex flex-wrap items-center gap-x-2 text-base text-text-sec"
               >
                 {provider.tagline ? <span>{provider.tagline}</span> : null}
@@ -149,9 +150,9 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
             )}
 
             <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              initial={reduce ? false : { opacity: 0, y: 6 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
             >
               <span className="inline-flex items-center gap-1.5 text-text-main">
@@ -184,9 +185,9 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
 
             {provider.categories.length > 0 ? (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
+                initial={reduce ? false : { opacity: 0 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.3 }}
                 className="mt-4 flex flex-wrap gap-1.5"
               >
                 {provider.categories.slice(0, 6).map((category) => (

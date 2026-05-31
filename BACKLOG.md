@@ -635,6 +635,63 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
 - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
+### ~~FRAMER-MOTION-REDUCED-MOTION-SWEEP-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Pattern 5 (WCAG SC 2.3.3) coverage tail closed: 46 surfaces wrapped с `useReducedMotion()`**
+- **Trigger:** Tier 3 pre-launch polish. 12 shared/marketing primitives already compliant; remaining ~56 direct callers handled animations без honoring `prefers-reduced-motion: reduce`. Users с vestibular disorders / migraines experienced uncontrolled animations
+- **Scope:** mechanical sweep — wrap existing motion, NO animation content changes (durations/easings/sequences preserved)
+- **Audit findings:**
+  - Total framer-motion callers (non-test): 58
+  - Already compliant: 12 (modal-surface, drawer, 5 marketing sections, faq-item, stories-viewer-overlay, 2 model-offer components)
+  - **Sweep target: 46** (close to estimated 56 — under-by-10 = scope healthy, no STOP gate)
+  - Test files using framer-motion: 0
+- **Pattern decision: Option B (per-file inline `useReducedMotion()`)** — matches existing 12 compliant files. Creating a utility would create churn for already-compliant files; per-file inline preserves consistency
+- **Reference implementation** (already in tree): `src/features/marketing/sections/hero-section.tsx` — `const reduce = useReducedMotion(); const variants = reduce ? undefined : ORIGINAL`. Applied this exact treatment к sweep targets
+- **Workflow:**
+  1. 2 sample files done manually (`src/app/not-found.tsx` + `src/components/ui/error-state.tsx`) to verify pattern, typecheck green
+  2. Remaining 44 files delegated к general-purpose agent (mechanical fan-out — same pattern, large surface)
+  3. Agent processed all 44 successfully, ran intermediate typechecks, returned report. Spot-verified 3 of agent's edits (booking-flow-stepper complex AnimatePresence / hot-slots-preview with variable-rename edge case / step-transition variants-based) — all clean
+- **Edge cases handled cleanly by agent:**
+  - **Variable-name collision** in `hot-slots-preview.tsx`, `stories-rail.tsx`, `notifications-center-page.tsx` — local `item` already in scope → renamed motion helper to `itemAnim`
+  - **`AnimatePresence mode="wait"` with key-swap rotating icons** in `auth-mobile-menu.tsx` — guarded only the rotate/opacity transitions; AP wrapper preserved as orchestrator
+  - **`layoutId` shared-element animations** in `cabinet-bottom-nav.tsx`, `category-chips.tsx` — guarded `transition` prop к `{duration:0}` under reduce (indicator snaps instead of springs)
+  - **`whileHover` / `whileTap` / `whileInView`** — set к `undefined` to skip variant entirely (matches reference pattern of skipping non-essential interaction motion)
+- **No new utility files created** — per-file inline pattern preserved consistency with existing 12 compliant files
+- **Files modified (46 total):**
+  - Layout / nav (6): bottom-nav, auth-mobile-menu, auth-user-menu, cookie-consent, FooterCTA, install-prompt
+  - Cabinet bottom-nav variants (3): cabinet-bottom-nav, master-bottom-nav, studio-bottom-nav
+  - Admin cabinet (13): billing-payments-tab, plans-grid, subscriptions-table, catalog-table, cities-table, admin-sidebar-mobile, events-feed, reviews-list, 4 settings sections, users-table
+  - Booking flow (2): booking-flow-stepper, step-transition
+  - Home (10): hero, become-master-banner, category-chips, faq-section, feed-card, hot-slots-preview, how-it-works, popular-categories, portfolio-card, stories-rail
+  - Public profile (4): hero-block, portfolio-strip, reviews-preview, services-menu
+  - Other (8): not-found, error-state, faq-accordion, login-client, features-page-client, catalog-page-client, city-prompt-overlay, notifications-center-page
+- **Files preserved verbatim:**
+  - Shared primitives (modal-surface, drawer) — already compliant
+  - 5 marketing sections + faq-item + stories-viewer-overlay + 2 model-offer components — already compliant
+  - Animation content: ALL durations, easings, sequences, variant values unchanged
+  - Non-motion code: no refactoring of unrelated code
+  - Tests: no changes (existing tests cover non-motion behaviour; motion conditional doesn't break test expectations)
+- **Validation:**
+  - typecheck ✅
+  - **651/651 tests** preserved ✅
+  - lint baseline preserved (1 error / 3 warnings — pre-existing, unrelated to sweep)
+  - encoding ✅
+  - mojibake ✅
+  - ui-text ✅
+  - **Coverage check** (`comm -23` between framer-motion callers and useReducedMotion users): **EMPTY** — every non-test framer-motion caller now uses useReducedMotion
+- **Pre-launch a11y status — Pattern 5 (WCAG SC 2.3.3 reduced-motion):** **COMPREHENSIVE coverage** across both shared primitives (12 files) AND direct callers (46 files) = 58/58 non-test surfaces compliant
+- **What was NOT done:**
+  - NO animation content changes (durations / easings / variant values preserved)
+  - NO new utility files / wrappers (per-file inline matched pattern)
+  - NO shared primitive modifications (already compliant)
+  - NO test changes
+  - NO non-motion code changes
+  - NO STOP-gates triggered (scope healthy, pattern consistent, tests preserved)
+- **Pre-launch Tier 3 progress:** 3 of 4 items done (VAPID-PUSH-VERIFY + AI-ADVISOR-PROMPT-TUNE + FRAMER-MOTION-REDUCED-MOTION-SWEEP). Remaining: EMPTY-STATE-COMPONENT-A
+- **Process insight (Pattern 14 — explicit-helpers/shared-primitive fan-out + Pattern 15 — workflow agent-orchestrated mechanical fan-out):**
+  - Pattern matched perfectly с Agent tool's design — large-fan-out mechanical edit with consistent pattern + sample-then-delegate workflow
+  - Pattern coverage now demonstrably comprehensive on the a11y motion axis (58/58 surfaces). Future framer-motion additions to codebase should follow same pattern by default — could be enforced by ESLint rule «import motion must accompany useReducedMotion in same file» (🔵 backlog candidate, not necessary now)
+- **Visual experience for default users:** UNCHANGED (motion still runs identically для users без `prefers-reduced-motion` preference). **A11y improvement** for users с the preference: animations collapse к instant transitions, no scaling / no fades / no spring oscillations
+- **Open questions for user:** none. Clean mechanical sweep. Pattern 5 coverage tail closed
+
 ### ~~AI-ADVISOR-PROMPT-TUNE-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Actionability 4.00 → 4.975 (Δ +0.975) на single prompt iteration. Phase 4e hypothesis «prompt-fixable» VALIDATED.**
 - **Trigger:** Tier 3 pre-launch polish. Phase 4e (AI-ADVISOR-MIGRATE-A) identified Actionability gap (Yandex 4.00 vs OpenAI 4.53) — agent predicted «prompt-fixable, not model-fixable». This commit tested + validated the prediction.
 - **Scope:** `src/lib/ai/prompts.ts` `advisorAdvice.system` ONLY. NO surface code changes. NO model upgrade. NO other prompts touched.

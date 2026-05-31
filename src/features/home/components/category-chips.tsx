@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type CategoryItem = {
@@ -22,6 +22,7 @@ const LAYOUT_ID = "category-chip-active";
 
 export function CategoryChips({ categories, selectedId, onSelect }: Props) {
   const chips = categories.filter((category) => !category.parentId);
+  const reduce = useReducedMotion();
 
   return (
     <div className="mt-2 flex flex-nowrap gap-2 overflow-x-auto pb-1 scrollbar-hide sm:flex-wrap sm:overflow-visible">
@@ -36,7 +37,7 @@ export function CategoryChips({ categories, selectedId, onSelect }: Props) {
           <motion.span
             layoutId={LAYOUT_ID}
             className="absolute inset-0 rounded-full bg-primary"
-            transition={{ type: "spring", stiffness: 400, damping: 35 }}
+            transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 35 }}
           />
         ) : null}
         <span className={`relative z-10 ${selectedId === null ? "text-white" : "text-text-sec"}`}>
@@ -58,7 +59,7 @@ export function CategoryChips({ categories, selectedId, onSelect }: Props) {
               <motion.span
                 layoutId={LAYOUT_ID}
                 className="absolute inset-0 rounded-full bg-primary"
-                transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 35 }}
               />
             ) : null}
             <span className={`relative z-10 ${isActive ? "text-white" : "text-text-sec"}`}>

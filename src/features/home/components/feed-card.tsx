@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Star } from "lucide-react";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -20,6 +20,7 @@ function formatPriceRub(kopeks: number): string {
 export function FeedCard({ item, index }: Props) {
   const router = useRouter();
   const T = UI_TEXT.homeFeed;
+  const reduce = useReducedMotion();
   const profileHref = item.masterPublicUsername ? `/u/${item.masterPublicUsername}` : null;
   const priceRub = item.totalPrice > 0 ? formatPriceRub(item.totalPrice) : null;
   const rating = item.masterRatingAvg > 0 ? item.masterRatingAvg.toFixed(1) : null;
@@ -28,11 +29,11 @@ export function FeedCard({ item, index }: Props) {
 
   const Inner = (
     <motion.article
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
+      initial={reduce ? false : { opacity: 0 }}
+      animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+      transition={reduce ? { duration: 0 } : { duration: 0.3, ease: "easeOut" }}
+      whileHover={reduce ? undefined : { y: -4 }}
+      whileTap={reduce ? undefined : { scale: 0.98 }}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle/60 bg-bg-card shadow-card transition-shadow duration-200 hover:shadow-hover"
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">

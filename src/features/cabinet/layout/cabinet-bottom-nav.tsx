@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Calendar, Heart, Send, User, Star } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const TABS = [
@@ -20,6 +20,7 @@ function isActive(pathname: string, href: string) {
 
 export function CabinetBottomNav() {
   const pathname = usePathname();
+  const reduce = useReducedMotion();
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 lg:hidden">
@@ -39,7 +40,7 @@ export function CabinetBottomNav() {
                 <motion.span
                   layoutId="bottom-nav-indicator"
                   className="absolute inset-x-1 top-0 h-[2px] rounded-full bg-gradient-to-r from-primary to-primary-magenta"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 30 }}
                 />
               ) : null}
               <Icon

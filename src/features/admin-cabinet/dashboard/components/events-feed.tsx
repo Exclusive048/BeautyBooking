@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { EventsFeedItem } from "@/features/admin-cabinet/dashboard/components/events-feed-item";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
@@ -28,6 +28,7 @@ export function EventsFeed({ initial }: Props) {
   const [items, setItems] = useState<AdminEventItem[]>(initial);
   const seenIds = useRef<Set<string>>(new Set(initial.map((e) => e.id)));
   const isVisible = useRef(true);
+  const reduce = useReducedMotion();
 
   const latestMs = items.length > 0 ? items[0]!.timeMs : 0;
 
@@ -97,10 +98,10 @@ export function EventsFeed({ initial }: Props) {
             {items.map((event) => (
               <motion.div
                 key={event.id}
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                initial={reduce ? false : { opacity: 0, y: -8 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               >
                 <EventsFeedItem event={event} />
               </motion.div>

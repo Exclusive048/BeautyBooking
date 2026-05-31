@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -13,6 +13,7 @@ type Props = {
 };
 
 export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
+  const reduce = useReducedMotion();
   return (
     <section className="lux-card rounded-[28px] p-5">
       <h2 className="text-lg font-semibold text-text-main">{UI_TEXT.publicProfile.services.title}</h2>
@@ -20,14 +21,14 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
         className="mt-4 space-y-3"
         initial="hidden"
         animate="visible"
-        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+        variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
       >
         {services.map((service) => {
           const isSelected = selectedServiceIds.includes(service.id);
           return (
             <motion.article
               key={service.id}
-              variants={{
+              variants={reduce ? undefined : {
                 hidden: { opacity: 0, y: 10 },
                 visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
               }}

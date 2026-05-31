@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SubscriptionScope } from "@prisma/client";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { PlanCardView } from "@/features/admin-cabinet/billing/components/plan-card";
 import {
   PlanEditDialog,
@@ -35,6 +35,7 @@ export function PlansGrid({ plans, candidates }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState<AdminPlanCard | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const reduce = useReducedMotion();
 
   const masterPlans = plans.filter(
     (p) => p.scope === SubscriptionScope.MASTER,
@@ -71,9 +72,9 @@ export function PlansGrid({ plans, candidates }: Props) {
         {toast ? (
           <motion.div
             role="status"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
             className={cn(
               "rounded-2xl border px-4 py-2.5 text-sm",
               toast.kind === "success"

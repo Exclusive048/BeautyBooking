@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SearchX } from "lucide-react";
 import { CatalogHeader } from "@/features/admin-cabinet/catalog/components/catalog-header";
 import { CatalogRowActions } from "@/features/admin-cabinet/catalog/components/catalog-row-actions";
@@ -50,6 +50,7 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<AdminCategoryRow | null>(null);
   const [rejectTarget, setRejectTarget] = useState<AdminCategoryRow | null>(null);
+  const reduce = useReducedMotion();
 
   // Re-sync local state if the server-rendered list changes
   // (e.g. URL filter changed and the page re-rendered).
@@ -151,9 +152,9 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
         {toast ? (
           <motion.div
             role="status"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
             className={cn(
               "rounded-2xl border px-4 py-2.5 text-sm",
               toast.kind === "success"

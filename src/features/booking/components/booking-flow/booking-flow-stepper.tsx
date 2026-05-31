@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import {
   fetchPublicServiceBookingConfig,
@@ -103,6 +103,7 @@ export function BookingFlowStepper({
   const idempotencyKeyRef = useRef<string>(
     typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`,
   );
+  const reduce = useReducedMotion();
 
   const [state, dispatch] = useReducer(
     bookingFlowReducer,
@@ -450,10 +451,10 @@ export function BookingFlowStepper({
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={state.phase}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         >
           {state.phase === "selection" ? (
             <SelectionPhase

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, X, Scissors, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
@@ -79,6 +79,7 @@ export function AuthMobileMenu({
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (!open) return;
@@ -119,10 +120,10 @@ export function AuthMobileMenu({
           {open ? (
             <motion.span
               key="close"
-              initial={{ opacity: 0, rotate: -90 }}
-              animate={{ opacity: 1, rotate: 0 }}
-              exit={{ opacity: 0, rotate: 90 }}
-              transition={{ duration: 0.15 }}
+              initial={reduce ? false : { opacity: 0, rotate: -90 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, rotate: 0 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, rotate: 90 }}
+              transition={reduce ? { duration: 0 } : { duration: 0.15 }}
               className="flex items-center justify-center"
             >
               <X className="h-5 w-5" aria-hidden />
@@ -130,10 +131,10 @@ export function AuthMobileMenu({
           ) : (
             <motion.span
               key="open"
-              initial={{ opacity: 0, rotate: 90 }}
-              animate={{ opacity: 1, rotate: 0 }}
-              exit={{ opacity: 0, rotate: -90 }}
-              transition={{ duration: 0.15 }}
+              initial={reduce ? false : { opacity: 0, rotate: 90 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, rotate: 0 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, rotate: -90 }}
+              transition={reduce ? { duration: 0 } : { duration: 0.15 }}
               className="flex items-center justify-center"
             >
               <Menu className="h-5 w-5" aria-hidden />
@@ -145,10 +146,10 @@ export function AuthMobileMenu({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -8 }}
-            transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+            initial={reduce ? false : { opacity: 0, scale: 0.95, y: -8 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -8 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
             className="absolute right-0 z-[100] mt-2 w-[min(88vw,320px)] rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
           >
             {!isGuest && (

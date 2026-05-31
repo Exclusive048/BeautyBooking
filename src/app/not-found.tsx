@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -22,6 +22,9 @@ const itemVariants = {
 };
 
 export default function NotFound() {
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const item = reduce ? undefined : itemVariants;
   return (
     <div className="relative flex min-h-[80dvh] items-center justify-center overflow-hidden px-4 py-16">
       {/* Ambient gradient blobs */}
@@ -36,12 +39,12 @@ export default function NotFound() {
 
       <motion.div
         className="relative z-10 text-center"
-        variants={containerVariants}
+        variants={container}
         initial="hidden"
         animate="visible"
       >
         {/* Giant 404 */}
-        <motion.div variants={itemVariants} className="select-none">
+        <motion.div variants={item} className="select-none">
           <span className="bg-gradient-to-r from-primary via-primary-hover to-primary-magenta bg-clip-text text-[120px] font-black leading-none tracking-tighter text-transparent sm:text-[160px]">
             404
           </span>
@@ -49,7 +52,7 @@ export default function NotFound() {
 
         {/* Title */}
         <motion.h1
-          variants={itemVariants}
+          variants={item}
           className="-mt-2 text-2xl font-bold text-text-main sm:text-3xl"
         >
           {t.title}
@@ -57,7 +60,7 @@ export default function NotFound() {
 
         {/* Subtitle */}
         <motion.p
-          variants={itemVariants}
+          variants={item}
           className="mx-auto mt-3 max-w-sm text-base leading-relaxed text-text-sec"
         >
           {t.subtitle}
@@ -65,7 +68,7 @@ export default function NotFound() {
 
         {/* Actions */}
         <motion.div
-          variants={itemVariants}
+          variants={item}
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           <Button asChild>

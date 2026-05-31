@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
@@ -195,6 +195,10 @@ const stepVariants = {
 export default function LoginClient({ heroImageUrl, emailEnabled = false, stats = null }: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
+  const reduce = useReducedMotion();
+  const panelAnim = reduce ? undefined : panelVariants;
+  const panelItemAnim = reduce ? undefined : panelItemVariants;
+  const stepAnim = reduce ? undefined : stepVariants;
 
   const [mode, setMode] = useState<LoginMode>("phone");
   const [phone, setPhone] = useState("");
@@ -445,7 +449,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
 
           {/* Content */}
           <motion.div
-            variants={panelVariants}
+            variants={panelAnim}
             initial="hidden"
             animate="visible"
             className="relative flex h-full flex-col justify-between p-10"
@@ -457,7 +461,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
                 its gradient for brand identity. Tagline sits under
                 the row as a separate <p>, matching the sidebar
                 pattern. */}
-            <motion.div variants={panelItemVariants}>
+            <motion.div variants={panelItemAnim}>
               <BrandLogo
                 variant="full"
                 size="md"
@@ -472,7 +476,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
             {/* Headline + sub */}
             <div className="space-y-5">
               <motion.h2
-                variants={panelItemVariants}
+                variants={panelItemAnim}
                 className="text-balance text-[2.4rem] font-bold leading-[1.05] tracking-tight xl:text-[3rem]"
               >
                 {T.heroTitle}{" "}
@@ -480,7 +484,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
               </motion.h2>
 
               <motion.p
-                variants={panelItemVariants}
+                variants={panelItemAnim}
                 className="max-w-md text-base leading-relaxed text-white/82"
               >
                 {T.heroSubtitle}
@@ -489,7 +493,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
 
             {/* Stats (only if API returned data) */}
             {stats ? (
-              <motion.div variants={panelItemVariants} className="flex items-end gap-6">
+              <motion.div variants={panelItemAnim} className="flex items-end gap-6">
                 <div>
                   <div className="font-mono text-2xl font-semibold tabular-nums text-white">
                     {formatStatNumber(stats.masters)}
@@ -509,7 +513,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
                 </div>
               </motion.div>
             ) : (
-              <motion.div variants={panelItemVariants} aria-hidden />
+              <motion.div variants={panelItemAnim} aria-hidden />
             )}
           </motion.div>
         </aside>
@@ -553,10 +557,10 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
               {errorText ? (
                 <motion.div
                   key={`error-${shakeKey}`}
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18 }}
+                  initial={reduce ? false : { opacity: 0, y: -6 }}
+                  animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.18 }}
                   role="alert"
                   aria-live="polite"
                   className="animate-shake mb-4 rounded-xl border border-red-300/70 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
@@ -597,7 +601,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
               {step === "input" ? (
                 <motion.div
                   key={`input-step-${mode}`}
-                  variants={stepVariants}
+                  variants={stepAnim}
                   initial="enter"
                   animate="center"
                   exit="exit"
@@ -675,7 +679,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
               ) : (
                 <motion.div
                   key="otp-step"
-                  variants={stepVariants}
+                  variants={stepAnim}
                   initial="enter"
                   animate="center"
                   exit="exit"

@@ -2,7 +2,7 @@
 
 import { Flag, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReviewForm } from "@/features/reviews/components/review-form";
@@ -97,6 +97,7 @@ export function ReviewsPreview({
   aiSummaryEnabled = false,
 }: Props) {
   const t = UI_TEXT.publicProfile.reviews;
+  const reduce = useReducedMotion();
 
   const [reviews, setReviews] = useState<ReviewDto[]>(initialReviews);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -253,7 +254,7 @@ export function ReviewsPreview({
           className="mt-4 space-y-3"
           initial="hidden"
           animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
+          variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
         >
           {reviews.length === 0 ? (
             <div className="text-sm text-text-sec">{t.noReviews}</div>
@@ -261,7 +262,7 @@ export function ReviewsPreview({
             reviews.map((review) => (
               <motion.div
                 key={review.id}
-                variants={{
+                variants={reduce ? undefined : {
                   hidden: { opacity: 0, y: 8 },
                   visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
                 }}

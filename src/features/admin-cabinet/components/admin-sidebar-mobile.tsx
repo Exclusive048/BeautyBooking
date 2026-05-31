@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { AdminSidebar } from "@/features/admin-cabinet/components/admin-sidebar";
 import type { AdminPanelUser } from "@/features/admin-cabinet/types";
@@ -22,6 +22,7 @@ type Props = {
  */
 export function AdminSidebarMobile({ open, onClose, user }: Props) {
   const pathname = usePathname();
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (open) onClose();
@@ -47,25 +48,25 @@ export function AdminSidebarMobile({ open, onClose, user }: Props) {
           role="dialog"
           aria-modal="true"
           aria-label={UI_TEXT.adminPanel.aria.sidebar}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          initial={reduce ? false : { opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
         >
           <motion.div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            initial={reduce ? false : { opacity: 0 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           />
           <motion.div
             className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-bg-page shadow-2xl"
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            initial={reduce ? false : { x: "-100%" }}
+            animate={reduce ? { x: 0 } : { x: 0 }}
+            exit={reduce ? { x: "-100%" } : { x: "-100%" }}
+            transition={reduce ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           >
             <button
               type="button"

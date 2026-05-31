@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -21,10 +21,13 @@ const itemVariants = {
 
 export function BecomeMasterBanner() {
   const T = UI_TEXT.homeGuest.becomeMaster;
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const item = reduce ? undefined : itemVariants;
 
   return (
     <motion.section
-      variants={containerVariants}
+      variants={container}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-80px" }}
@@ -51,21 +54,21 @@ export function BecomeMasterBanner() {
 
       <div className="relative mx-auto max-w-3xl text-center">
         <motion.h2
-          variants={itemVariants}
+          variants={item}
           className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
         >
           <em className="font-display font-semibold italic">{T.title}</em>
         </motion.h2>
 
         <motion.p
-          variants={itemVariants}
+          variants={item}
           className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
         >
           {T.subtitle}
         </motion.p>
 
         <motion.div
-          variants={itemVariants}
+          variants={item}
           className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
           <Button asChild size="lg" className="min-w-[180px] bg-white text-primary hover:bg-white/90">

@@ -1325,6 +1325,48 @@ graphify --help                    # Full CLI reference
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-31 — FRAMER-MOTION-REDUCED-MOTION-SWEEP-A** (commit on `auditandaction`). Tier 3 pre-launch polish — Pattern 5 (WCAG SC 2.3.3 «Animation from Interactions») coverage tail closed. **46 surfaces wrapped с `useReducedMotion()`.** **NO animation content changes** (durations/easings/variants preserved). **NO test changes** (651/651 preserved).
+  - **Audit:** 58 total framer-motion non-test callers; 12 already compliant (shared primitives + marketing sections); **46 sweep target** (within scope: estimated 56, actual 46 — no STOP gate)
+  - **Pattern decision:** Option B (per-file inline `useReducedMotion()`) — matches established 12 compliant files. Creating utility would create churn для already-compliant files; per-file consistency wins
+  - **Reference implementation** (already in tree): `src/features/marketing/sections/hero-section.tsx` — `const reduce = useReducedMotion(); const variants = reduce ? undefined : ORIGINAL`. Applied to all 46 sweep targets
+  - **Workflow:**
+    1. 2 sample files done manually (`src/app/not-found.tsx` + `src/components/ui/error-state.tsx`) to verify pattern works, typecheck green
+    2. Remaining 44 files delegated к general-purpose agent (mechanical fan-out — same pattern, large surface). Agent processed cleanly с intermediate typechecks
+    3. Main context spot-verified 3 of agent's edits (booking-flow-stepper / hot-slots-preview / step-transition) — all clean
+  - **Edge cases handled cleanly** (agent reported):
+    - Variable-name collisions (`hot-slots-preview.tsx`, `stories-rail.tsx`, `notifications-center-page.tsx`) — renamed motion helper к `itemAnim` where `item` was loop variable
+    - `AnimatePresence mode="wait"` key-swap rotating icons (`auth-mobile-menu.tsx`) — guarded rotate/opacity transitions; AP wrapper preserved as orchestrator
+    - `layoutId` shared-element animations (`cabinet-bottom-nav.tsx`, `category-chips.tsx`) — guarded `transition` к `{duration:0}` (indicator snaps instead of springs)
+    - `whileHover` / `whileTap` / `whileInView` — set к `undefined` to skip variant entirely (matches reference pattern)
+  - **46 files modified by category:**
+    - Layout/nav (6) + cabinet bottom-navs (3) + admin cabinet (13) + booking flow (2) + home (10) + public profile (4) + other (8) = 46
+  - **Раздел 3 (Архитектура):** no architectural changes — all edits are conditional guards around existing motion props. Established pattern (1 helper hook applied across 58 surfaces — 12 prior + 46 new = 58 = total non-test callers)
+  - **Раздел 5 (Бизнес-логика):** не затронуты — pure UI/a11y change
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Деплой):** A11y compliance status — **WCAG SC 2.3.3 «Animation from Interactions» COMPREHENSIVE** across all 58 non-test framer-motion surfaces (shared primitives + direct callers). Users с `prefers-reduced-motion: reduce` OS preference now get instant transitions across the entire app
+  - **Раздел 12 (Инварианты):** не затронуты — pattern existed before; sweep extends coverage, doesn't introduce new invariant
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 651/651 tests preserved ✅ / lint baseline preserved (1 error / 3 warnings pre-existing) / encoding/mojibake/ui-text ✅ / coverage check empty (every non-test framer-motion caller now uses useReducedMotion)
+  - **Files preserved verbatim:**
+    - Shared primitives (modal-surface, drawer) — already compliant
+    - 5 marketing sections + faq-item + stories-viewer-overlay + 2 model-offer components — already compliant
+    - Animation content: ALL durations, easings, variant values, sequences unchanged
+    - Non-motion code, tests
+  - **What was NOT done:**
+    - NO animation content changes
+    - NO new utility files / wrapper components
+    - NO shared primitive modifications
+    - NO test changes
+    - NO non-motion code refactoring
+    - NO STOP-gates triggered
+  - **Visual experience:** unchanged for default users (motion still runs identically). **A11y improvement** для users с reduced-motion preference — animations collapse к instant transitions
+  - **Pre-launch Tier 3 progress:** 3 of 4 items done (VAPID-PUSH-VERIFY + AI-ADVISOR-PROMPT-TUNE + FRAMER-MOTION-REDUCED-MOTION-SWEEP). Remaining: EMPTY-STATE-COMPONENT-A
+  - **Process insight (Pattern 14 + Pattern 15 combined):**
+    - **Pattern 14 (explicit-helpers fan-out)** at scale: 1 hook applied across 58 surfaces, mechanical and consistent
+    - **Pattern 15 (workflow-orchestrated parallel survey audit)** applied operationally: sample-then-delegate worked smoothly — 2 sample files manually + 44 delegated к Agent + spot-verified 3 of agent's outputs. Total elapsed time ~15 min for sweep that would have taken ~2 hr manually
+    - Future framer-motion additions could be enforced by ESLint rule «import `motion` must accompany `useReducedMotion` in same file» — 🔵 backlog candidate, not blocking
+  - **Open questions for user:** none. Clean sweep. Pattern 5 coverage tail closed across whole codebase
+
 - **2026-05-31 — AI-ADVISOR-PROMPT-TUNE-A** (commit on `auditandaction`). Tier 3 pre-launch polish — closes Phase 4e Actionability gap (Yandex 4.00 → **4.975**, Δ +0.975) на single prompt iteration. **Validates Phase 4e hypothesis «prompt-fixable, not model-fixable» — Pro upgrade avoided per plan (4× cost savings preserved).** NO surface code changes. NO model upgrade. NO other prompts touched.
   - **Gap pattern analysis (from Phase 4e samples):** Yandex Lite interpreted minimal prompt's «конкретных совета» as COUNT (1-2) NOT as «specific CONTENT». Generic patterns dominated: «расширьте присутствие в соцсетях», «онлайн-запись сервисы» (despite master on platform), generic «акции», fewer specific numbers vs OpenAI's «5-10 фото», «20% скидка», «10-15 фото», «до/после», time-bound offers
   - **Iteration 1 prompt change (only in `src/lib/ai/prompts.ts` `advisorAdvice.system` block):** 3 lines → 10 lines (+~120 tokens system prompt). Added:
