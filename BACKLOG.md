@@ -604,18 +604,36 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Operational tail:** advisor advice production-ready on Yandex Lite. After operator approves production cutover (separate decision after 1-week dev stability of all 4 surfaces), masters will receive Yandex-generated advice. Rollback path: env-toggle `AI_PROVIDER=openai` reverts instantly. `OPENAI_API_KEY` preserved
 - **Process insight:** synthetic stats validation worked well (15 profiles × 5 categories × clear pattern coverage). Same approach as Phase 4d. Real DB sampling deferred to operator's discretion if production validation reveals stat-distribution edge cases not covered by synthetic profiles
 - **Spawned backlog:**
-  - 🔵 `AI-ADVISOR-PROMPT-TUNE` — add «Дай конкретные числа и примеры в советах» to prompt; could close Yandex's 0.53 Actionability gap without Pro upgrade. ~1 hour focused work
-  - 🟡 `AI-PROVIDER-FAILOVER-RUNBOOK-A` (still pending from Phase 3) — `docs/runbooks/ai-provider-failover.md` for documented rollback procedure (~30 min). Higher priority now that all 4 surfaces migrated and production cutover is the next gate
-  - 🟡 `AI-PRODUCTION-CUTOVER-DECISION` — operator decision after 1-week dev stability monitoring. Default: enable `AI_PROVIDER=yandex` in production env
+  - 🔵 `AI-ADVISOR-PROMPT-TUNE` — add «Дай конкретные числа и примеры в советах» to prompt; could close Yandex's 0.53 Actionability gap without Pro upgrade. ~1 hour focused work (non-urgent — Lite passes ≥4.0 across all categories)
 
-### 🟡 AI-PROVIDER-FAILOVER-RUNBOOK-A (optional, ~30 min)
-- **What:** new `docs/runbooks/ai-provider-failover.md` documenting 5 scenarios (Yandex unreachable / quality regression / 429 rate-limit / 402 balance / unknown 5xx) with detection + mitigation steps. Mirrors existing runbook style. Cross-link from `docs/runbooks/README.md` quick-index.
-- **Depends on:** none (parallel-safe with Phase 4a).
-- **Trigger:** before production switch to `AI_PROVIDER=yandex` (operator preparedness).
-
-### 🟡 AI-QUALITY-VALIDATION-SCRIPT-A (optional, ~1 hr)
-- **What:** `scripts/compare-ai-providers.mjs` — reads sample-prompts file (YAML/JSON), runs both providers via `aiChat()` with provider override, writes Markdown comparison table. Accelerates iteration if quality issues surface during 4b-4e validation. Not required (manual sampling sufficient for 5-15 sample sizes).
-- **Depends on:** AI-WRAPPER-SWAP-A.
+### ~~OPENAI-CLEANUP-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Pre-launch reality correction: Yandex is single chat provider**
+- **Trigger:** Migration complete (Phases 4b/4c/4d/4e all ✅ ACCEPTED on Lite). Pre-launch project (no production users, no «cutover» concept). OpenAI-fallback infrastructure no longer needed.
+- **Code changes:**
+  - **`src/lib/env.ts`** — `AI_PROVIDER` default flipped `openai → yandex`. Schema retains enum (back-compat with existing `.env.local` files setting `AI_PROVIDER=yandex`) but marked vestigial — `client.ts` ignores it. Refine collapsed from 2 (provider-conditional) to 1 (unconditional Yandex requirement when AI features enabled). `OPENAI_API_KEY` schema field kept — `src/lib/visual-search/*` still imports it directly (deferred post-launch)
+  - **`src/lib/ai/client.ts`** — rewritten Yandex-only. Removed `getProviderConfig()` + `provider` branch in `getClient()`. `YANDEX_BASE_URL` constant. `resolveDefaultChatModel()` simplified (no openai branch). `logAiFailure()` hardcodes `yandex:` prefix in error tracking + Russian alert copy. Log payload `provider: env.AI_PROVIDER` → `provider: "yandex"` literal. Header comment frozen with migration history + COMPAT VERIFIED record
+  - **`src/lib/ai/config.ts`** — removed `AIProvider` type + `getCurrentAIProvider()` helper (audit confirmed 0 external callers — only used in config.ts itself). `ensureAiFeaturesStartupConfig()` simplified — single Yandex-credentials check, no provider branch
+  - **`src/lib/ai/client.test.ts`** — rewritten Yandex-only. Removed 6 provider-switching tests (OpenAI-default model, OpenAI-constructor args, OpenAI-fallback null when key missing, etc). Added 7 Yandex-focused tests (folder-id whitespace edge case, opts.model override bypasses folder check, throw vs null behaviour distinct). **13 tests pass.**
+- **Doc changes:**
+  - `.env.example` — Yandex section renamed «AI chat surfaces (post-migration)», Yandex vars moved BEFORE OPENAI_API_KEY (which is now «Visual search separate post-launch track»). Removed dual-provider switching block + commented-out `AI_PROVIDER=yandex` line
+  - `.env.production.example` — same restructure. `AI_FEATURES_ENABLED` default flipped to `true` (production-ready post-cleanup). `AI_PROVIDER` line removed entirely from production template (schema default is yandex, no need to surface)
+  - `MASTERRYADOM_AI_CONTEXT.md` раздел 11 — replaced «AI provider strategy (plan resolved, implementation queued)» with «AI provider (post-migration 2026-05-31)». Removed «Production cutover timing» / «1-week dev stability» / «Reversibility via env-toggle» language. Added validation evidence summary + visual-search post-launch clarity + cross-ref to migration-samples archive
+  - `docs/AI-MIGRATION-STRATEGY.md` — added 🔒 **MIGRATION COMPLETE** header at top. Original Phase 3 deliverable preserved verbatim below as historical record (per Option A from prompt — frozen doc beats new-doc churn)
+- **Removed (moot):** «AI-PRODUCTION-CUTOVER-DECISION» backlog item (no «cutover» — pre-launch project); «AI-PROVIDER-FAILOVER-RUNBOOK-A» (failover semantic differs without dual-provider — single provider has no failover path, only «AI features degraded to 503» which is already in the wrapper's null-return contract); «AI-QUALITY-VALIDATION-SCRIPT-A» (validation done, evidence archived in migration-samples/, no future migrations queued)
+- **Files preserved verbatim:**
+  - 4 surface service files (`review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts`) — abstraction held через migration + cleanup
+  - `src/lib/ai/prompts.ts` — Russian prompts unchanged
+  - `src/lib/visual-search/*` (4 files importing OpenAI directly) — deferred post-launch independent track
+  - `docs/migration-samples/` — 8 sample JSON files preserved as historical evidence
+- **Test changes:** 653 → 651 tests (net -2; removed 15 provider-switching/openai-focused tests in the file rewrite, added 13 Yandex-focused tests covering the same behavioural surface — model derivation, constructor args, opts.model override, temperature/max_tokens pass-through, empty/whitespace response handling, missing-key behaviour)
+- **Validation:** typecheck ✅ / 651/651 tests ✅ / lint baseline preserved / encoding/mojibake/ui-text/context-freshness/schema-drift/openapi-routes ✅ / build ✅
+- **NO source modifications outside AI module.** NO schema migration. NO 4 surface files touched. NO prompts.ts touched. NO visual-search code touched. NO `docs/migration-samples/` touched. Sprint work fully preserved
+- **Pre-launch reality alignment:**
+  - Code shows what we're launching (Yandex-only chat AI)
+  - Docs reflect launch state (no «ongoing migration» framing)
+  - Migration history preserved как evidence (strategy doc frozen + sample archive)
+  - Visual search clearly tagged as post-launch independent work
+- **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
+- **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
 ### 🟡 VISUAL-SEARCH-YANDEX-MIGRATION (post-launch, ~half-day spike + ~1-2 days implementation if feasible)
 - **What:** spike-test Yandex AI Studio `multimodels-request` endpoint with 6 beauty-category samples → decide ship/stay-OpenAI/use-Yandex-Vision-OCR. If positive: schema migration `vector(1536) → vector(256)`, refactor `src/lib/visual-search/openai.ts` to native Yandex multimodal API (NOT OpenAI-compat — vision unsupported there), update 3 `EMBEDDING_DIMENSIONS` constants, retest, re-enable `VISUAL_SEARCH_ENABLED`. **0 vectors stored currently** = zero historical re-indexing burden.

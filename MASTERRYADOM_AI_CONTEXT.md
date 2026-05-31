@@ -1064,19 +1064,35 @@ The following architectural choices block 4 pre-launch runbooks. **Each decision
 
 **Once DevOps engages:** these 4 decisions unblock DR-2/3/6 runbooks + DR-4 pgbouncer applicability → production execution batch can proceed.
 
-### AI provider strategy (MIGRATION-STRATEGY-DOC 2026-05-30 — plan resolved, implementation queued)
+### AI provider (post-migration 2026-05-31 — OPENAI-CLEANUP-A)
 
-> Separate concern from infrastructure decisions above. Phases 1-3 complete; Phases 4-N queued in BACKLOG as discrete self-contained implementation prompts. Full spec: [`docs/AI-MIGRATION-STRATEGY.md`](../docs/AI-MIGRATION-STRATEGY.md).
+> Migration history archived in [`docs/AI-MIGRATION-STRATEGY.md`](../docs/AI-MIGRATION-STRATEGY.md) (frozen as historical record). Sample evidence in [`docs/migration-samples/`](../docs/migration-samples/).
 
-**Plan summary:**
-- **Mechanism:** `AI_PROVIDER=openai|yandex` env var switches between `https://api.openai.com` (current baseline, default) and `https://llm.api.cloud.yandex.net/v1` (Yandex Cloud's official OpenAI-compatible endpoint). Single-line conditional inside `src/lib/ai/client.ts` — entire 4-chat-surface migration reduces to a config switch, no SDK refactor.
-- **Model:** YandexGPT 5 Lite for all 4 chat surfaces baseline (review-summary / review-reply / service-description / advisor); per-surface override to Pro available if quality validation requires (advisor most likely candidate).
-- **Visual search:** DEFER post-launch (evidence-based per Phase 2 — 0 vectors stored = zero migration burden; AI Studio multimodal endpoint requires API spike-testing; OpenAI-compat layer doesn't pass vision so this surface needs separate native-API wrapper).
-- **Reversibility:** env-toggle rollback in minutes, no code change. `OPENAI_API_KEY` stays in env post-migration as instant-fallback path.
-- **Cost projection:** ~1,100-2,600₽/month (~$12-28) for the 4 chat surfaces, vs current OpenAI usage. Operational simplification — no more VPN/proxy dependency for OpenAI access from РФ.
-- **Quality validation:** parallel sampling (5-15 inputs per surface, side-by-side OpenAI vs YandexGPT outputs, 1-5 score across 5 criteria, 80% threshold → proceed).
-- **Implementation effort:** ~3-4 hours focused work for 4 chat surfaces (one Phase 4a wrapper change + 4 zero-code env-flag flips with quality validation per surface).
-- **Status:** Phases 1 (audit) + 2 (research) + 3 (strategy doc) complete; Phases 4a-4e queued, each self-contained.
+**Pre-launch state — chat surfaces:**
+- **Provider:** Yandex Cloud Foundation Models (single provider)
+- **Endpoint:** `https://llm.api.cloud.yandex.net/v1` (OpenAI-compatible)
+- **Model:** YandexGPT 5 Lite baseline для всех 4 chat surfaces (review-summary / review-reply / service-description / advisor-advice). Per-surface override hook preserved via `opts.model` (Pro tier escape valve if needed)
+- **Authentication:** API key (service account, scope `yc.ai.foundationModels.execute`) + folder id via `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` env vars
+- **Chokepoint:** [`src/lib/ai/client.ts`](../src/lib/ai/client.ts) — single `aiChat()` function, Yandex-only construction. Surface services (`review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts`) import `aiChat` and don't know про provider
+- **Cost projection:** ~1,100-2,600₽/мес at expected usage (validated against ~1.75₽ total spent across 4 validation phases)
+- **Operational benefit:** native RU access, no VPN/proxy dependency
+
+**Validation evidence (archived):**
+- 30+ samples per surface (15 advisor profiles, 8 each для review-reply / service-description, 3 review-summary)
+- Quality ≥4.0/5 across all 5 categories на advisor (lowest 4.38, overall 4.66/5)
+- Zero hallucinations in Yandex across all 4 surfaces
+- One surface where Yandex BEAT OpenAI baseline (service-description, 4.975 vs 4.875)
+- Validated 2026-05-31 (Phases 4b-4e all ✅ ACCEPTED on Lite)
+
+**Visual search (post-launch independent track):**
+- Inactive by default (`VISUAL_SEARCH_ENABLED=false`)
+- `src/lib/visual-search/*` imports OpenAI SDK directly (uses `OPENAI_API_KEY`)
+- 0 vectors currently stored → zero re-indexing burden when reactivated
+- Migration к Yandex (vision + embeddings + native multimodal endpoint) deferred post-launch — separate work track
+- Yandex's OpenAI-compat layer does NOT pass vision through; native AI Studio multimodal endpoint requires separate wrapper. Schema migration `vector(1536) → vector(256)` also needed when reactivated
+
+**Reversibility hook (vestigial):**
+- `AI_PROVIDER` env var remains in `env.ts` schema as enum (back-compat with existing `.env.local` files) but ignored by `client.ts`. To revive OpenAI for chat surfaces (legacy escape), would require client.ts changes — no longer single env-toggle
 
 **Note on DEPLOYMENT-READINESS findings (audit-волна 7/11):** some Supabase-specific concerns (pgbouncer connection limits, Supabase pooler quirks) require re-evaluation under whatever hosting is chosen. Annotation preserved in section 15 changelog for that audit entry; findings themselves not rewritten (historical record).
 
@@ -1308,6 +1324,42 @@ graphify --help                    # Full CLI reference
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-31 — OPENAI-CLEANUP-A** (commit on `auditandaction`). **Pre-launch reality correction: Yandex is single chat AI provider.** Removed dual-provider switching infrastructure from `client.ts` + `config.ts` + tests. Documentation reframed from «ongoing migration» to «post-migration reality». **NO 4 surface service files modified** (abstraction held through cleanup). **NO visual-search files modified** (deferred post-launch). **NO `docs/migration-samples/` touched** (historical evidence preserved).
+  - **Trigger:** All 4 chat surfaces (4b/4c/4d/4e) validated on YandexGPT 5 Lite — ≥4.0/5 quality across all categories, zero hallucinations across 30+ samples. Pre-launch project (no production users, no «cutover» concept). OpenAI fallback infrastructure was insurance during validation — insurance no longer needed.
+  - **Раздел 3 (Архитектура):** 5 source files modified:
+    - **MODIFIED** [`src/lib/env.ts`](src/lib/env.ts) — `AI_PROVIDER` default flipped `openai → yandex`. Schema retains enum (back-compat with existing `.env.local` files setting `AI_PROVIDER=yandex`) but marked vestigial — `client.ts` ignores it. Refine collapsed from 2 (provider-conditional) to 1 (unconditional Yandex when AI features on). `OPENAI_API_KEY` schema field kept — `src/lib/visual-search/*` still imports it directly
+    - **MODIFIED** [`src/lib/ai/client.ts`](src/lib/ai/client.ts) — rewritten Yandex-only. Removed `getProviderConfig()` + `provider` branch in `getClient()`. `YANDEX_BASE_URL` constant. `resolveDefaultChatModel()` simplified (no openai branch — folder-id check directly). `logAiFailure()` hardcodes `yandex:` prefix in error tracking + Russian alert copy. Log payload `provider: env.AI_PROVIDER` → `provider: "yandex"` literal. Header comment frozen with migration history + COMPAT VERIFIED record from AI-WRAPPER-VERIFICATION
+    - **MODIFIED** [`src/lib/ai/config.ts`](src/lib/ai/config.ts) — removed `AIProvider` type + `getCurrentAIProvider()` helper (audit confirmed 0 external callers). `ensureAiFeaturesStartupConfig()` simplified — single Yandex-credentials check, no provider branch
+    - **MODIFIED** [`src/lib/ai/client.test.ts`](src/lib/ai/client.test.ts) — rewritten Yandex-only. Removed 6 provider-switching tests (OpenAI-default model, OpenAI constructor args, OpenAI fallback null, etc). Added 7 Yandex-focused tests including folder-id whitespace edge case + opts.model override bypasses folder check + distinct throw-vs-null behaviour
+    - **MODIFIED** [`.env.example`](.env.example) — Yandex section moved before OpenAI, renamed «AI chat surfaces (post-migration)». Removed dual-provider switching block + commented-out `AI_PROVIDER=yandex` line. OpenAI section reframed как «Visual search separate post-launch track»
+    - **MODIFIED** [`.env.production.example`](.env.production.example) — same restructure. `AI_FEATURES_ENABLED` default flipped to `true` (production-ready post-cleanup). `AI_PROVIDER` line removed entirely from production template (schema default is yandex, no need to surface in template)
+    - **MODIFIED** [`docs/AI-MIGRATION-STRATEGY.md`](docs/AI-MIGRATION-STRATEGY.md) — added 🔒 «MIGRATION COMPLETE 2026-05-31» header at top. Original Phase 3 deliverable preserved verbatim below as historical record. Cross-refs added: AI_CONTEXT раздел 11 для current state, `docs/migration-samples/` для evidence
+  - **Раздел 5 (Бизнес-логика):** AI chat surfaces — 4 services (`review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts`) all import `aiChat` from client.ts. They don't know про provider — abstraction held через migration AND cleanup. Visual search (`src/lib/visual-search/*`) imports OpenAI SDK directly с `OPENAI_API_KEY` — separate track, deferred post-launch
+  - **Раздел 6 (Маршруты):** не затронуты — endpoint signatures unchanged
+  - **Раздел 7 (Env vars):** `AI_PROVIDER` default `openai → yandex`; refine adapted; documentation in templates restructured
+  - **Раздел 11 (Деплой):** reframed from «AI provider strategy (migration plan)» к «AI provider (post-migration)». Removed «Production cutover timing» / «1-week dev stability» / «Reversibility via env-toggle» language. Added validation evidence summary + cost projection + visual-search post-launch clarity + cross-ref к migration-samples archive
+  - **Раздел 12 (Инварианты):** не затронуты — abstraction invariant («4 chat surfaces import aiChat()») preserved across cleanup
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / lint baseline preserved / encoding/mojibake/ui-text ✅ / check:context-freshness ✅ / check:schema-drift ✅ / check:openapi-routes ✅ / **651/651 tests** ✅ (653 → 651, net -2: removed 15 provider-switching/OpenAI-focused tests in the file rewrite, added 13 Yandex-focused covering the same behavioural surface) / `npm run build` ✅
+  - **What was NOT done (per strict rules):**
+    - **NO 4 surface service files modified** — `review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts` all preserved verbatim (abstraction held)
+    - **NO `src/lib/visual-search/*` modified** — defer post-launch independent track (Yandex multimodal + 256-dim embedding migration)
+    - **NO `src/lib/ai/prompts.ts` modified** — Russian prompts unchanged across migration + cleanup
+    - **NO `docs/migration-samples/*` touched** — 8 sample JSON files preserved as historical evidence (per Phase 4b-4e validation runs)
+    - **NO schema migration**, **NO new endpoints**, **NO new dependencies**
+    - **NO production behaviour change** — pre-launch project, no production users to migrate
+  - **Removed from BACKLOG (moot post-cleanup):**
+    - `AI-PRODUCTION-CUTOVER-DECISION` — no «cutover» concept in pre-launch project
+    - `AI-PROVIDER-FAILOVER-RUNBOOK-A` — failover semantic differs without dual-provider; single provider has no failover path, only «AI features degraded to 503» which is already in wrapper's null-return contract
+    - `AI-QUALITY-VALIDATION-SCRIPT-A` — validation done, evidence archived, no future migrations queued
+  - **Pre-launch reality alignment:**
+    - Code shows what we're launching (Yandex-only chat AI, not dual-stack)
+    - Docs reflect launch state (no «ongoing migration» framing anywhere)
+    - Migration history preserved as evidence (strategy doc frozen + sample archive intact)
+    - Visual search clearly tagged as post-launch independent work
+  - **Process insight:** Pattern 5 (coverage-tail closure) at the docs/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
+  - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
 - **2026-05-31 — GRAPHIFY-SETUP-AND-INITIAL-AUDIT** (commit on `auditandaction`). Always-on knowledge layer installed. **NO source code modifications.** **NO architectural fixes applied** — initial audit revealed 0 actionable findings (codebase architecturally clean).
   - **Pre-install state:** Graphify v0.8.25 already globally installed via pip (Python 3.10). NO new install required. Pipx not available; uv 0.11.15 available as alt. Phase 2 install step satisfied by existing global install.

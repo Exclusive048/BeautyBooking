@@ -4,15 +4,13 @@ import { del, get, set } from "@/lib/cache/cache";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Active AI provider — set by `env.AI_PROVIDER` (MIGRATION-STRATEGY 2026-05-30).
- * Surface code may import this for provider attribution in logs / metrics.
- * Switching providers requires only an env-var change — no code edits.
+ * Post-OPENAI-CLEANUP-A (2026-05-31): single AI provider — Yandex Cloud
+ * Foundation Models. Provider-switching helpers (`AIProvider` type,
+ * `getCurrentAIProvider()`) removed — they had no callers outside this file
+ * after the migration. `client.ts` constructs Yandex client unconditionally;
+ * env.ts refine guarantees YANDEX_API_KEY + YANDEX_FOLDER_ID present when
+ * AI_FEATURES_ENABLED.
  */
-export type AIProvider = "openai" | "yandex";
-
-export function getCurrentAIProvider(): AIProvider {
-  return env.AI_PROVIDER;
-}
 
 export const AI_FEATURES_SYSTEM_CONFIG_KEY = "aiFeaturesEnabled";
 export const AI_FEATURES_CACHE_KEY = "system:ai-features-enabled";
@@ -24,20 +22,11 @@ export function getAiFeaturesEnabledByEnv(): boolean {
 
 export function ensureAiFeaturesStartupConfig(): void {
   if (!isAiFeaturesEnabled) return;
-  if (env.AI_PROVIDER === "yandex") {
-    const apiKey = env.YANDEX_API_KEY?.trim();
-    const folderId = env.YANDEX_FOLDER_ID?.trim();
-    if (apiKey && folderId) return;
-    throw new AppError(
-      "AI_PROVIDER=yandex requires YANDEX_API_KEY + YANDEX_FOLDER_ID when AI_FEATURES_ENABLED=true",
-      500,
-      "INTERNAL_ERROR",
-    );
-  }
-  const apiKey = env.OPENAI_API_KEY?.trim();
-  if (apiKey) return;
+  const apiKey = env.YANDEX_API_KEY?.trim();
+  const folderId = env.YANDEX_FOLDER_ID?.trim();
+  if (apiKey && folderId) return;
   throw new AppError(
-    "OPENAI_API_KEY is required when AI_FEATURES_ENABLED=true (AI_PROVIDER=openai)",
+    "AI_FEATURES_ENABLED=true requires YANDEX_API_KEY + YANDEX_FOLDER_ID",
     500,
     "INTERNAL_ERROR",
   );

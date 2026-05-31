@@ -1,5 +1,18 @@
 # AI Provider Migration Strategy — OpenAI → Yandex
 
+> 🔒 **MIGRATION COMPLETE 2026-05-31 — этот документ заморожен как историческое.**
+>
+> All 4 chat surfaces (review-summary / review-reply / service-description / advisor-advice) migrated to YandexGPT 5 Lite. Validated ≥4.0/5 quality across all categories, zero hallucinations across 30+ samples per surface. One surface (service-description) where Yandex beat OpenAI baseline.
+>
+> Post-migration cleanup (OPENAI-CLEANUP-A 2026-05-31): `AI_PROVIDER` switching removed from `client.ts` (Yandex-only construction); `OPENAI_API_KEY` retained only for visual-search (post-launch independent track).
+>
+> **For current AI provider state see:** [`MASTERRYADOM_AI_CONTEXT.md`](../MASTERRYADOM_AI_CONTEXT.md) раздел 11 «AI provider (post-migration)».
+> **For migration evidence (sample outputs):** [`docs/migration-samples/`](./migration-samples/).
+>
+> ---
+>
+> **Original Phase 3 deliverable below** — preserved verbatim as historical record of the plan that drove Phase 4a-4e execution. Quality validation thresholds, model choice rationale, cost projection, and reversibility analysis all match what actually happened.
+
 > **Phase 3 deliverable** of OPENAI-TO-YANDEX-MIGRATION (BACKLOG.md).
 > Reads directly into per-surface Phase 4 implementation prompts.
 > Synthesized from Phase 1 audit (AI-CURRENT-STATE-AUDIT) + Phase 2 research (YANDEX-GPT-RESEARCH).

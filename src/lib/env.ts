@@ -85,19 +85,28 @@ const envSchema = z.object({
   YANDEX_SUGGEST_API_KEY: z.string().optional(),
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: z.string().optional(),
 
-  // ── OpenAI ────────────────────────────────────────────────────────────────
+  // ── OpenAI (legacy — visual-search only, AI chat surfaces migrated to Yandex) ─
+  // OPENAI_API_KEY remains in schema because `src/lib/visual-search/*` still
+  // imports the OpenAI SDK directly (vision + embeddings — Yandex multimodal
+  // migration deferred post-launch per docs/AI-MIGRATION-STRATEGY.md). For the
+  // 4 chat surfaces it's no longer needed — Yandex is the single AI provider.
   OPENAI_API_KEY: z.string().optional(),
 
-  // ── AI provider switch (MIGRATION-STRATEGY 2026-05-30 — Phase 4a) ────────
-  // Routes the 4 chat surfaces (review-summary / review-reply / service-
-  // description / advisor) to one of two backends via the single chokepoint
-  // in `src/lib/ai/client.ts`. Default `openai` preserves existing baseline.
-  // Set to `yandex` to route through Yandex Cloud's OpenAI-compatible
-  // endpoint (`https://llm.api.cloud.yandex.net/v1`). Reversible at any time
-  // via env toggle alone — see `docs/AI-MIGRATION-STRATEGY.md`. Visual
-  // search (`src/lib/visual-search/*`) ignores this flag — that surface
-  // still uses OpenAI directly and defers post-launch.
-  AI_PROVIDER: z.enum(["openai", "yandex"]).default("openai"),
+  // ── AI provider (post-migration 2026-05-31 — OPENAI-CLEANUP-A) ───────────
+  // The 4 chat surfaces (review-summary / review-reply / service-description /
+  // advisor) flow through `src/lib/ai/client.ts` which is wired to Yandex
+  // Cloud's OpenAI-compatible endpoint (`https://llm.api.cloud.yandex.net/v1`)
+  // via YANDEX_API_KEY + YANDEX_FOLDER_ID.
+  //
+  // `AI_PROVIDER` is vestigial post-cleanup — schema kept so existing `.env`
+  // files with `AI_PROVIDER=yandex` don't break Zod parse, but `client.ts`
+  // ignores the value and always constructs a Yandex client. Refine below
+  // requires YANDEX credentials unconditionally when AI_FEATURES_ENABLED.
+  //
+  // Visual search (`src/lib/visual-search/*`) imports the OpenAI SDK directly
+  // and uses OPENAI_API_KEY independently. Migrating it to Yandex (vision +
+  // embeddings) happens post-launch (separate work).
+  AI_PROVIDER: z.enum(["openai", "yandex"]).default("yandex"),
   YANDEX_API_KEY: z.string().optional(),
   YANDEX_FOLDER_ID: z.string().optional(),
 
@@ -159,19 +168,13 @@ const refinedSchema = envSchema
     (e) => !e.VISUAL_SEARCH_ENABLED || Boolean(e.OPENAI_API_KEY),
     "OPENAI_API_KEY is required when VISUAL_SEARCH_ENABLED=true"
   )
+  // Post-migration (OPENAI-CLEANUP-A 2026-05-31): Yandex is the single chat
+  // provider. `client.ts` ignores AI_PROVIDER and always constructs a Yandex
+  // client, so YANDEX credentials are required unconditionally when AI
+  // features are on. (OPENAI_API_KEY is checked separately for visual-search.)
   .refine(
-    (e) =>
-      !e.AI_FEATURES_ENABLED ||
-      (e.AI_PROVIDER === "yandex"
-        ? Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)
-        : Boolean(e.OPENAI_API_KEY)),
-    "AI_FEATURES_ENABLED=true requires the active provider's credentials (OPENAI_API_KEY when AI_PROVIDER=openai; YANDEX_API_KEY + YANDEX_FOLDER_ID when AI_PROVIDER=yandex). See docs/AI-MIGRATION-STRATEGY.md."
-  )
-  .refine(
-    (e) =>
-      e.AI_PROVIDER !== "yandex" ||
-      (Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)),
-    "AI_PROVIDER=yandex requires YANDEX_API_KEY + YANDEX_FOLDER_ID. See docs/AI-MIGRATION-STRATEGY.md."
+    (e) => !e.AI_FEATURES_ENABLED || (Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)),
+    "AI_FEATURES_ENABLED=true requires YANDEX_API_KEY + YANDEX_FOLDER_ID (chat surfaces hit Yandex Cloud Foundation Models post-migration). Visual search uses OPENAI_API_KEY separately."
   )
   .refine(
     (e) =>

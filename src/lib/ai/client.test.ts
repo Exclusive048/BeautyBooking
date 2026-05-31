@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock env.ts before importing client — vi.hoisted lets us mutate per-test.
+// Mock env.ts before importing client. Post OPENAI-CLEANUP-A (2026-05-31)
+// `client.ts` only reads YANDEX_API_KEY + YANDEX_FOLDER_ID — `AI_PROVIDER` is
+// vestigial schema field, ignored by the wrapper.
 const mockEnv = vi.hoisted(() => ({
-  AI_PROVIDER: "openai" as "openai" | "yandex",
-  OPENAI_API_KEY: "sk-test-openai-key" as string | undefined,
-  YANDEX_API_KEY: undefined as string | undefined,
-  YANDEX_FOLDER_ID: undefined as string | undefined,
+  YANDEX_API_KEY: "AQVN-test-yandex-key" as string | undefined,
+  YANDEX_FOLDER_ID: "b1g-test-folder" as string | undefined,
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -14,9 +14,8 @@ vi.mock("@/lib/env", () => ({
   isProduction: false,
 }));
 
-// Stub the modules that client.ts imports for logging / monitoring. We don't
-// need their behaviour in these tests — we only verify provider/model decision
-// logic, not the full request lifecycle.
+// Stub modules client.ts imports for logging / monitoring. We only verify
+// construction + model-derivation logic, not the full request lifecycle.
 vi.mock("@/lib/logging/logger", () => ({
   logInfo: vi.fn(),
   logError: vi.fn(),
@@ -27,15 +26,12 @@ vi.mock("@/lib/monitoring/alerts", () => ({
 }));
 
 // Mock the OpenAI SDK — capture constructor args and stub chat.completions.create.
-// vi.hoisted lets the mock factory and the spy arrays share the same scope.
 const { mockCreate, constructorCalls } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
   constructorCalls: [] as Array<{ apiKey: string; baseURL?: string }>,
 }));
 
 vi.mock("openai", () => {
-  // OpenAI SDK default export is a class — model it as a constructor function
-  // so `new OpenAI({...})` runs our capture-and-stub logic correctly.
   function MockOpenAI(this: object, config: { apiKey: string; baseURL?: string }) {
     constructorCalls.push(config);
     (this as { chat: unknown }).chat = {
@@ -55,45 +51,32 @@ beforeEach(() => {
   });
   constructorCalls.length = 0;
   _resetClientForTesting();
-  // Reset mock env to OpenAI defaults each test
-  mockEnv.AI_PROVIDER = "openai";
-  mockEnv.OPENAI_API_KEY = "sk-test-openai-key";
-  mockEnv.YANDEX_API_KEY = undefined;
-  mockEnv.YANDEX_FOLDER_ID = undefined;
+  // Reset env to default Yandex creds each test
+  mockEnv.YANDEX_API_KEY = "AQVN-test-yandex-key";
+  mockEnv.YANDEX_FOLDER_ID = "b1g-test-folder";
 });
 
-describe("resolveDefaultChatModel — provider-aware default model", () => {
-  it("returns gpt-4o-mini when AI_PROVIDER=openai", () => {
-    mockEnv.AI_PROVIDER = "openai";
-    expect(resolveDefaultChatModel()).toBe("gpt-4o-mini");
+describe("resolveDefaultChatModel — Yandex Lite default", () => {
+  it("returns Yandex Lite URI built from YANDEX_FOLDER_ID", () => {
+    mockEnv.YANDEX_FOLDER_ID = "b1g-some-folder";
+    expect(resolveDefaultChatModel()).toBe("gpt://b1g-some-folder/yandexgpt-lite/latest");
   });
 
-  it("returns Yandex URI when AI_PROVIDER=yandex with folder id set", () => {
-    mockEnv.AI_PROVIDER = "yandex";
-    mockEnv.YANDEX_API_KEY = "AQVN-test-yandex-key";
-    mockEnv.YANDEX_FOLDER_ID = "b1g-test-folder";
-    expect(resolveDefaultChatModel()).toBe("gpt://b1g-test-folder/yandexgpt-lite/latest");
-  });
-
-  it("throws INTERNAL_ERROR when AI_PROVIDER=yandex but YANDEX_FOLDER_ID missing", () => {
-    mockEnv.AI_PROVIDER = "yandex";
-    mockEnv.YANDEX_API_KEY = "AQVN-test-yandex-key";
+  it("throws INTERNAL_ERROR when YANDEX_FOLDER_ID missing", () => {
     mockEnv.YANDEX_FOLDER_ID = undefined;
     expect(() => resolveDefaultChatModel()).toThrow(/YANDEX_FOLDER_ID/);
   });
 
   it("trims whitespace-only folder id as missing (catches '   ' misconfigs)", () => {
-    mockEnv.AI_PROVIDER = "yandex";
-    mockEnv.YANDEX_API_KEY = "AQVN-test-yandex-key";
     mockEnv.YANDEX_FOLDER_ID = "   ";
     expect(() => resolveDefaultChatModel()).toThrow(/YANDEX_FOLDER_ID/);
   });
 });
 
-describe("aiChat — provider-aware client construction", () => {
-  it("OpenAI provider: constructs client with OPENAI_API_KEY and no baseURL", async () => {
-    mockEnv.AI_PROVIDER = "openai";
-    mockEnv.OPENAI_API_KEY = "sk-openai-abc";
+describe("aiChat — Yandex client construction", () => {
+  it("constructs OpenAI SDK with YANDEX_API_KEY and Yandex compat baseURL", async () => {
+    mockEnv.YANDEX_API_KEY = "AQVN-yandex-abc";
+    mockEnv.YANDEX_FOLDER_ID = "b1g-folder";
 
     await aiChat({
       scope: "test-scope",
@@ -102,42 +85,11 @@ describe("aiChat — provider-aware client construction", () => {
     });
 
     expect(constructorCalls).toHaveLength(1);
-    expect(constructorCalls[0].apiKey).toBe("sk-openai-abc");
-    expect(constructorCalls[0].baseURL).toBeUndefined();
-  });
-
-  it("Yandex provider: constructs client with YANDEX_API_KEY and compat baseURL", async () => {
-    mockEnv.AI_PROVIDER = "yandex";
-    mockEnv.YANDEX_API_KEY = "AQVN-yandex-xyz";
-    mockEnv.YANDEX_FOLDER_ID = "b1g-folder-1";
-
-    await aiChat({
-      scope: "test-scope",
-      systemPrompt: "system",
-      userPrompt: "user",
-    });
-
-    expect(constructorCalls).toHaveLength(1);
-    expect(constructorCalls[0].apiKey).toBe("AQVN-yandex-xyz");
+    expect(constructorCalls[0].apiKey).toBe("AQVN-yandex-abc");
     expect(constructorCalls[0].baseURL).toBe("https://llm.api.cloud.yandex.net/v1");
   });
 
-  it("OpenAI: passes gpt-4o-mini as model when no override", async () => {
-    mockEnv.AI_PROVIDER = "openai";
-
-    await aiChat({
-      scope: "test-scope",
-      systemPrompt: "system",
-      userPrompt: "user",
-    });
-
-    expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockCreate.mock.calls[0][0].model).toBe("gpt-4o-mini");
-  });
-
-  it("Yandex: passes Yandex URI as model when no override", async () => {
-    mockEnv.AI_PROVIDER = "yandex";
-    mockEnv.YANDEX_API_KEY = "AQVN-key";
+  it("passes Yandex Lite URI as default model when no override", async () => {
     mockEnv.YANDEX_FOLDER_ID = "b1g-folder-42";
 
     await aiChat({
@@ -146,12 +98,11 @@ describe("aiChat — provider-aware client construction", () => {
       userPrompt: "user",
     });
 
+    expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(mockCreate.mock.calls[0][0].model).toBe("gpt://b1g-folder-42/yandexgpt-lite/latest");
   });
 
-  it("opts.model override beats default (per-surface upgrade, e.g. advisor → Pro)", async () => {
-    mockEnv.AI_PROVIDER = "yandex";
-    mockEnv.YANDEX_API_KEY = "AQVN-key";
+  it("opts.model override beats default (per-surface Pro upgrade hook)", async () => {
     mockEnv.YANDEX_FOLDER_ID = "b1g-folder";
 
     await aiChat({
@@ -217,16 +168,13 @@ describe("aiChat — provider-aware client construction", () => {
     expect(result).toBeNull();
   });
 
-  it("Yandex: returns null if YANDEX_API_KEY missing (error caught by retry loop)", async () => {
-    mockEnv.AI_PROVIDER = "yandex";
+  it("returns null if YANDEX_API_KEY missing (error caught by retry loop)", async () => {
     mockEnv.YANDEX_API_KEY = undefined;
     mockEnv.YANDEX_FOLDER_ID = "b1g-folder";
 
-    // `resolveDefaultChatModel()` succeeds (folder id present), so the
-    // INTERNAL_ERROR comes from `getProviderConfig()` during client init —
-    // which happens inside the try/catch in the retry loop. aiChat catches
-    // and returns null instead of throwing (preserves existing contract
-    // for surface services that already expect string | null).
+    // resolveDefaultChatModel() succeeds (folder id present), so the
+    // INTERNAL_ERROR comes from getClient() during construction — caught
+    // inside aiChat's try/catch which returns null (preserves contract).
     const result = await aiChat({
       scope: "test-scope",
       systemPrompt: "system",
@@ -235,15 +183,35 @@ describe("aiChat — provider-aware client construction", () => {
     expect(result).toBeNull();
   });
 
-  it("OpenAI: returns null if OPENAI_API_KEY missing (error caught by retry loop)", async () => {
-    mockEnv.AI_PROVIDER = "openai";
-    mockEnv.OPENAI_API_KEY = undefined;
+  it("throws INTERNAL_ERROR if YANDEX_FOLDER_ID missing (default-model derivation runs before try/catch)", async () => {
+    // resolveDefaultChatModel() is called eagerly at the top of aiChat, BEFORE
+    // the retry loop's try/catch. Misconfig surfaces as a thrown AppError
+    // rather than null — distinct from YANDEX_API_KEY missing, where the
+    // failure happens inside getClient() inside the loop. Both are misconfig
+    // signals at startup time; aiChat assumes env.ts refine catches them and
+    // doesn't silently mask folder-id errors.
+    mockEnv.YANDEX_FOLDER_ID = undefined;
+
+    await expect(
+      aiChat({ scope: "test-scope", systemPrompt: "system", userPrompt: "user" }),
+    ).rejects.toThrow(/YANDEX_FOLDER_ID/);
+  });
+
+  it("override via opts.model bypasses default-model derivation (no folder id needed)", async () => {
+    // When caller provides explicit model URI, resolveDefaultChatModel() is
+    // not invoked → no YANDEX_FOLDER_ID check. Useful for tests that want to
+    // exercise aiChat without env state, and for any future per-surface
+    // hard-coded model overrides.
+    mockEnv.YANDEX_FOLDER_ID = undefined;
 
     const result = await aiChat({
       scope: "test-scope",
       systemPrompt: "system",
       userPrompt: "user",
+      model: "gpt://hardcoded-folder/yandexgpt-lite/latest",
     });
-    expect(result).toBeNull();
+
+    expect(result).toBe("mocked AI response");
+    expect(mockCreate.mock.calls[0][0].model).toBe("gpt://hardcoded-folder/yandexgpt-lite/latest");
   });
 });
