@@ -635,6 +635,74 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
 - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
+### ~~PRE-LAUNCH-QUICK-AUDITS-A~~ ✅ ЗАКРЫТ (2026-05-31) — **4 read-only audits: rate-limit STRONG / cache STRONG / CORS STRONG with 2 🟠 fixable bugs / security headers STRONG. NO LAUNCH-BLOCKERS.**
+- **Trigger:** 4 concerns не explicitly covered audit-волна — verify pre-launch state. Read-only inspection. Findings categorized per audit-волна methodology
+- **NO code/config changes** — pure audit
+- **Area 1 — Rate Limiting: ✅ STRONG**
+  - Custom module (`src/lib/rate-limit/`) — NOT third-party library
+  - Backend: Redis primary + bounded in-memory fallback (20K-bucket LRU cap)
+  - **OTP rate-limit** specialized (`src/lib/auth/otp-rate-limit.ts`): dual IP (5/min, hashed SHA-256) + phone (3/5min, hashed) + verify-lock (5 failures → 15-min lock). Email OTP has parallel implementation
+  - **Sensitive routes fail-CLOSED** when Redis unavailable (SENSITIVE_ROUTE_PREFIXES allowlist covers /api/auth, /api/bookings, /api/payments, /api/{me,cabinet}/delete, /api/reviews, /api/master/portfolio, /api/studio, /api/categories/propose). Returns 429 immediately rather than fail-open
+  - Telegram alert when Redis fails 3× in a minute
+  - Configs (typed presets): bookingCreate 10/min, reviewCreate 5/min, modelOffer 5/hr, destructiveDelete 1/hr, aiSuggest* 20/hr, publicApi 120/min
+  - Middleware-level enforcement in `proxy.ts:resolveRateLimitTier` per-route tier classification
+  - **Findings:** 0 critical / 0 should-fix / 0 nice-to-have
+- **Area 2 — Cache Strategy: ✅ STRONG**
+  - Cache module (`src/lib/cache/cache.ts`) — Redis primary, in-memory fallback ONLY in dev. **Production REQUIRES Redis** (throws at startup if missing)
+  - Key namespacing: consistent colon-separated (`ai:review-summary:`, `advisor:master:`, `slots:`, `plan:current:`, `feed:stories:`, etc)
+  - TTL strategy varied by use case: feature flags 30s / slot cache 120s / plan cache 5min / AI surfaces + advisor 24h
+  - Invalidation: TTL primary + event-driven (schedule changes invalidate slot cache; plan changes invalidate plan cache; advisor manual)
+  - **`delByPattern` uses Redis SCAN with COUNT=100** — production-safe (NOT `KEYS *`)
+  - `setNx` used 3 places as lock pattern (idempotency, hot-slot-freed, weekly-stats-job) — distinct from stampede protection
+  - **Findings:** 0 critical
+    - 🟡 **Cache stampede on hot keys** — no singleflight pattern. Multiple concurrent requests for same hot key (e.g. slots:*, advisor:master:*) can all miss cache simultaneously and all compute. Bounded risk (TTL caps redundant work; worst case N redundant DB queries per TTL window per key). Acceptable for MVP; post-launch optimization via setNx-gated computation. Backlog 🟡 `CACHE-SINGLEFLIGHT-A` (~half-day if needed)
+    - 🔵 **Redis maxmemory-policy** — operator concern (recommend `allkeys-lru` или `volatile-lru` in prod Redis config). NOT code work
+- **Area 3 — CORS: ⚠️ STRONG with 2 🟠 fixable bugs**
+  - Location: `src/proxy.ts` (Next.js middleware-class, renamed from middleware.ts per CLAUDE.md rule 11)
+  - Production origin policy: explicit allowlist (`https://мастеррядом.online`, www variant, env.NEXT_PUBLIC_APP_URL)
+  - Dev origin policy: reflective (any origin) — acceptable for dev only
+  - Credentials: `Access-Control-Allow-Credentials: true` paired с explicit allowlist (correct — not wildcard)
+  - Preflight: OPTIONS returns 204, Max-Age=600 (10 min)
+  - **Findings: 0 critical / 2 🟠 should-fix**
+    - 🟠 **`CORS-WWW-FIX-A`** — `src/proxy.ts:24-25` builds www comparison string WITHOUT `https://` prefix: `` `www.${PRODUCTION_ORIGIN.replace("https://", "")}` `` = `"www.мастеррядом.online"`. Browser sends Origin headers WITH protocol — comparison never matches. **Effectively blocks www subdomain.** Fix: prepend `https://` или use URL parsing. ~10 min including verification
+    - 🟠 **`CORS-IDN-FIX-A`** — production allowlist has literal `https://мастеррядом.online` (Cyrillic IDN). Modern browsers send Origin in Punycode form (`https://xn--80ahbgef0bf9j.online` or similar). Literal string match will fail for Punycode-encoded origins. Need to: (a) verify what real browsers send for this domain via `new URL("https://мастеррядом.online").host`, (b) add Punycode variant to allowlist. ~15 min including encoding verification
+- **Area 4 — Security Headers: ✅ STRONG**
+  - **CSP** set in `proxy.ts` per-request, production-only (dev needs eval for Fast Refresh). Modern pattern: `script-src 'self' 'nonce-{nonce}' 'strict-dynamic' https:` + `frame-ancestors 'none'` + `base-uri 'self'` + `form-action 'self'` + `object-src 'none'` + `upgrade-insecure-requests` (prod). Per-request 16-byte nonce
+  - **HSTS** production-only via `next.config.ts`: `max-age=31536000; includeSubDomains` (1 year). Correctly omitted in dev
+  - **X-Frame-Options:** `DENY` (next.config — redundant с CSP frame-ancestors но defense-in-depth)
+  - **X-Content-Type-Options:** `nosniff`
+  - **Referrer-Policy:** `strict-origin-when-cross-origin`
+  - **Permissions-Policy:** `geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()` (FLoC opt-out)
+  - **Findings:** 0 critical / 0 missing
+    - **Note (not actionable):** `style-src 'unsafe-inline'` — usually unavoidable for Next.js + Tailwind framework styles. Acceptable trade-off — `script-src` is the higher-risk surface and properly nonce-locked
+- **Overall pre-launch severity:**
+
+  | Area | Findings | Severity |
+  |---|---|---|
+  | Rate limiting | 0 issues | ✅ STRONG |
+  | Cache | 0 critical / 1 🟡 / 1 🔵 (DevOps) | ✅ STRONG |
+  | CORS | 2 🟠 (www + IDN bugs) | ⚠️ Should-fix |
+  | Security headers | 0 issues | ✅ STRONG |
+
+- **🎉 NO LAUNCH-BLOCKERS.** 2 🟠 CORS issues are real bugs but bounded scope (www subdomain + IDN encoding) — fix prompts spawned below
+- **Cross-reference SECURITY-AUDIT-A (2026-05-23):** that audit covered application-layer security (privacy invariants, DTO leaks, file uploads, etc). This audit covers infrastructure-layer (rate/cache/CORS/headers) — complementary, no overlap
+- **Validation:** typecheck ✅ / 667/667 tests preserved ✅ / encoding/mojibake ✅ / NO code/config changes confirmed
+- **Spawned fix prompts:**
+  - 🟠 `CORS-WWW-FIX-A` (~10 min) — prepend `https://` to www comparison string в `src/proxy.ts:24-25`. Fix-prompt ready
+  - 🟠 `CORS-IDN-FIX-A` (~15 min) — add Punycode variant к production CORS allowlist for IDN domain compatibility. Fix-prompt ready
+  - 🟡 `CACHE-SINGLEFLIGHT-A` (post-launch, ~half-day) — singleflight pattern via setNx for hot cache keys (slots:*, advisor:master:*). Bounded current risk; optimization not blocking
+- **What was NOT done:**
+  - NO code/config changes (READ-ONLY audit honored)
+  - NO API calls / penetration tests
+  - NO architectural recommendations (findings only; fix decisions separate)
+  - NO sprint work touched
+  - NO schema migrations
+- **STOP-gates triggered:** NONE — clean read-only audit, no major gaps surfaced
+- **Open questions for user:**
+  - Schedule the 2 🟠 CORS fixes pre-launch (~25 min combined)? Recommend yes — both are quick, both are real bugs that would break legitimate users on the www subdomain or with Punycode-encoded origins
+  - `CACHE-SINGLEFLIGHT-A` — defer post-launch unless concrete production traffic shows the bounded redundancy is causing measurable DB load
+  - Redis `maxmemory-policy` — DevOps decision (recommend `allkeys-lru` for safe LRU eviction). NOT code work
+
 ### ~~EMPTY-STATE-COMPONENT-A~~ ✅ ЗАКРЫТ (2026-05-31) — **🎉 Tier 3 COMPLETE (4/4). Shared `<EmptyState>` extracted, 10 callers consolidated, UI consistency improved**
 - **Trigger:** Last Tier 3 pre-launch polish item. 15 dedicated empty-state implementations existed across cabinets — each feature wrote its own with subtly inconsistent visual treatment. Consolidation improves UI consistency before launch
 - **Audit findings (Step 1-2):**

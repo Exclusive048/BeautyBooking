@@ -1325,6 +1325,50 @@ graphify --help                    # Full CLI reference
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-31 — PRE-LAUNCH-QUICK-AUDITS-A** (commit on `auditandaction`). Read-only audit of 4 pre-launch concerns не explicitly covered audit-волна. **NO LAUNCH-BLOCKERS.** 2 🟠 CORS bugs surfaced + fix-prompts spawned. Complementary to SECURITY-AUDIT-A (which covered application-layer; this covers infrastructure)
+  - **Method:** read-only inspection of `src/lib/rate-limit/*`, `src/lib/cache/*`, `src/proxy.ts`, `next.config.ts`. No code/config changes
+  - **Area 1 — Rate Limiting: ✅ STRONG (0 issues)**
+    - Custom module `src/lib/rate-limit/` (NOT third-party)
+    - OTP specialized: dual IP+phone hashed limit + 5-failure verify-lock + email parallel
+    - **Sensitive routes fail-CLOSED** when Redis unavailable (auth/bookings/payments/delete/etc — explicit allowlist)
+    - Bounded in-memory fallback (20K LRU)
+    - Middleware-level tier-classified rate-limit applied per-route in proxy.ts
+  - **Area 2 — Cache Strategy: ✅ STRONG (0 critical)**
+    - Production REQUIRES Redis (throws at startup if missing)
+    - Consistent namespacing (`feature:subfeature:`)
+    - Varied TTL by use case (30s feature flags → 24h AI cache)
+    - SCAN-based delByPattern (not KEYS *) — production-safe
+    - 🟡 No singleflight для stampede protection — bounded risk, backlog post-launch
+    - 🔵 Redis maxmemory-policy is DevOps concern (not code)
+  - **Area 3 — CORS: ⚠️ STRONG with 2 🟠 fixable bugs**
+    - Production: explicit allowlist (`https://мастеррядом.online` + www + env.NEXT_PUBLIC_APP_URL)
+    - Dev: reflective (acceptable)
+    - Credentials + explicit allowlist (semantically correct)
+    - Preflight handled (OPTIONS 204, Max-Age 600)
+    - 🟠 **`CORS-WWW-FIX-A`** — `proxy.ts:24-25` builds www string WITHOUT `https://` prefix → effectively blocks www subdomain. Fix: prepend `https://`. ~10 min
+    - 🟠 **`CORS-IDN-FIX-A`** — Cyrillic IDN domain literal in allowlist; browsers send Punycode form → mismatch. Fix: add Punycode variant. ~15 min
+  - **Area 4 — Security Headers: ✅ STRONG (0 issues)**
+    - **CSP** modern via proxy.ts: per-request nonce + strict-dynamic + frame-ancestors none + base-uri/form-action self + object-src none + upgrade-insecure-requests (prod). Production-only (dev needs eval for Fast Refresh)
+    - HSTS production-only (max-age 1y + includeSubDomains)
+    - X-Frame-Options DENY + X-Content-Type-Options nosniff + Referrer-Policy strict-origin-when-cross-origin + Permissions-Policy comprehensive (camera/mic/geo/payment/usb/interest-cohort all blocked)
+  - **Раздел 3 (Архитектура):** не затронут — pure audit
+  - **Раздел 5 (Бизнес-логика):** не затронут
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 10 (Безопасность):** infrastructure-layer security posture verified comprehensive. SECURITY-AUDIT-A (2026-05-23) covered application-layer concerns; this audit confirms infrastructure layer also strong. CSP modern pattern (nonce + strict-dynamic) blocks reflective XSS structurally
+  - **Раздел 11 (Деплой):** security posture comprehensive — rate limiting + cache + CORS + headers all production-ready. 2 CORS bugs are real but bounded (www + IDN) — fix-prompts spawned
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 667/667 tests preserved ✅ / encoding/mojibake ✅ / NO code/config changes confirmed
+  - **Spawned fix prompts:**
+    - 🟠 `CORS-WWW-FIX-A` (~10 min — real bug, recommend pre-launch)
+    - 🟠 `CORS-IDN-FIX-A` (~15 min — real bug for IDN domain, recommend pre-launch)
+    - 🟡 `CACHE-SINGLEFLIGHT-A` (post-launch, optimization not blocking)
+  - **STOP-gates triggered:** NONE — clean audit
+  - **Open questions for user:**
+    - Schedule 2 CORS fixes pre-launch (~25 min combined)? Recommend YES
+    - CACHE-SINGLEFLIGHT-A defer post-launch unless production traffic shows measurable DB load
+    - Redis maxmemory-policy — DevOps decision (recommend `allkeys-lru`)
+
 - **2026-05-31 — EMPTY-STATE-COMPONENT-A** (commit on `auditandaction`). **🎉 Tier 3 pre-launch polish COMPLETE (4/4).** Shared `<EmptyState>` primitive extracted, 10 cabinet callers consolidated. NO copy text changes, NO new UI_TEXT keys.
   - **Audit:** 15 dedicated empty-state files across cabinets (master 8, admin 4, studio 1, other 2). Each cabinet wrote its own with subtly inconsistent visual treatment. No prior shared component
   - **2 visual variants identified:**
