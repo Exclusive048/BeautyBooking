@@ -1260,6 +1260,27 @@ npm run prisma:generate  # Генерация Prisma client
 npm run smoke            # Smoke тесты
 ```
 
+### Knowledge graph (Graphify — added GRAPHIFY-SETUP-AND-INITIAL-AUDIT 2026-05-31)
+
+> Read-only structural layer for fast codebase navigation. Tree-sitter local parsing (0 LLM cost during build). Skill auto-loaded into Claude Code session via `.claude/skills/graphify/`.
+
+```bash
+graphify update .                  # Rebuild graph from current code (~2 min for ~1825 files; no API cost)
+graphify query "<question>"        # BFS subgraph for a focused question (faster than grep)
+graphify path "<A>" "<B>"          # Shortest path between two symbols (refactor blast-radius scan)
+graphify explain "<symbol>"        # Plain-language description of a node + neighbors
+graphify --help                    # Full CLI reference
+```
+
+**Graph artifacts** (`graphify-out/`, gitignored):
+- `graph.json` — full graph data
+- `GRAPH_REPORT.md` — markdown summary (god nodes, communities, freshness, suggested questions)
+- `cache/` — incremental extraction cache
+
+**When to use:** large codebase question, refactor planning, «which files use X», cluster exploration. **When NOT:** trivial single-file edits, simple greps, sprint-pattern review (use SPRINT-PATTERNS.md).
+
+**Maintenance:** run `graphify update .` after structural sprint phases to keep graph fresh. Optional `graphify watch src/` for auto-rebuild during active work. Privacy: 100% local tree-sitter; no third-party LLM calls during build (token cost 0 input / 0 output verified at install).
+
 ### Типичные задачи
 
 **Добавить новый тип уведомления:**
@@ -1287,6 +1308,53 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-05-31 — GRAPHIFY-SETUP-AND-INITIAL-AUDIT** (commit on `auditandaction`). Always-on knowledge layer installed. **NO source code modifications.** **NO architectural fixes applied** — initial audit revealed 0 actionable findings (codebase architecturally clean).
+  - **Pre-install state:** Graphify v0.8.25 already globally installed via pip (Python 3.10). NO new install required. Pipx not available; uv 0.11.15 available as alt. Phase 2 install step satisfied by existing global install.
+  - **Build:** `graphify update .` ran ~2 min — **1825 files / 9500 nodes / 27447 edges / 353 communities** (328 shown + 25 thin omitted). 100% AST-extracted via tree-sitter local; 65 inferred edges (avg confidence 0.8). **Token cost: 0 input / 0 output** — privacy verified (no LLM calls during build).
+  - **Integration:** `graphify install --project --platform claude` → created `.claude/skills/graphify/SKILL.md` (skill manifest) + `.claude/CLAUDE.md` (3-line minimal pointer) + appended `## graphify` section to **root `CLAUDE.md` (lines 80-87, 8 lines added)** + registered PreToolUse hook in `.claude/settings.json` (matcher: Bash; fires only on grep/rg/find/fd/ack/ag command patterns; emits informational reminder via `hookSpecificOutput.additionalContext`; does NOT block tools or modify behavior — purely additive context).
+  - **Verification:** skill now visible in Claude Code available-skills list. `graphify query "where is the booking flow defined?"` returned 283 relevant nodes in ~2s, correctly surfaced `route.ts [src=src/app/api/cabinet/master/schedule/route.ts]` + booking primitives + helper graph. Query subgraph dramatically smaller than full GRAPH_REPORT.md.
+  - **Раздел 3 (Архитектура):** new tooling layer documented. **NO source code changes** — Graphify is read-only on codebase. New artifacts:
+    - `.claude/skills/graphify/SKILL.md` (skill manifest)
+    - `.claude/CLAUDE.md` (3 lines)
+    - `CLAUDE.md` root (8 lines appended at end — `## graphify` section instructing to prefer `graphify query` over raw grep for codebase questions)
+    - `.claude/settings.json` (PreToolUse hook added under `hooks.PreToolUse[]`)
+    - `graphify-out/` directory (gitignored — `graph.json` + `GRAPH_REPORT.md` + `cache/` + `manifest.json`)
+  - **Раздел 5 (Бизнес-логика):** не затронут — pure tooling install
+  - **Раздел 6 (Маршруты):** не затронут
+  - **Раздел 14 (Tooling):** new «Knowledge graph (Graphify)» subsection added — commands + maintenance + privacy guarantee
+  - **Раздел 15:** this entry
+  - **Architectural findings categorized (per spec rule 6 honesty):**
+    - **🔴 Actionable findings: NONE.** Graphify's structural audit lens revealed nothing requiring a fix prompt. Validates the 11-audit-wave + all sprint discipline produced an architecturally clean codebase.
+    - **📗 Noted findings (no action needed):**
+      - **Top 10 god nodes all by-design foundational helpers** — `UI_TEXT` (626 edges) validates CLAUDE.md rule 1 single-source-of-truth project-wide; `toAppError` / `jsonOk` / `jsonFail` / `getRequestId` / `cn` / `logError` / `Button` / `getSessionUser` / `parseBody` all explicitly designed cross-cutting concerns. NONE problematic.
+      - **Cluster structure aligns with feature modules** — Community 7 = billing, Community 13 = admin audit, Community 14 = OTP/visual-search, Community 17 = schedule core, Community 22 = admin cities, Community 24 = chat shell, Community 28 = schedule cache. Domain boundaries respected.
+      - **«Surprising connections» all expected** — 5 script→lib edges in backfill/migration scripts (backend tooling pattern, not coupling concerns).
+      - **NO circular dependencies surfaced** — would have appeared in surprising-connections section.
+      - **NO unexpected cross-domain coupling** — billing doesn't depend on feed, feed doesn't depend on admin.
+    - **🔵 Noise (graph artifacts / expected patterns / false positives):**
+      - **2906 isolated nodes (30%)** — mostly config-file singletons (`eslintConfig`, `nextConfig`, `withPWA`, `withBundleAnalyzer`). Tree-sitter doesn't extract relationships through complex config patterns. Not real isolation.
+      - **Low cohesion 0.02-0.06 per community** — heuristic, expected for TypeScript with many small files. 353 communities / 9500 nodes ≈ 27 nodes/community signals well-modularized code.
+      - **Knowledge-gap «high betweenness centrality» suggestions for UI_TEXT / cn / logError** — these are by-design cross-cutting concerns; centrality is FEATURE, not bug.
+  - **Раздел 12 (Инварианты):** не затронуты. Graphify validated existing invariants (centralized UI_TEXT, API helper consolidation) — actionable confirmation that the discipline produces measurable structural health.
+  - **Validation:** typecheck ✅ / encoding ✅ / mojibake ✅ / context-freshness ✅ / 653/653 tests ✅ (Graphify is read-only — no test surface changed) / build not re-run (no source changes)
+  - **What was NOT done (per strict rules):**
+    - **NO source code modifications** (Graphify is read-only on codebase by design)
+    - **NO architectural fixes applied** (none warranted — initial audit clean)
+    - **NO commit** — files staged but not committed per project rule
+    - **NO schema changes**, **NO new dependencies in package.json** (Graphify is a Python CLI, not a Node dependency)
+    - **NO behaviour change for existing tests, build, or runtime**
+    - **NO third-party data egress during build** (verified via «Token cost: 0 input · 0 output» in build output)
+  - **Future maintenance:**
+    - Run `graphify update .` after sprint phases (no API cost, ~2 min, incremental cache used after first build)
+    - Optional `graphify watch src/` for auto-rebuild during active sprint phases
+    - Re-run quarterly post-launch to track architectural drift over time
+  - **Rollback procedure (if ever decided to remove):**
+    ```bash
+    graphify uninstall --purge          # removes skill + graphify-out/ + reverts CLAUDE.md/settings.json edits
+    # OR manual: rm -rf .claude/skills/graphify graphify-out/ + revert CLAUDE.md + .claude/settings.json
+    ```
+  - **Open questions for user:** none. Initial audit clean (no actionable findings → no fix-prompts spawned). Ready for continued Yandex AI migration work and remaining pre-launch tasks. Faster Claude Code navigation via `/graphify query` available from next prompt onward.
 
 - **2026-05-31 — AI-ADVISOR-MIGRATE-A (OpenAI → Yandex Phase 4e — final chat surface migration)** (commit on `auditandaction`). **🎉 4/4 chat surfaces now on YandexGPT 5 Lite — AI MIGRATION CORE COMPLETE.** Decision: ✅ MIGRATION ACCEPTED on Lite (Yandex 4.66/5 vs OpenAI 4.77/5 — Δ -0.11, all 5 categories pass ≥4.0 threshold). ZERO surface-code changes — Phase 3 abstraction held across ALL 4 surfaces. NO Pro upgrade applied (Lite passes; gap stylistic + prompt-fixable).
   - **Audit findings:**

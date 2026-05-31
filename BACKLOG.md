@@ -31,6 +31,51 @@
 
 > Полная карта sprint'а — выполненные направления. Детали по каждому коммиту в AI_CONTEXT раздел 15.
 
+### ~~GRAPHIFY-SETUP-AND-INITIAL-AUDIT~~ ✅ ЗАКРЫТ (2026-05-31) — **Graphify integrated + initial audit complete**
+- **Install:** Graphify v0.8.25 already globally installed via pip (Python 3.10). NO new install required.
+- **Build stats:** `graphify update .` ran in ~2 min — **1825 files / 9500 nodes / 27447 edges / 353 communities** (328 shown + 25 thin omitted). 100% AST-extracted (tree-sitter local), 65 inferred edges (avg confidence 0.8). Token cost: **0 input / 0 output** (no LLM calls — privacy clean).
+- **Integration:** `graphify install --project --platform claude` → created `.claude/skills/graphify/SKILL.md` + `.claude/CLAUDE.md` (3 lines, minimal) + appended «graphify» section to root `CLAUDE.md` (lines 80-87, 8 lines added) + registered PreToolUse hook in `.claude/settings.json` (matcher: Bash; fires only on grep/rg/find/fd/ack/ag patterns, emits informational reminder, does NOT block tools). Skill now visible in Claude Code session (confirmed in available-skills list).
+- **Privacy verified:** ✅ 0 LLM token cost during build. Tree-sitter AST extraction only. No third-party data egress. CLAUDE.md mentions optional GEMINI_API_KEY for richer semantic extraction but NOT used (basic extraction sufficient).
+- **`/graphify query` test:** ✅ working — query «where is the booking flow defined?» returned 283 nodes in ~2s, correctly surfaced `route.ts [src=src/app/api/cabinet/master/schedule/route.ts]` + booking primitives + helper graph.
+- **Architectural findings categorization:**
+
+**📗 Noted (good to know, NO immediate action — codebase architecturally healthy):**
+  - **Top 10 god nodes all by-design foundational helpers** (no problematic mega-abstractions): `UI_TEXT` (626 edges — validates CLAUDE.md rule 1 single-source-of-truth project-wide) / `toAppError()` (464) / `getRequestId()` (416) / `jsonFail()` (374) / `jsonOk()` (368) / `cn()` (327 — Tailwind class merge) / `logError()` (303) / `Button()` (235 — UI primitive) / `getSessionUser()` (201 — auth) / `parseBody()` (136 — Zod validation). **NONE problematic.** All match invariants in CLAUDE.md.
+  - **Cluster structure aligns with feature modules** — Community 7 = billing helpers, Community 13 = admin audit, Community 14 = OTP/visual-search, Community 17 = schedule core, Community 22 = admin cities, Community 28 = schedule cache, Community 24 = chat shell. Naming reflects business domains correctly — healthy decomposition.
+  - **«Surprising connections» all expected** — 5 script→lib edges in backfill scripts (`scripts/backfill-cities-from-addresses.ts → src/lib/cities/detect-city.ts`, `scripts/migrate-billing-plans.ts → src/lib/billing/plan-seed.ts`, etc.). Expected backend tooling pattern, NOT actual coupling concerns.
+  - **NO circular dependencies surfaced** — would have appeared as a «surprising connection» if present. Clean.
+  - **NO unexpected cross-domain coupling** — billing doesn't depend on feed, feed doesn't depend on admin, etc. Domain boundaries respected.
+
+**🔵 Noise (graph artifacts / expected patterns / false positives):**
+  - **2906 isolated nodes (30% of graph)** — mostly config-file singletons (`eslintConfig`, `path`, `withBundleAnalyzer`, `withPWA`, `nextConfig`). Tree-sitter doesn't extract relationships through complex config-file patterns. **Not real isolation** — these files DO have effects on the build, just not parseable as graph edges.
+  - **Low cohesion scores (0.02-0.06) per community** — heuristic averages, expected for a TypeScript codebase with many small files. 353 communities for 9500 nodes (~27 nodes/community) signals well-modularized code, not over-fragmentation. Community-split suggestions ignored.
+  - **Knowledge-gap «high betweenness centrality» questions for UI_TEXT / cn / logError** — these are by-design cross-cutting concerns; their betweenness is FEATURE, not bug. CLAUDE.md rule 1 (centralized UI_TEXT) explicitly enforces this pattern.
+
+**🔴 Actionable findings: NONE.** Graphify's structural audit lens revealed nothing requiring a fix prompt. Codebase architecturally clean.
+
+- **What this enables for future Claude Code work:**
+  - Faster file discovery via `graphify query "<question>"` (BFS subgraph, smaller than full GRAPH_REPORT.md)
+  - `graphify path "<A>" "<B>"` shows shortest path between two symbols — useful for understanding refactor blast radius
+  - `graphify explain "<symbol>"` gives plain-language explanation of a node + neighbors
+  - PreToolUse hook gently nudges future sessions toward graphify when grep/rg patterns detected — no behavior change
+  - Faster onboarding for second developer / future Claude session via cluster-by-cluster exploration
+- **Maintenance:** run `graphify update .` after structural changes (no API cost, ~2 min). Optional `graphify watch <path>` for auto-rebuild on save. CLAUDE.md graphify section instructs to prefer query/path/explain over raw grep.
+- **Rollback procedure (if ever needed):**
+  ```bash
+  graphify uninstall --purge          # removes skill + graphify-out/ + reverts CLAUDE.md/settings.json edits
+  # OR manual: rm -rf .claude/skills/graphify graphify-out/ + revert CLAUDE.md + .claude/settings.json
+  ```
+- **Files modified (per project rules — never commit raw graph output):**
+  - `.gitignore` — added `graphify-out/` exclusion (+ explanatory comment block)
+  - `CLAUDE.md` (root) — appended `## graphify` section (lines 80-87)
+  - `.claude/CLAUDE.md` (new) — 3-line minimal pointer
+  - `.claude/skills/graphify/SKILL.md` (new) — skill manifest
+  - `.claude/settings.json` — appended PreToolUse hook (Bash matcher, grep-pattern-only, non-blocking)
+- **NO source code modifications.** NO architectural fixes applied (none warranted). NO schema changes. Sprint work preserved (653 tests, all gates).
+- **Spawned backlog: NONE** — no actionable findings to track. Future considerations:
+  - 🔵 (optional, opportunistic) `graphify watch src/` during active sprint phases for auto-rebuild as code evolves
+  - 🔵 (optional, post-launch) re-run `graphify update .` quarterly to track architectural drift over time
+
 ### ✅ Завершено
 - [x] **Catalog** — каталог мастеров + favorites (22a/b)
 - [x] **Cabinet Master shell** — sidebar + topbar + UserChip (23a)

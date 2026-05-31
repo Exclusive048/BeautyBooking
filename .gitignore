@@ -70,3 +70,8 @@ docs/runbooks/
 !docs/AI-MIGRATION-STRATEGY.md
 !docs/migration-samples/
 !docs/migration-samples/**
+
+# Graphify knowledge graph output (regeneratable via `graphify update .`)
+# Excludes graph.json (large, derived) + GRAPH_REPORT.md (large, derived) + cache.
+# Skill manifest + CLAUDE.md + .claude/settings.json hook are version-controlled separately.
+graphify-out/
