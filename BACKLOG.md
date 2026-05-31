@@ -604,7 +604,7 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Operational tail:** advisor advice production-ready on Yandex Lite. After operator approves production cutover (separate decision after 1-week dev stability of all 4 surfaces), masters will receive Yandex-generated advice. Rollback path: env-toggle `AI_PROVIDER=openai` reverts instantly. `OPENAI_API_KEY` preserved
 - **Process insight:** synthetic stats validation worked well (15 profiles × 5 categories × clear pattern coverage). Same approach as Phase 4d. Real DB sampling deferred to operator's discretion if production validation reveals stat-distribution edge cases not covered by synthetic profiles
 - **Spawned backlog:**
-  - 🔵 `AI-ADVISOR-PROMPT-TUNE` — add «Дай конкретные числа и примеры в советах» to prompt; could close Yandex's 0.53 Actionability gap without Pro upgrade. ~1 hour focused work (non-urgent — Lite passes ≥4.0 across all categories)
+  - ~~`AI-ADVISOR-PROMPT-TUNE`~~ ✅ ЗАКРЫТ (2026-05-31, single iteration) — see AI-ADVISOR-PROMPT-TUNE-A entry below
 
 ### ~~OPENAI-CLEANUP-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Pre-launch reality correction: Yandex is single chat provider**
 - **Trigger:** Migration complete (Phases 4b/4c/4d/4e all ✅ ACCEPTED on Lite). Pre-launch project (no production users, no «cutover» concept). OpenAI-fallback infrastructure no longer needed.
@@ -634,6 +634,73 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
   - Visual search clearly tagged as post-launch independent work
 - **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
 - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
+
+### ~~AI-ADVISOR-PROMPT-TUNE-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Actionability 4.00 → 4.975 (Δ +0.975) на single prompt iteration. Phase 4e hypothesis «prompt-fixable» VALIDATED.**
+- **Trigger:** Tier 3 pre-launch polish. Phase 4e (AI-ADVISOR-MIGRATE-A) identified Actionability gap (Yandex 4.00 vs OpenAI 4.53) — agent predicted «prompt-fixable, not model-fixable». This commit tested + validated the prediction.
+- **Scope:** `src/lib/ai/prompts.ts` `advisorAdvice.system` ONLY. NO surface code changes. NO model upgrade. NO other prompts touched.
+- **Gap pattern analysis (from Phase 4e samples):**
+  - Yandex generic patterns: «расширьте присутствие в соцсетях» (repetitive), «онлайн-запись сервисы» (despite master уже on booking platform — nw-2 context-blindness), generic «акции», fewer specific numbers
+  - OpenAI specific patterns: «5-10 фото», «20% скидка», «10-15 фото», «до/после», time-bound offers
+  - Root cause: minimal 3-line prompt («Дай 1-2 конкретных совета... Коротко, без воды») — Yandex Lite interpreted «конкретных» as COUNT («specific NUMBER of advice items» = 1-2) NOT as «specific CONTENT (with concrete details)». OpenAI's more elaborate training compensated; Yandex needed explicit instruction
+- **Iteration 1 prompt change:** added 3 elements к `advisorAdvice.system`:
+  1. **Explicit specificity rule:** «Каждый совет должен содержать конкретное число или пример»
+  2. **BAD/GOOD examples** (concrete bait-and-switch table):
+     - BAD: «улучшайте профиль», «расширьте присутствие в соцсетях», «проводите акции», «используйте онлайн-запись»
+     - GOOD: «добавьте 5-10 фото работ в портфолио», «опубликуйте 2-3 поста с фото до/после в Instagram в неделю», «запустите акцию: 15% скидка постоянным клиентам, привёдшим друга»
+  3. **Context-blindness fix:** «Не предлагай онлайн-запись или регистрацию на платформах — мастер уже зарегистрирован на МастерРядом» (directly addresses nw-2 issue from Phase 4e where Yandex suggested «онлайн-запись сервисы»)
+- **Prompt growth:** 3 lines → 10 lines (+~120 tokens system prompt). Per-call cost impact negligible (~0.024₽ extra per call at Lite 0.20₽/1K) — well below quality improvement justification
+- **Iteration 1 validation:** 8 profiles sampled (subset of Phase 4e weakest-scoring profiles where lift mattered most): lt-1, lt-2, md-1, md-3, hi-2, hi-3, pr-3, nw-2
+- **Scoring (Actionability per-profile):**
+
+  | Profile | Phase 4e Yandex | Iter1 | Δ | Notes |
+  |---|---|---|---|---|
+  | lt-1 | 4.0 | **5.0** | +1.0 | «5-10 фото профиль» + «100-150 слов описание» |
+  | lt-2 | 4.0 | **5.0** | +1.0 | «2-3 преимущества» (с example «натуральные средства») + «2-3 поста до/после» |
+  | md-1 | 4.0 | **5.0** | +1.0 | «2-3 поста до/после в неделю» + «скидка 10-15% новым» |
+  | md-3 | 4.0 | **4.8** | +0.8 | Specific posts + discount; no-show issue not directly addressed |
+  | hi-2 | 4.0 | **5.0** | +1.0 | «2-3 поста в неделю» + «10-15% за двух друзей» |
+  | hi-3 | 4.0 | **5.0** | +1.0 | «5-10 новых фото» + «20% акция на месяц» — time-bound |
+  | pr-3 | 4.0 | **5.0** | +1.0 | «3-5 новых фото» + «10-15% первым трём в неделю» |
+  | nw-2 | 4.0 | **5.0** | +1.0 | **🎉 «Онлайн-запись» context-blindness FIXED** — no longer suggests booking platform |
+  | **Aggregate** | **4.00** | **4.975** | **+0.975** |
+
+- **Other criteria preserved (no regressions):**
+  - **Accuracy:** 5.0/5 — no hallucinations across 8 samples; all stats-aware
+  - **Tone (business consultant):** 5.0/5 — preserved cleanly, no «Здравствуйте» prefix
+  - **Task adherence:** 5.0/5 — all 8 deliver 1-2 advice items
+  - **RU language:** 5.0/5 — clean Russian throughout
+- **Decision: ✅ ACCEPT iteration 1.** Target was ≥4.3; actual **4.975**. Exceeded by 0.675. **Iteration 2 not needed.** Phase 4e hypothesis «prompt-fixable, not model-fixable» **VALIDATED** — Pro upgrade explicitly avoided per Phase 4e plan (4× cost savings preserved)
+- **Files modified:**
+  - **MODIFIED** [`src/lib/ai/prompts.ts`](src/lib/ai/prompts.ts) — `advisorAdvice.system` block only (lines 52-55 → ~62)
+  - **NEW** [`docs/migration-samples/advisor-yandex-tuned.json`](docs/migration-samples/advisor-yandex-tuned.json) — 8 tuned samples archived (gitignored per project convention but locally preserved as evidence)
+  - **DELETED** `scripts/sample-advisor-tune.mts` — temporary, removed post-validation
+- **Files preserved verbatim:**
+  - `src/lib/advisor/ai-advice.ts` — abstraction held (no code change needed for prompt tune)
+  - `src/lib/ai/client.ts` — Yandex-only wrapper untouched
+  - `src/lib/ai/config.ts` — startup config untouched
+  - Other 3 prompts in `prompts.ts` (reviewSummary / reviewReply / serviceDescription) — preserved verbatim
+  - `src/lib/visual-search/*` — independent track
+  - Phase 4e samples archive (`advisor-openai.json` + `advisor-yandex.json`) — preserved as historical baseline
+- **Cumulative advisor cost (per-prompt + tune validation):**
+  - Phase 4e baseline: ~0.55₽ (30 calls)
+  - Tune iter1: ~0.15₽ (8 calls, system prompt slightly longer but still bounded)
+  - Total advisor surface: **~0.70₽**
+- **Cumulative migration + cleanup spend (all AI work):**
+  - Phase 4b ~0.30₽ + 4c ~0.50₽ + 4d ~0.40₽ + 4e ~0.55₽ + tune ~0.15₽ = **~1.90₽**
+- **No STOP-gates triggered** — single iteration achieved target; no regression in other criteria; no model upgrade needed
+- **Validation:** typecheck ✅ / 651/651 tests preserved ✅ / encoding/mojibake ✅
+- **What was NOT done:**
+  - NO surface code changes (`ai-advice.ts` abstraction held)
+  - NO model upgrade (Lite stays default per Phase 4e decision)
+  - NO other prompts touched (reviewSummary / reviewReply / serviceDescription preserved)
+  - NO production cutover
+  - NO schema changes
+  - NO test additions (prompt change tested through sampling, not unit tests — same as Phase 4b-4e pattern)
+- **Pre-launch Tier 3 progress:** 2 of 4 items done (VAPID-PUSH-VERIFY + AI-ADVISOR-PROMPT-TUNE). Remaining: MRR-CRON-SCHEDULE, YANDEX-DEPLOY-A, CLEANUP-BILLING-PROD execution
+- **Process insight (Pattern 5 + new):**
+  - **Pattern 5 (coverage-tail closure) applied to prompt quality** — Phase 4e closed migration; this commit closed the single per-criterion gap that remained. Same shape as OPENAI-CLEANUP-A closing the dual-stack tail after Phase 4e closed the migration tail
+  - **New observation worth noting:** for Yandex Lite, **explicit BAD/GOOD examples in prompt outperform abstract «be specific» instructions**. The «избегай общих фраз типа X, пиши конкретно как Y» pattern produced immediate measurable improvement. Strong signal for future Yandex prompt engineering on other surfaces
+- **Open questions for user:** none. Clean improvement, validates Phase 4e hypothesis, no follow-ups needed
 
 ### ~~VAPID-PUSH-VERIFY-WORKFLOW-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Operational runbook для push notifications post-deploy verification**
 - **Trigger:** Tier 3 pre-launch polish. Push notifications могут быть active at launch (auto-subscribe via `<PushManager>` on first cabinet load in production) — broken push = silent failure. Need verified-ready procedure document so operator может confidently verify push works end-to-end после production deploy.

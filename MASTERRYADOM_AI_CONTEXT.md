@@ -1325,6 +1325,47 @@ graphify --help                    # Full CLI reference
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-31 — AI-ADVISOR-PROMPT-TUNE-A** (commit on `auditandaction`). Tier 3 pre-launch polish — closes Phase 4e Actionability gap (Yandex 4.00 → **4.975**, Δ +0.975) на single prompt iteration. **Validates Phase 4e hypothesis «prompt-fixable, not model-fixable» — Pro upgrade avoided per plan (4× cost savings preserved).** NO surface code changes. NO model upgrade. NO other prompts touched.
+  - **Gap pattern analysis (from Phase 4e samples):** Yandex Lite interpreted minimal prompt's «конкретных совета» as COUNT (1-2) NOT as «specific CONTENT». Generic patterns dominated: «расширьте присутствие в соцсетях», «онлайн-запись сервисы» (despite master on platform), generic «акции», fewer specific numbers vs OpenAI's «5-10 фото», «20% скидка», «10-15 фото», «до/после», time-bound offers
+  - **Iteration 1 prompt change (only in `src/lib/ai/prompts.ts` `advisorAdvice.system` block):** 3 lines → 10 lines (+~120 tokens system prompt). Added:
+    1. **Explicit specificity rule:** «Каждый совет должен содержать конкретное число или пример»
+    2. **BAD/GOOD examples table** (concrete bait-and-switch):
+       - BAD: «улучшайте профиль», «расширьте присутствие в соцсетях», «проводите акции», «используйте онлайн-запись»
+       - GOOD: «добавьте 5-10 фото работ в портфолио», «опубликуйте 2-3 поста с фото до/после в Instagram в неделю», «запустите акцию: 15% скидка постоянным клиентам, привёдшим друга»
+    3. **Context-blindness fix:** «Не предлагай онлайн-запись или регистрацию на платформах — мастер уже зарегистрирован на МастерРядом» (directly addresses nw-2 issue from Phase 4e where Yandex suggested «онлайн-запись сервисы»)
+  - **Validation:** 8 profiles sampled (subset of Phase 4e weakest-scoring profiles where lift mattered most): lt-1, lt-2, md-1, md-3, hi-2, hi-3, pr-3, nw-2
+  - **Per-profile Actionability scoring:**
+
+    | Profile | Phase 4e Yandex | Iter1 | Δ |
+    |---|---|---|---|
+    | lt-1 | 4.0 | **5.0** | +1.0 |
+    | lt-2 | 4.0 | **5.0** | +1.0 |
+    | md-1 | 4.0 | **5.0** | +1.0 |
+    | md-3 | 4.0 | **4.8** | +0.8 |
+    | hi-2 | 4.0 | **5.0** | +1.0 |
+    | hi-3 | 4.0 | **5.0** | +1.0 |
+    | pr-3 | 4.0 | **5.0** | +1.0 |
+    | nw-2 | 4.0 | **5.0** | +1.0 (🎉 «онлайн-запись» context-blindness FIXED) |
+    | **Aggregate** | **4.00** | **4.975** | **+0.975** |
+
+  - **Other criteria preserved (no regressions):** Accuracy 5.0/5 (no hallucinations) / Tone 5.0/5 (business consultant preserved, no «Здравствуйте» prefix) / Task adherence 5.0/5 / RU language 5.0/5
+  - **Decision: ✅ ACCEPT iteration 1.** Target was ≥4.3; actual **4.975**. Exceeded by 0.675. **Iteration 2 not needed.** Notable bonus: nw-2 context-blindness (Phase 4e known weakness) resolved by explicit instruction
+  - **Раздел 3 (Архитектура):** 1 source file modified (prompts.ts advisorAdvice block only). NO ai-advice.ts changes. NO client.ts changes. NO other prompt changes
+  - **Раздел 5 (Бизнес-логика):** semantics identical — advisor advice generation still flows: master → cabinet UI → `getAdvisorInsights(providerId)` → `computeAdvisorInsights` → `generateAdvisorAdvice(stats)` → `aiChat()` → Yandex Lite → returns 1-2 advice items in Russian → cached 24h. Only the PROMPT content changed; flow unchanged
+  - **Раздел 6 (Маршруты):** not affected
+  - **Раздел 11 (Производительность):** prompt growth +~120 tokens — negligible cost impact (~0.024₽ per call at Lite pricing); well below quality improvement justification. 24h advisor cache absorbs latency for repeat-views
+  - **Раздел 12 (Инварианты):** не затронуты — wrapper invariant + abstraction held
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 651/651 tests preserved ✅ / encoding/mojibake/ui-text ✅ / no behaviour regression
+  - **Files modified:** `src/lib/ai/prompts.ts` (advisorAdvice block) + `BACKLOG.md` + `MASTERRYADOM_AI_CONTEXT.md`
+  - **Files preserved verbatim:** `src/lib/advisor/ai-advice.ts` (abstraction held), `src/lib/ai/client.ts` (Yandex-only post-cleanup), other 3 prompts (reviewSummary / reviewReply / serviceDescription), Phase 4e baseline archives
+  - **NEW archive:** `docs/migration-samples/advisor-yandex-tuned.json` — 8 tuned samples preserved as evidence (gitignored per project convention; available locally for future tune validation comparisons)
+  - **DELETED:** `scripts/sample-advisor-tune.mts` — temporary post-validation
+  - **Cumulative AI spend (all migration + cleanup + tune):** Phase 4b ~0.30₽ + 4c ~0.50₽ + 4d ~0.40₽ + 4e ~0.55₽ + tune ~0.15₽ = **~1.90₽** total
+  - **Pre-launch Tier 3 progress:** 2 of 4 items done (VAPID-PUSH-VERIFY + AI-ADVISOR-PROMPT-TUNE). Remaining: MRR-CRON-SCHEDULE, YANDEX-DEPLOY-A, CLEANUP-BILLING-PROD execution
+  - **Process insight — new prompt engineering pattern для Yandex Lite:** **explicit BAD/GOOD examples outperform abstract «be specific» instructions.** The «избегай общих фраз типа X, пиши конкретно как Y» pattern produced immediate +0.975 improvement on Actionability with no regression elsewhere. Strong signal for future Yandex prompt engineering on other surfaces if similar gaps surface. Documented для potential reuse if reviewSummary/reviewReply/serviceDescription ever need similar tuning
+  - **Open questions for user:** none. Clean improvement, hypothesis validated, no follow-ups needed
+
 - **2026-05-31 — VAPID-PUSH-VERIFY-WORKFLOW-A** (commit on `auditandaction`). Tier 3 pre-launch polish — operational runbook for push notifications post-deploy verification. **Documentation-only.** NO source code changes. NO env changes. NO live push dispatch.
   - **Audit findings (push infrastructure complete):**
     - **Library:** `web-push` (Node.js, server-side only)
