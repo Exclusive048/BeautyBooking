@@ -635,6 +635,55 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
 - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
+### ~~CORS-FIXES-BATCH-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Both 🟠 CORS bugs from PRE-LAUNCH-QUICK-AUDITS-A closed via single unified fix. www subdomain + Cyrillic IDN → Punycode normalization handled.**
+- **Trigger:** 2 🟠 bugs identified by PRE-LAUNCH-QUICK-AUDITS-A (rate-limit/cache/CORS/security-headers audit). Pre-launch fix to ensure legitimate users on www subdomain OR Punycode-encoded origins aren't blocked
+- **Pre-flight verification (Step 1-3):**
+  - Read `src/proxy.ts:1-50` — confirmed exact bug locations matching audit
+  - Bug 1 verified: line 22 `` `www.${PRODUCTION_ORIGIN.replace("https://", "")}` `` = `"www.мастеррядом.online"` (no protocol; browser sends with protocol)
+  - Bug 2 verified: line 8 `PRODUCTION_ORIGIN = "https://мастеррядом.online"` (Cyrillic literal; browsers send Punycode)
+  - **Critical: discovered actual Punycode form is `xn--80aic0adlmagk0m.online`** (NOT the placeholder used in audit/prompt). Determined via `node -e "new URL('https://мастеррядом.online').origin"`
+  - **Node URL parsing verified handles BOTH forms automatically:** input Cyrillic → output Punycode; input Punycode → output Punycode (idempotent). This unlocked Option B path
+- **Approach decision: Option B (URL normalization)** — verified working perfectly across 5 test cases (Cyrillic bare / Punycode bare / Cyrillic www / Punycode www / wrong protocol). Cleaner than Option A's manual enumeration of 4+ literal strings; future-proof when adding new origins; no risk of Punycode form drift
+- **Fix applied (Step 4):** [`src/proxy.ts`](src/proxy.ts) — lines 8-65 modified:
+  - **NEW constant** `PRODUCTION_WWW_ORIGIN = "https://www.мастеррядом.online"` (explicit, with protocol — closes Bug 1)
+  - **NEW exported helper** `normalizeOrigin(origin: string): string | null` — wraps `new URL().origin`; returns null on parse failure (defensive). Exported для testability + future reuse
+  - **NEW const** `PRODUCTION_ALLOWLIST_NORMALIZED = new Set([...].map(normalizeOrigin).filter(...))` — pre-computed at module load для O(1) lookup
+  - **`getAllowedOrigin()` rewritten:** normalizes incoming origin via `normalizeOrigin()`, compares against normalized allowlist Set. NEXT_PUBLIC_APP_URL also runs through `normalizeOrigin()` (was raw string compare before — bonus fix for env-var case)
+  - **Dev mode unchanged** (reflective, as before — fine for dev)
+  - **Behavior preservation:** `Access-Control-Allow-Origin` response header echoes the RAW browser-sent string (per browser convention) — only the comparison is normalized
+- **Tests added (Step 5):** [`src/proxy.test.ts`](src/proxy.test.ts) NEW file — 16 tests covering:
+  - 7 normalizeOrigin tests (Cyrillic→Punycode normalization, idempotent Punycode, www variant, null on parse fail, protocol preservation, non-IDN passthrough, path/query/hash strip)
+  - 9 allowlist behavior tests:
+    - Bug 1 regression: www Cyrillic + www Punycode both allowed
+    - Bug 2 regression: bare Cyrillic + bare Punycode both allowed
+    - Security negatives: evil origin rejected, wrong protocol rejected (http vs https), look-alike subdomain hijack rejected (`xn--...online.evil.com`), empty/malformed rejected, unauthorized subdomains (api/admin.мастеррядом.online) rejected
+- **Validation (Step 6):**
+  - typecheck ✅
+  - **683/683 tests** ✅ (667 → 683, net +16 from new proxy.test.ts)
+  - lint baseline preserved (1 error / 3 warnings — pre-existing, unrelated)
+  - encoding ✅
+  - mojibake ✅
+- **Files modified (2 total):**
+  - **MODIFIED** `src/proxy.ts` — only `getAllowedOrigin` + 2 new constants + 1 new exported helper. NO other changes (rate-limit / preflight / CSP / cookie handling / request-id all preserved verbatim)
+  - **NEW** `src/proxy.test.ts` — 16 regression tests
+- **Files preserved verbatim:**
+  - `src/proxy.ts` everything OUTSIDE the CORS section (rate-limit tier resolution, CSP nonce generation, OPTIONS preflight handler, cookie refresh logic, request-id, set-cookie splitting, etc)
+  - `next.config.ts` (security headers — separately strong)
+  - `src/lib/rate-limit/*` (independent module — covered by audit, no bugs)
+  - All cabinet code, business logic, sprint work
+- **No structural redesign** — fix is targeted (single function rewritten + 1 helper + 1 constant). Doesn't touch other proxy.ts concerns (rate-limit / CSP / preflight / cookie refresh)
+- **No STOP-gates triggered** — Node URL parsing IDN behavior was exactly as predicted (Option B worked first time); proxy.ts structure matched audit; existing tests preserved
+- **Both bugs closed:**
+  - 🟠 `CORS-WWW-FIX-A` — explicit `PRODUCTION_WWW_ORIGIN` constant с correct `https://` prefix + normalized comparison
+  - 🟠 `CORS-IDN-FIX-A` — `new URL().origin` auto-converts Cyrillic→Punycode для both incoming AND allowlist, so any browser-sent form matches
+- **Pre-launch state:**
+  - All 4 PRE-LAUNCH-QUICK-AUDITS areas now ✅ / 0 launch-blockers / 0 🟠 should-fix outstanding
+  - CORS comprehensive: handles Cyrillic + Punycode + bare + www subdomain + env-var override + look-alike attack rejection + protocol preservation
+- **Process insight (small but worth recording):**
+  - **Audit's placeholder Punycode (`xn--80aaqmbjngarkb2chcv5l.online`) was WRONG** — actual is `xn--80aic0adlmagk0m.online`. This is why audit prompts should say «verify via `new URL()`» rather than embedding speculative Punycode strings. Saved us от Option A's «hardcode the wrong Punycode» pitfall
+  - **Option B (URL normalization) is preferred over Option A (literal enumeration)** when Node URL parsing handles the normalization. Tested before committing — exactly what spec rule 10 STOP-gate guarded against («if Node URL parsing IDN behavior unexpected → fallback к Option A»). Node parsed correctly → no fallback needed
+- **Open questions for user:** none. Clean fix. Both bugs closed with regression tests pinning the behavior
+
 ### ~~PRE-LAUNCH-QUICK-AUDITS-A~~ ✅ ЗАКРЫТ (2026-05-31) — **4 read-only audits: rate-limit STRONG / cache STRONG / CORS STRONG with 2 🟠 fixable bugs / security headers STRONG. NO LAUNCH-BLOCKERS.**
 - **Trigger:** 4 concerns не explicitly covered audit-волна — verify pre-launch state. Read-only inspection. Findings categorized per audit-волна methodology
 - **NO code/config changes** — pure audit

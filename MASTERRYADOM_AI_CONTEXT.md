@@ -1325,6 +1325,31 @@ graphify --help                    # Full CLI reference
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-31 — CORS-FIXES-BATCH-A** (commit on `auditandaction`). Closes both 🟠 CORS bugs from PRE-LAUNCH-QUICK-AUDITS-A via single unified fix. Cyrillic IDN + www subdomain + Punycode all canonicalized via `new URL().origin` normalization
+  - **Bug 1 (CORS-WWW-FIX-A):** `src/proxy.ts:22` built www comparison string WITHOUT `https://` prefix → never matched browser Origin headers. **Fix:** explicit `PRODUCTION_WWW_ORIGIN = "https://www.мастеррядом.online"` constant + normalized-Set comparison
+  - **Bug 2 (CORS-IDN-FIX-A):** Cyrillic IDN literal `https://мастеррядом.online` never matched browser-sent Punycode form. **Fix:** `normalizeOrigin()` helper using `new URL().origin` — Node URL parser converts Cyrillic→Punycode automatically; both sides of comparison normalize к canonical Punycode (`xn--80aic0adlmagk0m.online`)
+  - **Critical pre-flight verification:** discovered actual Punycode form is `xn--80aic0adlmagk0m.online`, NOT the placeholder `xn--80aaqmbjngarkb2chcv5l.online` used in audit/prompt. Verified via `node -e "new URL('https://мастеррядом.online').origin"`. This is why prompts should say «verify via Node» rather than embed speculative Punycode
+  - **Approach decision:** Option B (URL normalization) chosen over Option A (literal enumeration) because Node parsing handles IDN cleanly. Verified all 5 cases pass before applying (Cyrillic bare / Punycode bare / Cyrillic www / Punycode www / wrong protocol). Cleaner than maintaining 4+ literal allowlist entries; future-proof; auto-derives canonical form
+  - **Раздел 3 (Архитектура):** `src/proxy.ts` extended — new exported `normalizeOrigin()` helper + `PRODUCTION_WWW_ORIGIN` const + `PRODUCTION_ALLOWLIST_NORMALIZED` Set (pre-computed at module load для O(1) lookup) + rewritten `getAllowedOrigin()` body. ~25 LOC delta in proxy.ts
+  - **Раздел 5 (Бизнес-логика):** не затронут — pure infrastructure-layer fix
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 10 (Безопасность):** CORS comprehensive post-fix — Cyrillic + Punycode + bare + www + protocol preservation + look-alike subdomain rejection (`xn--...online.evil.com` correctly blocked) + unauthorized-subdomain rejection (`api.мастеррядом.online` blocked — only bare + www allowed)
+  - **Раздел 11 (Деплой):** PRE-LAUNCH-QUICK-AUDITS-A all 4 areas now ✅ — 0 launch-blockers, 0 🟠 should-fix outstanding. CORS handles Cyrillic IDN domain correctly which is central for RU-market МастерРядом
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / **683/683 tests** ✅ (667 → 683, net +16 from new proxy.test.ts) / lint baseline preserved (1 error / 3 warnings pre-existing) / encoding/mojibake ✅
+  - **Test coverage added (16 new tests in `src/proxy.test.ts`):**
+    - 7 `normalizeOrigin` tests: Cyrillic→Punycode normalization, idempotent Punycode, www variant, null on parse fail, protocol preservation (http vs https distinct), non-IDN passthrough, path/query/hash strip
+    - 9 allowlist behavior tests:
+      - Bug 1 regression: www Cyrillic + www Punycode both allowed
+      - Bug 2 regression: bare Cyrillic + bare Punycode both allowed
+      - Security negatives: evil origin rejected, wrong protocol (http) rejected, look-alike subdomain hijack rejected, empty/malformed rejected, unauthorized subdomains (api/admin.*) rejected
+  - **Files preserved verbatim:** everything outside CORS section в `src/proxy.ts` (rate-limit tier classification, CSP nonce, preflight handler, cookie refresh, request-id) — `next.config.ts` security headers — `src/lib/rate-limit/*` — all cabinet/business code
+  - **Behavior preservation:** `Access-Control-Allow-Origin` response header still echoes the RAW browser-sent string (per browser convention) — only the comparison logic is normalized. Зашло чисто через все 16 regression tests
+  - **No STOP-gates triggered** — Node URL parsing behaved exactly as predicted (Option B worked first time); proxy.ts structure matched audit; existing tests preserved
+  - **Pre-launch status:** all PRE-LAUNCH-QUICK-AUDITS findings closed. Remaining backlog: 🟡 `CACHE-SINGLEFLIGHT-A` (post-launch optimization, bounded risk) + 🔵 Redis maxmemory-policy (DevOps decision)
+  - **Open questions for user:** none. Clean fix. Both bugs closed with regression tests pinning behavior. Pre-launch CORS posture comprehensive
+
 - **2026-05-31 — PRE-LAUNCH-QUICK-AUDITS-A** (commit on `auditandaction`). Read-only audit of 4 pre-launch concerns не explicitly covered audit-волна. **NO LAUNCH-BLOCKERS.** 2 🟠 CORS bugs surfaced + fix-prompts spawned. Complementary to SECURITY-AUDIT-A (which covered application-layer; this covers infrastructure)
   - **Method:** read-only inspection of `src/lib/rate-limit/*`, `src/lib/cache/*`, `src/proxy.ts`, `next.config.ts`. No code/config changes
   - **Area 1 — Rate Limiting: ✅ STRONG (0 issues)**
