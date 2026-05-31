@@ -1325,6 +1325,52 @@ graphify --help                    # Full CLI reference
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-05-31 — EMPTY-STATE-COMPONENT-A** (commit on `auditandaction`). **🎉 Tier 3 pre-launch polish COMPLETE (4/4).** Shared `<EmptyState>` primitive extracted, 10 cabinet callers consolidated. NO copy text changes, NO new UI_TEXT keys.
+  - **Audit:** 15 dedicated empty-state files across cabinets (master 8, admin 4, studio 1, other 2). Each cabinet wrote its own with subtly inconsistent visual treatment. No prior shared component
+  - **2 visual variants identified:**
+    - **compact** — flex centered no frame (cities, users, billing-tab, exception, service-detail) — matches `.claude/skills/ui-ux-pro-max/SKILL.md` section 16 canonical reference exactly
+    - **card** — `rounded-2xl border-dashed bg-bg-card/60` frame (notifications, portfolio, services with lg icon-circle + CTA; clients-detail + application с small icon)
+  - **Icon size split:** `sm` (h-12 flat) vs `lg` (h-14 wrapped in bg-bg-input circle, h-6 icon)
+  - **Component design:** `<EmptyState>` with `title` (req), `description?`, `icon?` (ComponentType), `variant?` (compact/card, default compact), `iconSize?` (sm/lg, default sm), `action?` (discriminated union `{onClick}|{href}` + optional `leadingIcon`/`variant`/`size`), `children?` (extras below action), `className?` (layout override)
+  - **Migration:** **10 of 11 candidates** migrated к shared component. **5 stay-verbatim** (reviews-empty distinct solid+shadow frame; offer-empty distinct brand-color icon; empty-column text-only by design; empty-cells-overlay NOT empty state — interactive overlay; model-offers/empty educational composition)
+  - **Раздел 3 (Архитектура):** new shared UI primitive — `src/components/ui/empty-state.tsx` + `empty-state.test.ts` (16 pure-predicate tests mirroring component decision logic, same pattern as `prompt-modal.test.tsx`)
+  - **Раздел 5 (Бизнес-логика):** не затронут — pure UI consolidation
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 14 (Tooling):** `<EmptyState>` added к shared UI primitives. Future empty-state additions should consume it (canonical pattern). For NEW empty-state surfaces use `<EmptyState>`; for legitimately-distinct visual treatments (brand-color icons, solid+shadow frames, educational compositions) stay inline like the 5 preserved-verbatim cases
+  - **Раздел 12 (Инварианты):** не затронуты (pattern is reuse opportunity, not invariant — alternative inline implementations remain valid for distinct visual identities)
+  - **Раздел 15:** this entry
+  - **Validation:**
+    - typecheck ✅
+    - **667/667 tests** ✅ (651 → 667, net +16 from new EmptyState tests)
+    - lint baseline preserved (1 error / 3 warnings pre-existing)
+    - encoding ✅
+    - mojibake ✅
+    - check:ui-text ✅
+    - check:context-freshness ✅
+  - **Visual quality preservation:**
+    - Both themes verified mentally — component uses semantic tokens only (`text-main`, `text-sec`, `bg-card`, `bg-input`, `border-subtle`); both light + dark adapt automatically via next-themes
+    - Mobile-first — all classes mobile-first (max-w-md, px-4 default)
+    - Acceptable consolidation deltas: minor opacity normalization (`bg-bg-card` → `bg-bg-card/60` in 1 file), icon-size canonicalization (h-10 → h-12, h-12-circle → h-14-circle in 2 files), padding normalization (py-16 → py-12 in 1 file). All within consolidation philosophy «normalize to canonical»
+  - **Copy text preserved verbatim** — ZERO string changes across all 10 migrations. All UI_TEXT keys flow through as before
+  - **Files modified (12 total):** 2 new (component + tests) + 10 migrated (cities-empty / exception-empty-state / users-empty / billing-tab-empty / service-detail-empty / clients-empty-detail-state / notifications-empty-state / portfolio-empty-state / services-empty-state / application-empty-state)
+  - **What was NOT done:**
+    - NO copy text changes (preserved verbatim)
+    - NO new UI_TEXT keys (all existing keys reused)
+    - NO redesign — consolidation only
+    - NO deletion of 5 stay-verbatim files (legitimately distinct visual identities)
+    - NO sprint work touched
+    - NO schema / API / route changes
+    - NO STOP-gates triggered
+  - **🎉 Pre-launch Tier 3: 4 of 4 ALL DONE:**
+    - ✅ VAPID-PUSH-VERIFY-WORKFLOW-A (operational runbook)
+    - ✅ AI-ADVISOR-PROMPT-TUNE-A (Yandex Actionability 4.00 → 4.975)
+    - ✅ FRAMER-MOTION-REDUCED-MOTION-SWEEP-A (46 files, WCAG SC 2.3.3 comprehensive)
+    - ✅ **EMPTY-STATE-COMPONENT-A** (shared primitive + 10 callers consolidated)
+  - **Process insight (Pattern 14 «explicit shared primitive» applied again):**
+    - 1 primitive × 10 callers = consolidated maintenance surface. Same shape as MODAL-A11Y-BATCH-A (use-modal-a11y × 55) and previous primitive extractions. Sprint discipline of «invest in shared primitive when N≥3 callers» continues paying off
+    - **Honest limit of consolidation:** 5 stay-verbatim files document where the pattern doesn't fit (brand-color icon, solid+shadow frame, non-empty-state intent, educational composition). Not over-applying the pattern к cases that need distinct visual identity — disciplined categorization
+  - **Open questions for user:** none. Clean consolidation. Tier 3 polish complete
+
 - **2026-05-31 — FRAMER-MOTION-REDUCED-MOTION-SWEEP-A** (commit on `auditandaction`). Tier 3 pre-launch polish — Pattern 5 (WCAG SC 2.3.3 «Animation from Interactions») coverage tail closed. **46 surfaces wrapped с `useReducedMotion()`.** **NO animation content changes** (durations/easings/variants preserved). **NO test changes** (651/651 preserved).
   - **Audit:** 58 total framer-motion non-test callers; 12 already compliant (shared primitives + marketing sections); **46 sweep target** (within scope: estimated 56, actual 46 — no STOP gate)
   - **Pattern decision:** Option B (per-file inline `useReducedMotion()`) — matches established 12 compliant files. Creating utility would create churn для already-compliant files; per-file consistency wins

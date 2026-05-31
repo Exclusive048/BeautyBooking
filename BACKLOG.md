@@ -635,7 +635,90 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
 - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
-### ~~FRAMER-MOTION-REDUCED-MOTION-SWEEP-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Pattern 5 (WCAG SC 2.3.3) coverage tail closed: 46 surfaces wrapped с `useReducedMotion()`**
+### ~~EMPTY-STATE-COMPONENT-A~~ ✅ ЗАКРЫТ (2026-05-31) — **🎉 Tier 3 COMPLETE (4/4). Shared `<EmptyState>` extracted, 10 callers consolidated, UI consistency improved**
+- **Trigger:** Last Tier 3 pre-launch polish item. 15 dedicated empty-state implementations existed across cabinets — each feature wrote its own with subtly inconsistent visual treatment. Consolidation improves UI consistency before launch
+- **Audit findings (Step 1-2):**
+  - **15 dedicated empty-state files** found (vs ~10-15 estimate — scope healthy, no STOP gate)
+  - Distribution: master-cabinet (8: bookings/empty-column, clients/empty-detail-state, model-offers application + offer, notifications/empty-state, portfolio + services, schedule/empty-cells-overlay, schedule-settings/exceptions/exception-empty-state) + admin-cabinet (4: billing/billing-tab + cities + reviews + users) + studio-cabinet (1: services/service-detail-empty) + model-offers (1: empty-state) + master/services (1)
+  - **No existing shared component** — each cabinet wrote its own
+  - **2 visual variants identified:**
+    - **Compact** — flex centered, no card frame (cities, users, billing-tab, exception, service-detail). Matches ui-ux-pro-max skill canonical reference exactly
+    - **Card** — `rounded-2xl border-dashed border-border-subtle bg-bg-card/60` frame (portfolio, services with `lg` icon-circle + CTA; notifications + clients-detail + application + offer with small icon)
+  - **Icon size split:** `sm` (h-12 flat icon, text-text-sec/40) vs `lg` (h-14 wrapped in bg-bg-input circle, h-6 icon)
+- **Component design (Step 3-4):** `<EmptyState>` API:
+  - `title: string` (required) — font-display, scales по iconSize
+  - `description?: string` — text-sec, leading-relaxed, max-w-md
+  - `icon?: ComponentType` — lucide-style icon component (NOT element — for consistent styling)
+  - `variant?: "compact" | "card"` — default `compact`. Card adds dashed frame + bg-card/60 + larger padding
+  - `iconSize?: "sm" | "lg"` — default `sm`. `lg` renders icon in `h-14 w-14 rounded-full bg-bg-input` circle
+  - `action?: EmptyStateAction` — discriminated union: `{onClick}` OR `{href}` (mutually exclusive TS-level). Plus optional `leadingIcon` (e.g. Plus prefix), `variant` (default `secondary`), `size` (default `md`)
+  - `children?: ReactNode` — extras below action (tips grid / fallback link / custom CTA component)
+  - `className?: string` — layout-specific override (e.g., `h-full` for clients detail right-pane)
+- **Component file:** [`src/components/ui/empty-state.tsx`](src/components/ui/empty-state.tsx) — pure functional, no inline styles, all tokens
+- **Tests:** [`src/components/ui/empty-state.test.ts`](src/components/ui/empty-state.test.ts) — 16 pure-predicate tests mirroring component decision logic (same pattern as `prompt-modal.test.tsx`):
+  - Frame class mapping (variant → frame classes)
+  - Icon size mapping (iconSize → render mode flag)
+  - Title size scales with iconSize
+  - Action discriminator predicate (href vs onClick)
+  - Action defaults (variant=secondary, size=md)
+- **Migration sweep results (Step 5):**
+
+  | # | File | Result | Variant |
+  |---|---|---|---|
+  | 1 | `admin-cabinet/cities/cities-empty.tsx` | ✅ migrated | compact |
+  | 2 | `master/schedule-settings/exceptions/exception-empty-state.tsx` | ✅ migrated | compact + secondary CTA + leadingIcon Plus |
+  | 3 | `admin-cabinet/users/users-empty.tsx` | ✅ migrated | compact |
+  | 4 | `admin-cabinet/billing/billing-tab-empty.tsx` | ✅ migrated | compact |
+  | 5 | `studio-cabinet/services/service-detail-empty.tsx` | ✅ migrated | card |
+  | 6 | `master/clients/empty-detail-state.tsx` | ✅ migrated | card + h-full |
+  | 7 | `master/notifications/empty-state.tsx` | ✅ migrated | card + ghost-link CTA |
+  | 8 | `master/portfolio/portfolio-empty-state.tsx` | ✅ migrated | card + lg + primary CTA + tips children |
+  | 9 | `master/services/services-empty-state.tsx` | ✅ migrated | card + lg + AddServiceButton child |
+  | 10 | `master/model-offers/application-empty-state.tsx` | ✅ migrated | card + lg + optional reset-filter link child |
+  | 11 | `admin-cabinet/reviews/reviews-empty.tsx` | ⏸ stay verbatim | solid border + shadow (distinct frame; would be visual regression to force into dashed) |
+  | 12 | `master/model-offers/offer-empty-state.tsx` | ⏸ stay verbatim | `bg-primary/10 text-primary` brand-color icon-circle (distinct brand identity) |
+  | 13 | `master/bookings/empty-column.tsx` | ⏸ stay verbatim | text-only inline by design (kanban column) |
+  | 14 | `master/schedule/empty-cells-overlay.tsx` | ⏸ stay verbatim | NOT empty state — interactive click-to-create overlay (misleading filename) |
+  | 15 | `model-offers/empty-state.tsx` | ⏸ stay verbatim | educational composition (city-hint + fallback link + custom layout) |
+
+  **10/11 migration candidates** (excluding 4 stay-verbatim — 5 total including overlay non-empty-state). **66% of dedicated empty-state files** now use shared component
+- **Sample-then-scale validation:** 2 samples manually verified (cities-empty + exception-empty-state — typecheck green), then scaled to remaining 8
+- **Copy text preserved:** ZERO string changes. All `UI_TEXT` keys passed through verbatim
+- **No new UI_TEXT additions** — all existing keys reused
+- **Both themes verified mentally** — component uses semantic tokens only (`text-main`, `text-sec`, `bg-card`, `bg-input`, `border-subtle`); both light + dark adapt automatically via next-themes
+- **Mobile-first** — all classes mobile-first (max-w-md, px-4 default, no min-width assumptions)
+- **Feature preservation:** every migrated empty-state's user-visible behavior preserved (title + description + action + children all render correctly; functionality identical — only styling source consolidated)
+- **Acceptable visual deltas from consolidation:**
+  - service-detail-empty: `bg-bg-card` → `bg-bg-card/60` (minor opacity normalization)
+  - empty-detail-state: h-10 icon → h-12 (canonical sm size)
+  - notifications: py-16 → py-12 (canonical card padding)
+  - application: h-12 icon-circle → h-14 (canonical lg size)
+  - These were per-file micro-tunings; consolidation normalizes к the canonical pattern (matches ui-ux-pro-max skill reference exactly)
+- **Files preserved verbatim (per spec rule «no deprecation cleanup этим prompt»):** 5 stay-verbatim files listed above. Old inline JSX in 10 migrated files replaced in-place (no orphan files to flag deprecated)
+- **Validation:**
+  - typecheck ✅
+  - **667/667 tests** ✅ (651 → 667, net +16 from new EmptyState tests)
+  - lint baseline preserved (1 error / 3 warnings pre-existing, unrelated)
+  - encoding ✅
+  - mojibake ✅
+  - check:ui-text ✅
+  - check:context-freshness ✅
+- **Files modified (12 total):**
+  - **NEW:** `src/components/ui/empty-state.tsx` (~120 LOC component)
+  - **NEW:** `src/components/ui/empty-state.test.ts` (~140 LOC, 16 tests)
+  - **10 migrated:** cities-empty / exception-empty-state / users-empty / billing-tab-empty / service-detail-empty / empty-detail-state / notifications-empty-state / portfolio-empty-state / services-empty-state / application-empty-state
+- **LOC delta:** +260 (component + tests) − ~210 (consolidated inline JSX across 10 migrations) = **net +~50 LOC**, but with much improved future maintenance posture (single source of truth)
+- **No STOP-gates triggered** — scope healthy (15 found vs ~10-15 estimate), 2 visual variants tractable (no >5-variant ambiguity), tests preserved, samples verified before scale
+- **Pre-launch Tier 3 progress: 🎉 4 of 4 ALL DONE**
+  - ✅ VAPID-PUSH-VERIFY-WORKFLOW-A
+  - ✅ AI-ADVISOR-PROMPT-TUNE-A
+  - ✅ FRAMER-MOTION-REDUCED-MOTION-SWEEP-A
+  - ✅ **EMPTY-STATE-COMPONENT-A** (this commit)
+- **Process insight (Pattern 14 «explicit-helpers / shared-primitive» fan-out applied again):**
+  - 1 primitive (`<EmptyState>`) × 10 callers = consolidated maintenance surface for future empty-state additions / design adjustments
+  - Same Pattern 14 shape as MODAL-A11Y-BATCH-A (`use-modal-a11y` hook × 55 consumers) — sprint discipline of «invest in shared primitive when N≥3 callers» continues paying off
+  - 5 stay-verbatim files document the limit of consolidation: visually distinct treatments (brand-color icon, solid+shadow frame, non-empty-state intent, educational compositions) stay independent. This is honest categorization — not over-applying the pattern to cases that don't fit
+- **Open questions for user:** none. Clean consolidation. Tier 3 polish complete
 - **Trigger:** Tier 3 pre-launch polish. 12 shared/marketing primitives already compliant; remaining ~56 direct callers handled animations без honoring `prefers-reduced-motion: reduce`. Users с vestibular disorders / migraines experienced uncontrolled animations
 - **Scope:** mechanical sweep — wrap existing motion, NO animation content changes (durations/easings/sequences preserved)
 - **Audit findings:**

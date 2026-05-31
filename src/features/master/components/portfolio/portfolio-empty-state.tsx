@@ -2,7 +2,7 @@
 
 import { Camera, ImageIcon, Layers, Maximize, Plus } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type {
   PortfolioCategoryOption,
 } from "@/lib/master/portfolio-view.service";
@@ -25,22 +25,25 @@ export function PortfolioEmptyState({ categories }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 px-6 py-12 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-bg-input">
-          <Camera className="h-6 w-6 text-text-sec/60" aria-hidden />
-        </div>
-        <h3 className="font-display text-lg text-text-main">{T.title}</h3>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-text-sec">{T.body}</p>
-        <Button variant="primary" size="md" onClick={() => setOpen(true)} className="mt-5 gap-1.5">
-          <Plus className="h-4 w-4" aria-hidden />
-          {T.cta}
-        </Button>
+      <EmptyState
+        variant="card"
+        iconSize="lg"
+        icon={Camera}
+        title={T.title}
+        description={T.body}
+        action={{
+          label: T.cta,
+          onClick: () => setOpen(true),
+          variant: "primary",
+          leadingIcon: Plus,
+        }}
+      >
         <ul className="mx-auto mt-8 grid max-w-md grid-cols-3 gap-3 text-text-sec">
           <Tip icon={ImageIcon} label={T.tip1} />
           <Tip icon={Maximize} label={T.tip2} />
           <Tip icon={Layers} label={T.tip3} />
         </ul>
-      </div>
+      </EmptyState>
       <UploadModal
         open={open}
         onClose={() => setOpen(false)}
