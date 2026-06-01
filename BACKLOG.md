@@ -635,6 +635,320 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
 - **Process insight:** classic Pattern 5 (coverage-tail closure) at the documentation/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
 - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
 
+### ~~EMAIL-MODULE-AUDIT-A~~ ✅ ЗАКРЫТ (2026-06-02) — **Comprehensive read-only audit. 10 areas inspected. Major gap: 10 NotificationType emails share ONE generic template — 5 mockup designs require dedicated templates. Brand color mismatch (purple/pink → dark red mockup). SMTP NOT configured (placeholders only).**
+- **Trigger:** user supplied 5 email mockups (МастерРядом dark-red brand style) для downstream redesign. Need to understand current email module scope before planning redesign work
+- **Method:** read-only inspection. NO code/config changes. NO real emails sent
+- **Area 1 — Module location:**
+  - **Single directory:** `src/lib/email/` (3 files total — sender.ts + 2 templates)
+  - **Sub-module:** `templates/` (otp-code.ts + notification.ts)
+  - **Architectural pattern:** plain template-literal functions returning HTML strings (no template engine framework)
+- **Area 2 — Template engine technology:**
+  - **Library:** `nodemailer ^8.0.2` (SMTP-based)
+  - **Template format:** plain string template literals (`return \`<!DOCTYPE html>...\`;`) inline in `.ts` files
+  - **NOT used:** React Email / MJML / Handlebars / Mustache / any rendering framework
+  - **No build/compile step** — templates render at call time
+- **Area 3 — Templates inventory (CRITICAL FINDING):**
+
+  | Template | Function | Lines | UI_TEXT? | Tests? | Status |
+  |---|---|---|---|---|---|
+  | `otp-code.ts` | `buildOtpEmailHtml` + `buildOtpEmailText` | 53 | ❌ inline Russian | ❌ none | ✅ implemented (purple/pink gradient — wrong brand color vs mockup) |
+  | `notification.ts` | `buildNotificationEmailHtml` + `buildNotificationEmailText` | 82 | ❌ inline Russian | ❌ none | ⚠️ generic — used as fallback для 10 distinct notification types |
+
+  **Only 2 templates exist.** Booking confirmation / Reminder / Cancellation / Review request mockups ALL currently use the SAME generic `notification.ts` template (verified via `delivery.ts` — list below)
+- **Area 4 — SMTP provider configuration:**
+  - **Provider:** SMTP via nodemailer (no SaaS like Resend/Sendgrid/Mailgun)
+  - **Env vars in schema (all optional, no production refine):**
+    - `SMTP_HOST` (e.g. `smtp.example.com` in template — placeholder)
+    - `SMTP_PORT` (defaults to 587 in code if missing)
+    - `SMTP_USER` (placeholder `noreply@example.com`)
+    - `SMTP_PASS` (placeholder `replace-with-smtp-password`)
+    - `SMTP_FROM` (placeholder `"МастерРядом <noreply@example.com>"` — defaults к SMTP_USER if unset)
+    - `SUPPORT_TO` + `SUPPORT_TO_PARTNERSHIP` (support address routing)
+    - `EMAIL_AUTH_ENABLED` boolean flag (gates email-OTP login feature)
+  - **Helper:** `isEmailConfigured()` returns boolean if all 3 critical vars set
+  - **Fail-soft:** `sendEmail()` returns boolean; logs error if SMTP not configured but never throws
+  - **Production readiness:** ❌ NOT configured — `.env.example` has only placeholders; no production refine; **DevOps decision needed** для provider choice (Yandex Mail / Resend / SES / etc) + DNS setup (DKIM/SPF/DMARC)
+- **Area 5 — Hardcoded brand strings audit:**
+  - **`beautyhub.art`:** ✅ ZERO remaining in src (EMAIL-BRAND-URL-FIX-A 2026-06-02 closed 4 sites; only my own JSDoc comment in notification.ts references it as fix-history)
+  - **Other `beautyhub` references found:**
+    - `src/components/layout/footer/FooterSocials.tsx:13` — `https://vk.com/beautyhub` (footer VK social link — wrong brand handle). 🟠 should-fix pre-launch
+    - `src/lib/prisma-direct.ts` + `src/lib/prisma.ts` — internal HMR globals `__beautyhubPrisma` / `__beautyhubPrismaDirect` (name-only, no user-visible impact). 🔵 cosmetic — can rename when convenient
+  - **Domain variants in code:**
+    - `masterryadom.online` (canonical, double R, .online) — used in ICS UIDs (`booking-${id}@masterryadom.online`), FAQ support link (`mailto:support@masterryadom.online`)
+    - `мастеррядом.online` (canonical Cyrillic) — fixed by EMAIL-BRAND-URL-FIX-A в email template + UI text + legal pages
+  - **⚠️ Support address inconsistency vs mockups:**
+    - Mockups show `help@masteryadom.ru` (single R, .ru domain)
+    - Codebase uses `support@masterryadom.online` (double R, .online domain)
+    - **DECISION NEEDED:** user must clarify support address. Possible intent: `.ru` for support is shorter / friendlier OR mockup typo
+- **Area 6 — UI_TEXT integration:**
+  - ❌ **ZERO UI_TEXT usage in email module** (verified via Grep)
+  - All Russian strings (`"Код подтверждения"`, `"Введите этот код..."`, `"Если вы не запрашивали..."`, etc) are INLINE in template literal HTML
+  - **Implication:** any copy change requires email-template code change (no centralization)
+  - i18n unprepared (Russian-only assumption baked in)
+- **Area 7 — Test infrastructure:**
+  - ❌ **ZERO email tests** (no `*email*.test.ts` files exist)
+  - ❌ No mock pattern для `sendEmail` in other tests (callers ignore return value)
+  - Template HTML output never snapshot-tested
+- **Area 8 — Render/preview tooling:**
+  - ❌ **NO preview tooling** (no React Email server, no `npx email dev`, no static HTML preview route)
+  - Development workflow: developer reads code, sends real email через configured SMTP, or runs ad-hoc Node script
+  - Snapshot testing absent
+- **Area 9 — Send call sites:**
+  - **3 caller modules + 1 dispatcher:**
+    1. `src/lib/notifications/delivery.ts` — generic dispatcher for 10 NotificationType values (see Area 10 list)
+    2. `src/app/api/auth/otp/email/request/route.ts` — email OTP login flow
+    3. `src/app/api/cabinet/user/profile/email/request-verify/route.ts` — email change verification
+  - **Pattern:** all callers import `sendEmail` + a `build*EmailHtml` function, pass user email + subject + html
+  - **`delivery.ts`** filters: only sends if `isEmailConfigured()` AND user has `emailNotificationsEnabled` AND `EMAIL_NOTIFICATION_TYPES.has(type)`
+- **Area 10 — Mockup vs existing gap:**
+  - **EMAIL_NOTIFICATION_TYPES set** (from `delivery.ts:31-42`) — these 10 NotificationType values currently send email via the SAME generic `buildNotificationEmailHtml`:
+    1. BOOKING_CREATED
+    2. BOOKING_CONFIRMED ← mockup #2 «Запись подтверждена»
+    3. BOOKING_CANCELLED ← mockup #4 «Запись отменена»
+    4. BOOKING_CANCELLED_BY_MASTER ← mockup #4 variant
+    5. BOOKING_CANCELLED_BY_CLIENT ← mockup #4 variant
+    6. BOOKING_RESCHEDULED ← could be mockup variant
+    7. BOOKING_RESCHEDULE_REQUESTED ← could be mockup variant
+    8. BOOKING_REMINDER_24H ← mockup #3 «Визит уже сегодня» (or near-day variant)
+    9. BOOKING_REMINDER_2H ← mockup #3 «Визит уже сегодня»
+    10. REVIEW_LEFT ← mockup #5 «Как всё прошло?» (but mockup is for «ASK for review» not «review was left»)
+
+  - **Mockup vs existing gap matrix:**
+
+    | Mockup | Existing template | Match % | Gap |
+    |---|---|---|---|
+    | #1 OTP code | `otp-code.ts` | 30% | Color (purple→dark red brand), structure (need security warning copy, brand mark «M» logo, full footer с legal/ИП block, contact: `help@masteryadom.ru` vs none currently) |
+    | #2 Booking confirmed | generic `notification.ts` | 15% | Need DEDICATED template: green check icon, master card (avatar+name+role+rating), services table (услуга/дата/длительность/адрес/итого), «Открыть запись» CTA |
+    | #3 Reminder | generic `notification.ts` | 10% | Need DEDICATED template: orange clock icon, master card, «Построить маршрут» CTA, «Перенести / Отменить» secondary actions |
+    | #4 Cancellation | generic `notification.ts` | 10% | Need DEDICATED template: red X icon, refund info block, master card, «Записаться снова» CTA |
+    | #5 Review request | generic `notification.ts` | 10% | Need DEDICATED template: gold star icon, master card, «Оценить визит» CTA + «BOOKING_REVIEW_REQUEST» NotificationType doesn't exist yet (would need schema addition) |
+
+  - **Shared elements across mockups (extraction candidates):**
+    - Header: dark red gradient (~#7A1E2E approximate), «M» mark, brand text, context caption right-aligned
+    - Master card component (avatar + name + role + rating chip)
+    - Footer: МастерРядом description / Москва address / ИП Кравцова А. И. / navigation links / auto-message disclaimer / `help@masteryadom.ru` (or canonical address per decision)
+    - CTA button: dark red, white text, arrow suffix
+  - **Redesign scope estimate:**
+    - 🟢 **Quick path** (stay with template literals, extract shared layout function): ~5-8 hr total — shared layout helper + 5 dedicated templates + dispatcher rewiring + 1 schema add (BOOKING_REVIEW_REQUEST if needed)
+    - 🟡 **Complex path** (migrate to React Email): ~3-4 hr setup (deps + preview server + base components) + ~1.5 hr per template = ~10-12 hr total. **Benefits:** component reuse, live preview server, better testability, future i18n via `react-email/components`. **Drawbacks:** new dependency stack, build-step considerations для emails-as-static-strings vs runtime render
+- **Production readiness summary:**
+  - SMTP provider: ❌ NOT configured (placeholders only)
+  - Sender domain: ❌ not configured (default `noreply@example.com` is placeholder)
+  - DKIM/SPF/DMARC: 🔴 not auditable from code (DevOps + DNS)
+  - Production refine for SMTP env vars: ❌ none (production could silently lose emails если env vars unset)
+- **Spawned downstream work (recommended sequence):**
+  - ✅ `EMAIL-BRAND-URL-FIX-A` (CLOSED 2026-06-02 in previous prompt — 4 sites fixed)
+  - 🟢 `EMAIL-SUPPORT-ADDRESS-DECISION` (~5 min user decision) — clarify `help@masteryadom.ru` (mockup) vs `support@masterryadom.online` (codebase). Need user input
+  - 🟠 `FOOTER-VK-HANDLE-FIX` (~5 min) — `FooterSocials.tsx:13` `vk.com/beautyhub` → correct VK handle (user decision needed для actual VK community URL)
+  - 🟡 **`EMAIL-TEMPLATE-REDESIGN-A`** (~6-10 hr, biggest item) — main work. **User decision needed:** Quick path (template literals + shared layout helper) OR Complex path (React Email migration). Includes:
+    - Shared layout extraction (header / footer / master-card / CTA components)
+    - 5 dedicated templates (OTP redesign / booking confirmed / reminder / cancellation / review request)
+    - Dispatcher rewiring (`delivery.ts` switches template per NotificationType)
+    - Possible NotificationType schema addition: `BOOKING_REVIEW_REQUEST` if «ask for review» mockup is a separate trigger (vs current `REVIEW_LEFT` for «review was left»)
+  - 🔴 **`SMTP-PROVIDER-SETUP`** (DevOps scope) — user/DevOps decides provider (Yandex Mail / Resend / SES / Postmark) + provisions account + sets DNS (DKIM/SPF/DMARC) + populates env vars. Until done, all emails silently fail (no user impact in dev, broken in production)
+  - 🟡 `EMAIL-PREVIEW-TOOLING` (~30 min if Quick path; ~2 hr if React Email) — local preview route showing all template variants for QA / design iteration. Lower priority but high value
+  - 🟡 `EMAIL-UI-TEXT-MIGRATION` (~2-3 hr, lower priority) — move Russian strings to UI_TEXT for centralization. Defer post-launch unless i18n becomes urgent
+  - 🔵 `EMAIL-TEST-COVERAGE` (~half-day post-launch) — snapshot tests + smoke tests for sendEmail flow. Post-launch acceptable
+- **Production refine recommendation (not applied — read-only audit):** в env.ts add refine для `EMAIL_AUTH_ENABLED=true` → SMTP_HOST + SMTP_USER + SMTP_PASS required (mirrors `AI_FEATURES_ENABLED` refine pattern). Currently feature could be silently disabled in production if env vars forgotten. Flag для EMAIL-TEMPLATE-REDESIGN-A или separate prompt
+- **Files modified (audit-only):**
+  - `MASTERRYADOM_AI_CONTEXT.md` (раздел 11 + 15)
+  - `BACKLOG.md` (this entry)
+- **Validation:**
+  - typecheck ✅
+  - 683/683 tests preserved ✅
+  - **NO code/config changes** confirmed
+- **What was NOT done (per strict rules):**
+  - NO fixes applied (read-only audit)
+  - NO real emails sent
+  - NO schema changes (BOOKING_REVIEW_REQUEST flagged but not added)
+  - NO architectural decisions made (Quick vs Complex path flagged для user)
+  - NO sprint work touched
+- **STOP gates triggered:** NONE — module exists and works; OTP flow functional; SMTP gracefully fail-soft. Clean audit
+- **Honest gaps (items not auditable read-only):**
+  - SMTP credentials validity (cannot verify without sending real email)
+  - Email deliverability (DKIM/SPF/DMARC require DNS access)
+  - Actual rendered appearance on email clients (Gmail / Outlook / Apple Mail differ — visual QA requires real emails)
+  - Domain decision (`help@masteryadom.ru` vs `support@masterryadom.online`) — requires user
+- **Open questions for user (consolidated):**
+  1. **Support email address** — `help@masteryadom.ru` (mockup) or `support@masterryadom.online` (codebase)? Domain choice affects DNS setup
+  2. **Redesign approach** — Quick path (template literals + shared helpers) или Complex path (migrate к React Email)? Quick is ~5-8 hr; Complex is ~10-12 hr с long-term reuse benefits
+  3. **`BOOKING_REVIEW_REQUEST` NotificationType** — should mockup #5 «Как всё прошло?» be a new NotificationType (separate from `REVIEW_LEFT` which fires when someone left a review)? Likely yes — these are 2 different user journeys
+  4. **SMTP provider decision** — Yandex Mail (RU-native) / Resend (modern API) / SES (cheap, AWS-dependent) / Postmark (transactional-focused) / other? DevOps + user concern
+  5. **VK community handle** — `vk.com/beautyhub` in footer is wrong. What's the actual community URL?
+- **Process insight:** audit-first pattern delivers honest scope. PRE-LAUNCH-CHECKLIST estimated email-templates-audit as ~30 min quick win. Actual audit reveals: 10 of the 11 emails share ONE generic template; 5 dedicated mockup designs needed; brand color completely wrong; SMTP not configured; no tests; no preview tooling. Real redesign scope ~6-12 hr depending on path. Estimate honest: not a quick win — это substantial work disguised as small task
+
+### ~~EMAIL-BRAND-URL-FIX-A~~ ✅ ЗАКРЫТ (2026-06-02) — **🟢 1/10 quick-win done. Hardcoded dead-domain `beautyhub.art` replaced across 4 user-visible surfaces.**
+- **Trigger:** PRE-LAUNCH-CHECKLIST-DOCUMENT (2026-05-31) flagged this как highest-ROI quick-win (#1) — every notification email contained broken brand link to dead `beautyhub.art` domain
+- **Audit findings (Step 1) — scope SLIGHTLY wider than initial estimate:**
+  - 4 occurrences (not just 1 как PRE-LAUNCH-CHECKLIST initial estimate):
+    1. `src/lib/email/templates/notification.ts:2` — `BRAND_URL` constant (primary target — every notification email)
+    2. `src/lib/ui/text.ts:858` — `urlPreview: (username) => "beautyhub.art/u/${username}"` UI helper (intended for master cabinet «public URL preview» display; currently has no consumer per grep but still wrong-domain literal)
+    3. `src/features/legal/content/privacy-content.tsx:46` — Privacy policy body text с `<a href="https://beautyhub.art">beautyhub.art</a>` (user-visible legal page)
+    4. `src/features/legal/content/terms-content.tsx:39` — Terms of service body text с same broken link
+  - All 4 same bug class: project renamed BeautyHub → МастерРядом, some old references remained
+  - **STOP gate evaluation:** 4 occurrences < 5-file threshold; non-email contexts present BUT same bug class + trivial mechanical fix. Proceeded with all 4 fixed in single commit (doesn't change legal substance — labels + hrefs both swap; legal review for L4/L5 still applies)
+- **Step 2 audit — env infrastructure exists:**
+  - `env.NEXT_PUBLIC_APP_URL` defined в `src/lib/env.ts:29` (Zod-validated, required в production via refine at line 158-159)
+  - `resolvePublicAppUrl()` helper exists в `src/lib/app-url.ts` (env-first с request-URL fallback)
+  - **Outcome A path chosen** (use existing env var) for email template — preferred per spec
+- **Fix approach per file:**
+  - **`src/lib/email/templates/notification.ts`** — uses `env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"` pattern. Production: env var (enforced by refine). Dev: literal fallback to canonical Cyrillic domain. JSDoc explains the fix history + dev-fallback rationale
+  - **`src/lib/ui/text.ts`** — literal swap к `мастеррядом.online/u/${username}` (no protocol — matches existing format; masters see customer-friendly Cyrillic form). UI_TEXT is module-load const; no env coupling needed (and not desirable — text.ts should stay env-independent)
+  - **Privacy + Terms pages** — surgical href + label swap. Both `<a href>` and visible link text swap к `мастеррядом.online`. Legal substance unchanged (only the URL/label tokens swapped). Legal review (L4/L5 в checklist) still applies for content beyond this URL fix
+- **Verification (Step 4):**
+  - `grep "beautyhub.art" src` returns ONLY the documentation comment в notification.ts (my own JSDoc explaining the fix history) — no live URL references remain
+  - No tests reference `BRAND_URL` или `beautyhub` — no test updates needed
+  - typecheck ✅ / 683/683 tests preserved ✅
+- **Validation (Step 5):**
+  - typecheck ✅
+  - **683/683 tests** preserved ✅
+  - lint baseline preserved (1 error / 3 warnings — pre-existing, unrelated)
+  - encoding ✅
+  - mojibake ✅
+  - check:ui-text ✅
+  - check:context-freshness ✅
+- **Files modified (4 src + 2 docs):**
+  - `src/lib/email/templates/notification.ts` (env-var pattern + JSDoc)
+  - `src/lib/ui/text.ts` (literal swap)
+  - `src/features/legal/content/privacy-content.tsx` (URL swap, legal substance unchanged)
+  - `src/features/legal/content/terms-content.tsx` (URL swap, legal substance unchanged)
+- **Files preserved verbatim:**
+  - Email template HTML structure / design / CTA block / unsubscribe link (none touched)
+  - Email module architecture (`src/lib/email/sender.ts`, `templates/otp-code.ts`) — verified clean
+  - `env.ts` schema (no new env vars — `NEXT_PUBLIC_APP_URL` already existed)
+  - All non-email code, sprint work, UI_TEXT structure (only the one `urlPreview` literal changed)
+- **STOP gates triggered:** NONE — schema change not needed (env var already existed); 4-file scope under 5-file threshold; legal content URL replacement preserved substance (didn't change legal terms — only the broken brand link)
+- **What was NOT done:**
+  - NO email design changes
+  - NO email structure changes
+  - NO real emails sent (verification via code inspection only)
+  - NO new env vars (existing infrastructure sufficient)
+  - NO refactor of email module
+  - NO legal content rewrite (only URL/label tokens swapped — legal review L4/L5 still applies)
+  - NO sprint work touched
+- **Pre-launch state:**
+  - **🟢 Quick wins: 1 of 10 done**
+  - Email brand links now functional (production: env-var-driven; dev: canonical literal fallback)
+  - Master cabinet «public URL preview» helper shows correct domain
+  - Privacy + Terms broken links fixed (legal substance unchanged; legal review still pending)
+  - 9 remaining quick-wins: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SENSITIVE-DATA-LOGS-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+- **Open questions for user:** none. Clean fix. Both notification email body links AND legal page links work correctly. Master cabinet «public URL» preview shows correct Cyrillic domain
+
+### ~~EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A~~ ✅ ЗАКРЫТ (2026-06-02) — **🟢 2/10 quick-win done. Support address consolidated to canonical Cyrillic `support@мастеррядом.online` via UI_TEXT (per CLAUDE.md rule 1).**
+- **Trigger:** EMAIL-MODULE-AUDIT-A (2026-06-02) Open Question #1 — user supplied final value `support@мастеррядом.online` (Cyrillic, EAI-aware) resolving mockup-vs-codebase mismatch
+- **Audit findings (Step 1) — scope smaller than spec anticipated:**
+  - Only **1 file** had stale ASCII variant `support@masterryadom.online`:
+    - `src/features/client-cabinet/faq/client-faq-page.tsx:147,151` (href + display)
+  - Other 2 references already canonical Cyrillic (preserved as-is):
+    - `src/components/layout/footer/Footer.tsx:50` (contact link)
+    - `src/lib/ui/text.ts` (3 places: `footer.contacts.support`, `support.alternativeContact.email`, `support.alternativeContact.emailHref`)
+  - **Variant scan confirmed clean:** `help@masteryadom.ru` / `help@masterryadom.online` / `support@beautyhub.*` / `help@beautyhub.*` — 0 occurrences each. No mockup-style placeholders leaked into codebase
+  - **STOP gate:** scope = 1 file / 2 references — well under thresholds; trivial fix
+- **Approach selected — Hybrid of spec Option A (literal) + Option B (shared constant):**
+  - Spec offered 3 options (A literal, B shared constant — recommended, C env var)
+  - **Per CLAUDE.md rule 1 («UI strings ONLY через UI_TEXT»):** the project-canonical approach is wiring к UI_TEXT, не isolated constant module. Adds 2 keys to `UI_TEXT.clientCabinet.faq` namespace; mirrors existing precedent в `UI_TEXT.support.alternativeContact` (display + mailto stored separately)
+  - Rejected: Option A (would violate CLAUDE.md rule 1), Option C (avoids schema-change coordination, per spec preference)
+- **Files modified (2):**
+  - `src/lib/ui/text.ts` — added 2 keys в `UI_TEXT.clientCabinet.faq` (between `contactEmail` label and `contactPhone`): `contactEmailAddress: "support@мастеррядом.online"` + `contactEmailHref: "mailto:support@мастеррядом.online"`. Inline comment cites EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A + DEVOPS Q4 EAI requirement (см. ниже)
+  - `src/features/client-cabinet/faq/client-faq-page.tsx` — 2 byte-level surgical edits: `href="mailto:support@masterryadom.online"` → `href={T.contactEmailHref}`; display text `support@masterryadom.online` → `{T.contactEmailAddress}`. JSX structure preserved; Mail icon + className unchanged
+- **🚨 DEVOPS Q4 — NEW EAI requirement (mail-server config blocker для production):**
+  - Canonical support address `support@мастеррядом.online` имеет **Cyrillic local part** (`support@` is ASCII, но domain `мастеррядом.online` is Cyrillic IDN; the FULL address requires SMTPUTF8 / EAI support per RFC 6531)
+  - **Required Yandex Mail (or whoever serves the mailbox) configuration:**
+    - SMTPUTF8 extension enabled на receiving server
+    - Mailbox provisioned to accept addresses to IDN/Cyrillic domain
+    - DNS MX record points to EAI-capable server
+    - SPF/DKIM/DMARC records signed against canonical domain form (both Punycode `xn--80aic0adlmagk0m.online` AND Cyrillic form may be tested by various senders)
+  - **Pre-launch test recommendations:**
+    - Send test email from external provider (Gmail / Outlook / Yandex Mail / Mail.ru) к `support@мастеррядом.online` — verify delivery
+    - Test reply flow (admin replies from same Cyrillic-domain mailbox — some clients may garble the From address)
+    - Test mobile mail clients (iOS Mail / Gmail Android / Yandex Mail Android — Cyrillic-domain support varies)
+    - Test client-side mailto: handlers (Outlook Web / Apple Mail / Gmail Web — verify mailto link opens compose с canonical recipient)
+  - **Risk acknowledged:** user accepts Cyrillic email reliability tradeoffs. If delivery issues surface, fallback to ASCII variant (`support@masterryadom.online`) is a 2-key UI_TEXT change + DNS reconfiguration — recoverable
+  - **Backlog status:** filed для DevOps Q4 consultation (joins existing Q1 TLS / Q2 backup / Q3 rollback / Q4 EAI configuration items)
+- **Validation:**
+  - typecheck ✅
+  - **683/683 tests** preserved ✅
+  - lint: 1 error / 3 warnings baseline preserved (pre-existing PHASE7-CLEANUP-A baseline, no new issues)
+  - encoding ✅ / mojibake ✅ / check:ui-text ✅ / check:context-freshness ✅
+- **What was NOT done (per strict rules):**
+  - NO email module architecture changes
+  - NO SMTP configuration changes (DevOps Q4 scope)
+  - NO sender/from address changes (outbound separate concern from inbound support address)
+  - NO env var added (Option C rejected — avoided schema-change coordination)
+  - NO new shared constant module (Option B literal interpretation rejected — UI_TEXT exists for this purpose)
+  - NO email templates touched (this is UI page work, not email module)
+  - NO real emails sent (verification via code inspection + variant scan only)
+  - NO mockup files referenced (mockup designs use `help@masteryadom.ru` — different value; user decision deviates; only canonical value persisted)
+  - NO sprint work touched
+- **Pre-launch state:**
+  - **🟢 Quick wins: 2 of 10 done** (EMAIL-BRAND-URL-FIX-A + this)
+  - Support address consistent everywhere в codebase
+  - FAQ contact UI references canonical address via UI_TEXT (no string drift possible from this surface)
+  - DevOps Q4 EAI requirement documented (waiting on mail-server provisioning)
+  - 8 remaining quick-wins: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT (template redesign separate from address) / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SENSITIVE-DATA-LOGS-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+- **STOP gates triggered:** NONE — scope under threshold (1 file < 10); no env var schema change; no encoding issues (UTF-8 без BOM preserved; mojibake check passes confirming Cyrillic intact)
+- **Process insight:** confirms Pattern 5 (coverage-tail closure) at the «consistent canonical value» axis. EMAIL-MODULE-AUDIT-A surfaced inconsistency; this fix closes it. Trivial scope (2 byte-level edits) but unblocks downstream EMAIL-TEMPLATE-REDESIGN-A (templates can now safely link к support email knowing все surface references match). Pre-redesign cleanup paid off
+- **Open questions for user:** none for the fix itself. **DevOps Q4 EAI requirement** is the explicit follow-up — waits on mail-server provisioning before launch
+
+### ~~PRE-LAUNCH-CHECKLIST-DOCUMENT~~ ✅ ЗАКРЫТ (2026-05-31) — **Comprehensive launch readiness inventory created (`docs/PRE-LAUNCH-CHECKLIST.md`, 537 lines)**
+- **Trigger:** User asked for checklist categorized by manual / quick wins / complex wins to track remaining launch work
+- **Scope:** documentation-only. NO code changes. NO architectural recommendations. NO fix prompts spawned (checklist is tracking infrastructure only — each 🟢/🟡 item gets its own future fix-prompt slot when user is ready to execute)
+- **Audit findings (Step 1) — actual state vs claimed state:**
+  - **Sentry NOT installed** (verified: no `@sentry` in package.json, no imports) — EH-1 backlog item correctly outstanding
+  - **E2E tests NOT setup** (no playwright/cypress configs, no e2e/ directory) — TC-5 audit finding outstanding
+  - **OTP-EMAIL-LOGIN-RACE** — 6th P2002 site still latent per BACKLOG
+  - **Email template hardcoded к WRONG DOMAIN** — `src/lib/email/templates/notification.ts:2` `BRAND_URL = "https://beautyhub.art"` (old/wrong) instead of `https://мастеррядом.online`. Quick-win opportunity for 🟢 item #1
+  - **SEO infrastructure exists:** `src/app/sitemap.ts`, `src/app/robots.ts`, 5 files using `generateMetadata` — auditable but coverage gaps possible
+  - **Privacy + Terms pages exist:** `src/app/privacy/page.tsx`, `src/app/terms/page.tsx` — content needs lawyer review (user scope)
+  - **Email infrastructure exists:** `src/lib/email/sender.ts` + 2 templates (OTP + notification)
+  - **Push infrastructure complete:** VAPID config + sw-push.js + sendPushToUser + 3 dispatch callers + runbook (vapid-push-verify.md created earlier)
+  - **PWA assets present:** manifest.json + sw.js + sw-push.js
+  - **10 ops runbooks exist:** auth-outage / cleanup-duplicate-billing-plans / incident-drill-checklist / mrr-snapshot-cron / queue-backlog-worker-lag / redis-down / release-go-no-go-checklist / vapid-push-verify / yookassa-allowlist-maintenance / README
+  - **Cookie consent component** exists: `src/components/layout/cookie-consent.tsx`
+- **Categorization (Step 2):**
+
+  | Category | Count | Description |
+  |---|---|---|
+  | 🟢 Быстрые победы (Claude scope) | 10 | ~30 min — 1 hr each, high ROI |
+  | 🟡 Сложные победы (Claude scope) | 7 | multiple hours — half-day each |
+  | 🔴 Ручные (User scope) | ~32 | Legal (5) / Business (4) / Acquisition (5) / DevOps (6) / Manual QA (7) / Operations (4) / Content (3) |
+
+- **Total Claude-scope time estimate:** ~20-27 hours focused work (parallelizable across sessions)
+- **User-scope time:** depends on legal turnaround + DevOps consultation + business decisions (calendar time, not work time)
+- **Notable observations:**
+  - **EMAIL-BRAND-URL-FIX is the single highest-ROI quick-win discovered during audit** — every notification email currently links to dead `beautyhub.art` domain. ~15 min fix, 100% pre-launch necessity
+  - **«QA целиком ок, девопс ок, сентри ок» honest reality check** (per user's earlier statement):
+    - QA — manual walkthroughs (Q1-Q7) NOT YET DONE
+    - DevOps — 4 decisions PENDING (D1-D3, D5)
+    - Sentry — NOT installed (verified)
+    - Code readiness IS strong (683/683 tests, all audit areas covered)
+    - Rest takes calendar time, not code time
+  - **152-ФЗ compliance + Юрлицо registration + YooKassa real-merchant + DevOps decisions** = critical path launch-blockers (all user scope)
+- **Cross-referenced existing artifacts:**
+  - BACKLOG.md (backlog items)
+  - MASTERRYADOM_AI_CONTEXT.md section 11 (deploy posture) + 15 (changelog)
+  - `docs/SPRINT-PATTERNS.md` (meta-lessons)
+  - `docs/QUALITY-GATES.md` (per-commit checks)
+  - `docs/AI-MIGRATION-STRATEGY.md` (frozen)
+  - `docs/runbooks/` (10 existing runbooks)
+- **STOP gates noted:**
+  - Document length 537 lines (slightly above 500-line STOP gate) — but structure preserved (sections + progress table + cross-refs maintain scannability). Splitting into multiple sub-docs would hurt «single source of truth» purpose. Kept as one document
+- **Document location:** `docs/PRE-LAUNCH-CHECKLIST.md`
+  - **Gitignored per project convention** (matches runbooks treatment in `.gitignore`). To version-control: add `!docs/PRE-LAUNCH-CHECKLIST.md` exception к `.gitignore` (not done в этом prompt per «no config changes» rule — flagged as open question for user)
+- **Validation:** typecheck ✅ / 683/683 tests preserved ✅ / encoding/mojibake ✅ / **NO code/config changes** confirmed
+- **What was NOT done (per strict rules):**
+  - NO fixes applied (checklist is tracking only)
+  - NO architectural recommendations
+  - NO assumptions about user-scope items (legal / business / DevOps flagged honestly как unknown)
+  - NO inflation of effort estimates
+  - NO `.gitignore` change (not in scope; flagged as open question)
+  - NO sprint work touched
+- **Open questions for user:**
+  - Add `!docs/PRE-LAUNCH-CHECKLIST.md` к `.gitignore` exceptions to version-control progress? (recommend yes — same treatment as SPRINT-PATTERNS / QUALITY-GATES / AI-MIGRATION-STRATEGY)
+  - Schedule the 10 🟢 quick-wins as a single sweep prompt (~5-7 hr total) или separate prompts? Recommend separate (1 prompt per item) so each can be reviewed independently
+  - 🟡 OBSERVABILITY-SENTRY-A is highest-priority complex win (production debugging foundation). Schedule first среди complex wins
+- **Notable insight (process):** writing the checklist forced honest assessment of «done vs claimed done». Several items user assumed done were actually NOT done (Sentry, manual QA, DevOps decisions). Document closes that gap — visible accountability
+
 ### ~~CORS-FIXES-BATCH-A~~ ✅ ЗАКРЫТ (2026-05-31) — **Both 🟠 CORS bugs from PRE-LAUNCH-QUICK-AUDITS-A closed via single unified fix. www subdomain + Cyrillic IDN → Punycode normalization handled.**
 - **Trigger:** 2 🟠 bugs identified by PRE-LAUNCH-QUICK-AUDITS-A (rate-limit/cache/CORS/security-headers audit). Pre-launch fix to ensure legitimate users on www subdomain OR Punycode-encoded origins aren't blocked
 - **Pre-flight verification (Step 1-3):**

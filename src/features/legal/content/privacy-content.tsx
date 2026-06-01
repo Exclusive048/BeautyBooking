@@ -43,7 +43,7 @@ export function PrivacyContent() {
         сервис.
       </p>
       <p>
-        Действие Политики распространяется на сайт <a href="https://beautyhub.art">beautyhub.art</a>
+        Действие Политики распространяется на сайт <a href="https://мастеррядом.online">мастеррядом.online</a>
         , мобильную PWA-версию и связанные с сервисом каналы (Telegram-бот, push-уведомления,
         email).
       </p>

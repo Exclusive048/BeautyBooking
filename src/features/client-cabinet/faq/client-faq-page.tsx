@@ -144,11 +144,11 @@ export function ClientFaqPage() {
             <ul className="space-y-2 text-sm">
               <li>
                 <a
-                  href="mailto:support@masterryadom.online"
+                  href={T.contactEmailHref}
                   className="inline-flex items-center gap-2 text-text-main hover:text-primary"
                 >
                   <Mail className="h-4 w-4 text-text-sec" aria-hidden />
-                  support@masterryadom.online
+                  {T.contactEmailAddress}
                 </a>
               </li>
               <li>
