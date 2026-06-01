@@ -1325,6 +1325,71 @@ graphify --help                    # Full CLI reference
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
 
+- **2026-06-02 — SENSITIVE-DATA-LOGS-AUDIT-A** (commit on `auditandaction`). **🟢 PRE-LAUNCH-CHECKLIST 3/10 quick-wins done.** Read-only PII exposure audit across 8 areas. **3 🔴 HIGH-severity findings** (raw phone/email в production logs) + **1 🟡 acceptable** (mock provider dev-only) + **NO 🚨 catastrophic** findings. Sentry integration prerequisites documented. Tier 2 predecessor для OBSERVABILITY-SENTRY-A.
+  - **Logger inventory:** primary module `src/lib/logging/logger.ts` (canonical `logInfo`/`logError` exports, AsyncLocalStorage requestId, auto-Telegram-alert from logError). Masking helpers `src/lib/logging/masking.ts` (`maskPhone`/`maskEmail` from OTP-LOG-DEV-GUARD-A May 23). ~836 callsites (709 logError / 163 logInfo / 1 logWarn) across 549 api routes + 28 worker + 25 notifications + 18 bookings + 17 queue + 15 billing + 14 admin-cabinet + 13 profiles + 13 hot-slots + 12 ai. Direct `console.X` outside logger: 7 callsites (all production-safe — env validation crash, block-error formatters, alerting fallback)
+  - **🔴 HIGH-severity findings (3 — all surgical fixable):**
+    1. `src/lib/sms/index.ts:67,75` — `logInfo("OTP SMS delivered", { phone, ... })` + `logError("OTP SMS delivery failed", { phone, ... })` — raw phone unmasked. Production path. 152-ФЗ exposure
+    2. `src/lib/email/sender.ts:41,47,51` (×3 callsites) — `{ to: opts.to, subject }` — raw email unmasked. Production path. Every email send (SMTP-not-configured / sent / failed branches)
+    3. `src/app/api/cabinet/user/profile/email/verify/route.ts:97-99` — `logInfo("Cabinet email verify completed", { userId, email: normalizedEmail })` — raw email logged on successful verify (sibling request-verify route in the SAME file family uses maskEmail correctly; verify route forgot)
+  - **🟡 acceptable findings:**
+    - `src/lib/sms/mock-provider.ts:18-20` logs raw phone + OTP message. Mock only active when `SMS_PROVIDER_ENABLED=false` (dev workflow by-design). Acceptable per OTP-LOG-DEV-GUARD-A precedent
+    - Telegram alert text `\`User ${profile.id} logged in...\`` includes cuid (pseudo-anonymous, admin chat only)
+    - YooKassa webhook IP allowlist denial logs `ip` (security forensics context — legitimate)
+    - Some `logError` payloads include `stack: error.stack` (debugging value high; Sentry beforeSend could strip local var captures if framework adds them)
+  - **✅ CLEAN areas (Areas 4/5/6/7 + most of 2/3):**
+    - **OTP codes (Area 4 catastrophic check):** `...(isProduction ? {} : { code })` properly guards all 3 OTP log sites — verified clean
+    - **Auth secrets (passwords / JWT / API keys / refresh tokens):** NOT logged anywhere
+    - **Webhook signature/secret:** logs only `Boolean(signature)` / `Boolean(secret)` presence flags
+    - **Payment data (PCI DSS):** logs `paymentId` (internal) only. NO card numbers / CVV / payment tokens
+    - **Object dumps (`JSON.stringify(user)`):** NONE found in log calls. Hot-slots `logInfo(..., stats)` — stats is pure counter (processed/skipped/notified), no PII
+    - **Error message PII interpolation (Area 6):** static error strings, no `${phone}` / `${email}` patterns in `throw new Error`
+    - **HTTP request (Area 7):** `src/proxy.ts` has NO logging. NO `req.body` / `Authorization` / `Cookie` headers logged anywhere
+    - **AI prompt/response content:** `src/lib/ai/client.ts` logs scope/model/status/attempt only. No prompt body or generated text
+    - **Booking specifics:** `createBooking` logs `transactionMs` + `bookingId` only. No client name+master+service combinations
+    - **Chat / review / notes body:** NOT logged
+    - **Phone/email — already-correct sites:** OTP request routes + cabinet request-verify route + link-guest-bookings + setSessionCookies (cookies set not logged)
+  - **🚨 STOP-gate evaluation:** NONE triggered. No catastrophic auth secret logging; no payment card data logging; logger pattern consistent (single canonical module + 7 audited direct-console sites); audit proceeded to documentation phase
+  - **Cross-reference SECURITY-AUDIT-A (2026-05-23):** SEC-1 OTP code closed by OTP-LOG-DEV-GUARD-A (verified by this audit). SEC-2/SEC-3 orthogonal (XSS / API key restriction). **NEW findings parallel to SECURITY-AUDIT-A**: SMS provider phone + email sender raw email + cabinet verify raw email. SECURITY-AUDIT-A focused on application boundaries (auth scope / DTO leaks / cross-tenant isolation); this audit's logger-discipline lens surfaces parallel gaps
+  - **Раздел 3 (Архитектура):** не затронут — read-only audit
+  - **Раздел 5 (Бизнес-логика):** не затронут
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Деплой):** privacy posture для logs audited. 3 🔴 findings surgical fixable (~30-45 min via PII-LOGGING-FIX-A spawn). Sentry integration BLOCKED until fixes land (otherwise Sentry would silently capture raw phone/email from production logs)
+  - **Раздел 10 (Безопасность) — Sentry integration prerequisites documented** (for downstream OBSERVABILITY-SENTRY-A — NOT applied этим audit):
+    - **PII scrubbing config required:** `beforeSend` hook walking event.extra/contexts/breadcrumbs, masking phone/email/to fields, redacting code/password/secret/token/apiKey/jwt fields, stripping request body + Authorization/Cookie headers
+    - **`sendDefaultPii: false`** — explicit opt-out from default PII collection
+    - **User context strategy:** `Sentry.setUser({ id: cuid })` ONLY — NOT email/phone/username
+    - **Integrations к configure:** HTTP integration filter (URLs may contain legacy `?phone=` query params; strip body + sensitive headers); Console integration verified safe (7 audited direct-console sites carry no PII); **Replay integration DO NOT enable** without further audit (could capture form inputs incl. phone/email/OTP typing)
+    - **Recommended sequencing:** PII-LOGGING-FIX-A first → then Sentry with beforeSend scrubber as defense-in-depth on TOP of fixed log discipline
+  - **Раздел 12 (Инварианты):** не затронуты formally. Implicit emerging invariant candidate (NOT yet formalized): «production logs never carry raw phone/email — wrap via maskPhone/maskEmail». Currently 3 violations; if PII-LOGGING-FIX-A closes them + LOGGER-DISCIPLINE-CI-GATE structurally prevents regression, could formalize at N=4 sites confirmed clean
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / **NO code/config changes** confirmed / 683/683 tests preserved / no test surface touched
+  - **What was NOT done:**
+    - NO code/config changes (read-only audit per strict rules)
+    - NO logger executed live (code inspection only — все findings based on grep + file reads)
+    - NO Sentry config applied (prerequisites documented for downstream prompt)
+    - NO architectural recommendations beyond Sentry integration prerequisites
+    - NO sprint work touched (683 tests + features all preserved)
+    - NO masking helper modifications (existing `maskPhone`/`maskEmail` reused as-is)
+  - **Honest gaps (NOT auditable read-only):**
+    - External integration log destinations (no APM currently — none к worry about)
+    - Runtime variable capture by Sentry framework (cannot verify without running Sentry — documented as concern для Sentry config phase)
+    - Production log retention policy (DevOps concern — outside code audit scope)
+    - Worker / cron stdout capture (systemd journal / Docker logs handle whatever Sentry stdout integration does)
+  - **Spawned downstream work:**
+    - 🔴 **`PII-LOGGING-FIX-A`** (~30-45 min, pre-launch recommended) — close 3 🔴 sites: SMS provider phone wrap + email sender opts.to wrap (×3 callsites in single file) + cabinet verify email wrap (single line). Surgical, no schema/no API contract change, no new helpers needed (`maskPhone`/`maskEmail` already exist and tested)
+    - 🟠 **`OBSERVABILITY-SENTRY-A`** (~half-day) — proceed AFTER PII-LOGGING-FIX-A. Sentry init с `sendDefaultPii: false` + `beforeSend` PII scrubber + `beforeBreadcrumb` filter + HTTP integration body/header stripping + user context = cuid only + Replay disabled
+    - 🔵 `TELEGRAM-ALERT-PII-REVIEW` (post-launch optional) — review user ID interpolation в alert text
+    - 🔵 `LOGGER-DISCIPLINE-CI-GATE` (post-launch nice-to-have) — AST-walk CI gate flagging `logInfo`/`logError` payloads с unwrapped `phone`/`email`/`to` keys. Same shape as `check:schema-drift` + `check:openapi-routes`
+  - **Pre-launch state:**
+    - **🟢 Quick wins: 3 of 10 done** (EMAIL-BRAND-URL-FIX-A + EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A + this audit)
+    - Logs PII exposure understood with concrete site list
+    - Sentry integration prerequisites clear + sequencing established
+    - 7 remaining quick-wins: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+  - **Process insight:** confirms Pattern 7 (tooling-absence remediation) at logger-discipline axis. Existing masking helpers from OTP-LOG-DEV-GUARD-A are present + tested, but adoption gap accumulates new sites (SMS provider added в SMS-GATEWAY-A; email sender adopted opts.to pattern; cabinet verify route shipped without consulting request-verify sibling). CI gate would close this structurally; meanwhile PII-LOGGING-FIX-A closes current tail (3 sites, well-contained, no new infrastructure). Same shape as ENV-DISCIPLINE-SWEEP-A (helpers existed; 45 sites needed migration) but order of magnitude smaller surface. **Audit-first methodology saved a Sentry-rushed integration:** had Sentry been enabled before this audit, 152-ФЗ violation would have been silent (Sentry captures logs by default with no PII discrimination)
+  - **Open questions for user:**
+    - Schedule PII-LOGGING-FIX-A pre-launch? Recommend YES — ~30-45 min trivial; closes Sentry blocker
+    - LOGGER-DISCIPLINE-CI-GATE proactive (closes class structurally) or reactive (wait for second regression)?
+
 - **2026-06-02 — EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A** (commit on `auditandaction`). **🟢 PRE-LAUNCH-CHECKLIST 2/10 quick-wins done.** Closes EMAIL-MODULE-AUDIT-A Open Question #1 (support address mismatch). Canonical value: **`support@мастеррядом.online`** (Cyrillic, EAI-aware) per user decision.
   - **Audit findings:** only **1 file** had stale ASCII variant — `src/features/client-cabinet/faq/client-faq-page.tsx` (lines 147 + 151). Other 2 surfaces already canonical: `Footer.tsx` + 3 places в `text.ts` (`footer.contacts.support`, `support.alternativeContact.{email,emailHref}`). Variant scan confirmed 0 occurrences of mockup-style placeholders (`help@masteryadom.ru` / `help@masterryadom.online` / `support@beautyhub.*` / `help@beautyhub.*`)
   - **Approach selected — Hybrid of spec Option A + Option B (UI_TEXT wiring per CLAUDE.md rule 1):** spec offered 3 options (A literal / B shared constant / C env var); project-canonical approach is wiring к UI_TEXT — added 2 keys к `UI_TEXT.clientCabinet.faq` namespace (mirrors precedent в `UI_TEXT.support.alternativeContact`)

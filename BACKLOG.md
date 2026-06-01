@@ -31,6 +31,140 @@
 
 > Полная карта sprint'а — выполненные направления. Детали по каждому коммиту в AI_CONTEXT раздел 15.
 
+### ~~SENSITIVE-DATA-LOGS-AUDIT-A~~ ✅ ЗАКРЫТ (2026-06-02) — **🟢 PRE-LAUNCH-CHECKLIST 3/10 quick-wins done. Comprehensive read-only PII exposure audit across 8 areas. 3 🔴 HIGH-severity findings (raw phone/email in production logs) + 1 🟡 acceptable mock-only finding. NO 🚨 catastrophic findings. Sentry integration prerequisites documented.**
+- **Trigger:** PRE-LAUNCH-CHECKLIST flagged как Tier 2 predecessor для OBSERVABILITY-SENTRY-A. Sentry автоматически captures `console.X` breadcrumbs + log payloads + HTTP request data → если PII (phone/email/auth secrets/payment data) leaks через logs, Sentry captures это → 152-ФЗ violation. Must audit logs hygiene BEFORE Sentry лёгкий integration.
+- **Read-only inspection: NO code changes, NO logger live execution, NO Sentry config applied**
+- **Logger inventory:**
+  - **Primary module:** `src/lib/logging/logger.ts` — canonical `logInfo` / `logError` (no `logWarn` export despite 1 usage hit). AsyncLocalStorage для requestId propagation. logError автоматически triggers Telegram alerts via `alertError` + tracks error rate (5/5min threshold → critical alert)
+  - **PII masking helpers:** `src/lib/logging/masking.ts` — `maskPhone()` («+7****67») + `maskEmail()` («jo******@example.com»). Created by OTP-LOG-DEV-GUARD-A May 23. Defensive helpers exist; adoption gap is the audit finding
+  - **Telegram alerts module:** `src/lib/monitoring/{alert.ts, alerts.ts, api-alerts.ts}` — production-only (`env.NODE_ENV !== "production"` early-return). HTML-escapes context. Cooldown shared via Redis. Fires from logError automatically unless `__skipAlert: true` set
+  - **Total log callsites:** ~836 (logError 709 / logInfo 163 / logWarn 1)
+  - **Distribution:** 549 в api routes / 28 worker / 25 notifications / 18 bookings / 17 queue / 15 billing / 14 admin-cabinet / 13 profiles / 13 hot-slots / 12 ai / 10 visual-search / 9 monitoring / 9 media / 9 cache / 9 auth / 8 deletion / 8 cities / 7 sms / 7 master / 6 redis
+  - **Direct `console.X` outside logger:** 7 callsites total — all production-safe: `src/lib/env.ts` (startup validation crash with credentials NOT printed), `src/lib/alerting.ts` (fallback when Telegram unconfigured), `src/features/public-{profile,studio}/server/block-error.ts` (block name + error.message, no PII), `src/lib/schedule/usecases.ts:406` (dev info). All checked — no PII
+- **PII exposure findings catalog:**
+
+  | Category | Severity | Locations | Examples | Mitigation |
+  |---|---|---|---|---|
+  | **OTP codes (auth secret)** | ✅ CLEAN | OTP request routes (phone + email) | `...(isProduction ? {} : { code })` | Already guarded by `isProduction` flag — OTP-LOG-DEV-GUARD-A May 23 |
+  | **Phone numbers — SMS provider** | 🔴 HIGH | `src/lib/sms/index.ts:67,75` | `logInfo("OTP SMS delivered", { phone, ... })` + `logError("OTP SMS delivery failed", { phone, ... })` | Wrap with `maskPhone()` |
+  | **Phone numbers — mock provider** | 🟡 MEDIUM (dev-only) | `src/lib/sms/mock-provider.ts:18-20` | `logInfo("[MOCK SMS] would deliver", { phone, message })` | Mock only active when `SMS_PROVIDER_ENABLED=false` (dev workflow by-design). Acceptable per OTP-LOG-DEV-GUARD-A precedent |
+  | **Phone numbers — link-guest** | ✅ CLEAN | `src/lib/bookings/link-guest-bookings.ts:99-103` | `{ phone: maskPhone(normalized \|\| phoneRaw), ... }` | Already masked |
+  | **Phone numbers — OTP request route** | ✅ CLEAN | `src/app/api/auth/otp/request/route.ts:60-65` | `{ phone: maskPhone(phone), ... }` | Already masked |
+  | **Phone — session cookies** | ✅ CLEAN (not logged) | `setSessionCookies({sub, phone})` | Cookies set, not logged | N/A |
+  | **Email addresses — sender** | 🔴 HIGH | `src/lib/email/sender.ts:41,47,51` (×3) | `logError("SMTP not configured", { to: opts.to, ... })`, `logInfo("Email sent", { to: opts.to, ... })`, `logError("Failed to send email", { to: opts.to, ... })` | Wrap with `maskEmail()` |
+  | **Email addresses — cabinet verify** | 🔴 HIGH | `src/app/api/cabinet/user/profile/email/verify/route.ts:97-99` | `logInfo("Cabinet email verify completed", { userId, email: normalizedEmail })` | Use `maskEmail()` (cabinet request-verify uses it correctly; verify route forgot) |
+  | **Email — OTP routes (request)** | ✅ CLEAN | `src/app/api/auth/otp/email/request/route.ts:73-83` + `cabinet/user/profile/email/request-verify/route.ts:135-145` | `{ email: maskEmail(normalizedEmail), ... }` | Already masked |
+  | **Email — support routes** | ✅ CLEAN (no email logged) | `partnership/route.ts:264`, `tickets/route.ts:411` | Logs phase/errorKind/errorMessage only, not customer email | N/A |
+  | **Authentication secrets** | ✅ CLEAN | webhook + auth flows | Webhook logs `Boolean(signature)` / `Boolean(secret)` only. JWT / refresh tokens / passwords / API keys: NOT logged | N/A |
+  | **Payment details** | ✅ CLEAN | YooKassa webhook + processor | Logs `paymentId` (internal) only. NO card numbers / CVV / payment tokens | N/A |
+  | **Full names** | ✅ CLEAN | profile flows | Profile mutations log `userId` only. No `firstName` / `lastName` / `clientName` patterns in log payloads | N/A |
+  | **Personal addresses** | ✅ CLEAN | Yandex maps + booking flows | No `address` / `geoLat` / `geoLng` in log payloads | N/A |
+  | **Geographic IP** | 🟡 LOW | YooKassa webhook IP allowlist denial (`{ ip: allowlistCheck.ip }`) | Limited surface; legitimate security forensics use | Acceptable (security context) |
+  | **Session identifiers** | ✅ CLEAN | session/cookie flows | Set, never logged | N/A |
+  | **Booking specifics (PII combo)** | ✅ CLEAN | bookings flows | `createBooking` logs `transactionMs` + `bookingId` only. No client name+master+service combinations dumped | N/A |
+  | **Chat message body / review text / notes** | ✅ CLEAN | chat / crm modules | No chat body / review text / clientNote text in log payloads | N/A |
+  | **Object dumps (`JSON.stringify(user)`)** | ✅ CLEAN | all modules | NONE found. Only `JSON.stringify` для Redis enqueue/serialization (not logging) | N/A |
+  | **Error message PII interpolation** | ✅ CLEAN | error throws | Static error strings («Address suggestions unavailable» etc), no `${phone}` / `${email}` patterns | N/A |
+  | **Stack traces** | 🟡 LOW | Some `logError` payloads include `stack: error.stack` | Stack traces may include file paths + sometimes local variable values (framework-dependent). Sentry would capture these by default | Acceptable for debugging; Sentry `beforeSend` could strip if framework includes locals |
+  | **HTTP request body / headers** | ✅ CLEAN | middleware + routes | `src/proxy.ts` has NO logging. NO `req.body` / `Authorization` / `Cookie` headers logged anywhere | N/A |
+  | **Hot-slots stats / job stats** | ✅ CLEAN | `logInfo("Hot slots job completed", stats)` + smart-price | Pure counters (processed/skipped/notified). No PII | N/A |
+  | **AI prompt/response content** | ✅ CLEAN | `src/lib/ai/client.ts` | Logs scope/model/status/attempt only. NO prompt body or generated text in logs | N/A |
+  | **Telegram alert text — user ID interpolation** | 🟡 LOW | `email/verify/route.ts:120` | `\`User ${profile.id} logged in via email without free subscription\`` — cuid in alert string | Pseudo-anonymous. Acceptable (admin chat only, no raw PII) |
+  | **AdminAuditLog DB ipAddress/userAgent** | ✅ INTENTIONAL | `prisma/schema/audit.prisma:41,43`, `auth.prisma:139,141` | Stored deliberately для compliance + abuse detection. Different from logs surface | Intentional compliance design |
+
+- **🚨 STOP-gate evaluation:** **NONE triggered.**
+  - No catastrophic auth secret logging (passwords / JWT / refresh tokens / API keys / live OTP codes in production paths)
+  - No payment card data logging (PCI DSS catastrophic concern: not present)
+  - Logger pattern is **consistent** (single canonical `logger.ts` module). Direct `console.X` outside logger is limited to 7 production-safe sites
+  - Audit can proceed to documentation phase
+- **Cross-reference SECURITY-AUDIT-A (2026-05-23) findings:**
+  - SEC-1 (email OTP code logging) — closed by OTP-LOG-DEV-GUARD-A May 23. Verified clean by this audit
+  - SEC-2 (JSON-LD escaping) — orthogonal (XSS surface, not logs)
+  - SEC-3 (Yandex Maps API key restriction) — orthogonal (env var surface)
+  - **NEW findings not in SECURITY-AUDIT-A:** SMS provider phone logging + email sender raw email + cabinet verify raw email. SECURITY-AUDIT-A focused on application-level boundaries (auth scope / DTO leaks / cross-tenant isolation); this audit's logger-discipline lens surfaces parallel gaps
+- **Sentry integration prerequisites (for SENTRY downstream prompt — NOT applied этим audit):**
+
+  **1. PII scrubbing config required в `beforeSend` hook:**
+  ```typescript
+  // Conceptual — NOT applied этим audit
+  Sentry.init({
+    sendDefaultPii: false, // disable default PII collection
+    beforeSend(event, hint) {
+      // Walk event.extra / event.contexts / event.breadcrumbs[].data
+      // For any string field named: phone, to (in email contexts), email
+      //   → apply maskPhone() / maskEmail()
+      // For any field named: code, password, secret, token, apiKey, jwt
+      //   → replace with "[REDACTED]"
+      // Strip request body entirely (HTTP integration)
+      // Strip Authorization + Cookie headers (HTTP integration)
+      return event;
+    },
+    beforeBreadcrumb(breadcrumb) {
+      // Console breadcrumbs that include PII patterns → strip args
+      // HTTP breadcrumbs → strip request body
+      return breadcrumb;
+    },
+  });
+  ```
+
+  **2. Sentry user context strategy:**
+  - `Sentry.setUser({ id: hashedUserId })` — use **internal cuid only**, NOT `phone` / `email` / `username`
+  - DO NOT set `Sentry.setUser({ email })` — Sentry default behavior would tag every event with that email
+
+  **3. Sentry integrations к disable / configure:**
+  - **HTTP integration:** `breadcrumbs: { http: true }` captures URLs by default. Need filter to strip query strings (could contain phone numbers in legacy `?phone=` params) + body + sensitive headers
+  - **Console integration:** captures `console.X` automatically as breadcrumbs. Need to verify our 7 production `console.X` sites don't carry PII (they don't — confirmed in audit)
+  - **Default PII:** `sendDefaultPii: false` — explicitly opt out
+  - **Replay integration:** **DO NOT enable** without further audit (could capture form inputs incl. phone/email/OTP code typing)
+
+  **4. Specific patterns к flag in `beforeSend` hook:**
+  - Field name `phone` → mask
+  - Field name `email` OR `to` (in email-send contexts) → mask
+  - Field name `code` (OTP) → redact entirely (already production-stripped, defense-in-depth)
+  - Field name `raw` (queue parse failures) → redact (could contain serialized job payloads)
+  - Stack frames с local variable values → consider stripping `localVars` if framework captures them
+
+  **5. Recommended sequencing:**
+  - **PII-LOGGING-FIX-A first** (closes 3 🔴 findings)
+  - **OBSERVABILITY-SENTRY-A after** (with `beforeSend` PII scrubber as defense-in-depth on TOP of fixed log discipline)
+- **Spawned downstream work:**
+  - 🔴 **`PII-LOGGING-FIX-A`** (~30-45 min, pre-launch recommended) — close 3 HIGH-severity findings:
+    1. `src/lib/sms/index.ts:67,75` — wrap `phone` with `maskPhone()` (mirrors OTP request route pattern)
+    2. `src/lib/email/sender.ts:41,47,51` — wrap `opts.to` with `maskEmail()` (3 callsites, single helper file)
+    3. `src/app/api/cabinet/user/profile/email/verify/route.ts:99` — wrap `email: normalizedEmail` with `maskEmail()` (single line, mirrors request-verify route in same file family)
+    - **Validation:** masking helpers already exist + tested (`src/lib/logging/masking.test.ts`). Surgical fix без новых helpers / new dependencies
+    - **No schema migration / no API contract change** — purely log payload string formatting
+  - 🟠 **`OBSERVABILITY-SENTRY-A`** (~half-day) — proceed AFTER PII-LOGGING-FIX-A lands. Sentry init с `sendDefaultPii: false` + `beforeSend` PII scrubber + `beforeBreadcrumb` filter + HTTP integration body/header stripping. User context = cuid only. Replay integration disabled.
+  - 🔵 **`TELEGRAM-ALERT-PII-REVIEW`** (post-launch optional) — review whether user IDs (cuids) в alert text strings (`User ${profile.id} ...`) should be hashed. Currently: low impact (admin Telegram chat only, no raw PII leaked, just user IDs that admin could query DB for anyway). Acceptable for now.
+  - 🔵 **`LOGGER-DISCIPLINE-CI-GATE`** (post-launch nice-to-have) — `scripts/check-logger-pii.mjs` AST-walk over `logInfo` / `logError` payload literals. Flag keys named `phone` / `email` / `to` not wrapped в `maskPhone()` / `maskEmail()`. Prevents future regression. Same shape as existing `check:schema-drift` + `check:openapi-routes` CI gates
+- **Validation:**
+  - typecheck ✅
+  - **NO code/config changes** confirmed (`git status` clean before audit; only doc updates after)
+  - 683/683 tests preserved (no test surface touched)
+- **What was NOT done (per strict rules):**
+  - NO code/config changes (read-only audit)
+  - NO logger executed live (code inspection only)
+  - NO Sentry config applied (prerequisites documented for downstream prompt)
+  - NO architectural recommendations beyond Sentry integration prerequisites
+  - NO sprint work touched (683 tests, all features preserved)
+  - NO masking helper changes (existing `maskPhone`/`maskEmail` reused as-is)
+- **STOP-gates triggered:** NONE — clean audit (no catastrophic findings; logger pattern consistent)
+- **Honest gaps (NOT auditable read-only):**
+  - **External integration log destinations** — if logs forwarded to 3rd party aggregator (Datadog / Splunk / etc), additional concerns apply. No APM integration found in package.json today (✅ none yet)
+  - **Runtime variable capture** — some frameworks (Sentry default) capture local variables in stack traces. Cannot verify without running Sentry to see what it captures. Documented как concern для Sentry config phase
+  - **Production log retention** — runbook / DevOps concern (logs may be retained по weeks/months at infrastructure layer). 152-ФЗ compliance depends на log retention policy too — outside code audit scope
+  - **Worker / cron stdout** — `npm run worker` outputs goes to stdout. Whatever captures stdout (systemd journal / Docker logs / supervisor) has same PII concerns. Same scrubbing applies if Sentry's stdout integration enabled
+- **Pre-launch state:**
+  - **🟢 Quick wins: 3 of 10 done** (EMAIL-BRAND-URL-FIX-A + EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A + this audit)
+  - Logs PII exposure understood (3 🔴 findings, all surgical fixable in <1 hr)
+  - Sentry integration prerequisites documented + sequencing clear
+  - **Blocker for OBSERVABILITY-SENTRY-A:** PII-LOGGING-FIX-A first (otherwise Sentry would silently capture raw phone/email from production logs)
+  - 7 remaining quick-wins: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+- **Process insight:** confirms Pattern 7 (tooling-absence remediation) at a new axis — the existing `maskPhone`/`maskEmail` helpers (from OTP-LOG-DEV-GUARD-A) are present and tested, but adoption gap accumulates new sites quickly. CI gate would close this structurally; meanwhile PII-LOGGING-FIX-A closes the current tail. Three 🔴 sites are well-contained (single SMS provider file + single email sender file + single cabinet route line). Fix scope smaller than initially anticipated. Same shape as ENV-DISCIPLINE-SWEEP-A (helpers existed, 45 sites needed migration) but much smaller surface (3 sites)
+- **Open questions for user:**
+  - Schedule PII-LOGGING-FIX-A pre-launch (recommend YES — ~30-45 min trivial)? After that Sentry integration unblocked
+  - LOGGER-DISCIPLINE-CI-GATE — proactive (closes class structurally) or reactive (wait for second regression)?
+
 ### ~~GRAPHIFY-SETUP-AND-INITIAL-AUDIT~~ ✅ ЗАКРЫТ (2026-05-31) — **Graphify integrated + initial audit complete**
 - **Install:** Graphify v0.8.25 already globally installed via pip (Python 3.10). NO new install required.
 - **Build stats:** `graphify update .` ran in ~2 min — **1825 files / 9500 nodes / 27447 edges / 353 communities** (328 shown + 25 thin omitted). 100% AST-extracted (tree-sitter local), 65 inferred edges (avg confidence 0.8). Token cost: **0 input / 0 output** (no LLM calls — privacy clean).
