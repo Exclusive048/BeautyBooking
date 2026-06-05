@@ -8,6 +8,7 @@ import { getNotificationsNotifierRuntimeStatus, notificationsNotifier } from "@/
 import { prisma } from "@/lib/prisma";
 import { getQueueStats } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
+import { env, isProduction } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,7 @@ const QUEUE_DEAD_THRESHOLD = 10;
 const QUEUE_PROCESSING_THRESHOLD = 50;
 
 function resolveWorkerSecret(): string | null {
-  const secret = process.env.WORKER_SECRET?.trim();
+  const secret = env.WORKER_SECRET?.trim();
   return secret && secret.length > 0 ? secret : null;
 }
 
@@ -108,7 +109,6 @@ export async function GET(request: Request) {
       alertWorkerDown(parsePingAgeSeconds(workerLastPingAtMs));
     }
 
-    const isProduction = process.env.NODE_ENV === "production";
     const readiness = {
       db: dbReady,
       redis: redisReady,
@@ -126,7 +126,7 @@ export async function GET(request: Request) {
     return ok(
       {
         generatedAt: new Date().toISOString(),
-        environment: process.env.NODE_ENV ?? "development",
+        environment: env.NODE_ENV,
         readiness: {
           ...readiness,
           ready,

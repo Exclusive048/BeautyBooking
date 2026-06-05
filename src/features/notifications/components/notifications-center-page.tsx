@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
 import {
   Bell,
   BellOff,
@@ -223,6 +223,9 @@ const itemVariants: Variants = {
 export function NotificationsCenterPage({ initialData }: Props) {
   const t = UI_TEXT.notificationsCenter;
   const viewerTimeZone = useViewerTimeZoneContext();
+  const reduce = useReducedMotion();
+  const listAnim = reduce ? undefined : listVariants;
+  const itemAnim = reduce ? undefined : itemVariants;
   const [filter, setFilter] = useState<FilterKey>("all");
   const [invites, setInvites] = useState(initialData.invites);
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
@@ -494,10 +497,10 @@ export function NotificationsCenterPage({ initialData }: Props) {
         {actionNotice ? (
           <motion.div
             key="action-notice"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.2 }}
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.2 }}
             className={`rounded-2xl border px-4 py-3 text-sm ${
               actionNotice.tone === "success"
                 ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
@@ -536,7 +539,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
             className="space-y-2"
             initial="hidden"
             animate="visible"
-            variants={listVariants}
+            variants={listAnim}
           >
             <AnimatePresence>
               {filteredNotifications.map((note) => {
@@ -557,8 +560,8 @@ export function NotificationsCenterPage({ initialData }: Props) {
                   <motion.article
                     key={note.id}
                     layout
-                    variants={itemVariants}
-                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+                    variants={itemAnim}
+                    exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
                     className={`relative flex gap-3 rounded-2xl border p-4 transition-colors ${
                       isUnread
                         ? "border-primary/20 bg-primary/5"

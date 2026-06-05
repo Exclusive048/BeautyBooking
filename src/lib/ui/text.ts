@@ -855,7 +855,7 @@ export const UI_TEXT = {
       subtitle: "Настройте публичную ссылку и поделитесь профилем.",
       usernameLabel: "Публичный адрес",
       usernameHint: "Только латинские буквы, цифры и дефис. Мин. 3 символа.",
-      urlPreview: (username: string) => `beautyhub.art/u/${username}`,
+      urlPreview: (username: string) => `мастеррядом.online/u/${username}`,
       copyLink: "Скопировать ссылку",
       copied: "Скопировано!",
       qrTitle: "QR-код профиля",
@@ -3953,6 +3953,7 @@ export const UI_TEXT = {
       reportReasonOffensive: "Оскорбительный контент",
       reportReasonInappropriate: "Неприемлемый контент",
       reportReasonOther: "Другое",
+      reportReasonPlaceholder: "— выберите причину —",
       verified: "Проверенный отзыв",
       sortBy: {
         label: "Сортировать",
@@ -4795,8 +4796,11 @@ export const UI_TEXT = {
       titlePhoto: "Обрезать фото",
       hint: "Двигайте фото под рамкой или используйте ползунок масштаба.",
       zoomLabel: "Масштаб",
+      zoomOut: "Уменьшить",
+      zoomIn: "Увеличить",
       previewLabel: "Превью",
       save: "Применить",
+      saving: "Сохраняем...",
       skip: "Пропустить",
       saveFailed: "Не удалось сохранить обрезку.",
       setCrop: "Обрезать",
@@ -4915,6 +4919,7 @@ export const UI_TEXT = {
     },
     reviewForm: {
       title: "Оставить отзыв",
+      starAria: "{star} звезд",
       publicTagsTitle: "Что понравилось больше всего (до 3 пунктов)",
       privateTagsTitle: "Что можно улучшить (до 3 пунктов)",
       privateTagsHint: "Эти отметки видит только мастер",
@@ -5135,6 +5140,12 @@ export const UI_TEXT = {
       contactsTitle: "Контакты",
       contactsDescription: "Если вопрос срочный — пишите напрямую.",
       contactEmail: "Почта",
+      // EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A: canonical support address with
+      // Cyrillic local part. Mirrors precedent in UI_TEXT.support.alternativeContact
+      // (storing both display + mailto pre-built). Yandex Mail EAI configuration
+      // required to receive this address — see DEVOPS Q4 in BACKLOG.
+      contactEmailAddress: "support@мастеррядом.online",
+      contactEmailHref: "mailto:support@мастеррядом.online",
       contactPhone: "Телефон",
       contactTelegram: "Telegram",
       docsTitle: "Документы",
@@ -7072,6 +7083,7 @@ export const UI_TEXT = {
     },
     steps: {
       stepLabel: "Шаг {n}",
+      ariaLabel: "Шаги записи",
       service: "Услуга",
       master: "Мастер",
       when: "Когда",
@@ -7112,6 +7124,8 @@ export const UI_TEXT = {
       back: "Назад",
       today: "Сегодня",
       tomorrow: "Завтра",
+      daysOfWeek: ["вс", "пн", "вт", "ср", "чт", "пт", "сб"],
+      months: ["янв", "фев", "мар", "апр", "мая", "июня", "июля", "авг", "сен", "окт", "ноя", "дек"],
     },
     youStep: {
       title: "Последний шаг",

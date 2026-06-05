@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 
 export type FAQItem = { readonly q: string; readonly a: string };
@@ -9,6 +9,7 @@ export type FAQGroup = { readonly title: string; readonly items: readonly FAQIte
 
 function FAQAccordionItem({ item }: { item: FAQItem }) {
   const [open, setOpen] = useState(false);
+  const reduce = useReducedMotion();
 
   return (
     <div className="lux-card rounded-[16px] bg-bg-card">
@@ -20,8 +21,8 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
       >
         <span>{item.q}</span>
         <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: "easeInOut" }}
+          animate={reduce ? undefined : { rotate: open ? 180 : 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
           className="shrink-0 text-text-sec"
         >
           <ChevronDown className="h-4 w-4" aria-hidden />
@@ -31,10 +32,10 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         {open && (
           <motion.div
             key="content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeInOut" }}
+            initial={reduce ? false : { height: 0, opacity: 0 }}
+            animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
+            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.22, ease: "easeInOut" }}
             className="overflow-hidden"
           >
             <p className="px-5 pb-5 text-sm text-text-sec leading-relaxed">{item.a}</p>

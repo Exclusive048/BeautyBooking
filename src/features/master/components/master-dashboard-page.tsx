@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { env } from "@/lib/env";
 import { AnnouncementsSection } from "@/features/master/components/dashboard/announcements-section";
 import { AttentionSection } from "@/features/master/components/dashboard/attention-section";
 import { GreetingHero } from "@/features/master/components/dashboard/greeting-hero";
@@ -75,7 +76,7 @@ export async function MasterDashboardPage() {
     : null;
 
   const publicProfileUrl = data.master.publicUsername
-    ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/u/${data.master.publicUsername}` || `/u/${data.master.publicUsername}`
+    ? `${env.NEXT_PUBLIC_APP_URL ?? ""}/u/${data.master.publicUsername}` || `/u/${data.master.publicUsername}`
     : null;
 
   const HEADER = UI_TEXT.cabinetMaster.pageHeader;

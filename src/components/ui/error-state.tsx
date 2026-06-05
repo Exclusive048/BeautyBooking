@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   AlertTriangle,
@@ -86,17 +86,20 @@ export function ErrorState({
   className,
 }: Props) {
   const Icon = icon ?? DEFAULT_ICONS[variant];
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const item = reduce ? undefined : itemVariants;
 
   return (
     <motion.div
       className={cn("flex flex-col items-center px-4 py-16 text-center", className)}
-      variants={containerVariants}
+      variants={container}
       initial="hidden"
       animate="visible"
     >
       {/* Icon circle */}
       <motion.div
-        variants={itemVariants}
+        variants={item}
         className={cn(
           "flex h-20 w-20 items-center justify-center rounded-full",
           ICON_BG[variant]
@@ -107,7 +110,7 @@ export function ErrorState({
 
       {/* Title */}
       <motion.h1
-        variants={itemVariants}
+        variants={item}
         className="mt-6 text-2xl font-bold text-text-main md:text-3xl"
       >
         {title}
@@ -116,7 +119,7 @@ export function ErrorState({
       {/* Description */}
       {description && (
         <motion.p
-          variants={itemVariants}
+          variants={item}
           className="mt-3 max-w-sm text-base leading-relaxed text-text-sec"
         >
           {description}
@@ -126,7 +129,7 @@ export function ErrorState({
       {/* Actions */}
       {(primaryAction ?? secondaryAction) && (
         <motion.div
-          variants={itemVariants}
+          variants={item}
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           {primaryAction && <ActionButton action={primaryAction} variant="primary" />}

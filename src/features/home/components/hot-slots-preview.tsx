@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Flame, Clock } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
@@ -87,6 +87,9 @@ const itemVariants = {
 export function HotSlotsPreview() {
   const [slots, setSlots] = useState<HotSlotItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const itemAnim = reduce ? undefined : itemVariants;
 
   useEffect(() => {
     let cancelled = false;
@@ -128,7 +131,7 @@ export function HotSlotsPreview() {
       </div>
 
       <motion.div
-        variants={containerVariants}
+        variants={container}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, margin: "-60px" }}
@@ -150,7 +153,7 @@ export function HotSlotsPreview() {
           return (
             <motion.div
               key={item.id}
-              variants={itemVariants}
+              variants={itemAnim}
               className="flex flex-col gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/90 p-4"
             >
               {/* Header */}

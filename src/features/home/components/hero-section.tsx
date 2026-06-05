@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,9 @@ export function HeroSection({ stats }: Props) {
   const T = UI_TEXT.homeGuest;
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const item = reduce ? undefined : itemVariants;
 
   const showStats = stats !== null && stats.masters >= STATS_MIN_MASTERS;
   const eyebrowText = stats !== null && stats.masters >= STATS_MIN_MASTERS
@@ -56,7 +59,7 @@ export function HeroSection({ stats }: Props) {
 
   return (
     <motion.section
-      variants={containerVariants}
+      variants={container}
       initial="hidden"
       animate="visible"
       className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-20 lg:py-24"
@@ -74,7 +77,7 @@ export function HeroSection({ stats }: Props) {
       <div className="relative mx-auto max-w-3xl text-center">
         {/* Eyebrow */}
         <motion.p
-          variants={itemVariants}
+          variants={item}
           className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary"
         >
           {eyebrowText}
@@ -82,7 +85,7 @@ export function HeroSection({ stats }: Props) {
 
         {/* Headline with Fraunces italic accent */}
         <motion.h1
-          variants={itemVariants}
+          variants={item}
           className="mt-4 text-balance text-[2.25rem] font-bold leading-[1.1] tracking-tight text-text-main sm:text-5xl lg:text-[3.75rem]"
         >
           {T.heroTitle}{" "}
@@ -92,7 +95,7 @@ export function HeroSection({ stats }: Props) {
 
         {/* Subtitle */}
         <motion.p
-          variants={itemVariants}
+          variants={item}
           className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-text-sec sm:text-lg"
         >
           {T.heroSubtitle}
@@ -100,7 +103,7 @@ export function HeroSection({ stats }: Props) {
 
         {/* Search bar */}
         <motion.form
-          variants={itemVariants}
+          variants={item}
           onSubmit={handleSubmit}
           className="mx-auto mt-8 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center"
         >
@@ -124,7 +127,7 @@ export function HeroSection({ stats }: Props) {
 
         {/* Stats — reserve height to avoid CLS */}
         <motion.div
-          variants={itemVariants}
+          variants={item}
           className="mx-auto mt-8 flex min-h-[3rem] items-center justify-center"
         >
           {showStats && stats ? (

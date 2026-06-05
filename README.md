@@ -103,7 +103,7 @@ Create a studio → invite masters by phone → assign services → manage the w
 | Language        | TypeScript                              |
 | Styling         | Tailwind CSS (custom design tokens)     |
 | ORM             | Prisma                                  |
-| Database        | PostgreSQL (Supabase)                   |
+| Database        | PostgreSQL + pgvector (local dev: `pgvector/pgvector:pg16` Docker; production provider TBD pending DevOps) |
 | Cache / Pub-Sub | Redis                                   |
 | Auth            | OTP (phone), Telegram Login, VK OAuth   |
 | Payments        | ЮKassa (YooKassa) — _in integration_    |

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -37,6 +37,7 @@ type Phase = "pending" | ConsentValue;
 export function CookieConsent() {
   const t = UI_TEXT.cookieConsent;
   const [phase, setPhase] = useState<Phase>("pending");
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration: detect client mount to read localStorage without SSR mismatch
@@ -59,10 +60,10 @@ export function CookieConsent() {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ y: 80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 80, opacity: 0 }}
-        transition={{ type: "spring", damping: 28, stiffness: 320 }}
+        initial={reduce ? false : { y: 80, opacity: 0 }}
+        animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1 }}
+        exit={reduce ? { opacity: 0 } : { y: 80, opacity: 0 }}
+        transition={reduce ? { duration: 0 } : { type: "spring", damping: 28, stiffness: 320 }}
         className="fixed bottom-0 left-0 right-0 z-[45] p-3 pb-safe md:p-5"
       >
         <div className="mx-auto max-w-5xl rounded-2xl border border-border-subtle bg-bg-card/95 p-4 shadow-hover backdrop-blur-md md:p-5">

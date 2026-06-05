@@ -24,6 +24,8 @@ import { SWRProvider } from "@/components/providers/swr-provider";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
+import { env } from "@/lib/env";
+import { safeJsonLd } from "@/lib/seo/schema";
 
 ensureVisualSearchStartupConfig();
 
@@ -75,7 +77,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"),
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"),
   title: {
     default: UI_TEXT.meta.title,
     template: `%s | ${UI_TEXT.brand.name}`,
@@ -181,7 +183,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: LOCAL_SW_RESET_SCRIPT }} />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSON_LD) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(SITE_JSON_LD) }}
         />
       </head>
       <body>

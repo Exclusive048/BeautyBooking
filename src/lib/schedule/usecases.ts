@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { isProduction } from "@/lib/env";
 import type { Result } from "@/lib/domain/result";
 import type {
   AvailabilitySlot,
@@ -400,7 +401,7 @@ export async function listAvailabilitySlotsPaginated(
     pageSize,
   };
 
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
     const durationMs = Date.now() - startedAt;
     console.info(
       `[availability] provider=${providerId} days=${totalDays} bookings=${bookingRanges.length} slots=${slots.length} ms=${durationMs}`

@@ -23,7 +23,7 @@ export function StepsBar({ active, done, scenarioB }: Props) {
   return (
     <div
       role="list"
-      aria-label="Шаги записи"
+      aria-label={UI_TEXT.bookingWidget.steps.ariaLabel}
       className="flex items-stretch gap-0 rounded-xl border border-border-subtle bg-bg-card p-2 sm:p-2.5"
     >
       {visible.map((step, i) => {

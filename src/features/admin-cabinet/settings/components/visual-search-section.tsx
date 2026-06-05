@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
@@ -23,6 +23,7 @@ export function VisualSearchSection({ initial, enabled }: Props) {
   const [stats] = useState<VisualSearchStatsView>(initial);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const reduce = useReducedMotion();
 
   const nothingToIndex = stats.notIndexed === 0;
   const disableButton = !enabled || nothingToIndex || status === "running";
@@ -54,9 +55,9 @@ export function VisualSearchSection({ initial, enabled }: Props) {
             {status === "running" ? (
               <motion.span
                 key="running"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={reduce ? false : { opacity: 0 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-text-sec"
               >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -65,9 +66,9 @@ export function VisualSearchSection({ initial, enabled }: Props) {
             ) : status === "done" ? (
               <motion.span
                 key="done"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+                initial={reduce ? false : { opacity: 0, y: -4 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
               >
                 <Check className="h-3.5 w-3.5" aria-hidden />
@@ -76,9 +77,9 @@ export function VisualSearchSection({ initial, enabled }: Props) {
             ) : status === "error" ? (
               <motion.span
                 key="error"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={reduce ? false : { opacity: 0 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
               >
                 <TriangleAlert className="h-3.5 w-3.5" aria-hidden />

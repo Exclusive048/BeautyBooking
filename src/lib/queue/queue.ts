@@ -3,13 +3,14 @@ import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connect
 import { logError } from "@/lib/logging/logger";
 import type { Job } from "@/lib/queue/types";
 import { isJob, normalizeJobMeta } from "@/lib/queue/types";
+import { isProduction } from "@/lib/env";
 
 const QUEUE_KEY = "queue:jobs";
 const PROCESSING_KEY = "queue:processing";
 const DEAD_KEY = "queue:dead";
 const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RECOVERY_ATTEMPTS = 3;
-const allowMemoryQueueFallback = process.env.NODE_ENV !== "production";
+const allowMemoryQueueFallback = !isProduction;
 
 const memoryQueue: Job[] = [];
 const memoryProcessing: Job[] = [];

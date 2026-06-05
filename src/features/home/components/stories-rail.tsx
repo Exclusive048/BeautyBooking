@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useStoriesViewer } from "@/features/home/stories-viewer-context";
 import {
   getViewedItemIds,
@@ -39,6 +39,8 @@ function StoryRing({
   onSelect: (group: StoriesGroup) => void;
 }) {
   const T = UI_TEXT.homeFeed.stories;
+  const reduce = useReducedMotion();
+  const itemAnim = reduce ? undefined : itemVariants;
   const initials = group.providerName
     .split(" ")
     .map((w) => w[0])
@@ -49,9 +51,9 @@ function StoryRing({
   return (
     <motion.button
       type="button"
-      variants={itemVariants}
-      whileHover={{ scale: 1.04 }}
-      whileTap={{ scale: 0.95 }}
+      variants={itemAnim}
+      whileHover={reduce ? undefined : { scale: 1.04 }}
+      whileTap={reduce ? undefined : { scale: 0.95 }}
       onClick={() => onSelect(group)}
       aria-label={`${T.cardLabel} ${group.providerName}`}
       className="flex w-[84px] shrink-0 snap-start flex-col items-center gap-1.5 focus-visible:outline-none sm:w-[92px]"
@@ -111,6 +113,8 @@ function RailSkeleton() {
 
 export function StoriesRail() {
   const { open, viewedRevision } = useStoriesViewer();
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
   const { data, isLoading, error } = useSWR<StoriesPayload>(
     "/api/feed/stories",
     fetcher,
@@ -151,14 +155,14 @@ export function StoriesRail() {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+      initial={reduce ? false : { opacity: 0, y: -8 }}
+      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      transition={reduce ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
       aria-label="Сторис мастеров"
       className="-mx-4 sm:-mx-6"
     >
       <motion.div
-        variants={containerVariants}
+        variants={container}
         initial="hidden"
         animate="visible"
         className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 pt-1 sm:gap-4 sm:px-6"

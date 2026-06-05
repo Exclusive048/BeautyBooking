@@ -4,21 +4,30 @@
 # Usage:
 #   docker compose -f docker-compose.dev.yml up -d
 #
-# DATABASE_URL=postgresql://beautyhub:beautyhub_dev@localhost:5432/beautyhub
+# DATABASE_URL=postgresql://master:master123@localhost:5432/masterryadom
 # REDIS_URL=redis://localhost:6379
+#
+# Naming note (LOCAL-DEV-CLEANUP 2026-05-29):
+# Container/DB/user/volume names match the actual manually-created setup that
+# pre-dated this compose file. If a `pgdata` volume already exists from prior
+# manual `docker run`, compose will reuse it (no re-init, data preserved). For
+# a fresh checkout, compose creates `pgdata` on first `up -d` and `prisma
+# migrate deploy` populates the schema. Redis preserved as-is — never had a
+# pre-existing manual volume to align with.
 
 services:
   postgres:
+    container_name: masterryadom-db
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: beautyhub
-      POSTGRES_USER: beautyhub
-      POSTGRES_PASSWORD: beautyhub_dev
+      POSTGRES_DB: masterryadom
+      POSTGRES_USER: master
+      POSTGRES_PASSWORD: master123
     ports:
       - "5432:5432"
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -29,5 +38,6 @@ services:
       - redis_dev_data:/data
 
 volumes:
-  postgres_dev_data:
+  pgdata:
+    name: pgdata
   redis_dev_data:

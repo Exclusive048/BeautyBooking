@@ -9,6 +9,7 @@ import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subsc
 import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { env } from "@/lib/env";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
 
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
       void recordSurfaceEvent({
         surface: "auth",

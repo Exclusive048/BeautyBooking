@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -33,6 +33,9 @@ const itemVariants = {
 
 export function PopularCategoriesSection() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const item = reduce ? undefined : itemVariants;
 
   useEffect(() => {
     let cancelled = false;
@@ -80,14 +83,14 @@ export function PopularCategoriesSection() {
       </div>
 
       <motion.div
-        variants={containerVariants}
+        variants={container}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, margin: "-60px" }}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
       >
         {categories.map((cat) => (
-          <motion.div key={cat.id} variants={itemVariants}>
+          <motion.div key={cat.id} variants={item}>
             <Link
               href={`/catalog?category=${cat.slug ?? cat.id}`}
               className="group flex flex-col items-center gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"

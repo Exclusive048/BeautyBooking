@@ -43,7 +43,10 @@ function StarRating({
           onMouseEnter={() => !disabled && setHovered(star)}
           onMouseLeave={() => setHovered(0)}
           disabled={disabled}
-          aria-label={`${star} звезд`}
+          aria-label={UI_TEXT.clientCabinet.reviewForm.starAria.replace(
+            "{star}",
+            String(star),
+          )}
           className="p-1 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Star

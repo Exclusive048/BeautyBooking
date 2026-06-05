@@ -8,6 +8,7 @@ import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError } from "@/lib/logging/logger";
 import { NotificationType } from "@prisma/client";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
+import { env } from "@/lib/env";
 import { processTrialExpirations } from "@/lib/billing/trial-cron";
 
 export const runtime = "nodejs";
@@ -41,7 +42,7 @@ function getGraceUntil(now: Date): Date {
 
 export async function POST(req: Request) {
   const token = getCronToken(req);
-  const expected = process.env.BILLING_RENEW_SECRET?.trim();
+  const expected = env.BILLING_RENEW_SECRET?.trim();
 
   if (!expected || token !== expected) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");

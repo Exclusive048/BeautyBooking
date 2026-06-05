@@ -3,6 +3,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ type YandexGeocodeResponse = {
 const YANDEX_GEOCODE_URL = "https://geocode-maps.yandex.ru/1.x/";
 
 function getGeocodeKey(): string {
-  const key = process.env.YANDEX_GEOCODER_API_KEY ?? "";
+  const key = env.YANDEX_GEOCODER_API_KEY ?? "";
   const trimmed = key.trim();
   if (!trimmed) {
     throw new AppError("Geocoding unavailable", 503, "INTERNAL_ERROR");

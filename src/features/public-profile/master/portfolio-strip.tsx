@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -35,6 +35,7 @@ export function PortfolioStrip({ items }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<PortfolioDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const reduce = useReducedMotion();
 
   function closeViewer() {
     setSelectedId(null);
@@ -85,12 +86,12 @@ export function PortfolioStrip({ items }: Props) {
           className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3"
           initial="hidden"
           animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+          variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
         >
           {items.map((item) => (
             <motion.div
               key={item.id}
-              variants={{
+              variants={reduce ? undefined : {
                 hidden: { opacity: 0, scale: 0.95 },
                 visible: { opacity: 1, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
               }}
@@ -136,10 +137,10 @@ export function PortfolioStrip({ items }: Props) {
           <motion.div
             key="lightbox"
             className="fixed inset-0 z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            initial={reduce ? false : { opacity: 0 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           >
             <Button
               variant="wrapper"
@@ -150,10 +151,10 @@ export function PortfolioStrip({ items }: Props) {
             <div className="absolute inset-0 flex items-center justify-center p-4">
               <motion.div
                 className="relative w-full max-w-4xl rounded-[26px] border border-border-subtle bg-bg-card p-4 shadow-hover"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
+                initial={reduce ? false : { opacity: 0, scale: 0.95 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
               >
                 <button
                   type="button"

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { OtpChannel } from "@prisma/client";
+import { OtpChannel, Prisma } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
-import { toAppError } from "@/lib/api/errors";
+import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpEmailRequestRateLimit } from "@/lib/auth/otp-rate-limit";
@@ -12,6 +12,8 @@ import {
   buildOtpEmailText,
 } from "@/lib/email/templates/otp-code";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
+import { maskEmail } from "@/lib/logging/masking";
+import { isProduction } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
 
@@ -20,6 +22,27 @@ export const runtime = "nodejs";
 const requestSchema = z.object({
   email: z.string().email().max(255),
 });
+
+/**
+ * EMAIL-VERIFY-FIX-A: map Prisma's `P2002` unique-violation on
+ * `UserProfile.email` to a user-friendly 409. Atomic catch (no
+ * pre-check — TOCTOU race avoided). Mirrors `mapPrismaBookingConflict`
+ * in `src/lib/bookings/createBooking.ts:26-37`. Exported for unit
+ * testing only; the route handler is the sole production caller.
+ */
+export function mapEmailAlreadyUsedConflict(error: unknown): AppError | null {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    return new AppError(
+      "Этот email уже используется другим аккаунтом. Укажите другой адрес.",
+      409,
+      "EMAIL_ALREADY_USED",
+    );
+  }
+  return null;
+}
 
 function extractClientIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -69,10 +92,22 @@ export async function POST(req: Request) {
 
     // Apply the email immediately and reset verification — UI shows
     // unverified state until the verify endpoint runs.
-    await prisma.userProfile.update({
-      where: { id: user.id },
-      data: { email: normalizedEmail, emailVerifiedAt: null },
-    });
+    //
+    // EMAIL-VERIFY-FIX-A: catch P2002 atomically (no pre-check — TOCTOU
+    // race avoided). `UserProfile.email` is `@unique`; if another user
+    // owns this address `mapEmailAlreadyUsedConflict` surfaces a
+    // user-friendly 409 instead of leaking a 500. Other Prisma errors
+    // re-throw → upstream `toAppError` maps them.
+    try {
+      await prisma.userProfile.update({
+        where: { id: user.id },
+        data: { email: normalizedEmail, emailVerifiedAt: null },
+      });
+    } catch (error) {
+      const mapped = mapEmailAlreadyUsedConflict(error);
+      if (mapped) throw mapped;
+      throw error;
+    }
 
     const code = generateOtpCode();
     const codeHash = hashOtpCode(normalizedEmail, code);
@@ -94,17 +129,19 @@ export async function POST(req: Request) {
       text: buildOtpEmailText(code),
     });
 
+    // OTP-LOG-DEV-GUARD-A: `code` only in dev/staging (closes SEC-1
+    // regression-gap vs SMS-GATEWAY-A — production logs never carry it).
     if (!sent) {
       logInfo("Cabinet email OTP requested (send failed)", {
         userId: user.id,
-        email: normalizedEmail,
-        code,
+        email: maskEmail(normalizedEmail),
         expiresAt: expiresAt.toISOString(),
+        ...(isProduction ? {} : { code }),
       });
     } else {
       logInfo("Cabinet email OTP requested", {
         userId: user.id,
-        email: normalizedEmail,
+        email: maskEmail(normalizedEmail),
         expiresAt: expiresAt.toISOString(),
       });
     }

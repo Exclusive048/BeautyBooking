@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useMe } from "@/lib/hooks/use-me";
+import { env, isProduction } from "@/lib/env";
 
 // Converts a VAPID public key (base64url) to Uint8Array required by pushManager.subscribe()
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -76,7 +77,7 @@ export function PushManager() {
 
   useEffect(() => {
     // Only run in production (SW is disabled in dev by next-pwa)
-    if (process.env.NODE_ENV !== "production") return;
+    if (!isProduction) return;
     // Wait until user data is resolved
     if (isLoading) return;
     // Only subscribe for authenticated users
@@ -84,7 +85,7 @@ export function PushManager() {
     // Don't attempt twice in the same session
     if (attempted.current) return;
 
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidPublicKey) return;
     if (!isPushSupported()) return;
 

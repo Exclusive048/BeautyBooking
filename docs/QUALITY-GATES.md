@@ -1,0 +1,227 @@
+# 08-QUALITY-GATES: Чеклист при каждом изменении кода
+
+> Этот файл — обязательное приложение к КАЖДОМУ промпту для ИИ при работе с кодом МастерРядом.
+> Вставляй его вместе с MASTERRYADOM_AI_CONTEXT.md и промптом задачи.
+>
+> **Companion doc:** [`SPRINT-PATTERNS.md`](./SPRINT-PATTERNS.md) — meta-lessons synthesized from the 16-fix-wave + 5-audit redesign sprint. Consult **before designing a fix** (audit-first, trace parallel channels, redesign-commit checklist, defense-layering, etc). This file covers **per-commit checks**; SPRINT-PATTERNS covers **how-we-work**.
+
+---
+
+## ПЕРЕД ИЗМЕНЕНИЯМИ
+
+1. **Проверить текущий функционал**
+   - Как сейчас работает затрагиваемый код
+   - Какие модули/компоненты используют изменяемые файлы
+   - Есть ли тесты для затрагиваемого кода
+
+2. **Найти все usage**
+   - `grep -rn "import.*ИмяКомпонента" src/`
+   - Проверить влияние на другие части системы
+   - Не менять в одном месте, если это ломает глобально
+
+---
+
+## ПРИ ИЗМЕНЕНИЯХ
+
+### UI-тексты
+- [ ] ВСЕ пользовательские строки — из `UI_TEXT` (`src/lib/ui/text.ts`)
+- [ ] Новые тексты: добавить в `UI_TEXT`, писать на русском, UTF-8
+- [ ] CTA = глагол: «Сохранить», «Удалить», «Записаться» (допустимо: «Применить фильтры»)
+- [ ] Ошибки: «Не удалось {действие}. Попробуйте ещё раз.»
+- [ ] Empty states: 1 фраза + 1 кнопка-действие
+
+### Кодировка
+- [ ] Файлы в UTF-8 без BOM
+- [ ] Нет mojibake/битых символов
+
+### Design system
+- [ ] Только shared-компоненты: Button, Card, Input, Select, Textarea, Tabs, Switch, Badge
+- [ ] Нет inline-цветов (`#fff`, `rgb(`)
+- [ ] Нет `<button` без shared Button (кроме Radix primitives)
+- [ ] Только Tailwind-токены для стилей
+
+### Логика
+- [ ] Бизнес-логика не зависит от текстовых строк (только enum, boolean, числа)
+- [ ] Серверный код не в клиентском бандле
+- [ ] `process.env.SECRET_*` только в серверных файлах
+
+### Безопасность
+- [ ] Мутирующие API за rate limiting
+- [ ] Валидация входных данных через Zod
+- [ ] Нет логирования секретов (кроме OTP — оставлено для тестирования)
+- [ ] Auth проверяется через `requireAuth()` / `getSessionUser()`
+
+### Расписание (если затронуто)
+- [ ] Изменения через `ScheduleEngine` / `editor.ts`, не напрямую через Prisma
+- [ ] Инвалидация кэша после изменений
+
+### Prisma (если затронута схема)
+- [ ] `npx prisma validate`
+- [ ] `npx prisma generate`
+- [ ] Миграция через `--create-only`
+
+### Чистота
+- [ ] Нет `console.log/debug/warn/info` (использовать `logInfo()` / `logError()`)
+- [ ] Нет неиспользуемых импортов
+- [ ] Нет закомментированного кода
+- [ ] Нет `any` без обоснования
+
+### UTF-8 + Windows PowerShell editing
+- [ ] При редактировании UTF-8 файлов на Windows PowerShell использовать `[System.IO.File]::ReadAllText` / `WriteAllText` с `UTF8Encoding($false)` (без BOM)
+- [ ] **НЕ использовать** `Get-Content` / `Set-Content` cmdlets — они либо ломают русский текст через codepage conversion, либо записывают BOM, что вызывает mojibake и ломает `npm run check:encoding` / `check:mojibake`
+- [ ] Если используешь `Out-File` — обязательно `-Encoding utf8 -NoNewline` (а лучше `[IO.File]::WriteAllText`)
+- [ ] Все новые файлы с русскими строками (особенно `UI_TEXT`) — открыть в hex-viewer или `file -i` после правки, убедиться что нет `EF BB BF` префикса
+
+### Server/Client import boundary
+- [ ] Client components (`"use client"`) **никогда** не импортируют server-only модули — ни напрямую, ни транзитивно (Prisma, Redis, fs, Node API типа `net`/`crypto`/`dns`)
+- [ ] Для типов из server модулей — только `import type { Foo } from "..."` (стирается на compile-time)
+- [ ] Runtime helpers/constants/normalizers нужные клиенту — выносить в `*-shared.ts` без server-only зависимостей. Образец: `src/lib/schedule/editor-shared.ts` (client-safe) ↔ `src/lib/schedule/editor.ts` (server-only с Prisma + Redis)
+- [ ] Watch chains, которые тащат Redis в клиент: `editor.ts → slotsCache.ts → cache.ts → redisClient.ts → @redis/client`. Один `import { runtimeValue }` (не type) из такого модуля в client компонент роняет build
+- [ ] Сигнал нарушения границы — ошибка `Module not found: Can't resolve 'net'` (или `'fs'`, `'tls'`) во время `npm run build`
+
+### RSC serialization
+- [ ] Server Components **никогда** не передают React-компоненты или функции в Client Components как props — они не сериализуются через RSC boundary
+- [ ] Pattern для иконок и других компонентов: string identifier (union тип) + lookup map. Образец: `src/features/marketing/icons/feature-icons.ts` мапит `FeatureIconName` → lucide компоненты
+- [ ] Через границу проходят только сериализуемые данные: plain objects, arrays, primitives, Date, null. Нельзя: Map, Set, Symbol, classes, функции, JSX
+
+### Reference comparison (для редизайн-коммитов)
+- [ ] Если есть `.claude/references/{page}.png` или `.claude/references/{page}.js` — прочитать **до** начала работы
+- [ ] Audit-фаза должна включать: (1) какие фичи в reference уже реализованы, (2) что отсутствует, (3) сложность каждой (simple/medium/complex), (4) scope decision — что в текущий commit, что defer на следующий
+- [ ] Не начинать имплементацию пока gap analysis + scope не записаны в плане
+- [ ] Если reference противоречит существующим инвариантам или backend-возможностям — флагать и спрашивать решения, не «угадывать»
+
+### Behaviour-level audit (для visual / positioning bug fixes)
+- [ ] Не останавливаться на file-level проверке («использует ли компонент Х?») — проверять **rendered behaviour**: где элемент реально живёт в DOM, какие ancestors у него, что у них в computed CSS
+- [ ] Для bugs с `position: fixed` (модалки, drawer, popover): проверить ancestor chain от мест монтирования до root на наличие `transform`, `filter`, `backdrop-filter`, `will-change`, `contain`, `perspective` — любое из этих свойств создаёт **containing block** для fixed-descendant и ломает viewport-anchoring
+- [ ] Для bugs повторяющихся 2+ раза: предыдущий audit gave wrong verdict. Не повторять тот же подход — менять метод (если file-level не нашло → переходить к DOM ancestry trace; если static не нашло → DevTools на реальном environment)
+- [ ] Документировать ограничения аудита: «что не доказано из кода» (например, browser-specific quirks, runtime-only behaviours). Pragmatic fixes лучше confident wrong root cause — см. `modals-investigation` коммит как пример (Portal-to-body fix addressed all 8 hypotheses simultaneously without needing to prove which one was real)
+- [ ] Modal positioning: ВСЕГДА через `ModalSurface` (использует `createPortal` к `document.body`). Любой `fixed inset-0 z-...` outside `ModalSurface`, drawer или bottom-sheet primitive — нарушение convention. После 3 recurrences один и тот же bug → нужен ESLint rule (см. BACKLOG)
+
+---
+
+## ПОСЛЕ ИЗМЕНЕНИЙ
+
+### Обязательные проверки
+```bash
+npm run typecheck
+npm run lint
+npm run check:encoding
+npm run check:mojibake
+npm run test        # если затронуты модули с тестами
+```
+
+### Если изменена схема
+```bash
+npx prisma migrate dev --name <descriptive_name>   # обязательно: создаёт миграцию
+npx prisma validate
+npx prisma generate
+npm run check:schema-drift                          # обязательно: drift-гейт
+```
+
+> 🚨 **`prisma db push` ЗАПРЕЩЁН** — обходит migration history и вызывает silent schema drift.
+> Проект попал на 24-операционный drift в мае 2026 (см. MIGRATION-RECONCILIATION-BATCH).
+> Полное правило — `CLAUDE.md` § ВАЖНЫЕ ПРАВИЛА #16.
+
+### check:schema-drift (MIGRATION-RECONCILIATION-BATCH 2026-05-30)
+
+**Назначение:** предотвращает повтор `db push` anti-pattern через CI-enforced gate.
+
+**Триггер:** любой commit меняющий `prisma/schema/*.prisma` (включается в `npm run check`).
+
+**Mechanism:** `prisma migrate diff` сравнивает migrations history vs schema.prisma. Любой non-empty diff = drift = fail.
+
+**Failure recovery:**
+1. Запустить `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url "<url>" --script` чтобы увидеть конкретные операции
+2. Manual review SQL (no DROP / no destructive expected — sprint discipline ADD-only)
+3. Создать миграцию: `mkdir prisma/schema/migrations/<timestamp>_descriptive_name/` + написать `migration.sql` (или использовать interactive `prisma migrate dev` если терминал поддерживает)
+4. Apply: `npx prisma migrate deploy` (then commit the migration file)
+5. Re-run `npm run check:schema-drift` — должен exit 0
+
+**Local mode:** если Postgres не запущен, скрипт graceful-skips с warning (не блокирует local dev).
+**CI mode:** при `CI=true` + Postgres unreachable script fails hard. Currently CI не имеет Postgres service — script запускается в local-skip mode и выдаёт warning в logs. Когда DevOps provisions shadow DB в CI workflow + sets `SHADOW_DATABASE_URL`, gate становится hard-enforcing automatically (no script change needed).
+
+**History:** added 2026-05-30 после MIGRATION-RECONCILIATION discovered 24-операционный sprint-long drift caused by README-instructed `db push`. Structural prevention для drift class.
+
+### Smoke
+- [ ] Затронутая страница открывается
+- [ ] Нет runtime ошибок в Console
+- [ ] UI отображается корректно
+
+---
+
+## 📚 Обновление контекста (правило 15 из CLAUDE.md)
+
+Snapshot `MASTERRYADOM_AI_CONTEXT.md` живёт рядом с кодом и должен отражать реальное состояние. Прошлый раз он ушёл в drift на 2 месяца (`CONTEXT-REFRESH-V2` 2026-05-13 это исправил) — повторять не хочется.
+
+### Триггеры ОБЯЗАТЕЛЬНОГО обновления
+
+| Изменение в коммите | Что обновляется |
+|---|---|
+| Schema migration (новая модель, поле, enum) | Раздел 4 (Модель данных), Раздел 12 (Инварианты) если появился invariant |
+| Новая page route (`src/app/**/page.tsx`) | Раздел 6 (Маршруты) |
+| Новая API endpoint group | Раздел 6 + Раздел 5 (Бизнес-логика) если затрагивает core flow |
+| Новая env var | Раздел 7 (Переменные окружения) |
+| Новый `src/features/*` или `src/lib/*` модуль | Раздел 3 (Архитектура кода) |
+| Изменения в auth / RBAC / rate-limit | Раздел 10 (Безопасность) |
+| Изменения в core flows (auth, bookings, payments, notifications, schedule) | Раздел 5 |
+| Новые dependencies (`package.json`) | Раздел 2 (Тех. стек) |
+| Завершение пункта redesign-map | `BACKLOG.md` — перенос в ✅ Выполнено + актуализация map |
+
+### НЕ требуют обновления
+
+- UI redesign без изменения routes/API/schema
+- Внутренний рефакторинг компонента
+- Исправление багов без изменения структуры
+- Изменения в `UI_TEXT` (это deployment detail, не архитектура)
+- Тесты (если не значительный объём, ~10+ файлов)
+
+### Формат секции в отчёте
+
+В конце каждого отчёта по коммиту — секция:
+
+```
+### Context updates
+- MASTERRYADOM_AI_CONTEXT.md:
+  - Раздел X — добавлено/изменено: ...
+  - Раздел Y — добавлено/изменено: ...
+  - (или: «не затронуто, изменения не требуют обновления»)
+- BACKLOG.md:
+  - Добавлено в категорию X: ...
+  - Перенесено в ✅ Выполнено: ...
+  - (или: «обновлено только дата выполнения»)
+```
+
+### Periodic full refresh
+
+Раз в **4-6 коммитов** (или **~2 недели**) — полный CONTEXT-REFRESH через отдельный коммит (см. `CONTEXT-REFRESH-V2` от 2026-05-13). Цель — пересинхронизировать snapshot со всеми разделами, поскольку даже с per-commit updates неизбежно появляется drift.
+
+Триггеры для запуска CONTEXT-REFRESH:
+- Snapshot дата старше 14 дней
+- Завершён большой sprint (Cabinet Master, Admin Panel, Public surfaces — каждый достоин refresh при завершении)
+- В разговоре с user всплыл факт о коде, который не соответствует snapshot (как было с City моделью)
+
+---
+
+## ОТЧЁТ (обязателен в конце)
+
+```
+### Изменения
+1. Какие файлы изменены (список)
+2. Какие тексты добавлены в UI_TEXT (если были)
+3. Где убран хардкод (если был)
+
+### Проверки
+- typecheck: ✅/❌
+- lint: ✅/❌
+- encoding: ✅/❌
+- mojibake: ✅/❌
+- test: ✅/❌/не затронуты
+- prisma validate: ✅/❌/не затронута
+
+### Context updates
+- MASTERRYADOM_AI_CONTEXT.md: (см. правило выше)
+- BACKLOG.md: (см. правило выше)
+
+### Найденные проблемы
+- (если были побочные эффекты или несостыковки)
+```

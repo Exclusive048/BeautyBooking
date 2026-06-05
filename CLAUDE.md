@@ -48,11 +48,12 @@
 8. **Время** — всё в UTC (`startAtUtc`, `endAtUtc`). Локальное только для отображения.
 9. **OTP в логах** — оставить как есть (нужно для тестирования на текущей стадии).
 10. **Rate limiting** — на все мутирующие/чувствительные эндпоинты. Sensitive routes = fail-closed при Redis outage.
-11. **Переменные окружения** — ТОЛЬКО через `env` из `src/lib/env.ts`. `process.env.*` напрямую запрещён везде кроме: самого `env.ts`, файлов Prisma (`prisma.ts`, `prisma-direct.ts`), тестовых файлов (`*.test.ts`), `src/lib/startup.ts`, и `src/middleware.ts`. Computed flags (`isPushEnabled`, `isPaymentsEnabled` и пр.) — из того же модуля.
+11. **Переменные окружения** — ТОЛЬКО через `env` из `src/lib/env.ts`. `process.env.*` напрямую запрещён везде кроме: самого `env.ts`, файлов Prisma (`prisma.ts`, `prisma-direct.ts`), тестовых файлов (`*.test.ts`), `src/lib/startup.ts`, и `src/proxy.ts` (middleware-class файл; в Next 16 переименован из `src/middleware.ts` — legit usage сохранён). Computed flags (`isPushEnabled`, `isPaymentsEnabled` и пр.) — из того же модуля.
 12. **Нет внутренних ID в публичных API** — CUID/внутренние `id` нельзя возвращать в ответах публичных эндпоинтов (`/api/public/*`, `/api/catalog/*`, `/models/*` и т.п.). Использовать только `publicUsername`, `publicCode` или аналогичные непредсказуемые публичные идентификаторы. Курсоры пагинации кодировать через `encodeCursor` (base64url). Исключения (где `id` допустим): внутренние кабинеты (`/cabinet/*`), admin-панель, booking-флоу где `id` нужен клиенту для последующих запросов.
 13. **Server/Client import boundary** — client components (`"use client"`) никогда транзитивно не импортируют server-only модули (Prisma, Redis, fs, Node API). Webpack тянет полный module graph в browser bundle и роняет build с ошибкой типа `Module not found: 'net'`. Для типов — `import type`. Runtime helpers нужные клиенту — выносить в `*-shared.ts` без server-only зависимостей (см. `src/lib/schedule/editor-shared.ts` как образец). Подробности и watch-chains — в `docs/QUALITY-GATES.md`.
 14. **Reference-driven редизайн** — design references лежат в `.claude/references/{page}.png` + `{page}.js`. Перед редизайн-коммитом: `view` reference, сравнение existing code vs reference, gap-analysis, complexity-assessment, scope-decision (что в commit, что defer). Только после этого — план и реализация.
 15. **Контекст-снапшот обновляется после каждого структурного изменения** — `MASTERRYADOM_AI_CONTEXT.md` и `BACKLOG.md` должны отражать реальное состояние репо. Триггеры обязательного обновления и формат — в `docs/QUALITY-GATES.md` (раздел «📚 Обновление контекста»). Каждый отчёт по коммиту обязан содержать секцию `### Context updates`. Раз в 4-6 коммитов (или ~2 недели) — полный CONTEXT-REFRESH через отдельный коммит.
+16. **Schema discipline (MIGRATION-RECONCILIATION 2026-05-30)** — изменения `prisma/schema/*.prisma` идут ТОЛЬКО через `npx prisma migrate dev --name <descriptive>`. Production deploy использует `npx prisma migrate deploy`. **🚨 `prisma db push` ЗАПРЕЩЁН** — обходит migration history → silent schema drift → production runtime crashes (проект попал в 24-операционный drift в мае 2026, blocked launch до reconciliation). `prisma migrate reset` — dev-only (запрещён в production paths). Migration files (`prisma/schema/migrations/*`) versioned, audited, immutable once committed. **Drift detection через `npm run check:schema-drift`** (CI-enforced gate, добавлен 2026-05-30). **Если случайно `db push` произошёл:** stop → `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url ... --script` чтобы увидеть drift → один reconciliation migration через `migrate dev` → manual review SQL → apply.
 
 ## Стиль кода
 
@@ -75,3 +76,13 @@ npm run typecheck && npm run lint && npm run check:encoding && npm run check:moj
 ## Качество — чеклист
 
 @docs/QUALITY-GATES.md
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

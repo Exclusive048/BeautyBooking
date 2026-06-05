@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Bell } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.notifications;
@@ -12,13 +11,17 @@ const T = UI_TEXT.cabinetMaster.notifications;
  */
 export function NotificationsEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle bg-bg-card px-4 py-16 text-center">
-      <Bell className="mb-3 h-10 w-10 text-text-sec/40" aria-hidden />
-      <p className="font-display text-base text-text-main">{T.emptyTitle}</p>
-      <p className="mt-1 max-w-md text-sm text-text-sec">{T.emptyBody}</p>
-      <Button asChild variant="ghost" size="sm" className="mt-4 rounded-lg">
-        <Link href="/notifications">{T.personalLink}</Link>
-      </Button>
-    </div>
+    <EmptyState
+      variant="card"
+      icon={Bell}
+      title={T.emptyTitle}
+      description={T.emptyBody}
+      action={{
+        label: T.personalLink,
+        href: "/notifications",
+        variant: "ghost",
+        size: "sm",
+      }}
+    />
   );
 }

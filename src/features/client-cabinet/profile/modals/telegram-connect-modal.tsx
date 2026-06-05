@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { env } from "@/lib/env";
 
 type TelegramAuthUser = {
   id: number;
@@ -46,7 +47,7 @@ export function TelegramConnectModal({ onClose, onSuccess }: Props) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const botUsername = env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
 
   useEffect(() => {
     window.__mr_onTelegramLink = async (user) => {

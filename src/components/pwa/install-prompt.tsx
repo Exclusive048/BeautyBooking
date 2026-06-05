@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
 import { UI_TEXT } from "@/lib/ui/text";
+import { isProduction } from "@/lib/env";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -69,6 +70,7 @@ export function PWAInstallPrompt() {
   const [visible, setVisible] = useState(false);
   const [standalone] = useState(() => isStandaloneMode());
   const [ios] = useState(() => isIOSDevice());
+  const reduce = useReducedMotion();
 
   // Capture beforeinstallprompt before the user interacts
   useEffect(() => {
@@ -104,17 +106,17 @@ export function PWAInstallPrompt() {
     setDeferredPrompt(null);
   };
 
-  if (process.env.NODE_ENV !== "production") return null;
+  if (!isProduction) return null;
 
   return (
     <AnimatePresence>
       {visible ? (
         <motion.div
           key="install-banner"
-          initial={{ y: 80, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 80, opacity: 0 }}
-          transition={{ type: "spring", damping: 28, stiffness: 320 }}
+          initial={reduce ? false : { y: 80, opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1 }}
+          exit={reduce ? { opacity: 0 } : { y: 80, opacity: 0 }}
+          transition={reduce ? { duration: 0 } : { type: "spring", damping: 28, stiffness: 320 }}
           className="fixed bottom-20 left-3 right-3 z-[46] lg:bottom-6 lg:left-auto lg:right-5 lg:w-80"
         >
           <div className="rounded-2xl border border-border-subtle bg-bg-card px-4 py-3.5 shadow-card backdrop-blur-sm">

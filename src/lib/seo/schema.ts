@@ -101,3 +101,22 @@ export function buildProviderSchema(input: ProviderSchemaInput, baseUrl?: string
 
   return schema;
 }
+
+/**
+ * Safe serialization of a JSON-LD schema for embedding inside
+ * `<script type="application/ld+json" dangerouslySetInnerHTML=...>`.
+ *
+ * Escapes `<` to `<` so a user-controlled string containing
+ * `</script>` (or any HTML-looking fragment) cannot break out of
+ * the script tag. Standard JSON-LD XSS mitigation — valid JSON-LD
+ * parsers handle the unicode escape transparently, SEO unaffected.
+ *
+ * Defense-in-depth: CSP (nonce + strict-dynamic + no unsafe-inline)
+ * already blocks any injected script execution in production, but
+ * the escape removes the structural breakout possibility entirely.
+ *
+ * FAST-WINS-BATCH-A — SEC-2 closure (SECURITY-AUDIT-A finding).
+ */
+export function safeJsonLd(schema: unknown): string {
+  return JSON.stringify(schema).replace(/</g, "\\u003c");
+}

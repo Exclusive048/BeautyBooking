@@ -41,6 +41,69 @@ export type PortfolioDetail = PortfolioFeedItem & {
   }>;
 };
 
+/**
+ * Precomputed (masterProviderId, serviceId) override lookup.
+ *
+ * FEED-PORTFOLIO-N1-FIX-A (PERF-1): replaces the prior `service.masterServices`
+ * cross-product include that fetched the full master×service matrix per row.
+ * Key uses ":" as joiner — both ids are cuids (no colons) so collisions are
+ * structurally impossible.
+ */
+type MasterServiceOverride = {
+  isEnabled: boolean;
+  priceOverride: number | null;
+  durationOverrideMin: number | null;
+};
+
+export type MasterServiceOverrideMap = Map<string, MasterServiceOverride>;
+
+function overrideMapKey(masterProviderId: string, serviceId: string): string {
+  return `${masterProviderId}:${serviceId}`;
+}
+
+/**
+ * Batched lookup helper — single Prisma query that resolves all
+ * (masterProviderId, serviceId) tuples used by a feed page or detail view.
+ *
+ * Empty inputs short-circuit without firing a query (preserves zero-cost
+ * for empty pages).
+ */
+export async function loadMasterServiceOverridesMap(
+  pairs: Array<{ masterProviderId: string; serviceId: string }>,
+): Promise<MasterServiceOverrideMap> {
+  const map: MasterServiceOverrideMap = new Map();
+  if (pairs.length === 0) return map;
+
+  const masterIds = Array.from(new Set(pairs.map((pair) => pair.masterProviderId)));
+  const serviceIds = Array.from(new Set(pairs.map((pair) => pair.serviceId)));
+  if (masterIds.length === 0 || serviceIds.length === 0) return map;
+
+  const rows = await prisma.masterService.findMany({
+    where: {
+      masterProviderId: { in: masterIds },
+      serviceId: { in: serviceIds },
+      isEnabled: true,
+    },
+    select: {
+      masterProviderId: true,
+      serviceId: true,
+      isEnabled: true,
+      priceOverride: true,
+      durationOverrideMin: true,
+    },
+  });
+
+  for (const row of rows) {
+    map.set(overrideMapKey(row.masterProviderId, row.serviceId), {
+      isEnabled: row.isEnabled,
+      priceOverride: row.priceOverride,
+      durationOverrideMin: row.durationOverrideMin,
+    });
+  }
+
+  return map;
+}
+
 function resolveServiceOption(input: {
   masterId: string;
   service: {
@@ -49,17 +112,10 @@ function resolveServiceOption(input: {
     title: string | null;
     price: number;
     durationMin: number;
-    masterServices: Array<{
-      masterProviderId: string;
-      isEnabled: boolean;
-      priceOverride: number | null;
-      durationOverrideMin: number | null;
-    }>;
   };
+  overrides: MasterServiceOverrideMap;
 }): PortfolioServiceOption {
-  const override = input.service.masterServices.find(
-    (ms) => ms.masterProviderId === input.masterId && ms.isEnabled
-  );
+  const override = input.overrides.get(overrideMapKey(input.masterId, input.service.id));
 
   return {
     serviceId: input.service.id,
@@ -132,14 +188,9 @@ function buildPortfolioSnapshot(input: {
       title: string | null;
       price: number;
       durationMin: number;
-      masterServices: Array<{
-        masterProviderId: string;
-        isEnabled: boolean;
-        priceOverride: number | null;
-        durationOverrideMin: number | null;
-      }>;
     };
   }>;
+  overrides: MasterServiceOverrideMap;
 }): {
   serviceOptions: PortfolioServiceOption[];
   totalDurationMin: number;
@@ -148,7 +199,11 @@ function buildPortfolioSnapshot(input: {
   serviceIds: string[];
 } {
   const serviceOptions = input.services.map((link) =>
-    resolveServiceOption({ masterId: input.masterId, service: link.service })
+    resolveServiceOption({
+      masterId: input.masterId,
+      service: link.service,
+      overrides: input.overrides,
+    }),
   );
 
   const totalDurationMin = serviceOptions.reduce((sum, option) => sum + option.durationMin, 0);
@@ -161,6 +216,35 @@ function buildPortfolioSnapshot(input: {
     primaryServiceTitle: serviceOptions[0]?.title ?? null,
     serviceIds: serviceOptions.map((option) => option.serviceId),
   };
+}
+
+/**
+ * Collect all unique (masterProviderId, serviceId) pairs needed to resolve
+ * the per-master override for each portfolio row in a page.
+ *
+ * Shared between `listPortfolioFeed`, `listHomePortfolioFeed`, and the two
+ * sub-queries in `getPortfolioDetail`.
+ */
+function collectMasterServicePairs(
+  rows: Array<{
+    master: { id: string };
+    services: Array<{ service: { id: string } }>;
+  }>,
+): Array<{ masterProviderId: string; serviceId: string }> {
+  const pairs: Array<{ masterProviderId: string; serviceId: string }> = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const masterId = row.master.id;
+    for (const link of row.services) {
+      const serviceId = link.service.id;
+      const key = overrideMapKey(masterId, serviceId);
+      if (!seen.has(key)) {
+        seen.add(key);
+        pairs.push({ masterProviderId: masterId, serviceId });
+      }
+    }
+  }
+  return pairs;
 }
 
 function isDeletedCursorError(error: unknown): boolean {
@@ -234,14 +318,6 @@ export async function listPortfolioFeed(input: {
                 title: true,
                 price: true,
                 durationMin: true,
-                masterServices: {
-                  select: {
-                    masterProviderId: true,
-                    isEnabled: true,
-                    priceOverride: true,
-                    durationOverrideMin: true,
-                  },
-                },
               },
             },
           },
@@ -276,9 +352,15 @@ export async function listPortfolioFeed(input: {
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, -1) : rows;
   const visualReadyByUrl = await buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl));
+  // FEED-PORTFOLIO-N1-FIX-A: single batched lookup replaces per-row masterServices include.
+  const overrides = await loadMasterServiceOverridesMap(collectMasterServicePairs(pageRows));
 
   const items = pageRows.map((row) => {
-    const snapshot = buildPortfolioSnapshot({ masterId: row.master.id, services: row.services });
+    const snapshot = buildPortfolioSnapshot({
+      masterId: row.master.id,
+      services: row.services,
+      overrides,
+    });
     return {
       id: row.id,
       mediaUrl: row.mediaUrl,
@@ -359,14 +441,6 @@ export async function listHomePortfolioFeed(input: {
                 title: true,
                 price: true,
                 durationMin: true,
-                masterServices: {
-                  select: {
-                    masterProviderId: true,
-                    isEnabled: true,
-                    priceOverride: true,
-                    durationOverrideMin: true,
-                  },
-                },
               },
             },
           },
@@ -401,9 +475,15 @@ export async function listHomePortfolioFeed(input: {
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, -1) : rows;
   const visualReadyByUrl = await buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl));
+  // FEED-PORTFOLIO-N1-FIX-A: single batched lookup replaces per-row masterServices include.
+  const overrides = await loadMasterServiceOverridesMap(collectMasterServicePairs(pageRows));
 
   const items = pageRows.map((row) => {
-    const snapshot = buildPortfolioSnapshot({ masterId: row.master.id, services: row.services });
+    const snapshot = buildPortfolioSnapshot({
+      masterId: row.master.id,
+      services: row.services,
+      overrides,
+    });
     return {
       id: row.id,
       mediaUrl: row.mediaUrl,
@@ -458,14 +538,6 @@ export async function getPortfolioDetail(
               title: true,
               price: true,
               durationMin: true,
-              masterServices: {
-                select: {
-                  masterProviderId: true,
-                  isEnabled: true,
-                  priceOverride: true,
-                  durationOverrideMin: true,
-                },
-              },
             },
           },
         },
@@ -484,7 +556,13 @@ export async function getPortfolioDetail(
     throw new AppError("Not found", 404, "NOT_FOUND");
   }
 
-  const snapshot = buildPortfolioSnapshot({ masterId: item.master.id, services: item.services });
+  // FEED-PORTFOLIO-N1-FIX-A: single batched lookup for the main item's services.
+  const mainOverrides = await loadMasterServiceOverridesMap(collectMasterServicePairs([item]));
+  const snapshot = buildPortfolioSnapshot({
+    masterId: item.master.id,
+    services: item.services,
+    overrides: mainOverrides,
+  });
   const visualReadyByUrl = await buildVisualSearchReadyMapByUrl([item.mediaUrl]);
 
   const similarRows = await prisma.portfolioItem.findMany({
@@ -515,14 +593,6 @@ export async function getPortfolioDetail(
               title: true,
               price: true,
               durationMin: true,
-              masterServices: {
-                select: {
-                  masterProviderId: true,
-                  isEnabled: true,
-                  priceOverride: true,
-                  durationOverrideMin: true,
-                },
-              },
             },
           },
         },
@@ -532,10 +602,16 @@ export async function getPortfolioDetail(
     take: 8,
   });
 
+  // FEED-PORTFOLIO-N1-FIX-A: single batched lookup for similar items.
+  const similarOverrides = await loadMasterServiceOverridesMap(
+    collectMasterServicePairs(similarRows),
+  );
+
   const similarItems = similarRows.map((similar) => {
     const similarSnapshot = buildPortfolioSnapshot({
       masterId: similar.master.id,
       services: similar.services,
+      overrides: similarOverrides,
     });
     return {
       id: similar.id,

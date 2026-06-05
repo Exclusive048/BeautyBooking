@@ -7,6 +7,8 @@ import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpRequestRateLimit } from "@/lib/auth/otp-rate-limit";
 import { otpRequestSchema } from "@/lib/auth/schemas";
 import { logInfo } from "@/lib/logging/logger";
+import { maskPhone } from "@/lib/logging/masking";
+import { isProduction } from "@/lib/env";
 import { sendOtpSms } from "@/lib/sms";
 
 function extractClientIp(req: Request): string | null {
@@ -53,9 +55,12 @@ export async function POST(req: Request) {
     // When `SMS_PROVIDER_ENABLED=false` the factory selects the mock
     // provider, which logs the code locally — preserving the dev workflow
     // documented in CONTEXT P1 («OTP в логах», `MVP: no SMS gateway yet`).
+    // OTP-LOG-DEV-GUARD-A: `code` is included in dev/staging only (saves
+    // SMSC credits + helps QA); production logs strip it for 152-ФЗ hygiene.
     logInfo("OTP requested", {
-      phone,
+      phone: maskPhone(phone),
       expiresAt: expiresAt.toISOString(),
+      ...(isProduction ? {} : { code }),
     });
 
     const smsResult = await sendOtpSms(phone, code);

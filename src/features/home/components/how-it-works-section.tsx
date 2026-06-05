@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, CalendarCheck, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const containerVariants = {
@@ -20,6 +20,9 @@ const itemVariants = {
 
 export function HowItWorksSection() {
   const T = UI_TEXT.homeGuest.howItWorks;
+  const reduce = useReducedMotion();
+  const container = reduce ? undefined : containerVariants;
+  const item = reduce ? undefined : itemVariants;
   const steps = [
     { icon: Search, title: T.step1Title, desc: T.step1Text },
     { icon: CalendarCheck, title: T.step2Title, desc: T.step2Text },
@@ -28,13 +31,13 @@ export function HowItWorksSection() {
 
   return (
     <motion.section
-      variants={containerVariants}
+      variants={container}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-80px" }}
       className="mx-auto max-w-6xl px-4 py-16 sm:py-20"
     >
-      <motion.div variants={itemVariants} className="text-center">
+      <motion.div variants={item} className="text-center">
         <h2 className="text-3xl font-bold tracking-tight text-text-main sm:text-4xl">
           {T.title}{" "}
           <em className="font-display font-normal italic text-primary">{T.titleAccent}</em>
@@ -48,9 +51,9 @@ export function HowItWorksSection() {
           return (
             <motion.div
               key={step.title}
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              transition={{ duration: 0.2 }}
+              variants={item}
+              whileHover={reduce ? undefined : { y: -4 }}
+              transition={reduce ? { duration: 0 } : { duration: 0.2 }}
               className="relative flex flex-col items-center gap-5 rounded-2xl bg-bg-card p-8 text-center shadow-card"
             >
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 font-mono text-xs font-semibold tabular-nums text-white">

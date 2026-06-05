@@ -10,6 +10,8 @@ import { otpEmailRequestSchema } from "@/lib/auth/schemas";
 import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
 import { buildOtpEmailHtml, buildOtpEmailText } from "@/lib/email/templates/otp-code";
 import { logInfo } from "@/lib/logging/logger";
+import { maskEmail } from "@/lib/logging/masking";
+import { isProduction } from "@/lib/env";
 
 function extractClientIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -65,11 +67,19 @@ export async function POST(req: Request) {
       text: buildOtpEmailText(code),
     });
 
-    // Log code for dev/test environments when email is not delivered
+    // OTP-LOG-DEV-GUARD-A: `code` only in dev/staging (closes SEC-1
+    // regression-gap vs SMS-GATEWAY-A — production logs never carry it).
     if (!sent) {
-      logInfo("Email OTP requested (send failed)", { email: normalizedEmail, code, expiresAt: expiresAt.toISOString() });
+      logInfo("Email OTP requested (send failed)", {
+        email: maskEmail(normalizedEmail),
+        expiresAt: expiresAt.toISOString(),
+        ...(isProduction ? {} : { code }),
+      });
     } else {
-      logInfo("Email OTP requested", { email: normalizedEmail, expiresAt: expiresAt.toISOString() });
+      logInfo("Email OTP requested", {
+        email: maskEmail(normalizedEmail),
+        expiresAt: expiresAt.toISOString(),
+      });
     }
 
     return ok({});

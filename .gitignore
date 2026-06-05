@@ -32,6 +32,15 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Public env templates — tracked so fresh clones inherit the full var list
+# operators need to fill in. Both files contain only `replace-with-*` /
+# placeholder values, no real secrets (verified by SECURITY-AUDIT-A +
+# PROD-ENV-EXAMPLE-SYNC-A). Real `.env` / `.env.production` stays ignored
+# above. Without these re-includes, the DEPLOYMENT-READINESS-AUDIT-A DR-1
+# fix (synced prod template) lives only on the maintainer's disk —
+# defeating the purpose of a checked-in template.
+!.env.example
+!.env.production.example
 
 # vercel
 .vercel
@@ -42,9 +51,27 @@ next-env.d.ts
 
 /src/generated/prisma
 _tmp_api_routes.txt
-docs/QUALITY-GATES.md
 .claude
 prisma/seed-test.sql
 prisma/seed.sql
 prisma/seed.sh
-docs
+
+# Operational docs (runbooks, internal guides) live outside git by convention.
+# `docs/*` ignores contents but not the directory itself, so specific files
+# can be re-included via `!docs/<file>` below.
+docs/*
+docs/runbooks/
+# Shareable knowledge docs — tracked so a second developer / future Claude
+# session inherits sprint meta-lessons without needing the original sprint
+# context. SPRINT-PATTERNS references QUALITY-GATES as its companion, so
+# both must be visible for cross-doc links to work for fresh-clone readers.
+!docs/SPRINT-PATTERNS.md
+!docs/QUALITY-GATES.md
+!docs/AI-MIGRATION-STRATEGY.md
+!docs/migration-samples/
+!docs/migration-samples/**
+
+# Graphify knowledge graph output (regeneratable via `graphify update .`)
+# Excludes graph.json (large, derived) + GRAPH_REPORT.md (large, derived) + cache.
+# Skill manifest + CLAUDE.md + .claude/settings.json hook are version-controlled separately.
+graphify-out/

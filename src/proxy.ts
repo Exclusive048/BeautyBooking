@@ -6,6 +6,7 @@ import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { verifyToken } from "@/lib/auth/jwt";
 
 const PRODUCTION_ORIGIN = "https://мастеррядом.online";
+const PRODUCTION_WWW_ORIGIN = "https://www.мастеррядом.online";
 const ALLOWED_DEV_ORIGINS = new Set([
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -13,18 +14,52 @@ const ALLOWED_DEV_ORIGINS = new Set([
 const CORS_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
 const CORS_HEADERS = "Content-Type, Authorization, x-idempotency-key";
 
+/**
+ * Normalize an origin string into the canonical form `new URL` produces.
+ *
+ * Critical for МастерРядом's Cyrillic IDN domain: browsers serialize the
+ * `Origin` header as Punycode (e.g. `https://xn--80aic0adlmagk0m.online`)
+ * while the source code spells it in Cyrillic (`https://мастеррядом.online`).
+ * `new URL().origin` normalizes both forms to the same Punycode canonical,
+ * so allowlist comparison must run BOTH sides through this function.
+ *
+ * Closes two CORS bugs found by PRE-LAUNCH-QUICK-AUDITS-A (2026-05-31):
+ *   1. www-subdomain comparison built `"www.${host}"` WITHOUT `https://`
+ *      prefix → never matched browser's `Origin: https://www.…` header.
+ *   2. Cyrillic IDN literal in allowlist never matched the Punycode form
+ *      that browsers actually send.
+ *
+ * Returns null if the input is not parseable as a URL (defensive — same
+ * caller-side handling: "treat as blocked").
+ */
+export function normalizeOrigin(origin: string): string | null {
+  try {
+    return new URL(origin).origin;
+  } catch {
+    return null;
+  }
+}
+
+const PRODUCTION_ALLOWLIST_NORMALIZED = new Set(
+  [PRODUCTION_ORIGIN, PRODUCTION_WWW_ORIGIN]
+    .map(normalizeOrigin)
+    .filter((value): value is string => value !== null),
+);
+
 function getAllowedOrigin(requestOrigin: string | null): string | null {
   if (!requestOrigin) return null;
 
   if (process.env.NODE_ENV === "production") {
-    if (
-      requestOrigin === PRODUCTION_ORIGIN ||
-      requestOrigin === `www.${PRODUCTION_ORIGIN.replace("https://", "")}`
-    ) {
+    const incoming = normalizeOrigin(requestOrigin);
+    if (!incoming) return null;
+    if (PRODUCTION_ALLOWLIST_NORMALIZED.has(incoming)) {
       return requestOrigin;
     }
     const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-    if (envUrl && requestOrigin === envUrl) return requestOrigin;
+    if (envUrl) {
+      const envNormalized = normalizeOrigin(envUrl);
+      if (envNormalized && envNormalized === incoming) return requestOrigin;
+    }
     return null;
   }
 

@@ -38,7 +38,13 @@ function parsePayload(rawBody: Buffer): YookassaWebhookPayload | null {
   }
 }
 
-function verifySignature(rawBody: Buffer, signature: string, secret: string): boolean {
+/**
+ * Exported for unit testing only (`verify-signature.test.ts`). Production
+ * callers consume it via the local POST handler below — no other module
+ * imports it. Behavior unchanged; the `export` keyword is purely for
+ * test discoverability. Invariant #5 (YooKassa webhook HMAC + IP allowlist).
+ */
+export function verifySignature(rawBody: Buffer, signature: string, secret: string): boolean {
   const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
   const expectedBuf = Buffer.from(expected);
   const providedBuf = Buffer.from(signature);

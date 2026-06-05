@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CitiesEmpty } from "@/features/admin-cabinet/cities/components/cities-empty";
 import { CitiesHeader } from "@/features/admin-cabinet/cities/components/cities-header";
 import { CitiesDetailPanel } from "@/features/admin-cabinet/cities/components/cities-detail-panel";
@@ -56,6 +56,7 @@ export function CitiesTable({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [, startTransition] = useTransition();
+  const reduce = useReducedMotion();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeSource, setMergeSource] = useState<AdminCityRow | null>(null);
@@ -218,9 +219,9 @@ export function CitiesTable({
         {toast ? (
           <motion.div
             role="status"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
             className={cn(
               "rounded-2xl border px-4 py-2.5 text-sm",
               toast.kind === "success"

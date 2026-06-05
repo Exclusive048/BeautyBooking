@@ -7,6 +7,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
 import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
+import { isProduction } from "@/lib/env";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -23,14 +24,14 @@ export async function GET() {
     cookieStore.set(VK_ID_STATE_COOKIE, signVkCookieValue(state), {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       path: "/",
       maxAge: VK_ID_STATE_TTL_SECONDS,
     });
     cookieStore.set(VK_ID_VERIFIER_COOKIE, signVkCookieValue(codeVerifier), {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       path: "/",
       maxAge: VK_ID_STATE_TTL_SECONDS,
     });

@@ -5,12 +5,18 @@ import {
   useId,
   useRef,
   type ReactNode,
+  type RefObject,
   type TouchEvent as ReactTouchEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  useFocusTrap,
+  useInitialFocus,
+  useReturnFocus,
+} from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -48,6 +54,11 @@ type Props = {
   className?: string;
   /** Optional aria-label override when no title is set. */
   ariaLabel?: string;
+  /**
+   * MODAL-A11Y-BATCH-A: optional ref for initial focus when the
+   * drawer opens. Default = first focusable child inside the panel.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 };
 
@@ -110,12 +121,15 @@ export function Drawer({
   footer,
   className,
   ariaLabel,
+  initialFocusRef,
   children,
 }: Props) {
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef<number | null>(null);
   const dragCurrentY = useRef<number>(0);
+  // MODAL-A11Y-BATCH-A: respect OS prefers-reduced-motion.
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (!open) return;
@@ -131,12 +145,20 @@ export function Drawer({
     };
   }, [open, onClose]);
 
+  // MODAL-A11Y-BATCH-A: WCAG SC 2.4.3 + 3.2.1 focus management shared
+  // with ModalSurface via use-modal-a11y hooks.
+  useReturnFocus(open);
+  useInitialFocus(open, sheetRef, initialFocusRef);
+  useFocusTrap(sheetRef, open);
+
   if (!isBrowser) return null;
 
   const isBottom = side === "bottom";
   const isRight = side === "right";
 
-  const panelMotion = isBottom
+  const panelMotion = shouldReduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : isBottom
     ? { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%" } }
     : isRight
     ? { initial: { x: "100%" }, animate: { x: 0 }, exit: { x: "100%" } }
@@ -175,7 +197,7 @@ export function Drawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.18 }}
             className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
             onClick={onClose}
             aria-hidden
@@ -189,10 +211,13 @@ export function Drawer({
             aria-label={!title ? ariaLabel : undefined}
             {...panelMotion}
             transition={
-              isBottom
+              shouldReduceMotion
+                ? { duration: 0 }
+                : isBottom
                 ? { type: "spring", stiffness: 320, damping: 32 }
                 : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
             }
+            tabIndex={-1}
             className={cn(
               "fixed z-50 flex flex-col border-border-subtle bg-bg-page shadow-2xl",
               panelPositionClass,

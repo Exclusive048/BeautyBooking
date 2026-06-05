@@ -1,7 +1,7 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- drag-and-drop editor needs direct DOM img for reordering */
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import Image from "next/image";
 import { Pencil, Trash2 } from "lucide-react";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
@@ -195,8 +195,14 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {assets.map((asset) => (
           <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
-            <Button variant="wrapper" className="h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
-              <img src={asset.url} alt="" className="h-full w-full object-cover" />
+            <Button variant="wrapper" className="relative h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
+              <Image
+                src={asset.url}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 50vw, 25vw"
+                className="object-cover"
+              />
             </Button>
 
             {canEdit ? (
@@ -235,7 +241,16 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       {previewUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <Button variant="wrapper" className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label={mediaText.closePreviewAria} />
-          <img src={previewUrl} alt="" className="relative max-h-[90vh] max-w-[90vw] rounded-2xl bg-bg-card object-contain" />
+          <div className="relative h-[90vh] w-[90vw]">
+            <Image
+              src={previewUrl}
+              alt=""
+              fill
+              sizes="90vw"
+              className="rounded-2xl bg-bg-card object-contain"
+              unoptimized
+            />
+          </div>
         </div>
       ) : null}
 

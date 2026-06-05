@@ -1,6 +1,7 @@
 import { getQueueStats } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
+import { env, isProduction } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -8,10 +9,8 @@ const WORKER_LAST_PING_KEY = "worker:last-ping";
 const WORKER_PING_TTL_SECONDS = 300;
 const WORKER_ALIVE_THRESHOLD_MS = 120_000;
 
-const isProduction = process.env.NODE_ENV === "production";
-
 function resolveWorkerSecret(): string | null {
-  const secret = process.env.WORKER_SECRET?.trim();
+  const secret = env.WORKER_SECRET?.trim();
   return secret && secret.length > 0 ? secret : null;
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { env } from "@/lib/env";
 
 type TelegramAuthUser = {
   id: number;
@@ -45,7 +46,7 @@ export default function TelegramLoginButton({
   const [errorText, setErrorText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const botUsername = env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
   const label = UI_TEXT.auth.telegram.loginButton;
 
   useEffect(() => {

@@ -36,7 +36,7 @@ export function TermsContent() {
       <ul>
         <li>
           <strong>Платформа / Сервис</strong> — сайт{" "}
-          <a href="https://beautyhub.art">beautyhub.art</a> и связанные с ним программные модули.
+          <a href="https://мастеррядом.online">мастеррядом.online</a> и связанные с ним программные модули.
         </li>
         <li>
           <strong>Оператор</strong> — индивидуальный предприниматель, реквизиты которого указаны

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Lock, ChevronDown, Sparkles, Bell, Zap, BarChart3, CreditCard, Users, Image, Wallet, Clock } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -205,6 +205,7 @@ function FeatureGroupCard({
   billingHref: string;
 }) {
   const [open, setOpen] = useState(true);
+  const reduce = useReducedMotion();
   const { icon: GroupIcon } = group;
   const activeCount = group.items.filter((i) => i.enabled && !i.planned).length;
   const totalCount = group.items.filter((i) => !i.planned).length;
@@ -225,7 +226,7 @@ function FeatureGroupCard({
         <span className="mr-2 text-xs text-text-sec">
           {t.activeCount(activeCount, totalCount)}
         </span>
-        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+        <motion.span animate={reduce ? undefined : { rotate: open ? 180 : 0 }} transition={reduce ? { duration: 0 } : { duration: 0.2 }}>
           <ChevronDown className="h-4 w-4 text-text-sec" aria-hidden />
         </motion.span>
       </button>
@@ -234,10 +235,10 @@ function FeatureGroupCard({
         {open && (
           <motion.div
             key="content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
+            initial={reduce ? false : { height: 0, opacity: 0 }}
+            animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
+            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
             <div className="divide-y divide-border-subtle/60 border-t border-border-subtle/60">

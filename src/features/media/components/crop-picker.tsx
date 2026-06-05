@@ -166,7 +166,7 @@ export function CropPicker({
       <div className="flex items-center gap-3 px-1" role="group" aria-label={t.zoomLabel}>
         <button
           type="button"
-          aria-label="Уменьшить"
+          aria-label={t.zoomOut}
           onClick={() => setZoom((z) => Math.max(1, z - 0.1))}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-text-sec hover:bg-bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
@@ -184,7 +184,7 @@ export function CropPicker({
         />
         <button
           type="button"
-          aria-label="Увеличить"
+          aria-label={t.zoomIn}
           onClick={() => setZoom((z) => Math.min(3, z + 0.1))}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-text-sec hover:bg-bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
@@ -218,7 +218,7 @@ export function CropPicker({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={() => void save()} disabled={busy || !latestCropRef.current}>
-          {busy ? "Сохраняем..." : t.save}
+          {busy ? t.saving : t.save}
         </Button>
         <Button type="button" variant="secondary" onClick={onSkip} disabled={busy}>
           {t.skip}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, User, Settings, Shield, LogIn, Briefcase, Building2, UserCircle2, Check } from "lucide-react";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import type { CabinetKind } from "@/lib/auth/available-cabinets";
@@ -35,6 +35,7 @@ const CABINET_LABEL: Record<CabinetKind, string> = {
 export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const reduce = useReducedMotion();
   const pathname = usePathname() ?? "/";
   const currentCabinet = detectCurrentCabinet(pathname);
   const showSwitcher = availableCabinets.length > 1;
@@ -75,8 +76,8 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
       >
         <span className="max-w-[120px] truncate">{userLabel}</span>
         <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
+          animate={reduce ? undefined : { rotate: open ? 180 : 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           className="text-text-sec"
         >
           <ChevronDown className="h-4 w-4" aria-hidden />
@@ -86,10 +87,10 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -6 }}
-            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+            initial={reduce ? false : { opacity: 0, scale: 0.95, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -6 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="absolute right-0 z-[100] mt-2 w-64 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
           >
             {showSwitcher ? (

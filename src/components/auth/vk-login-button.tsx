@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
+import { env } from "@/lib/env";
 
 type VkLoginButtonProps = {
   iconOnly?: boolean;
@@ -19,7 +20,7 @@ function VkIcon({ className }: { className?: string }) {
 }
 
 export default function VkLoginButton({ iconOnly = false, className }: VkLoginButtonProps) {
-  const vkEnabled = process.env.NEXT_PUBLIC_VK_ENABLED === "true";
+  const vkEnabled = String(env.NEXT_PUBLIC_VK_ENABLED) === "true";
   if (!vkEnabled) return null;
 
   const label = UI_TEXT.auth.vk.loginButton;

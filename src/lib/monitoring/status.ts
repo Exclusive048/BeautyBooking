@@ -1,5 +1,6 @@
 import { logError } from "@/lib/logging/logger";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
+import { isProduction } from "@/lib/env";
 
 export const CRITICAL_OBSERVABILITY_SURFACES = [
   "auth",
@@ -38,7 +39,7 @@ export type SurfaceStatusSnapshot = {
 
 const STATUS_KEY_PREFIX = "mon:status:surface:";
 const STATUS_TTL_SECONDS = 7 * 24 * 60 * 60;
-const allowMemoryFallback = process.env.NODE_ENV !== "production";
+const allowMemoryFallback = !isProduction;
 const memoryStore = new Map<CriticalObservabilitySurface, SurfaceStatusSnapshot>();
 const PRODUCTION_DEGRADED_MARKER_TTL_MS = 10 * 60 * 1000;
 const PRODUCTION_DEGRADED_MARKER_MIN_INTERVAL_MS = 60_000;

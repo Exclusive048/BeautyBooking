@@ -5,6 +5,7 @@ import { emptyBodySchema } from "@/lib/auth/schemas";
 import { AccountType } from "@prisma/client";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/auth/jwt";
+import { env } from "@/lib/env";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
   }
 
   const cookieStore = await cookies();
-  const name = process.env.AUTH_COOKIE_NAME ?? "bh_session";
+  const name = env.AUTH_COOKIE_NAME;
   const token = cookieStore.get(name)?.value;
   if (!token) {
     return fail("Unauthorized", 401, "UNAUTHORIZED");

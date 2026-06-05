@@ -81,7 +81,7 @@ export function ReportReviewModal({ reviewId, open, onClose, onSuccess }: Props)
           onChange={(e) => setReason(e.target.value as ReportReason | "")}
           className="w-full"
         >
-          <option value="" disabled>— выберите причину —</option>
+          <option value="" disabled>{t.reportReasonPlaceholder}</option>
           {REASONS.map((r) => (
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -211,6 +211,7 @@ export default function CatalogPageClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const reduce = useReducedMotion();
 
   const serviceQuery = searchParams.get("serviceQuery") ?? "";
   const serviceId = searchParams.get("serviceId") ?? "";
@@ -812,13 +813,13 @@ export default function CatalogPageClient({
               className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
               initial="hidden"
               animate="visible"
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+              variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
             >
               {timeModeActive
                 ? availabilityData.items.map((item) => (
                     <motion.div
                       key={item.providerId}
-                      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                      variants={reduce ? undefined : { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
                     >
                       <ProviderResultCard item={item} />
                     </motion.div>
@@ -826,7 +827,7 @@ export default function CatalogPageClient({
                 : data.items.map((item) => (
                     <motion.div
                       key={item.id}
-                      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                      variants={reduce ? undefined : { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
                     >
                       <CatalogCard
                         item={item}

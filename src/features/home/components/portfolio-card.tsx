@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Star, ExternalLink } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -14,6 +14,7 @@ type Props = {
 };
 
 export function PortfolioCard({ item, onSelect }: Props) {
+  const reduce = useReducedMotion();
   const serviceLabel = item.primaryServiceTitle;
 
   const bookingUrl = item.masterPublicUsername
@@ -60,9 +61,9 @@ export function PortfolioCard({ item, onSelect }: Props) {
 
           {/* Hover overlay — gradient + info text */}
           <motion.div
-            initial={{ opacity: 0 }}
-            whileHover={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
+            initial={reduce ? false : { opacity: 0 }}
+            whileHover={reduce ? undefined : { opacity: 1 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.2 }}
             className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/20 to-transparent p-3"
           >
             <p className="line-clamp-1 text-sm font-semibold text-white drop-shadow">

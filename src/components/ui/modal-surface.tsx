@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
+import {
+  useFocusTrap,
+  useInitialFocus,
+  useReturnFocus,
+} from "@/components/ui/use-modal-a11y";
 
 export type ModalSurfaceSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -37,6 +42,14 @@ type Props = {
    * override entirely if a non-standard width is needed.
    */
   size?: ModalSurfaceSize;
+  /**
+   * MODAL-A11Y-BATCH-A: optional ref for initial focus when the
+   * modal opens. Default = first focusable child inside the panel
+   * (button / input / etc). Override with this ref to focus a
+   * specific element (e.g. the «Confirm» button vs the «Cancel»
+   * one). Falls back to the panel container if no focusable found.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
   className?: string;
 };
@@ -90,10 +103,19 @@ export function ModalSurface({
   header,
   footer,
   size = "lg",
+  initialFocusRef,
   children,
   className,
 }: Props) {
   const titleId = useId();
+  const panelRef = useRef<HTMLElement>(null);
+  // MODAL-A11Y-BATCH-A: respect OS-level prefers-reduced-motion.
+  // framer-motion's useReducedMotion returns true when the user has
+  // requested reduced motion. We collapse the entrance/exit to a
+  // simple opacity fade and zero scale/translate so vestibular-
+  // sensitive users + battery-conscious mobile users get an instant,
+  // motion-free open. Default users see the original animation.
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (!open) return;
@@ -108,6 +130,17 @@ export function ModalSurface({
       window.removeEventListener("keydown", handleKey);
     };
   }, [open, onClose]);
+
+  // MODAL-A11Y-BATCH-A: WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus).
+  // useReturnFocus captures the opener element on open + restores focus
+  // when the modal closes. useInitialFocus places focus on the first
+  // focusable child (or explicit initialFocusRef) so keyboard users
+  // don't have to Tab from page-start. useFocusTrap cycles Tab within
+  // the modal panel — Tab from the last focusable wraps to first; Shift+
+  // Tab from first wraps to last.
+  useReturnFocus(open);
+  useInitialFocus(open, panelRef, initialFocusRef);
+  useFocusTrap(panelRef, open);
 
   if (!isBrowser) return null;
 
@@ -127,20 +160,22 @@ export function ModalSurface({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
             <motion.section
+              ref={panelRef}
               onClick={(event) => event.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.97, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 4 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 8 }}
+              animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: 4 }}
+              transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
               className={cn(
                 "relative my-6 w-full rounded-[24px] border border-border-subtle bg-bg-card p-5 shadow-hover",
                 SIZE_CLASS[size],
                 className,
               )}
+              tabIndex={-1}
             >
               {header ? (
                 <header className="mb-4 flex items-start gap-3">

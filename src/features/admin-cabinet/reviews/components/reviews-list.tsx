@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ApproveReviewDialog } from "@/features/admin-cabinet/reviews/components/approve-review-dialog";
 import { DeleteReviewDialog } from "@/features/admin-cabinet/reviews/components/delete-review-dialog";
@@ -42,6 +42,7 @@ export function ReviewsList({ rows: initialRows, nextCursor, tab }: Props) {
   const [toast, setToast] = useState<Toast>(null);
   const [approveTarget, setApproveTarget] = useState<AdminReviewRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminReviewRow | null>(null);
+  const reduce = useReducedMotion();
 
   const showToast = useCallback(
     (text: string, kind: "success" | "error" = "success") => {
@@ -130,9 +131,9 @@ export function ReviewsList({ rows: initialRows, nextCursor, tab }: Props) {
         {toast ? (
           <motion.div
             role="status"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
             className={cn(
               "rounded-2xl border px-4 py-2.5 text-sm",
               toast.kind === "success"

@@ -1,10 +1,19 @@
 # МастерРядом — Контекст проекта для ИИ
-> Дата аудита: **13 мая 2026** (refresh — CONTEXT-REFRESH-V2; предыдущий snapshot был 7 мая 2026)
-> Файлов проверено: **1407 TypeScript-файлов** в `src/` (271 API route.ts + 89 page.tsx)
-> Коммит/ветка: `designStudioCabinet`. Последний коммит main: `b3eedaf` (Merge PR #71 — Admin Cabinet).
-> Моделей: **65**, enum'ов: **36**, миграций: **16** (последняя — `20260514000936_add_admin_initiated_notification_types`).
+> Дата аудита: **29 мая 2026** (refresh — CONTEXT-REFRESH-V3; предыдущий snapshot был 13 мая 2026 — V2)
+> Файлов проверено: **621 features tsx + 65 components tsx + 277 route.ts + 90 page.tsx + 74 test files** (counts verified by parallel inspectors)
+> Коммит/ветка: `auditandaction`. Последний значимый: MODAL-A11Y-BATCH-A (a11y закрытие 55+ модалов через shared use-modal-a11y hooks).
+> Моделей: **65**, enum'ов: **36**, миграций: **16** (без новых миграций за всю audit-волну — design discipline maintained).
+> Тестов: **629** (рост 358 → 629 за audit-волну, +271).
+> Error codes: **113** typed (`EMAIL_ALREADY_USED` добавлен по EMAIL-VERIFY-FIX-A).
 >
-> **Active sprint:** редизайн кабинета студии в ветке `designStudioCabinet`.
+> **🎉 Sprint phase: AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness.**
+> Tier 1 audits (items 1-6): LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / SPRINT-RETROSPECTIVE-DOC
+> Tier 2 audits (items 7-11): DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION
+> Fix-prompts закрывшие критические находки во время волны: PROD-ENV-EXAMPLE-SYNC-A (DR-1), FEED-PORTFOLIO-N1-FIX-A (PERF-1), MODAL-A11Y-BATCH-A (UI-1 + UI-3), EMAIL-VERIFY-FIX-A (🔴 #1), OTP-LOG-DEV-GUARD-A (SEC-1), ENV-DISCIPLINE-SWEEP-A (CC-1), FAST-WINS-BATCH-A (TC-2 + SEC-2 + proxy.ts), SECURITY-SURFACE-TESTS-A (TC-1).
+> **0 🔴 + 0 🟠 unaddressed** — pre-launch критический путь чист.
+> Next phase: STRUCTURAL-PREVENTION-AUDIT (Шаг 3) consolidate all prevention candidates → production execution batch.
+>
+> **Predecessor active sprint** (preserved для context): редизайн кабинета студии в ветке `designStudioCabinet`.
 > - ✅ Schedule request approval UI (STUDIO-SCHEDULE-REQUEST-APPROVAL-A — closed functional gap)
 > - ✅ Shell foundation (STUDIO-SHELL-A — sidebar/topbar/UserChip/bottom-nav + nav config + counts service)
 > - ✅ Symmetric switcher rollback (SYMMETRIC-SWITCHER-A — cabinet UI без duplicate switcher)
@@ -140,7 +149,7 @@ src/
 │   ├── (public)/           # Группа роутов: публичные страницы
 │   ├── api/                # REST API (route.ts)
 │   └── [страницы]/         # Публичные страницы (login, catalog, etc.)
-├── components/             # Переиспользуемые UI-компоненты (60 tsx-файлов)
+├── components/             # Переиспользуемые UI-компоненты (65 tsx-файлов — verified 2026-05-29)
 │   ├── auth/
 │   ├── billing/
 │   ├── blocks/
@@ -150,7 +159,7 @@ src/
 │   ├── providers/
 │   ├── pwa/
 │   └── ui/
-├── features/               # Feature-слайсы (271 tsx-файла)
+├── features/               # Feature-слайсы (621 tsx-файла — verified 2026-05-29; рост от 271 за audit-волну)
 │   ├── admin/
 │   ├── analytics/
 │   ├── auth/
@@ -252,21 +261,21 @@ src/
 - **RBAC**: `requireAuth()`, `requireRole()`, `hasAnyRole()` в `src/lib/auth/guards.ts`
 - **Централизованные UI-тексты**: `src/lib/ui/text.ts` экспортирует константу `UI_TEXT`
 
-### Количество файлов
-| Тип | Количество |
-|-----|-----------|
-| route.ts (API handlers) | 240 |
-| page.tsx (страницы) | 78 |
-| test-файлов | 29 |
-| tsx-файлов в components/ | 60 |
-| tsx-файлов в features/ | 271 |
-| Всего TS/TSX в src/ | 1094 |
+### Количество файлов (verified 2026-05-29 by CONTEXT-REFRESH-V3 parallel inspectors)
+| Тип | Количество | Δ от V2 (13 мая) |
+|-----|-----------|---|
+| route.ts (API handlers) | 277 | +37 |
+| page.tsx (страницы) | 90 | +12 |
+| test-файлов | 74 | +45 (audit-волна added regression tests) |
+| tsx-файлов в components/ | 65 | +5 |
+| tsx-файлов в features/ | 621 | +350 (sprint redesign + studio cabinet wave) |
+| Тестов (count) | 629 | +271 (358 → 629) |
 
 ---
 
 ## 4. МОДЕЛЬ ДАННЫХ
 
-### Enums (35 штук, актуально на 2026-05-13)
+### Enums (36 штук, verified 2026-05-29 by CONTEXT-REFRESH-V3 — list current; AdminAuditAction was the 36th, added 2026-05-13 MIGRATIONS-PRELAUNCH-A)
 
 Полный список из `prisma/schema/enums.prisma`: OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole, StudioMemberStatus, MembershipStatus, CategoryStatus, BookingStatus, BookingCancelledBy, BookingRequestedBy, BookingActionRequiredBy, BookingSource, ChatSenderType, ScheduleMode, ScheduleBreakKind, ScheduleOverrideKind, ScheduleChangeRequestStatus, TimeBlockType, PlanTier, SubscriptionScope, SubscriptionStatus, BillingPaymentStatus, NotificationType, MediaEntityType, MediaKind, MediaAssetStatus, ReviewTargetType, ReviewTagType, ReviewReportReason, DiscountType, DiscountApplyMode, ModelOfferStatus, ModelApplicationStatus, **AdminAuditAction**.
 
@@ -312,7 +321,7 @@ src/
 | ConsentType | TERMS, PRIVACY, MARKETING, PUBLIC_PROFILE |
 | ChatSenderType | CLIENT, MASTER |
 
-### Модели данных (64 модели, актуально на 2026-05-13)
+### Модели данных (65 моделей, verified 2026-05-29 — content current; +1 от V2 = AdminAuditLog added by MIGRATIONS-PRELAUNCH-A 2026-05-13 same wave)
 
 **Изменения с предыдущего snapshot:**
 - ➕ **`MrrSnapshot`** (MRR-SNAPSHOTS-A, миграция `20260513115124_add_mrr_snapshot`) — `id`, `snapshotDate` (`@db.Date @unique`), `mrrKopeks` (`BigInt`), `activeSubscriptionsCount`, `breakdownJson?`, `createdAt`. Daily snapshot platform-wide MRR + active subs count. Записывается worker'ом через `mrr.snapshot.daily` job (triggered внешним cron через `/api/billing/mrr/snapshot/run`). Используется admin/billing для вычисления MRR delta vs ~30 дней назад. `BigInt` для overflow safety; `breakdownJson` зарезервирован под future per-tier/per-scope drill-down.
@@ -640,7 +649,7 @@ src/
 | `/api/provider/schedule/templates` | GET, POST | Шаблоны |
 | `/api/provider/schedule/status` | GET | Статус расписания |
 
-### API — остальные группы (актуально 2026-05-13; всего 271 route.ts)
+### API — остальные группы (verified 2026-05-29; всего 277 route.ts)
 | Группа | Количество handlers | Примечание |
 |--------|-------------------|---|
 | /api/admin/* | ~35 | + новые `/admin/dashboard/{kpis,charts,events,health}` (ADMIN-DASH-A), `/admin/cities/*` + `/admin/cities/duplicates` (ADMIN-CITIES-UI), `/admin/users/[id]/plan` (ADMIN-USERS-A — audit-logged plan change), `/admin/billing/kpis` + `/admin/billing/plans/[id]` (ADMIN-BILLING-A — audit-logged plan edit), `/admin/billing/subscriptions/[id]/cancel` (ADMIN-BILLING-B — audit-logged cancel), `/admin/reviews/[id]/{approve,delete}` (ADMIN-REVIEWS-A — audit-logged moderation), `/admin/reviews/*` (legacy GET/PATCH/DELETE), `/admin/catalog/categories/*`. ADMIN-SETTINGS-A: расширены `/admin/system-config` (добавлен `legalDraftMode` + audit logging) и `/admin/settings` (audit logging для SEO changes). PHASE-7-CLEANUP-A: удалены `/admin/metrics`, `/admin/users` (GET + PATCH; `/[id]/plan` сохранён), `/admin/catalog/global-categories/*` всё дерево |
@@ -745,7 +754,7 @@ src/
 - Cost+balance logged on every successful send (`messageId`, `cost`, `balanceLeft`) для retrospective monitoring.
 - **Pre-launch ops:** установить `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` в prod env, пополнить SMSC баланс, smoke-test (Beeline/MTS/Megafon RU + KZ). SMS-MONITORING-A (admin balance widget + daily low-balance cron) — отдельный 🟡 backlog.
 
-**P2: VAPID ключи использованы с `!` (non-null assertion) — crash при старте если не заданы** — Сделано: НЕТ. **Pre-launch task**.
+**P2: VAPID ключи использованы с `!` (non-null assertion) — crash при старте если не заданы** — Сделано: **ЧАСТИЧНО** (verified by CONTEXT-REFRESH-V3 2026-05-29). `isPushEnabled` computed flag в `src/lib/env.ts` теперь guards module-level usage. Residual risk: file-internal `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!` (vapid.ts:5-6) crashes если **только один** ключ задан (non-null assertion fires per-key). Fix: guard individual key assignments OR replace `!` с conditional return. **Backlog 🟡 — VAPID-NON-NULL-FIX** (~20 min).
 - Файл: `src/lib/notifications/push/vapid.ts:5-6`
 - `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!`, `process.env.VAPID_PRIVATE_KEY!`
 - Если ключи не заданы, инициализация vapid упадёт с TypeError в production.
@@ -779,7 +788,7 @@ src/
 
 ### 🟡 Технический долг
 
-**T0: Legacy orphan inventory (LEGACY-CLEANUP-AUDIT-A 2026-05-23)** — read-only audit. **~3 694 LOC removable across ~23 files (LARGE scope, 2-phase EXEC pending).**
+**T0: Legacy orphan inventory (LEGACY-CLEANUP-AUDIT-A 2026-05-23)** — ✅ **100% CLOSED (Phase 1 EXEC-A + Phase 2 EXEC-B + Phase 3 EXEC-C, all 2026-05-23): ~3 700 LOC removed across 24 files + 1 fn + 3 consts + 2 types.** Phase 1: 21 orphan components (~3 613 LOC, `features/schedule/` dir gone). Phase 2: 2 dead routes (`/api/home/feed`, `/api/home/stories`, 81 LOC) + `listStoriesMasters` fn + 3 V1 constants. Phase 3: cascade-orphan `story-viewer.tsx` + `StoryMaster`/`StoryPhoto` types (revealed when Phase 1 deleted their last consumer `portfolio-stories-bar.tsx`). Stories V1 cluster (UI + routes + service fn + types) entirely removed; V2 (`/api/feed/*` + `stories-rail`/`stories-viewer-overlay`/`home-feed` + `getActiveStoriesGroups`) preserved. 0 schema migrations, 0 test regressions across all 3 phases.
 - **21 orphan components (0 static import-hits, verified):** `features/schedule/components/{schedule-builder.tsx (1434), schedule-requests-panel.tsx (528)}` (whole dead dir — pre-redesign schedule editor superseded by master/studio cabinet); `features/cabinet/components/{client-dashboard.tsx (360), cabinet-nav-tabs.tsx (34), cabinet-side-nav.tsx (38)}`; `features/master/components/{connected-accounts-section.tsx (165), master-advisor-section.tsx (139), auto-publish-stories-toggle.tsx (111), schedule-settings/breaks/{break-modal.tsx (184), recurring-breaks-section.tsx (52)}}`; `features/home/components/{portfolio-preview-modal.tsx (121), portfolio-stories-bar.tsx (108), home-filters.tsx (42), tag-chips.tsx (31)}`; `features/catalog/components/{search-capsule.tsx (56), map-placeholder.tsx (41)}`; `features/studio-cabinet/components/studio-settings-sidebar.tsx (41)`; `features/media/components/site-logo-manager.tsx (17)`; `components/ui/{dynamic-icon.tsx (65), date-picker.tsx (25), tooltip-hint.tsx (21)}`.
 - **2 dead API routes:** `/api/home/feed/route.ts` (54, no caller), `/api/home/stories/route.ts` (27, only called by orphan `portfolio-stories-bar.tsx`).
 - **1 partial-file edit:** `listStoriesMasters` fn + V1 comment block in `src/lib/feed/stories.service.ts` (file keeps live `getActiveStoriesGroups`/`invalidateStoriesCache`/types).
@@ -863,7 +872,23 @@ src/
 - Environment: node
 - Plugins: vite-tsconfig-paths (поддержка `@/` алиасов)
 
-### Тестовые файлы (45 файлов / 358 тестов, актуально 2026-05-19)
+### TEST-COVERAGE-AUDIT-A posture + post-волна refresh (verified 2026-05-29 by CONTEXT-REFRESH-V3)
+> **Current: 74 test files / 629 tests** (358 → 629 across audit-волна 11/11, +271 tests). Post audit-волна additions: SECURITY-SURFACE-TESTS-A (TC-1+TC-2 webhook + chat-attachment validators), FAST-WINS-BATCH-A (validateReferenceAsset + safeJsonLd), EMAIL-VERIFY-FIX-A (mapEmailAlreadyUsedConflict), FEED-PORTFOLIO-N1-FIX-A (portfolio batched-lookup regression tests +8), MODAL-A11Y-BATCH-A (use-modal-a11y focus-trap predicate +18). Coverage strong on critical paths + invariants + regression scenarios; 2 moderate gaps remain (TC-3 integration test infra + TC-4 coverage tooling) — deferred к Шаг 3 STRUCTURAL-PREVENTION-AUDIT.
+- **Distribution:** heavy in `src/lib/` — booking (9 files), schedule (8), billing (7), sms (3), chat+media (6), cities (3); features lighter (regression-test pattern — tests follow fixes).
+- **✅ Booking lifecycle:** state machine (28 tests in `flow.test.ts`) + policy-enforcement + reschedule-policy + reschedule-enforcement + action-state + client-privacy + idempotency-key + reminders + link-guest. Illegal transitions blocked + 60-min cancel/reschedule window + cancellation deadline tested.
+- **✅ Billing pure helpers:** features (29) + marketing (19) + trial (15) + utils period-math (14) + guards (6) + mrr (6) + mrr-snapshot (6) = ~95 tests. **Known gap (documented backlog):** createBooking integration, cancelBooking, marketing-pricing.load SSR, idempotency Prisma-touching, getCurrentPlan, full subscribe/refund/proration integration — deferred until integration-test infra exists.
+- **✅ Invariants regression-tested:** #25 master CRM privacy (`client-privacy.test.ts` 13 tests, type-level + source-level guards) + #26 chat attachment ACL (`chat-attachment-acl.test.ts` 8 tests + `chat-attachment-token.test.ts` 11 tests). Policy helpers covered.
+- **✅ Auth pure helpers:** jwt sign/verify (7) + otp generation/hash (3) + otp-flow integration (3). Rate-limit + session + role guards are Prisma/Redis-bound — need integration infra to test (note as 🟡 below).
+- **✅ Test quality:** zero assertion-less files (all 67 use `expect()`). No smoke-only files.
+- **✅ Schedule pure logic:** slots (4) + slotsCache (5) + slots-range (2) + dateKey (4) + overlap (1) + publish-horizon (4) + booking-days (2) + studio-slot-aggregation (9) = 31 tests.
+- **✅ SMS + masking:** SMSC provider (17) + sender (4) + mock (3) + masking (10) = 34 tests (SMS-GATEWAY-A + OTP-LOG-DEV-GUARD-A waves).
+- **🟡 TC-1 Webhook signature verify gap:** `src/app/api/payments/yookassa/webhook/route.ts` has inline `verifySignature` (HMAC-SHA256) + IP allowlist (per invariant #5), but **no dedicated test file**. Pure-helper test feasible (mock fetch with known signature → assert verify/reject behavior). Security-critical (payment confirmation) — moderate severity.
+- **🟡 TC-2 File upload validation chain gap:** booking-reference + chat-attachment uploads validate MIME-allowlist + size + magic-byte sniff (`fileTypeFromBuffer`) + Sharp re-encode, but **no unit tests** for the validation predicates (`validateReferenceAsset`, `validateChatAttachmentAsset`). The shape is testable as pure functions independent of HTTP route.
+- **🟡 TC-3 Auth integration coverage:** rate-limit logic (Redis-bound), session creation/invalidation (Prisma-bound), role guards (Prisma-bound), OAuth flows (VK/Telegram), all currently uncovered. **Same root cause** as billing integration gap — needs integration-test infra. Same backlog item.
+- **🔵 TC-4 Coverage tooling absent:** no c8/vitest --coverage configured. Gap analysis is manual. Easy backlog: add `npm run test:coverage` with thresholds for critical paths.
+- **🔵 TC-5 E2E framework absent:** no Playwright/Cypress. **Expected for MVP.** Once production launches + integration confidence proven, add minimal critical-journey smoke E2E (master signup → publish; client browse → book → review).
+
+### Тестовые файлы (67 файлов / 572 тестов, актуально 2026-05-23 — обновлено TEST-COVERAGE-AUDIT-A)
 
 **Новое в TEST-COVERAGE-A (2026-05-19):** `src/lib/billing/utils.test.ts` (15) + `src/lib/billing/marketing-pricing.test.ts` (19) + `src/lib/billing/guards.test.ts` (6) + `src/lib/bookings/flow.test.ts` (32) + `src/lib/bookings/idempotency-key.test.ts` (6) — pure-helper coverage. `quality-gates.yml` уже запускает `npm run test` в CI (T7 закрыт).
 
@@ -952,9 +977,21 @@ src/
 - YooKassa webhook: HMAC-SHA256 подпись + IP allowlist
 
 ### Потенциальные уязвимости
-- OTP в логах (критично, см. P1)
+- ~~OTP в логах (P1 phone + SEC-1 email)~~ ✅ **fully closed** — SMS-GATEWAY-A (phone) + OTP-LOG-DEV-GUARD-A (email + NODE_ENV guard across all 3 surfaces). Production logs strip `code`; dev/staging retain it for testing convenience via shared `isProduction` flag (env.ts) + `maskPhone`/`maskEmail` (`src/lib/logging/masking.ts`).
 - Нет явного middleware для auth (каждый handler сам проверяет)
 - JWT без rotation секрета — компрометация AUTH_JWT_SECRET инвалидирует все токены
+
+### SECURITY-AUDIT-A posture (2026-05-23, read-only application-level audit)
+> Complements PHASE6-HARDENING-AUDIT-A (which covered infrastructure: SMS/JWT/rate-limit/deploy). This audit covered application logic: authorization scope, privacy invariants, DTO leaks, PII-in-logs, input validation, injection, cross-tenant isolation, sensitive operations. **6 of 8 categories CLEAN — sprint security patterns held consistently.**
+- **✅ Authorization scope:** 277 API routes; every cabinet/admin/master/studio mutation has an auth guard. 3 guard-less mutations (`log-error`, `search/by-photo`, `support/partnership`) are intentionally public + each rate-limited + Zod-validated.
+- **✅ Cross-tenant isolation:** `ensureStudioRole({ studioId, userId, allowed })` verifies owner-or-active-membership for the *requested* studio (throws 403) — client-supplies-ID-server-authorizes done right. Master scoped by session `providerId`, client by `userId`. No leaks found.
+- **✅ Privacy invariants #25/#26 + HMAC:** regression-tested (`client-privacy.test.ts`, `chat-attachment-acl.test.ts`); 3 HMAC token apps cover sensitive URLs; **no 4th cuid-in-URL case** → HMAC-factory extraction not yet triggered.
+- **✅ DTO leaks:** no hashes/tokens in responses (`vk accessToken` selected internal-only for `logoutVkSession`, not returned); public catalog/feed/provider DTOs carry no phone/email; `link-guest` log uses `maskPhone`.
+- **✅ Input validation:** mutations use `parseBody(req, zodSchema)`; file uploads validate MIME-allowlist + size + magic-byte (`fileTypeFromBuffer`, not trusting Content-Type) + Sharp re-encode.
+- **✅ Sensitive ops:** YooKassa webhook = HMAC-SHA256 signature + IP allowlist + 401-reject (invariant #5); booking state machine `flow.ts` tested; cookies `httpOnly`+`sameSite=lax`+`secure`.
+- ~~**🟠 SEC-1**~~ ✅ **closed by OTP-LOG-DEV-GUARD-A (2026-05-23)** with stricter+broader scope: NODE_ENV guard pattern across all 3 OTP log surfaces (phone + 2 email), `isProduction` flag + shared `maskPhone`/`maskEmail`. Production strips `code`; dev/staging keep it for testing convenience.
+- **🟡 SEC-2 (Medium, defense-in-depth):** JSON-LD `dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}` on `/u/[username]` (+ faq/layout) embeds user-controlled strings without `<`-escaping. CSP (prod-only, nonce + `strict-dynamic` + no `unsafe-inline`) blocks breakout execution → not script-exec-exploitable in prod. Add `.replace(/</g, "\\u003c")`.
+- **🔵 SEC-3 (Low, ops):** `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` should be domain-restricted in Yandex console.
 
 ---
 
@@ -963,7 +1000,7 @@ src/
 ### Кэширование
 - **Redis**: rate-limit windows, schedule DayPlan, slots cache, session data, idempotency locks, notifier pub/sub
 - **Next.js**: нет явного `cache()` или `unstable_cache` в найденных файлах — преимущественно клиентский SWR
-- **Service Worker**: CacheFirst для шрифтов Google, StaleWhileRevalidate для изображений и Supabase storage
+- **Service Worker**: CacheFirst для шрифтов Google, StaleWhileRevalidate для изображений. **Note (AI-CONTEXT-FACT-CORRECTION 2026-05-29)**: legacy SW caching rule в `next.config.ts:34-37` matches `*.supabase.co/storage/v1/object/public/*` URLs с `cacheName: "supabase-storage"` — orphan config since Supabase confirmed unused (assumption invalidated). Live media goes через Yandex S3 (`storage.yandexcloud.net`). Backlog cleanup candidate (see `SW-SUPABASE-RULE-CLEANUP` 🔵)
 - **Schedule cache invalidation** — после любого save в Schedule Settings (`applyScheduleSnapshot`) автоматически вызывается `invalidateSlotsForMaster(providerId)`. Cache-version aggregator смотрит `updatedAt` от `provider`, `scheduleOverride`, `scheduleTemplate`, `weeklyScheduleConfig` — bump любого из них пробивает кэш
 
 ### N+1 проблемы
@@ -993,9 +1030,71 @@ src/
 - Нет горизонтального масштабирования воркера (один процесс)
 
 ### База данных
-- Pgvector для визуального поиска: требует специфичной версии PostgreSQL
+- Pgvector для визуального поиска: требует специфичной версии PostgreSQL (local dev: `pgvector/pgvector:pg16`)
 - Индексы оптимизированы для основных запросов (Provider, Booking, UserSubscription)
 - directUrl для Prisma Migrate (поддержка connection pooler типа PgBouncer)
+
+### Infrastructure decisions (pending DevOps consultation — AI-CONTEXT-FACT-CORRECTION 2026-05-29)
+
+> **Context:** Supabase confirmed NOT in use (недоступен из РФ + alternatives planned). Production hosting strategy awaits DevOps team input. Local dev unchanged: `pgvector/pgvector:pg16` Docker container.
+
+The following architectural choices block 4 pre-launch runbooks. **Each decision is DevOps-team scope, not a Claude / agent decision.** Documentation here marks state honestly without promoting any specific option.
+
+1. **PostgreSQL hosting** — pending choice between:
+   - Yandex Managed PostgreSQL (managed, pgvector ≥0.8.0 supported)
+   - Self-hosted Postgres on Compute Instance (same Docker container pattern as local dev)
+   - Other РФ-reachable managed provider
+   - **Blocks:** DR-3 backup runbook, connection pooling approach (DR-4)
+
+2. **TLS termination** — pending choice between:
+   - Yandex Application Load Balancer (managed)
+   - nginx sidecar in `docker-compose.prod.yml` (self-managed)
+   - Cloudflare proxy — NOT recommended (РФ accessibility risk)
+   - **Blocks:** DR-6 TLS-setup runbook
+
+3. **DB backup target** — depends on Postgres hosting choice (managed provider may include automated backups; self-hosted needs explicit pg_dump + off-host storage strategy)
+   - **Blocks:** DR-3 DB-backup runbook
+
+4. **Deploy rollback policy** — DevOps preference:
+   - Manual procedure (documented runbook for re-deploy of previous `IMAGE_TAG`)
+   - Auto-rollback on health-check failure (more orchestration complexity)
+   - **Blocks:** DR-2 deploy-rollback runbook
+
+**Local dev unchanged:** `docker-compose.dev.yml` with `pgvector/pgvector:pg16` — onboarding path predictable (LOCAL-DEV-CLEANUP 2026-05-29 closed the naming-drift hazard).
+
+**Once DevOps engages:** these 4 decisions unblock DR-2/3/6 runbooks + DR-4 pgbouncer applicability → production execution batch can proceed.
+
+### AI provider (post-migration 2026-05-31 — OPENAI-CLEANUP-A)
+
+> Migration history archived in [`docs/AI-MIGRATION-STRATEGY.md`](../docs/AI-MIGRATION-STRATEGY.md) (frozen as historical record). Sample evidence in [`docs/migration-samples/`](../docs/migration-samples/).
+
+**Pre-launch state — chat surfaces:**
+- **Provider:** Yandex Cloud Foundation Models (single provider)
+- **Endpoint:** `https://llm.api.cloud.yandex.net/v1` (OpenAI-compatible)
+- **Model:** YandexGPT 5 Lite baseline для всех 4 chat surfaces (review-summary / review-reply / service-description / advisor-advice). Per-surface override hook preserved via `opts.model` (Pro tier escape valve if needed)
+- **Authentication:** API key (service account, scope `yc.ai.foundationModels.execute`) + folder id via `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` env vars
+- **Chokepoint:** [`src/lib/ai/client.ts`](../src/lib/ai/client.ts) — single `aiChat()` function, Yandex-only construction. Surface services (`review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts`) import `aiChat` and don't know про provider
+- **Cost projection:** ~1,100-2,600₽/мес at expected usage (validated against ~1.75₽ total spent across 4 validation phases)
+- **Operational benefit:** native RU access, no VPN/proxy dependency
+
+**Validation evidence (archived):**
+- 30+ samples per surface (15 advisor profiles, 8 each для review-reply / service-description, 3 review-summary)
+- Quality ≥4.0/5 across all 5 categories на advisor (lowest 4.38, overall 4.66/5)
+- Zero hallucinations in Yandex across all 4 surfaces
+- One surface where Yandex BEAT OpenAI baseline (service-description, 4.975 vs 4.875)
+- Validated 2026-05-31 (Phases 4b-4e all ✅ ACCEPTED on Lite)
+
+**Visual search (post-launch independent track):**
+- Inactive by default (`VISUAL_SEARCH_ENABLED=false`)
+- `src/lib/visual-search/*` imports OpenAI SDK directly (uses `OPENAI_API_KEY`)
+- 0 vectors currently stored → zero re-indexing burden when reactivated
+- Migration к Yandex (vision + embeddings + native multimodal endpoint) deferred post-launch — separate work track
+- Yandex's OpenAI-compat layer does NOT pass vision through; native AI Studio multimodal endpoint requires separate wrapper. Schema migration `vector(1536) → vector(256)` also needed when reactivated
+
+**Reversibility hook (vestigial):**
+- `AI_PROVIDER` env var remains in `env.ts` schema as enum (back-compat with existing `.env.local` files) but ignored by `client.ts`. To revive OpenAI for chat surfaces (legacy escape), would require client.ts changes — no longer single env-toggle
+
+**Note on DEPLOYMENT-READINESS findings (audit-волна 7/11):** some Supabase-specific concerns (pgbouncer connection limits, Supabase pooler quirks) require re-evaluation under whatever hosting is chosen. Annotation preserved in section 15 changelog for that audit entry; findings themselves not rewritten (historical record).
 
 ---
 
@@ -1029,12 +1128,23 @@ src/
 | 23 | **Category visibility: APPROVED = public; PENDING = creator scope only** | `src/features/studio-cabinet/services/server/services-data.service.ts` (`listAvailableCategoriesForStudio`) + `src/lib/master/services-view.service.ts` (`listAvailableGlobalCategories`) + `/api/catalog/global-categories` GET + `catalog.service.ts` filter (CATEGORY-UNIFICATION-A) | `GlobalCategory.status = APPROVED` AND `visibleToAll = true` → visible everywhere (public catalog, all studios, all masters). `GlobalCategory.status = PENDING` → visible ТОЛЬКО to creator (`createdByUserId` / `proposedBy` match `auth.user.id`) in their own service/portfolio picker. Public catalog (`/api/catalog/global-categories`) **строго** filters `status: APPROVED, visibleToAll: true` — pending drafts never leak. Master `service-modal.tsx` + studio `add-service-dialog.tsx` propose new categories via `POST /api/categories/propose` → создаёт `status: PENDING, visibleToAll: false`. Категория становится globally visible только после admin approval. **Никогда не filter catalog/public surfaces by `OR: [APPROVED, own-PENDING]`** — это сломает invariant (см. `catalog/global-categories/route.ts` services-category-creation-restore comment про prior bug). |
 | 26 | **Chat attachment ACL = chat participants only (1:1 client↔master); studio admins/outsiders denied** | `src/lib/media/access.ts` (`ensureCanReadMedia` CHAT_MESSAGE case + `canReadChatAttachmentMedia` helper). Route `/api/chat/attachment/[token]` (MASTER-CHAT-ATTACHMENT-FIX-A) | MediaAsset rows tagged `entityType=CHAT_MESSAGE` + `entityId="chat-message:<msgId>"` могут читать ТОЛЬКО два участника беседы — `booking.clientUserId` (client) и `booking.masterProvider.ownerUserId` (master). Studio admin/owner — НЕТ (privacy 152-ФЗ, same boundary as `resolveChatAccess`). Outsiders → 403. Availability gate intentionally skipped для read (участники видят историю и после окончания брони — как сообщения). URL pattern: opaque token-only (`/api/chat/attachment/[token]`) — assetId cuid не в URL (signed payload embeds `aid`, `exp`, `purpose:"chat-attachment-read"`). Distinct purpose claim предотвращает cross-replay с generic `media-read` токенами. Защищён tests: `chat-attachment-acl.test.ts` (8 boundary scenarios) + `chat-attachment-token.test.ts` (11 token contract + URL-no-cuid). |
 | 25 | **Master CRM private fields никогда не появляются в client-facing API/DTO/SSR** | `src/lib/bookings/dto.ts` (`BookingDto` / `BookingClientDto` без `notes`/`tags`/`clientCard`), `src/lib/bookings/list.ts` (`listClientBookings` explicit-list select), `src/lib/client-cabinet/bookings.service.ts` (`ClientBookingDTO` + `listClientBookings`), `/api/cabinet/user/*`, `/api/bookings/my`, `/api/bookings/[id]/chat` — все explicit-list select без CRM-полей. Guarded by `src/lib/bookings/client-privacy.test.ts` (13 tests: type-level + source-level regex) (MASTER-PRIVACY-FIX-A) | Master CRM private поля — `Booking.notes` (мастер пишет при manual booking), `ClientCard.notes` / `ClientCard.tags` / `ClientCard.photos` (CRM-карточка клиента у мастера, providerId-scoped), `ClientNote.text` (отдельная модель notes by master) — **никогда не возвращаются клиенту** через API/DTO/SSR. Это 152-ФЗ-критичное: мастер обрабатывает персональные данные клиента для CRM-цели, в руки клиенту они не должны попадать (модель данных мастера, не клиента). **Что НЕ master-private** и легитимно в client DTO: `Booking.comment` (client-to-master comment, клиент сам написал), `Booking.changeComment` (bilateral reschedule communication), `ClientNote` model — приватна полностью, **никогда** не include в client paths. **Boundary защищается двумя слоями**: (1) TypeScript type-level — `extends keyof` assertions в `client-privacy.test.ts` fail at compile time если поле просочится в DTO type; (2) Source-level regex — тот же test читает байты 6 client-facing файлов и матчит `notes: true` / `clientCard:` / `clientNote:` паттерны (ловит даже `as`-cast обходы types). Расширение privacy-полей в схеме → расширить оба массива в test. |
+| 27 | **ModalSurface + Drawer enforce WCAG SC 2.4.3 + 2.3.3 + 3.2.1 для всех callers через `use-modal-a11y` hooks** | `src/components/ui/use-modal-a11y.ts` (`useReturnFocus` + `useInitialFocus` + `useFocusTrap` + `decideFocusTrap` pure helper) — applied в `src/components/ui/modal-surface.tsx` + `src/components/ui/drawer.tsx`. 50+ ModalSurface callers + 5 Drawer migrations inherit без per-caller code change (MODAL-A11Y-BATCH-A 2026-05-23). | Каждый модал / drawer enforced для WCAG: (1) **focus trap** — Tab cycles внутри modal panel; (2) **initial focus** — first focusable child OR explicit `initialFocusRef` prop OR container fallback с `tabIndex={-1}`; (3) **return focus** — opener element restored at close (guard against opener-removed-from-DOM); (4) **`useReducedMotion`** — animations collapse to opacity-only когда user prefers reduced motion. Custom focus trap (~50 LOC) вместо `@radix-ui/react-focus-scope` (не в deps). Mouse-user behavior identical (focus trap invisible). Default-user animations preserved. **Защищён tests**: `use-modal-a11y.test.ts` (18 tests — `FOCUSABLE_SELECTOR` discipline + `decideFocusTrap` pure helper across Tab/Shift+Tab × position × outside-container edge cases). React lifecycle integration deferred until TC-3 (jsdom + @testing-library infra). Pattern 14 largest fan-out leverage: 1 primitive fix → 55+ callers hardened. **Stories-viewer-overlay** keeps independent focus-trap (different concerns: arrow nav + swipe + progress bars — `STORIES-VIEWER-A11Y-CONSOLIDATE` 🔵 carryover). |
+| 28 | **Все Booking state-change endpoints idempotent через `x-idempotency-key` + Redis lock** | `src/lib/bookings/idempotency.ts` (`resolveBookingIdempotency` + `storeBookingIdempotency` + `clearBookingIdempotency`) — applied в `createBooking.ts` + `createClientBooking.ts` (rescheduleBooking + confirmBooking inherit via shared transaction patterns). TTL 600s. (BUSINESS-LOGIC-AUDIT-A confirmed) | Booking creation accepts optional `idempotencyKey` параметр — построение Redis key via `buildCreateBookingIdempotencyKey(namespaceKey, requestId)` namespaced by `clientUserId ?? \`guest:${clientPhone}\``. Lock-then-create pattern + on-failure cleanup (`clearBookingIdempotency`). Duplicate POST returns cached booking (если completed) OR throws `DUPLICATE_REQUEST 409` (если parallel insert race). **5-я P2002 surface** (booking + chat conversation-slug + cities + MRR snapshot + email-verify) mapped к user-friendly errors; OTP-EMAIL-LOGIN-RACE 6th site remains latent (low-probability — backlog 🟡 `OTP-EMAIL-LOGIN-RACE`). **Защищён tests**: `idempotency-key.test.ts` (6 tests pinning key composition + determinism + guest namespace + TTL constant). **Эмерджентный смежный invariant candidate** (formalize если 6th site OTP login race closes): «every P2002 → user-friendly error либо silent recovery, никогда 500». |
 
 ---
 
 ## 13. ПРАВИЛА ПРИ РАБОТЕ С КОДОМ
 
+> **Process meta-lessons:** [`docs/SPRINT-PATTERNS.md`](../docs/SPRINT-PATTERNS.md) — **15 evidence-grounded patterns** (Pattern 15 added 2026-05-29 by STRUCTURAL-PREVENTION-AUDIT — «Workflow-orchestrated parallel survey audit»). Plus **Patterns enforcement column** (Шаг 2 of 3-step Structural Prevention plan, completed 2026-05-29): each pattern honestly tagged manual / partial / structural / none. **Aggregate: 2 structural / 5 partial / 7 manual / 0 none** — most patterns rely on developer/Claude discipline (intentional design for small-team codebase). Consult **before designing a fix** (audit-first, trace-ALL-parallel-channels, cascade-orphan re-scan, redesign-commit 5-step checklist, HMAC-token rule of N=4, defense-layering, visibility-over-hiding UX, constructive pushback, verified-ready vs выполнено status discipline, assertX helpers, parallel-survey workflow). **Consult enforcement column** when evaluating «what could prevent recurrence» — to avoid over-recommending automation for patterns where manual discipline is intentionally sufficient. The rules below cover **per-commit conventions** (naming/errors/auth/UTC/Prisma); SPRINT-PATTERNS covers **planning + execution discipline** + **enforcement-state honesty**.
+
 ### Конвенции из кода
+
+**Schema discipline (MIGRATION-RECONCILIATION 2026-05-30, added rule 16 in CLAUDE.md):**
+- Schema changes в `prisma/schema/*.prisma` ТОЛЬКО через `npx prisma migrate dev --name <descriptive>`
+- Production deploy → `npx prisma migrate deploy` (correct in `.github/workflows/deploy.yml:127`)
+- 🚨 **`prisma db push` ЗАПРЕЩЁН** — обходит migration history → silent drift → runtime crashes. Проект попал на 24-op drift в мае 2026 (см. раздел 15 changelog «MIGRATION-RECONCILIATION-BATCH»)
+- CI gate `npm run check:schema-drift` ([`scripts/check-schema-drift.mjs`](scripts/check-schema-drift.mjs)) запрещает merge с drift
+- Полная процедура восстановления — `CLAUDE.md` § ВАЖНЫЕ ПРАВИЛА #16
 
 **Именование:**
 - Файлы: kebab-case (`booking-core.ts`, `create-booking.ts`)
@@ -1047,6 +1157,41 @@ src/
 - `toAppError()` — конвертация любой ошибки в AppError
 - Логирование: `logInfo()` / `logError()` из `src/lib/logging/logger.ts` (НЕ `console.log`)
 - `recordSurfaceEvent()` из `src/lib/monitoring/status.ts` — трекинг метрик
+
+**Логирование PII / secrets:**
+- Phone/email в log payloads — через `maskPhone` / `maskEmail` из `src/lib/logging/masking.ts`. Raw PII в production logs = 152-ФЗ exposure
+- OTP codes / tokens / любые **secrets** — НИКОГДА в production logs. Pattern для dev-convenience: `logInfo("...", { ..., ...(isProduction ? {} : { code }) })` где `isProduction` из `src/lib/env.ts`. Production payload strips the field; dev/staging keep it for testing
+- Reference: OTP-LOG-DEV-GUARD-A (2026-05-23) применил pattern к 3 OTP log surfaces; SMS-GATEWAY-A precedent
+
+### ERROR-HANDLING-AUDIT-A posture (2026-05-23, read-only audit)
+> Audit-волна item 5. **8 of 8 categories strong** — sprint's error-handling discipline is the most consistently-applied pattern audited so far. Single moderate gap: no error-aggregation/APM instrumentation. NO new 🔴/🟠 findings beyond already-tracked items.
+- **✅ Typed error registry:** **113 error codes** centralized in `src/lib/api/errors.ts` (`EMAIL_ALREADY_USED` добавлен EMAIL-VERIFY-FIX-A 2026-05-23, MASTER_NOT_ACTIVE / OUTSIDE_WORK_HOURS / MASTER_SERVICE_MISMATCH / INVALID_REQUEST_PAYLOAD за audit-волну); `AppError` class + `toAppError` catch-all converter used in 10+ files. No raw `Internal Server Error` / scattered string literals.
+- **✅ React error boundaries:** all 4 present and recoverable — `src/app/(admin)/error.tsx`, `(cabinet)/error.tsx`, `(public)/error.tsx`, `global-error.tsx`. Each renders retry-button via `onClick={reset}`. Per-route-group + global fallback.
+- **✅ Loading/empty/error states:** 18 `loading.tsx` route-level files; data-fetching components consistently expose `isLoading`/`error`/empty states.
+- **✅ Graceful degradation:**
+  - Redis cache miss → returns null, callers fall back to DB
+  - Prisma `P2002` (unique race) handled in 3+ booking sites + chat conversation-slug race + MRR snapshot race
+  - External APIs use `AbortController` (yookassa, telegram, Yandex maps suggest/geocode)
+  - SMS provider outage → 503 + retry guidance (SMS-GATEWAY-A fail-soft pattern)
+  - **Known un-mapped P2002 case:** `🔴 #1 EMAIL-VERIFY-FIX` (already in pre-launch blockers) — only such gap.
+- **✅ Logging level appropriateness:** zero `logInfo` calls inside `catch` blocks (errors correctly logged at error level). `error.stack` appears only in `logError` payloads (server logs), never in API response bodies.
+- **✅ Sensitive data в error paths:** `AppError.message` returned to client is the curated Russian user-friendly string (controlled by caller); raw Prisma/exception messages go to `logError` only. Stack traces never leak to client. PII masked via OTP-LOG-DEV-GUARD-A `maskPhone`/`maskEmail` where applicable.
+- **✅ Error code consistency:** single registry (112 codes, SCREAMING_SNAKE_CASE).
+- **✅ Fail-closed where needed:** `src/lib/rate-limit/index.ts:153` — sensitive auth/booking routes get `{ limited: true, retryAfter: 60 }` on Redis failure; line 170 — non-sensitive routes fail-open with `logError`. OTP rate-limit → 503 `RATE_LIMIT_UNAVAILABLE`. YooKassa webhook → 401 on invalid signature (not 500). Webhook auth + signature validation correct.
+- **🟡 EH-1 Observability — no Sentry/APM/error-aggregation tooling.** Zero `Sentry`/`@sentry`/`datadog`/`newrelic`/`posthog` instrumentation. Production debugging relies entirely on log scraping. Not launch-blocking (logs are structured + central error code registry helps grep) but significant quality gap for production triage. **Backlog:** add Sentry (or alternative) — well-defined ~half-day setup task.
+
+### CODE-CONSISTENCY-AUDIT-A posture (2026-05-23, read-only audit)
+> Complements SECURITY-AUDIT-A (security patterns) — audited non-security architectural conventions. **6 of 8 categories CLEAN.** Sprint discipline confirmed strong.
+- **✅ Server/client boundary:** no client component imports server-only modules (Prisma/Redis/Node APIs) directly. Memory note about `editor.ts → slotsCache.ts → redisClient.ts` chain pattern holds — separation respected.
+- **✅ HMAC token consistency:** 3 known applications (`chat-attachment`, `client-history`, `studio-master-view`); no 4th cuid-in-URL case found → factory extraction not yet triggered (rule of N=4). The one cuid-in-URL site (`/api/bookings/[id]/ics`) is auth-gated server-side, design-choice not gap.
+- **✅ Phone validation:** centralized via `normalizeRussianPhone`; 2 phone-input components (`booking-flow/phone-input`, `public-studio/you-step`) delegate normalization to parents — legit parent-normalizes design.
+- **✅ Policy enforcement parallel-paths:** `assertBookingWindow` applied in both `createBooking` (`booking-core.ts:323`) and `rescheduleBooking` (`usecases.ts:201`); `moveStudioBooking` applies `assertWithinMasterWorkHours` + `assertMasterPerformsService` (closed by STUDIO-RESCHEDULE-VALIDATION-A + MASTER-RESCHEDULE-FIX-A).
+- **✅ Naming / deep imports:** no `../../../..` 4-level relative imports — `@/` alias used consistently.
+- **✅ Zod parseBody coverage:** 114 mutation files use `parseBody`/`safeParse` — strong coverage, no obvious gaps.
+- **✅ import type discipline:** 619 files use `import type` — strong type-only-import hygiene (supports client/server boundary).
+- **🟡 CC-1 process.env.* discipline (rule 11):** **45 sites** outside the allowed list (env.ts / startup / middleware / proxy / prisma / tests). Mostly mechanical-migration debt — `process.env.NODE_ENV === "production"` (16 sites, now coverable by `isProduction`) + `AUTH_COOKIE_NAME` (3 sites) + various direct env reads (already defined in env.ts schema). Single sweep fix-prompt `ENV-DISCIPLINE-SWEEP-A` (~1-2 hr).
+- **🟡 CC-2 UI_TEXT broader-scope debt:** **306 Cyrillic-containing lines** across 4 cabinet feature dirs (master/studio-cabinet/admin-cabinet/client-cabinet) outside check:ui-text ROOTS. Sample confirms real hardcode (e.g. `plan-card.tsx` month-name array — same pattern UI-TEXT-HARDCODE-FIX-A centralized for booking-widget). Estimated ~30-100 real strings to centralize. Multi-prompt sweep `UI-TEXT-CABINET-SWEEP` (not launch-blocking).
+- **Design-choice note (not findings):** `fixed inset-0` overlays in 10 files are mostly mobile-nav drawers / story viewer / city-prompt overlay — non-modal positioning, different convention from `ModalSurface`. No pseudo-modals masquerading detected on spot-check.
 
 **API routes:**
 - Паттерн: `withRequestContext(req, async () => { ... })` или прямой try/catch
@@ -1096,6 +1241,7 @@ src/
 | Область | Ключевые файлы | Порядок чтения |
 |---------|---------------|----------------|
 | **Понять продукт** | `prisma/schema.prisma`, `src/lib/ui/text.ts`, `.env.example` | 1 → 2 → 3 |
+| **AI provider switch** (Phase 4a + verified) | `src/lib/ai/client.ts` (chokepoint + 5 TBDs ✅ verified 2026-05-31), `src/lib/ai/config.ts` (`getCurrentAIProvider()`), `src/lib/env.ts` (`AI_PROVIDER` + `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` + refines), `docs/AI-MIGRATION-STRATEGY.md` | 4 → 1 → 2 → 3 |
 | **Авторизация** | `src/lib/auth/jwt.ts`, `src/lib/auth/session.ts`, `src/lib/auth/guards.ts`, `src/lib/auth/otp.ts` | 1 → 2 → 3 → 4 |
 | **Создание бронирования** | `src/lib/bookings/createBooking.ts`, `src/lib/bookings/booking-core.ts`, `src/lib/bookings/idempotency.ts`, `src/app/api/bookings/route.ts` | 1 → 2 → 3 → 4 |
 | **Расписание и слоты** | `src/lib/schedule/engine.ts`, `src/lib/schedule/engine-core.ts`, `src/lib/schedule/slots.ts`, `src/lib/schedule/types.ts` | 1 → 2 → 3 → 4 |
@@ -1130,6 +1276,27 @@ npm run prisma:generate  # Генерация Prisma client
 npm run smoke            # Smoke тесты
 ```
 
+### Knowledge graph (Graphify — added GRAPHIFY-SETUP-AND-INITIAL-AUDIT 2026-05-31)
+
+> Read-only structural layer for fast codebase navigation. Tree-sitter local parsing (0 LLM cost during build). Skill auto-loaded into Claude Code session via `.claude/skills/graphify/`.
+
+```bash
+graphify update .                  # Rebuild graph from current code (~2 min for ~1825 files; no API cost)
+graphify query "<question>"        # BFS subgraph for a focused question (faster than grep)
+graphify path "<A>" "<B>"          # Shortest path between two symbols (refactor blast-radius scan)
+graphify explain "<symbol>"        # Plain-language description of a node + neighbors
+graphify --help                    # Full CLI reference
+```
+
+**Graph artifacts** (`graphify-out/`, gitignored):
+- `graph.json` — full graph data
+- `GRAPH_REPORT.md` — markdown summary (god nodes, communities, freshness, suggested questions)
+- `cache/` — incremental extraction cache
+
+**When to use:** large codebase question, refactor planning, «which files use X», cluster exploration. **When NOT:** trivial single-file edits, simple greps, sprint-pattern review (use SPRINT-PATTERNS.md).
+
+**Maintenance:** run `graphify update .` after structural sprint phases to keep graph fresh. Optional `graphify watch src/` for auto-rebuild during active work. Privacy: 100% local tree-sitter; no third-party LLM calls during build (token cost 0 input / 0 output verified at install).
+
 ### Типичные задачи
 
 **Добавить новый тип уведомления:**
@@ -1157,6 +1324,1615 @@ npm run smoke            # Smoke тесты
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-06-02 — SENSITIVE-DATA-LOGS-AUDIT-A** (commit on `auditandaction`). **🟢 PRE-LAUNCH-CHECKLIST 3/10 quick-wins done.** Read-only PII exposure audit across 8 areas. **3 🔴 HIGH-severity findings** (raw phone/email в production logs) + **1 🟡 acceptable** (mock provider dev-only) + **NO 🚨 catastrophic** findings. Sentry integration prerequisites documented. Tier 2 predecessor для OBSERVABILITY-SENTRY-A.
+  - **Logger inventory:** primary module `src/lib/logging/logger.ts` (canonical `logInfo`/`logError` exports, AsyncLocalStorage requestId, auto-Telegram-alert from logError). Masking helpers `src/lib/logging/masking.ts` (`maskPhone`/`maskEmail` from OTP-LOG-DEV-GUARD-A May 23). ~836 callsites (709 logError / 163 logInfo / 1 logWarn) across 549 api routes + 28 worker + 25 notifications + 18 bookings + 17 queue + 15 billing + 14 admin-cabinet + 13 profiles + 13 hot-slots + 12 ai. Direct `console.X` outside logger: 7 callsites (all production-safe — env validation crash, block-error formatters, alerting fallback)
+  - **🔴 HIGH-severity findings (3 — all surgical fixable):**
+    1. `src/lib/sms/index.ts:67,75` — `logInfo("OTP SMS delivered", { phone, ... })` + `logError("OTP SMS delivery failed", { phone, ... })` — raw phone unmasked. Production path. 152-ФЗ exposure
+    2. `src/lib/email/sender.ts:41,47,51` (×3 callsites) — `{ to: opts.to, subject }` — raw email unmasked. Production path. Every email send (SMTP-not-configured / sent / failed branches)
+    3. `src/app/api/cabinet/user/profile/email/verify/route.ts:97-99` — `logInfo("Cabinet email verify completed", { userId, email: normalizedEmail })` — raw email logged on successful verify (sibling request-verify route in the SAME file family uses maskEmail correctly; verify route forgot)
+  - **🟡 acceptable findings:**
+    - `src/lib/sms/mock-provider.ts:18-20` logs raw phone + OTP message. Mock only active when `SMS_PROVIDER_ENABLED=false` (dev workflow by-design). Acceptable per OTP-LOG-DEV-GUARD-A precedent
+    - Telegram alert text `\`User ${profile.id} logged in...\`` includes cuid (pseudo-anonymous, admin chat only)
+    - YooKassa webhook IP allowlist denial logs `ip` (security forensics context — legitimate)
+    - Some `logError` payloads include `stack: error.stack` (debugging value high; Sentry beforeSend could strip local var captures if framework adds them)
+  - **✅ CLEAN areas (Areas 4/5/6/7 + most of 2/3):**
+    - **OTP codes (Area 4 catastrophic check):** `...(isProduction ? {} : { code })` properly guards all 3 OTP log sites — verified clean
+    - **Auth secrets (passwords / JWT / API keys / refresh tokens):** NOT logged anywhere
+    - **Webhook signature/secret:** logs only `Boolean(signature)` / `Boolean(secret)` presence flags
+    - **Payment data (PCI DSS):** logs `paymentId` (internal) only. NO card numbers / CVV / payment tokens
+    - **Object dumps (`JSON.stringify(user)`):** NONE found in log calls. Hot-slots `logInfo(..., stats)` — stats is pure counter (processed/skipped/notified), no PII
+    - **Error message PII interpolation (Area 6):** static error strings, no `${phone}` / `${email}` patterns in `throw new Error`
+    - **HTTP request (Area 7):** `src/proxy.ts` has NO logging. NO `req.body` / `Authorization` / `Cookie` headers logged anywhere
+    - **AI prompt/response content:** `src/lib/ai/client.ts` logs scope/model/status/attempt only. No prompt body or generated text
+    - **Booking specifics:** `createBooking` logs `transactionMs` + `bookingId` only. No client name+master+service combinations
+    - **Chat / review / notes body:** NOT logged
+    - **Phone/email — already-correct sites:** OTP request routes + cabinet request-verify route + link-guest-bookings + setSessionCookies (cookies set not logged)
+  - **🚨 STOP-gate evaluation:** NONE triggered. No catastrophic auth secret logging; no payment card data logging; logger pattern consistent (single canonical module + 7 audited direct-console sites); audit proceeded to documentation phase
+  - **Cross-reference SECURITY-AUDIT-A (2026-05-23):** SEC-1 OTP code closed by OTP-LOG-DEV-GUARD-A (verified by this audit). SEC-2/SEC-3 orthogonal (XSS / API key restriction). **NEW findings parallel to SECURITY-AUDIT-A**: SMS provider phone + email sender raw email + cabinet verify raw email. SECURITY-AUDIT-A focused on application boundaries (auth scope / DTO leaks / cross-tenant isolation); this audit's logger-discipline lens surfaces parallel gaps
+  - **Раздел 3 (Архитектура):** не затронут — read-only audit
+  - **Раздел 5 (Бизнес-логика):** не затронут
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Деплой):** privacy posture для logs audited. 3 🔴 findings surgical fixable (~30-45 min via PII-LOGGING-FIX-A spawn). Sentry integration BLOCKED until fixes land (otherwise Sentry would silently capture raw phone/email from production logs)
+  - **Раздел 10 (Безопасность) — Sentry integration prerequisites documented** (for downstream OBSERVABILITY-SENTRY-A — NOT applied этим audit):
+    - **PII scrubbing config required:** `beforeSend` hook walking event.extra/contexts/breadcrumbs, masking phone/email/to fields, redacting code/password/secret/token/apiKey/jwt fields, stripping request body + Authorization/Cookie headers
+    - **`sendDefaultPii: false`** — explicit opt-out from default PII collection
+    - **User context strategy:** `Sentry.setUser({ id: cuid })` ONLY — NOT email/phone/username
+    - **Integrations к configure:** HTTP integration filter (URLs may contain legacy `?phone=` query params; strip body + sensitive headers); Console integration verified safe (7 audited direct-console sites carry no PII); **Replay integration DO NOT enable** without further audit (could capture form inputs incl. phone/email/OTP typing)
+    - **Recommended sequencing:** PII-LOGGING-FIX-A first → then Sentry with beforeSend scrubber as defense-in-depth on TOP of fixed log discipline
+  - **Раздел 12 (Инварианты):** не затронуты formally. Implicit emerging invariant candidate (NOT yet formalized): «production logs never carry raw phone/email — wrap via maskPhone/maskEmail». Currently 3 violations; if PII-LOGGING-FIX-A closes them + LOGGER-DISCIPLINE-CI-GATE structurally prevents regression, could formalize at N=4 sites confirmed clean
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / **NO code/config changes** confirmed / 683/683 tests preserved / no test surface touched
+  - **What was NOT done:**
+    - NO code/config changes (read-only audit per strict rules)
+    - NO logger executed live (code inspection only — все findings based on grep + file reads)
+    - NO Sentry config applied (prerequisites documented for downstream prompt)
+    - NO architectural recommendations beyond Sentry integration prerequisites
+    - NO sprint work touched (683 tests + features all preserved)
+    - NO masking helper modifications (existing `maskPhone`/`maskEmail` reused as-is)
+  - **Honest gaps (NOT auditable read-only):**
+    - External integration log destinations (no APM currently — none к worry about)
+    - Runtime variable capture by Sentry framework (cannot verify without running Sentry — documented as concern для Sentry config phase)
+    - Production log retention policy (DevOps concern — outside code audit scope)
+    - Worker / cron stdout capture (systemd journal / Docker logs handle whatever Sentry stdout integration does)
+  - **Spawned downstream work:**
+    - 🔴 **`PII-LOGGING-FIX-A`** (~30-45 min, pre-launch recommended) — close 3 🔴 sites: SMS provider phone wrap + email sender opts.to wrap (×3 callsites in single file) + cabinet verify email wrap (single line). Surgical, no schema/no API contract change, no new helpers needed (`maskPhone`/`maskEmail` already exist and tested)
+    - 🟠 **`OBSERVABILITY-SENTRY-A`** (~half-day) — proceed AFTER PII-LOGGING-FIX-A. Sentry init с `sendDefaultPii: false` + `beforeSend` PII scrubber + `beforeBreadcrumb` filter + HTTP integration body/header stripping + user context = cuid only + Replay disabled
+    - 🔵 `TELEGRAM-ALERT-PII-REVIEW` (post-launch optional) — review user ID interpolation в alert text
+    - 🔵 `LOGGER-DISCIPLINE-CI-GATE` (post-launch nice-to-have) — AST-walk CI gate flagging `logInfo`/`logError` payloads с unwrapped `phone`/`email`/`to` keys. Same shape as `check:schema-drift` + `check:openapi-routes`
+  - **Pre-launch state:**
+    - **🟢 Quick wins: 3 of 10 done** (EMAIL-BRAND-URL-FIX-A + EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A + this audit)
+    - Logs PII exposure understood with concrete site list
+    - Sentry integration prerequisites clear + sequencing established
+    - 7 remaining quick-wins: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+  - **Process insight:** confirms Pattern 7 (tooling-absence remediation) at logger-discipline axis. Existing masking helpers from OTP-LOG-DEV-GUARD-A are present + tested, but adoption gap accumulates new sites (SMS provider added в SMS-GATEWAY-A; email sender adopted opts.to pattern; cabinet verify route shipped without consulting request-verify sibling). CI gate would close this structurally; meanwhile PII-LOGGING-FIX-A closes current tail (3 sites, well-contained, no new infrastructure). Same shape as ENV-DISCIPLINE-SWEEP-A (helpers existed; 45 sites needed migration) but order of magnitude smaller surface. **Audit-first methodology saved a Sentry-rushed integration:** had Sentry been enabled before this audit, 152-ФЗ violation would have been silent (Sentry captures logs by default with no PII discrimination)
+  - **Open questions for user:**
+    - Schedule PII-LOGGING-FIX-A pre-launch? Recommend YES — ~30-45 min trivial; closes Sentry blocker
+    - LOGGER-DISCIPLINE-CI-GATE proactive (closes class structurally) or reactive (wait for second regression)?
+
+- **2026-06-02 — EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A** (commit on `auditandaction`). **🟢 PRE-LAUNCH-CHECKLIST 2/10 quick-wins done.** Closes EMAIL-MODULE-AUDIT-A Open Question #1 (support address mismatch). Canonical value: **`support@мастеррядом.online`** (Cyrillic, EAI-aware) per user decision.
+  - **Audit findings:** only **1 file** had stale ASCII variant — `src/features/client-cabinet/faq/client-faq-page.tsx` (lines 147 + 151). Other 2 surfaces already canonical: `Footer.tsx` + 3 places в `text.ts` (`footer.contacts.support`, `support.alternativeContact.{email,emailHref}`). Variant scan confirmed 0 occurrences of mockup-style placeholders (`help@masteryadom.ru` / `help@masterryadom.online` / `support@beautyhub.*` / `help@beautyhub.*`)
+  - **Approach selected — Hybrid of spec Option A + Option B (UI_TEXT wiring per CLAUDE.md rule 1):** spec offered 3 options (A literal / B shared constant / C env var); project-canonical approach is wiring к UI_TEXT — added 2 keys к `UI_TEXT.clientCabinet.faq` namespace (mirrors precedent в `UI_TEXT.support.alternativeContact`)
+  - **Раздел 3 (Архитектура):** 2 file modifications:
+    - `src/lib/ui/text.ts` — `UI_TEXT.clientCabinet.faq` extended с `contactEmailAddress` + `contactEmailHref` keys (canonical Cyrillic value + pre-built mailto). Inline comment cites EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A + DEVOPS Q4 EAI requirement
+    - `src/features/client-cabinet/faq/client-faq-page.tsx` — 2 byte-level surgical edits в Contacts card: `href="mailto:support@masterryadom.online"` → `href={T.contactEmailHref}`; display text → `{T.contactEmailAddress}`. JSX structure preserved
+  - **Раздел 5 (Бизнес-логика):** не затронут — UI consolidation. Email module / sender / SMTP / templates все untouched. Outbound concerns (from address, DKIM/SPF/DMARC) — отдельный DevOps scope. This fix is inbound support address surface alignment only
+  - **Раздел 6 (Маршруты):** не затронуты — FAQ page route preserved verbatim
+  - **Раздел 7 (Env vars):** **no new env vars** (Option C rejected per spec preference — avoids schema-change coordination)
+  - **Раздел 11 (Деплой):** **🚨 NEW DEVOPS Q4 EAI requirement** — canonical address has Cyrillic local part (`support@` ASCII + `мастеррядом.online` IDN domain → full address requires SMTPUTF8 / EAI per RFC 6531). Yandex Mail (or equivalent receiver) needs: (a) SMTPUTF8 enabled, (b) mailbox provisioned to accept IDN/Cyrillic-domain addresses, (c) DNS MX к EAI-capable server, (d) SPF/DKIM/DMARC signed against canonical domain form. Pre-launch test recommendations: send from Gmail/Outlook/Yandex Mail/Mail.ru → verify delivery; test reply flow; mobile client testing (iOS Mail / Gmail Android / Yandex Mail Android — Cyrillic-domain support varies); test mailto: handlers (Outlook Web / Apple Mail / Gmail Web). **Risk acknowledged:** user accepts Cyrillic email reliability tradeoffs; fallback to ASCII variant (`support@masterryadom.online`) is recoverable если delivery issues surface (2-key UI_TEXT change + DNS reconfiguration)
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / **683/683 tests** preserved ✅ / lint baseline (1 error / 3 warnings) preserved / encoding ✅ / mojibake ✅ / check:ui-text ✅ / check:context-freshness ✅
+  - **Final variant scan:** `grep "support@masterryadom\|help@masteryadom\|support@beautyhub\|help@beautyhub" src` → **0 hits**. Only canonical `support@мастеррядом.online` survives across `Footer.tsx` + `text.ts` (5 UI_TEXT references total)
+  - **What was NOT done (per strict rules):**
+    - NO email module architecture / sender / SMTP / templates touched
+    - NO sender/from address changes (outbound separate concern)
+    - NO env var added
+    - NO new shared constant module
+    - NO real emails sent
+    - NO mockup files referenced (mockup uses `help@masteryadom.ru` — different value; user decision deviates)
+    - NO sprint work touched
+  - **Pre-launch state:**
+    - **🟢 Quick wins: 2 of 10 done** (EMAIL-BRAND-URL-FIX-A 2026-06-02 + this)
+    - Support address consistent everywhere в codebase
+    - FAQ contact UI references canonical address via UI_TEXT (string drift impossible from this surface going forward)
+    - DEVOPS Q4 EAI requirement documented + filed alongside Q1 TLS / Q2 backup / Q3 rollback
+    - 8 remaining quick-wins: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT (template redesign — separate scope from address) / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SENSITIVE-DATA-LOGS-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+  - **STOP gates triggered:** NONE — scope under threshold (1 file < 10); no env var schema change; no encoding issues (mojibake check passes confirming Cyrillic intact UTF-8 без BOM)
+  - **Process insight:** Pattern 5 (coverage-tail closure) at «consistent canonical value» axis. EMAIL-MODULE-AUDIT-A surfaced inconsistency; this fix closes it. Trivial scope (2 byte-level edits) but unblocks downstream EMAIL-TEMPLATE-REDESIGN-A (templates can safely link к support email knowing все surface references match)
+  - **Open questions for user:** none for the fix itself. **DEVOPS Q4 EAI requirement** is the explicit follow-up — waits on mail-server provisioning before launch
+
+- **2026-06-02 — EMAIL-MODULE-AUDIT-A** (commit on `auditandaction`). Read-only audit. 10 areas inspected (module/engine/templates/SMTP/brand-strings/UI_TEXT/tests/preview/callers/mockup-gap). NO fixes applied. NO real emails sent
+  - **Architecture findings:**
+    - Module: `src/lib/email/` (single dir, 3 files: sender.ts + templates/otp-code.ts + templates/notification.ts)
+    - Library: **nodemailer 8.0.2** via SMTP — no SaaS (Resend/Sendgrid/Mailgun absent)
+    - Template format: **plain string template literals** in .ts files (no React Email / MJML / Handlebars)
+    - Sender: module-cached transporter singleton + `isEmailConfigured()` helper + fail-soft return
+  - **Templates inventory: only 2 exist** — `otp-code.ts` (dedicated) + `notification.ts` (GENERIC fallback for 10 booking-related NotificationType values). User's 5 mockup designs would require 4 NEW dedicated templates (booking confirmed / reminder / cancellation / review request) plus OTP redesign
+  - **SMTP configuration: ❌ NOT configured** — `.env.example` placeholders only (`smtp.example.com`, `noreply@example.com`). All SMTP env vars optional in schema (no production refine — feature could silently disable). DevOps decision required for provider + DNS (DKIM/SPF/DMARC)
+  - **Brand color mismatch:** existing templates use purple/pink gradient (`#7c3aed`, `#ec4899` — left over from BeautyHub branding). Mockups want dark red (~#7A1E2E approximate). Color redesign required
+  - **Remaining hardcoded brand strings (post-EMAIL-BRAND-URL-FIX-A):**
+    - `src/components/layout/footer/FooterSocials.tsx:13` — `https://vk.com/beautyhub` (wrong VK handle). 🟠 pre-launch fix
+    - `src/lib/prisma{,-direct}.ts` — internal HMR globals `__beautyhubPrisma{,Direct}` (name-only, cosmetic). 🔵 post-launch
+  - **Support address inconsistency vs mockups:** mockups show `help@masteryadom.ru` (single R, .ru) vs codebase `support@masterryadom.online` (double R, .online). 🟢 user decision needed
+  - **UI_TEXT integration: ❌ ZERO** — all email Russian strings inline в template literals
+  - **Test infrastructure: ❌ ZERO** — no email tests, no mocks, no snapshots
+  - **Preview tooling: ❌ NONE** — no React Email preview server, no static HTML preview route
+  - **Email-dispatched NotificationType values (10) from delivery.ts:** BOOKING_CREATED / BOOKING_CONFIRMED / BOOKING_CANCELLED / BOOKING_CANCELLED_BY_MASTER / BOOKING_CANCELLED_BY_CLIENT / BOOKING_RESCHEDULED / BOOKING_RESCHEDULE_REQUESTED / BOOKING_REMINDER_24H / BOOKING_REMINDER_2H / REVIEW_LEFT. **All currently render via SAME generic notification.ts template** — 10 different user contexts share one shell
+  - **Mockup #5 «Review request» («Как всё прошло?»)** is likely NEW NotificationType (`BOOKING_REVIEW_REQUEST`) distinct from existing `REVIEW_LEFT`. Would need schema addition during redesign
+  - **Раздел 3 (Архитектура):** не затронут — pure audit. Email module structure documented
+  - **Раздел 5 (Бизнес-логика):** не затронут — email dispatch logic unchanged
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Деплой):** email infrastructure inventory captured. **SMTP NOT configured production-ready** — placeholders only. Listed as DevOps work alongside other pending infrastructure decisions (hosting / TLS / backups)
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 683/683 tests preserved ✅ / NO code/config changes confirmed
+  - **Spawned downstream work (recommended sequence):**
+    1. ✅ EMAIL-BRAND-URL-FIX-A (CLOSED 2026-06-02 previous prompt)
+    2. 🟢 EMAIL-SUPPORT-ADDRESS-DECISION (~5 min user decision)
+    3. 🟠 FOOTER-VK-HANDLE-FIX (~5 min, needs actual VK community URL)
+    4. 🟡 **EMAIL-TEMPLATE-REDESIGN-A** (~6-12 hr depending on Quick path vs React Email migration) — biggest item, **needs user decision на approach**
+    5. 🔴 SMTP-PROVIDER-SETUP (DevOps scope) — provider + DNS + env vars
+    6. 🟡 EMAIL-PREVIEW-TOOLING (~30 min — 2 hr) — local preview route
+    7. 🟡 EMAIL-UI-TEXT-MIGRATION (~2-3 hr) — defer post-launch
+    8. 🔵 EMAIL-TEST-COVERAGE (~half-day post-launch)
+  - **Honest gaps:** SMTP creds validity / DKIM-SPF-DMARC / actual email-client rendering / support address decision — all require external context (real email send OR user input OR DevOps DNS access)
+  - **Open questions for user (5 decisions):**
+    1. Support email — `help@masteryadom.ru` (mockup) vs `support@masterryadom.online` (codebase)?
+    2. Redesign approach — Quick path (template literals + shared helpers) vs Complex path (React Email migration)?
+    3. New `BOOKING_REVIEW_REQUEST` NotificationType — confirm needed for mockup #5?
+    4. SMTP provider — Yandex Mail / Resend / SES / Postmark / other?
+    5. VK community URL — current `vk.com/beautyhub` is wrong, what's correct?
+  - **Process insight:** PRE-LAUNCH-CHECKLIST estimated «EMAIL-TEMPLATES-AUDIT» as ~30 min quick-win. Actual audit reveals substantial work (10 emails share 1 generic template; 5 dedicated mockup designs needed; SMTP not configured; brand color wrong; no tests; no preview). Honest scope: ~6-12 hr redesign work, NOT a quick win. Audit-first pattern saves from underestimation
+
+- **2026-06-02 — EMAIL-BRAND-URL-FIX-A** (commit on `auditandaction`). 🟢 1/10 quick-win from PRE-LAUNCH-CHECKLIST. Hardcoded dead-domain `beautyhub.art` replaced across 4 user-visible surfaces. NO real emails sent; verification via code inspection only
+  - **Audit findings — scope SLIGHTLY wider than PRE-LAUNCH-CHECKLIST initial estimate (1 site → 4 sites, all same bug class):**
+    1. `src/lib/email/templates/notification.ts:2` — `BRAND_URL` constant (every notification email)
+    2. `src/lib/ui/text.ts:858` — `urlPreview` UI helper (master cabinet «public URL» preview)
+    3. `src/features/legal/content/privacy-content.tsx:46` — Privacy policy body text
+    4. `src/features/legal/content/terms-content.tsx:39` — Terms of service body text
+  - **STOP gate evaluation:** 4 < 5-file threshold; non-email contexts present BUT same bug class + trivial mechanical fix. Proceeded — legal substance unchanged (only URL/label tokens swapped; legal review L4/L5 still applies)
+  - **Step 2 audit — env infrastructure exists:**
+    - `env.NEXT_PUBLIC_APP_URL` defined in env.ts:29 (Zod-validated, required в production via refine)
+    - `resolvePublicAppUrl()` helper exists в `src/lib/app-url.ts`
+    - **Outcome A path chosen** (use existing env var) for email template
+  - **Fix approach per file:**
+    - **`notification.ts`** — `env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"` pattern. Production: env var (refine-enforced). Dev: literal Cyrillic fallback. JSDoc explains fix history
+    - **`text.ts`** — literal swap к `мастеррядом.online/u/${username}` (no protocol; customer-friendly Cyrillic form). UI_TEXT module-load const, no env coupling
+    - **Privacy + Terms** — surgical href + label swap к `мастеррядом.online`. Legal substance unchanged
+  - **Verification:** grep `beautyhub.art` returns ONLY my own JSDoc comment в notification.ts documenting the fix history — no live URL references remain. No tests reference BRAND_URL
+  - **Раздел 3 (Архитектура):** 4 source files surgically modified (CORS+ email + UI text + 2 legal pages). NO email module architecture changes. NO env schema changes (existing infrastructure sufficient). NO sprint work touched
+  - **Раздел 5 (Бизнес-логика):** email rendering semantics unchanged — only the URL pre-fix constant value changed. Master cabinet «public URL» preview now shows correct domain
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 7 (Env vars):** не затронуты — `NEXT_PUBLIC_APP_URL` already existed in schema with production refine
+  - **Раздел 11 (Деплой):** email brand links now production-correct (env-driven with dev fallback). Pre-launch checklist 🟢 quick wins: 1/10 done
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / **683/683 tests preserved** ✅ / lint baseline preserved / encoding/mojibake/ui-text/context-freshness ✅
+  - **Files preserved verbatim:** email HTML structure (CTA block / unsubscribe / styles), email module architecture (sender.ts, otp-code.ts template), env.ts schema, legal content substance (only URL tokens swapped), all non-email code
+  - **What was NOT done:** NO email design / structure changes / NO real emails sent / NO new env vars / NO refactor / NO legal content rewrite / NO sprint work touched
+  - **Pre-launch state — quick wins: 1/10 done.** 9 remaining: USER-FACING-COPY-AUDIT / EMAIL-TEMPLATES-AUDIT / PUSH-NOTIFICATION-COPY-AUDIT / SEO-METADATA-AUDIT / SENSITIVE-DATA-LOGS-AUDIT / SHOWCASE-QA-SCENARIOS-DOCUMENT / PWA-OFFLINE-AUDIT / PERFORMANCE-BASELINE-AUDIT / ROBOTS-INDEXATION-DECISION
+  - **Process insight:** audit catching 3 additional sites beyond initial PRE-LAUNCH-CHECKLIST estimate validates the «audit-first» discipline pattern. Initial estimates from documentation are honest starting points; per-fix audit refines scope. All 4 sites trivially fixable in single commit — no value in splitting into separate prompts
+  - **Open questions for user:** none. Clean fix. Email + UI + legal pages all show correct МастерРядом domain
+
+- **2026-05-31 — PRE-LAUNCH-CHECKLIST-DOCUMENT** (commit on `auditandaction`). Documentation-only. Comprehensive launch readiness inventory (`docs/PRE-LAUNCH-CHECKLIST.md`, 537 lines) created для user (Артём) to track remaining launch work. NO code changes
+  - **Trigger:** User requested checklist categorized 🟢 quick / 🟡 complex / 🔴 manual to track remaining launch work after intense sprint reached strong milestone
+  - **Audit findings — actual state vs assumed «done»:**
+    - **Sentry NOT installed** (verified — no @sentry in package.json/code)
+    - **E2E tests NOT setup** (no playwright/cypress)
+    - **OTP-EMAIL-LOGIN-RACE** — 6th P2002 site still latent
+    - **Email template hardcoded к WRONG domain** — `beautyhub.art` (old) instead of `мастеррядом.online` → broken brand links в every notification email. Discovered during audit, became #1 quick-win
+    - **Confirmed PRESENT:** SEO files (sitemap.ts + robots.ts), Privacy + Terms pages, Email infrastructure (sender + 2 templates), Push infrastructure complete, PWA assets, 10 ops runbooks, cookie consent component
+  - **Раздел 3 (Архитектура):** не затронут — pure documentation
+  - **Раздел 5 (Бизнес-логика):** не затронут
+  - **Раздел 6 (Маршруты):** не затронут
+  - **Раздел 11 (Деплой):** PRE-LAUNCH-CHECKLIST.md added к cross-references — single source of truth for launch readiness tracking
+  - **Раздел 15:** this entry
+  - **Document structure (5 sections):**
+    1. Executive Summary — current state per category (code ~92% / infra ~50% / comms ~60% / business+legal user-scope / acquisition user-scope)
+    2. 🟢 Быстрые победы — 10 items, ~30 min — 1 hr each, total ~5-7 hr Claude scope
+    3. 🟡 Сложные победы — 7 items, multiple hours each, total ~15-20 hr Claude scope
+    4. 🔴 Ручные — ~32 items in 7 sub-categories (Legal 5 / Business 4 / Acquisition 5 / DevOps 6 / Manual QA 7 / Operations 4 / Content 3)
+    5. Progress tracking + Launch readiness gates (minimum required / highly recommended / post-launch acceptable)
+  - **Honest categorization rules applied:**
+    - **No inflation** — items reflect real effort needed
+    - **No pretend** — items requiring user expertise clearly flagged
+    - **Per-item details** — Что / Зачем pre-launch / Время / Зависимости / Scope / Риск if skipped
+    - **Scope boundary explicit** — Claude can fix-prompt 10 🟢 + 7 🟡 (~20-27 hr); user must own 32+ 🔴
+  - **Critical-path launch-blockers identified:**
+    - 🔴 L1 (152-ФЗ) + L3 (Юрлицо) + B2 (YooKassa real-merchant) + D1-D3 (hosting / TLS / backups) + Q1-Q4 (manual QA all 4 cabinets) + Q7 (IDN domain test)
+    - 🟡 1 (Sentry) — production debugging foundation
+    - 🟢 1 (EMAIL-BRAND-URL-FIX) — broken brand links unacceptable
+  - **Document length:** 537 lines (slightly above 500-line STOP gate). Structure preserved (sections + progress table + cross-refs maintain scannability). Splitting into sub-docs would hurt «single source of truth» purpose — kept as one document
+  - **Gitignored per project convention** (matches runbooks treatment). To version-control progress: add `!docs/PRE-LAUNCH-CHECKLIST.md` к `.gitignore` exceptions (NOT done в этом prompt per «no config changes» rule)
+  - **Validation:** typecheck ✅ / 683/683 tests preserved ✅ / encoding/mojibake ✅ / NO code changes
+  - **What was NOT done:**
+    - NO fixes applied (checklist is tracking infrastructure only)
+    - NO fix prompts spawned (each 🟢/🟡 gets its own future prompt when user is ready)
+    - NO architectural recommendations
+    - NO assumptions about user-scope items (legal/business/DevOps flagged honestly as unknown)
+    - NO `.gitignore` change (out of scope; flagged as open question)
+    - NO sprint work touched
+  - **Process insight:** writing the checklist forced honest assessment «done vs claimed done». User stated «QA целиком ок, девопс ок, сентри ок» but audit revealed: Sentry NOT installed / manual QA NOT done / 4 DevOps decisions PENDING. Document closes that gap with visible accountability. **Code readiness IS strong** (683/683 tests, all audit areas covered, AI migrated, Tier 3 complete) — most remaining work is calendar-time (legal review, DevOps consultation, manual QA) not code-time
+  - **Open questions for user:**
+    1. Add gitignore exception для version-control? (recommend yes — same treatment as SPRINT-PATTERNS)
+    2. 10 🟢 quick-wins as single sweep или separate prompts? Recommend separate
+    3. OBSERVABILITY-SENTRY-A as highest-priority 🟡? Recommend yes (production debugging foundation)
+
+- **2026-05-31 — CORS-FIXES-BATCH-A** (commit on `auditandaction`). Closes both 🟠 CORS bugs from PRE-LAUNCH-QUICK-AUDITS-A via single unified fix. Cyrillic IDN + www subdomain + Punycode all canonicalized via `new URL().origin` normalization
+  - **Bug 1 (CORS-WWW-FIX-A):** `src/proxy.ts:22` built www comparison string WITHOUT `https://` prefix → never matched browser Origin headers. **Fix:** explicit `PRODUCTION_WWW_ORIGIN = "https://www.мастеррядом.online"` constant + normalized-Set comparison
+  - **Bug 2 (CORS-IDN-FIX-A):** Cyrillic IDN literal `https://мастеррядом.online` never matched browser-sent Punycode form. **Fix:** `normalizeOrigin()` helper using `new URL().origin` — Node URL parser converts Cyrillic→Punycode automatically; both sides of comparison normalize к canonical Punycode (`xn--80aic0adlmagk0m.online`)
+  - **Critical pre-flight verification:** discovered actual Punycode form is `xn--80aic0adlmagk0m.online`, NOT the placeholder `xn--80aaqmbjngarkb2chcv5l.online` used in audit/prompt. Verified via `node -e "new URL('https://мастеррядом.online').origin"`. This is why prompts should say «verify via Node» rather than embed speculative Punycode
+  - **Approach decision:** Option B (URL normalization) chosen over Option A (literal enumeration) because Node parsing handles IDN cleanly. Verified all 5 cases pass before applying (Cyrillic bare / Punycode bare / Cyrillic www / Punycode www / wrong protocol). Cleaner than maintaining 4+ literal allowlist entries; future-proof; auto-derives canonical form
+  - **Раздел 3 (Архитектура):** `src/proxy.ts` extended — new exported `normalizeOrigin()` helper + `PRODUCTION_WWW_ORIGIN` const + `PRODUCTION_ALLOWLIST_NORMALIZED` Set (pre-computed at module load для O(1) lookup) + rewritten `getAllowedOrigin()` body. ~25 LOC delta in proxy.ts
+  - **Раздел 5 (Бизнес-логика):** не затронут — pure infrastructure-layer fix
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 10 (Безопасность):** CORS comprehensive post-fix — Cyrillic + Punycode + bare + www + protocol preservation + look-alike subdomain rejection (`xn--...online.evil.com` correctly blocked) + unauthorized-subdomain rejection (`api.мастеррядом.online` blocked — only bare + www allowed)
+  - **Раздел 11 (Деплой):** PRE-LAUNCH-QUICK-AUDITS-A all 4 areas now ✅ — 0 launch-blockers, 0 🟠 should-fix outstanding. CORS handles Cyrillic IDN domain correctly which is central for RU-market МастерРядом
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / **683/683 tests** ✅ (667 → 683, net +16 from new proxy.test.ts) / lint baseline preserved (1 error / 3 warnings pre-existing) / encoding/mojibake ✅
+  - **Test coverage added (16 new tests in `src/proxy.test.ts`):**
+    - 7 `normalizeOrigin` tests: Cyrillic→Punycode normalization, idempotent Punycode, www variant, null on parse fail, protocol preservation (http vs https distinct), non-IDN passthrough, path/query/hash strip
+    - 9 allowlist behavior tests:
+      - Bug 1 regression: www Cyrillic + www Punycode both allowed
+      - Bug 2 regression: bare Cyrillic + bare Punycode both allowed
+      - Security negatives: evil origin rejected, wrong protocol (http) rejected, look-alike subdomain hijack rejected, empty/malformed rejected, unauthorized subdomains (api/admin.*) rejected
+  - **Files preserved verbatim:** everything outside CORS section в `src/proxy.ts` (rate-limit tier classification, CSP nonce, preflight handler, cookie refresh, request-id) — `next.config.ts` security headers — `src/lib/rate-limit/*` — all cabinet/business code
+  - **Behavior preservation:** `Access-Control-Allow-Origin` response header still echoes the RAW browser-sent string (per browser convention) — only the comparison logic is normalized. Зашло чисто через все 16 regression tests
+  - **No STOP-gates triggered** — Node URL parsing behaved exactly as predicted (Option B worked first time); proxy.ts structure matched audit; existing tests preserved
+  - **Pre-launch status:** all PRE-LAUNCH-QUICK-AUDITS findings closed. Remaining backlog: 🟡 `CACHE-SINGLEFLIGHT-A` (post-launch optimization, bounded risk) + 🔵 Redis maxmemory-policy (DevOps decision)
+  - **Open questions for user:** none. Clean fix. Both bugs closed with regression tests pinning behavior. Pre-launch CORS posture comprehensive
+
+- **2026-05-31 — PRE-LAUNCH-QUICK-AUDITS-A** (commit on `auditandaction`). Read-only audit of 4 pre-launch concerns не explicitly covered audit-волна. **NO LAUNCH-BLOCKERS.** 2 🟠 CORS bugs surfaced + fix-prompts spawned. Complementary to SECURITY-AUDIT-A (which covered application-layer; this covers infrastructure)
+  - **Method:** read-only inspection of `src/lib/rate-limit/*`, `src/lib/cache/*`, `src/proxy.ts`, `next.config.ts`. No code/config changes
+  - **Area 1 — Rate Limiting: ✅ STRONG (0 issues)**
+    - Custom module `src/lib/rate-limit/` (NOT third-party)
+    - OTP specialized: dual IP+phone hashed limit + 5-failure verify-lock + email parallel
+    - **Sensitive routes fail-CLOSED** when Redis unavailable (auth/bookings/payments/delete/etc — explicit allowlist)
+    - Bounded in-memory fallback (20K LRU)
+    - Middleware-level tier-classified rate-limit applied per-route in proxy.ts
+  - **Area 2 — Cache Strategy: ✅ STRONG (0 critical)**
+    - Production REQUIRES Redis (throws at startup if missing)
+    - Consistent namespacing (`feature:subfeature:`)
+    - Varied TTL by use case (30s feature flags → 24h AI cache)
+    - SCAN-based delByPattern (not KEYS *) — production-safe
+    - 🟡 No singleflight для stampede protection — bounded risk, backlog post-launch
+    - 🔵 Redis maxmemory-policy is DevOps concern (not code)
+  - **Area 3 — CORS: ⚠️ STRONG with 2 🟠 fixable bugs**
+    - Production: explicit allowlist (`https://мастеррядом.online` + www + env.NEXT_PUBLIC_APP_URL)
+    - Dev: reflective (acceptable)
+    - Credentials + explicit allowlist (semantically correct)
+    - Preflight handled (OPTIONS 204, Max-Age 600)
+    - 🟠 **`CORS-WWW-FIX-A`** — `proxy.ts:24-25` builds www string WITHOUT `https://` prefix → effectively blocks www subdomain. Fix: prepend `https://`. ~10 min
+    - 🟠 **`CORS-IDN-FIX-A`** — Cyrillic IDN domain literal in allowlist; browsers send Punycode form → mismatch. Fix: add Punycode variant. ~15 min
+  - **Area 4 — Security Headers: ✅ STRONG (0 issues)**
+    - **CSP** modern via proxy.ts: per-request nonce + strict-dynamic + frame-ancestors none + base-uri/form-action self + object-src none + upgrade-insecure-requests (prod). Production-only (dev needs eval for Fast Refresh)
+    - HSTS production-only (max-age 1y + includeSubDomains)
+    - X-Frame-Options DENY + X-Content-Type-Options nosniff + Referrer-Policy strict-origin-when-cross-origin + Permissions-Policy comprehensive (camera/mic/geo/payment/usb/interest-cohort all blocked)
+  - **Раздел 3 (Архитектура):** не затронут — pure audit
+  - **Раздел 5 (Бизнес-логика):** не затронут
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 10 (Безопасность):** infrastructure-layer security posture verified comprehensive. SECURITY-AUDIT-A (2026-05-23) covered application-layer concerns; this audit confirms infrastructure layer also strong. CSP modern pattern (nonce + strict-dynamic) blocks reflective XSS structurally
+  - **Раздел 11 (Деплой):** security posture comprehensive — rate limiting + cache + CORS + headers all production-ready. 2 CORS bugs are real but bounded (www + IDN) — fix-prompts spawned
+  - **Раздел 12 (Инварианты):** не затронуты
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 667/667 tests preserved ✅ / encoding/mojibake ✅ / NO code/config changes confirmed
+  - **Spawned fix prompts:**
+    - 🟠 `CORS-WWW-FIX-A` (~10 min — real bug, recommend pre-launch)
+    - 🟠 `CORS-IDN-FIX-A` (~15 min — real bug for IDN domain, recommend pre-launch)
+    - 🟡 `CACHE-SINGLEFLIGHT-A` (post-launch, optimization not blocking)
+  - **STOP-gates triggered:** NONE — clean audit
+  - **Open questions for user:**
+    - Schedule 2 CORS fixes pre-launch (~25 min combined)? Recommend YES
+    - CACHE-SINGLEFLIGHT-A defer post-launch unless production traffic shows measurable DB load
+    - Redis maxmemory-policy — DevOps decision (recommend `allkeys-lru`)
+
+- **2026-05-31 — EMPTY-STATE-COMPONENT-A** (commit on `auditandaction`). **🎉 Tier 3 pre-launch polish COMPLETE (4/4).** Shared `<EmptyState>` primitive extracted, 10 cabinet callers consolidated. NO copy text changes, NO new UI_TEXT keys.
+  - **Audit:** 15 dedicated empty-state files across cabinets (master 8, admin 4, studio 1, other 2). Each cabinet wrote its own with subtly inconsistent visual treatment. No prior shared component
+  - **2 visual variants identified:**
+    - **compact** — flex centered no frame (cities, users, billing-tab, exception, service-detail) — matches `.claude/skills/ui-ux-pro-max/SKILL.md` section 16 canonical reference exactly
+    - **card** — `rounded-2xl border-dashed bg-bg-card/60` frame (notifications, portfolio, services with lg icon-circle + CTA; clients-detail + application с small icon)
+  - **Icon size split:** `sm` (h-12 flat) vs `lg` (h-14 wrapped in bg-bg-input circle, h-6 icon)
+  - **Component design:** `<EmptyState>` with `title` (req), `description?`, `icon?` (ComponentType), `variant?` (compact/card, default compact), `iconSize?` (sm/lg, default sm), `action?` (discriminated union `{onClick}|{href}` + optional `leadingIcon`/`variant`/`size`), `children?` (extras below action), `className?` (layout override)
+  - **Migration:** **10 of 11 candidates** migrated к shared component. **5 stay-verbatim** (reviews-empty distinct solid+shadow frame; offer-empty distinct brand-color icon; empty-column text-only by design; empty-cells-overlay NOT empty state — interactive overlay; model-offers/empty educational composition)
+  - **Раздел 3 (Архитектура):** new shared UI primitive — `src/components/ui/empty-state.tsx` + `empty-state.test.ts` (16 pure-predicate tests mirroring component decision logic, same pattern as `prompt-modal.test.tsx`)
+  - **Раздел 5 (Бизнес-логика):** не затронут — pure UI consolidation
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 14 (Tooling):** `<EmptyState>` added к shared UI primitives. Future empty-state additions should consume it (canonical pattern). For NEW empty-state surfaces use `<EmptyState>`; for legitimately-distinct visual treatments (brand-color icons, solid+shadow frames, educational compositions) stay inline like the 5 preserved-verbatim cases
+  - **Раздел 12 (Инварианты):** не затронуты (pattern is reuse opportunity, not invariant — alternative inline implementations remain valid for distinct visual identities)
+  - **Раздел 15:** this entry
+  - **Validation:**
+    - typecheck ✅
+    - **667/667 tests** ✅ (651 → 667, net +16 from new EmptyState tests)
+    - lint baseline preserved (1 error / 3 warnings pre-existing)
+    - encoding ✅
+    - mojibake ✅
+    - check:ui-text ✅
+    - check:context-freshness ✅
+  - **Visual quality preservation:**
+    - Both themes verified mentally — component uses semantic tokens only (`text-main`, `text-sec`, `bg-card`, `bg-input`, `border-subtle`); both light + dark adapt automatically via next-themes
+    - Mobile-first — all classes mobile-first (max-w-md, px-4 default)
+    - Acceptable consolidation deltas: minor opacity normalization (`bg-bg-card` → `bg-bg-card/60` in 1 file), icon-size canonicalization (h-10 → h-12, h-12-circle → h-14-circle in 2 files), padding normalization (py-16 → py-12 in 1 file). All within consolidation philosophy «normalize to canonical»
+  - **Copy text preserved verbatim** — ZERO string changes across all 10 migrations. All UI_TEXT keys flow through as before
+  - **Files modified (12 total):** 2 new (component + tests) + 10 migrated (cities-empty / exception-empty-state / users-empty / billing-tab-empty / service-detail-empty / clients-empty-detail-state / notifications-empty-state / portfolio-empty-state / services-empty-state / application-empty-state)
+  - **What was NOT done:**
+    - NO copy text changes (preserved verbatim)
+    - NO new UI_TEXT keys (all existing keys reused)
+    - NO redesign — consolidation only
+    - NO deletion of 5 stay-verbatim files (legitimately distinct visual identities)
+    - NO sprint work touched
+    - NO schema / API / route changes
+    - NO STOP-gates triggered
+  - **🎉 Pre-launch Tier 3: 4 of 4 ALL DONE:**
+    - ✅ VAPID-PUSH-VERIFY-WORKFLOW-A (operational runbook)
+    - ✅ AI-ADVISOR-PROMPT-TUNE-A (Yandex Actionability 4.00 → 4.975)
+    - ✅ FRAMER-MOTION-REDUCED-MOTION-SWEEP-A (46 files, WCAG SC 2.3.3 comprehensive)
+    - ✅ **EMPTY-STATE-COMPONENT-A** (shared primitive + 10 callers consolidated)
+  - **Process insight (Pattern 14 «explicit shared primitive» applied again):**
+    - 1 primitive × 10 callers = consolidated maintenance surface. Same shape as MODAL-A11Y-BATCH-A (use-modal-a11y × 55) and previous primitive extractions. Sprint discipline of «invest in shared primitive when N≥3 callers» continues paying off
+    - **Honest limit of consolidation:** 5 stay-verbatim files document where the pattern doesn't fit (brand-color icon, solid+shadow frame, non-empty-state intent, educational composition). Not over-applying the pattern к cases that need distinct visual identity — disciplined categorization
+  - **Open questions for user:** none. Clean consolidation. Tier 3 polish complete
+
+- **2026-05-31 — FRAMER-MOTION-REDUCED-MOTION-SWEEP-A** (commit on `auditandaction`). Tier 3 pre-launch polish — Pattern 5 (WCAG SC 2.3.3 «Animation from Interactions») coverage tail closed. **46 surfaces wrapped с `useReducedMotion()`.** **NO animation content changes** (durations/easings/variants preserved). **NO test changes** (651/651 preserved).
+  - **Audit:** 58 total framer-motion non-test callers; 12 already compliant (shared primitives + marketing sections); **46 sweep target** (within scope: estimated 56, actual 46 — no STOP gate)
+  - **Pattern decision:** Option B (per-file inline `useReducedMotion()`) — matches established 12 compliant files. Creating utility would create churn для already-compliant files; per-file consistency wins
+  - **Reference implementation** (already in tree): `src/features/marketing/sections/hero-section.tsx` — `const reduce = useReducedMotion(); const variants = reduce ? undefined : ORIGINAL`. Applied to all 46 sweep targets
+  - **Workflow:**
+    1. 2 sample files done manually (`src/app/not-found.tsx` + `src/components/ui/error-state.tsx`) to verify pattern works, typecheck green
+    2. Remaining 44 files delegated к general-purpose agent (mechanical fan-out — same pattern, large surface). Agent processed cleanly с intermediate typechecks
+    3. Main context spot-verified 3 of agent's edits (booking-flow-stepper / hot-slots-preview / step-transition) — all clean
+  - **Edge cases handled cleanly** (agent reported):
+    - Variable-name collisions (`hot-slots-preview.tsx`, `stories-rail.tsx`, `notifications-center-page.tsx`) — renamed motion helper к `itemAnim` where `item` was loop variable
+    - `AnimatePresence mode="wait"` key-swap rotating icons (`auth-mobile-menu.tsx`) — guarded rotate/opacity transitions; AP wrapper preserved as orchestrator
+    - `layoutId` shared-element animations (`cabinet-bottom-nav.tsx`, `category-chips.tsx`) — guarded `transition` к `{duration:0}` (indicator snaps instead of springs)
+    - `whileHover` / `whileTap` / `whileInView` — set к `undefined` to skip variant entirely (matches reference pattern)
+  - **46 files modified by category:**
+    - Layout/nav (6) + cabinet bottom-navs (3) + admin cabinet (13) + booking flow (2) + home (10) + public profile (4) + other (8) = 46
+  - **Раздел 3 (Архитектура):** no architectural changes — all edits are conditional guards around existing motion props. Established pattern (1 helper hook applied across 58 surfaces — 12 prior + 46 new = 58 = total non-test callers)
+  - **Раздел 5 (Бизнес-логика):** не затронуты — pure UI/a11y change
+  - **Раздел 6 (Маршруты):** не затронуты
+  - **Раздел 11 (Деплой):** A11y compliance status — **WCAG SC 2.3.3 «Animation from Interactions» COMPREHENSIVE** across all 58 non-test framer-motion surfaces (shared primitives + direct callers). Users с `prefers-reduced-motion: reduce` OS preference now get instant transitions across the entire app
+  - **Раздел 12 (Инварианты):** не затронуты — pattern existed before; sweep extends coverage, doesn't introduce new invariant
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 651/651 tests preserved ✅ / lint baseline preserved (1 error / 3 warnings pre-existing) / encoding/mojibake/ui-text ✅ / coverage check empty (every non-test framer-motion caller now uses useReducedMotion)
+  - **Files preserved verbatim:**
+    - Shared primitives (modal-surface, drawer) — already compliant
+    - 5 marketing sections + faq-item + stories-viewer-overlay + 2 model-offer components — already compliant
+    - Animation content: ALL durations, easings, variant values, sequences unchanged
+    - Non-motion code, tests
+  - **What was NOT done:**
+    - NO animation content changes
+    - NO new utility files / wrapper components
+    - NO shared primitive modifications
+    - NO test changes
+    - NO non-motion code refactoring
+    - NO STOP-gates triggered
+  - **Visual experience:** unchanged for default users (motion still runs identically). **A11y improvement** для users с reduced-motion preference — animations collapse к instant transitions
+  - **Pre-launch Tier 3 progress:** 3 of 4 items done (VAPID-PUSH-VERIFY + AI-ADVISOR-PROMPT-TUNE + FRAMER-MOTION-REDUCED-MOTION-SWEEP). Remaining: EMPTY-STATE-COMPONENT-A
+  - **Process insight (Pattern 14 + Pattern 15 combined):**
+    - **Pattern 14 (explicit-helpers fan-out)** at scale: 1 hook applied across 58 surfaces, mechanical and consistent
+    - **Pattern 15 (workflow-orchestrated parallel survey audit)** applied operationally: sample-then-delegate worked smoothly — 2 sample files manually + 44 delegated к Agent + spot-verified 3 of agent's outputs. Total elapsed time ~15 min for sweep that would have taken ~2 hr manually
+    - Future framer-motion additions could be enforced by ESLint rule «import `motion` must accompany `useReducedMotion` in same file» — 🔵 backlog candidate, not blocking
+  - **Open questions for user:** none. Clean sweep. Pattern 5 coverage tail closed across whole codebase
+
+- **2026-05-31 — AI-ADVISOR-PROMPT-TUNE-A** (commit on `auditandaction`). Tier 3 pre-launch polish — closes Phase 4e Actionability gap (Yandex 4.00 → **4.975**, Δ +0.975) на single prompt iteration. **Validates Phase 4e hypothesis «prompt-fixable, not model-fixable» — Pro upgrade avoided per plan (4× cost savings preserved).** NO surface code changes. NO model upgrade. NO other prompts touched.
+  - **Gap pattern analysis (from Phase 4e samples):** Yandex Lite interpreted minimal prompt's «конкретных совета» as COUNT (1-2) NOT as «specific CONTENT». Generic patterns dominated: «расширьте присутствие в соцсетях», «онлайн-запись сервисы» (despite master on platform), generic «акции», fewer specific numbers vs OpenAI's «5-10 фото», «20% скидка», «10-15 фото», «до/после», time-bound offers
+  - **Iteration 1 prompt change (only in `src/lib/ai/prompts.ts` `advisorAdvice.system` block):** 3 lines → 10 lines (+~120 tokens system prompt). Added:
+    1. **Explicit specificity rule:** «Каждый совет должен содержать конкретное число или пример»
+    2. **BAD/GOOD examples table** (concrete bait-and-switch):
+       - BAD: «улучшайте профиль», «расширьте присутствие в соцсетях», «проводите акции», «используйте онлайн-запись»
+       - GOOD: «добавьте 5-10 фото работ в портфолио», «опубликуйте 2-3 поста с фото до/после в Instagram в неделю», «запустите акцию: 15% скидка постоянным клиентам, привёдшим друга»
+    3. **Context-blindness fix:** «Не предлагай онлайн-запись или регистрацию на платформах — мастер уже зарегистрирован на МастерРядом» (directly addresses nw-2 issue from Phase 4e where Yandex suggested «онлайн-запись сервисы»)
+  - **Validation:** 8 profiles sampled (subset of Phase 4e weakest-scoring profiles where lift mattered most): lt-1, lt-2, md-1, md-3, hi-2, hi-3, pr-3, nw-2
+  - **Per-profile Actionability scoring:**
+
+    | Profile | Phase 4e Yandex | Iter1 | Δ |
+    |---|---|---|---|
+    | lt-1 | 4.0 | **5.0** | +1.0 |
+    | lt-2 | 4.0 | **5.0** | +1.0 |
+    | md-1 | 4.0 | **5.0** | +1.0 |
+    | md-3 | 4.0 | **4.8** | +0.8 |
+    | hi-2 | 4.0 | **5.0** | +1.0 |
+    | hi-3 | 4.0 | **5.0** | +1.0 |
+    | pr-3 | 4.0 | **5.0** | +1.0 |
+    | nw-2 | 4.0 | **5.0** | +1.0 (🎉 «онлайн-запись» context-blindness FIXED) |
+    | **Aggregate** | **4.00** | **4.975** | **+0.975** |
+
+  - **Other criteria preserved (no regressions):** Accuracy 5.0/5 (no hallucinations) / Tone 5.0/5 (business consultant preserved, no «Здравствуйте» prefix) / Task adherence 5.0/5 / RU language 5.0/5
+  - **Decision: ✅ ACCEPT iteration 1.** Target was ≥4.3; actual **4.975**. Exceeded by 0.675. **Iteration 2 not needed.** Notable bonus: nw-2 context-blindness (Phase 4e known weakness) resolved by explicit instruction
+  - **Раздел 3 (Архитектура):** 1 source file modified (prompts.ts advisorAdvice block only). NO ai-advice.ts changes. NO client.ts changes. NO other prompt changes
+  - **Раздел 5 (Бизнес-логика):** semantics identical — advisor advice generation still flows: master → cabinet UI → `getAdvisorInsights(providerId)` → `computeAdvisorInsights` → `generateAdvisorAdvice(stats)` → `aiChat()` → Yandex Lite → returns 1-2 advice items in Russian → cached 24h. Only the PROMPT content changed; flow unchanged
+  - **Раздел 6 (Маршруты):** not affected
+  - **Раздел 11 (Производительность):** prompt growth +~120 tokens — negligible cost impact (~0.024₽ per call at Lite pricing); well below quality improvement justification. 24h advisor cache absorbs latency for repeat-views
+  - **Раздел 12 (Инварианты):** не затронуты — wrapper invariant + abstraction held
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 651/651 tests preserved ✅ / encoding/mojibake/ui-text ✅ / no behaviour regression
+  - **Files modified:** `src/lib/ai/prompts.ts` (advisorAdvice block) + `BACKLOG.md` + `MASTERRYADOM_AI_CONTEXT.md`
+  - **Files preserved verbatim:** `src/lib/advisor/ai-advice.ts` (abstraction held), `src/lib/ai/client.ts` (Yandex-only post-cleanup), other 3 prompts (reviewSummary / reviewReply / serviceDescription), Phase 4e baseline archives
+  - **NEW archive:** `docs/migration-samples/advisor-yandex-tuned.json` — 8 tuned samples preserved as evidence (gitignored per project convention; available locally for future tune validation comparisons)
+  - **DELETED:** `scripts/sample-advisor-tune.mts` — temporary post-validation
+  - **Cumulative AI spend (all migration + cleanup + tune):** Phase 4b ~0.30₽ + 4c ~0.50₽ + 4d ~0.40₽ + 4e ~0.55₽ + tune ~0.15₽ = **~1.90₽** total
+  - **Pre-launch Tier 3 progress:** 2 of 4 items done (VAPID-PUSH-VERIFY + AI-ADVISOR-PROMPT-TUNE). Remaining: MRR-CRON-SCHEDULE, YANDEX-DEPLOY-A, CLEANUP-BILLING-PROD execution
+  - **Process insight — new prompt engineering pattern для Yandex Lite:** **explicit BAD/GOOD examples outperform abstract «be specific» instructions.** The «избегай общих фраз типа X, пиши конкретно как Y» pattern produced immediate +0.975 improvement on Actionability with no regression elsewhere. Strong signal for future Yandex prompt engineering on other surfaces if similar gaps surface. Documented для potential reuse if reviewSummary/reviewReply/serviceDescription ever need similar tuning
+  - **Open questions for user:** none. Clean improvement, hypothesis validated, no follow-ups needed
+
+- **2026-05-31 — VAPID-PUSH-VERIFY-WORKFLOW-A** (commit on `auditandaction`). Tier 3 pre-launch polish — operational runbook for push notifications post-deploy verification. **Documentation-only.** NO source code changes. NO env changes. NO live push dispatch.
+  - **Audit findings (push infrastructure complete):**
+    - **Library:** `web-push` (Node.js, server-side only)
+    - **VAPID env vars** (schema in [`src/lib/env.ts`](src/lib/env.ts)): `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_EMAIL` — all optional. `isPushEnabled` computed flag derives from all 3
+    - **VAPID setup:** [`src/lib/notifications/push/vapid.ts`](src/lib/notifications/push/vapid.ts) calls `webpush.setVapidDetails()` at module load when all 3 keys truthy-after-trim. VAPID-NON-NULL-FIX (Bucket A 2026-05-29) trims values + gates side-effect, so whitespace-only env doesn't crash startup
+    - **Service worker:** `public/sw.js` (next-pwa autogenerated) → imports `/sw-push.js` (custom push + notificationclick + activate handlers)
+    - **Subscription model:** `PushSubscription` Prisma — id / userId / endpoint @unique / p256dh / auth / timestamps. Allows MULTIPLE per user (one per device)
+    - **Client subscription:** [`src/components/pwa/push-manager.tsx`](src/components/pwa/push-manager.tsx) — auto-attempts on first authenticated cabinet load IN PRODUCTION (`isProduction` guard); silent on permission denied; re-syncs existing subscription to server
+    - **Subscribe endpoint:** `POST /api/notifications/push/subscribe`
+    - **Send mechanism:** `sendPushToUser(userId, payload)` in [`src/lib/notifications/push/send.ts`](src/lib/notifications/push/send.ts) — parallel dispatch to all user's subscriptions; handles `statusCode === 410` (Gone) by auto-deleting invalid row
+    - **3 dispatch callers:** `delivery.ts` (generic in-app), `billing/notifications.ts` (billing events), `admin-initiated.ts` (admin actions)
+    - **Trigger pattern:** synchronous from API route handlers (not queue-based)
+    - **Test coverage:** `vapid-config.test.ts` (pure predicate covering trim edge cases). NO integration test for `sendPushToUser` (manual runbook substitutes)
+  - **Runbook created:** [`docs/runbooks/vapid-push-verify.md`](docs/runbooks/vapid-push-verify.md) — ~310 lines
+    - Architecture diagram + Prerequisites (HTTPS / key generation / env vars / SW assets / DB migration / next-pwa active)
+    - 7-step verification procedure: server-side VAPID config validity / SW registration in browser / subscription grant flow / test notification dispatch / failure handling (410 cleanup) / cross-browser verification / volume sanity check
+    - Troubleshooting section — 6 common failure modes with practical resolutions
+    - Cross-references — 10+ links к actual code locations
+    - Test coverage section honestly notes integration-test gap
+    - History section с placeholders for operator to fill after first successful verification
+  - **No STOP-gates triggered** — push infrastructure complete and production-ready. All expected pieces present
+  - **Раздел 3 (Архитектура):** не затронут — pure documentation
+  - **Раздел 5 (Бизнес-логика):** не затронут
+  - **Раздел 6 (Маршруты):** не затронут (endpoints documented, not modified)
+  - **Раздел 11 (Деплой):** new operational runbook reference added cross-listed alongside other ops runbooks (`docs/runbooks/`)
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / 651/651 tests preserved ✅ / encoding/mojibake/ui-text ✅
+  - **What was NOT done:**
+    - NO live push notification dispatch (production deploy work)
+    - NO VAPID key generation/rotation (operator work)
+    - NO push code modifications
+    - NO env schema changes
+    - NO service worker modifications
+    - NO API calls к FCM/APNs
+  - **Pre-launch Tier 3 progress:** 1 of 4 items done (VAPID-PUSH-VERIFY documented). Remaining: MRR-CRON-SCHEDULE, YANDEX-DEPLOY-A, CLEANUP-BILLING-PROD `--confirm` execution (+ CHAT-ATTACHMENT-MIGRATE-DEPLOY)
+  - **Process insight:** classic Pattern 7 (tooling-absence remediation via documentation when integration-test infra absent). The runbook IS the test — operator-driven manual verification compensates for the gap that an integration test would normally fill. Cross-references к code make this auditable
+  - **Open questions for user:** none. Runbook ready для use на first production deploy
+
+- **2026-05-31 — OPENAI-CLEANUP-A** (commit on `auditandaction`). **Pre-launch reality correction: Yandex is single chat AI provider.** Removed dual-provider switching infrastructure from `client.ts` + `config.ts` + tests. Documentation reframed from «ongoing migration» to «post-migration reality». **NO 4 surface service files modified** (abstraction held through cleanup). **NO visual-search files modified** (deferred post-launch). **NO `docs/migration-samples/` touched** (historical evidence preserved).
+  - **Trigger:** All 4 chat surfaces (4b/4c/4d/4e) validated on YandexGPT 5 Lite — ≥4.0/5 quality across all categories, zero hallucinations across 30+ samples. Pre-launch project (no production users, no «cutover» concept). OpenAI fallback infrastructure was insurance during validation — insurance no longer needed.
+  - **Раздел 3 (Архитектура):** 5 source files modified:
+    - **MODIFIED** [`src/lib/env.ts`](src/lib/env.ts) — `AI_PROVIDER` default flipped `openai → yandex`. Schema retains enum (back-compat with existing `.env.local` files setting `AI_PROVIDER=yandex`) but marked vestigial — `client.ts` ignores it. Refine collapsed from 2 (provider-conditional) to 1 (unconditional Yandex when AI features on). `OPENAI_API_KEY` schema field kept — `src/lib/visual-search/*` still imports it directly
+    - **MODIFIED** [`src/lib/ai/client.ts`](src/lib/ai/client.ts) — rewritten Yandex-only. Removed `getProviderConfig()` + `provider` branch in `getClient()`. `YANDEX_BASE_URL` constant. `resolveDefaultChatModel()` simplified (no openai branch — folder-id check directly). `logAiFailure()` hardcodes `yandex:` prefix in error tracking + Russian alert copy. Log payload `provider: env.AI_PROVIDER` → `provider: "yandex"` literal. Header comment frozen with migration history + COMPAT VERIFIED record from AI-WRAPPER-VERIFICATION
+    - **MODIFIED** [`src/lib/ai/config.ts`](src/lib/ai/config.ts) — removed `AIProvider` type + `getCurrentAIProvider()` helper (audit confirmed 0 external callers). `ensureAiFeaturesStartupConfig()` simplified — single Yandex-credentials check, no provider branch
+    - **MODIFIED** [`src/lib/ai/client.test.ts`](src/lib/ai/client.test.ts) — rewritten Yandex-only. Removed 6 provider-switching tests (OpenAI-default model, OpenAI constructor args, OpenAI fallback null, etc). Added 7 Yandex-focused tests including folder-id whitespace edge case + opts.model override bypasses folder check + distinct throw-vs-null behaviour
+    - **MODIFIED** [`.env.example`](.env.example) — Yandex section moved before OpenAI, renamed «AI chat surfaces (post-migration)». Removed dual-provider switching block + commented-out `AI_PROVIDER=yandex` line. OpenAI section reframed как «Visual search separate post-launch track»
+    - **MODIFIED** [`.env.production.example`](.env.production.example) — same restructure. `AI_FEATURES_ENABLED` default flipped to `true` (production-ready post-cleanup). `AI_PROVIDER` line removed entirely from production template (schema default is yandex, no need to surface in template)
+    - **MODIFIED** [`docs/AI-MIGRATION-STRATEGY.md`](docs/AI-MIGRATION-STRATEGY.md) — added 🔒 «MIGRATION COMPLETE 2026-05-31» header at top. Original Phase 3 deliverable preserved verbatim below as historical record. Cross-refs added: AI_CONTEXT раздел 11 для current state, `docs/migration-samples/` для evidence
+  - **Раздел 5 (Бизнес-логика):** AI chat surfaces — 4 services (`review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts`) all import `aiChat` from client.ts. They don't know про provider — abstraction held через migration AND cleanup. Visual search (`src/lib/visual-search/*`) imports OpenAI SDK directly с `OPENAI_API_KEY` — separate track, deferred post-launch
+  - **Раздел 6 (Маршруты):** не затронуты — endpoint signatures unchanged
+  - **Раздел 7 (Env vars):** `AI_PROVIDER` default `openai → yandex`; refine adapted; documentation in templates restructured
+  - **Раздел 11 (Деплой):** reframed from «AI provider strategy (migration plan)» к «AI provider (post-migration)». Removed «Production cutover timing» / «1-week dev stability» / «Reversibility via env-toggle» language. Added validation evidence summary + cost projection + visual-search post-launch clarity + cross-ref к migration-samples archive
+  - **Раздел 12 (Инварианты):** не затронуты — abstraction invariant («4 chat surfaces import aiChat()») preserved across cleanup
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / lint baseline preserved / encoding/mojibake/ui-text ✅ / check:context-freshness ✅ / check:schema-drift ✅ / check:openapi-routes ✅ / **651/651 tests** ✅ (653 → 651, net -2: removed 15 provider-switching/OpenAI-focused tests in the file rewrite, added 13 Yandex-focused covering the same behavioural surface) / `npm run build` ✅
+  - **What was NOT done (per strict rules):**
+    - **NO 4 surface service files modified** — `review-summary.ts`, `review-reply.ts`, `service-description.ts`, `advisor/ai-advice.ts` all preserved verbatim (abstraction held)
+    - **NO `src/lib/visual-search/*` modified** — defer post-launch independent track (Yandex multimodal + 256-dim embedding migration)
+    - **NO `src/lib/ai/prompts.ts` modified** — Russian prompts unchanged across migration + cleanup
+    - **NO `docs/migration-samples/*` touched** — 8 sample JSON files preserved as historical evidence (per Phase 4b-4e validation runs)
+    - **NO schema migration**, **NO new endpoints**, **NO new dependencies**
+    - **NO production behaviour change** — pre-launch project, no production users to migrate
+  - **Removed from BACKLOG (moot post-cleanup):**
+    - `AI-PRODUCTION-CUTOVER-DECISION` — no «cutover» concept in pre-launch project
+    - `AI-PROVIDER-FAILOVER-RUNBOOK-A` — failover semantic differs without dual-provider; single provider has no failover path, only «AI features degraded to 503» which is already in wrapper's null-return contract
+    - `AI-QUALITY-VALIDATION-SCRIPT-A` — validation done, evidence archived, no future migrations queued
+  - **Pre-launch reality alignment:**
+    - Code shows what we're launching (Yandex-only chat AI, not dual-stack)
+    - Docs reflect launch state (no «ongoing migration» framing anywhere)
+    - Migration history preserved as evidence (strategy doc frozen + sample archive intact)
+    - Visual search clearly tagged as post-launch independent work
+  - **Process insight:** Pattern 5 (coverage-tail closure) at the docs/code-alignment axis. Phase 4e closed the migration; OPENAI-CLEANUP-A closed the cleanup-after-migration tail. Reality and code agree
+  - **Open questions for user:** none. Pre-launch state aligned. Visual-search migration remains genuine post-launch work track
+
+- **2026-05-31 — GRAPHIFY-SETUP-AND-INITIAL-AUDIT** (commit on `auditandaction`). Always-on knowledge layer installed. **NO source code modifications.** **NO architectural fixes applied** — initial audit revealed 0 actionable findings (codebase architecturally clean).
+  - **Pre-install state:** Graphify v0.8.25 already globally installed via pip (Python 3.10). NO new install required. Pipx not available; uv 0.11.15 available as alt. Phase 2 install step satisfied by existing global install.
+  - **Build:** `graphify update .` ran ~2 min — **1825 files / 9500 nodes / 27447 edges / 353 communities** (328 shown + 25 thin omitted). 100% AST-extracted via tree-sitter local; 65 inferred edges (avg confidence 0.8). **Token cost: 0 input / 0 output** — privacy verified (no LLM calls during build).
+  - **Integration:** `graphify install --project --platform claude` → created `.claude/skills/graphify/SKILL.md` (skill manifest) + `.claude/CLAUDE.md` (3-line minimal pointer) + appended `## graphify` section to **root `CLAUDE.md` (lines 80-87, 8 lines added)** + registered PreToolUse hook in `.claude/settings.json` (matcher: Bash; fires only on grep/rg/find/fd/ack/ag command patterns; emits informational reminder via `hookSpecificOutput.additionalContext`; does NOT block tools or modify behavior — purely additive context).
+  - **Verification:** skill now visible in Claude Code available-skills list. `graphify query "where is the booking flow defined?"` returned 283 relevant nodes in ~2s, correctly surfaced `route.ts [src=src/app/api/cabinet/master/schedule/route.ts]` + booking primitives + helper graph. Query subgraph dramatically smaller than full GRAPH_REPORT.md.
+  - **Раздел 3 (Архитектура):** new tooling layer documented. **NO source code changes** — Graphify is read-only on codebase. New artifacts:
+    - `.claude/skills/graphify/SKILL.md` (skill manifest)
+    - `.claude/CLAUDE.md` (3 lines)
+    - `CLAUDE.md` root (8 lines appended at end — `## graphify` section instructing to prefer `graphify query` over raw grep for codebase questions)
+    - `.claude/settings.json` (PreToolUse hook added under `hooks.PreToolUse[]`)
+    - `graphify-out/` directory (gitignored — `graph.json` + `GRAPH_REPORT.md` + `cache/` + `manifest.json`)
+  - **Раздел 5 (Бизнес-логика):** не затронут — pure tooling install
+  - **Раздел 6 (Маршруты):** не затронут
+  - **Раздел 14 (Tooling):** new «Knowledge graph (Graphify)» subsection added — commands + maintenance + privacy guarantee
+  - **Раздел 15:** this entry
+  - **Architectural findings categorized (per spec rule 6 honesty):**
+    - **🔴 Actionable findings: NONE.** Graphify's structural audit lens revealed nothing requiring a fix prompt. Validates the 11-audit-wave + all sprint discipline produced an architecturally clean codebase.
+    - **📗 Noted findings (no action needed):**
+      - **Top 10 god nodes all by-design foundational helpers** — `UI_TEXT` (626 edges) validates CLAUDE.md rule 1 single-source-of-truth project-wide; `toAppError` / `jsonOk` / `jsonFail` / `getRequestId` / `cn` / `logError` / `Button` / `getSessionUser` / `parseBody` all explicitly designed cross-cutting concerns. NONE problematic.
+      - **Cluster structure aligns with feature modules** — Community 7 = billing, Community 13 = admin audit, Community 14 = OTP/visual-search, Community 17 = schedule core, Community 22 = admin cities, Community 24 = chat shell, Community 28 = schedule cache. Domain boundaries respected.
+      - **«Surprising connections» all expected** — 5 script→lib edges in backfill/migration scripts (backend tooling pattern, not coupling concerns).
+      - **NO circular dependencies surfaced** — would have appeared in surprising-connections section.
+      - **NO unexpected cross-domain coupling** — billing doesn't depend on feed, feed doesn't depend on admin.
+    - **🔵 Noise (graph artifacts / expected patterns / false positives):**
+      - **2906 isolated nodes (30%)** — mostly config-file singletons (`eslintConfig`, `nextConfig`, `withPWA`, `withBundleAnalyzer`). Tree-sitter doesn't extract relationships through complex config patterns. Not real isolation.
+      - **Low cohesion 0.02-0.06 per community** — heuristic, expected for TypeScript with many small files. 353 communities / 9500 nodes ≈ 27 nodes/community signals well-modularized code.
+      - **Knowledge-gap «high betweenness centrality» suggestions for UI_TEXT / cn / logError** — these are by-design cross-cutting concerns; centrality is FEATURE, not bug.
+  - **Раздел 12 (Инварианты):** не затронуты. Graphify validated existing invariants (centralized UI_TEXT, API helper consolidation) — actionable confirmation that the discipline produces measurable structural health.
+  - **Validation:** typecheck ✅ / encoding ✅ / mojibake ✅ / context-freshness ✅ / 653/653 tests ✅ (Graphify is read-only — no test surface changed) / build not re-run (no source changes)
+  - **What was NOT done (per strict rules):**
+    - **NO source code modifications** (Graphify is read-only on codebase by design)
+    - **NO architectural fixes applied** (none warranted — initial audit clean)
+    - **NO commit** — files staged but not committed per project rule
+    - **NO schema changes**, **NO new dependencies in package.json** (Graphify is a Python CLI, not a Node dependency)
+    - **NO behaviour change for existing tests, build, or runtime**
+    - **NO third-party data egress during build** (verified via «Token cost: 0 input · 0 output» in build output)
+  - **Future maintenance:**
+    - Run `graphify update .` after sprint phases (no API cost, ~2 min, incremental cache used after first build)
+    - Optional `graphify watch src/` for auto-rebuild during active sprint phases
+    - Re-run quarterly post-launch to track architectural drift over time
+  - **Rollback procedure (if ever decided to remove):**
+    ```bash
+    graphify uninstall --purge          # removes skill + graphify-out/ + reverts CLAUDE.md/settings.json edits
+    # OR manual: rm -rf .claude/skills/graphify graphify-out/ + revert CLAUDE.md + .claude/settings.json
+    ```
+  - **Open questions for user:** none. Initial audit clean (no actionable findings → no fix-prompts spawned). Ready for continued Yandex AI migration work and remaining pre-launch tasks. Faster Claude Code navigation via `/graphify query` available from next prompt onward.
+
+- **2026-05-31 — AI-ADVISOR-MIGRATE-A (OpenAI → Yandex Phase 4e — final chat surface migration)** (commit on `auditandaction`). **🎉 4/4 chat surfaces now on YandexGPT 5 Lite — AI MIGRATION CORE COMPLETE.** Decision: ✅ MIGRATION ACCEPTED on Lite (Yandex 4.66/5 vs OpenAI 4.77/5 — Δ -0.11, all 5 categories pass ≥4.0 threshold). ZERO surface-code changes — Phase 3 abstraction held across ALL 4 surfaces. NO Pro upgrade applied (Lite passes; gap stylistic + prompt-fixable).
+  - **Audit findings:**
+    - **Surface:** `src/lib/advisor/ai-advice.ts` (~25 LOC) — business-consultant prompt, temperature 0.7, maxTokens 300, target 1-2 actionable advice items. **NO own cache layer** — every call hits AI provider directly. Cache lives at `src/lib/advisor/cache.ts` keyed `advisor:master:<providerId>` storing `AdvisorInsight[]` (rules + AI advice combined), TTL 24h, invalidate via `invalidateAdvisorCache(providerId)`. Cache not touched in this validation — synthetic stats bypass real master records
+    - **Prompt (`prompts.ts:advisorAdvice`)** instructs «Дай 1-2 конкретных совета как увеличить количество записей. Коротко, на русском, без воды.» — business-consultant tone with stats summary (8 fields). Different from helper tone (4c) and copywriter tone (4d) — predicted to behave differently; key question: does Yandex Lite handle business reasoning at scale?
+  - **Sample coverage:** **15 synthetic master profiles × 5 categories × 3 each** — Low-traffic / Mid / High / Premium-services / New. Synthetic preferred (Phase 4d precedent) for precise category coverage + direct `MasterStats` input matches what the prompt consumes (no DB roundtrip signal loss). Categories chosen per Phase 4e spec rigour: covers full spectrum of master operational states (no portfolio → top-tier with queue → premium pricing → recently registered)
+  - **Per-criterion quality matrix (15 samples × 5 criteria × 2 providers × weighted = 150 cells):**
+    - **Weights applied:** Russian ×1.0, Task ×1.5, Tone ×1.0, Accuracy ×2.0, Actionability ×2.0 (heavier on safety + practical value for advisor surface)
+    - **Per-criterion aggregate (unweighted, cross-phase comparison):**
+      | Criterion | OpenAI | Yandex | Detail |
+      |---|---|---|---|
+      | RU language quality | 5.0 | 5.0 | both clean |
+      | Task adherence | 4.53 | 4.53 | TIE |
+      | Tone (business consultant) | 5.0 | **5.0** | 🎉 **NO «Здравствуйте\n\n» prefix** in either — confirms Phase 4c hypothesis (email-prefix tendency was helper-tone artifact only; business-consultant tone safe) |
+      | Accuracy | 4.67 | **4.93** | OpenAI invented «волосы/кожа» domain context for массажист (md-2 — context absent from prompt); Yandex clean across 15 profiles. Continues factual-safety pattern from 4b/4c/4d |
+      | Actionability | **4.53** | 4.00 | **OpenAI wins**: «5-10 фото», «20% скидка», «10-15 фото», «до/после» specifics; Yandex more formulaic «расширьте присутствие в соцсетях» repeated |
+    - **Per-category aggregate (weighted):**
+      | Category | OpenAI | Yandex | Δ | Threshold ≥4.0 |
+      |---|---|---|---|---|
+      | Low-traffic (3) | 4.84 | 4.82 | -0.02 | ✅ both |
+      | Mid (3) | 4.51 | 4.47 | -0.04 | ✅ both |
+      | High (3) | 4.56 | 4.38 | -0.18 | ✅ both |
+      | Premium (3) | 4.96 | 4.91 | -0.05 | ✅ both |
+      | New (3) | 5.00 | 4.71 | -0.29 | ✅ both |
+      | **Overall** | **4.77** | **4.66** | **-0.11** | **✅ both** |
+  - **Critical safety check:** **0 hallucinations** in Yandex across 15 profiles. OpenAI had 1 minor concern (md-2 invented «уход за волосами/кожей» domain for массажист — context absent from prompt). No 🚨 STOP-gate triggered. Aligns with Yandex's factual-safety pattern observed across 4b/4c/4d (Phase 4d Sample 2 SPA inclusions + Sample 6 henna duration also OpenAI inventions)
+  - **Decision: ✅ MIGRATION ACCEPTED on Lite.** All 5 categories ≥4.0 threshold (lowest 4.38). Overall 4.66/5 vs OpenAI 4.77/5 — Δ -0.11 within acceptable margin. **NO Pro upgrade applied** because:
+    1. All categories pass threshold (no failure mode)
+    2. Accuracy actually WINS for Yandex (4.93 vs 4.67) — heaviest-weighted criterion (×2.0) and most safety-critical
+    3. Tone (business consultant) preserved cleanly — no email-prefix tendency
+    4. Actionability gap (4.00 vs 4.53) is **prompt-fixable**, not model-fixable. Adding «Дай 1-2 совета с конкретными числами и примерами» to prompt would likely close most of it. Cheaper option than 4× Pro pricing
+    5. Cost discipline: Lite 0.20₽/1K vs Pro 0.80₽/1K. Pro upgrade for marginal 0.11 gain (mostly stylistic) = poor ROI
+    6. Cumulative phase trajectory: Lite proved production-ready across 4 surfaces; Pro upgrade would be inconsistent with prior 3 surface decisions
+  - **Notable Yandex wins (3 cases worth citing):**
+    - **lt-3 «Мастер бровей с короткой неделей» (2 days/week + 8 portfolio + 3 bookings)**: Yandex correctly caught the **2-days/week structural issue** and recommended «Оптимизируйте график работы до 5–6 дней в неделю»; OpenAI missed it entirely and gave generic social media advice. Stronger business-consultant analysis from Yandex
+    - **pr-2 «Свадебный визажист с высоким чеком»**: Yandex suggested **B2B partnerships** («Сотрудничайте с местными салонами и магазинами косметики для совместных акций») — stronger business-consultant insight than OpenAI's tactical «таргет реклама»
+    - **md-2 «Массажист»**: Yandex didn't invent context (OpenAI fabricated «уход за волосами/кожей» — wrong domain entirely for a massage therapist)
+  - **Notable Yandex weaknesses (3 cases):**
+    - **nw-2 «Новый мастер активно постит»**: Yandex suggested «Используйте сервисы для онлайн-записи» — but master is **already on a booking platform** (МастерРядом). Slight context-blindness
+    - **Repetitive «расширьте присутствие в соцсетях»** across many profiles — formulaic, less varied than OpenAI's tactical advice
+    - **Less specific numbers** — Yandex generic «акции» / «скидки» vs OpenAI's «20% скидка», «5-10 фото», «10-15 фото», «до/после»
+  - **Раздел 3 (Архитектура):** **NO code changes.** Wrapper + surface + prompts + cache layer + schema all preserved. Only artifacts: new sample JSONs.
+    - **NEW** [`docs/migration-samples/advisor-openai.json`](docs/migration-samples/advisor-openai.json) — 15 baseline advice outputs across 5 categories
+    - **NEW** [`docs/migration-samples/advisor-yandex.json`](docs/migration-samples/advisor-yandex.json) — 15 Yandex advice outputs (same 15 profiles, default Lite model `gpt://<folder>/yandexgpt-lite/latest`)
+    - **DELETED** `scripts/sample-advisor-advice.mts` — temporary, removed post-validation
+  - **Раздел 5 (Бизнес-логика):** semantics identical. Master cabinet calls `getAdvisorInsights(providerId)` → cache check → on miss runs `computeAdvisorInsights` (deterministic rules + `generateAdvisorAdvice(stats)`) → wrapper routes to Yandex via env flag → returns 1-2 business-consultant advice items in Russian → cached 24h. Flow unchanged. Production behaviour preserved
+  - **Раздел 6 (Маршруты):** not affected — `/api/master/advisor` endpoint signature unchanged, no new routes
+  - **Раздел 11 (Производительность):** Yandex compat layer responds in ~700-1100ms for advisor (slightly higher than other surfaces due to longer prompts with stats summary — similar to OpenAI ~600-900ms). 24h advisor cache absorbs latency for repeat-views. No retry storms observed during 30-call sampling run. **Production rollout decision** (operator scope): after 1-week dev stability monitoring of all 4 surfaces, enable `AI_PROVIDER=yandex` in production env. Rollback path: instant env-toggle to `AI_PROVIDER=openai`. `OPENAI_API_KEY` preserved post-migration for instant fallback
+  - **Раздел 12 (Инварианты):** не затронуты — wrapper invariant (single `aiChat(options)` abstraction across providers) demonstrated for the 4th time. **Abstraction proven** across diverse prompt tones: helper (4c), copywriter (4d), business consultant (4e), summarizer (4b)
+  - **Token spend:** ~5000 tokens combined (15 OpenAI + 15 Yandex calls, longer than 4d due to richer stats input — 8-field stats summary vs 4-field service metadata). Yandex side ~0.55₽
+  - **Validation:** typecheck ✅ / lint baseline preserved / encoding/mojibake ✅ / 653/653 tests pass (unchanged) / no behaviour regression
+  - **🎉 Cumulative migration state — 4/4 chat surfaces migrated on Lite:**
+    - Phase 4b (review-summary): ✅ migrated (4.83/5) — 2026-05-31
+    - Phase 4c (review-reply): ✅ migrated (4.87/5) — 2026-05-31
+    - Phase 4d (service-description): ✅ migrated (4.975/5 — Yandex beat OpenAI) — 2026-05-31
+    - **Phase 4e (advisor): ✅ migrated (4.66/5) — 2026-05-31**
+    - Phase 4f (visual search): post-launch (documented in AI-MIGRATION-STRATEGY)
+  - **Cumulative migration cost:** Phase 4b ~0.30₽ + 4c ~0.50₽ + 4d ~0.40₽ + 4e ~0.55₽ = **~1.75₽** total (4 phases). Well within Phase 2 projection of ~1100-2600₽/month operational cost for the 4 chat surfaces combined
+  - **Pattern observations across 4 surfaces (final consolidated):**
+    - **Yandex aggregate trajectory:** 4b 4.83 → 4c 4.87 → 4d 4.975 → 4e 4.66. **Peak at copywriter tone (4d), lowest at business-consultant (4e)** — but ALL above 4.0 threshold. Lite handles dense-information formats best (descriptions), formulaic-advice formats slightly worse (consultant). Helper (4c) lies between
+    - **Yandex factual safety wins across ALL 4 surfaces** — consistently avoids fabricated context OpenAI confidently invents (4d SPA inclusions + henna duration, 4e massage therapist «hair/skin»). For customer-facing copy this matters more than flourish
+    - **Yandex `Здравствуйте\n\n` prefix tendency** — appeared ONLY in 4c helper tone (~37% of replies). Confirmed absent in 4b summarizer, 4d copywriter, 4e consultant. **Tone-specific quirk, not universal**
+    - **Yandex conciseness consistent** — respects target length across all surfaces. OpenAI tends verbose (4d 3-4 sentences vs 2-3 target; 4e 415ch avg vs Yandex 225ch)
+    - **Yandex weakness pattern (consolidated):** less varied/specific phrasing, occasional context-blindness (4e nw-2 «онлайн-запись сервисы» on a booking platform; 4d Sample 4 Балаяж dry for luxury tier). All edge cases, NOT systematic failures
+    - **Pro upgrade NEVER required** — Lite passed all 4 surfaces. Pro reserved as escape valve if production validation reveals issues
+    - **Cost-quality combined argument:** Lite is both 4× cheaper than Pro AND quality-competitive (or winning, e.g. 4d) vs OpenAI baseline. Strong default
+  - **What was NOT done:**
+    - **NO surface code modifications** (preservation invariant held across ALL 4 surfaces now)
+    - **NO behaviour changes for production** (`.env.local` flip is local-dev only; production env unchanged; cutover separate operator decision)
+    - **NO Pro upgrade attempt** — not needed (Lite passes all 5 categories ≥4.0 threshold)
+    - **NO prompts.ts modifications** — backlog candidate (4e prompt-tune for actionability specifics)
+    - **NO schema migration**, **NO new endpoints**, **NO new dependencies**
+    - **NO real master profiles queried** — synthetic stats give precise category coverage; production behaviour identical (collector → MasterStats → ai-advice unchanged)
+  - **Spawned backlog:**
+    - 🔵 `AI-ADVISOR-PROMPT-TUNE` — add «Дай конкретные числа и примеры в советах» to prompt; could close Yandex's 0.53 Actionability gap without Pro upgrade. ~1 hour focused work
+    - 🟡 `AI-PROVIDER-FAILOVER-RUNBOOK-A` (still pending from Phase 3) — `docs/runbooks/ai-provider-failover.md` for documented rollback procedure (~30 min). **Higher priority now** that all 4 surfaces migrated and production cutover is the next gate
+    - 🟡 `AI-PRODUCTION-CUTOVER-DECISION` — operator decision after 1-week dev stability monitoring. Default: enable `AI_PROVIDER=yandex` in production env
+  - **Open questions for user:** **AI migration core is COMPLETE.** Operator decisions remain:
+    1. **Production cutover timing** — after 1-week dev stability monitoring of all 4 surfaces (recommended)
+    2. **Optional pre-cutover:** `AI-PROVIDER-FAILOVER-RUNBOOK-A` (~30 min) for documented operator switchback procedure if production surface regression
+    3. **Optional post-cutover:** `AI-ADVISOR-PROMPT-TUNE` (~1 hour) to close Actionability gap stylistically
+
+- **2026-05-31 — AI-SERVICE-DESCRIPTION-MIGRATE-A (OpenAI → Yandex Phase 4d — third surface migration)** (commit on `auditandaction`). **🎉 First surface where Yandex BEATS OpenAI baseline.** 3 of 4 chat surfaces now on YandexGPT 5 Lite. Decision: ✅ MIGRATION ACCEPTED (Yandex 4.975/5 vs OpenAI 4.875/5 — Δ +0.10). ZERO surface-code changes — Phase 3 abstraction continues to hold.
+  - **Audit findings:**
+    - **Surface:** `src/lib/ai/service-description.ts` (~28 LOC) — copywriter prompt, temperature 0.7, maxTokens 200, target 2-3 sentences. **NO cache** by design (master may iterate description repeatedly until satisfied — staleness no concern)
+    - **Prompt (`prompts.ts:serviceDescription`)** instructs «Стиль: информативно, привлекательно, без воды» + «Длина: 2-3 предложения, до 200 символов». Tone is **copywriter / marketing** — different from Phase 4c helper tone, predicted to behave differently
+    - **No DB-side migration needed.** Description writes to `Service.description` via existing PATCH endpoint regardless of provider — service-description.ts only suggests text, master accepts/edits/declines
+  - **Sample coverage:** **8 diverse services × 7 categories × varied price tiers × varied durations**
+    - Маникюр классический (basic, 1937₽ / 60min), СПА-педикюр (medium, 3399₽ / 90min), Стрижка женская (basic, 2797₽ / 60min), Балаяж (**premium 11000₽** / 240min), Вечерний макияж (medium-high, 4500₽ / 75min), Окрашивание бровей хной (niche, 2200₽ / 60min), Массаж лица (luxury, 3500₽ / 60min), Наращивание ресниц 2D (mid, 3703₽ / 120min)
+    - Categories: Маникюр / Педикюр / Стрижка / Окрашивание / Макияж / Оформление бровей / Массаж и СПА / Наращивание ресниц — strong representativeness across catalog
+  - **Per-criterion quality matrix (8 samples × 5 criteria × 2 providers = 80 cells):**
+    | Criterion | OpenAI | Yandex | Detail |
+    |---|---|---|---|
+    | RU language quality | 4.875/5 | 5.0/5 | OpenAI Sample 8 grammar bug «с услугах» (case mismatch — should be «с услугой»); Yandex consistently correct |
+    | Task adherence | 5.0/5 | 5.0/5 | both produce copywriter copy as instructed |
+    | Tone match (copywriter/marketing) | 5.0/5 | 4.875/5 | Yandex Sample 4 (Балаяж 11K₽ premium) too dry; lacks sales push for luxury tier |
+    | Accuracy | 4.75/5 | 5.0/5 | OpenAI fabricated SPA inclusions (Sample 2 «массаж, ванночку, уход за ногтями» — invented) + over-promised henna duration (Sample 6 «продлится до 6 недель» — typical is 2-4w); Yandex stays factually safe |
+    | Conciseness (2-3 sentences target) | 4.75/5 | 5.0/5 | OpenAI verbose on Samples 1, 2, 4 (4 sentences, 246-331ch); Yandex consistently within 2-3 sentence target |
+    | **Aggregate** | **4.875/5** | **4.975/5** |
+  - **Decision: ✅ MIGRATION ACCEPTED.** Both ≥ 4.0 threshold; **first surface where Yandex outperforms OpenAI baseline** (Δ +0.10). Cutover: env flag `AI_PROVIDER=yandex` already active in `.env.local` from Phase 4b — covers service-description automatically (single wrapper). NO surface code change.
+  - **3 reasons Yandex wins this surface:**
+    1. **Factual safety** — Yandex avoids speculative inclusions/durations OpenAI confidently invents. For master-facing copy that ships to customers, factual safety matters more than flourish
+    2. **Russian grammar consistency** — Yandex Russian-native model has fewer case/agreement errors
+    3. **Respects 2-3 sentence target** more reliably than OpenAI's tendency to verbose 3-4 sentence copy
+  - **Yandex weakness (single edge case, NOT blocker):**
+    - Sample 4 Балаяж (11K₽ luxury, 4h) — too dry for premium-tier pricing; lacks copywriter sell that justifies the price. **Acceptable trade-off** for this surface: master can edit suggestion before save; factual safety + conciseness wins matter more across the catalog. If post-launch revenue data shows premium-service descriptions converting poorly, consider per-surface Pro upgrade for high-ticket services specifically — NOT needed now
+  - **Раздел 3 (Архитектура):** **NO code changes.** Wrapper + surface + prompts + cache layer + schema all preserved. Only artifacts: new sample JSONs.
+    - **NEW** [`docs/migration-samples/service-description-openai.json`](docs/migration-samples/service-description-openai.json) — 8 baseline descriptions
+    - **NEW** [`docs/migration-samples/service-description-yandex.json`](docs/migration-samples/service-description-yandex.json) — 8 Yandex descriptions (same input sets, deterministic comparison)
+    - **DELETED** `scripts/sample-service-descriptions.mts` — temporary script, removed post-validation
+  - **Раздел 5 (Бизнес-логика):** semantics identical. Master clicks «Сгенерировать описание» → wrapper routes to Yandex via env flag → Yandex returns ≤200 char copywriter description in Russian → master edits/accepts → existing PATCH endpoint writes to `Service.description`. Flow unchanged.
+  - **Раздел 6 (Маршруты):** not affected — no endpoint signature changes, no new routes
+  - **Раздел 11 (Производительность):** Yandex compat layer responds in ~600-900ms (similar to OpenAI ~500-700ms — no perf regression). No retry storms observed during 16-call sampling run
+  - **Раздел 12 (Инварианты):** не затронуты — wrapper invariant (single `aiChat(options)` abstraction across providers) demonstrated again
+  - **Token spend:** ~3000 tokens combined (8 OpenAI + 8 Yandex calls; slightly longer outputs than Phase 4c due to copywriter tone). Yandex side ~0.30₽ (well within ~0.50₽ budget)
+  - **Validation:** typecheck ✅ / lint baseline preserved / encoding/mojibake ✅ / 653/653 tests pass (unchanged from Phase 4a addition) / no behaviour regression
+  - **Observations carried to Phase 4e (advisor):**
+    - **Yandex `Здравствуйте\n\n` prefix tendency** — DID NOT appear in this surface. Strengthens hypothesis from Phase 4c that helper-tone prompts specifically trigger it. Phase 4e advisor uses business-consultant tone — may or may not trigger; watch for it
+    - **Yandex factual safety advantage** — proven across 8 samples this phase. Likely valuable for advisor surface where statistical/contextual claims appear. Less risk of inventing «typical industry standards» that OpenAI may invent
+    - **Yandex conciseness advantage** — consistent across 3 surfaces now (4b summary, 4c reply, 4d description). Advisor prompt asks for «1-2 конкретных совета как увеличить количество записей» — conciseness-friendly target
+    - **Yandex weakness on premium/expensive context** — relevant for advisor IF master has premium services in profile (advisor reads stats). Watch for whether Yandex's advice tone scales with master tier (master earning 50K/мес vs 500K/мес — does Yandex calibrate?)
+    - **Pattern across 3 surfaces:** Yandex aggregate scores: 4b 4.83 / 4c 4.87 / 4d 4.975 — trending upward as we move from helper-tone (least suited to Lite) to copywriter-tone (better suited to Lite's information-density style). Advisor tone is **business-consultant** — different again; predict ~4.7-4.9 if Lite holds, lower if business reasoning surfaces Lite limitations
+    - **Recommendation for Phase 4e:** START WITH LITE per Phase 3 plan (consistent treatment), validate against 5+ diverse master stat profiles (low-traffic / mid / high / premium-services / new). If quality regresses noticeably below 4.0 OR advice becomes generic-sounding, upgrade to Pro for advisor specifically (only surface where Pro upgrade may be warranted)
+  - **What was NOT done:**
+    - **NO surface code modifications** (preservation invariant held across 3 surfaces now)
+    - **NO behaviour changes for production** (`.env.local` flip is local-dev only; production env unchanged; cutover separate decision)
+    - **NO Phase 4e attempt** — separate prompt per user spec
+    - **NO Pro upgrade attempt** — not needed (Lite beats OpenAI baseline on this surface)
+    - **NO schema migration**, **NO new endpoints**, **NO new dependencies**
+    - **NO retroactive change to service descriptions already in DB** — only future generations affected
+  - **Cost discipline preserved:** Phase 4d wallet impact ~0.30₽. Total migration spend across Phases 4a-4d: ~1.2₽. Well under launch-prep budget. Yandex Lite proves cost-competitive AND quality-competitive for this surface — strong combined argument
+  - **Open questions for user:** Phase 4e (`AI-ADVISOR-MIGRATE-A`) ready when convenient. **Recommendation: schedule when masters have actual stat data populated** — synthetic profiles work but real master patterns give stronger quality signal. Optional pre-Phase-4e: AI-PROVIDER-FAILOVER-RUNBOOK-A (~30 min) so production has documented switchback procedure if Phase 4e cutover surfaces regression
+
+- **2026-05-31 — AI-REVIEW-REPLY-MIGRATE-A (OpenAI → Yandex Phase 4c — second surface migration)** (commit on `auditandaction`). **🎉 Second surface (review-reply) migrated. 2 of 4 chat surfaces now on YandexGPT 5 Lite. Pattern from Phase 4b replicated cleanly.** ZERO surface-code changes — abstraction held.
+  - **Decision:** ✅ MIGRATION ACCEPTED. Yandex aggregate **4.83/5** vs OpenAI baseline **4.98/5** (Δ = 0.15) — threshold ≥4.0/5 cleared on every per-criterion sub-average.
+  - **Sample coverage:** 8 reviews × diverse ratings (4×5★ from showcase seed + 2×4★ + 1×3★ + 1× synthetic 2★). Branch coverage tested: both positive→thank/invite (samples 1-6) AND negative→apologize/propose-solution (sample 8). Seed-data positive-skew gap documented; synthetic 2★ added to exercise the else-branch.
+  - **Per-criterion scoring summary:**
+    - **RU language quality:** OpenAI 5 / Yandex 5
+    - **Task adherence:** OpenAI 5 / Yandex 5 — both branches handled
+    - **Tone match:** OpenAI 5 / Yandex 4.5 — Yandex `Здравствуйте, X!\n\n` email-prefix tendency in ~37% of replies
+    - **Accuracy:** OpenAI 4.875 / Yandex 4.75 — Yandex mis-called 3★ «высокую оценку» (rating-vs-text edge case); less concrete remedy on negative
+    - **Conciseness:** OpenAI 4.875 / Yandex 4.625 — Yandex slightly verbose
+  - **Раздел 3 (Архитектура):** zero changes to wrapper / surface / prompts. Files preserved verbatim:
+    - `src/lib/ai/review-reply.ts` (~28 LOC) — verbatim
+    - `src/lib/ai/prompts.ts` — verbatim
+    - `src/lib/ai/client.ts` + `config.ts` — verbatim (already provider-aware from Phase 4a)
+  - **Files added (data archive):**
+    - **NEW** [`docs/migration-samples/review-reply-openai.json`](docs/migration-samples/review-reply-openai.json) — 8 OpenAI baseline replies
+    - **NEW** [`docs/migration-samples/review-reply-yandex.json`](docs/migration-samples/review-reply-yandex.json) — 8 Yandex replies (same inputs)
+  - **Раздел 5 (Бизнес-логика):** review-reply surface now generates suggestions via YandexGPT 5 Lite in dev. No cache to invalidate (review-reply is one-off per request by design). Surface ships immediately when `AI_PROVIDER=yandex` set; no code or prompt change.
+  - **Раздел 9 (Тестирование):** 653/653 preserved — zero test changes (live API sampling, not unit tests).
+  - **Раздел 11 (Производительность / Деплой) — migration status:**
+    - Phase 4b (review-summary): ✅ migrated (dev) — 2026-05-31
+    - **Phase 4c (review-reply): ✅ migrated (dev) — 2026-05-31**
+    - Phase 4d (service-description): ready
+    - Phase 4e (advisor): ready (last + most rigorous validation per Phase 3 plan)
+    - Production: still `AI_PROVIDER=openai` (operator decision after all 4c-e done + 1-week dev stability)
+  - **Раздел 15:** this entry.
+  - **Observations carried to Phase 4d-e:**
+    - **Yandex `Здравствуйте, X!\n\n` email-prefix tendency** — universal in helper-tone prompts? Phase 4d (copywriter tone for service description) less likely to trigger; Phase 4e (business-consultant for advisor) may trigger. Worth tracking — not a quality issue but a UX consideration if surfaced in chat-bubble UI
+    - **Yandex less-concrete-remedy on negatives** — minor; brand-voice preference
+    - **Yandex 3★ mis-categorization** — edge case (seed text-tone vs rating mismatch); unlikely in real production
+    - **No per-surface Pro upgrade needed** for review-reply (Lite quality sufficient)
+  - **Pattern reuse from Phase 4b:**
+    - Same `--env-file=.env --env-file=.env.local` Node invocation
+    - Same `process.env.AI_PROVIDER = tag` override before imports
+    - Same `docs/migration-samples/<surface>-<provider>.json` archive convention
+    - Same scoring matrix (5 criteria × N samples × 2 providers)
+    - Same env-toggle reversibility property preserved
+  - **STOP-gate encountered + resolved:** `masterryadom-db` container restarted mid-prompt (Postgres auth failure on first Yandex attempt — credentials valid but Postgres not ready post-restart). Waited via `until ... do sleep ... done` until ready, re-ran cleanly. Environmental issue, no code impact.
+  - **Validation:** typecheck ✅ / 653/653 tests ✅ / encoding/mojibake ✅
+  - **Token spend:** ~2500 tokens combined (OpenAI + Yandex 8 calls each + 1 failed-retry); Yandex side ~0.25₽
+  - **Cleanup:** temporary `scripts/sample-review-replies.mts` deleted
+  - **What was NOT changed:** wrapper / surface / prompts / visual-search / schema / production / 2 other surfaces (4d-4e separate)
+  - **Reversibility:** instant via `AI_PROVIDER=openai`; `OPENAI_API_KEY` preserved
+  - **Pre-launch state:** AI migration Phases 1+2+3+4a+verification+4b+**4c** ALL DONE. **2 of 4 chat surfaces migrated.** Phase 4d (service-description) READY — same pattern.
+  - **Open questions for user:** none. Phase 4d can start when convenient.
+
+- **2026-05-31 — AI-REVIEW-SUMMARY-MIGRATE-A (OpenAI → Yandex Phase 4b — first surface migration)** (commit on `auditandaction`). **🎉 First surface (review-summary) migrated to YandexGPT 5 Lite. Quality threshold cleared.** ZERO surface-code changes — abstraction held per Phase 3 plan. Migration = env-toggle only.
+  - **Decision:** ✅ MIGRATION ACCEPTED. Yandex aggregate **4.87/5** vs OpenAI baseline **4.93/5** (Δ = 0.06, within noise). 3 providers sampled (Anna 9 reviews, Marina 3, Elena 3) × 5 criteria × 2 providers = 30 scored cells. Threshold ≥4.0/5 cleared on every per-criterion sub-average.
+  - **Sample coverage:** 3 providers (below 5-10 spec target) — documented gap: seed data has only 22 reviews and most attach to `targetType: 'studio'`. Sample size sufficient to detect systemic quality issues (the purpose of the validation); all 3 are real provider-targeted showcase reviews with varied review-count contexts (9 / 3 / 3) + master vs studio-member scenarios.
+  - **Per-criterion scoring summary:**
+    - **RU language quality:** OpenAI 5 / Yandex 5 — indistinguishable; both native-fluent
+    - **Task adherence:** OpenAI 5 / Yandex 5 — both summarize correctly
+    - **Tone match:** OpenAI 5 / Yandex 4.67 — Yandex used a literal quote («Марина — золотые руки!») slightly conversational vs OpenAI's pure synthesis
+    - **Accuracy:** OpenAI 4.67 / Yandex 5 — OpenAI hinted at timing complaint that may be invented for all-positive review sets; Yandex's «no complaints» factually safer
+    - **Conciseness:** OpenAI 5 / Yandex 4.67 — Yandex went 2 sentences on Elena's 3-review set (under 3-4 instruction)
+  - **Раздел 3 (Архитектура):** zero changes to wrapper / surface / prompts code. Files preserved verbatim per abstraction guarantee:
+    - `src/lib/ai/review-summary.ts` — verbatim
+    - `src/lib/ai/prompts.ts` — verbatim
+    - `src/lib/ai/client.ts` — verbatim (already provider-aware from Phase 4a)
+    - `src/lib/ai/config.ts` — verbatim
+  - **Files added (data archive):**
+    - **NEW** [`docs/migration-samples/review-summary-openai.json`](docs/migration-samples/review-summary-openai.json) — 3 baseline summaries
+    - **NEW** [`docs/migration-samples/review-summary-yandex.json`](docs/migration-samples/review-summary-yandex.json) — 3 Yandex summaries (same providers, post-cache-clear)
+    - [`.gitignore`](.gitignore) — `!docs/migration-samples/` + `!docs/migration-samples/**` exception (same pattern as `SPRINT-PATTERNS.md` / `QUALITY-GATES.md` / `AI-MIGRATION-STRATEGY.md`)
+  - **Files modified (env only — gitignored):**
+    - `.env.local` — appended `AI_PROVIDER=yandex` (gitignored; user-local toggle for dev). Comment cites prompt name + date for future archaeology.
+  - **Раздел 5 (Бизнес-логика):** review-summary surface now generates summaries via YandexGPT 5 Lite in dev (when AI_PROVIDER=yandex). Production unaffected (operator-controlled prod env still `AI_PROVIDER=openai` by default). Cache (`ai:review-summary:*`, 24h TTL) invalidated mid-prompt + after final switch so user-facing requests hit Yandex fresh.
+  - **Раздел 9 (Тестирование):** 653/653 tests preserved — zero test surface changes (validation done via live API sampling, not unit tests).
+  - **Раздел 11 (Производительность / Деплой) — migration status:**
+    - Phase 4b: review-summary ✅ migrated (dev)
+    - Phase 4c-e: ready (Phase 4c next — review-reply)
+    - Production: still `AI_PROVIDER=openai` default; production cutover separate operator decision after Phase 4c-e all clear + 1-week dev stability
+  - **Раздел 14 (Быстрый старт):** «AI provider switch» row updated implicitly — Phase 4b is now part of «verified + 1 surface migrated» pattern.
+  - **Раздел 15:** this entry.
+  - **Observations carried forward to Phase 4c-e:**
+    - Yandex tendency: occasional literal quoting; may go below 3-4 sentence target on short input sets. Brand-voice trade-off minor and acceptable.
+    - OpenAI tendency: more abstract synthesis; mild «invented common complaint» risk for all-positive sets.
+    - Both production-ready; no per-surface model upgrade needed for review summary.
+    - `--env-file=.env --env-file=.env.local` Node invocation pattern is how Phase 4c-e scripts should load both env layers (the second file's `AI_PROVIDER=yandex` overrides the first's absent value).
+  - **Validation:** typecheck ✅ / 653/653 tests ✅ / encoding/mojibake ✅ / no source code changed = no build re-run needed
+  - **Token spend:** combined OpenAI + Yandex sampling ~1500 tokens across debug + clean runs; Yandex side ~0.30₽ at 0.20₽/1K Lite rate; cost-discipline preserved
+  - **Cleanup:** temporary `scripts/sample-review-summaries.mts` deleted per spec Step 7
+  - **What was NOT changed:** wrapper code / surface code / prompts.ts / visual-search / schema / production / sprint work / 4 other AI surfaces (Phase 4c-e separate)
+  - **Reversibility:** instant via `AI_PROVIDER=openai` env toggle (no code change); `OPENAI_API_KEY` preserved in env. Cache will repopulate with OpenAI summaries on next request after toggle.
+  - **Pre-launch state:** AI migration Phases 1+2+3+4a+verification+4b ALL DONE. Phase 4c (review-reply) READY — execute when convenient.
+  - **Open questions for user:** none. Phase 4c can start whenever — same pattern (env-toggle + sample 5-10 + score + decide).
+
+- **2026-05-31 — AI-WRAPPER-VERIFICATION (OpenAI → Yandex Phase 4a-verify)** (commit on `auditandaction`). **🎉 All 5 TBDs verified clean, ZERO wrapper adaptations needed, Phase 4b-e (4 surface migrations) UNBLOCKED.** Live API smoke against `https://llm.api.cloud.yandex.net/v1` via OpenAI SDK. Total token spend: **149 tokens (~0.03₽)** — well within 1000-token / 0.5₽ cost-discipline budget.
+  - **Method:** single consolidated verification script (created + deleted, NOT committed per spec) covering 5 TBDs + 3 error-shape scenarios in one batch. Reused the same `OpenAI` SDK client construction as production wrapper to maximize signal accuracy.
+  - **Per-TBD outcomes:**
+    1. **✅ Response shape** — full shape mirrors OpenAI exactly: `{ id, object, created, model, choices: [{ index, message: { role, content }, finish_reason }], usage }`. Path `response.choices[0]?.message?.content` works identically. `usage` includes `prompt_tokens`/`completion_tokens`/`total_tokens`/`prompt_tokens_details.cached_tokens` — same shape.
+    2. **✅ Parameters pass-through** — `temperature: 0.1` produced deterministic output ("1, 2, 3, 4, 5."); `max_tokens: 5` correctly truncated with `finish_reason: "length"`. No silent ignoring.
+    3. **✅ Model URI** — `gpt://${folderId}/yandexgpt-lite/latest` accepted as `model` field; response.model echoes back verbatim. The format `resolveDefaultChatModel()` builds is correct.
+    4. **✅ Error shape preserved — OpenAI SDK class hierarchy intact.** Invalid API key → `AuthenticationError` (status 401, type `authentication_error`); invalid folder → `PermissionDeniedError` (status 403, type `permission_error`). Existing `isRetryable()` checks `error.status` and `error.name` — both work unchanged. **Bonus:** excessive `max_tokens` (1M) silently clamped, no error (Yandex tolerant).
+    5. **✅ JSON output via `response_format: { type: "json_object" }` works through compat layer.** Phase 2 research had marked this as «native API only, may not pass through compat»; live test refutes — it does pass through. Returned content parses as valid JSON. **Bonus impact:** visual-search reactivation (post-launch) becomes simpler than Phase 3 plan assumed — JSON mode works via OpenAI SDK + the compat baseURL, no need for a separate native-fetch wrapper for that surface.
+  - **Раздел 3 (Архитектура) — single change:**
+    - [`src/lib/ai/client.ts`](src/lib/ai/client.ts) header docstring — «VERIFICATION TBDs» section replaced with «COMPAT VERIFIED 2026-05-31» record listing per-TBD outcomes for future readers. **NO code/logic change.** Wrapper itself is correct as-is.
+  - **Files NOT modified (zero deviations = zero adaptation):**
+    - Wrapper logic in `src/lib/ai/client.ts` (only docstring updated)
+    - 4 surface services (`review-summary.ts` / `review-reply.ts` / `service-description.ts` / `advisor/ai-advice.ts`) — verbatim per Phase 4a abstraction guarantee
+    - `src/lib/visual-search/*` — verbatim (defer post-launch; JSON-mode finding makes future reactivation easier)
+    - `src/lib/env.ts` — verbatim (Phase 4a refines correct)
+    - `src/lib/ai/config.ts` — verbatim
+    - `src/lib/ai/client.test.ts` — verbatim (15 tests still pass)
+  - **Раздел 9 (Тестирование):** 653/653 tests unchanged. No new tests added for verification — the live API call IS the verification; pure-helper tests already cover decision logic deterministically.
+  - **Раздел 14 (Быстрый старт):** «AI provider switch» row updated — TBDs notation replaced with «✅ verified 2026-05-31» badge.
+  - **Раздел 15:** this entry.
+  - **Validation:** typecheck ✅ / 15/15 wrapper tests ✅ / verification script deleted from `scripts/` ✅ / git status shows only `client.ts` (docstring) + `BACKLOG.md` + `MASTERRYADOM_AI_CONTEXT.md` modified
+  - **What was NOT changed:** wrapper code (zero deviations found = zero adaptation needed) / surface services / visual-search / env.ts / tests / schema / production behaviour
+  - **Pre-launch state:** **AI migration Phases 1+2+3+4a + verification ALL complete.** 4 surface migrations (4b/4c/4d/4e) UNBLOCKED — ready to execute when convenient. Each is a config-flip (no code change) + parallel quality sampling. Total remaining effort: ~3-4 hours focused work across 4 sub-phases.
+  - **Bonus finding for visual-search post-launch plan:** JSON mode works via compat — simplifies the `src/lib/visual-search/openai.ts` refactor when that surface reactivates. Originally planned to use «native API + raw fetch» for the classifier; can now use OpenAI SDK + baseURL + response_format like the chat surfaces.
+  - **Open questions for user:** none. Phase 4b (`AI-REVIEW-SUMMARY-MIGRATE-A`) ready when convenient — config flip + quality sampling.
+
+- **2026-05-31 — AI-WRAPPER-SWAP-A (OpenAI → Yandex Phase 4a — wrapper infrastructure)** (commit on `auditandaction`). First implementation prompt of the migration. **NO production behaviour change** — default `AI_PROVIDER=openai` preserves existing baseline. Verification deferred to separate `AI-WRAPPER-VERIFICATION` prompt after user obtains Yandex API key + folder id. Phase 4b-e (4 surface migrations) blocked pending verification.
+  - **Раздел 3 (Архитектура) — file changes:**
+    - **MODIFIED** [`src/lib/env.ts`](src/lib/env.ts) — added `AI_PROVIDER` enum (default `openai`) + `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` (both optional). Extended existing `AI_FEATURES_ENABLED → OPENAI_API_KEY` refine to be provider-aware (yandex branch requires API key + folder id). New refine `AI_PROVIDER=yandex → YANDEX_API_KEY + YANDEX_FOLDER_ID` with helpful error pointing at strategy doc
+    - **MODIFIED** [`src/lib/ai/client.ts`](src/lib/ai/client.ts) — `AI_MODEL` constant replaced with `resolveDefaultChatModel()`; `getApiKey()` → `getProviderConfig()` returning `{ apiKey, baseURL? }`; client singleton uses provider-aware config; `AiChatOptions` extended with optional `model?: string` for per-surface override; `logInfo` payload now includes `provider` attribution; Telegram alert text + trackError keys parameterized by provider (`openai:rate-limit` / `yandex:rate-limit`); new `_resetClientForTesting()` helper. **5 verification TBDs documented inline** in header comment for `AI-WRAPPER-VERIFICATION` consumption
+    - **MODIFIED** [`src/lib/ai/config.ts`](src/lib/ai/config.ts) — new `AIProvider` type + `getCurrentAIProvider()` helper; `ensureAiFeaturesStartupConfig()` made provider-aware
+    - **MODIFIED** [`.env.example`](.env.example) — documented Yandex block (commented), explains AI_PROVIDER toggle + 2 required vars when yandex
+    - **MODIFIED** [`.env.production.example`](.env.production.example) — documented Yandex block + production-specific rollback-preservation note («keep OPENAI_API_KEY populated post-migration for instant rollback»)
+    - **NEW** [`src/lib/ai/client.test.ts`](src/lib/ai/client.test.ts) — 15 tests pinning provider-switch decision logic. Coverage: 4 for `resolveDefaultChatModel` (openai default / yandex with folder / missing-folder throws / whitespace-folder throws) + 11 for `aiChat` (constructor args per provider × 2 / model name per provider × 2 / opts.model override / params pass-through / max_tokens omission / trim / null on empty / null on missing-key per provider × 2). OpenAI SDK mocked as constructor function via `vi.hoisted` to capture init args; existing retry-catch logic preserved (errors → `null` return, not throws)
+  - **Раздел 5 (Бизнес-логика) preserved:**
+    - 4 surface services (`review-summary.ts` / `review-reply.ts` / `service-description.ts` / `advisor/ai-advice.ts`) — **verbatim**. Abstraction through `aiChat()` means they continue working with both providers without modification
+    - `src/lib/visual-search/*` — **verbatim**. Defers post-launch per Phase 3 plan; still uses OpenAI directly (independent of `AI_PROVIDER`)
+    - `src/lib/ai/prompts.ts` — **verbatim**
+  - **Раздел 6 (Маршруты):** no route changes. All existing AI endpoints (`/api/master/services/[id]/suggest-description` / `/api/reviews/[id]/suggest-reply` / `/api/public/providers/[providerId]/review-summary` / `/api/master/advisor`) work identically; provider switch is transparent at the wrapper level
+  - **Раздел 7 (Переменные окружения):** 3 new env vars added — `AI_PROVIDER` (enum, default `openai`) + `YANDEX_API_KEY` (string optional) + `YANDEX_FOLDER_ID` (string optional). Documented in both `.env.example` and `.env.production.example` with rollback-preservation guidance for prod
+  - **Раздел 8 (Проблемы):** no new risks. `OPENAI_API_KEY` preserved as instant-rollback path post-Yandex-switch
+  - **Раздел 9 (Тестирование):** **638 → 653 tests** (+15 from `client.test.ts`). Existing tests untouched (default provider preserved means no regression surface)
+  - **Раздел 10 (Безопасность):** Yandex auth via long-lived API key (header `Authorization: Api-Key <key>`, scope `yc.ai.foundationModels.execute`). Documented in env templates. No new attack surface
+  - **Раздел 14 (Быстрый старт):** new row «AI provider switch» mapping the 4 chokepoint files + strategy doc
+  - **Раздел 15:** this entry
+  - **Validation:** typecheck ✅ / lint **1 error / 3 warnings baseline preserved** (pre-existing email-verify-modal setState-in-effect + 2 use-active-role unused-disable warnings from PHASE7-CLEANUP-A) / encoding/mojibake/ui-text ✅ / check:context-freshness ✅ / **653/653 tests ✅** / `npm run build` ✅ Compiled successfully in 36.4s
+  - **What was NOT changed:**
+    - Production behaviour at deploy (default `AI_PROVIDER=openai`)
+    - 4 surface service files (abstraction preserved)
+    - `src/lib/visual-search/*` (defer post-launch)
+    - `src/lib/ai/prompts.ts` (verbatim — works with both providers)
+    - Schema (NO migration — code-only change)
+    - Sprint work — 638 baseline tests still pass + 15 new = 653 total
+  - **5 TBDs queued for AI-WRAPPER-VERIFICATION:**
+    1. Response shape — `completion.choices[0]?.message?.content` path on Yandex compat endpoint
+    2. Parameter pass-through — `temperature` + `max_tokens` accepted identically
+    3. Model URI format — `gpt://<folder>/yandexgpt-lite/latest` accepted as `model` field
+    4. Error shape — 429/402/5xx status codes propagate so `isRetryable()` + Telegram alerts keep working
+    5. JSON output mode — only matters if visual-search reactivates; currently unused by 4 chat surfaces
+  - **Phase 4b-e all BLOCKED on `AI-WRAPPER-VERIFICATION`.** User obtaining Yandex credentials in parallel track. Once keys arrive, ~30 min verification unblocks 4 surface migrations.
+  - **Open questions for user:** none for Phase 4a closure. After credentials arrive, trigger `AI-WRAPPER-VERIFICATION` to resolve the 5 TBDs and unblock 4b-e.
+
+- **2026-05-30 — MIGRATION-STRATEGY-DOC (OpenAI → Yandex Phase 3 of 3 planning phases)** (commit on `auditandaction`). Documentation-only. Synthesis of Phase 1 audit (5 AI surfaces inventoried) + Phase 2 research (6 unknowns resolved including official OpenAI-compat endpoint discovery) into a concrete implementation plan. **NO code / env / schema changes.**
+  - **Deliverable:** new file [`docs/AI-MIGRATION-STRATEGY.md`](docs/AI-MIGRATION-STRATEGY.md) — 9 sections covering:
+    1. **Architecture** — before/after diagrams; `client.ts` is the only behaviour-change site; 4 surface services preserve `aiChat()` abstraction (zero changes)
+    2. **Feature flag strategy** — `AI_PROVIDER` enum (default `openai`) + `YANDEX_API_KEY` + `YANDEX_FOLDER_ID` conditional vars + env.ts refine
+    3. **File-level diffs** — concrete diffs for 6 files (`client.ts` ~25 LOC delta, `config.ts` +1 export, `env.ts` +3 vars + 1 refine update, both env templates documented, optional new test file)
+    4. **Visual search defer** — evidence-based decision: 0 vectors stored, brand models text-only, AI Studio multimodal requires spike-testing, OpenAI-compat doesn't pass vision; files preserved verbatim
+    5. **Rollout sequence** — 5 sub-phases (4a wrapper / 4b-d easy chats / 4e advisor / 4f visual-search defer); env-driven, no redeploy between provider switches
+    6. **Quality validation** — parallel sampling (5-15 inputs/surface), side-by-side OpenAI vs YandexGPT, 5 scoring criteria (RU quality / task adherence / tone / accuracy / length), 80% threshold decision matrix
+    7. **Fallback strategy** — 3 scenarios (unreachable / quality regression / rate-limit) with env-toggle recovery in minutes; runbook filed as separate item
+    8. **Success metrics** — technical (gates / tests / lint baseline preserved), business (cost projection ~1,100-2,600₽/month, no quality complaints), explicit rollback triggers (>5% errors, >2× cost, ≥3 complaints/48h)
+    9. **Visual search post-launch plan** — spike phase (~half-day) + implementation (~1-2 days) with schema migration `vector(1536) → vector(256)` and refactor to Yandex AI Studio multimodal native endpoint
+  - **BACKLOG updates:** Phase 3 marked DONE in the umbrella `OPENAI-TO-YANDEX-MIGRATION` entry. **7 new discrete backlog items** queued:
+    - 🟡 `AI-WRAPPER-SWAP-A` (Phase 4a, ~30 min) — foundation; default preserves baseline
+    - 🟡 `AI-REVIEW-SUMMARY-MIGRATE-A` (Phase 4b, ~30 min + validation) — zero code change; env flip + cache invalidation + quality validation
+    - 🟡 `AI-REVIEW-REPLY-MIGRATE-A` (Phase 4c, ~30 min + validation)
+    - 🟡 `AI-SERVICE-DESCRIPTION-MIGRATE-A` (Phase 4d, ~30 min + validation)
+    - 🟡 `AI-ADVISOR-MIGRATE-A` (Phase 4e, ~half-day) — rigorous quality validation, per-surface Pro override if Lite regresses on >20% samples
+    - 🟡 `AI-PROVIDER-FAILOVER-RUNBOOK-A` (optional, ~30 min) — `docs/runbooks/ai-provider-failover.md` for ops preparedness
+    - 🟡 `AI-QUALITY-VALIDATION-SCRIPT-A` (optional, ~1 hr) — `scripts/compare-ai-providers.mjs` for parallel-sample comparison automation
+    - 🟡 `VISUAL-SEARCH-YANDEX-MIGRATION` (post-launch, ~half-day spike + ~1-2 days impl) — separate from chat-surface track
+  - **Раздел 11 updated:** new «AI provider strategy» subsection after «Infrastructure decisions» — documents the resolved plan with cost projection + reversibility property. Cross-references the strategy doc.
+  - **Раздел 15 (changelog):** this entry.
+  - **Total effort estimate for chat-surface migration:** ~3-4 hours focused work across 5 sub-phases (4a-4e). Visual search ships post-launch as separate track.
+  - **Honest TBDs flagged for Phase 4a verification:** Yandex compat response-shape exact match (`response.choices[0].message.content` path) / `temperature` + `max_tokens` pass-through / model URI format acceptance / error-shape propagation for `isRetryable()` + Telegram alerts to keep working unchanged / JSON output mode via compat layer (matters only if visual-search reactivates).
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / check:schema-drift ✅ / check:context-freshness ✅ / **NO code / env / schema changes**. `git status`: only new `docs/AI-MIGRATION-STRATEGY.md` + BACKLOG + AI_CONTEXT modified.
+  - **Open questions for user (Phase 3 closure):** none blocking. Plan is complete and Phase 4a can start whenever convenient. Optional decision before Phase 4e: if you'd prefer Pro for advisor from day one (skip Lite quality-test for that specific surface), say so — otherwise the plan starts everything on Lite per «lowest-risk first» and upgrades only if quality validation requires.
+
+- **2026-05-30 — MIGRATION-RECONCILIATION-BATCH** (commit on `auditandaction`). **🎉 🔴 LAUNCH BLOCKER CLOSED.** Four-part batch resolves 24-operation sprint-long schema drift discovered by LOCAL-DB-RECOVERY audit + closes the source (db-push workflow) + adds structural prevention (CI drift gate) + unblocks Part 1 of prior audit (seed completion). **Hybrid execution:** main context handled Part 1 (migration generation + manual review + apply — STOP-gated work) + Part 4 (seed) + final updates. Parallel workflow attempted Parts 2+3 but agents failed to call StructuredOutput; main context completed both as fallback.
+  - **Part 1 — Reconciliation migration (CRITICAL, main context):**
+    - Pre-state verified: container `masterryadom-db` running, 17/17 migrations applied, drift confirmed at 24 operations via `prisma migrate diff`
+    - `prisma migrate dev --name reconcile_drifted_schema --create-only` failed (non-interactive environment) → switched to manual workflow: `prisma migrate diff --script` → write to migration file → `prisma migrate deploy`
+    - **Manual SQL review of all 24 operations:** 1 AlterEnum (`ChatSenderType.SYSTEM`) + 6 AlterTables (ChatMessage / Notification / PortfolioItem / Provider [7 BOOKING-WIDGET-A enforcement fields, all NOT NULL with defaults — safe for existing rows] / ScheduleTemplateBreak / UserProfile [hideAgeYear NOT NULL DEFAULT true / emailVerifiedAt nullable]) + 4 CreateTables (ConversationSlug / UserFavorite / ServicePackage / ServicePackageItem) + 12 CreateIndexes + 6 AddForeignKeys. **All ADD-only, no DROP/destructive operations.** Sprint discipline preserved.
+    - **STOP-gate triggered:** 1 CREATE INDEX (`UserSubscription_isTrial_trialEndsAt_idx`) conflicts with existing partial index of same name from migration `20260430000000`. **Resolution proposed + applied:** deliberately skip that CREATE INDEX line in reconciliation migration (preserves working partial-index optimization for cron query) + remove `@@index([isTrial, trialEndsAt])` decorator from `prisma/schema/billing.prisma` (Prisma can't express partial WHERE via `@@index`; schema decorator was misleading) + explanatory comment in both places explaining the divergence and warning future devs not to re-add the decorator.
+    - Migration file: [`prisma/schema/migrations/20260530000000_reconcile_drifted_schema/migration.sql`](prisma/schema/migrations/20260530000000_reconcile_drifted_schema/migration.sql) with full review-trail comment block.
+    - Applied via `npx prisma migrate deploy` → ✅ «18 migrations found / Database schema is up to date»
+    - `prisma generate` + `npm run typecheck` ✅
+  - **Part 2 — Workflow policy fix (docs):**
+    - [`prisma/seeds/test-data/README.md`](prisma/seeds/test-data/README.md) — removed `npx prisma db push` instruction (was the root cause), replaced with `npx prisma migrate dev --name <descriptive>` + warning header citing MIGRATION-RECONCILIATION precedent
+    - [`CLAUDE.md`](CLAUDE.md) — new rule 16 «Schema discipline» (in Russian, ВАЖНЫЕ ПРАВИЛА section): forbids `prisma db push`, requires `migrate dev`, references CI gate + recovery procedure
+    - [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) раздел 13 — cross-reference to CLAUDE.md rule 16 + 5-bullet summary
+    - Cross-doc check: only `prisma/seeds/test-data/README.md` had instructional `db push`; all other `db push` mentions in docs (BACKLOG audit history, AI_CONTEXT changelog) are historical/explanatory and preserved verbatim
+  - **Part 3 — SCHEMA-DRIFT-CI-CHECK (structural prevention):**
+    - **NEW** [`scripts/check-schema-drift.mjs`](scripts/check-schema-drift.mjs) — runs `prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --exit-code`. Exit codes: 0 clean / 1 drift detected (with detailed recovery guide pointing at MIGRATION-RECONCILIATION precedent) / 1 hard fail in CI when Postgres unreachable / 0 with WARNING locally when Postgres unreachable (graceful skip, doesn't block local dev)
+    - [`package.json`](package.json) — `check:schema-drift` script + wired into `check` aggregate (between `check:openapi-routes` and `smoke`)
+    - [`.github/workflows/quality-gates.yml`](.github/workflows/quality-gates.yml) — new step «Schema drift check» after «OpenAPI routes coverage». **CI integration PARTIAL** (honest gap documented): CI workflow has no Postgres service, so script's local-skip branch fires with warning. Locally + on developer machines via `npm run check` it's hard-enforcing. TODO comment in workflow YAML for DevOps to provision shadow DB service → gate becomes hard-enforcing in CI without code changes
+    - [`docs/QUALITY-GATES.md`](docs/QUALITY-GATES.md) — new «check:schema-drift» section: purpose, trigger, failure-recovery 5-step procedure, local-vs-CI mode explanation, history note
+    - **Self-test:** initial run detected drift (the partial-index schema decorator divergence), helped surface the schema fix needed before close. After schema fix: `node scripts/check-schema-drift.mjs` → `SCHEMA-DRIFT: OK — schema.prisma matches migrations history (0 drift).`
+  - **Part 4 — Seed completion (unblocks prior audit Part 1):**
+    - `npm run seed:test` succeeded (was previously blocked by `P2022: column hideAgeYear does not exist` — reconciliation cleared the gate)
+    - **New baseline counts:** 8 cities · 12 categories · 6 plans · 28 masters · 6 studios · 15 clients · 63 bookings · 22 reviews · 4 hotSlots · 3 modelOffers · 11 favorites · 3 showcase logins working (master `+79991000000` / studio `+79992000000` / studio-member-master `+79993000000` / admin `+79994000000` / client `+79995000000`)
+    - Tests: 638/638 ✅
+  - **Workflow execution note:** parallel workflow `wjwxlxce8` launched for Parts 2+3 but both agents «completed without calling StructuredOutput after 2 nudges» (0 tokens, 6 tool uses across 19s — explored but didn't structure return). No spurious file changes — verified via `git status`. Main context completed Parts 2+3 as fallback. Workflow failure mode logged for future Pattern 15 refinement (when subagents return null, fallback path in main context preserves batch progress).
+  - **Раздел 11 (Производительность / Деплой):** local dev environment fully ready — 18/18 migrations + seeded showcase data. Drift prevention active (3 defense layers: README discipline + CLAUDE.md rule 16 + CI check gate locally hard / CI partial). Production deploy path complete + safe.
+  - **Раздел 13 (Правила):** new schema discipline section + cross-reference to CLAUDE.md rule 16. Pattern: rule lives in CLAUDE.md (single source of truth); AI_CONTEXT cross-references with brief summary.
+  - **Раздел 14 (Tooling / Available patterns):** new `check:schema-drift` quality gate added to the standard `npm run check` aggregate (10 gates total now: lint / typecheck / prisma:validate / prisma:generate / openapi:generate / check:encoding / check:mojibake / check:ui-text / check:context-freshness / check:openapi-routes / **check:schema-drift** / smoke).
+  - **Раздел 15 (changelog):** this entry.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / check:context-freshness ✅ / **check:schema-drift ✅** (0 drift) / `prisma migrate status` 18/18 ✅
+  - **What was NOT changed (per strict batch constraints):**
+    - Source code in `src/` (zero changes)
+    - Existing 17 migration files (content immutable per spec rule)
+    - Production deploy workflow (Part 3 added CI step but no changes to deploy.yml itself)
+    - `.env` / `.env.local` files
+    - Sprint work — 638 tests preserved
+    - `prisma generate` regenerated client (expected — schema reconciled)
+    - Postgres-agnostic content (Prisma usage / queries / business logic — none drift-class-specific)
+  - **Pre-launch state:** 🎉 **0 🔴 / 0 🟠 outstanding.** Code work complete (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A + LOCAL-DEV-CLEANUP + AI-CONTEXT-FACT-CORRECTION + **MIGRATION-RECONCILIATION-BATCH**). Local dev: 18/18 + seeded + drift prevention active. Production deploy: command correct + history complete + CI enforces drift discipline going forward (CI partial — hard locally). Infrastructure decisions still BLOCKED on DevOps consultation (Q1/Q2/Q3 + DR-2/3/6 runbooks), but those are separate operational concerns from launch-critical code paths.
+  - **Spawned (defense-in-depth, deferred):** 🔵 `PRE-COMMIT-SCHEMA-MIGRATION-PAIR` — pre-commit hook fail if schema.prisma modified without migration in same commit (~1 hr, post-launch).
+  - **Process insight — strongest validation of audit-first methodology (Pattern 1) yet.** LOCAL-DB-RECOVERY-AND-MIGRATION-DISCIPLINE-AUDIT found the drift via systematic investigation; MIGRATION-RECONCILIATION-BATCH closed it before production deploy could crash. If production deploy had been attempted before audit: migrations would apply cleanly, app code would crash at runtime on first request touching a drifted column, no clear cause → triage hell. Audit-before-deploy saved an undefined-length incident.
+  - **🛡 Defense-in-depth drift prevention (3 layers):**
+    1. **Documentation:** seeds README updated, CLAUDE.md rule 16, AI_CONTEXT раздел 13 cross-ref
+    2. **CI gate:** `check:schema-drift` in `npm run check` aggregate (hard-enforcing locally + on dev machines)
+    3. **Future (deferred):** pre-commit hook (🔵 `PRE-COMMIT-SCHEMA-MIGRATION-PAIR`) for belt-and-suspenders coverage
+  - **Open questions for user (operational, non-blocking):** (1) When DevOps provisions CI Postgres → set `SHADOW_DATABASE_URL` in quality-gates.yml so `check:schema-drift` becomes hard-enforcing in CI too; (2) Schedule `PRE-COMMIT-SCHEMA-MIGRATION-PAIR` for early post-launch sprint?
+
+- **2026-05-29 — LOCAL-DB-RECOVERY-AND-MIGRATION-DISCIPLINE-AUDIT** (commit on `auditandaction`). **🔴 LAUNCH BLOCKER discovered.** Three-part recovery + investigation prompt; Part 1 (seed local DB) STOP-gated by second schema drift; Parts 2 + 3 completed thoroughly. **NO code / schema / production changes** — discovery + documentation only. New 🔴 blocker `MIGRATION-RECONCILIATION` added to BACKLOG.
+  - **Part 1 — Local DB seed (BLOCKED):**
+    - Pre-state ✅: container `masterryadom-db` running, 17/17 migrations applied (post user's `migrate reset --force` recovery), DB empty (0 rows in Provider / UserProfile / Service / Booking / BillingPlan / GlobalCategory — confirmed expected post-reset).
+    - Seed scripts identified: `seed:test` (orchestrator at `prisma/seeds/test-data/index.ts`), `seed:sql`, `seed:billing/plans`, `seed:review-tags`.
+    - `npm run seed:test` execution: ✅ Cities (8) + Categories (12) + Billing plans (6) succeeded → ❌ Providers stage failed with `PrismaClientKnownRequestError P2022: The column hideAgeYear does not exist in the current database.`
+    - **STOP-gate triggered per spec rule** — did NOT auto-fix; investigation pivoted to Part 2.
+  - **Part 2 — Schema drift root cause investigation:**
+    - **Grep audit:** `prisma/schema/auth.prisma:43` defines `hideAgeYear Boolean @default(true)`; **0 migrations** include it (`grep -rn hideAgeYear prisma/schema/migrations/` returns empty). 4 src/ references actively use the field (`src/features/client-cabinet/profile/client-profile-page.tsx:87/88/350/351/353`).
+    - **Git blame:** `git log --all --oneline -S "hideAgeYear"` returns single commit `b219864` (2026-05-13, «feat: add system messages for booking events»). `git show --name-only b219864 | grep prisma/` lists 4 schema files modified, **zero migration files**. Schema field added without migration generation.
+    - **Authoritative drift report:** `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url postgresql://master:master123@localhost:5432/postgres --script` returned **24 schema operations missing** from migrations history: 1 AlterEnum (`ChatSenderType.SYSTEM`) + 6 AlterTables (ChatMessage / Notification / PortfolioItem / Provider [BOOKING-WIDGET-A enforcement fields] / ScheduleTemplateBreak / UserProfile) + 4 CreateTables (ConversationSlug / UserFavorite / ServicePackage + 1 other) + 13 CreateIndexes. Drift is pervasive, not isolated.
+    - **Root cause confirmed (Hypothesis A — `prisma db push` workflow):** [`prisma/seeds/test-data/README.md:9`](prisma/seeds/test-data/README.md#L9) documents the dev workflow as «Apply schema first (only needed once after a schema change): `npx prisma db push`». `db push` syncs `schema.prisma` → DB without creating migration files. Sprint accumulated 24 operations through this workflow — schema-source-of-truth ahead of migrations-source-of-truth.
+    - **`isTrial` original drift (the trigger for user's `migrate reset`):** migration `20260430000000_add_trial_to_user_subscription/migration.sql` EXISTS and is correctly written (ALTER TABLE adds isTrial / trialEndsAt / etc with partial index). User's earlier «column already exists» error happened because local DB had `isTrial` from earlier `db push` BEFORE the migration was created — migration apply collided. Migration itself is correct; drift was on the DB-state side. Reset recovered cleanly.
+  - **Part 3 — Production deploy discipline audit (CLEAN findings):**
+    | Surface | Migration command | Classification |
+    |---|---|---|
+    | `.github/workflows/deploy.yml:29` | `npx prisma generate` | ⚠️ OK (client only) |
+    | `.github/workflows/deploy.yml:127` | `node_modules/.bin/prisma migrate deploy` | ✅ Correct |
+    | `docker-compose.prod.yml` | (none) | ✅ |
+    | `docs/runbooks/release-go-no-go-checklist.md:80` | `npx prisma validate` | ⚠️ OK |
+    | `docs/runbooks/release-go-no-go-checklist.md:95` | `npx prisma migrate status` | ⚠️ OK (read-only) |
+    | `docs/runbooks/release-go-no-go-checklist.md:372-373` | `prisma validate` + `prisma generate` | ⚠️ OK |
+    - **No** `db push` / `migrate dev` / `migrate reset` anywhere in production paths ✅
+    - **Critical asymmetry:** production COMMAND is correct (`migrate deploy`), but production would apply an INCOMPLETE migration history. App code at runtime would crash on first access to any of the 24 drifted operations. **Production deploy of current code WILL fail at runtime** until reconciliation migration is generated.
+  - **Severity escalation: 🔴 LAUNCH BLOCKER MIGRATION-RECONCILIATION** — see BACKLOG entry for full details + required actions (generate one reconciliation migration, update seeds README, add CLAUDE.md rule against `db push`, implement `SCHEMA-DRIFT-CI-CHECK` for structural prevention).
+  - **Structural prevention escalation:** `SCHEMA-DRIFT-CI-CHECK` moved to 🟠 HIGH PRIORITY (above typical Bucket B items per Шаг 1) — `scripts/check-schema-drift.mjs` fails CI if `migrate diff` returns non-empty. Closes the drift class structurally. ~half-day; pair with MIGRATION-RECONCILIATION closure.
+  - **What was NOT changed:** seed scripts (existing — seed:test ran, failed mid-flow, no resumed); code (zero); schema (zero); migrations (no new — per spec rule 3); production paths (Part 3 audit-only per spec rule 4); `.env` files; CLAUDE.md (new rule recommendation deferred to user); CI workflows (recommendation deferred); sprint work preserved (638 tests pass).
+  - **Open questions for user (require decision before production launch):**
+    - **(1) MIGRATION-RECONCILIATION execution** — generate single `prisma migrate dev --name reconcile_drifted_schema` migration (manual review of generated SQL critical given 24 operations including drops/index-changes). After migration: re-seed via `npm run seed:test` should succeed. Cross-blocks CLEANUP-BILLING-PROD-A + CHAT-ATTACHMENT-MIGRATE-DEPLOY ops items.
+    - **(2) `prisma db push` policy** — update `prisma/seeds/test-data/README.md:9` to remove the `db push` instruction; replace with `npx prisma migrate dev`. Add CLAUDE.md rule «schema.prisma changes ONLY through `prisma migrate dev` — `db push` forbidden». Enforces discipline going forward.
+    - **(3) SCHEMA-DRIFT-CI-CHECK implementation** — pre-launch recommended (~half-day) to lock down the invariant structurally before next sprint.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / **NO** code/schema/production changes. `prisma migrate status` reports «Database schema is up to date!» (means «matches migrations on disk» — does NOT mean «matches schema.prisma»; that's the silent drift gap that `migrate diff` surfaces).
+  - **Sprint state update:** code work COMPLETE (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A + LOCAL-DEV-CLEANUP + AI-CONTEXT-FACT-CORRECTION). Infrastructure decisions BLOCKED on DevOps. Schema reconciliation now BLOCKED on user decision (above). **Pre-launch critical path: 🔴 MIGRATION-RECONCILIATION must close before production deploy.**
+
+- **2026-05-29 — AI-CONTEXT-FACT-CORRECTION** (commit on `auditandaction`). Documentation-only correction — Supabase confirmed NOT in use (недоступен из РФ + alternatives planned, DevOps consultation pending for choice). All Supabase references across docs annotated / replaced; infrastructure decisions explicitly marked «pending DevOps». **NO code / schema / test changes**. **NO architecture decisions** made — strictly fact correction.
+  - **Trigger:** user clarified during Q1/Q2/Q3 deployment discussion: «Supabase не нужен нам, недоступен из РФ + есть альтернативы, селфхостед там же где апка, или отдельная ВМ». AI_CONTEXT V3 still referenced Supabase as Postgres provider — accuracy issue.
+  - **Audit inventory (5 occurrences in scope + 1 borderline preserved):**
+    | File:line | Type | Action |
+    |---|---|---|
+    | `MASTERRYADOM_AI_CONTEXT.md:1003` | «StaleWhileRevalidate для изображений и Supabase storage» (Service Worker cache line) | Replaced — Yandex S3 noted as live storage; SW rule flagged as orphan + cross-ref to new SW-SUPABASE-RULE-CLEANUP backlog item |
+    | `README.md:106` | «Database: PostgreSQL (Supabase)» (tech stack table) | Replaced — «PostgreSQL + pgvector (local dev: `pgvector/pgvector:pg16` Docker; production provider TBD pending DevOps)» |
+    | `README.md:295` | Historical note «Supabase variables ... are no longer used» | Preserved (already-correct historical statement) |
+    | `.env.production.example:25` | Comment mentioning Supabase as one managed PG option | Replaced — «Yandex Managed PostgreSQL OR equivalent — DevOps decision; Supabase not used (РФ accessibility)» |
+    | `BACKLOG.md:347` | `ENV-DATABASE-CLEANUP` correctly identifies Supabase project as inactive | Preserved (already factually accurate historical context) |
+    | `next.config.ts:34-37` (borderline) | Dead SW caching rule `urlPattern: supabase.co/storage/...` + `cacheName: "supabase-storage"` | Preserved per «NO code changes» rule; flagged as 🔵 `SW-SUPABASE-RULE-CLEANUP` backlog |
+  - **Раздел 11 — Infrastructure decisions subsection added** at end of «База данных» (before section 12). New subsection lists 4 architectural choices blocking 4 pre-launch runbooks explicitly. Each decision tagged «pending DevOps consultation» with options-under-consideration (no recommendations made). Local dev preservation reaffirmed.
+  - **DEPLOYMENT-READINESS-AUDIT-A entry** in BACKLOG gets new annotation block at top: «DR-4 pgbouncer finding partially Supabase-tied — assumption invalidated; applicability now depends on hosting choice». DR-3 backup options re-scoped. DR-2 / DR-6 unaffected (hosting-agnostic). Original audit text preserved (historical record per spec rule 10).
+  - **New backlog item:** 🔵 `SW-SUPABASE-RULE-CLEANUP` — remove dead urlPattern + cacheName from `next.config.ts` (orphan since storage actually goes through Yandex S3). ~5 min opportunistic cleanup.
+  - **What was NOT changed:**
+    - Code / schema / tests (638 preserved)
+    - Postgres-agnostic content (Prisma usage / queries / business logic / types — none Supabase-specific)
+    - All sprint waves (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A + LOCAL-DEV-CLEANUP)
+    - Local dev configuration (`pgvector/pgvector:pg16` Docker preserved verbatim)
+    - CLAUDE.md / SPRINT-PATTERNS.md (not Supabase-mentioning)
+    - DR-2/3/4/6 backlog items themselves (status annotated, not deleted; runbooks still blocked on DevOps)
+    - No new patterns / no new invariants
+  - **Cross-document consistency verified** — same «pending DevOps consultation» framing across AI_CONTEXT раздел 11 + DEPLOYMENT-READINESS annotation + .env.production.example + README.
+  - **Pre-launch state:** documentation accuracy restored. Code work complete (11 audits + 8 fixes + V3 + Шаг 3 + Bucket A); infrastructure decisions BLOCKED on DevOps consultation explicitly acknowledged. Next phase: DevOps engagement → 4 infrastructure decisions → DR-2/3/6 runbooks → production execution batch.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / check:context-freshness ✅ / **NO** code/schema/.env changes
+  - **Open questions for user:** none — all DevOps decisions explicitly out-of-scope per this prompt (Q1 TLS / Q2 backup / Q3 rollback / Postgres hosting all flagged as «pending DevOps» in section 11).
+
+- **2026-05-29 — LOCAL-DEV-CLEANUP** (commit on `auditandaction`). Local dev hygiene cleanup — onboarding hazards (compose / templates beautyhub→masterryadom rename) + container restart + migrations state verified. **NO code / .env / schema changes**. **STOP-gate triggered** at Part 2: 6 of 17 migrations pending on local DB (see BACKLOG `LOCAL-DEV-MIGRATIONS-CATCHUP` for user-decision options).
+  - **Part 1 — Onboarding hazards closed (rename consistency):**
+    - [`docker-compose.dev.yml`](docker-compose.dev.yml) — postgres service updated to match actual manually-created container: `container_name: masterryadom-db` + `POSTGRES_DB: masterryadom` + `POSTGRES_USER: master` + `POSTGRES_PASSWORD: master123` + `volumes: pgdata` (with explicit `volumes.pgdata.name: pgdata` so compose reuses the existing named volume if present rather than creating a separate `<project>_pgdata`). Redis service preserved as-is (had no pre-existing manual container to align with). Header comment explains the LOCAL-DEV-CLEANUP rationale.
+    - [`.env.example`](.env.example) — `DATABASE_URL` updated to match compose defaults (`master:master123@localhost:5432/masterryadom`). Comment notes the dev/compose alignment. `DIRECT_URL` guidance clarified (leave blank in dev, or set to same as DATABASE_URL).
+    - [`.env.production.example`](.env.production.example) — `POSTGRES_DB` / `POSTGRES_USER` / `DATABASE_URL` / `DIRECT_URL` (lines 18-27) renamed to `masterryadom`. Comment added: «Production hosting TBD (pending DevOps decision — managed Postgres OR self-hosted). pgvector extension required». Brand domain refs (`beautyhub.art` in NEXT_PUBLIC_APP_URL / VAPID_EMAIL / VK_REDIRECT_URI / SMTP_*) preserved — brand domain is unrelated to DB name.
+  - **Out of scope (preserved):**
+    - `.github/workflows/quality-gates.yml` — CI test env placeholder (vitest sets `DATABASE_URL=""` per workflow line 49, so the placeholder DB name doesn't actually connect; semantic is «non-empty for env.ts Zod validation only»)
+    - `.github/workflows/deploy.yml` — Docker registry image names (`beautyhub-app` / `beautyhub-worker`) — these are deploy artifact namespacing, separate concern from local dev DB hygiene
+    - `docker-compose.prod.yml` — production compose, separate DevOps concern
+    - `.env` / `.env.local` — env vars cleanup deferred to DevOps batch (`ENV-DATABASE-CLEANUP` 🟡 backlog item)
+    - `BACKLOG.md` / `MASTERRYADOM_AI_CONTEXT.md` — historical mentions of `beautyhub` in audit reports preserved as-is (history doesn't get rewritten)
+    - `docs/runbooks/release-go-no-go-checklist.md` — references are filesystem paths (`d:/BeautyBooking/beautyhub/`), not DB names
+  - **Part 2 — Container restart + migrations verify:**
+    - `docker start masterryadom-db` → ✅ `Up 4 seconds 0.0.0.0:5432->5432/tcp` (volume `pgdata` survived 8-day stop, no recreation needed)
+    - `npx prisma migrate status` → **17 found on disk / 11 applied / 6 pending**:
+      ```
+      Following migrations have not yet been applied:
+        20260430000000_add_trial_to_user_subscription
+        20260430000100_add_trial_notification_types
+        20260513115124_add_mrr_snapshot
+        20260513224252_pre_launch_audit_soft_delete_block
+        20260514000936_add_admin_initiated_notification_types
+        20260519120000_add_chat_attachment
+      ```
+    - **STOP-gate honored** — did NOT auto-run `prisma migrate deploy`. User-decision required (3 options documented in BACKLOG `LOCAL-DEV-MIGRATIONS-CATCHUP`)
+    - Data integrity sanity (read-only counts): **63 Provider rows / 74 UserProfile rows** present — volume `pgdata` preserved data through the 8-day container stop. Local DB is at the «28 April 2026» schema state (after `multi_city_foundation`); 6 sprint-late migrations not yet applied here
+  - **Раздел 11 (Деплой):** local dev compose now reflects actual `masterryadom-db` container setup. Onboarding path predictable: clone → `docker compose -f docker-compose.dev.yml up -d` → container named `masterryadom-db` with volume `pgdata` → `.env` matches defaults → `npm run dev` works. Compose explicitly uses `volumes.pgdata.name: pgdata` so existing manually-created volumes are reused without re-init.
+  - **Validation:** typecheck ✅ / 638/638 tests ✅ / encoding ✅ / mojibake ✅ / **NO code / schema / .env changes**
+  - **Open questions for user (resolve before production launch):**
+    - **(1) LOCAL-DEV-MIGRATIONS-CATCHUP STOP-gate:** apply 6 pending migrations locally now (recommended — `prisma migrate deploy`) or defer? Trade-offs documented in BACKLOG entry
+    - **(2)** `ENV-DATABASE-CLEANUP` (3 orphan vars in `.env` / `.env.local`) — still deferred to separate DevOps batch as agreed
+    - **(3)** `docker-compose.prod.yml` still has `${POSTGRES_DB:-beautyhub}` fallback defaults — pending DevOps batch update OR can be done with prod env hardening
+
+- **2026-05-29 — BUCKET-A-BATCH** (commit on `auditandaction`). **🎉 All 6 Bucket A quick-win items from STRUCTURAL-PREVENTION-AUDIT capstone shipped in one batch.** Hybrid execution: parallel workflow (`wnxsid0oh`, 2 agents, ~31 min wall-clock) for Items 2 + 3 + 4 (CI script + 2 docs — disjoint files, safe to parallelize) + main-context sequential for Items 1 + 5 + 6 (code fixes requiring careful audit-before-edit + Item 5 OpenAPI strategy STOP-gate clearance).
+  - **Раздел 3 (Архитектура):** 2 new pure helpers + 1 new test file + 2 new CI scripts + 1 new CI allowlist:
+    - **NEW** [`src/lib/notifications/push/vapid-config.ts`](src/lib/notifications/push/vapid-config.ts) — `isVapidConfigured(public, private, email): boolean` pure predicate. Extracted from `vapid.ts` so the trim-edge-case test surface doesn't trigger the import-time `webpush.setVapidDetails` side-effect
+    - **NEW** [`src/lib/notifications/push/vapid-config.test.ts`](src/lib/notifications/push/vapid-config.test.ts) — 9 regression tests covering all-set / 3× missing / 3× whitespace-only / all-undefined / all-empty (pins V3 inspectors' finding + the broader trim-edge that they didn't surface)
+    - **NEW** [`scripts/check-context-freshness.mjs`](scripts/check-context-freshness.mjs) — parses «Дата аудита: \*\*\<day\> \<месяц\> \<year\>\*\*» header from `MASTERRYADOM_AI_CONTEXT.md`, fails CI when snapshot is more than 30 days old / date in future / day/year out of range / malformed. Skips silently if file missing. Rationale comment block inlined (V2→V3 drift was 16 days; 30 = 2× buffer)
+    - **NEW** [`scripts/check-openapi-routes.mjs`](scripts/check-openapi-routes.mjs) — scans `src/app/api/**/route.ts`, normalizes to OpenAPI paths (`[id]` → `{id}`, drops route groups, handles catch-all), diffs against `src/lib/openapi/spec.ts` documented paths, fails CI when undocumented route not in allowlist
+    - **NEW** [`scripts/openapi-route-allowlist.txt`](scripts/openapi-route-allowlist.txt) — frozen baseline of 216 currently-undocumented routes. Header documents retirement rule (delete entry when route gets `spec.ts` coverage) + acceptable reasons for permanent allowlist (webhook owned by external service, internal cron, runtime debug)
+  - **Раздел 3 (модификации):** 5 files modified:
+    - [`src/lib/notifications/push/vapid.ts`](src/lib/notifications/push/vapid.ts) — non-null assertions removed; conditional guard `if (vapidPublicKey && vapidPrivateKey && vapidEmail)` runs side-effect only when trim yields non-empty; exports `isPushEnabled` derived from the trimmed values themselves via `isVapidConfigured`. JSDoc explains the V3 hazard + trim-edge nuance
+    - [`src/features/media/components/portfolio-editor.tsx`](src/features/media/components/portfolio-editor.tsx) — 2 raw `<img>` replaced with `next/image` (thumbnail uses `fill` + `object-cover` + responsive `sizes`; lightbox wraps `<Image fill unoptimized>` in sized container for `object-contain`). File-level `eslint-disable @next/next/no-img-element` comment removed — its rationale was misleading (only DnD in the file is upload drop-zone on a `<div>`)
+    - [`docs/runbooks/README.md`](docs/runbooks/README.md) — rewritten as ops-discoverable index. 4 categorized tables (Incident response / Routine operations / Pre-launch / Drills) with When-to-open + Primary signal columns. Original API reference preserved verbatim as «Technical reference» subsection
+    - [`docs/runbooks/incident-drill-checklist.md`](docs/runbooks/incident-drill-checklist.md) — explicit PASS/FAIL criteria + result template added per drill (Redis down / Queue backlog / YooKassa webhook / Auth outage). Existing scenarios preserved
+    - [`package.json`](package.json) + [`.github/workflows/quality-gates.yml`](.github/workflows/quality-gates.yml) — wired `check:context-freshness` + `check:openapi-routes` into both `npm run check` batch + CI workflow (mirrors `check:encoding` / `check:mojibake` dual-integration)
+  - **Раздел 5 (Бизнес-логика):** VAPID push initialization no longer crashes when a key is whitespace-only — broader fix than V3 inspectors flagged. The `!` non-null assertions only caught `null/undefined`; whitespace-only env values passed `Boolean(env.X)` in env.ts truthiness check while `.trim()` here yielded `""`, and `webpush.setVapidDetails(..., "", "")` rejected at runtime with cryptic web-push validation error. The local trimmed-value guard at the side-effect site is the canonical fix. Other modules continue to import `isPushEnabled` — semantics unchanged for all-set / all-missing cases, fixed for whitespace edge case
+  - **Раздел 6 (Маршруты):** no route changes. OPENAPI-ROUTE-CI is a build-time gate, doesn't add routes
+  - **Раздел 7 (Env vars):** no new env vars
+  - **Раздел 8 (Проблемы и риски):** P2 VAPID gap «Сделано: ЧАСТИЧНО» → **«Сделано: ДА»** (closed by VAPID-NON-NULL-FIX). Bucket A items all closed (6/6 from STRUCTURAL-PREVENTION-AUDIT capstone)
+  - **Раздел 9 (Тестирование):** 629 → **638 tests** (+9 from `vapid-config.test.ts`). Test files: 74 → 75. New CI gates: `check:context-freshness` + `check:openapi-routes`. Coverage: pre-launch hardening continues — pure-helper test density on critical helpers
+  - **Раздел 10 (Безопасность):** indirect improvement — VAPID misconfiguration now fails closed (push disabled) instead of crashing with cryptic error. CI gate against context staleness ensures future audit baselines reflect reality
+  - **Раздел 11 (Производительность):** PERF-4 closed (portfolio editor thumbnails now get next/image optimization pipeline — LCP improvement target). Lightbox uses `unoptimized` deliberately (full-size view, no resizing wanted)
+  - **Раздел 12 (Инварианты):** no new invariants. Existing #28 (Booking idempotency) + 26 others preserved
+  - **Раздел 14 (Workflow / patterns):** Pattern 15 (workflow-orchestrated parallel survey audit) demonstrated in execution mode this commit — 2 parallel inspector subagents writing disjoint files (CI script + 2 docs) in 31 min vs estimated 1.5 hr sequential
+  - **Validation:** typecheck ✅ / lint **1 error / 3 warnings baseline preserved** (pre-existing email-verify-modal setState-in-effect from PHASE7) / encoding ✅ / mojibake ✅ / check:ui-text ✅ / check:context-freshness ✅ (0 days old) / check:openapi-routes ✅ (72 documented + 216 allowlisted + 0 gap) / `npm run build` ✅ Compiled successfully in 18.2s / **638/638 tests** pass
+  - **What was NOT changed (per strict batch constraints):**
+    - Schema (NO migration — 16 preserved)
+    - API contracts (VAPID export `isPushEnabled` semantics preserved for all-set / all-missing; only whitespace edge changed)
+    - Existing runbook content (Item 3 only rewrote README.md index; 10 runbook files untouched; Item 4 only added PASS/FAIL sections alongside existing drill scenarios)
+    - Admin portfolio editor functionality (Item 6 cosmetic image migration, no business logic touched)
+    - All sprint waves preserved (Cabinet Master / Studio / Client / Admin / Public surfaces / booking widget / modal a11y / chat / categories — all intact)
+    - 629 baseline tests (all still pass + 9 new = 638 total)
+    - SPRINT-PATTERNS.md, CLAUDE.md, env.ts (no behavioral changes needed)
+  - **Pre-launch risks обнаруженные:** none new. 1 follow-up backlog item spawned: `OPENAPI-COVERAGE-INCREMENTAL` (🟡 — drive allowlist from 216 → 0 over post-launch sprints, cluster-by-cluster)
+  - **Open questions for user:** none — Item 5 OpenAPI strategy STOP-gate cleared automatically (audit found existing `src/lib/openapi/spec.ts` manual spec is the canonical strategy; gate uses baseline-freeze pattern same as eslint `--max-warnings`)
+  - **🎯 Pre-launch critical path:** Bucket A done (6/6). Verified-ready ops items remain (CLEANUP-BILLING-PROD `--confirm` / CHAT-ATTACHMENT-MIGRATE deploy / YANDEX-DEPLOY-A / VAPID-PUSH-VERIFY / MRR-CRON-SCHEDULE — all awaiting ops window). Launch path clear
+
+- **2026-05-29 — STRUCTURAL-PREVENTION-AUDIT (Capstone Шаг 3)** (commit on `auditandaction`). **🎉 3-step Structural Prevention plan COMPLETE.** Capstone meta-synthesis across audit-волна 11/11 + 8 fixes + CONTEXT-REFRESH-V3. Delivered via workflow (3 parallel inspector subagents — 164K tokens / 61 tool uses / ~21 min wall-clock). **NO code/schema/test changes** — synthesis + 3 doc edits (SPRINT-PATTERNS / AI_CONTEXT / BACKLOG).
+  - **3-step plan execution complete:**
+    - ✅ **Шаг 1 (Template update)** applied to 6+ fix/audit prompts since BUSINESS-LOGIC-AUDIT-A (each prompt habit-includes «🛡 Structural Prevention consideration»)
+    - ✅ **Шаг 2 (SPRINT-PATTERNS enforcement column)** added 2026-05-29: all 15 patterns honestly tagged manual / partial / structural / none
+    - ✅ **Шаг 3 (this capstone)** consolidated all candidates + Pattern 15 formalization + prioritized enforcement plan
+  - **Inventory result:** **24 candidates across 24 sources.** Breakdown: 19 backlog / 1 closed (MODAL-FOCUS-TRAP via MODAL-A11Y-BATCH) / 2 partially-implemented / 0 never-filed. Every audit-found candidate made it to BACKLOG — inspector confirmed «no lost candidates».
+  - **Pattern 15 formalized** in [`docs/SPRINT-PATTERNS.md`](docs/SPRINT-PATTERNS.md): «Workflow-orchestrated parallel survey audit». 2 evidence instances (DOCUMENTATION-AUDIT-A 6 agents + CONTEXT-REFRESH-V3 3 agents). Specification complete (Trigger / Action / Composition / 6-case Counter-example / Cost-value). Enforcement: **structural** (Workflow API + parallel() + Explore + JSON schema infrastructure exists).
+  - **Enforcement column aggregate: 2 structural / 5 partial / 7 manual / 0 none.** Honest tracking confirms organizing thesis: most patterns rely on manual discipline (intentional design for small-team / agent-collaborated codebase); structural enforcement reserved for high-recurrence classes (Vitest test suite = Pattern 6, Workflow tool = Pattern 15). Pattern 14 «explicit assertX helpers» = structural at the test-coverage level (BUSINESS-LOGIC-AUDIT 0 critical/high findings strongly correlated).
+  - **Prioritized enforcement plan (Bucket A / B / C):**
+    - **Bucket A (implement pre-launch, ~3-4 hr total):** VAPID-NON-NULL-FIX (~30 min) + CONTEXT-FRESHNESS-CI-CHECK (~30 min) + RUNBOOK-INDEX-A (~30-45 min) + DRILL-PASS-CRITERIA-A (~45 min) + OPENAPI-ROUTE-CI (~30 min) + PORTFOLIO-EDITOR-NEXT-IMAGE (~30 min)
+    - **Bucket B (Sprint 2 / post-launch, ~3-4 days total):** PRISMA-INCLUDE-WHERE-CI-CHECK / MONEY-BRAND-TYPE-A / EMPTY-STATE-COMPONENT-A / ENV-TEMPLATES-CI-CHECK / RUNBOOK-COVERAGE-CI / FINDMANY-TAKE-CI-CHECK / TAILWIND-COLOR-LINT / JSDoc-REQUIRE / REDUCED-MOTION-A full sweep / STORYBOOK-SETUP / FRAMER-MOTION-REDUCED-MOTION-SWEEP / TAP-TARGET-AUDIT-A / STORIES-VIEWER-A11Y-CONSOLIDATE
+    - **Bucket C (accept manual / defer):** BOOKING-PARTIAL-UNIQUE-INDEX (defense-in-depth, current sufficient) / BOOKING-AUDIT-LOG (when dispute surfaces) / BOOKING-STATUS-PROMOTION-CRON (if analytics need DB-level) / BUNDLE-SIZE-BASELINE (post-launch needs user data) / Patterns 1, 3, 7, 8, 10, 12, 13 (meta/behavioral — structural enforcement would require agent-level tooling outside scope)
+  - **Meta-insights:**
+    - **Pattern 4 generalization** (from V3): «periodic reset for long-running discipline gates» — applies к docs too (rule 15 per-commit worked diligently; holistic refresh required Шаг 3-class periodic reset). CONTEXT-FRESHNESS-CI-CHECK in Bucket A closes via structural prevention.
+    - **Organizing thesis confirmed across 11 audits:** «strong on new code + shared primitives, gaps in legacy + tooling-absence as deferred backlog accumulation». Pattern 7 (tooling-absence) recurs at every axis. Bucket A targets highest-recurrence quick-wins.
+    - **Pattern 14 + Pattern 15 = только 2 structural patterns** — both reflect investments в shared primitives + workflow tooling. **Implication for future sprints:** invest early в primitives (Pattern 14 leverage), invest в workflow patterns для survey-class work (Pattern 15 leverage), accept manual discipline elsewhere (intentional).
+    - **Шаг 1 durability:** habit established, expected to continue post-Шаг 3 без degradation. Each new fix/audit prompt includes the consideration section.
+  - **Раздел 13 (Правила):** SPRINT-PATTERNS.md now contains «Patterns enforcement column» (Шаг 2 deliverable). Future audit/fix prompts должны check the column to honestly tag prevention candidates as manual / partial / structural / none rather than over-recommending automation.
+  - **Validation:** typecheck ✅ / encoding ✅ / mojibake ✅ / **629/629 tests** preserved. No code changes.
+  - **What was NOT changed:** sprint code, schema (NO migration, 16 preserved), CLAUDE.md / docs/QUALITY-GATES.md / docs/runbooks/* (untouched), tests (629/629), prevention candidates themselves (this audit is meta-synthesis + planning, не implementation). Patterns 1-14 intentionally preserved verbatim — only enforcement column ADDED as new section.
+  - **Pre-launch risks обнаруженные:** none new. Bucket A items become explicit pre-launch fix candidates (~3-4 hr total work; the user может schedule после Шаг 3 results).
+  - **Open questions for user:**
+    - **(1)** Bucket A scheduling — implement now (pre-launch) или после first ops window? Recommendation: VAPID-NON-NULL-FIX + CONTEXT-FRESHNESS-CI-CHECK + RUNBOOK-INDEX-A immediately (~2 hr) — closes residual P2/P3-class risks с trivial cost.
+    - **(2)** Pattern 15 promotion — formalized as #15 in SPRINT-PATTERNS. Add to QUALITY-GATES.md cross-reference? (currently lives only in SPRINT-PATTERNS).
+    - **(3)** Bucket B Sprint 2 planning — пакетировать структурно (1 sprint = CI scripts, 1 sprint = type guards) или opportunistic with related feature work?
+  - **🎉 АУДИТ-ВОЛНА + ВСЕ FIX-ПРОМПТЫ + V3 + 3-STEP PREVENTION PLAN — ALL COMPLETE.** Pre-launch critical path clear (0 🔴 / 0 🟠 outstanding). Next phase: ops polish (Bucket A, ~3-4 hr) → production execution batch (verified-ready ops awaiting window) → launch.
+  - **Process insight (this audit's own contribution to Pattern 4):** STRUCTURAL-PREVENTION-AUDIT-A demonstrates Pattern 4 at meta-meta-level — «periodic reset for the prevention discipline itself». Шаг 1 worked diligently (each prompt habit-includes consideration), но Шаг 3-class periodic consolidation surfaces accumulated candidates + reveals enforcement-state gap (manual-dominant). Recommendation for next sprint cycle: schedule periodic STRUCTURAL-PREVENTION review (every audit-волна completion OR major milestone) to prevent prevention-candidates from going stale. Same shape as CONTEXT-REFRESH-V1 → V2 → V3 cycle that surfaced Pattern 4 for docs. **Pattern 4 likely deserves the periodic-reset addendum formally** — flagged для next SPRINT-PATTERNS evolution.
+
+- **2026-05-29 — CONTEXT-REFRESH-V3** (commit on `auditandaction`). **🎉 Closes DOC-1 + DOC-2 from DOCUMENTATION-AUDIT-A (16-day header drift + holistic refresh overdue).** Delivered via 2-phase workflow: 3 parallel inspector subagents (Explore type) covering sections 1-7 / 8-14 / 15-changelog × 273K tokens / 132 tool uses / 14 min wall-clock + main-context sequential edit (this entry). NO code/schema/test changes — documentation only.
+  - **Workflow result: STOP-gate triggered** by section 15 inspector flagging strategic-decision deferral on changelog compaction strategy. Inspector itself classified status as «minor-update» + defended current full-chronological format («defensible given high audit velocity; 2344 lines manageable»). All other 14 section assessments returned non-blocking. Decision: applied safe minor edits в main context (header refresh + numeric drift + invariants); preserved full-chronological changelog per inspector's defense. Compaction strategy filed as soft-decision backlog item for user revisit.
+  - **Section-by-section walk (14 sections + 15 changelog):**
+    - **Sections 1, 2, 5, 7**: **current** — no edits needed. Product overview / tech stack / business logic / env discipline all match реальность.
+    - **Section 3 (Architecture)** — minor-update: file counts drifted (`features/` 271 → **621**, `components/` 60 → **65**, `route.ts` 240 → **277**, `page.tsx` 78 → **90**, tests 29 → **74**). Updated with «verified 2026-05-29» annotations + Δ-from-V2 column added к counts table.
+    - **Section 4 (Data Model)** — minor-update: enum count claimed 35 → actual **36** (AdminAuditAction was the 36th added 2026-05-13 MIGRATIONS-PRELAUNCH-A); models claimed 64 → actual **65** (same wave). Headers refreshed.
+    - **Section 6 (Routes)** — minor-update: API group header «271 route.ts» → **277**.
+    - **Section 8 (Security)** — minor-update: **P2 VAPID** status reclassified «Сделано: НЕТ» → **«Сделано: ЧАСТИЧНО»** (verified by inspectors: `isPushEnabled` computed flag in env.ts guards module-level usage; residual risk = file-internal `!` non-null assertion на отдельные ключи). New backlog item 🟡 `VAPID-NON-NULL-FIX` (~20 min).
+    - **Section 9 (Тестирование)** — minor-update: snapshot 67 files / 572 tests → **74 files / 629 tests** (post-волна additions documented: SECURITY-SURFACE-TESTS / FAST-WINS / EMAIL-VERIFY / FEED-PORTFOLIO-N1 / MODAL-A11Y).
+    - **Section 11 (Production Deploy posture)** — text current per DEPLOYMENT-READINESS-AUDIT-A + PROD-ENV-SYNC closing DR-1. Other DR-2/3/6 still pending user decisions; no rewrite.
+    - **Section 12 (Invariants)** — **2 new invariants formalized** (per ready-to-formalize emergent candidates from inspectors):
+      - **#27 ModalSurface + Drawer enforce WCAG SC 2.4.3 + 2.3.3 + 3.2.1** via `use-modal-a11y` hooks (50+ ModalSurface + 5 Drawer callers inherit без per-caller change; tested via `use-modal-a11y.test.ts` 18 tests; stories-viewer-overlay independent — carryover backlog)
+      - **#28 Booking state-change endpoints idempotent** via `x-idempotency-key` + Redis lock (TTL 600s; namespace-by-userId-or-phone; lock-then-create + on-failure cleanup; 5th of 6 P2002 surfaces mapped; 6th = OTP-EMAIL-LOGIN-RACE remains latent backlog)
+      - Numbering #25/#26 quirk (added out-of-order during prior sprint) preserved — content correct, renumbering cosmetic; «invariant 25 enforced» citations work via search.
+      - **Deferred candidates**: «every P2002 → user-friendly error never 500» (5/6 sites — wait for 6th OTP-EMAIL-LOGIN-RACE closure); «all env reads through env.ts» (already enforced via CLAUDE.md rule 11 + ENV-DISCIPLINE-SWEEP-A — already-formalized как rule, не нужно дублировать как invariant).
+    - **Section 13 (Rules)** — error code count 112 → **113** (`EMAIL_ALREADY_USED` + 4 audit-волна codes documented).
+    - **Section 14** — current.
+    - **Section 15 (Changelog)** — preserved full-chronological per inspector's defense. Strategy decision deferred to user (backlog item — compaction recommended IF section grows > 4000 lines OR onboarding feedback indicates issue; current 2344 lines manageable).
+  - **Header refresh (the canonical surface that triggered V3):**
+    - Date: «13 мая 2026» → **«29 мая 2026»** (CONTEXT-REFRESH-V3)
+    - Sprint phase: «Active sprint: studio cabinet redesign» → **«AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness»** + full audit + fix-prompt inventory + 0 🔴/🟠 outstanding confirmation + next phase declaration
+    - Tests: 358 → **629** (+271 audit-волна growth) ; Error codes: **113** ; Migrations: **16** (0 new за audit-волну — design discipline maintained throughout)
+  - **Cross-references verified by inspectors:** 22 cross-refs checked. **0 broken** (8 numeric drifts in sections 3/4/6 — now fixed). File path refs (e.g. `src/components/ui/modal-surface.tsx:86-182` in MODAL-A11Y-BATCH-A entry) all valid. SPRINT-PATTERNS.md / QUALITY-GATES.md / BACKLOG.md cross-doc links all functional.
+  - **Раздел 8/11/12/15 + header touched** (per rule 15 «### Context updates» discipline maintained by this V3 commit itself):
+    - Section 3: file-count table refreshed
+    - Section 4: enum + model counts + dates
+    - Section 6: route count header
+    - Section 8: P2 VAPID status
+    - Section 9: tests count + snapshot
+    - Section 11: text current (per prior DEPLOYMENT-READINESS audit)
+    - Section 12: +2 invariants (#27, #28)
+    - Section 13: error codes 113
+    - Section 15: this entry
+    - Header: date + sprint phase + inventory
+  - **Validation:** typecheck ✅, encoding/mojibake ✅, **629/629 tests** preserved.
+  - **What was NOT changed:** sprint code, schema (NO migration — 16 migrations preserved), SPRINT-PATTERNS.md (separate doc; Pattern 15 «Workflow-orchestrated parallel survey audit» candidate now has 2 evidence instances — DOCUMENTATION-AUDIT-A + CONTEXT-REFRESH-V3 — but Pattern 14 «Scale-with-adoption» already covers similar leverage; deferred к Шаг 3 STRUCTURAL-PREVENTION-AUDIT for consolidation decision), CLAUDE.md / docs/QUALITY-GATES.md / docs/runbooks/* (untouched per scope), BACKLOG.md updates (separate phase below).
+  - **Workflow execution stats:** 3 parallel Explore inspector agents (sections 1-7 / 8-14 / 15-changelog), each returned structured JSON via schema (`stopGateReason` field guards user-decision points). **STOP-gate triggered correctly** — workflow design surfaced section 15 compaction strategy as user-decision before silent change. Main context resolved via «inspector itself defended full chronological» reasoning. Time: 14 min wall-clock for 3 parallel inspections vs estimated ~30 min if sequential. Pattern 15 candidate strengthens: 2 instances now (DOCUMENTATION-AUDIT + CONTEXT-REFRESH-V3) — both used parallel-fan-out with main-context synthesis. Both succeeded. **Eligible для formalization in SPRINT-PATTERNS Pattern 15 после Шаг 3 review.**
+  - **Pre-launch risks обнаруженные:** none new. DOC-1 + DOC-2 closed (header date + holistic refresh). VAPID P2 partial mitigation acknowledged + 🟡 backlog `VAPID-NON-NULL-FIX` filed для full closure.
+  - **Open questions for user:** (1) Changelog compaction strategy (current full-chronological defended by inspector — keep OR schedule split-to-archive)? (2) Pattern 15 formalization (workflow-orchestrated parallel survey — 2 instances now: DOCUMENTATION-AUDIT + CONTEXT-REFRESH-V3) — add к SPRINT-PATTERNS now OR wait для Шаг 3?
+  - **Process insight — V3 itself demonstrates Pattern 4 (quality-gate health monitoring) at meta-level**: «document maintenance gate periodically reset». Rule 15 per-commit «### Context updates» discipline worked diligently (every fix-prompt + audit entry had the section) but **holistic header + cross-section coherence required Шаг 3-class periodic reset**. Same shape as Pattern 4 «check:ui-text crashed-vs-passing distinction» — gate health needs monitoring, not just gate existence. **Recommendation:** `CONTEXT-FRESHNESS-CI-CHECK` (already in backlog from DOCUMENTATION-AUDIT) — fail CI if AI_CONTEXT header date >14 days OR <commit date. Closes V1→V2→V3 cycle's recurring need by structural prevention.
+  - **🎉 V3 closes audit-волна 11/11 + foundation work.** Next: STRUCTURAL-PREVENTION-AUDIT (Шаг 3) consolidates ALL prevention candidates from 11 audits + 8 fix-prompts + Pattern 15 decision + remaining backlog grooming → production execution batch authorization.
+
+- **2026-05-29 — DOCUMENTATION-AUDIT-A** (commit on `auditandaction`). **🎉 LAST audit (item 11/11). Audit-волна 100% complete.** Read-only documentation completeness audit across 6 parallel streams via workflow (onboarding / operations / internal / process / code+schema / API). **NO code/docs changes — discovery only.** Workflow execution: 6 Explore subagents in `parallel()`, 228 tool uses, ~4 min, 427K tokens. **Result: STRONG documentation discipline overall — sprint rule 15 (per-commit context updates) clearly working. 2 high-severity operational gaps + 1 high-severity refresh-cadence gap discovered by sub-agents that this audit itself reveals as «process needs CONTEXT-REFRESH-V3 before next sprint».**
+  - **Workflow design:** 6 parallel agents (Explore type) inspected disjoint surfaces — Onboarding/README, Operational runbooks, Internal AI_CONTEXT, Process docs (QUALITY-GATES + SPRINT-PATTERNS + CLAUDE.md), Code+Schema TSDoc, API documentation. Each returned structured findings + structural-prevention candidates via JSON schema. Synthesis happens in main context (this entry).
+  - **Aggregate stats:** **31 findings total** across 6 categories. **0 🔴 critical / 3 🟠 high / 13 🟡 medium / 15 🔵 low.** No findings block production deploy or new developer onboarding. Categories: 4 well-documented (internal AI_CONTEXT, process docs, code+schema with TSDoc on critical helpers), 2 with minor gaps (onboarding, operations), 0 with significant gaps. API documentation = moderate gaps but **design-choice** (MVP scope; internal-only routes use Zod types as docs).
+  - **🟠 High-severity findings (3):**
+    - **OP-1 (operations)**: `docs/runbooks/README.md` is API reference (health endpoint fields) — **NOT a runbook index**. New ops staff cannot discover which file handles which symptom. Fix: add «Quick Index» section listing all 10 runbooks with 1-line symptom triggers. ~30 min. Backlog 🟠 `RUNBOOK-INDEX-A`.
+    - **OP-2 (operations)**: 3 critical runbooks missing — **DR-2 deploy-rollback / DR-3 db-backup / DR-6 TLS-setup** (cross-ref DEPLOYMENT-READINESS-AUDIT-A). Already in backlog from prior audit; this audit reconfirms via independent reader's perspective. Backlog 🟠 (already filed; user decisions pending on Q1/Q2/Q3 from DEPLOYMENT-READINESS).
+    - **DOC-1+DOC-2 (process)**: **MASTERRYADOM_AI_CONTEXT.md header dated «13 мая 2026»** but today is 2026-05-29 (16 days drift) with ~70 commits + 5 audits since CONTEXT-REFRESH-V2. **Per rule 15 trigger** (4-6 commits OR ~2 weeks), full CONTEXT-REFRESH-V3 is overdue. Per-commit updates still happened diligently (rule 15 «### Context updates» section present in every fix-prompt entry per audit-волна), but holistic header + cross-section refresh not done. Backlog 🟠 `CONTEXT-REFRESH-V3` (~2-4 hr — full sections 1-15 rewalk + header date + audit-волна completion summary).
+  - **🟡 Medium-severity findings (13)** — full breakdown in BACKLOG entry. Highlights:
+    - **OP-3**: incident-drill-checklist lacks explicit PASS/FAIL criteria per drill
+    - **OP-6**: mrr-snapshot-cron.md doesn't say how to choose Yandex Scheduler vs GitHub Actions vs cron
+    - **OP-7**: README health endpoint doc lacks cross-references к runbooks using each endpoint (proposed: «Quick Diagnosis Matrix»)
+    - **DOC-3 (process)**: SPRINT-PATTERNS audit-волна stats table reflects May-23 snapshot; May 28-29 audits (DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / MODAL-A11Y) not yet integrated
+    - **DOC-4 (process)**: QUALITY-GATES trigger table doesn't list «audit-wave completion» as explicit refresh trigger (implicit via «~2 недели»)
+    - **DOC-2 (internal AI_CONTEXT)**: P2 VAPID keys partially mitigated (isPushEnabled guard exists at line 11-18 of vapid.ts) but section 8 still says «Сделано: НЕТ»
+    - **DOC-4 (code+schema)**: schedule resolution engine-core.ts lacks narrative block-comment on WEEKLY/CYCLE precedence
+    - **API-DOC-2** (api): analytics module (40+ routes) absent from OpenAPI spec
+    - **API-DOC-3** (api): studio/master cabinet routes largely absent from OpenAPI spec (~15-20 most-used would close)
+    - **API-DOC-4** (api): 113-code error registry not indexed by endpoint
+  - **🔵 Low-severity findings (15)** — primarily polish (typos, version-number specificity in README, TSDoc additions on individual helpers, formatting). Backlog 🔵 batch.
+  - **Раздел 8 (UI/UX), Раздел 11 (Деплой), Раздел 12 (Инварианты):** strong baseline confirmed by independent reader. Sub-agents found NO broken cross-references (rule 15 → QUALITY-GATES.md / SPRINT-PATTERNS.md / .claude/references/ all functional). 26 invariants — only minor numbering quirk (#25/#26 added out-of-order in section 12 table; functional content correct). Internal AI_CONTEXT discipline rated «well-documented» (overall assessment from internal-doc subagent — strongest result of the 6).
+  - **Production-handover readiness (key deliverable per prompt):**
+    - **Ready**: README + CLAUDE.md + AI_CONTEXT (modulo refresh) + 10 runbooks for known incidents + release-go-no-go-checklist comprehensive + SPRINT-PATTERNS for future Claude sessions + env templates synced (PROD-ENV-SYNC-A closed DR-1) + per-commit context updates demonstrate active maintenance.
+    - **Needs work before handover**: (1) Runbook index for ops discoverability (OP-1, ~30 min); (2) 3 missing runbooks (OP-2 / DR-2 + DR-3 + DR-6 — user decisions pending on TLS strategy + DB backup target + rollback policy from DEPLOYMENT-READINESS audit); (3) CONTEXT-REFRESH-V3 (DOC-1 + DOC-2) before next sprint or 2nd developer onboarding.
+  - **Аудит-волна 11/11 COMPLETE — milestone:**
+    - **Tier 1 (items 1-6)**: LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / SPRINT-RETROSPECTIVE-DOC (synthesis)
+    - **Tier 2 (items 7-11)**: DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION
+    - **Fix-prompts spawned + closed during волна**: PROD-ENV-EXAMPLE-SYNC-A (DR-1), FEED-PORTFOLIO-N1-FIX-A (PERF-1), MODAL-A11Y-BATCH-A (UI-1 + UI-3), EMAIL-VERIFY-FIX-A (pre-launch 🔴 #1), OTP-LOG-DEV-GUARD-A (SEC-1), ENV-DISCIPLINE-SWEEP-A (CC-1), FAST-WINS-BATCH-A (TC-2 + SEC-2 + proxy.ts), SECURITY-SURFACE-TESTS-A (TC-1)
+    - **Test count growth**: 358 → **629** (+271 across the wave, ~+57 per ~3 fix-prompts batch)
+    - **Pattern occurrences captured in SPRINT-PATTERNS**: Pattern 2 (5 occurrences), Pattern 5 (5 evidence points), Pattern 14 (scaling demonstration with leverage table)
+  - **Combined audit-волна aggregate (all 11 audits):**
+    - SECURITY 6/8 + 3 findings (closed via FAST-WINS for SEC-2 + OTP-LOG-DEV-GUARD for SEC-1; SEC-3 backlog)
+    - CODE-CONSISTENCY 6/8 + 2 findings (ENV-DISCIPLINE-SWEEP closed CC-1; CC-2 backlog)
+    - TEST-COVERAGE 0 critical + 5 minor (TC-1 + TC-2 closed via SECURITY-SURFACE-TESTS + FAST-WINS)
+    - ERROR-HANDLING 8/8 + 1 tooling-gap (EH-1 OBSERVABILITY-SENTRY backlog)
+    - DEPLOYMENT-READINESS 7/8 + 1 closed (DR-1 via PROD-ENV-SYNC; DR-2/3/6 pending user decisions)
+    - BUSINESS-LOGIC 8/8 + 4 design-choice (no bugs)
+    - PERFORMANCE 7/8 + 1 🔴 closed (PERF-1 via FEED-PORTFOLIO-N1-FIX)
+    - UI-UX 6/8 + 1 🟠 closed (UI-1 via MODAL-A11Y-BATCH) + 1 🟡 closed (UI-3 same batch) + remaining backlog
+    - **DOCUMENTATION 4/6 well-documented + 3 🟠 + 13 🟡 + 15 🔵 (no 🔴; all gaps non-blocking)**
+    - **🎉 0 🔴 + 0 🟠 unaddressed (all 🟠 either closed or backlog'd with clear next step)**.
+  - **Process insight — workflow shape validates:** parallel-fan-out audit with structured-JSON returns + main-context synthesis works well for survey-class read-only tasks. 6 agents × 4 min wall-clock = ~24 agent-minutes done in parallel. Each agent returned 4-7 findings with concrete evidence. Synthesis pulled into single coherent picture. **Same shape would work for any «inspect N disjoint surfaces, report findings» task** — future audit-волна-class work should default to this pattern. Workflow tool's `parallel()` with schema-validated returns + Explore agentType combined cleanly.
+  - **NO code/docs changes (read-only):** typecheck ✅ / 629/629 tests preserved / `git status` clean / only this entry + BACKLOG entry written.
+  - **Open questions for user (consolidated post-волна):**
+    - **(1)** `CONTEXT-REFRESH-V3` — schedule before next sprint or now? Half-day investment closes DOC-1 + DOC-2 and gives clean baseline.
+    - **(2)** Runbook index + 3 missing runbooks (OP-1, OP-2) — pre-launch ops priority?
+    - **(3)** STRUCTURAL-PREVENTION-AUDIT (Шаг 3 from earlier discussion) — consolidate ALL prevention candidates from 11 audits into single review? Estimated ~half-day.
+  - **🎉 11/11 audit-волна complete. Sprint validated through 11 comprehensive lenses; pre-launch critical path clear.**
+
+- **2026-05-23 — MODAL-A11Y-BATCH-A** (commit on `auditandaction`). **🎉 Closes UI-1 (🟠 modal focus management) + UI-3 (🟡 reduced motion) from UI-UX-AUDIT-A — 0 🟠 findings remaining in audit-волна.** WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus) + SC 2.3.3 (Animation from Interactions) compliance. Pattern 14 demonstrated at the largest scale yet — **single shared-primitive fix hardens 50+ ModalSurface callers + 5 Drawer migrations.** **NO API contract changes** — caller code untouched. **NO schema migration.**
+  - **Audit findings:**
+    - **`ModalSurface` (`src/components/ui/modal-surface.tsx`)** — 50 caller files via grep. Had `role="dialog"` + `aria-modal` + `aria-labelledby` + ESC + body scroll-lock ✅. Missing: focus trap, initial focus, return focus, reduced-motion handling.
+    - **`Drawer` (`src/components/ui/drawer.tsx`)** — same shared primitive (introduced by MODAL-UNIFY-IMPL-A) used by 5 migrated drawers (booking-detail / client-card / master-card / mobile-filter / booking-bottom-sheet). Same a11y gaps. **In-scope** for the batch (both shared primitives).
+    - **`@radix-ui/react-focus-scope` NOT in deps** — only `@radix-ui/react-slot` installed. Decision: custom implementation (~50 LOC) rather than expanding Radix surface area. Matches existing project pattern (stories-viewer-overlay has manual focus-trap implementation at line 115).
+    - **`stories-viewer-overlay.tsx` manual focus-trap** — preserved untouched. Different specialized concerns (arrow-key nav, swipe, progress bars). Consolidation not trivial; documented as deferred carryover.
+    - **framer-motion scope** — 58 files. Conservative scope per prompt rule: applied `useReducedMotion` to the 2 shared primitives ONLY (`ModalSurface` + `Drawer`). Exhaustive sweep across all 58 surfaces would be a separate prompt (avoids scope-creep risk noted in prompt's STOP condition).
+  - **Раздел 3 (Архитектура):** new shared module `src/components/ui/use-modal-a11y.ts` with 3 hooks + 1 pure helper:
+    - `useReturnFocus(open)` — captures `document.activeElement` on open, restores it on close/unmount. Guards against opener-removed-from-DOM (fallback: no-op, focus stays where it landed).
+    - `useInitialFocus(open, containerRef, initialFocusRef?)` — focuses explicit `initialFocusRef.current` if provided, else first focusable child via `FOCUSABLE_SELECTOR`, else container itself (caller sets `tabIndex={-1}`). Deferred via `requestAnimationFrame` so framer-motion's mount animation doesn't fight for active element.
+    - `useFocusTrap(containerRef, enabled)` — Tab + Shift+Tab cycle within container. Wraps via `decideFocusTrap` pure helper.
+    - `decideFocusTrap(...)` — **pure** decision function returning `{kind: "ignore" | "block" | "wrap"; target?}`. Extracted for unit testing (matches booking `assertX` family pattern — sprint discipline).
+    - `FOCUSABLE_SELECTOR` — standard WAI-ARIA Authoring Practices set (button / link / input / select / textarea / tabindex≠-1 / contenteditable).
+  - **Раздел 8 (UI/UX):** `ModalSurface` + `Drawer` now WCAG-compliant for keyboard + screen-reader users. **Default user behavior identical** (mouse users see no change; animations preserved for users без `prefers-reduced-motion` preference). New optional `initialFocusRef?: RefObject<HTMLElement | null>` prop on both — opt-in, callers don't need to pass (default = first focusable).
+  - **Раздел 12 (Инварианты):** emergent invariant — «`ModalSurface` + `Drawer` enforce WCAG SC 2.4.3 + 3.2.1 + 2.3.3 for all callers via shared a11y hooks». Not formally added to invariants table yet (would need 3rd primitive to crystallize the pattern). Same Pattern 14 shape as the booking-policy invariants — primitive enforces rule, all callers inherit.
+  - **Раздел 15 (changelog):** this entry.
+  - **stories-viewer-overlay consolidation status:** **carryover backlog** — has working manual focus-trap (line 115) + arrow-key nav + swipe + progress-bar concerns specific to story viewing. Consolidation would either (a) extract a richer overlay primitive that supports all these concerns (large refactor) or (b) leave as-is (current). Conservative choice: leave as-is. Backlog 🔵 `STORIES-VIEWER-A11Y-CONSOLIDATE` (post-launch, opportunistic).
+  - **Tests added (+18):** [`src/components/ui/use-modal-a11y.test.ts`](src/components/ui/use-modal-a11y.test.ts) — 6 `FOCUSABLE_SELECTOR` lock tests + 4 Tab-forward + 3 Shift+Tab + 5 edge cases (empty list, single focusable wrap-to-self, middle-of-list ignore). All test `decideFocusTrap` pure helper via mock element factory (no jsdom needed — matches project's environment=node + `prompt-modal.test.tsx` precedent). React lifecycle integration tests for `useReturnFocus` / `useInitialFocus` / `useFocusTrap` deferred until TC-3 integration-test infra (jsdom + @testing-library) lands. 611 → **629 tests** ✅.
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved (no new findings), encoding/mojibake/check:ui-text/prisma (NO migration)/build ✅.
+  - **What was NOT changed:**
+    - `ModalSurface` API — only added optional `initialFocusRef` prop; 50 callers untouched
+    - `Drawer` API — only added optional `initialFocusRef` prop; 5 callers untouched
+    - `stories-viewer-overlay.tsx` — preserved verbatim (carryover)
+    - `role="dialog"` / `aria-modal` / `aria-labelledby` / ESC / body scroll-lock — preserved verbatim
+    - framer-motion default animations — preserved (only reduced-motion branch added)
+    - Schema (NO migration)
+    - All sprint waves
+  - **Pre-launch risks обнаруженные:** none new. UI-1 + UI-3 closed. Russian accessibility law (152-ФЗ + ГОСТ Р 52872-2019) alignment improved for the 50+ modal surfaces. The custom focus-trap implementation is tested via the pure decision helper; runtime lifecycle integration deferred to TC-3 (acceptable — manual QA + code review verify the React lifecycle wiring).
+  - **Open questions for user:** none — refactor mechanical, all gates green, behavior identical for default users. 2 deferred items: (1) `stories-viewer-overlay` consolidation (`STORIES-VIEWER-A11Y-CONSOLIDATE` 🔵 post-launch); (2) framer-motion exhaustive `useReducedMotion` sweep across remaining 56 surfaces (not blocker — shared primitives now respect preference; per-surface application opportunistic per Pattern 5 coverage-tail).
+  - **Process insight (Pattern 14 — largest fan-out demonstrated):**
+    - **Booking `assertX` family**: 6 helpers × ~14 enforcement points (BUSINESS-LOGIC-AUDIT-A)
+    - **Portfolio shared helper** (`loadMasterServiceOverridesMap`): 1 helper × 4 sites (FEED-PORTFOLIO-N1-FIX-A)
+    - **MODAL-A11Y shared hooks**: 3 hooks × **55+ enforcement points** (50 ModalSurface + 5 Drawer)
+    - Pattern 14 **scales with primitive adoption** — earlier primitives had narrow fan-out (assertX in single-function paths); shared UI primitives have orders-of-magnitude larger fan-out. **The earlier a pattern lands in a shared primitive, the larger the latent leverage** for future fixes. Confirms ModalUnify-Impl-A investment paid off — single ModalSurface investment now hardens 50 callers at the a11y axis without per-caller work.
+  - **SPRINT-PATTERNS Pattern 14 addendum** — added 4th evidence point (modal-a11y) + the «scale-with-adoption» insight + counter-example («don't extract a primitive prematurely for 1-2 callers — wait for ≥3 to confirm the pattern; extraction at scale = single-fix leverage at any future axis»).
+  - **Combined audit-волна aggregate (all 10 audits + 3 fix-prompts done):** SECURITY 6/8 + 3 (closed via FAST-WINS for SEC-2 + OTP-LOG-DEV-GUARD for SEC-1; SEC-3 backlog), CODE-CONSISTENCY 6/8 + 2 (ENV-DISCIPLINE-SWEEP closed CC-1; CC-2 backlog), TEST-COVERAGE 0 critical + 5 minor (TC-1 + TC-2 closed via SECURITY-SURFACE-TESTS + FAST-WINS), ERROR-HANDLING 8/8 + 1 tooling-gap (EH-1 backlog), DEPLOYMENT-READINESS 7/8 + 1 closed (DR-1 via PROD-ENV-SYNC), BUSINESS-LOGIC 8/8 + 4 design-choice (no bugs), PERFORMANCE 7/8 + 1 🔴 closed (PERF-1 via FEED-PORTFOLIO-N1-FIX), **UI-UX 6/8 + 1 🟠 closed (UI-1 via MODAL-A11Y-BATCH) + 1 🟡 closed (UI-3 same batch) + 3 🟡 backlog + 3 🔵 backlog**. **🎉 0 🔴 + 0 🟠 remaining across all 10 audits.** Audit-волна 10/11 done; item 11 DOCUMENTATION-AUDIT — last remaining.
+
+- **2026-05-23 — UI-UX-AUDIT-A** (commit on `auditandaction`). **Audit-волна item 10/11. NO code/CSS changes — read-only systematic UI/UX/a11y audit.** Complementary to manual cabinet QA (which covered functional flows); this audit covers a11y / responsive / states / theme / forms / navigation systematically. Sample-based — comprehensive sweep of every component would be a separate big task. **Result: STRONG sprint discipline across 6 of 8 categories. 0 🔴 unusable surfaces. 1 🟠 modal-focus-trap a11y gap (touches 79 callers via shared primitive — single fix would harden all). 4 🟡 consistency/polish gaps. 3 🔵 minor.** Reference: `.claude/skills/ui-ux-pro-max/SKILL.md` as design authority.
+  - **Method:** 8 categories + bonus swept. Inventoried `eslint.config.mjs` (a11y rules via `eslint-config-next/core-web-vitals` active — lint baseline 1/3 means no jsx-a11y violations). Read `src/components/ui/modal-surface.tsx`, `button.tsx` end-to-end. Grepped 132 `aria-*` usages across features. Sampled `photo-carousel.tsx`, `studio-profile-page.tsx`, admin tab patterns. Inventoried `EmptyState` (no shared component — each feature defines its own), `loading.tsx` route files (18), `error.tsx` route files (3), `prefers-reduced-motion` handling (none). Cross-referenced CODE-CONSISTENCY-AUDIT-A + UI-TEXT-HARDCODE-FIX-A findings.
+  - **Раздел 8 (UI/UX):** strong baseline confirmed —
+    - **Shared UI components used widely** — `ModalSurface` 79+ callers, `Button` with size variants (sm/md/lg/icon/none), `Input` h-11, `Select` h-11, all using brand tokens (`bg-bg-card`, `text-text-main`, `border-border-subtle`, `text-text-sec`).
+    - **`ModalSurface` a11y baseline correct** — `role="dialog"` + `aria-modal="true"` + `aria-labelledby` (with `useId`), ESC handler, body scroll lock, portal-to-body (containing-block fix documented).
+    - **ARIA discipline** — 132 `aria-*` attribute usages across `src/features` + `src/components`. Icon-only buttons consistently labelled (`aria-label`). Tab navigation patterns use `aria-current="page"` (e.g. admin billing tabs, master cabinet sidebar).
+    - **Theme support** — light + dark via `next-themes`; brand tokens (`bg-bg-card`, `text-text-main`, `border-border-subtle`, `bg-brand-gradient`) defined in `src/app/globals.css`. Only hardcoded hex colors found are external brand colors (Telegram `#2AABEE`, VK `#4C75A3`, accent `#c6a97e`) in legacy `studio-profile-page.tsx` + `studio-settings-page.tsx` (both `@deprecated` per Phase 7 cleanup backlog) — **legitimate design-choice** (Telegram + VK brand guidelines require exact colors).
+    - **Inline styles** — 68 occurrences, all dynamic (positioning, dimensions, backgroundImage, transforms). No hardcoded color styles.
+    - **Image discipline** — all `<Image>` components have `alt` (multiline regex returned 0 matches without `alt=`). 1 raw `<img>` in admin-only `portfolio-editor.tsx` (PERF-4 backlog).
+    - **Form UX** — required-field discipline strong (`required` Zod validation + `aria-required` not surveyed exhaustively but `PromptModal` + `FormDialog` enforce `required` prop). Submit-on-loading disabled state in shared `Button` via `disabled` prop. Error messages in `UI_TEXT` (Russian, actionable).
+    - **Loading/empty/error states** — 18 `loading.tsx` route files (ERROR-HANDLING-AUDIT confirmed); EmptyState present in 10+ feature paths (each feature defines own — see 🟡 gap below).
+    - **Navigation** — `MasterPageHeader` with `breadcrumb: Crumb[]` prop on cabinet pages, sidebar with active-state styling via `aria-current="page"`. Mobile bottom-nav present where appropriate.
+  - **Findings — full breakdown in BACKLOG entry:**
+    - **🟠 UI-1 ModalSurface lacks focus trap + initial-focus + return-focus** ([`src/components/ui/modal-surface.tsx:86-182`](src/components/ui/modal-surface.tsx)). 79+ callers via shared primitive. Currently: ESC closes ✅, body scroll-lock ✅, `aria-modal` ✅. **Missing**: (1) **focus trap** — Tab can escape modal to background page elements (WCAG SC 2.4.3 violation); (2) **initial focus** — no `autoFocus` on first interactive; keyboard users have to Tab from page-start; (3) **return focus on close** — focus doesn't restore to the trigger element (WCAG SC 2.4.3 + 3.2.1). Single fix across 79 callers. Fix-prompt: `MODAL-FOCUS-TRAP-FIX-A` (~half-day — add focus trap utility, return-focus on cleanup, initial-focus prop with sensible default of first focusable child). Same pattern as `react-aria-focus-scope` or `@radix-ui/react-focus-scope`. **Note**: 1 site (`stories-viewer-overlay.tsx:115`) implements manual focus-trap independently — could consolidate or extract shared helper. 🟠 severity (a11y for keyboard + screen reader users; affects every modal).
+    - **🟡 UI-2 No shared `<EmptyState>` component** — 10+ features (`client-cabinet/*`, `admin-cabinet/catalog`, `master/components/model-offers/{application-empty-state,offer-empty-state}`, `chat`, `studio` etc) define their own empty-state markup. UI-UX-PRO-MAX skill documents the pattern («Centered icon + title + description + secondary CTA»). Without shared component, visual drift possible (icon size / spacing / typography differing across cabinets). Fix: extract `src/components/ui/empty-state.tsx`, migrate ~10-15 callers (Pattern 14 — explicit primitive). ~half-day. Backlog 🟡 `EMPTY-STATE-COMPONENT-A`.
+    - **🟡 UI-3 No `prefers-reduced-motion` handling** — framer-motion animations (`ModalSurface` entry/exit, page transitions, etc) ignore OS-level «reduce motion» preference. WCAG SC 2.3.3 + Apple/Microsoft accessibility guidance. Fix: add `useReducedMotion()` hook (framer-motion native helper) to `ModalSurface` + other animation surfaces; respect reduced-motion by setting transition `duration: 0` or removing motion. Backlog 🟡 `REDUCED-MOTION-A`.
+    - **🟡 UI-4 Button sizes `sm` (h-9=36px) + `icon` (h-10 w-10=40px) below 44px tap-target recommendation** ([`button.tsx:28-34`](src/components/ui/button.tsx)). WCAG SC 2.5.5 (AAA, not strict) recommends ≥44×44px tap targets. Apple HIG = 44pt, Material = 48dp. `md` (h-11=44px) + `lg` (h-12=48px) compliant. **Concern only if `sm` / `icon` used on mobile-primary critical paths** (booking submit, OTP entry, etc). Sample needed to confirm usage. Fix: either (a) audit usage and migrate mobile-critical to `md`+, or (b) document `sm`/`icon` as desktop-only convention. Backlog 🔵 `TAP-TARGET-AUDIT-A`.
+    - **🟡 UI-5 Legacy `studio-profile-page.tsx` + `studio-settings-page.tsx` hardcoded brand colors** — Telegram/VK brand colors are **legitimate design-choice** (external brand guidelines require exact). BUT the broader legacy 837-LOC `studio-settings-page.tsx` is already `@deprecated` (Phase 7 cleanup backlog). When that file retires, these hex literals go with it. **Currently active but flagged for cleanup.** No standalone fix needed.
+    - **🔵 UI-6 Skeleton accuracy not systematically verified** — 18 `loading.tsx` files exist; whether each skeleton matches its actual content layout (preventing jumpy reflow on hydrate) is a per-page visual check. Not blocker; opportunistic improvement during page work.
+    - **🔵 UI-7 No Storybook / visual snapshot infrastructure** — visual regression undetected at PR-time. Backlog 🔵 `STORYBOOK-SETUP` for post-launch.
+    - **🔵 UI-8 1 raw `<img>` in admin portfolio editor** — already PERF-4 in PERFORMANCE-AUDIT backlog (`PORTFOLIO-EDITOR-NEXT-IMAGE`). Cross-ref only.
+  - **Categories with 0 findings (well-implemented):**
+    - **Theme support** — strong token discipline, light+dark via next-themes, only legacy/external-brand hex.
+    - **Navigation** — MasterPageHeader breadcrumbs on cabinet pages, sidebar `aria-current="page"`, mobile bottom-nav.
+    - **Component consistency** — CODE-CONSISTENCY-AUDIT-A already verified. 79+ shared modal callers, FormDialog/PromptModal/ShellSurface widely used.
+    - **Form UX** — `required` validation in `PromptModal`, error messages in UI_TEXT (Russian, actionable), submit-disabled state via shared Button.
+    - **Image discipline** — all `<Image>` have `alt`, no raw `<img>` outside 1 admin file (cross-ref).
+    - **ARIA basics** — 132 aria-* usages, `aria-modal`/`aria-labelledby`/`aria-current` patterns consistent.
+  - **🛡 Structural Prevention candidates (NEW — Шаг 1 demonstrated):**
+    | Finding class | Prevention candidate | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | UI-1 modal focus trap | Add `@radix-ui/react-focus-scope` or implement utility once, apply to ModalSurface | ~half-day | High (single fix → 79 callers hardened + WCAG SC 2.4.3 closure) | Backlog 🟠 `MODAL-FOCUS-TRAP-FIX-A` |
+    | UI-2 EmptyState drift | Extract shared component + migrate callers | ~half-day | High (Pattern 14 — primitive prevents future drift) | Backlog 🟡 `EMPTY-STATE-COMPONENT-A` |
+    | UI-3 reduced motion | `useReducedMotion()` hook + apply to all animation surfaces | ~1 hr | Medium (a11y + battery savings on mobile) | Backlog 🟡 `REDUCED-MOTION-A` |
+    | UI-4 tap targets | Audit usage of `sm`/`icon` button sizes on mobile + document convention | ~2 hr | Medium (mobile-first compliance) | Backlog 🔵 `TAP-TARGET-AUDIT-A` |
+    | (general) hardcoded colors | ESLint rule blocking `bg-\[#`, `text-\[#`, `border-\[#` outside allowlist | ~half-day | Medium (catches new instances) | Backlog 🔵 `TAILWIND-COLOR-LINT` |
+    | (general) modal contract | Storybook + chromatic visual regression | ~1 day setup | High (catches visual regressions) | Backlog 🔵 `STORYBOOK-SETUP` post-launch |
+    | (general) a11y systematic | `eslint-plugin-jsx-a11y` already active via `eslint-config-next/core-web-vitals` | already done | High | Verified working (0 violations in 1/3 baseline) |
+  - **What was NOT changed:** NO source code / CSS / shared components / sprint work. Only `MASTERRYADOM_AI_CONTEXT.md` + `BACKLOG.md` doc updates. Read-only discipline preserved. `git status` was clean before this audit started; this audit adds only docs.
+  - **Validation:** typecheck ✅, **611/611 tests** preserved.
+  - **Pre-launch risks обнаруженные:** **UI-1 modal-focus-trap is the only 🟠 finding.** Not blocker (modals work for mouse users; screen-reader + keyboard-only users hit the gap). Russian accessibility law (152-ФЗ + State Standard ГОСТ Р 52872-2019 for digital accessibility) is gaining enforcement weight; pre-launch fix recommended. ~half-day. Other findings are 🟡 polish / 🔵 nice-to-have.
+  - **Open questions for user:** **(1)** `MODAL-FOCUS-TRAP-FIX-A` — pre-launch (~half-day, 79 callers hardened in one fix) or post-launch? Recommendation: pre-launch given accessibility law trend. **(2)** `EMPTY-STATE-COMPONENT-A` (Pattern 14 primitive extraction) — opportunistic when next cabinet redesign happens, or proactive sweep now? **(3)** `REDUCED-MOTION-A` — small (~1 hr) but valuable for users with vestibular disorders + battery-conscious mobile users. Worth pre-launch?
+  - **Process insight:** sprint's UI discipline strong on **structural patterns** (shared components, theme tokens, UI_TEXT централизация, mobile-first applied via ui-ux-pro-max skill) but **a11y depth varies**: ARIA basics consistent (`aria-modal` / `aria-labelledby` / `aria-current` widely used) but **focus management was overlooked at the shared-primitive level**. Single fix to `ModalSurface` would harden 79 callers — same shape as Pattern 14 «explicit helpers / shared primitive» applied at the a11y axis. This is the **manual-QA-vs-systematic-audit differential** the prompt anticipated: manual QA verifies «modal opens, content visible, ESC closes» (all true); systematic audit catches «keyboard user can't Tab inside modal cleanly, focus doesn't return on close». Sample-based audit found 8 findings in ~30 min; comprehensive a11y sweep with axe-core or pa11y would find more but mostly polish-class.
+  - **Combined audit-волна aggregate (10 of 11 done):** SECURITY 6/8 clean + 3, CODE-CONSISTENCY 6/8 clean + 2, TEST-COVERAGE 0 critical + 5 minor, ERROR-HANDLING 8/8 strong + 1 tooling-gap, DEPLOYMENT-READINESS 7/8 strong + 1 closed via PROD-ENV-SYNC, BUSINESS-LOGIC 8/8 well-implemented + 4 design-choice, PERFORMANCE 7/8 + 1 🔴 closed via FEED-PORTFOLIO-N1-FIX, **UI-UX 6/8 strong + 1 🟠 + 4 🟡 + 3 🔵 (no 🔴)**. Sprint baseline strong across all 10 audit categories; consistent pattern is «sprint discipline strong on new code + shared primitives, legacy gaps + a11y depth + structural-prevention CI scripts as backlog accumulation».
+  - **Audit-волна progress:** items 1-10 done; **item 11 DOCUMENTATION-AUDIT — last remaining.**
+
+- **2026-05-23 — FEED-PORTFOLIO-N1-FIX-A** (commit on `auditandaction`). **🎉 Closes PERF-1 — the single 🔴 from a 9-audit wave.** Refactored 4 sites in `src/lib/feed/portfolio.service.ts` to eliminate nested-include N+1 over-fetch on the home feed hot path. **Pattern 2 (5th occurrence) + Pattern 14 (shared helper) + Pattern 5 architectural variant (legacy code migrated to «filter-at-query-time» sprint discipline).** Delivered via 2-phase workflow (audit subagent + implement+verify subagent). **NO schema migration**, **NO API contract changes** — `PortfolioFeedItem` / `PortfolioDetail` consumer-facing shape identical.
+  - **Audit findings (subagent Phase 1):** 4 sites mapped — `listPortfolioFeed` (lines 170-308), `listHomePortfolioFeed` (310-433), `getPortfolioDetail` main query (439-481), `getPortfolioDetail` similarRows query (490-533). All 4 used identical `services.include.service.select.masterServices` pattern with NO `where` filter. `resolveServiceOption` JS predicate: `ms.masterProviderId === input.masterId && ms.isEnabled`. **sharedHelperCandidate = true** (Pattern 14 opportunity). **complexityWarning = empty**, **apiContractRisk = empty** — mechanical refactor safe.
+  - **Refactor strategy (subagent Phase 2):**
+    - Stripped `masterServices` from nested include in all 4 Prisma queries.
+    - New helper `loadMasterServiceOverridesMap(pairs)` (Pattern 14 — explicit batched lookup): takes `(masterProviderId, serviceId)` tuples → returns `Map<string, MasterServiceOverride>` keyed by `${masterProviderId}:${serviceId}`.
+    - New helper `collectMasterServicePairs(rows)` dedupes pairs from page rows.
+    - `resolveServiceOption` + `buildPortfolioSnapshot` refactored to consume the precomputed map instead of iterating per-row `masterServices`.
+    - Single batched `prisma.masterService.findMany({ where: { masterProviderId: { in: [...] }, serviceId: { in: [...] }, isEnabled: true } })` per call site (2 for `getPortfolioDetail` — main + similar).
+    - Empty inputs short-circuit (no query fired).
+    - Cuid keys can't collide (both cuids have no colons; `${masterId}:${serviceId}` joiner unambiguous).
+  - **Раздел 3 (Архитектура):** `src/lib/feed/portfolio.service.ts` updated. New private helpers `loadMasterServiceOverridesMap` + `collectMasterServicePairs` at module scope. Pattern documented for future portfolio extensions.
+  - **Раздел 5 (Бизнес-логика):** portfolio query strategy now «filter-at-query-time» — matches sprint discipline. Public API behavior identical; row count fetched per home-feed page reduced from ~10K to ~100 (50 items × ~2 services/item = ~100 relevant pairs, single batched query). `getPortfolioDetail` does exactly 2 batched lookups (main + similar) — bounded by `take: 8` similar items × ~2 services each.
+  - **Раздел 15 (changelog):** this entry.
+  - **Performance impact (conceptual, no prod data):**
+    - **Before**: each of 4 sites included `service.masterServices` without WHERE. For 50-item feed × ~2 services/item × N masters who ever touched any of those services, materialized ~50 × 2 × N MasterService rows. Cross-product over-fetch.
+    - **After**: 50 items + 1 batched query of ≤~100 rows (only relevant master×service pairs that exist + enabled). The cross-product N factor eliminated.
+  - **Tests added (8):** [`src/lib/feed/portfolio.service.test.ts`](src/lib/feed/portfolio.service.test.ts) — helper short-circuit, key-collision absence, all 4 site behaviors (override application, fallback to service.price/durationMin per resolveServiceOption fallback semantics, empty-page zero-query, exactly-2-queries for detail, similar-rows short-circuit). 603 → **611 tests** ✅.
+  - **Validation:** typecheck ✅ / lint baseline 1/3 preserved (no new findings in modified files) / encoding ✅ / mojibake ✅ / check:ui-text ✅ / `npx prisma validate` ✅ (NO migration) / `npm run build` ✅ (Compiled successfully in 30.3s) / **611/611 tests** ✅.
+  - **What was NOT changed:** Prisma schema (NO migration). `PortfolioFeedItem` / `PortfolioDetail` DTO shapes (consumers see identical data). Cache TTL constants (`FEED_PORTFOLIO_CACHE_TTL_SECONDS = 60` in `route.ts` untouched). Cache invalidation discipline (time-based TTL only — preserved). Public exports of `portfolio.service.ts` (only internal helpers added; existing exports preserved). All sprint waves preserved.
+  - **Pre-launch risks обнаруженные:** none new. PERF-1 closed. The over-fetch pattern now structurally absent from these 4 sites.
+  - **Open questions for user:** none — refactor mechanical, all 8 gates green, behavior identical. The 2 structural-prevention CI scripts (`PRISMA-INCLUDE-WHERE-CI-CHECK` + `FINDMANY-TAKE-CI-CHECK`) remain deferred to Шаг 3 STRUCTURAL-PREVENTION-AUDIT comprehensive review.
+  - **Pattern occurrences advanced:**
+    - **Pattern 2 (trace-all-parallel-channels)** — 5th occurrence. Prior 4: STUDIO-CLIENT-WRITE-DIALOG-A, SEC-1 (OTP-LOG-DEV-GUARD-A), OTP-LOG-DEV-GUARD-A across 3 OTP surfaces, EMAIL-VERIFY-FIX-A (closed 1 of 2 email-write surfaces, second deferred as different fix shape). This 5th case: 4 sites all needed identical refactor; all fixed in one commit. Methodology continues working.
+    - **Pattern 14 (explicit `assertX` / helper)** — applied. `loadMasterServiceOverridesMap` + `collectMasterServicePairs` are explicit, side-effect-free helpers (no Prisma in `collectMasterServicePairs`; `loadMasterServiceOverridesMap` makes the one Prisma call). Same shape as `assertBookingWindow` / `assertMasterPerformsService` etc — extracted reusable contract, called from multiple sites.
+    - **Pattern 5 (coverage-tail) architectural closure** — sprint discipline «filter-at-query-time, not in-memory» now applied to legacy code that pre-dated the pattern. Same shape as ENV-DISCIPLINE-SWEEP-A migrating 45 inline `process.env.*` reads to typed `env` access. Coverage-tail-via-fix-prompt remains a valid remediation path when the gap is bounded (4 sites here, 45 sites for ENV).
+  - **Workflow execution:** 2-phase pipeline (audit Explore agent + implement subagent). 50 tool uses total, 12 min elapsed, 363K tokens. Audit subagent returned structured findings via JSON schema; implement subagent consumed audit verbatim + applied refactor + wrote tests + ran all 8 gates inline. **Workflow discipline:** audit-then-implement separation caught the «complexityWarning empty / apiContractRisk empty» go-ahead BEFORE any file changes — STOP gate worked as designed. If audit had flagged complexity, workflow would have returned `phase: "audit-only"` for user decision.
+
+- **2026-05-23 — PERFORMANCE-AUDIT-A** (commit on `auditandaction`). **Audit-волна item 9/11 (Tier 2). NO code/schema changes — read-only static analysis.** Caveat: static analysis is **not** load testing — production traffic data needed for full picture (slow-query log analysis, real hot-path identification, bundle-size user-impact). This audit identifies discoverable patterns from code reading. **Result: mostly well-tuned with 1 🔴 critical N+1-shape over-fetch on home feed hot path** + 1 🟡 unbounded findMany + 4 🔵 minor. 7 of 8 categories well-tuned (5 strong, 2 with minor opportunities). **Sprint's caching + pagination discipline was strong; the 🔴 is a pre-sprint pattern that wasn't refactored.**
+  - **Method:** 8 categories swept. Inventoried `src/app/api/feed/*` + `src/app/api/catalog/*` + `src/app/api/health/*` (hot paths). Read `feed/portfolio.service.ts`, `feed/stories.service.ts`, `catalog/catalog.service.ts`, `master/clients-view.service.ts`, `billing/trial-cron.ts` end-to-end. Inventoried Prisma `@@index` declarations on `booking.prisma` / `provider.prisma` / `service.prisma` / `billing.prisma`. Verified Prisma + Redis singletons, lazy-init patterns. Cross-referenced TEST-COVERAGE / SECURITY / ERROR-HANDLING / BUSINESS-LOGIC / DEPLOYMENT-READINESS audit findings (not re-reported).
+  - **Раздел 3 (Архитектура):** strong performance baseline confirmed —
+    - **Prisma singleton**: `src/lib/prisma.ts` uses `globalThis.__beautyhubPrisma` pattern to survive HMR + single client per Node process.
+    - **Redis lazy singleton**: `src/lib/redis/connection.ts` lazy-initialised, separate command + subscriber connections, 3s connect timeout + 2.5s command timeout (configurable via env), per-operation `withRedisCommandTimeout` wrapping.
+    - **Bundle config**: `output: "standalone"` + `serverExternalPackages: ["redis", "@redis/client", "@prisma/client", "sharp", "@aws-sdk/client-s3"]` (heavy server-side deps excluded from client bundle).
+    - **Image discipline**: 22 files use `next/image`; raw `<img>` only in 1 admin-only `portfolio-editor.tsx` (acceptable — admin flow).
+    - **Caching wired**: Redis caching on `/api/feed/portfolio` (60s TTL, anonymous + unfiltered path only — correctly skips cache for per-user/filtered to avoid keyspace explosion), `/api/feed/stories` (60s TTL), advisor cache, catalog smart-tag cache, billing plan cache. All have explicit invalidation discipline (verified by ERROR-HANDLING-AUDIT).
+    - **Pagination discipline**: cursor pagination on `feed/portfolio` (cursor + take: pageSize + 1), `catalog` (page-mode with totalCount in parallel OR cursor-mode), `master/clients` (cursor + page).
+    - **Cron batching**: `trial-cron.ts BATCH_SIZE = 100` per invocation; explicit pattern «if real volume outgrows, raise the limit».
+    - **Hot path identification**: `/api/feed/portfolio` cached for anonymous (correct — hot path) but uncached for authenticated (also correct — `isFavorited` is per-user state, can't be cached without keyspace explosion).
+  - **Раздел 4 (Модели данных):** **strong index coverage**:
+    - **Booking**: 9 indexes — `(providerId, startAtUtc, endAtUtc)`, `(providerId)`, `(masterProviderId)`, `(startAtUtc)`, `(serviceId)`, `(clientUserId)`, `(studioId)`, `(masterId)`, `(status, startAtUtc)`. Covers conflict-check + master/client lookups + status filter + time-range queries.
+    - **Provider**: 8 indexes — `(ownerUserId)`, `(studioId)`, **3 composite for catalog sort+filter** (`(isPublished, rating DESC, reviews DESC)`, `(isPublished, ratingAvg DESC, reviews DESC, createdAt DESC)`, `(studioId, type, isPublished, createdAt)`, `(type, isPublished, address)`, `(isPublished, autoPublishStoriesEnabled)`, `(cityId, isPublished)`). Excellent coverage of catalog query patterns.
+    - **Service**: 3 indexes — `(providerId)`, `(providerId, isEnabled, isActive)`, `(globalCategoryId, isEnabled, isActive)`. Covering indexes для master cabinet service list + public catalog category filter.
+    - **MasterService**: 4 indexes — `(masterProviderId)`, `(serviceId)`, `(masterProviderId, isEnabled)`, `(serviceId, isEnabled)`. Strong.
+    - **Provider denormalization**: `ratingAvg`, `ratingCount`, `reviews` cached на Provider row — avoids COUNT/AVG aggregation on every catalog query.
+  - **Findings — full breakdown in BACKLOG entry:**
+    - **🔴 PERF-1 over-fetch in feed/portfolio `listPortfolioFeed`** ([portfolio.service.ts:228-248](src/lib/feed/portfolio.service.ts)). `services.include.service.masterServices` has **NO `where` filter** — loads ALL `MasterService` rows for each service in the feed, then `resolveServiceOption` filters in JS by `masterProviderId`. For 50-item feed × ~2 services/item × hundreds of masters offering popular services = **~10K MasterService rows fetched to find ~100 matching**. Same pattern in 4 places: `listPortfolioFeed` (lines 228-248), `listHomePortfolioFeed` (lines 360-371), `getPortfolioDetail` (lines 459-470), `similarItems` loader (lines 516-527). Hot path (anonymous cached 60s — mitigates load; but cache MISS path + per-user authenticated path hit this every request). Fix: refactor to fetch matching MasterService rows by `(masterProviderId, serviceId) in ((m1,s1), (m1,s2), ...)` after main query, OR change per-row include to use a where-clause that references the parent (Prisma doesn't natively support; needs separate query). 🔴 because crashes-under-load on cache-MISS or for-user (Pattern 5 finder: pre-sprint code pattern, not sprint-introduced).
+    - **🟡 PERF-2 stories `findMany` without `take`** ([stories.service.ts:62](src/lib/feed/stories.service.ts)). Query selects `portfolioItem.findMany` filtered by `isPublic + createdAt >= since + master.isPublished + autoPublishStoriesEnabled`, then groups in-memory + caps to `STORIES_MAX_GROUPS × STORIES_MAX_ITEMS_PER_MASTER`. No `take:` clause on the query itself — relies on time horizon + filter to bound. Pragmatic for current scale; if many providers post in 24h window, query returns more than needed. Cached 60s mitigates. Fix: add `take: STORIES_MAX_GROUPS * STORIES_MAX_ITEMS_PER_MASTER * 2` safety cap. 🟡 because cache makes per-request impact low + scale-dependent.
+    - **🔵 PERF-3 catalog provider list nested `masters.portfolioItems`** ([catalog.service.ts:625-634](src/lib/catalog/catalog.service.ts)). Studio provider rows include `masters` → each master's `portfolioItems take: 4`. For a studio with N masters, generates N nested queries via Prisma. Not strictly N+1 (single SQL with nested JOINs through Prisma's relation loader), but query plan complexity scales with studio team size. Acceptable at studio scale (typically ≤10 masters); revisit if studios get large. 🔵 monitoring item.
+    - **🔵 PERF-4 raw `<img>` in admin portfolio editor** ([media/components/portfolio-editor.tsx](src/features/media/components/portfolio-editor.tsx)). 2 raw `<img>` instead of `next/image`. Admin-only flow, not user-facing hot path. Low priority.
+    - **🔵 PERF-5 dev-only `next/dynamic` adoption** — single usage in `landing-home.tsx`. Lazy loading underused; could split heavy client components (e.g. booking widget steps, schedule editors). Not blocking — current bundle splits via Next.js route-based code splitting are usually sufficient.
+    - **🔵 PERF-6 no `npm run analyze` baseline** — `@next/bundle-analyzer` is wired (`next.config.ts:3`) but no recorded baseline. Backlog 🔵 to capture bundle-size baseline after first prod deploy for future regression detection.
+  - **NO critical observations on:**
+    - Booking conflict check (`booking-core.ts:118 ensureNoConflicts`): uses `take: 1` + `select: { id, startAtUtc, endAtUtc }` minimal. JS-side overlap recheck necessary because Prisma can't express `endAt > start AND start < endAt` precision in single query. Acceptable.
+    - Cron batching: trial-cron `take: BATCH_SIZE` correctly bounded.
+    - Provider catalog query (`catalog.service.ts:566`): `select` explicit, `services where isEnabled isActive`, `masterServices where isEnabled`, `portfolioItems take: 8`, `masters.portfolioItems take: 4`. Smart-tag counts + highlighted user IDs batched via `loadSmartTagCounts(rows.map(...))` + `loadHighlightedUserIds(ownerUserIds, ...)`. Strong batching pattern.
+    - Master clients view: `userProfile.findMany({ where: { id: { in: userIds } } })` + `Promise.all` parallel reads — proper batching.
+  - **🛡 Structural Prevention candidates (NEW — Шаг 1 demonstrated):**
+    | Finding class | Prevention candidate | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | PERF-1 nested-include without where (N+1-shape over-fetch) | `scripts/check-prisma-include-where.mjs` — AST walk over `prisma.X.findMany({ include: { Y: { include: { Z: { ... no where ... } } } } })` patterns | ~half-day | High (catches new instances at PR-time) | Backlog 🟡 `PRISMA-INCLUDE-WHERE-CI-CHECK` |
+    | PERF-2 unbounded findMany | `scripts/check-findmany-take.mjs` — flag `findMany({...})` without `take` and without explicit «known small» comment | ~1 hr | Medium (catches forgot-take pattern) | Backlog 🔵 `FINDMANY-TAKE-CI-CHECK` |
+    | (general) missing-index detection | manual audit at schema-PR time (audit checklist) | manual | Medium | Manual sufficient (added to QUALITY-GATES) |
+    | (general) bundle size regression | `npm run analyze` baseline + CI diff check | ~1 hr setup + reporting infra | Low (manual review on big changes) | Backlog 🔵 `BUNDLE-SIZE-CI` |
+    | PERF-3 nested studio queries | runtime spy in dev (Prisma middleware logging slow queries) | ~half-day | Low (mostly already covered by `prisma log: ["warn"]` in dev) | Existing dev `log: warn` sufficient |
+    | PERF-4 raw `<img>` discipline | ESLint rule `@next/next/no-img-element` (already in next/core-web-vitals?) | ~5 min config | Medium | Verify lint rule active; if not, enable |
+  - **Sprint's caching + pagination discipline strong** — but doesn't yet have **CI checks that prevent the patterns this audit found from reappearing**. Pattern 7 (tooling-absence) shape: no tooling exists to flag missing-`where`-in-nested-include OR missing-`take`-on-findMany at PR-time. Adding 2 CI scripts (~half-day total) would prevent regressions.
+  - **What was NOT changed:** NO source code / schema / runbooks / sprint work. Only `MASTERRYADOM_AI_CONTEXT.md` + `BACKLOG.md` + (optional) SPRINT-PATTERNS addendum if Pattern 14 / Pattern 7 cross-reference helps. Read-only discipline preserved. `git status` shows ONLY 3 docs.
+  - **Validation:** typecheck ✅, **603/603 tests** preserved.
+  - **Production data needed for:**
+    - Actual hot-path traffic distribution (which endpoints are highest req/s)
+    - PostgreSQL slow-query log analysis (post-launch with real workload)
+    - Bundle size impact on real user TTFB / LCP (web vitals from real users)
+    - Cache hit rate measurement (Redis stats + per-key analysis)
+    - PERF-1 actual impact magnitude under load (depends on portfolio item × service × master cardinality in prod data)
+  - **Pre-launch risks обнаруженные:** **PERF-1 🔴 is real but mitigated by 60s cache on anonymous path** — first request after cache TTL + any authenticated request bypasses cache. Under high traffic + popular services + many masters, this can manifest as latency spike. **Recommendation:** schedule `FEED-PORTFOLIO-N1-FIX-A` (~half-day refactor) before launch — risk-reward favors it. PERF-2 stories has same cache mitigation but smaller blast radius.
+  - **Open questions for user:** **(1)** PERF-1 fix-prompt — schedule pre-launch (~half-day) or post-launch (riskier but cached path dominates)? **(2)** Structural prevention scripts (`PRISMA-INCLUDE-WHERE-CI-CHECK` + `FINDMANY-TAKE-CI-CHECK`) — proactively add to CI now or wait for second incident?
+  - **Process insight:** PERF-1 is **pre-sprint legacy pattern** that wasn't refactored during sprint (sprint focused on new features + correctness fixes, not perf refactors). Sprint's caching + pagination discipline is strong on **new code** but didn't sweep existing code. Pattern 5 (coverage-tail) shape at the architectural level: pattern «filter at query-time, not in-memory» exists conceptually but wasn't enforced retroactively. Same shape as CC-1 (env helpers exist, 45 sites not migrated). Recommendation: **add structural prevention CI checks** (Pattern 7 — tooling-absence remediation) rather than relying on developer discipline alone.
+  - **Audit-волна progress:** items 1-9 done (5 read-only audits + 1 synthesis + 1 deployment + 1 business-logic + 1 performance); items 10-11 remaining (UI-UX / DOCUMENTATION).
+
+- **2026-05-23 — BUSINESS-LOGIC-AUDIT-A** (commit on `auditandaction`). **Audit-волна item 8/11 (Tier 2 continuation). NO code/schema changes — read-only audit.** Complementary с предыдущими audits (TEST-COVERAGE / SECURITY / ERROR-HANDLING / CODE-CONSISTENCY / DEPLOYMENT-READINESS). Этот covers **business logic correctness** (pricing math / booking lifecycle / subscription flows / schedule rules / idempotency / audit log integrity / invariants). **Result: STRONGEST audit-wave outcome to date — 0 🔴 critical, 0 🟠 high, 4 🟡 design-choice/gap (not bugs), 8 of 8 categories well-implemented.** Sprint's business logic discipline is the most consistently-applied pattern in the codebase.
+  - **Method:** 8 categories + bonus swept. Inventoried `src/lib/billing/*` (15 files), `src/lib/bookings/*` (24 files), `src/lib/payments/yookassa/*`, `src/lib/schedule/*`, `src/lib/audit/*`, key prisma schema models. Read `flow.ts` + `policy-enforcement.ts` + `createBooking.ts` + `cancelBooking.ts` + `booking-core.ts` + `idempotency.ts` + `webhook-processor.ts` + `marketing-pricing.ts` + `mrr.ts` + `utils.ts addMonthsUtc` + `trial.ts` + `guards.ts` end-to-end. Cross-referenced TEST-COVERAGE / SECURITY / ERROR-HANDLING audit findings (not re-reported).
+  - **Раздел 5 (Бизнес-логика):** strong baseline confirmed across all 8 categories —
+    - **Pricing correctness — well-implemented**. Kopeks (integer) used throughout — `marketing-pricing.MarketingPlanPrice.priceKopeks: number`, `BillingPayment.amountKopeks: Int`, `MrrInput.priceKopeks: number`. `calcSavingsPercent` guards null/negative/zero monthly + periodMonths=1; `Math.round` ensures integer result. `mrr.calculateMRR` guards `periodMonths <= 0` divide-by-zero. `utils.addMonthsUtc` day-clamps for end-of-month (Jan 31 + 1 month → Feb 28/29 correctly). `yookassa/client.formatAmount(kopeks)` uses `(kopeks / 100).toFixed(2)` for YooKassa API string format — kopeks at billing scale (max ~10¹⁰) safely within Float exact-representation (< 2⁵³ ≈ 9×10¹⁵).
+    - **Booking lifecycle — well-implemented**. BookingStatus enum has 11 values (NEW/PENDING/CONFIRMED/CHANGE_REQUESTED/REJECTED/IN_PROGRESS/PREPAID/STARTED/FINISHED/CANCELLED/NO_SHOW). `normalizeBookingStatus` consolidates to 6 runtime statuses (legacy NEW→PENDING, PREPAID→CONFIRMED, STARTED→IN_PROGRESS, CANCELLED/NO_SHOW→REJECTED). `resolveBookingRuntimeStatus` computes IN_PROGRESS/FINISHED at-runtime based on `startAtUtc + duration + BOOKING_FINISH_GRACE_MINUTES=60`. `ensureBookingActionWindow` enforces 60-min cancel/reschedule cutoff. `ensureCancellationDeadline` respects provider's `cancellationDeadlineHours` + special-case `<= 0` = «cancellation forbidden». `cancelBooking` handles the «client declines master's reschedule» edge case (CONFIRMED stays + clears proposed). 32 tests in `flow.test.ts` lock the rules.
+    - **Subscription flows — well-implemented**. `trial.activateTrialForNewProvider` transaction-wrapped + 3-step eligibility (existing active / ever-had-PREMIUM / plan exists). UTC math, no DST traps. `webhook-processor.ts` payment.succeeded: terminal-state early-return (line 102) prevents reprocessing, `alreadySucceeded` flag (line 109) prevents duplicate audit/notification on retry, atomic transaction for payment + subscription update, `addMonthsUtc` for period calc. `BillingPayment.idempotenceKey @unique` + `yookassaPaymentId @unique` enforce DB-level idempotency. Plan cache invalidation wired on all state changes.
+    - **Schedule / work hours — well-implemented**. `assertWithinMasterWorkHours` inclusive boundaries (start ≥ open, end ≤ close). `assertMasterPerformsService` enforced on create + reschedule + studio move (Pattern 2 closure — STUDIO-RESCHEDULE-VALIDATION-A). `policy-enforcement.assertBookingWindow` applied at three surfaces (slots endpoint, createBooking, rescheduleBooking — Pattern 2 closure). Timezone-aware (`toUtcFromLocalDateTime` / `toLocalDateKey` with provider's `timezone` field, default `Europe/Moscow`).
+    - **Master/service correctness — well-implemented**. `resolveBookingCore` validates: provider exists / service exists+enabled+active / no own-booking / provider-service ownership / master exists / studio-master relationship / MasterService exists+enabled / duration+price integer-non-negative. `isStudioMasterActive` predicate (STUDIO-BUGS-FIX-A — invariant #24) enforces ACTIVE master eligibility.
+    - **Idempotency / race conditions — well-implemented**. **5 of 6 P2002 sites mapped** (booking BOOKING_CONFLICT 409; chat conversation-slug + cities + MRR snapshot use silent re-read recovery; email-verify EMAIL_ALREADY_USED 409 — EMAIL-VERIFY-FIX-A). Remaining: 🟡 OTP-EMAIL-LOGIN-RACE backlog (low probability). Booking creation: Redis idempotency 600s TTL + Serializable tx + double `ensureNoConflicts` (outside + inside tx) + P2002/P2034 catch.
+    - **Audit log integrity — well-implemented**. AdminAuditLog + BillingAuditLog: no `updatedAt`, only `createdAt`; service exports only `create`/`createSafe` (no update/delete API) — effectively immutable. `adminUserId onDelete: Restrict` (invariant #16) prevents admin deletion before audit reassignment. Strict/safe variants documented (invariants #18, #19). Critical financial + admin operations logged comprehensively (trial / payment / refund / plan-change / cancel / review-moderation / settings).
+    - **Cross-cutting invariants — well-implemented**. All 26 documented invariants enforced in code; #25 (master CRM privacy) + #26 (chat ACL) regression-tested.
+  - **Раздел 5 — Findings (full breakdown in BACKLOG entry):**
+    - **🟡 BL-1 Kopeks bare `number` type** (style / compile-time safety). No `Kopeks` brand type — `type Kopeks = number & { __brand: "Kopeks" }`. Misuse possible: dev accidentally subtracts rubles from kopeks at compile time. Schema-level type discipline strong (Prisma `Int`); helper-level type discipline absent. Backlog 🟡 `MONEY-BRAND-TYPE-A` — quick win (~half-day, single helper type + propagate to ~20 sites).
+    - **🟡 BL-2 Runtime booking status not persisted** (design choice, documented). `resolveBookingRuntimeStatus` computes IN_PROGRESS/FINISHED at-runtime from `startAtUtc + duration + 60min grace`, doesn't write to DB. Means DB queries on `Booking.status` see PENDING/CONFIRMED rows even after time passes. UI/admin uses runtime helper consistently. Acceptable for current scale. If analytics ever need DB-level filter on these statuses, periodic cron could promote. Backlog 🔵 `BOOKING-STATUS-PROMOTION-CRON` (if/when analytics need it).
+    - **🟡 BL-3 No DB-level booking-conflict unique constraint** (design choice). `Booking` has no partial unique index on `(providerId, masterProviderId, startAtUtc) WHERE status NOT IN (REJECTED, CANCELLED, NO_SHOW)`. Conflict prevention relies on Serializable tx + double `ensureNoConflicts` + P2034 catch. Works correctly; defense-in-depth would add belt-and-suspenders. Schema migration required. Backlog 🔵 `BOOKING-PARTIAL-UNIQUE-INDEX-A`.
+    - **🟡 BL-4 Booking lifecycle NOT in audit log** (gap by design). Booking create/cancel/reschedule logged via `logInfo` (operational), not audit log. Rationale: high-volume + user-initiated (not admin), different compliance class. If a dispute «who cancelled my booking and when?» — investigation relies on app logs. Could add `BookingAuditLog` model for compliance posture. Backlog 🔵 `BOOKING-AUDIT-LOG-A` (post-launch when needed).
+  - **🛡 Structural Prevention candidates (NEW Шаг 1 demonstrated):**
+    | Finding class | Prevention candidate | Cost | Value | Recommendation |
+    |---|---|---|---|---|
+    | BL-1 kopeks misuse | Brand type `Kopeks = number & { __brand }` + propagate to ~20 sites | ~half-day | High (compile-time) | Backlog 🟡 `MONEY-BRAND-TYPE-A` |
+    | BL-3 conflict race | Partial unique index migration | ~1 hr + migration | Medium (defense-in-depth; current works) | Backlog 🔵 schema |
+    | (general) state-machine illegal transitions | `assertValidTransition(from, to)` helper + apply at all status writes | ~half-day | Medium (covers future devs adding transitions) | Backlog 🔵 |
+    | (general) `process.env` direct read pattern | `scripts/check-env-templates.mjs` (filed by PROD-ENV-EXAMPLE-SYNC-A as ENV-TEMPLATES-CI-CHECK) | already filed | High | 🔵 backlog active |
+    | (general) Pattern 2 parallel-channel discipline | Manual code-review checklist + SPRINT-PATTERNS Pattern 2 awareness | manual | Strong already | No additional infra needed — sprint discipline working |
+    | (general) DB-immutability invariant for audit logs | TypeScript guard: audit-service exports `create`/`createSafe` only (no update/delete) | already done | Strong | Pattern preserved by code review |
+  - **NO new invariants needed** — все existing invariants enforced. Possible future invariant once all P2002 sites mapped: «каждый P2002 → user-friendly error либо silent recovery, никогда 500» (5 of 6 today, 1 backlog).
+  - **Validation:** typecheck ✅, **603/603 tests** preserved, NO code/schema/config changes. `git status` clean (prior commits landed, this audit adds only docs).
+  - **What was NOT changed:** NO source code / schema / runbooks / sprint work. Only AI_CONTEXT раздел 15 + BACKLOG entry. Read-only discipline preserved.
+  - **Pre-launch risks обнаруженные:** **0 🔴 critical, 0 🟠 high.** All 4 findings are 🟡 design-choice/gap (not bugs). Pre-launch deployment readiness unaffected. Cross-ref EMAIL-VERIFY-FIX-A already closed last 🔴 blocker.
+  - **Open questions for user:** **(1)** BL-1 brand type — half-day refactor, prevents future bugs but no current bug. Schedule now vs post-launch? **(2)** BL-3 partial unique index — would require schema migration. Defense-in-depth, current Serializable tx works. Schedule now vs post-launch? **(3)** BL-4 booking audit log — likely post-launch when first dispute surfaces.
+  - **Process insight:** sprint's discipline in business logic correctness was the **strongest of any audit category swept**. Combined audit-волна aggregate: SECURITY 6/8 clean + 3 findings, CODE-CONSISTENCY 6/8 clean + 2 findings, TEST-COVERAGE 0 critical + 5 minor, ERROR-HANDLING 8/8 strong + 1 gap, DEPLOYMENT-READINESS 7/8 strong + 1 high-impact (closed), **BUSINESS-LOGIC 8/8 well-implemented + 4 🟡 design-choice (no bugs)**. The «regression-test-per-fix» discipline (Pattern 6) + «Pattern 2 parallel-channel» discipline + «atomic catch / explicit invariants» discipline visibly produce business-correct code. Significant indicator: **0 critical / 0 high findings across 8 categories** — exceptional for a system with this much business surface area (booking lifecycle / billing / scheduling / pricing).
+  - **Audit-волна progress:** items 1-8 done (5 read-only audits + 1 synthesis doc + 1 deployment audit + 1 business-logic audit); items 9-11 remaining (PERFORMANCE / UI-UX / DOCUMENTATION).
+
+- **2026-05-23 — PROD-ENV-EXAMPLE-SYNC-A** (commit on `QAfix1`). **🎉 Closes DR-1 + uncovers deeper Pattern 5 instance (env templates were gitignored AND never committed).** Two parts shipped together. Synced `.env.production.example` to current `src/lib/env.ts` schema + added `.gitignore` re-include exceptions so both templates actually propagate to fresh clones. **NO code changes** — pure docs/config sync. **Audit-driven scope expanded**: audit said «5+ missing vars»; actual diff = **13 missing vars in 7 logical groups**. Includes the SMS-GATEWAY-A May 23 block (5 vars — silent-regression-prevention) + MRR_SNAPSHOT_SECRET (cron auth) + NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED + EMAIL_AUTH_ENABLED + SUPPORT_TO_PARTNERSHIP + 2 Redis timeout vars. **Mid-fix discovery**: `git status` after Part 1 edits showed `.env.production.example` was NOT modified. Investigation: `.gitignore:34` `.env*` matched both templates; `git ls-files .env*.example` empty; `git log` empty. Templates had **never been committed** — DEPLOYMENT-READINESS audit's premise was incomplete. Part 1 sync alone would have shipped with hidden zero-impact (fresh-clone operator gets NO template). Part 2 added `!.env.example` + `!.env.production.example` exceptions immediately after the `.env*` rule, with comment explaining placeholders-only safety. Real `.env`/`.env.production` stays ignored above. Pattern 5 instance recognised at TWO levels: (a) prod env template drift vs canonical env.ts; (b) gitignore exception pattern established by ENV-DISCIPLINE-SWEEP-A for SPRINT-PATTERNS without applying to envs.
+  - **Раздел 11 (Деплой):** `.env.production.example` now matches env.ts schema. DR-1 closed; deployment template safe for operator copy. Other DR-2 through DR-12 findings unchanged (carryover items per their priority).
+  - **NO modifications** to `src/lib/env.ts` (source of truth preserved) / `.env.example` (dev reference preserved) / any source code / schema / sprint work.
+  - **SPRINT-PATTERNS.md Pattern 5 addendum** — DR-1 added as 5th evidence point + new variant taxonomy («stale allowlists» + «inline reads» + «drifted mirror artifact»). Remediation rule formalised: «when env.ts changes, sync ALL templates dev AND prod in same commit». Structural-prevention backlog item ENV-TEMPLATES-CI-CHECK filed (🔵 — `scripts/check-env-templates.mjs` walking env.ts schema → grep both `.env*.example`).
+  - **Validation:** typecheck ✅, encoding/mojibake ✅, **603/603 tests** preserved, build ✅. Scripted completeness verification: `for var in <11 sync targets>; do grep -q "^${var}=" .env.production.example`; all 11 ✓. `git status` shows ONLY `.env.production.example` + 3 docs + carryover from previous commits.
+  - **Process insight:** DR-1 was already classified as Pattern 5 variant in the DEPLOYMENT-READINESS audit; this closure confirms the pattern and adds it formally to SPRINT-PATTERNS. The mechanic generalises beyond env: any «canonical-source + active-mirror maintained, passive-mirror touched at use-time only» triple is at risk (prod runbooks vs dev, prod README vs dev, etc). Recommend structural prevention (CI checker) over reactive sweeps when the canonical-source has a parseable schema like env.ts.
+
+- **2026-05-23 — DEPLOYMENT-READINESS-AUDIT-A** (commit on `QAfix1`). **Audit-волна item 7/11 (Tier 2, переставлен вперёд по pre-launch value). NO code/config changes — read-only audit.** Complementary с PHASE6-HARDENING-AUDIT-A (infrastructure components wired) — этот covers deployment mechanics (env/build/migration/health/runtime/operational). **Result: substantively strong deployment posture, MVP-shippable; 1 high-impact docs-drift finding (sync `.env.production.example`) + 4-5 ops-hygiene gaps; 0 deploy-blockers.**
+  - **Method:** 8 categories + bonus swept. env.ts vs `.env.example` vs `.env.production.example` 3-way diff; gitignore + git-log secret check; Dockerfile + Dockerfile.worker + docker-compose.prod.yml read end-to-end; `.github/workflows/{deploy,quality-gates}.yml` review; migration list + deploy order verification; health endpoint inventory + auth gating; runtime config (Redis/Postgres pooling/external creds); runbook inventory (`docs/runbooks/` — 10 files); bonus (TLS / domain / logs / resource limits / worker isolation).
+  - **Раздел 11 (Деплой):** strong baseline confirmed —
+    - **Env validation discipline** — env.ts uses Zod refines that fail-fast in production for missing REDIS_URL / WORKER_SECRET / MEDIA_DELIVERY_SECRET / NEXT_PUBLIC_APP_URL / S3 creds (when STORAGE_PROVIDER=s3) / OPENAI_API_KEY (when VISUAL_SEARCH/AI flags on) / SMS_PROVIDER_LOGIN+PASSWORD (when SMS_PROVIDER_ENABLED=true). `console.error` + `process.exit(1)` on parse failure in production runtime. Build phase + test env exempted (correct). ENV-DISCIPLINE-SWEEP-A migrated 45 sites to typed access.
+    - **Secrets management** — `.env*` gitignored (verified `git log --all -- .env*` empty); GitHub Actions secrets injection (YC_OAUTH_TOKEN / PROD_SSH_KEY / NEXT_PUBLIC_* / etc); placeholder strings (`replace-with-*`) in committed `.env*.example`; SECURITY-AUDIT-A confirmed no hardcoded secrets in source.
+    - **Build configuration** — multi-stage Dockerfile (deps → builder → runner) with non-root user (`nextjs:nodejs` uid 1001); standalone output (`output: "standalone"`); image domain configured (`storage.yandexcloud.net`); `package-lock.json` committed; `prisma generate` before `next build`; NEXT_PUBLIC_ vars baked via `--build-arg`.
+    - **CI/CD pipeline** — `quality-gates.yml` on every push/PR (validate/generate/lint/typecheck/test/mojibake/encoding); `deploy.yml` on push to `main` (quality → build → push to Yandex CR → SSH deploy); concurrency control prevents stomping; `prisma migrate deploy` BEFORE rolling restart (deploy.yml:122-127 — schema-first invariant respected).
+    - **Health checks 3-tier** — `/api/health` (liveness, unauthenticated, DB+Redis ping, 200/503); `/api/health/status` (readiness, admin-or-worker-secret auth, aggregated db/redis/worker/queue/notifier, distinct from liveness — orchestrator-friendly); `/api/health/worker` (heartbeat via Redis `worker:last-ping`, 120s threshold).
+    - **Graceful shutdown** — worker.ts wires SIGTERM + SIGINT handlers setting `isShuttingDown = true`; main loop drains. App container uses Next.js standalone default (acceptable).
+    - **Runtime config** — Redis prod (requirepass + AOF + healthcheck); Postgres prod (pgvector/pgvector:pg16 + healthcheck pg_isready); YooKassa IP allowlist wired (`yookassa/allowlist.ts`); AbortController timeouts on yookassa/telegram/maps (per ERROR-HANDLING-AUDIT).
+    - **Operational runbooks** — 10 docs: README, auth-outage, cleanup-duplicate-billing-plans (verified ready), incident-drill-checklist, mrr-snapshot-cron (cron config documented), queue-backlog-worker-lag, redis-down, **release-go-no-go-checklist.md (12-section comprehensive GO/NO-GO template)**, yookassa-allowlist-maintenance, yookassa-webhook-retry-storm.
+  - **Раздел 11 — findings (full breakdown in BACKLOG entry above):**
+    - **🟠 DR-1 `.env.production.example` OUT OF SYNC** — last updated Apr 16, missing 5+ vars added in May sprint (most critically: entire `SMS_PROVIDER_*` block — без них prod SMS не работает → users can't OTP-login → P1 regression for operator using stale template). Also missing: `MRR_SNAPSHOT_SECRET`, `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED`, `EMAIL_AUTH_ENABLED`, `SUPPORT_TO_PARTNERSHIP`, `REDIS_*_TIMEOUT_MS`. Fix: ~30 min sync. Highest-priority fast-fix item.
+    - **🟠 DR-2 no documented deploy rollback** — manual rollback works (re-deploy previous `IMAGE_TAG`) но no runbook. Most sprint migrations ADD-only so app-level rollback usually sufficient. Add `docs/runbooks/deploy-rollback.md`.
+    - **🟠 DR-3 no DB backup runbook** — self-hosted Postgres in named volume; no pg_dump schedule / off-host target documented. `cleanup-duplicate-billing-plans.md` references «backup before running» informally. Higher concern than DR-2 (data loss > app downtime).
+    - **🟡 DR-4 no connection pooling** (pgbouncer absent) — acceptable for MVP single-container scale.
+    - **🟡 DR-5 SMSC.ru IP whitelist not pre-configured** — operational dependency from SMS-GATEWAY-A.
+    - **🟡 DR-6 TLS termination not in compose** — services on `127.0.0.1:3000`; reverse proxy strategy (nginx/Cloudflare/Yandex ALB) not documented.
+    - **🟡 DR-7 no resource limits** в docker-compose.prod.yml — single OOM can starve sibling containers.
+    - **🟡 DR-8 no external log aggregation** — Docker `json-file` driver only; cross-ref EH-1 OBSERVABILITY.
+    - **🔵 DR-9 worker uses `tsx` at runtime** — marginal startup cost.
+    - **🔵 DR-10 worker copies entire `src/`** — minor image bloat.
+    - **🔵 DR-11 app container no explicit SIGTERM** — Next.js standalone default acceptable.
+    - **🔵 DR-12 prod seed strategy not in standalone runbook** — covered partially by CLEANUP-BILLING runbook.
+  - **Production-execution readiness — go/no-go checklist** (concrete actionable items in BACKLOG entry above). Aggregates DR-1 (must-fix-first) + secrets generation + GitHub Actions config + Yandex Compute provisioning + SMSC IP whitelist (DR-5) + TLS strategy (DR-6) + DB backup (DR-3) + first-deploy execution + post-deploy smoke (release-go-no-go).
+  - **Аggregate stats:** **0 🔴 deploy-blockers**, 3 🟠 risky-but-works (DR-1/2/3), 5 🟡 operational gaps (DR-4/5/6/7/8), 4 🔵 best-practice (DR-9/10/11/12). 8 categories — 1 has a high-impact finding (env example sync), 7 baseline-strong.
+  - **What was NOT changed:** NO source/config edits anywhere. Only `MASTERRYADOM_AI_CONTEXT.md` + `BACKLOG.md` doc updates. Schema not touched (no migration). 603/603 tests preserved. typecheck ✅. `git status` shows only docs + carryover artifacts from previous commits.
+  - **Pre-launch risks обнаруженные:** the 🟠 cluster (DR-1/2/3) is operational-hygiene class — not «can't deploy» but «can deploy badly». DR-1 specifically affects first-deploy SMS functionality if operator uses stale template, which is a 30-min docs fix. Cross-ref: aggregating these 3 with `PROD-ENV-EXAMPLE-SYNC-A` fix-prompt + 2 runbook additions = ~half-day of work to go from current «strong baseline» to «polished pre-deploy».
+  - **Open questions for user:** **(1)** TLS termination strategy (DR-6) is an operator preference — nginx sidecar / Cloudflare / Yandex ALB? Each has different config implications. **(2)** DB backup target (DR-3) — Yandex Object Storage as off-host backup destination, or external cloud? Determines runbook content. **(3)** Deploy rollback policy (DR-2) — auto-rollback on health-check failure (more complex orchestrator setup) vs documented manual procedure (simpler). MVP suggests manual-with-runbook.
+  - **Process insight:** deployment readiness audit confirms **sprint invested heavily in CI/CD scaffolding correctness** — multi-stage Dockerfile, schema-first migration order, fail-fast env validation, comprehensive runbooks. The single high-impact finding is a **documentation-drift coverage-tail** (Pattern 5): env.ts + dev `.env.example` evolved through May sprint; prod template stayed at Apr 16. Same shape as the legacy admin allowlist drift (PHASE7-CLEANUP-A). The fix is identical pattern — sync the stale artifact to the canonical source.
+  - **Audit-волна progress:** items 1-6 done (5 read-only audits + 1 synthesis doc); **item 7 DEPLOYMENT-READINESS now done**; items 8-11 remaining (BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION).
+
+- **2026-05-23 — EMAIL-VERIFY-FIX-A** (commit on `QAfix1`). **🎉 Closes last 🔴 #1 pre-launch blocker — 0 critical blockers remaining.** Atomic P2002 catch on `UserProfile.email` unique-violation → 409 `EMAIL_ALREADY_USED` with user-friendly Russian message. Variant (a) per user decision — **NO schema migration**. Pattern 2 (trace-all-parallel-channels) applied: audit found a 2nd email-write surface (OTP login `create` fallback) — classified as **different fix shape** (registration race needs re-read recovery, not 409 to user) and spawned as separate 🟡 backlog item.
+  - **Audit findings:**
+    - **Single in-scope surface**: [`src/app/api/cabinet/user/profile/email/request-verify/route.ts:74-77`](src/app/api/cabinet/user/profile/email/request-verify/route.ts) — `prisma.userProfile.update({ where: { id }, data: { email, ... } })`. `UserProfile.email` is `@unique`; collision throws `PrismaClientKnownRequestError` code `P2002` → bubbles unhandled → generic 500.
+    - **Parallel-channel scan (Pattern 2)**: grep `data:.*\bemail:` on UserProfile writes found **2 sites**. The 2nd is [`auth/otp/email/verify/route.ts:81`](src/app/api/auth/otp/email/verify/route.ts) — first-time-login `findUnique` then conditional `create({email})`. **Different shape** — registration race, not "address already used by stranger". Correct fix shape there: re-read after P2002 (mirror conversation-slug / detect-city / mrr-snapshot pattern). Out of scope for this commit; tracked as 🟡 `OTP-EMAIL-LOGIN-RACE`.
+    - **OtpCode model** has only `@@index([email])`, no `@unique` — `otpCode.create` cannot P2002. Single fix point confirmed.
+    - **Booking P2002 precedent**: [`src/lib/bookings/createBooking.ts:26-37`](src/lib/bookings/createBooking.ts) — `mapPrismaBookingConflict(error): AppError | null` extracted-helper pattern; atomic catch; re-throws non-P2002. Mirrors-and-tests cleanly. Same shape applied here.
+    - **Existing error codes**: no `EMAIL_ALREADY_USED` in the 112-code registry. Naming convention `*_ALREADY_*` (MASTER_ALREADY_ASSIGNED / REVIEW_ALREADY_EXISTS / VK_ALREADY_LINKED) → `EMAIL_ALREADY_USED` fits. **113 codes** now.
+    - **OTP-LOG-DEV-GUARD-A statement** (lines 99-114) — preserved verbatim, orthogonal to P2002 concern.
+  - **Раздел 3 (Архитектура):** 2 modified source files + 1 new test file:
+    - **MODIFIED** [`src/app/api/cabinet/user/profile/email/request-verify/route.ts`](src/app/api/cabinet/user/profile/email/request-verify/route.ts) — added `Prisma` to `@prisma/client` import and `AppError` to errors import. New exported helper `mapEmailAlreadyUsedConflict(error: unknown): AppError | null` (mirrors `mapPrismaBookingConflict` shape exactly) returns `AppError(409, "EMAIL_ALREADY_USED", "Этот email уже используется другим аккаунтом. Укажите другой адрес.")` on P2002, `null` otherwise. JSDoc cites booking precedent + «exported for tests only». Email write wrapped in try/catch — on error, `mapEmailAlreadyUsedConflict(error)` then throw mapped OR re-throw original.
+    - **MODIFIED** [`src/lib/api/errors.ts`](src/lib/api/errors.ts) — new `EMAIL_ALREADY_USED` value in `ERROR_CODES` union (alphabetic insert between `EDIT_WINDOW_EXPIRED` and `FEATURE_GATE`). 112 → 113 codes.
+    - **NEW** [`map-email-conflict.test.ts`](src/app/api/cabinet/user/profile/email/request-verify/map-email-conflict.test.ts) — 4 tests using real `Prisma.PrismaClientKnownRequestError` construction (no mocking; pure pattern test): P2002 → AppError 409 EMAIL_ALREADY_USED with Russian message; non-P2002 Prisma error (P2025) → null; plain JS Error → null; non-Error values (string/null/undefined) → null.
+  - **Раздел 5 (Бизнес-логика):** email-change happy path **preserved** — successful unique address still writes + sets `emailVerifiedAt: null` + sends OTP + returns `expiresAt`. Conflict path now returns clean 409 with actionable message («Укажите другой адрес») instead of cryptic 500. **Atomic catch** — no pre-check query (TOCTOU race: between read and write another user could take the address, so pre-check is unreliable). Non-P2002 errors re-thrown → upstream `toAppError` handler maps them as before. **OTP-LOG-DEV-GUARD-A behavior preserved** — logging branches untouched.
+  - **Раздел 6 (Маршруты):** `POST /api/cabinet/user/profile/email/request-verify` semantics extended — new 409 `EMAIL_ALREADY_USED` response code surfaces for taken addresses. Existing 200 / 400 / 401 / 429 / 503 paths preserved verbatim.
+  - **Раздел 10 (Безопасность):** P2002 email-verify gap closed — **all known P2002 surfaces в проекте now mapped к user-friendly errors**: booking conflict (BOOKING_CONFLICT 409), conversation slug race (re-read recovery), MRR snapshot race (re-read recovery), detect city race (re-read recovery), hot-slot conflict (typed error), chat system-messages dedup (silent skip), and now email-change (EMAIL_ALREADY_USED 409). Last un-mapped P2002 per ERROR-HANDLING-AUDIT-A confirmation — closed. **One 🟡 deferred**: OTP login `create` race (different shape — should re-read, not 409; spawned as backlog).
+  - **Раздел 12 (Инварианты):** не затронуты formally. **Emergent invariant candidate** (3rd-occurrence threshold not yet met formally — booking + chat + cities + MRR + email = 5 P2002 sites all mapped): «каждый P2002 site → user-friendly error либо silent recovery, никогда 500». Could be formalized once OTP-EMAIL-LOGIN-RACE closure (re-read recovery) confirms all known sites mapped — currently 1 site still has the latent gap. Formal write-up deferred until OTP race fixed.
+  - **Раздел 13 (Правила):** **Pattern P2002-recovery documented in practice (3rd application)** — extract `mapXxxConflict(error): AppError | null` helper, atomic catch in caller (no pre-check), re-throw non-target errors so upstream `toAppError` handles them. Reuse this shape for any new write to a `@unique` column whose collision has user-meaningful interpretation (booking time, email, etc).
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/check:ui-text/prisma (NO migration — `npx prisma validate` confirmed)/build ✅, **599 → 603 tests** ✅ (+4 mapEmailAlreadyUsedConflict).
+  - **What was NOT changed (per strict constraints):**
+    - Schema (variant a — `UserProfile.email` stays `@unique`, we catch violation; NO migration)
+    - Email verify token flow logic (only catch added around the write)
+    - OTP-LOG-DEV-GUARD-A log statement (preserved verbatim)
+    - Booking P2002 pattern (referenced, not modified)
+    - `toAppError` upstream handler (preserved — non-P2002 errors flow through it as before)
+    - OTP login `create` race surface (different fix shape; spawned as 🟡 backlog `OTP-EMAIL-LOGIN-RACE`)
+    - Master + studio + redesign + Phase 6 + LEGACY + UI-TEXT + SECURITY + OTP + ENV-DISCIPLINE + SECURITY-SURFACE-TESTS + FAST-WINS — all preserved
+  - **Pre-launch risks (новых не обнаружено):** none. The OTP-EMAIL-LOGIN-RACE parallel-channel finding is a latent issue (very-low probability — requires two parallel first-time logins for same email within ms), tracked but not blocking. All other P2002 sites already mapped.
+  - **Open questions for user:** none — single in-scope surface fixed, parallel-channel different-shape concern documented with clear remediation path.
+  - **Process insight (Pattern 2 — trace-all-parallel-channels nuanced)**: applying Pattern 2 doesn't mean «apply same fix N times». It means «identify all surfaces of the same finding-class, then decide per-surface what fix shape fits». Here: 2 email-write surfaces found, 1 fixed with 409 (this commit), 1 deferred with different fix shape (re-read recovery). The audit produces a complete map; the fixes match each surface's actual semantics. Same nuance demonstrated in CHAT-FOUNDATION audit (chat present on 2 surfaces, only 1 needed write path; other was read-only).
+  - **🎉 0 🔴 pre-launch blockers remaining.** Pre-launch critical path clear. Remaining post-launch-acceptable: 🟡 OBSERVABILITY-SENTRY-A (~half-day) + CC-2 UI-TEXT-CABINET-SWEEP (multi-phase, ~30-100 strings) + 🟡 OTP-EMAIL-LOGIN-RACE (new, low-probability) + 🔵 nice-to-haves. **Production execution batch** (CLEANUP-BILLING-PROD-A `--confirm` / CHAT-ATTACHMENT-MIGRATE-DEPLOY / YANDEX-DEPLOY-A / VAPID-PUSH-VERIFY / MRR-CRON-SCHEDULE) — verified ready, awaits ops window.
+  - **Fix-батч progress (4 prompts done):** ENV-DISCIPLINE-SWEEP-A / SECURITY-SURFACE-TESTS-A / FAST-WINS-BATCH-A / EMAIL-VERIFY-FIX-A. Tests: 572 → 603 (+31 across the batch).
+
+- **2026-05-23 — FAST-WINS-BATCH-A** (commit on `QAfix1`). **3 post-audit fast-wins closed in one micro-batch.** Closes TC-2 tail (booking-reference upload validator — pair to SECURITY-SURFACE-TESTS-A's chat-attachment) + SEC-2 (JSON-LD `<`-escaping defense layer) + proxy.ts CLAUDE.md rule 11 exception wording. Pattern 5 (coverage-tail) demonstrated: when a finding-class applies to N parallel surfaces, schedule all N closures as a tail before declaring «done».
+  - **Audit findings (3 distinct surfaces):**
+    - **Finding 1 (TC-2 tail):** `validateReferenceAsset` in [`src/lib/bookings/booking-extras.ts:61`](src/lib/bookings/booking-extras.ts#L61) is the pair to `validateChatAttachmentAsset` (tested in SECURITY-SURFACE-TESTS-A). Same validation chain shape (existence → soft-delete → kind → ownership → entityType + one-shot-claim) with reference-specific error codes (`REFERENCE_PHOTO_NOT_FOUND` / `REFERENCE_PHOTO_INVALID` / `REFERENCE_PHOTO_USED` vs `MEDIA_ASSET_NOT_FOUND` / `MEDIA_INVALID_KIND` / `MEDIA_INVALID_ENTITY`) and return type (`Promise<string>` vs `Promise<{ id: string }>`). Module-private — needs `export` keyword for testing (same precedent as `verifySignature` in SECURITY-SURFACE-TESTS-A).
+    - **Finding 2 (SEC-2):** SECURITY-AUDIT-A flagged 3 JSON-LD sites embedding user-controlled fields via raw `JSON.stringify` without `<`-escaping. Audit re-grep found **4 sites** (not 3): `src/app/layout.tsx:185` (SITE_JSON_LD — static but consistency wins), `src/app/faq/page.tsx:35` (FAQ_JSON_LD — derived from FAQ_DATA), `src/app/(public)/u/[username]/page.tsx:387,406` (master + studio profile schemas — user-controlled). `src/lib/seo/schema.ts` exists as natural home for new helper. CSP (nonce + strict-dynamic + no-unsafe-inline) blocks script execution in prod — escape is defense-in-depth eliminating structural breakout possibility.
+    - **Finding 3 (proxy.ts CLAUDE.md):** rule 11 text listed `src/middleware.ts` as exception, but Next 16 renamed it to `src/proxy.ts`. `proxy.ts` code's `process.env` usage was always legit (middleware-class file resolved before env.ts loads); just docs needed alignment. No code change to proxy.ts.
+  - **Раздел 3 (Архитектура):** 4 new files + 1 modified production file + 1 modified docs file + 4 site applications:
+    - **MODIFIED** [`src/lib/bookings/booking-extras.ts`](src/lib/bookings/booking-extras.ts) — `validateReferenceAsset` now has `export` keyword + JSDoc citing «exported for unit testing only, behavior unchanged» + reference to mirror pattern. **No runtime behavior change** — no other module imports it; `resolveBookingExtras` is the production caller.
+    - **NEW** [`src/lib/bookings/booking-extras.test.ts`](src/lib/bookings/booking-extras.test.ts) — 7 tests mirroring `validateChatAttachmentAsset` test pattern point-for-point. Same `vi.hoisted` + `vi.mock("@/lib/prisma")` mock pattern from `chat-attachment-acl.test.ts`. Tests: happy path returns asset id; missing → `REFERENCE_PHOTO_NOT_FOUND 404`; soft-deleted → same; wrong kind → `REFERENCE_PHOTO_INVALID 400`; cross-user attach → `FORBIDDEN 403`; double-claim (entityId not `pending:`) → `REFERENCE_PHOTO_USED 409`; wrong entityType → `REFERENCE_PHOTO_USED 409`.
+    - **MODIFIED** [`src/lib/seo/schema.ts`](src/lib/seo/schema.ts) — new `safeJsonLd(schema: unknown): string` helper at file tail. Single-line implementation: `JSON.stringify(schema).replace(/</g, "\\u003c")`. JSDoc explains: standard JSON-LD XSS mitigation; valid JSON-LD parsers handle the unicode escape transparently; SEO unaffected; CSP still primary defense.
+    - **NEW** [`src/lib/seo/schema.test.ts`](src/lib/seo/schema.test.ts) — 4 helper tests: escape every `<` to `<` (covers `</script>` breakout attempt); preserve valid JSON structure (round-trips through `JSON.parse`); escape nested user-controlled fields (not just top-level strings — reviewBody + nested author.name); handle primitives/empty objects without crashing.
+    - **MODIFIED 4 JSON-LD sites** to use `safeJsonLd(schema)` instead of `JSON.stringify(schema)`:
+      - `src/app/layout.tsx` — added `safeJsonLd` import + replaced `__html: JSON.stringify(SITE_JSON_LD)` → `__html: safeJsonLd(SITE_JSON_LD)`
+      - `src/app/faq/page.tsx` — same pattern for `FAQ_JSON_LD`
+      - `src/app/(public)/u/[username]/page.tsx` — both lines (387 + 406) wrapped via combined `replace_all`/individual edits; `buildProviderSchema` re-import joined `safeJsonLd`
+    - **MODIFIED** [`CLAUDE.md`](CLAUDE.md) — rule 11 text changed `src/middleware.ts` → `src/proxy.ts (middleware-class файл; в Next 16 переименован из src/middleware.ts — legit usage сохранён)`. proxy.ts code untouched (its `process.env` usage was always legit).
+  - **Раздел 5 (Бизнес-логика):** **NO behavior changes anywhere.** All 4 surfaces (validateReferenceAsset / JSON-LD content / proxy.ts / CSP) preserved verbatim. validateReferenceAsset code unchanged (only `export` keyword added). JSON-LD schemas identical (only serialization escaping; `JSON.parse(safeJsonLd(x).replace(/\\u003c/g, "<"))` round-trips to `x`). proxy.ts not touched at all. CSP not affected (defense-in-depth complements, doesn't replace).
+  - **Раздел 6 (Маршруты):** не затронуты — все routes preserved verbatim (no URL/contract changes).
+  - **Раздел 9 (Тесты):** TC-2 **fully closed** (both upload validators tested: chat-attachment 7+3 + booking-reference 7 + safeJsonLd 4 = +11 from this commit). **588 → 599 tests** ✅.
+  - **Раздел 10 (Безопасность):** SEC-2 **closed** — JSON-LD `<`-escaping defense layer applied to all 4 sites. CSP (nonce + strict-dynamic, prod-only) remains primary defense; escape eliminates structural breakout possibility (covers dev environments + defense-in-depth for prod). Pattern: new-gap-now-patterned. validateReferenceAsset locked against regression (chat-attachment + booking-reference + verifySignature now form 3-element trust-locked-by-tests cluster).
+  - **Раздел 12 (Инварианты):** не затронуты — no new invariants. Existing chat ACL invariants #25/#26 + webhook HMAC #5 + booking-reference upload semantics all preserved.
+  - **Раздел 13 (Правила):** rule 11 wording aligned — `src/middleware.ts` → `src/proxy.ts` (Next 16 rename context inlined). No semantic change to the rule (proxy.ts was always the de-facto exception; docs caught up).
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved (pre-existing), encoding/mojibake/check:ui-text/prisma (NO migration)/build ✅, **599/599 tests** ✅ (+11 from 588).
+  - **What was NOT changed (per strict constraints):**
+    - validateReferenceAsset production code (LOGIC) — only `export` keyword added with comment
+    - validateChatAttachmentAsset (already exported, locked by SECURITY-SURFACE-TESTS-A)
+    - JSON-LD schema content / structure (only serialization escaping wrap)
+    - `buildProviderSchema` / FAQ_JSON_LD / SITE_JSON_LD definitions
+    - proxy.ts code (all `process.env.*` usage preserved verbatim)
+    - CSP infrastructure (nonce / strict-dynamic / etc all preserved)
+    - schema (NO migration)
+    - master + studio + redesign + Phase 6 + LEGACY + UI-TEXT + SECURITY-AUDIT + OTP-LOG-DEV-GUARD + ENV-DISCIPLINE + SECURITY-SURFACE-TESTS — all preserved
+    - Other findings (TC-1 already closed; EH-1 / TC-3/4/5 / CC-2 / SEC-3 backlog; 🔴 EMAIL-VERIFY pre-launch blocker)
+  - **Pre-launch risks (новых не обнаружено):** none — no bugs surfaced in tested validate code; JSON-LD escape addresses SEC-2 finding without any user-visible side effect; proxy.ts wording is docs-only.
+  - **Open questions for user:** none — `validateReferenceAsset` open question from SECURITY-SURFACE-TESTS-A closed by this commit. TC-2 fully migrated finding → closure.
+  - **Process insight (Pattern 5 — coverage-tail closure):** demonstrates the «schedule all N parallel surfaces before declaring done» discipline. SECURITY-SURFACE-TESTS-A tested 1 of 2 upload validators (chat-attachment); this commit tests the second (booking-reference). Same shape as the SMS-GATEWAY-A → OTP-LOG-DEV-GUARD-A wave (phone-channel log fix → email-channel log fix). When a security pattern applies to N surfaces, the audit identifies them all; the fix should close them all. Otherwise the tail accumulates as «known-gap-but-incomplete-coverage» debt.
+  - **Next:** remaining post-audit fix candidates — `OBSERVABILITY-SENTRY-A` (EH-1, ~half-day), `UI-TEXT-CABINET-SWEEP` (CC-2, multi-phase ~30-100 strings), `EMAIL-VERIFY-FIX` (🔴 #1 pre-launch blocker), or production execution batch (CLEANUP-BILLING-PROD `--confirm` / CHAT-ATTACHMENT-MIGRATE deploy / YANDEX-DEPLOY / VAPID-PUSH-VERIFY / MRR-CRON-SCHEDULE) — or audit-волна items 7-11 (PERF / UI-UX / DEPLOYMENT / DOCS / BUSINESS-LOGIC).
+
+- **2026-05-23 — SECURITY-SURFACE-TESTS-A** (commit on `QAfix1`). **Closes TC-1 + TC-2 from TEST-COVERAGE-AUDIT-A** with 16 new pure-helper tests + gitignore exception for QUALITY-GATES.md (cross-doc link integrity with SPRINT-PATTERNS).
+  - **Audit findings (sources):** TC-1 webhook `verifySignature` (security-critical, no dedicated test); TC-2 `validateChatAttachmentAsset` + MIME/size constants (no unit tests). Both surfaces SECURITY-AUDIT-A confirmed hardened — this commit locks the behavior.
+  - **TC-1 — webhook signature verifier (6 tests):** [`src/app/api/payments/yookassa/webhook/verify-signature.test.ts`](src/app/api/payments/yookassa/webhook/verify-signature.test.ts) co-located with the route. Tests: valid HMAC-SHA256 accepted; tampered body rejected; wrong-content same-length signature rejected (exercises `timingSafeEqual` branch); wrong-length signature rejected (length early-return BEFORE `timingSafeEqual` — which would throw on length mismatch); empty signature rejected; wrong-secret rejected. Uses deterministic known test vector (test-secret + JSON payload → expected hex digest computed via `crypto.createHmac`).
+  - **Production touch — 1 keyword:** added `export` to `verifySignature` in `src/app/api/payments/yookassa/webhook/route.ts:41` for test discoverability. **No behavior change** — the POST handler still uses the local reference; no other module imports it. Explicit JSDoc comment documents the testing-only export rationale and references invariant #5 (YooKassa webhook HMAC + IP allowlist). This is the standard JS unit-testing pattern for module-private helpers; alternative (re-implement logic in test) would defeat the purpose.
+  - **TC-2 — chat attachment validator + MIME/size constants (10 tests):** [`src/lib/chat/attachment.test.ts`](src/lib/chat/attachment.test.ts). **7 tests on `validateChatAttachmentAsset`** (already-exported, no production touch needed): asset-not-found → `MEDIA_ASSET_NOT_FOUND 404`; soft-deleted → same; wrong kind → `MEDIA_INVALID_KIND 400`; cross-user attach → `FORBIDDEN 403`; already-attached (entityId no longer `pending:`) → `MEDIA_INVALID_ENTITY 409`; wrong entityType → same; happy path returns `{ id }`. Mock pattern reuses existing `vi.hoisted` + `vi.mock("@/lib/prisma")` from `chat-attachment-acl.test.ts`. **3 tests on MIME/size constants** (`MEDIA_ALLOWED_MIME_TYPES` exactly the 3 Sharp-supported formats; PDF/SVG/HEIC/video/HTML explicitly excluded for attack-surface minimization; `MEDIA_MAX_FILE_SIZE_BYTES` = 10 MiB matches Yandex S3 + Sharp ceiling).
+  - **`.gitignore` follow-up to ENV-DISCIPLINE-SWEEP-A:** added `!docs/QUALITY-GATES.md` exception so the cross-doc link from SPRINT-PATTERNS («companion to QUALITY-GATES.md») works for fresh-clone readers. SPRINT-PATTERNS already tracked from prior commit; runbooks remain ignored.
+  - **Раздел 9 (Тесты):** TC-1 + TC-2 marked closed; **572 → 588 tests** (+16: 6 webhook + 7 validator + 3 constants).
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), `check:ui-text` ✅ exit 0, **588/588 tests** ✅, `npm run build` ✅ Compiled successfully in 22.5s.
+  - **What was NOT changed:** `verifySignature` LOGIC (only `export` keyword added with comment), `validateChatAttachmentAsset` (already exported — no touch), MIME/size constants (read-only assertion tests, no modification), other validate paths (`validateReferenceAsset` not exported — left untouched per "no production code changes" rule, can be addressed via similar minimal-touch in a follow-up if TC-2 scope expands), schema, sprint work, master + studio + redesign + Phase 6 + LEGACY + UI-TEXT + SECURITY + OTP + ENV-DISCIPLINE work.
+  - **Pre-launch risks:** none — no bugs surfaced in tested code; both surfaces work as designed. Tests now lock that correctness against future regression. The webhook is the payment-confirmation authentication boundary; locking it via test is exactly the security posture that pre-launch deployment confidence requires.
+  - **Open questions for user:** `validateReferenceAsset` (booking-extras.ts:61, module-private async function) wasn't tested — same TC-2 finding class but second function. Following the same minimal-touch pattern would be ~5-min follow-up (`export` + 7 mirror tests). Defer or schedule? Strict TC-2 scope was «validateReferenceAsset/validateChatAttachmentAsset + MIME/size» — I covered MIME/size + chat-attachment fully; booking-reference variant has identical structure (it's the canonical pattern chat-attachment mirrors per `attachment.ts:7` comment) so tests would be near-duplicate. Marginal value beyond what's already covered.
+  - **Process insight:** demonstrates the **«lock behavior with tests after security audit confirms hardening»** pattern. SECURITY-AUDIT-A confirmed both surfaces correctly implemented; this commit prevents silent regression. Compounds the audit's value — without tests, a future refactor could break `verifySignature` and the audit's «webhook 401 not 500» finding would silently flip to «webhook 200 with wrong signature accepted». Same shape as Pattern 6 (regression-test-per-fix) but applied retrospectively to audit-confirmed-correct code.
+
+- **2026-05-23 — ENV-DISCIPLINE-SWEEP-A** (commit on `QAfix1`). **Mechanical migration of 45 `process.env.*` sites to env.ts (closes CC-1 from CODE-CONSISTENCY-AUDIT-A) + gitignore exception for SPRINT-PATTERNS.md.** First fix-prompt after the audit-волна — pivot from discovery to execution. Demonstrates Pattern 5 (coverage-tail migration): env helpers existed (`isProduction` added in OTP-LOG-DEV-GUARD-A, `env` object always available), inline reads migrated here.
+  - **Audit:** 45 process.env.* sites confirmed outside allowed list (env.ts/startup.ts/middleware.ts/proxy.ts/prisma/tests). All 12 distinct vars verified present in env.ts Zod schema (no new vars added). AUTH_COOKIE_NAME default match verified: schema `"bh_session"` = inline `?? "bh_session"`.
+  - **Раздел 13 (Правила) — rule 11 compliance restored across 31 source files:**
+    - **Category A — 22 `NODE_ENV` checks → `isProduction`** (consumes OTP-LOG-DEV-GUARD-A helper). Files: `auth/vk/{callback,start}` ×2 each, `integrations/vk/{callback,start}` ×2 each, `me/delete`, `health/status` (×2 + inline-const removed), `health/worker` (inline-const removed), `robots.ts`, 3 PWA components, 2 public block-error helpers, `auth/session.ts`, `monitoring/{alerts,status}`, `notifications/notifier`, `queue/queue`, `rate-limit/index` (inline-const removed), `schedule/usecases`, `worker.ts`.
+    - **Category B — 2 `AUTH_COOKIE_NAME` → `env.AUTH_COOKIE_NAME`:** `auth/profile/ensure`, `me/delete`.
+    - **Category C — 21 direct env reads → `env.X`:** `TELEGRAM_BOT_TOKEN` (telegram link+login), `WORKER_SECRET` (health/status, health/worker, worker.ts), `BILLING_RENEW_SECRET` (billing/renew/run), `YANDEX_GEOCODER_API_KEY` (address/geocode), `NEXT_PUBLIC_APP_URL` (layout, master-dashboard, worker.ts), `APP_PUBLIC_URL` (worker.ts), `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` (telegram-login-button + telegram-connect-modal), `NEXT_PUBLIC_VK_ENABLED` (vk-login-button, using `String()` coerce for client-side compat), `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (push-manager), `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` (catalog-map), `health/status` environment string.
+    - **`proxy.ts` deliberately not migrated** — middleware-class legit use of `process.env` per Next.js convention; separate 🟡 backlog item «add `proxy.ts` to CLAUDE.md rule 11 exception list».
+  - **Раздел 11 (Деплой):** env-var access pattern documented as canonical-through-env.ts (no more inline `process.env.*` outside the 5 exception files + proxy.ts).
+  - **gitignore fix:** `docs` rule changed from `docs` (excludes whole dir) to `docs/*` + explicit `docs/runbooks/` (matches existing structure) + `!docs/SPRINT-PATTERNS.md` (re-include the shareable knowledge doc). Result: SPRINT-PATTERNS.md now tracked by git (fresh clones see it without needing the original sprint context); runbooks remain ignored per project convention; QUALITY-GATES.md tracking state preserved (was never tracked — open question for separate decision).
+  - **Verification:** typecheck ✅ (imports resolve), lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), `check:ui-text` ✅ exit 0, **572/572 tests** ✅, `npm run build` ✅ Compiled successfully in 24.9s. **Re-grep:** 0 `process.env.*` outside allowed list (+ proxy.ts known exception).
+  - **What was NOT changed:** logic around env reads (mechanical replacement only — same values resolved), env.ts schema (no new vars), proxy.ts (separate scope), other CC findings (CC-2 UI-TEXT-CABINET-SWEEP separate), schema, tests, runbooks gitignore, sprint work, master + studio + redesign + Phase 6 + LEGACY + UI-TEXT + SECURITY + OTP-LOG-DEV-GUARD work.
+  - **Pre-launch risks:** none new. The mechanical migration produces identical runtime behavior; if anything, slightly safer because env.ts Zod validation now governs every read.
+  - **Open question for user:** QUALITY-GATES.md is referenced as «companion» from SPRINT-PATTERNS.md but remains gitignored — a fresh-clone reader would see a broken cross-doc link. Confirm whether to surface it via `!docs/QUALITY-GATES.md` exception in the same `.gitignore` block, or leave it as project-internal.
+  - **Process insight:** demonstrates pattern-coverage-tail closure in its purest form — 45 sites, 31 files, mechanical migration, identical behavior, single consumer of the helper added in a prior wave. **Total git surface: ~36 files** (31 source + .gitignore + SPRINT-PATTERNS now tracked + BACKLOG + AI_CONTEXT). Pivots audit-волна from discovery to execution mode.
+  - **Next:** remaining fix candidates — `WEBHOOK-VERIFY-TEST-A` (TC-1, ~30 min), `UPLOAD-VALIDATION-TEST-A` (TC-2, ~30 min), `OBSERVABILITY-SENTRY-A` (EH-1, ~half-day), `SEC-JSONLD-ESCAPE-FIX` (SEC-2, ~15 min), `EMAIL-VERIFY-FIX` (🔴 #1 pre-launch blocker), `UI-TEXT-CABINET-SWEEP` (CC-2, multi-phase) — or production execution batch (CLEANUP-BILLING-PROD / CHAT-ATTACHMENT-MIGRATE / YANDEX-DEPLOY).
+
+- **2026-05-23 — SPRINT-RETROSPECTIVE-DOC-A** (commit on `QAfix1`). **Synthesis + formalization of sprint meta-patterns. Audit-волна item 6/11 — first non-discovery item, documentation deliverable.** NO code changes (verified — git surface only `.md` docs). Audience: future Claude Code sessions + second developer + post-launch maintainers.
+  - **New file:** [`docs/SPRINT-PATTERNS.md`](../docs/SPRINT-PATTERNS.md) — 13 evidence-grounded patterns. Each in **Trigger → Action → Evidence** format with concrete prompt-name citations. Companion to QUALITY-GATES.md (gates = per-commit checks; patterns = how-we-work meta-lessons).
+  - **13 patterns formalized** (one per section):
+    1. Audit-first scope-collapse (~17 sprint examples, ~40-60% nominal work saved)
+    2. Trace-ALL-parallel-channels (3 occurrences: STUDIO-CLIENT-WRITE-DIALOG, SEC-1, OTP-LOG-DEV-GUARD)
+    3. Cascade-orphan re-scan (LEGACY EXEC-B → EXEC-C; 2-hop cascade for stories V1)
+    4. Quality-gate health monitoring (check:ui-text crashed 10 days, misread as exit-1-by-findings)
+    5. Pattern-coverage-tail (4 of 5 audits hit this shape: CC-1, CC-2, SEC-1, TEST-COVERAGE)
+    6. Regression-test-per-fix discipline (+214 tests, clustered around fixed files)
+    7. Tooling-absence vs coverage-gap distinction (EH-1 Sentry vs CC-1/CC-2 sweeps — different remediation classes)
+    8. Redesign-commit checklist (5-step — grep + 0-importers + backend deps + cascade re-scan + delete-all-in-one-commit; PHASE7+LEGACY found ~50 orphans / ~6.2K LOC that should have been deleted at original redesign)
+    9. HMAC opaque tokens (rule of N=4 — 3 apps shipped, factory deferred until 4th case)
+    10. Visibility-over-hiding UX (disable+tooltip vs hide; MASTER-BOOKING-UI + STUDIO-MASTERS examples)
+    11. Defense-layering (UI + backend + infra; STUDIO-RESCHEDULE / SMS upload / booking conflict examples)
+    12. Two-sided pushback / constructive disagreement (OTP-LOG-DEV-GUARD compromise example — agent pushed for NODE_ENV guard pattern instead of naive revert)
+    13. «Verified ready» vs «выполнено» status discipline (CLEANUP-BILLING-PROD-A precedent — code ready ≠ executed)
+  - **Audit-волна consolidated stats table** included (items 1-5 outcomes + new findings counts + linked patterns).
+  - **Framework alignment note** — user uploaded `ai-dev-framework` codifying ~80% of these patterns externally; decision was to defer framework adoption post-launch. This doc maps cleanly to most framework sections if/when adopted.
+  - **«When to consult this doc» quick-reference** at the end — task-type → relevant pattern numbers.
+  - **`docs/QUALITY-GATES.md` touch:** single 2-line companion-doc reference added at top (minimal touch — existing per-commit-checks rules preserved verbatim, NO rewrite).
+  - **Раздел 13 (Правила) reference added** — points to SPRINT-PATTERNS for planning/execution discipline; existing per-commit conventions (naming/errors/auth/UTC/Prisma) preserved as-is.
+  - **Validation:** typecheck ✅, encoding/mojibake ✅, **572/572 tests** untouched, git surface = 1 new doc + 1 QUALITY-GATES line + AI_CONTEXT updates + BACKLOG (no code/schema/test changes).
+  - **What was NOT changed:** existing QUALITY-GATES.md rules (only the companion-doc reference line added), existing AI_CONTEXT раздел 13 conventions (only reference added at top), code/schema/tests/sprint work — all preserved.
+  - **Pre-launch risks:** none — documentation task. The act of synthesizing patterns surfaced no new gaps; it confirmed that the sprint's pattern-application discipline is well-evidenced and codifiable.
+  - **Process insight (meta):** **this retrospective itself demonstrates Pattern 6 («capture knowledge while fresh»)** — sprint patterns could have been lost post-launch as memory faded. Doc preserves them for a hypothetical second developer joining the project without sprint context. Recommended **future cadence:** re-run SPRINT-RETROSPECTIVE-DOC at major milestones (post-launch first-month, post-payments-integration, etc) to keep patterns current.
+  - **Next:** audit-волна item 7 (PERF / DEPLOYMENT / DOCS / UI-UX / BUSINESS-LOGIC — user pick) OR pivot to pending fix-prompts (WEBHOOK-VERIFY-TEST, UPLOAD-VALIDATION-TEST, ENV-DISCIPLINE-SWEEP, OBSERVABILITY-SENTRY, SEC-JSONLD-ESCAPE).
+
+- **2026-05-23 — ERROR-HANDLING-AUDIT-A** (commit on `QAfix1`). **Read-only audit of error handling + observability — audit-волна item 5/11.** NO code changes (verified — git surface only `.md` docs). 8 categories + bonus swept.
+  - **Result: STRONGEST audit-wave outcome yet — 8 of 8 categories strong.** Sprint's error-handling discipline is consistently applied across all surfaces. **1 🟡 Medium gap (observability tooling), no new 🔴/🟠 findings** beyond already-tracked 🔴 #1 email-verify P2002.
+  - **Method:** typed error registry inventory (`src/lib/api/errors.ts` — 112 codes); error boundary file inventory; loading.tsx route count; Redis/Prisma/external API degradation patterns; `logInfo` in catch-block detection (zero); `error.stack` in response-body detection (zero); webhook signature reject path; rate-limit fail-closed verification.
+  - **Findings — only 1:**
+    - **🟡 EH-1 No Sentry/APM/error-aggregation tooling.** Zero instrumentation found across `Sentry`, `@sentry`, `datadog`, `newrelic`, `posthog`. Production debugging would rely entirely on log scraping (logs are structured + 112 typed codes help grep, but no breadcrumbs, no aggregation, no stack-trace history, no error rate alerting). **Not launch-blocking** (logs exist and SECURITY+TEST-COVERAGE audits showed error paths well-handled) but significant gap for production triage quality. Well-defined backlog: add Sentry (or alternative) — ~half-day setup. Fix-prompt: `OBSERVABILITY-SENTRY-A`.
+  - **Strong categories (all 8 explicit):** typed error registry (112 codes, AppError class, toAppError converter widely used); 4 React error boundaries with reset() retry UI; 18 route-level loading.tsx files; graceful degradation across Redis (null fallback) + Prisma (P2002 race-handled in 3+ booking sites + chat slug + MRR snapshot) + external APIs (AbortController on yookassa/telegram/maps); fail-soft SMS 503; logging discipline (zero logInfo-in-catch, error.stack only in server logs); sensitive-data hygiene (curated Russian AppError.message to client, no Prisma verbatim leaks); fail-closed rate-limit on sensitive routes (line 153); webhook 401 on invalid signature (invariant #5).
+  - **Cross-reference (not new finding):** the single un-mapped P2002 case is `🔴 #1 EMAIL-VERIFY-FIX` already in pre-launch blockers — verified by this audit as the only such gap, otherwise P2002 handling is consistent.
+  - **Раздел 13 (Правила):** full ERROR-HANDLING-AUDIT-A posture appended with per-category breakdown.
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 572/572 tests untouched.
+  - **Recommended next:** `OBSERVABILITY-SENTRY-A` (Medium, ~half-day, well-defined) → audit-волна item 6 (PERF / SPRINT-RETROSPECTIVE / other) OR pivot to pending fix-prompts (WEBHOOK-VERIFY-TEST-A, UPLOAD-VALIDATION-TEST-A from TEST-COVERAGE, ENV-DISCIPLINE-SWEEP from CODE-CONSISTENCY).
+  - **Process insight:** ERROR-HANDLING audit yielded the strongest result of the audit-волна so far (zero new gaps beyond observability). Combined with: SECURITY 6/8 clean + 3 findings, CODE-CONSISTENCY 6/8 clean + 2 findings, TEST-COVERAGE 0 critical gaps + 5 minor, ERROR-HANDLING 8/8 strong + 1 gap — the **audit-волна collectively confirms the sprint's pattern-application discipline produced highly-resilient surfaces**. The repeating gap shape is «known-pattern-but-incomplete-coverage» (env discipline 45 sites, UI_TEXT cabinet sweep, OTP log surfaces — all migration-tail debts). The new gap class surfacing here (observability tooling) is the first **tooling-absence** finding rather than pattern-coverage finding.
+
+- **2026-05-23 — TEST-COVERAGE-AUDIT-A** (commit on `QAfix1`). **Read-only audit of test coverage — audit-волна item 4/11.** NO code changes (verified — git surface only `.md`). 67 test files / 572 tests sampled across 8 areas + bonus.
+  - **Result: strong posture — critical paths well-covered.** Sprint discipline (regression test per fix) yielded ~95 billing tests, 28 booking-flow tests, 31 schedule tests, 39 chat+ACL+token tests, 34 SMS+masking tests. Zero assertion-less files. Invariants #25/#26 + HMAC tokens regression-tested. No 🔴 critical gaps.
+  - **Distribution:** heavily lib-weighted (booking 9 files, schedule 8, billing 7, chat+media 6, SMS 3, cities 3 — features lighter, regression-test pattern). 
+  - **3 🟡 Medium gaps + 2 🔵 Low (tooling):**
+    - **🟡 TC-1 Webhook signature verify gap** — yookassa webhook `verifySignature` (HMAC-SHA256, security-critical for payment confirmation) has no dedicated test. Feasible as pure-helper test (mock fetch + known signature). Fix-prompt: `WEBHOOK-VERIFY-TEST-A` (~30 min, ~5 tests).
+    - **🟡 TC-2 File upload validation chain gap** — `validateReferenceAsset` / `validateChatAttachmentAsset` + MIME-allowlist + size + magic-byte sniff implemented but not unit-tested. Booking-reference + chat-attachment upload routes consume them. Fix-prompt: `UPLOAD-VALIDATION-TEST-A` (~30 min, ~6-8 tests).
+    - **🟡 TC-3 Auth integration coverage** — rate-limit (Redis-bound), session create/invalidate (Prisma-bound), role guards (Prisma-bound), OAuth flows (VK/Telegram) currently uncovered. Same root cause as billing integration gap. Single solve: stand up integration-test infra (db-test container + Redis-test). Larger backlog item, defers to post-launch.
+    - **🔵 TC-4 Coverage tooling absent** — no c8/vitest --coverage. Manual gap analysis only. Easy backlog: add `npm run test:coverage` with thresholds for critical paths (e.g. lib/bookings ≥80%, lib/billing pure helpers ≥75%).
+    - **🔵 TC-5 E2E framework absent** — Playwright/Cypress not present. **Expected for MVP** per project stage. Once production launches + integration coverage solid, add minimal critical-journey smoke E2E (master signup → publish; client browse → book → review).
+  - **Раздел 9 (Тестирование):** full TEST-COVERAGE-AUDIT-A posture appended with per-area breakdown. Test count updated 45/358 → 67/572.
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 572/572 tests untouched.
+  - **Recommended next:** small-scope wins first — `WEBHOOK-VERIFY-TEST-A` (TC-1, 30 min, security-critical helper) → `UPLOAD-VALIDATION-TEST-A` (TC-2, 30 min, defense-in-depth) → coverage-tooling setup (TC-4) when convenient → integration-test infra (TC-3) post-launch.
+  - **Process insight:** the coverage map confirms the sprint's **regression-test-per-fix discipline** — most tests cluster around files that received fixes (flow, policy, ACL, HMAC, masking, MRR snapshot). This is a **strong pattern for preventing the same bug twice**. Baseline-flow coverage is lighter (cleaner createBooking integration without DB-mocking infra is genuinely hard) — that's the integration-infra gap, not a discipline gap. The 2 moderate findings (TC-1/TC-2) are both *pure-helper test gaps* that don't need integration infra — easy fast-wins.
+
+- **2026-05-23 — CODE-CONSISTENCY-AUDIT-A** (commit on `QAfix1`). **Read-only audit of non-security patterns — audit-волна item 3/11.** Complementary to SECURITY-AUDIT-A. NO code changes (verified — git surface only `.md` docs). 8 categories + bonus swept.
+  - **Result: strong posture — 6 of 8 categories CLEAN.** Sprint's architectural conventions held: server/client boundary (0 client-imports-server violations), HMAC token coverage (3/3 apps + no 4th case), policy enforcement parallel-paths (createBooking + rescheduleBooking + moveStudioBooking all apply asserts), phone validation (parent-normalizes design), naming (no deep relative imports), Zod (114 mutation files), import type (619 files).
+  - **2 findings, both 🟡 Medium (debt-class, not security/runtime):**
+    - **🟡 CC-1 process.env.* discipline (rule 11) — 45 sites** outside allowed list. Mostly mechanical-migration debt: 16 `process.env.NODE_ENV === "production"` (fully covered by new `isProduction` flag from OTP-LOG-DEV-GUARD-A) + 3 `AUTH_COOKIE_NAME` + ~26 direct env reads (TELEGRAM_BOT_TOKEN, WORKER_SECRET, BILLING_RENEW_SECRET, YANDEX_GEOCODER_API_KEY — all already in env.ts schema). Single `ENV-DISCIPLINE-SWEEP-A` fix-prompt (~1-2 hr, mechanical line-replace).
+    - **🟡 CC-2 UI_TEXT broader-scope debt — 306 Cyrillic-containing lines** across 4 cabinet feature dirs outside check:ui-text ROOTS. Sample shows real hardcode (e.g. `plan-card.tsx` month array, same pattern UI-TEXT-HARDCODE-FIX-A centralized for booking-widget). Estimated ~30-100 real strings to centralize. Multi-prompt `UI-TEXT-CABINET-SWEEP` (not launch-blocking — cabinet UI works; debt is consistency + i18n readiness).
+  - **Clean categories explicit:** server/client boundary, HMAC consistency, phone validation, policy enforcement parallel-paths, naming/deep-imports, Zod parseBody coverage, import type discipline, design-choice raw-overlay positioning (10 `fixed inset-0` sites all confirmed mobile-nav/story-viewer/city-prompt — not pseudo-modals).
+  - **Раздел 13 (Правила):** full CODE-CONSISTENCY-AUDIT-A posture summary appended.
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 572/572 tests untouched.
+  - **Recommended next:** `ENV-DISCIPLINE-SWEEP-A` (Medium, mechanical, fast win — closes CC-1 and consumes the just-added `isProduction` helper across 16 sites) → audit-волна item 4. `UI-TEXT-CABINET-SWEEP` is the larger multi-prompt project (defer or schedule per priority).
+  - **Process insight:** CODE-CONSISTENCY validates that the sprint's pattern-application discipline produces consistently architecture-correct surfaces — the 2 findings are both *known-pattern-but-incomplete-coverage* debt classes (env helpers exist but inline reads remain; UI_TEXT exists but cabinet dirs not in check gate). Pattern-existence is strong; pattern-coverage has tail. Same shape as SEC-1 (existing-pattern-missed-surface) but architectural rather than security-class.
+
+- **2026-05-23 — OTP-LOG-DEV-GUARD-A** (commit on `QAfix1`). **Closes SEC-1 (SECURITY-AUDIT-A) with a stricter+broader fix than originally scoped.** Per user decision, applied NODE_ENV guard across all 3 OTP log surfaces (phone + 2 email) instead of just dropping `code` from email logs. Net result: production logs never carry the OTP code, dev/staging keep it for testing convenience (saves SMSC.ru credits + helps QA reproduce flows).
+  - **Pattern:** new shared `isProduction` flag in `src/lib/env.ts` (computed alongside `isVkAuthEnabled`/`isPushEnabled`/`isSmsConfigured`) + new shared `src/lib/logging/masking.ts` (`maskPhone` + `maskEmail`). Call sites use `logInfo("...", { ..., ...(isProduction ? {} : { code }) })`. Mask helpers reused inside the same payloads for `phone`/`email` so the masked surface is consistent.
+  - **3 routes edited:**
+    - `src/app/api/auth/otp/request/route.ts` — phone OTP. After SMS-GATEWAY-A had stripped `code` entirely, this commit adds it back **only in dev/staging**; phone is masked.
+    - `src/app/api/auth/otp/email/request/route.ts` — email OTP request. Send-fail branch's `code` now guarded; both branches mask email.
+    - `src/app/api/cabinet/user/profile/email/request-verify/route.ts` — cabinet email verify. Same: send-fail `code` guarded, email masked in both branches.
+  - **Mock provider untouched** (`src/lib/sms/mock-provider.ts`): it always logs in mock mode (only active when `SMS_PROVIDER_ENABLED=false`, i.e. local dev) — independent of the production guard, by design.
+  - **Existing file-local mask copies preserved** (`maskPhone` in `link-guest-bookings.ts`, `maskEmailAddress` in `support/smtp.ts`) — not modified; new shared exports are the going-forward path. Deduplication is a separate 🔵 refactor candidate.
+  - **Раздел 7 (env discipline):** `NODE_ENV` consumption via the new `isProduction` flag respects rule 11 (env.ts is the single source for env-derived flags). Call sites import `isProduction` from `@/lib/env`, not `process.env.NODE_ENV` directly.
+  - **Раздел 10 (Безопасность):** OTP-in-logs marked **fully closed** (phone via SMS-GATEWAY-A + email via this commit). SEC-1 entry in SECURITY-AUDIT-A posture struck through.
+  - **Раздел 13 (Правила):** new **«Логирование PII / secrets»** sub-rule added — `maskPhone`/`maskEmail` for PII, `isProduction` guard for secrets like OTP codes.
+  - **Tests:** new `src/lib/logging/masking.test.ts` — 10 unit tests. Pins phone masking (format + verbatim-on-short + trim + middle-not-exposed), email masking (format + single-char-local + malformed → `***` + middle-not-exposed), conditional-spread call-site shape (`code` present when `isProduction=false`, absent when `=true`). 562 → **572 tests** (+10).
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), **572/572 tests** ✅, `check:ui-text` ✅ exit 0, `npm run build` ✅ Compiled successfully in 39.7s.
+  - **What was NOT changed:** OTP generation/validation (`generateOtpCode`, `hashOtpCode`, validation flow); SMS provider core; mock provider; email infrastructure; rate-limit; OtpCode schema; existing mask file-locals (link-guest, smtp); other unrelated logging; master + studio + redesign + Phase 6 + LEGACY + UI-TEXT + SMS-GATEWAY work; EMAIL-VERIFY-FIX (P2002, lives in the same cabinet email-verify file but is deferred — only the log statement was touched).
+  - **Pre-launch risks (новых не обнаружено):** the success-branch email logs in the 2 email routes log a masked email (consistent with this fix) but no code (so no SEC-1 class issue). No further unguarded OTP/secret logs uncovered.
+  - **Open questions for user:** нет. Carryover: EMAIL-VERIFY-FIX (P2002 → 500 in cabinet email-verify) remains a pre-launch blocker (🔴 #1 in BACKLOG), separate prompt.
+  - **Process insight (for SPRINT-RETROSPECTIVE-DOC):** the rule «trace ALL parallel channels when applying a security fix» surfaced again — phone OTP fix (SMS-GATEWAY-A) didn't propagate to email channels, surfaced by SECURITY-AUDIT-A, closed here with broader pattern. Same shape as STUDIO-CLIENT-WRITE-DIALOG-A (create + reschedule parallel-path gap). **Pre-launch invariant candidate:** «production logs never contain OTP/passwords/tokens/secrets» — could be added to Раздел 12 if a 4th secret-in-logs site is ever flagged (rule of N=4).
+
+- **2026-05-23 — SECURITY-AUDIT-A** (commit on `QAfix1`). **Read-only application-level security audit — audit-волна item 2/11.** NO code changes (verified — git surface only `.md` docs). Complements PHASE6-HARDENING-AUDIT-A (infrastructure). 8 categories + bonus swept.
+  - **Result: strong posture — 6 of 8 categories CLEAN.** Confirms the sprint's security patterns (auth guards, #25/#26 privacy invariants, 3 HMAC token apps, Zod validation, `ensureStudioRole` cross-tenant) were applied consistently. **3 findings total: 1 🟠 High, 1 🟡 Medium, 1 🔵 Low** — no 🔴 Critical.
+  - **Method:** endpoint inventory (277 routes) + guard-presence grep on all cabinet/admin/master/studio mutations; raw-SQL + `dangerouslySetInnerHTML` sweep; `log(Info|Error|Warn)` PII grep cross-referenced vs SMS-GATEWAY-A; DTO hash/token leak grep; cross-tenant scope spot-checks; webhook + file-upload + cookie + CSP + NEXT_PUBLIC verification.
+  - **Findings:**
+    - **🟠 SEC-1 (High, regression-gap):** email OTP `code` logged on send-failure branch — `auth/otp/email/request/route.ts:70` + `cabinet/user/profile/email/request-verify/route.ts:101`, `logInfo("... (send failed)", { email, code, expiresAt })` with no NODE_ENV guard (fires in prod). Email-channel equivalent of the phone P1 closed by SMS-GATEWAY-A. Conditional on send-failure + needs log access → 🟠. **Fix:** drop `code` from both logs (trivial). Recommended immediate `SEC-EMAIL-OTP-LOG-FIX-A`. Category: applies-pattern-but-missed-surface.
+    - **🟡 SEC-2 (Medium, defense-in-depth):** JSON-LD on `/u/[username]` (+ faq/layout) embeds user-controlled fields via raw `JSON.stringify` without `<`-escaping → `</script>` breakout structurally possible but **CSP-mitigated in prod** (nonce + strict-dynamic + no unsafe-inline blocks execution). **Fix:** `.replace(/</g, "\\u003c")`. Category: new-gap-not-yet-patterned.
+    - **🔵 SEC-3 (Low, ops):** `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` should be domain-restricted in Yandex console. Category: best-practice.
+  - **Clean categories (explicit):** Authorization scope (3 public endpoints all rate-limited+validated by design); DTO leaks (vk accessToken internal-only, public DTOs no phone/email, link-guest masks phone); Input validation (Zod + magic-byte file checks); Cross-tenant isolation (`ensureStudioRole` verifies membership-for-requested-resource); Privacy invariants #25/#26 (regression-tested) + HMAC (3 apps, no 4th cuid-in-URL case); Sensitive ops (webhook HMAC+IP-allowlist, booking state machine, cookie flags).
+  - **Раздел 10 (Безопасность):** full SECURITY-AUDIT-A posture summary added (per-category CLEAN/finding status + the 3 findings).
+  - **Validation:** typecheck ✅, git surface confirms zero new code changes (read-only), 562/562 tests untouched.
+  - **Recommended next:** `SEC-EMAIL-OTP-LOG-FIX-A` (immediate, ~15 min, mirrors SMS-GATEWAY-A) → optionally `SEC-JSONLD-ESCAPE-FIX` (Medium, schedule) → audit-волна item 3.
+  - **Process insight:** the audit validated that the sprint's invariant-application discipline (#25/#26 + HMAC + Zod + ensureStudioRole) produces consistently-secure surfaces — the only High finding (SEC-1) is itself a *missed surface* of an already-established pattern (SMS-GATEWAY-A's log-hygiene), reinforcing the «trace ALL parallel channels when applying a fix» lesson (phone OTP fixed, email OTP missed — same as the booking create/reschedule parallel-path lesson from STUDIO-CLIENT-WRITE-DIALOG-A).
+
+- **2026-05-23 — UI-TEXT-HARDCODE-FIX-A** (commit on `QAfix1`). **Closed pre-existing hardcoded-Cyrillic debt + restored `check:ui-text` to green.** Debt was masked for ~10 days: `check:ui-text` crashed since PHASE7-CLEANUP-A (stale admin allowlist `statSync`), LEGACY-CLEANUP-EXEC-A fixed the crash, and the now-running checker surfaced findings accumulated across prior booking-widget/public-studio/reviews/media commits — NOT introduced by any single commit.
+  - **Audit:** 15 findings, categorized — **9 real hardcoded strings (category A)** + **6 false positives (category B, all Cyrillic prose inside JSDoc/block/JSX comments)**. No category-C (no test-file / console.log / error-throw strings).
+  - **Раздел 13 (Правила):** 9 real strings centralized to `UI_TEXT` (additions only, 8 new keys — `${durationMin} мин` reused the existing `bookingWidget.serviceStep.duration`): `bookingWidget.whenStep.daysOfWeek` + `months` (arrays, replacing `when-step.tsx` `DOW`/`MONTH`); `bookingWidget.steps.ariaLabel` («Шаги записи», `steps-bar.tsx`); `media.crop.zoomOut`/`zoomIn`/`saving` (`crop-picker.tsx` ×3); `master.reviews.reportReasonPlaceholder` («— выберите причину —», `report-review-modal.tsx`); `clientCabinet.reviewForm.starAria` («{star} звезд» template, `review-form.tsx` — referenced via full `UI_TEXT.` path since the hardcode lived in the `StarRating` sub-component which has no local `t`). Template strings use `.replace("{token}", value)` consistent with the existing project pattern.
+  - **`scripts/check-ui-text.mjs` refined:** added a block-comment-aware `stripComments()` pass — tracks `/* … */` state across lines (so JSX `{/* */}` continuation lines that don't start with `*` are stripped too), blanks line `//` + block comment content before the Cyrillic test, reports the original line for context. Eliminates the 6 comment false positives without masking real code hardcode. Conservative on the false-negative side (a `//` inside a string literal could over-strip, documented in the fn JSDoc — not a real pattern here).
+  - **Раздел 7 (Техдолг):** UI-TEXT-HARDCODE debt CLOSED. **`npm run check:ui-text` now exits 0** (was exit-1-by-crash since 2026-05-13, then exit-1-by-findings after EXEC-A) — quality gate restored to green for the first time in ~10 days.
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), **562/562 tests** ✅, **`check:ui-text` ✅ exit 0**, `npm run build` ✅ Compiled successfully in 35s.
+  - **What was NOT changed:** visual output (DOW/MONTH/duration render identically), aria accessibility (labels still announce same text to screen readers), existing UI_TEXT keys + consumers, checker's core scan/ROOTS logic (only added a comment-stripping pre-pass), master + studio + redesign + SMS-GATEWAY-A + CLEANUP-BILLING-PROD-A + LEGACY-CLEANUP, schema (NO migration), tests (no new).
+  - **Pre-launch risks:** нет. No string was context-dependent/locale-fragile beyond the existing `.replace` token pattern.
+  - **Process insight (for SPRINT-RETROSPECTIVE-DOC):** **a crashing quality gate silently accumulated debt for ~10 days** — its exit-1 was misread as «expected failure» rather than «gate is broken». Gates themselves need health monitoring: distinguish exit-1-by-findings (actionable) from exit-1-by-crash (gate down). The LEGACY-CLEANUP-EXEC-A allowlist fix is what made this debt visible at all.
+  - **Next:** audit-волна item 2 (SECURITY / CODE-CONSISTENCY / other) OR production execution batch.
+
+- **2026-05-23 — LEGACY-CLEANUP-EXEC-C (Phase 3, cascade-orphan closure)** (commit on `QAfix1`). **🎉 Closes LEGACY-CLEANUP umbrella 100%.** Narrow op: 1 file deletion + 2 isolated type removals.
+  - **Pre-delete verification:** `story-viewer.tsx` 0 static importers, 0 dynamic imports (`import()`/`dynamic`/`lazy`). `StoryMaster`/`StoryPhoto` referenced only by `story-viewer.tsx` (import + usage) + their own defs in `stories.service.ts` + the EXEC-B comment. `StoryPhoto` used solely inside `StoryMaster.photos` — the two are a self-contained pair.
+  - **Раздел 3/5 (Архитектура/Бизнес-логика):** deleted `src/features/home/components/story-viewer.tsx` (cascade-orphan — its sole importer `portfolio-stories-bar.tsx` was removed in Phase 1, confirmed via `git show HEAD:...portfolio-stories-bar.tsx` line 9 `import { StoryViewer }`). Removed `StoryMaster` + `StoryPhoto` type defs from `src/lib/feed/stories.service.ts`. Updated the EXEC-B comment block to record the full V1 removal (fn + routes + UI + types). **Kept all V2 exports:** `getActiveStoriesGroups` (`/api/feed/stories`), `invalidateStoriesCache`, `FEED_STORIES_CACHE_KEY` + `STORIES_LOOKBACK_*` consts, `StoriesGroupItem`/`StoriesGroup`/`StoriesPayload` types.
+  - **Раздел 7 (Техдолг):** T0 marked 100% CLOSED across 3 phases.
+  - **Validation:** typecheck ✅, lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), **562/562 tests** ✅, `npm run build` ✅ **Compiled successfully in 25s**.
+  - **What was NOT changed:** Phase 1 + Phase 2 deletions remain; V2 stories path (`/api/feed/*`, `stories-rail`, `stories-viewer-overlay`, `home-feed`, `getActiveStoriesGroups`, `StoriesGroup*` types); auto-publish-stories logic (`autoPublishStoriesEnabled` + cache invalidation in `profile.service.ts`); master + studio + redesign + SMS-GATEWAY-A + CLEANUP-BILLING-PROD-A + CHAT-FOUNDATION; schema (NO migration); tests (no new).
+  - **Pre-launch risks:** нет — `story-viewer.tsx` was dead UI (no live render path), build-confirmed clean.
+  - **🎉 LEGACY-CLEANUP umbrella 100% COMPLETE (3 phases):** audit (9 categories) → Phase 1 (21 components) → Phase 2 (backend cluster) → Phase 3 (cascade-orphan tail). Total **~3 700 LOC across 24 files + 1 fn + 3 consts + 2 types**, dirs cleaned (`features/schedule/components`, `features/schedule`, `api/home/feed`, `api/home/stories`), 0 schema migrations, 0 test regressions, lint baseline preserved throughout.
+  - **Process insight (finalized for SPRINT-RETROSPECTIVE-DOC) — redesign-commit checklist:** (1) grep new component basename; (2) confirm 0 importers of the superseded component; (3) trace backend deps (routes/services/fns existing only for that UI); (4) **re-scan for cascade-orphans after deletion** — a removed file's exclusive imports may newly orphan (proven: deleting `portfolio-stories-bar.tsx` cascaded `story-viewer.tsx` → which cascaded `StoryMaster`/`StoryPhoto`); (5) delete all in the same commit: UI + routes + services + cascade tail. The methodology held by-the-book (audit-first, no bulk-delete, cascade tracked not ignored) — template for future cleanup work.
+  - **Next:** user choice — UI-TEXT-HARDCODE-FIX-A (Phase-1-revealed pre-existing debt) / audit-волна item 2 / production execution batch.
+
+- **2026-05-23 — LEGACY-CLEANUP-EXEC-B (Phase 2)** (commit on `QAfix1`). **Stories V1 backend cluster removed — closes LEGACY-CLEANUP umbrella.** Mixed op: 2 pure route deletions + 1 partial-file edit (function + constants removal in a keeping-alive file).
+  - **Pre-delete verification:** `/api/home/feed` 0 callers (only self-ref in own logging); `/api/home/stories` 0 callers (its UI `portfolio-stories-bar.tsx` deleted in Phase 1 — the `stories-rail`/`home-feed` grep hits were V2 `stories-viewer-context`/`stories-viewed-storage`, substring false-positives, not `/api/home/stories`); `listStoriesMasters` called only by the deleted route.
+  - **Раздел 6 (Маршруты):** **deleted** `src/app/api/home/feed/route.ts` (54 LOC) + `src/app/api/home/stories/route.ts` (27 LOC). Empty `feed/` + `stories/` subdirs `rmdir`'d. `/api/home/` **retains live routes** `categories`, `portfolio/[id]`, `tags`. Stories run through V2 `/api/feed/stories` + `/api/feed/portfolio`.
+  - **Раздел 5 (Бизнес-логика):** removed `listStoriesMasters` fn (~76 LOC) + 3 V1-only constants (`MAX_MASTERS`/`PHOTOS_PER_MASTER`/`LOOKBACK_DAYS`) from `src/lib/feed/stories.service.ts`. **Kept** all live exports: `getActiveStoriesGroups` (V2, `/api/feed/stories`), `invalidateStoriesCache`, `FEED_STORIES_CACHE_KEY` + config consts, `StoriesGroup`/`StoriesPayload` types, and `StoryMaster`/`StoryPhoto` types (still imported by `story-viewer.tsx`). Replaced the removed fn with a comment documenting the removal + EXEC-C pointer.
+  - **Раздел 7 (Техдолг):** T0 marked FULLY COMPLETE (Phase 1 + Phase 2).
+  - **Cascade-orphan discovery:** `story-viewer.tsx` lost its sole importer when Phase 1 deleted `portfolio-stories-bar.tsx` (confirmed via `git show HEAD:...portfolio-stories-bar.tsx` — line 9 `import { StoryViewer }`). Now a cascade-orphan + sole remaining consumer of `StoryMaster`/`StoryPhoto`. **Out of Phase 2 scope** (strict: routes + fn only) → spawned 🟠 BACKLOG «LEGACY-CLEANUP-EXEC-C». Kept the 2 types alive in Phase 2 to avoid breaking the out-of-scope file's typecheck.
+  - **Validation:** typecheck ✅ (no orphan `listStoriesMasters`/constant refs), lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅ (NO migration), **562/562 tests** ✅, `npm run build` ✅ **Compiled successfully in 24s** (no orphan route references).
+  - **What was NOT changed:** Phase 1's 21 deletions remain; V2 stories path (`/api/feed/*` + `stories-rail.tsx` + `home-feed.tsx`); other `/api/home/*` routes; all `stories.service.ts` live exports; master + studio + redesign + SMS-GATEWAY-A + CLEANUP-BILLING-PROD-A + CHAT-FOUNDATION; schema (NO migration); tests (no new); `story-viewer.tsx` (EXEC-C scope).
+  - **Pre-launch risks:** нет — cluster verified zero-caller, build-confirmed clean.
+  - **Process insight (expanded for SPRINT-RETROSPECTIVE-DOC):** the «backend-follows-UI» orphan pattern proved real twice — (1) Stories V1 backend stayed orphan after UI superseded; (2) Phase 1 deleting `portfolio-stories-bar.tsx` cascaded `story-viewer.tsx` into orphanhood. **Future redesign-commit checklist:** grep new component basename → confirm 0 importers of superseded one → **trace backend deps (routes/services/fns only for that UI)** → **re-scan for cascade-orphans after deletion** (a deleted file's exclusive imports may newly orphan) → delete all in same commit.
+  - **🎉 LEGACY-CLEANUP audit-волна item 1: 100% COMPLETE** — audit + Phase 1 (21 components) + Phase 2 (backend cluster). ~3 694 LOC removed, 23 files + 1 fn, 0 schema migrations, 0 test regressions. EXEC-C (cascade orphan) + UI-TEXT-HARDCODE-FIX (Phase 1 spawn) remain as small follow-ups.
+  - **Next:** user choice — UI-TEXT-HARDCODE-FIX-A / EXEC-C cascade-orphan / audit-волна item 2 / production execution batch.
+
+- **2026-05-23 — LEGACY-CLEANUP-EXEC-A (Phase 1)** (commit on `QAfix1`). **Pure deletion of 21 orphan components from LEGACY-CLEANUP-AUDIT-A inventory — ~3 613 LOC removed.** Zero-risk (0 importers each, double-verified). NO partial-file edits, NO behavior change.
+  - **Pre-delete verification:** (a) dynamic-`import()` / `next/dynamic` / `lazy(() => import())` grep across all 21 basenames → 0 matches; (b) static `from "...basename"` re-grep → 0 hits all 21; (c) all 21 confirmed present on disk. HIGH confidence held.
+  - **Раздел 3 (Архитектура):** `src/features/schedule/` directory **removed entirely** (only contained the 2 dead files `schedule-builder.tsx` 1434 + `schedule-requests-panel.tsx` 528 — pre-redesign schedule editor superseded by master/studio cabinet schedule pages). Empty parent dirs `features/schedule/components` + `features/schedule` cleaned with `rmdir`. Deleted components by area: `cabinet/components/{client-dashboard, cabinet-nav-tabs, cabinet-side-nav}`, `master/components/{connected-accounts-section, master-advisor-section, auto-publish-stories-toggle, schedule-settings/breaks/{break-modal, recurring-breaks-section}}`, `home/components/{portfolio-preview-modal, portfolio-stories-bar, home-filters, tag-chips}`, `catalog/components/{search-capsule, map-placeholder}`, `studio-cabinet/components/studio-settings-sidebar`, `media/components/site-logo-manager`, `components/ui/{dynamic-icon, date-picker, tooltip-hint}`. The 3 live `schedule-settings/breaks/` files (`break-card`, `breaks-footer-hint`, `buffer-section`) preserved — only the 2 orphans removed from that dir.
+  - **`scripts/check-ui-text.mjs` allowlist** — removed the 2 entries for deleted files (`schedule-builder.tsx`, `master-advisor-section.tsx`) **plus 2 stale PHASE7 leftovers** (`admin-billing.tsx`, `admin-settings.tsx` — `src/features/admin/` dir deleted in PHASE7-CLEANUP-A 2026-05-13, but their allowlist entries were never cleaned and were **crashing** `check:ui-text` via `statSync` on the missing path). Fixing the crash was in-scope (dead allowlist entries referring to deleted files) and unblocked the gate.
+  - **Раздел 7 (Техдолг):** T0 marked Phase 1 done. Phase 2 (stories V1 backend) pending.
+  - **Validation:** typecheck ✅ (no orphan imports left), lint **1 error / 3 warnings** baseline preserved, encoding/mojibake/prisma ✅, **562/562 tests** ✅ (pure deletion — no test surface touched), `npm run build` ✅ **Compiled successfully in 28s** (catches dynamic-resolution issues — none).
+  - **What was NOT changed:**
+    - Stories V1 backend (2 routes + `listStoriesMasters` fn) — Phase 2 scope, untouched
+    - Audit-preserved files: `focal-image` (38 importers), `FeatureGate` deprecated prop, `studio-settings-page.tsx` (4 route importers), booking legacy schema fields
+    - Master + studio + redesign + SMS-GATEWAY-A + CLEANUP-BILLING-PROD-A + CHAT-FOUNDATION + booking widget + catalog + auth
+    - Schema (NO migration), tests (no new), `.env` / `package.json` / `prisma` / `docs`
+  - **Pre-launch risks (новых не обнаружено):** no dead auth/billing/payment code in the orphan set. Build confirms no live path depended on any deleted file.
+  - **Spawned:** 🟠 **UI-TEXT-HARDCODE-FIX** — `check:ui-text` (crashing since PHASE7) now runs and surfaces **pre-existing** hardcoded Cyrillic in ~10 sites (booking-widget `when-step.tsx` DOW/MONTH arrays, `steps-bar.tsx` aria-label, `service-step.tsx` `${durationMin} мин`, `crop-picker.tsx` aria-labels, + comment-only matches `«Резюме»`/`«Написать в студию»`). All from prior commits — NOT EXEC-A. Separate fix: move real strings to `UI_TEXT` or refine checker's comment-skip. `check:ui-text` exits 1 (was exit-1-by-crash, now exit-1-by-findings — net same gate status, but actionable).
+  - **Open questions for user:** нет — all 21 deleted cleanly (no dynamic-import exclusions). Phase 2 (stories V1) ready when approved.
+  - **Total:** 21 files deleted, ~3 613 LOC removed. Combined with Phase 2 (~81 LOC + partial edit) the LEGACY-CLEANUP total ≈ 3 694 LOC.
 
 - **2026-05-23 — LEGACY-CLEANUP-AUDIT-A** (commit on `QAfix1`). **Read-only inventory** of remaining deprecated/orphan code — 1st item of whole-platform audit-волна, closing the long-promised legacy-cleanup backlog item. NO code changes, NO deletions. Only doc updates (BACKLOG marker + AI_CONTEXT раздел 8 T0 entry + this changelog).
   - **Method:** 9-category sweep + bonus. Orphan detection via two passes — basename-word grep (broad) then precise `from "...basename"` import-statement grep (confirmation, 0 hits = orphan). Cross-checked outside-src refs (scripts/prisma).

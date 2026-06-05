@@ -8,7 +8,7 @@ import { resolvePublicUsername } from "@/lib/publicUsername";
 import { PublicMasterProfilePage } from "@/features/public-profile/master/public-profile-page";
 import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-profile-page";
 import { resolvePublicAppUrl } from "@/lib/app-url";
-import { buildProviderSchema } from "@/lib/seo/schema";
+import { buildProviderSchema, safeJsonLd } from "@/lib/seo/schema";
 import { withQuery } from "@/lib/public-urls";
 import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
@@ -384,7 +384,7 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
           <script
             nonce={nonce}
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+            dangerouslySetInnerHTML={{ __html: safeJsonLd(schema) }}
           />
         ) : null}
         <Suspense fallback={<PublicProfilePageSkeleton />}>
@@ -403,7 +403,7 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
         <script
           nonce={nonce}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(schema) }}
         />
       ) : null}
       <Suspense fallback={<PublicProfilePageSkeleton />}>
