@@ -17,6 +17,7 @@ import {
 } from "@/lib/schedule/slotsCache";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
+import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import {
   addDaysToDateKey,
   compareDateKeys,
@@ -288,12 +289,13 @@ export async function listAvailabilitySlotsPaginated(
 
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
-    select: { id: true, timezone: true, bufferBetweenBookingsMin: true },
+    select: { id: true, timezone: true, bufferBetweenBookingsMin: true, slotStepMin: true },
   });
   if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
 
   const timezone = provider.timezone;
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
+  const slotStepMin = normalizeSlotStepMin(provider.slotStepMin);
 
   const ctx = await createScheduleContext({
     providerId,
@@ -378,6 +380,7 @@ export async function listAvailabilitySlotsPaginated(
         bufferMin,
         bookings: bookingsByDateKey.get(cursorKey) ?? [],
         now,
+        slotStepMin,
       });
       await setCachedSlotsForDate({
         key: cacheKey,
@@ -433,12 +436,13 @@ export async function listAvailabilitySlots(
 
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
-    select: { id: true, timezone: true, bufferBetweenBookingsMin: true },
+    select: { id: true, timezone: true, bufferBetweenBookingsMin: true, slotStepMin: true },
   });
   if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
 
   const timezone = provider.timezone;
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
+  const slotStepMin = normalizeSlotStepMin(provider.slotStepMin);
   const startKey = toLocalDateKey(from, timezone);
   const endKeyExclusive = toLocalDateKey(to, timezone);
   const ctx = await createScheduleContext({
@@ -507,6 +511,7 @@ export async function listAvailabilitySlots(
         bufferMin,
         bookings: bookingsByDateKey.get(cursorKey) ?? [],
         now,
+        slotStepMin,
       });
       await setCachedSlotsForDate({
         key: cacheKey,

@@ -55,21 +55,18 @@ export function TimeGrid({
     setLoading(true);
     setError(null);
     try {
-      const nextDay = new Date(`${dateKey}T00:00:00Z`);
-      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      const toKey = [
-        nextDay.getUTCFullYear(),
-        String(nextDay.getUTCMonth() + 1).padStart(2, "0"),
-        String(nextDay.getUTCDate()).padStart(2, "0"),
-      ].join("-");
-
+      // FIX-05 (QA-110): this grid shows ONE selected day. The slots API treats
+      // `to` as inclusive, so `from === to === dateKey` returns exactly that
+      // day — previously `to = dateKey + 1` pulled the next day's slots too,
+      // which rendered intermixed with no day label (and the summary could
+      // mislabel a next-day slot as the selected day).
       const url = new URL(
         `/api/public/providers/${providerId}/slots`,
         window.location.origin,
       );
       url.searchParams.set("serviceId", serviceId);
       url.searchParams.set("from", dateKey);
-      url.searchParams.set("to", toKey);
+      url.searchParams.set("to", dateKey);
       const res = await fetch(url.toString(), { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as
         | { ok: true; data: { slots: SlotPayload[] } }
@@ -79,21 +76,27 @@ export function TimeGrid({
         setError(UI_TEXT.publicProfile.slots.loadFailed);
         return;
       }
-      const parsed: BookingFlowSlot[] = json.data.slots.map((slot) => ({
-        id: `${slot.startAtUtc}-${slot.label}`,
-        label: slot.label,
-        timeText: slot.label.slice(-5),
-        dayKey: toLocalDateKey(slot.startAtUtc, providerTimezone),
-        startAtUtc: slot.startAtUtc,
-        endAtUtc: slot.endAtUtc,
-        hotSlotId: slot.hotSlotId ?? null,
-        isHot: slot.isHot ?? false,
-        discountType: slot.discountType,
-        discountValue: slot.discountValue,
-        originalPrice: slot.originalPrice ?? null,
-        discountedPrice: slot.discountedPrice ?? null,
-        discountPercent: slot.discountPercent ?? null,
-      }));
+      const parsed: BookingFlowSlot[] = json.data.slots
+        .map((slot) => ({
+          id: `${slot.startAtUtc}-${slot.label}`,
+          label: slot.label,
+          timeText: slot.label.slice(-5),
+          dayKey: toLocalDateKey(slot.startAtUtc, providerTimezone),
+          startAtUtc: slot.startAtUtc,
+          endAtUtc: slot.endAtUtc,
+          hotSlotId: slot.hotSlotId ?? null,
+          isHot: slot.isHot ?? false,
+          discountType: slot.discountType,
+          discountValue: slot.discountValue,
+          originalPrice: slot.originalPrice ?? null,
+          discountedPrice: slot.discountedPrice ?? null,
+          discountPercent: slot.discountPercent ?? null,
+        }))
+        // FIX-05 (QA-110): defensive — only the selected provider-local day.
+        // `dayKey` is the slot's day in the provider's timezone; with the
+        // single-day request above this is already exact, but the filter
+        // guards any midnight-boundary edge.
+        .filter((slot) => slot.dayKey === dateKey);
       setSlots(parsed);
     } catch {
       setError(UI_TEXT.publicProfile.slots.loadFailed);
@@ -120,7 +123,14 @@ export function TimeGrid({
       ) : error ? (
         <p className="text-sm text-text-sec">{error}</p>
       ) : slots.length === 0 ? (
-        <p className="text-sm italic text-text-sec">{T.emptyDay}</p>
+        // QA-122 (FIX-10): accurate empty state. If the selected day is today
+        // (provider tz) and 0 slots remain, the booking window has passed →
+        // distinct copy from a generic fully-booked / day-off message.
+        <p className="text-sm italic text-text-sec">
+          {dateKey === toLocalDateKey(new Date().toISOString(), providerTimezone)
+            ? T.emptyDayToday
+            : T.emptyDay}
+        </p>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
           {slots.map((slot) => {

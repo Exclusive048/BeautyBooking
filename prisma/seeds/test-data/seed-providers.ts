@@ -281,9 +281,12 @@ async function ensureSchedule(providerId: string) {
     create: { providerId },
   });
 
-  // weekday: 0 = Sunday … 6 = Saturday (matches the existing engine)
-  for (let weekday = 0; weekday < 7; weekday++) {
-    const isWorkday = weekday !== 0; // Sunday off
+  // QA-116: weekday is ISO 1=Mon … 7=Sun — the convention the engine,
+  // editor/apply path and analytics all use (engine-context.ts maps JS
+  // Sunday→7; kpi.ts maps 7→0). Was 0–6 (0=Sun), which only coincided for
+  // Mon–Sat and left Sunday-off as an orphan weekday-0 the engine never reads.
+  for (let weekday = 1; weekday <= 7; weekday++) {
+    const isWorkday = weekday !== 7; // Sunday (7) off
     await prisma.weeklyScheduleDay.upsert({
       where: { configId_weekday: { configId: config.id, weekday } },
       update: {

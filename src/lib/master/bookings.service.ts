@@ -5,6 +5,9 @@ import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { parseClientKeyIdentity } from "@/lib/crm/card-service";
 import { buildPhoneVariants } from "@/lib/crm/card-utils";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { getDayOfWeek, getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
+
+const DEFAULT_DISPLAY_TIMEZONE = "Europe/Moscow";
 
 export type ColumnId = "pending" | "confirmed" | "today" | "done" | "cancelled";
 
@@ -79,20 +82,25 @@ const MONTHS_GENITIVE = [
   "декабря",
 ] as const;
 
-/** Format "сб, 2 мая · 15:30" or "сегодня · 15:30" for booking cards. */
-function formatWhenLabel(date: Date | null, now: Date): string {
+/**
+ * Format "сб, 2 мая · 15:30" or "сегодня · 15:30" for booking cards.
+ *
+ * FIX-04 (QA-113): formats in the MASTER's own `timeZone` (self-view), not the
+ * Node process TZ — so an Almaty master reads Almaty time on a UTC prod host.
+ * The availability engine is untouched (it was already TZ-safe per QA-07); only
+ * this display label's source TZ changes. Format/locale/24h style unchanged.
+ */
+function formatWhenLabel(date: Date | null, now: Date, timeZone: string): string {
   if (!date) return "—";
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
+  const sameDay = toLocalDateKey(date, timeZone) === toLocalDateKey(now, timeZone);
+  const { hour, minute } = getLocalTimeParts(date, timeZone);
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
   if (sameDay) return `сегодня · ${hh}:${mm}`;
-  const weekday = WEEKDAYS_SHORT[date.getDay()] ?? "";
-  const day = date.getDate();
-  const month = MONTHS_GENITIVE[date.getMonth()] ?? "";
-  return `${weekday}, ${day} ${month} · ${hh}:${mm}`;
+  const [, mStr, dStr] = toLocalDateKey(date, timeZone).split("-");
+  const weekday = WEEKDAYS_SHORT[getDayOfWeek(date, timeZone)] ?? "";
+  const month = MONTHS_GENITIVE[Number(mStr) - 1] ?? "";
+  return `${weekday}, ${Number(dStr)} ${month} · ${hh}:${mm}`;
 }
 
 function bookingPrice(item: {
@@ -222,6 +230,13 @@ export const getMasterBookingsForKanban = cache(
       }),
     ]);
 
+    // FIX-04 (QA-113): booking labels render in the master's own timezone.
+    const providerTz = await prisma.provider.findUnique({
+      where: { id: input.masterId },
+      select: { timezone: true },
+    });
+    const timeZone = providerTz?.timezone ?? DEFAULT_DISPLAY_TIMEZONE;
+
     const allRows = [...activeRows, ...cancelledRows];
     const clientUserIds = Array.from(
       new Set(allRows.map((r) => r.clientUserId).filter((id): id is string => Boolean(id))),
@@ -305,7 +320,7 @@ export const getMasterBookingsForKanban = cache(
         serviceTitle: row.service.title?.trim() || row.service.name,
         startAtUtc: row.startAtUtc,
         endAtUtc: row.endAtUtc,
-        whenLabel: formatWhenLabel(row.startAtUtc, now),
+        whenLabel: formatWhenLabel(row.startAtUtc, now, timeZone),
         price: bookingPrice(row),
         changeComment: row.changeComment,
         reviewRating,

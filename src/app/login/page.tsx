@@ -11,6 +11,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getLoginHeroImageAsset } from "@/lib/media/queries";
 import { isEmailConfigured } from "@/lib/email/sender";
 import { getPublicStats, type PublicStats } from "@/lib/stats/public-stats";
+import { env } from "@/lib/env";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
@@ -29,6 +30,11 @@ export default async function LoginPage() {
         heroImageUrl={heroImage?.url ?? null}
         emailEnabled={isEmailConfigured()}
         stats={stats}
+        // QA-001: resolve NEXT_PUBLIC_* on the server (real values) and pass
+        // down — avoids the client `env`-alias returning `undefined` and the
+        // social buttons rendering a different branch than the server HTML.
+        telegramBotUsername={env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? ""}
+        vkEnabled={String(env.NEXT_PUBLIC_VK_ENABLED) === "true"}
       />
     </Suspense>
   );

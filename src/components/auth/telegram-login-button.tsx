@@ -20,6 +20,16 @@ type TelegramLoginButtonProps = {
   iconOnly?: boolean;
   className?: string;
   showConfigError?: boolean;
+  /**
+   * QA-001: bot username resolved SERVER-side and passed down, so the rendered
+   * branch is identical on server + client (no hydration mismatch). Reading
+   * `env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` directly here returns the real value
+   * on the server but `undefined` on the client (the `env` alias defeats Next's
+   * static `process.env.NEXT_PUBLIC_*` inlining) → divergent markup. When the
+   * prop is provided (any string incl. ""), it wins; callers that omit it keep
+   * the legacy env fallback (still latent until the env.ts root fix).
+   */
+  botUsername?: string;
 };
 
 declare global {
@@ -40,13 +50,17 @@ export default function TelegramLoginButton({
   iconOnly = false,
   className,
   showConfigError = true,
+  botUsername: botUsernameProp,
 }: TelegramLoginButtonProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didInitRef = useRef(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const botUsername = env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  // QA-001: prefer the server-passed prop (deterministic across SSR/CSR); fall
+  // back to env only for callers that don't pass it.
+  const botUsername =
+    botUsernameProp !== undefined ? botUsernameProp : env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
   const label = UI_TEXT.auth.telegram.loginButton;
 
   useEffect(() => {

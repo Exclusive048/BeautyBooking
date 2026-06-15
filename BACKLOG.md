@@ -441,6 +441,47 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   separate hardening item. Evidence: `.qa/diagnostics/fix-02/EVIDENCE.md`.
   **✅ Layer 2 VERIFIED LIVE (QA-04, 2026-06-15):** Anna's portfolio images load via
   `/_next/image?url=/portfolio-placeholders/*` (optimized, no 400). Layer 1 still open 🟡.
+- ✅ **FIX-10 — Выполнено (2026-06-16): three quick wins + a FIX-09 regression catch.**
+  (1) **Maps-key "typo" = false alarm** — dotenv parses `KEY = value` fine; key already inlined (4 chunks);
+  runtime-verified /catalog fires `api-maps…&apikey=b9f5c172…`; tracked templates already correct; normalized
+  local gitignored `.env` cosmetically. (2) **booking-happy-path determinism** — spec now picks the first day
+  WITH slots (skips exhausted today); passes at any hour. (3) **QA-122 (🟡) date-grid exhausted-today** —
+  chose clear empty-state (disable not feasible: date-grid lacks serviceId; `/booking-days` out of scope):
+  time-grid shows "Свободных окон в этот день нет" + "На сегодня свободных окон не осталось" (today, provider
+  tz) instead of the misleading "мастер занят"; verified both themes + slots-day + booking completes. Files:
+  `.qa/.../booking-happy-path.spec.ts`, `time-grid.tsx`, `ui/text.ts` (+gitignored `.env`). **🔧 Also fixed a
+  FIX-09 regression** (caught by FIX-10's `npm test`, 28 auth-token failures): the env.ts parse-fail fallback
+  used `clientEnv` for all runtimes, dropping `AUTH_JWT_SECRET`/`OTP_HMAC_SECRET` in the test/server runtime →
+  now branches on `isServerRuntime` (server→full `process.env`, client→`clientEnv`). 698/698 green. File:
+  `src/lib/env.ts`.
+- ✅ **FIX-09 — Выполнено (2026-06-16): env.ts client `NEXT_PUBLIC_*` inlining root fix (QA-001 root, app-wide).**
+  Client branch was `process.env as AppEnv` → aliased `env.NEXT_PUBLIC_X` defeated Next's static
+  `process.env.NEXT_PUBLIC_X` inlining → `undefined` for every client consumer (the ENV-DISCIPLINE sweep
+  introduced it). **Fix:** client branch now an explicit object of **literal** `process.env.NEXT_PUBLIC_X`
+  refs (all 6 schema NEXT_PUBLIC vars) + `NODE_ENV` (so `isProduction` is correct client-side —
+  push-manager early-returns on `!isProduction`). Server branch + fail-fast untouched. **Prod-verified:**
+  value inlined into 4 client chunks (was 0); telegram-connect-modal now sees the bot username (env-direct
+  path, was broken for all users); /login #418 still gone (light+dark); login smoke 5/5 (admin→/admin);
+  push blockers (isProduction + VAPID key) both fixed; no new hydration mismatch; booking widget unaffected
+  (34 slots on a valid day). File: `src/lib/env.ts` (client branch only). **Pre-existing observations (not
+  FIX-09):** booking-happy-path test fragile (picks exhausted "today" at midnight TZ-edge — QA-113/QA-107
+  family; widget itself works); `.env` trailing-space typo in `NEXT_PUBLIC_YANDEX_MAPS_API_KEY ` leaves the
+  maps key empty both sides. Both filed for follow-up.
+- ✅ **QA-001 — Выполнено (2026-06-16): login hydration mismatch fixed + prod-verified.**
+  **Root cause** (confirmed the prior guess + pinpointed): `TelegramLoginButton`/`VkLoginButton`
+  read `env.NEXT_PUBLIC_*`; the client `@/lib/env` is `process.env as AppEnv` and the **aliased**
+  property access defeats Next's static `process.env.NEXT_PUBLIC_X` inlining → `undefined` on the
+  client while the server has the real value → divergent branch → React #418. (The ENV-DISCIPLINE
+  `process.env.X`→`env.X` sweep introduced this; also left the Telegram button non-functional
+  post-hydration.) **Fix (narrow):** `/login` server `page.tsx` resolves the two NEXT_PUBLIC values
+  and passes them as props → `LoginClient` → the buttons (prop wins over env alias; deterministic
+  SSR+CSR). Buttons used only by login-client → fully contained, no env.ts change. **Prod-verified**
+  (`next start`): #418 gone (light+dark, real hydration), input-wipe gone, login E2E works (admin →
+  /admin after rate-limit clear). Files: login `page.tsx` + `login-client.tsx` + the 2 button
+  components. **Follow-up (root fix, not applied — app-wide ripple):** rebuild env.ts client branch
+  from literal `process.env.NEXT_PUBLIC_X` refs so every client consumer (push-manager, catalog-map,
+  telegram-connect-modal) gets real values — own prompt. **New observation:** `/login` prod CSP
+  `unsafe-eval` pageerror (non-blocking, login works) — separate CSP/eval pass. Original finding ⤵
 - 🟡 **QA-001 — login hydration mismatch — PROD VERDICT CORRECTED (2026-06-14, after FIX-01): reproduces in prod.**
   The QA-03 read ("dev-only, 0 hydration errors in prod") was **wrong** — QA-108's
   `process.exit` crash was killing the page *before* React could finish hydrating, so the
@@ -476,10 +517,10 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   Verified live: catalog cards 1 000–3 801 ₽, slider chips "1 000 ₽", public studio "от 1 300 ₽" (was "от 130 000 ₽").
   Regression test `src/lib/format.test.ts` (formatter output + source guard). **False positives left untouched:**
   `admin-body-templates` (already ÷100 — QA-09 confirmed clean), `slot-bubbles-row` (`discountValue` in rubles).
-  **Deferred (out of FIX-03 scope, likely additional instances — review in legacy/follow-up sweep):**
-  legacy `studio-services-page.tsx:617` (`moneyRUBPlain(basePrice)` — reachable only via the redirect-shadowed
-  legacy settings tab) + master `hot-slots-settings-section.tsx:279` (`moneyRUBPlain(effectivePrice)`). Neither
-  `moneyRUB` nor `moneyRUBPlain` is deprecatable yet (moneyRUB: 1 legit rubles caller; moneyRUBPlain: 2 callers to review).
+  **✅ hot-slots-settings-section.tsx:279 closed by FIX-04 Phase 0** (`effectivePrice` was kopecks → `moneyRUBPlainFromKopeks`).
+  **Deferred (review in legacy sweep):** legacy `studio-services-page.tsx:617` (`moneyRUBPlain(basePrice)` — reachable
+  only via the redirect-shadowed legacy settings tab). `moneyRUB`/`moneyRUBPlain` still not deprecatable
+  (moneyRUB: 1 legit rubles caller `slot-bubbles-row`; moneyRUBPlain: 1 legacy caller above).
   _Original finding (for reference):_
   Found in QA-04 after FIX-02 made `Service.price` correct kopeks. `src/lib/format.ts`
   `moneyRUB(value)` does NOT divide by 100, but is called on kopeks at: catalog-card.tsx:135,137;
@@ -504,7 +545,12 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   **✅ QA-10 re-confirmed live (client cabinet):** Elena's `/cabinet/bookings` ("Потрачено
   1 450 000 ₽", per-booking "400 000 ₽"…), `/cabinet/favorites` ("200 000 ₽"), and chat
   `system-message` ("400 000 ₽") all 100× inflated — exactly the listed callsites. Fix scope unchanged.
-- 🟠 **QA-110 — booking widget slot grid intermixes two days, unlabeled.**
+- ✅ **QA-110 — booking widget slot grid intermixed two days. Выполнено FIX-05 (2026-06-15).**
+  Chose **single-day** (reference: `time-grid.tsx` is "a single chosen day"; widget has a separate
+  `DateGrid`). `time-grid.tsx` now requests `to = dateKey` (API treats `to` inclusive → exactly that
+  day) + defensive `.filter(slot.dayKey === dateKey)`. Summary already labels from `selectedDateKey`,
+  so the mislabel is structurally gone. Proven live: request `from=06-16&to=06-16`, grid renders only
+  that day. Evidence `.qa/diagnostics/fix-05/`. _Original finding:_
   `time-grid.tsx:60-72` sets `to = dateKey+1` but `/api/public/providers/[id]/slots` treats `to`
   **inclusive** → returns selected day + next day; TimeGrid renders ALL of them (line 126) without
   filtering by `slot.dayKey` (computed line 86, ignored). Net: selecting "Пн 15" shows Mon 15 + Tue 16
@@ -513,14 +559,32 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   next-day slot with the date-strip's day (success card uses the real booking time, so final + stored
   data are correct). Fix: filter `slot.dayKey === dateKey` OR make `to` exclusive. Confusing UX; can
   mislead about appointment day until the success card.
-- 🟡 **QA-111 — slotStepMin ignored (slot grid hardcoded 30-min).** `src/lib/schedule/slots.ts:69`
+- ✅ **QA-111 — slotStepMin ignored (grid hardcoded 30-min). Выполнено FIX-05 (2026-06-15).**
+  `slots.ts buildSlotsForDay` now uses `slotStepMin` (new optional input, fallback 30 if a caller omits
+  it); `normalizeSlotStepMin(provider.slotStepMin)` plumbed through all 3 callers (`usecases.ts` ×2 +
+  `public-profile-view.service.ts`). Proven live (Galina): 15→34 slots/15-min, 30→17 slots/30-min,
+  honoured + reactive. Booking integrity re-verified at 15-min (consumed/overlap-blocked/double-book/
+  correct time + happy-path spec). Regression test in `slots.test.ts`. _Original finding:_
+  `src/lib/schedule/slots.ts:69`
   `const stepMin = 30` is hardcoded; `buildSlotsForDay` never reads `provider.slotStepMin`. Galina's
   slotStepMin=15 yields a 30-min grid. slotPrecision="exact" display IS honoured. Confirms the
   BACKLOG "slotPrecision/slotStepMin not enforced" item for slotStepMin specifically. Not a booking
   break; a master configuring 15-min steps doesn't get them.
   **✅ CONFIRMED master-side (QA-05):** changed slot step 30→15 in master settings → DB persisted
   `slotStepMin=15` but the offered grid stayed 30-min (no 10:15/10:45). The setting is inert.
-- 🟠 **QA-113 — master booking-time labels use server-process TZ (wrong on non-MSK hosts).**
+- ✅ **QA-113 — server-side TZ display labels (entity-own-tz). Выполнено FIX-04 (2026-06-15).**
+  Self-view display sites now format in the entity's own provider `timezone` (TZ-aware
+  `Intl`/`getLocalTimeParts`/`getDayOfWeek`/`toLocalDateKey`), not the Node process TZ:
+  `bookings.service.ts formatWhenLabel` (kanban labels) · master + studio notification "today"/grouping
+  (`group-by-day.ts` gained optional `timeZone`; both self-view callers pass entity tz; no client caller)
+  · `master-dashboard-page isWeekend`. **Proven under `TZ=UTC`:** (1) no-regression — Galina availability
+  identical to MSK baseline (17 slots, first `07:00Z`, Sunday=0); (2) fix — Anna (Almaty/UTC+5) kanban labels
+  render Almaty-local (`12:00Z`→17:00), not UTC. **LEFT (engine/internal/false-positive):** `schedule.service.ts`
+  grid-positioning + `schedule-utils.ts` (engine-coupled, TZ-safe per QA-07, do-not-touch), `model-offers-stats
+  formatOfferDate` (false positive — local-date-string, TZ-stable), `model-offers-view formatDateKey` (internal key).
+  **DEFER:** `reviews-stats` month bucketing (low-pri aggregation, not a clock label); `schedule.service.ts` grid
+  shift needs a separate coordinated grid+intervals fix with grid regression tests; **client-facing groupings → QA-107**.
+  Evidence `.qa/diagnostics/fix-04/`. _Original finding (for reference):_
   Found QA-05. `src/lib/master/bookings.service.ts:83` `formatWhenLabel` formats with
   `date.getHours()/getMinutes()/getDay()/getDate()` — JS local-time methods bound to the **Node
   server process TZ**, with no conversion to provider/viewer TZ (JSDoc "computed against the master
@@ -552,7 +616,15 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   reviews data route — a 3.5s wait renders all 46 reviews correctly and `GET /api/admin/reviews?tab=all`
   returns 200 with `data.reviews[]`. Dev-only latency artifact; compiled prod routes won't exhibit it.
   No fix needed; logged so a future run doesn't mistake it for a broken list.
-- 🟠 **QA-119 — mobile: fixed bottom-nav overlaps bottom content in the client cabinet (incl. destructive "Отменить").**
+- ✅ **QA-119 — mobile: bottom-nav clearance (client cabinet). Выполнено FIX-07 (2026-06-15).**
+  Behaviour-level re-audit refined the root cause: QA-10's "client main pb-0" measured the *outer* app-shell
+  `<main>` — the inner cabinet `<main>` already had `pb-24 lg:pb-0`. The genuine gap: **`CabinetBottomNav` was
+  the only one of the 4 bottom-navs missing the `<div className="h-16 lg:hidden" aria-hidden />` clearance
+  spacer** (master/studio/global all render it). Fix = added the spacer to `CabinetBottomNav` (completes the
+  master pattern: main `pb-24` + nav `h-16` spacer). Verified live 390×844: action row incl. "Отменить" clears
+  navTop; desktop 1440 unaffected (spacer + pb both vanish via `lg:hidden`/`lg:pb-0` → 0 dead space). Evidence
+  `.qa/diagnostics/fix-07/`. New separate finding spun off: **QA-121** (two mobile navs co-render on cabinet pages).
+  _Original finding:_
   Found QA-10 (390×844). The client cabinet `<main>` has `padding-bottom: 0` while a `position:fixed`
   52px mobile bottom-nav (`nav.fixed.bottom-0 … lg:hidden`) sits over it. On `/cabinet/bookings`, scrolling
   to the end leaves the **last booking card's action row — including "Отменить" — behind the nav, and taps
@@ -562,11 +634,24 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   only redundant in-page nav links). Mobile-first is a project mandate + this hides a destructive action on
   a high-traffic surface. Fix = add bottom padding (e.g. `pb-24`) to the client cabinet scroll container.
   Evidence: `.qa/diagnostics/qa10-mobile/`. covered-by-test: no.
-- 🟡 **QA-120 — mobile: booking action controls below the tap-target guideline (30px).** Found QA-10.
-  Чат / Перенести / В календарь / Маршрут / Отменить / Повторить / Связаться render at **30px height** at
-  390-wide (below 44px Apple-HIG / 48dp Material), several packed in one row incl. destructive "Отменить"
-  → mis-tap risk. Echoes the existing sprint TAP-TARGET-AUDIT-A backlog item; bundle the client-cabinet
-  booking actions into that audit. covered-by-test: no.
+- ✅ **QA-120 (instance) — booking action controls ≥44px. Выполнено FIX-07 (2026-06-15).**
+  `ActionButton`/`ActionLink` (client bookings) → `min-h-[44px] px-3 py-2` (was ~30px), action row gap
+  `gap-1.5`→`gap-2` so destructive "Отменить" is separated on wrap. Verified 44px live (light + dark).
+  ⚠️ **The app-wide `TAP-TARGET-AUDIT-A` remains OPEN** — FIX-07 closed only the QA-120 booking-controls
+  instance. _Original finding:_ Чат / Перенести / … rendered at 30px (below 44px Apple-HIG / 48dp Material).
+- 🟡 **QA-121 — two mobile bottom-navs co-render on cabinet pages.** Found FIX-07 (390×844 audit). On
+  `/cabinet/bookings` both `CabinetBottomNav` (client tabs: Мои записи/Сообщения/Избранное/Мои отзывы/Профиль,
+  `fixed inset-x-0`, h-52) AND the global `bottom-nav.tsx` (site tabs: Главная/Каталог/Записи/Профиль,
+  `fixed left-0 right-0`, h-64) render simultaneously, stacked. The global site nav should likely be hidden on
+  cabinet routes (the cabinet has its own nav). Not a FIX-07 fix (out of scope — would risk the shell layout);
+  needs an AppShell route-guard to suppress the global `BottomNav` under `/cabinet/*`. covered-by-test: no.
+- ✅ **QA-114 — Выполнено (FIX-06, 2026-06-15): approval feedback surfaced in the schedule editor.**
+  `studio-approval-banner.tsx` consumes the shared save-status inside `SaveStatusProvider`;
+  `schedule-settings-page.tsx` detects a studio master (`Provider.studioId`), loads the studio name +
+  whether a request is already PENDING, and passes `studioApproval` to the body → persistent info line +
+  **«Ожидает одобрения»** badge, flipping to "отправлено на одобрение" on save. Independent masters → no
+  banner. Approval mechanics/engine untouched (only the already-returned `approval` state surfaced).
+  Original finding ⤵
 - 🟠 **QA-114 — studio master's schedule edits need approval, but the settings UI gives zero feedback.**
   Found QA-06. The schedule approval flow itself WORKS (studio master edits route into a pending
   ScheduleChangeRequest; live schedule unchanged; cannot bypass — verified via `PATCH /api/cabinet/master/schedule`
@@ -576,6 +661,11 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   the server's `approval` block. The studio master sees her draft change and believes it applied; it
   did not (pending studio approval). Trust/clarity gap on a core flow. Fix = surface the `approval`
   state (mode/requestStatus/pendingRequestId/rejectedComment) in the settings UI for studio members.
+- ✅ **QA-115 — Выполнено (FIX-06, 2026-06-15): affiliation on public profile + cabinet.**
+  `MasterPublicProfileView.studio = { name, publicUsername | null }` (publicUsername only when the studio
+  `isPublished` — rule 12, no CUID). Public profile hero renders a "Часть студии «{name}»" pill linking to
+  `/u/{publicUsername}` (plain chip if not linkable); the dashboard renders a "Студия «{name}»" chip.
+  Independent masters → nothing. Original finding ⤵
 - 🟡 **QA-115 — studio affiliation invisible for a studio master.** Found QA-06. Neither Marina's
   master cabinet (dashboard) nor her public profile (`/u/vision-marina-lebedeva-1`) shows she belongs
   to Vision Beauty Studio — no studio name/branding/link anywhere. Studio members are visually
@@ -583,6 +673,13 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   cabinet) but flagged — esp. the public profile, where clients can't tell she's studio-backed.
   **QA-08:** the *studio's* public profile (`/u/vision-studio`) DOES list its 7 member masters, and the
   studio cabinet shows the studio name — so the gap is one-directional (master→studio invisibility).
+- ✅ **QA-116 — Выполнено (FIX-08, 2026-06-15): seed emits ISO 1–7.** Reader audit found no 0–6
+  consumer (engine/analytics/slots all read ISO 1–7). Fixed both seed generators (`seed-providers.ts`
+  bulk + `seed-showcase-studio.ts` studio) `for 0..6/Sun=0` → `for 1..7/Sun=7`; `seed-showcase-master.ts`
+  already 1–7. Verified: fresh re-seed → only weekday 1–7, and Sunday renders day-off (public slots
+  API: Sun 0 slots, Tue/Sat slots present, no off-by-one). Note: `reset.ts` doesn't clear
+  WeeklyScheduleConfig (Provider survives via `ownerUserId` SetNull) → reseed-over-existing leaves stale
+  weekday-0; fresh DB is clean. Original finding ⤵
 - 🔵 **QA-116 — WeeklyScheduleDay weekday convention drift (seed vs engine).** Found QA-08. Seed
   (seed-providers.ts) writes `weekday` **0–6 (0=Sun)**; engine + apply path use **ISO 1–7 (7=Sun)**
   (`engine-context.ts:90`, `unified.ts:162`). Benign for the standard Mon–Sat/Sun-off pattern (1–6
@@ -605,8 +702,17 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   category approve/reject ×2 pending, plan grant, sub cancel, 3 system flags, queue retry/delete, media cleanup,
   reindex). (4) Corroborations: QA-107 (9 providers need geocoding), QA-08 (Victoria's 2 pending categories),
   QA-109 (admin clean → public-only), QA-113 (admin dashboard joins the family). Full write-up: QA-FINDINGS.md §5.
+- ✅ **QA-002 — Выполнено (FIX-08, 2026-06-15): admin login lands on /admin.** `resolveCabinetRedirect`
+  gained an ADMIN/SUPERADMIN branch (before the client fallback; master/studio unchanged). 5-role smoke
+  all PASS (site-admin → /admin, others unchanged). Files: `src/lib/auth/cabinet-redirect.ts`. (Was
+  QA-FINDINGS-only, no prior BACKLOG row.)
 - 🔵 **Schema note (QA-06):** `Provider.studioId` stores the studio's **provider** id, not the
   `Studio` model id. Consistent but a query footgun. No user impact.
+- ✅ **QA-112 — Выполнено (FIX-08, 2026-06-15).** Capacity: `resolveTodayWorkingWindow` used
+  `now.getUTCDay()` (0=Sun, UTC) → never matched Sunday (ISO weekday 7) + ignored provider tz → "0ч".
+  Fixed to `getDayOfWeek(now, provider.timezone)` mapped to ISO 1–7 → Anna (Almaty) now shows "из 10ч".
+  Comparison: "vs прошлая суббота" was a hardcoded uncomputed comparison → replaced with honest
+  `todayRevenueSub: "По записям на сегодня"`. Verified both themes. Original finding ⤵
 - 🔵 **QA-112 — master dashboard KPI copy/calc oddities.** "Записей сегодня 3 из 0ч" (day-capacity
   denominator computed as 0ч) + "Выручка сегодня … vs прошлая суббота" (comparison baseline is last
   Saturday on a Monday). Cosmetic; dashboard otherwise correct. May be partly TZ-related.
@@ -704,6 +810,7 @@ The asymmetry is: production deploy command is correct, but the migration HISTOR
   - ~~**🟡 TC-2 File upload validation chain gap**~~ ✅ **FULLY CLOSED — SECURITY-SURFACE-TESTS-A (chat-attachment + MIME/size) + FAST-WINS-BATCH-A (booking-reference).** Both upload validators tested + MIME-allowlist + size constants locked. 7 + 10 = 17 tests pin behavior.
   - **🟡 TC-3 Auth integration coverage** — rate-limit (Redis-bound), session (Prisma-bound), role guards (Prisma-bound), VK/Telegram OAuth flows uncovered. Same root cause as billing-integration gap: needs integration-test infra (db-test container + Redis-test). Larger backlog, defers to post-launch.
   - **🔵 TC-4 Coverage tooling absent** — no c8/vitest --coverage. Manual gap analysis. Easy add: `npm run test:coverage` with critical-path thresholds.
+  - ✅ **vitest hygiene (FIX-08, 2026-06-15)** — `vitest.config.ts` now excludes `.qa/**` (`[...configDefaults.exclude, ".qa/**"]`) so `npm run test` no longer mis-collects the Playwright specs (was 4 false file-level failures). Clean run: 79 files / 698 tests passed. `playwright.config.ts` untouched.
   - **🔵 TC-5 E2E framework absent** — Playwright/Cypress not present, **expected for MVP**. Once production launches + integration confidence proven, add minimal critical-journey smoke E2E (master signup → publish; client browse → book → review).
   - Strong areas explicit: booking lifecycle (state machine + policy + privacy 9 files), billing pure helpers (~95 tests), invariants #25+#26+HMAC regression-tested, schedule pure logic (31 tests), chat ACL/privacy/token (39), SMS+masking (34).
 - **CODE-CONSISTENCY-AUDIT-A (2026-05-23)** — read-only audit of non-security patterns. **Result: 6 of 8 categories CLEAN.** Sprint conventions (server/client boundary, HMAC token coverage, policy enforcement parallel-paths, phone validation, naming, deep imports) held consistently. **2 findings:**

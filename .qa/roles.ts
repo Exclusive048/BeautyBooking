@@ -8,9 +8,8 @@
 // Landing logic (src/lib/auth/cabinet-redirect.ts):
 //   hasStudioAdmin && !hasMaster -> /cabinet/studio
 //   hasMaster && !hasStudioAdmin -> /cabinet/master/dashboard
+//   isAdmin (ADMIN/SUPERADMIN)   -> /admin           (QA-002 / FIX-08)
 //   else                         -> /cabinet/profile
-// NOTE: there is no ADMIN branch — a site admin (roles CLIENT,ADMIN)
-// lands on the CLIENT cabinet after OTP login, NOT /admin.
 
 export type RoleKey =
   | "master"
@@ -73,8 +72,8 @@ export const ROLES: Role[] = [
     label: "Site admin",
     phone: "+79994000000",
     roles: "CLIENT, ADMIN",
-    expectedLanding: "/cabinet/profile",
+    expectedLanding: "/admin",
     landingNote:
-      "ADMIN OTP login redirects to the CLIENT cabinet, not /admin. The /admin panel is reachable by direct navigation but is never the post-login landing surface.",
+      "QA-002 (FIX-08): a platform admin (roles CLIENT,ADMIN) now lands on /admin after OTP login (was /cabinet/profile — the redirect had no ADMIN branch).",
   },
 ];

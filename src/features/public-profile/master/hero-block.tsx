@@ -1,6 +1,6 @@
 "use client";
 import { motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, MapPin, Share2, Star } from "lucide-react";
+import { Building2, ChevronRight, MapPin, Share2, Star } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { FocalImage } from "@/components/ui/focal-image";
@@ -50,7 +50,7 @@ function formatExperience(months: number | null): string | null {
 }
 
 export function HeroBlock({ view, isAuthenticated = false, initialFavorited = false }: Props) {
-  const { provider, planTier, experienceMonths, availability } = view;
+  const { provider, planTier, experienceMonths, availability, studio } = view;
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const reduce = useReducedMotion();
   const isPremium = planTier === "PREMIUM";
@@ -148,6 +148,33 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 {experienceLabel ? <span>{experienceLabel}</span> : null}
               </motion.div>
             )}
+
+            {/* QA-115 (FIX-06): studio affiliation — links to the studio's public
+                profile via its public username (never an internal id); plain text
+                when the studio isn't publicly linkable. */}
+            {studio ? (
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: 6 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.19, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-3"
+              >
+                {studio.publicUsername ? (
+                  <Link
+                    href={`/u/${studio.publicUsername}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-main transition hover:border-primary/40 hover:text-primary"
+                  >
+                    <Building2 className="h-3.5 w-3.5" aria-hidden strokeWidth={1.6} />
+                    <span>{T.studioAffiliationTemplate.replace("{name}", studio.name)}</span>
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-sec">
+                    <Building2 className="h-3.5 w-3.5" aria-hidden strokeWidth={1.6} />
+                    <span>{T.studioAffiliationTemplate.replace("{name}", studio.name)}</span>
+                  </span>
+                )}
+              </motion.div>
+            ) : null}
 
             <motion.div
               initial={reduce ? false : { opacity: 0, y: 6 }}

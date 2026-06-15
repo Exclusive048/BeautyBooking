@@ -86,6 +86,111 @@ covered-by-test: yes (smoke captures it in consoleErrors).`
     on the login page (stats numbers / brand logo / framer-motion / theme).
     See the BACKLOG 🔴 "prod-build smoke subset" watch-item.
 
+**✅ QA-001 — RESOLVED (2026-06-16). Root cause + narrow fix + prod-verified.**
+- **Phase 1 — diverging node (dev detailed warning):** `TelegramLoginButton` inside
+  the social-login row. Server rendered `<div className="pointer-events-none absolute
+  opacity-0" aria-hidden>` (the "bot configured" container branch); client rendered
+  `<button disabled aria-label="Войти через Telegram">` (the "!botUsername" branch).
+- **Phase 2 — root cause (NOT env-divergence-as-FIX-01-assumed, but env-VIA-ALIAS):**
+  the buttons read `env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` / `env.NEXT_PUBLIC_VK_ENABLED`.
+  `.env` has these set, so the **server** value is correct, but on the **client**
+  `@/lib/env` is `process.env as AppEnv` and the aliased property access defeats Next's
+  static `process.env.NEXT_PUBLIC_*` inlining → **`undefined` on the client**. Server
+  renders the configured branch, client the not-configured branch → #418. (VkLoginButton
+  is the same class but renders `null` when off, so React reported Telegram first.)
+  This also meant the Telegram button was non-functional post-hydration (regenerated to
+  the disabled state). The ENV-DISCIPLINE sweep (`process.env.X` → `env.X`) introduced it.
+- **Phase 3 — fix (narrow, deterministic-value strategy):** `/login` `page.tsx` (server)
+  reads the two NEXT_PUBLIC values and passes them as props → `LoginClient` → the buttons,
+  which prefer the prop (defined on both SSR + CSR via the RSC payload) over the env alias.
+  Buttons gained optional `botUsername?` / `enabled?` props (other callers keep the legacy
+  env fallback). The two buttons are used **only** by `login-client.tsx`, so the change is
+  fully contained — no env.ts touch, no app-wide ripple. Files: `src/app/login/page.tsx`,
+  `src/app/login/login-client.tsx`, `src/components/auth/telegram-login-button.tsx`,
+  `src/components/auth/vk-login-button.tsx`.
+- **Phase 4 — PROD verification (`next start`, real static + hydration — the standalone
+  launcher 404s `_next/static` so it can't hydrate; used `prod-next-start.mjs`):**
+  #418 **gone** in light AND dark (console clean), **input-wipe gone** (fast type
+  "9991002030" sticks — no per-key retry needed), login works E2E (smoke 4/5 →
+  correct landings; the 5th = site-admin failed on per-IP OTP rate-limit, **not** the fix —
+  isolated re-run after clearing rate-limit logged admin in → /admin). Screenshots
+  `.qa/diagnostics/qa-001/`.
+- **Proposed follow-up (root fix, deliberately NOT applied here — ripples app-wide):**
+  fix `src/lib/env.ts` client branch to build the env object from **literal**
+  `process.env.NEXT_PUBLIC_X` references (one per var) so webpack inlines each → every
+  client `env.NEXT_PUBLIC_*` consumer gets the real value. Same latent bug currently
+  affects `push-manager` / `catalog-map` / `telegram-connect-modal` (env-via-alias →
+  undefined on client). Own prompt + full-surface verification recommended.
+- **Unrelated observation (new, pre-existing, prod-only, non-blocking):** `/login` emits a
+  CSP `unsafe-eval` pageerror (`'unsafe-eval' not allowed` under strict-dynamic) — a
+  string is eval'd somewhere (likely a dep). It did **not** block login (E2E completed).
+  Separate from QA-001 (not a hydration error). Filed for a future CSP/eval pass.
+
+**✅ FIX-09 (2026-06-16) — env.ts client `NEXT_PUBLIC_*` inlining root fix (the QA-001 root, app-wide).**
+- **Bug:** the client branch was `env = process.env as AppEnv`; reading `env.NEXT_PUBLIC_X` via that
+  alias defeats Next/webpack's static `process.env.NEXT_PUBLIC_X` inlining → **every** client consumer
+  got `undefined`. (Introduced by the ENV-DISCIPLINE `process.env.X`→`env.X` sweep.)
+- **Fix:** client branch now builds an explicit object from **literal** `process.env.NEXT_PUBLIC_X`
+  references — full set enumerated from the schema: `NEXT_PUBLIC_APP_URL`,
+  `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`, `NEXT_PUBLIC_VK_ENABLED`, `NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED`,
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` — **plus `NODE_ENV`** (needed so
+  `isProduction` is correct client-side; `push-manager` early-returns on `!isProduction`). Server branch
+  + fail-fast untouched. File: `src/lib/env.ts` (client branch only).
+- **Verified (prod `next start`):**
+  - **Static inlining:** `master_ryadom_ru_bot` now in **4 client chunks** (incl. the profile page); was 0.
+  - **telegram-connect-modal** (reads `env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` **directly**, no prop):
+    modal opens to the real connect widget — **no "Подключение Telegram недоступно"** (was broken/undefined
+    on client for all users pre-fix). The headline proof the root fix works beyond login.
+  - **/login** #418 gone in light AND dark (QA-001 stays green, 3/3); input-wipe gone.
+  - **Login smoke 5/5** on prod (master/studio/master-in-studio/client + site-admin → /admin).
+  - **push-manager:** both former blockers fixed — `isProduction` now true client-side (NODE_ENV inlined)
+    + `NEXT_PUBLIC_VAPID_PUBLIC_KEY` inlined (set in env). install/update-prompt (`isProduction`) benefit too.
+  - **No new hydration mismatch** (values inlined identically server+client).
+  - Computed flags recompute from real values (`isVkNotificationsEnabled` string-coerce intact; server-only
+    flags like `isPushEnabled`/`isVkAuthEnabled` stay correct — they gate on server-only secrets absent on client).
+  - Login buttons left on the QA-001 props (defensive; the env fallback now also works, but props keep QA-001
+    green independent of env.ts). Evidence: `.qa/diagnostics/fix-09/`.
+- **Observations (pre-existing, NOT FIX-09):**
+  - `booking-happy-path.spec.ts` fails at "pick a time slot" — the date strip offers **today** as the first
+    enabled day, but at the run time (00:54 MSK) today's 10–19 slots are all past the booking cutoff →
+    "В этот день мастер занят" → 0 slots; the test picks the first enabled day and gets the exhausted one.
+    The booking widget itself works (renders **34 slots** on a day with availability; reads no env, relative
+    same-origin fetch → FIX-09-independent). Date-grid marks today enabled even when exhausted — a date-grid/
+    time-grid TZ-edge (QA-113/QA-107 family). **Fix: make the test pick the first day WITH slots** (or the
+    date-grid disable an exhausted today).
+  - `.env` has a **trailing-space typo** in `NEXT_PUBLIC_YANDEX_MAPS_API_KEY ` → the key never matches
+    `process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY` → empty on BOTH server and client (catalog-map key unset
+    regardless of FIX-09). Pre-existing env typo — fix the `.env` line.
+
+**✅ FIX-10 (2026-06-16) — three quick wins + a FIX-09 regression catch.**
+- **Item 1 — maps-key "typo": FALSE ALARM (no real bug).** dotenv parses `KEY = value` correctly
+  (`KEY = b9f5…` → key `NEXT_PUBLIC_YANDEX_MAPS_API_KEY`, no trailing space) and the value was already
+  inlined into 4 client chunks (FIX-09). **Runtime-verified:** /catalog map view fires
+  `api-maps.yandex.ru/2.1/?…&apikey=b9f5c172…` — the key reaches the Yandex loader. Tracked templates
+  (`.env.example`, `.env.production.example`) already use the correct `KEY=` format → **no tracked-file fix
+  needed.** Normalized the local (gitignored) `.env` line `KEY = value`→`KEY=value` for tidiness. (Tile
+  rendering still depends on the key being a valid Yandex key — ops, not code.)
+- **Item 2 — booking-happy-path determinism:** the spec now iterates enabled days and picks the **first
+  day with selectable slots** (skips an exhausted today) instead of the first enabled day → passes at any
+  time of day. Verified PASS at ~01:30 MSK (the exact hour that broke it in FIX-09). File:
+  `.qa/specs/client/booking-happy-path.spec.ts`.
+- **Item 3 — QA-122 (🟡) date-grid exhausted-today empty state.** Chose the **clear empty-state** option
+  (Option B): disabling in the date-grid (Option A) wasn't cleanly feasible in scope — date-grid has no
+  `serviceId`/slot data and day-enablement comes from the out-of-scope `/booking-days` endpoint. time-grid
+  now shows an accurate message: `emptyDay` "Свободных окон в этот день нет" (was the misleading "В этот
+  день мастер занят") + `emptyDayToday` "На сегодня свободных окон не осталось" when the selected day is
+  today (provider tz). **Verified both themes** — exhausted ПН 15 → 0 slots, no "мастер занят", accurate
+  copy; Вс disabled (Sunday-off); a slots day still renders + booking completes (booking-happy-path).
+  Files: `time-grid.tsx` + 2 `UI_TEXT` keys. Screenshots `.qa/diagnostics/fix-10/`.
+- **🔧 FIX-09 regression caught by FIX-10's `npm test` (28 auth/token failures).** FIX-09's parse-fail
+  fallback returned `clientEnv` (only NODE_ENV + 6 NEXT_PUBLIC) for **all** runtimes — so in the
+  test/server runtime where the full Zod parse fails (no DATABASE_URL), `env.AUTH_JWT_SECRET`/
+  `OTP_HMAC_SECRET` vanished → jwt/otp/client-key-token/master-view-token tests failed. Fixed: the
+  parse-fail fallback now branches on `isServerRuntime` — **server** → full `process.env` (secrets intact),
+  **client** → `clientEnv` (literal-inlined NEXT_PUBLIC). 698/698 green. (FIX-09 ran build but not
+  `npm test`, per its own validation list — FIX-10's test run surfaced it.) File: `src/lib/env.ts`.
+
+
 ---
 
 ## 1. Master (independent)
@@ -160,6 +265,20 @@ KPI tiles: (1) "Записей сегодня 3 из 0ч · загрузка д�
 correct prices. May be partly TZ-related (today-boundary) — see QA-113/QA-107. ·
 screenshot: .qa/diagnostics/qa05-master/dashboard.png · covered-by-test: no.`
 
+**✅ QA-112 — RESOLVED in FIX-08 (2026-06-15).**
+- **Capacity "0ч"** — root cause in `dashboard.service.ts resolveTodayWorkingWindow`:
+  it queried `WeeklyScheduleDay` with `now.getUTCDay()` (JS 0=Sun…6=Sat, server UTC
+  day), but the rows use ISO 1–7 (Sunday=7, no weekday-0 row) → Sunday always missed →
+  "0ч", and it ignored the provider tz. Fixed to `getDayOfWeek(now, provider.timezone)`
+  mapped to ISO (`jsDay === 0 ? 7 : jsDay`). Verified live: Anna (Asia/Almaty, Tuesday
+  there) now shows **"3 из 10ч"** (was "из 0ч"). Aligns with the QA-116 seed convention.
+- **"vs прошлая суббота"** — a hardcoded sublabel claiming a comparison that is never
+  computed (KPI tiles carry no trend deltas, by design). Replaced with the honest
+  descriptive `todayRevenueSub: "По записям на сегодня"`. ("vs прошлая неделя" on the
+  week tile left as-is — generic, not flagged.) Both themes screenshotted →
+  `.qa/diagnostics/fix-08/qa112-dashboard-{light,dark}.png`. Files: `dashboard.service.ts`,
+  `src/lib/ui/text.ts`.
+
 `QA-113 · master booking-time labels (server-side formatting) · 🟠 High
 (PROD-host-dependent) · repro: master bookings kanban + schedule render Виктория
 Петрова (DB startAtUtc=2026-06-15 11:00 UTC) as "14:00" — i.e. UTC+3 (Moscow),
@@ -220,6 +339,32 @@ local time** — a master could misread when an appointment is (real-world no-sh
 groupings/greeting/capacity compute against UTC. The MSK dev host hid all of this (QA-108 masking
 pattern). Evidence: `.qa/diagnostics/qa07-tz-utc/schedule-grid-utc-shift.png`. Fix scope unchanged
 (the server-side `Date.get*` list above); the diagnostic only sets priority, not the fix surface.
+
+**✅ RESOLVED — FIX-04 (2026-06-15): entity-own-tz for the self-view display sites.**
+Each QA-113 offender classified (fix self-view / leave engine-internal / defer to QA-107):
+
+| Site | Classification | What changed |
+|---|---|---|
+| `bookings.service.ts:83 formatWhenLabel` | **FIX** (master self-view) | Now formats in the master's provider `timezone` via `getLocalTimeParts`/`getDayOfWeek`/`toLocalDateKey`. Provider tz loaded once in `getMasterBookingsForKanban`. Format/locale unchanged. |
+| `notifications.service.ts isToday` + day grouping | **FIX** (master self-view) | "today" + `groupNotificationsByDay` now use the master's tz (loaded from `masterId`). |
+| `studio-cabinet/.../notifications-data.service.ts isToday` + grouping | **FIX** (studio self-view) | Same, using the studio's provider tz; `loadStudioNotificationsData` now takes `studioProviderId` (page passes `resolveCurrentStudioAccess().providerId`). |
+| `group-by-day.ts` (shared by master+studio, **no client caller**) | **FIX** (plumbing) | `groupNotificationsByDay` + `describeDay` gained an optional `timeZone`; TZ-aware "today/yesterday/dated" when supplied, legacy process-TZ fallback otherwise. |
+| `master-dashboard-page.tsx isWeekend` | **FIX** (master self-view) | `getDayOfWeek(now, data.master.timezone)` instead of `now.getDay()`. |
+| `schedule.service.ts:103 minuteOfDay` (+ grid hour-range) | **LEAVE — engine-coupled** | Grid-positioning math tied to the engine's working-interval placement; explicitly do-not-touch. Still shifts under UTC but a safe fix needs coordinated grid+intervals change with grid-specific regression tests → separate task (noted under QA-113 residual). |
+| `schedule-utils.ts` date keys/week math | **LEAVE — engine internal** | TZ-safe per QA-07; do-not-touch. |
+| `model-offers-stats.ts formatOfferDate` | **LEAVE — false positive** | Operates on a `dateLocal` string via `new Date(y,m-1,d)` read back in the same process TZ → TZ-stable (no UTC instant). Comment confirms intent. |
+| `model-offers-view.service.ts:661 formatDateKey` | **LEAVE — internal key** | Grouping key, not a display label (per "only if display"). |
+| `reviews-stats.ts startOfMonth/startOfPrevMonth` | **DEFER (low-pri)** | Month-trend **aggregation** bucketing, not a clock label; only a near-month-boundary review (e.g. 23:00 UTC on the 31st) could misbucket the trend %. Not the "master misreads their schedule" harm. Needs provider tz plumbed into `computeReviewStats`; refinement, not pre-launch. |
+
+**No-regression proof (the 🔴-risk check) — availability under TZ=UTC == MSK baseline:**
+Re-ran the dev server under `TZ=UTC` (verified host TZ). Galina (`Europe/Moscow`) public slots:
+Tue 2026-06-16 → **17 slots, first `07:00:00Z` (=10:00 MSK), last `15:00:00Z` (=18:00)**; Sunday 2026-06-21 (day-off) → **0 slots** — **identical** to the MSK baseline. The TZ-safe engine is untouched. `.qa/diagnostics/fix-04/` (+ dev log).
+
+**Fix proof — master labels are entity-local under TZ=UTC (not UTC):**
+Logged in as Anna (`Asia/Almaty`, UTC+5) on the UTC host; her kanban labels = UTC+5, NOT raw UTC:
+06-16 `10:00Z`→**15:00**, `11:00Z`→**16:00**, `15:00Z`→**20:00**; 06-17 `12:00Z`→**17:00**, `14:00Z`→**19:00**; 06-18 `12:00Z`→**17:00**; 06-19 `10:00Z`→**15:00**; 06-21 `15:00Z`→**20:00**. (Old code on a UTC host showed the raw UTC clock.) Screenshot `anna-kanban-utc-almaty-local.png`. `booking-happy-path.spec.ts` also passes under UTC.
+
+**Client-facing groupings (group-by-month etc.) remain DEFERRED to the QA-107 per-viewer track** — `group-by-day`'s optional `timeZone` is only passed by the master+studio (self-view) callers; client surfaces are untouched here.
 
 **QA-107 (TZ) — observations (NOT finalized; rendering feature is a BACKLOG item):**
 - **Data-consistency check → NOT a bug.** Anna's `timezone=Asia/Almaty` is
@@ -325,6 +470,23 @@ applyScheduleSnapshot / approved (QA-08), their rows migrate to 1–7. Latent ri
 seed master were configured to WORK Sundays (seed weekday-0=on would be ignored by the engine).
 No current user impact; seed should write 1–7 to match the engine. · covered-by-test: no.`
 
+**✅ QA-116 — RESOLVED in FIX-08 (2026-06-15).**
+- **Reader audit first (no 0–6 consumer found):** the engine (`engine-context.ts` JS-Sun→7),
+  `analytics/domain/kpi.ts:199` (`weekday === 7 ? 0`), and the slots routes
+  (`dayIndexFromDateKey(dateKey) + 1`) all read this field as **ISO 1–7**. Proceeded.
+  (`studio-cabinet/analytics/lib/types.ts` "0=Sun..6=Sat" is a heatmap **output** DTO from
+  `getDayOfWeek`, not a reader of `WeeklyScheduleDay.weekday`.)
+- **Two offenders fixed** (seed only): `seed-providers.ts` (bulk masters) + `seed-showcase-studio.ts`
+  (studio masters) — loops changed `for 0..6 / Sun=0 off` → `for 1..7 / Sun=7 off`.
+  `seed-showcase-master.ts` (Anna) was already 1–7 — untouched. `buildVisionSchedulePayload`
+  (a ScheduleChangeRequest **editor-snapshot** `dayOfWeek`, separate convention) — out of scope.
+- **Verified:** wiped schedule tables + re-seeded → `WeeklyScheduleDay` distinct weekday =
+  **only 1–7** (no weekday-0). Correct-day render via public slots API (galina, Europe/Moscow):
+  **Sunday 2026-06-21 → 0 slots (day-off)**, Tuesday/Saturday → slots present (10:00 first). No
+  off-by-one. NOTE: `reset.ts` doesn't clear `WeeklyScheduleConfig` (Provider survives the
+  user-cascade via `ownerUserId` SetNull) → a reseed-over-existing leaves stale weekday-0 rows;
+  a fresh DB / table wipe produces clean 1–7. Files: both seed generators.
+
 - _(feature findings added by the Studio-admin deep-test prompt)_
 
 ## 3. Master in studio
@@ -406,6 +568,20 @@ data-wise (QA-06 Phase 2); this is purely the missing UX surfacing. · root caus
 the schedule-settings UI doesn't render the server's `approval` state (mode /
 requestStatus / pendingRequestId / rejectedComment / lastAction). · covered-by-test: no.`
 
+**✅ QA-114 — RESOLVED in FIX-06 (2026-06-15): approval feedback in the schedule editor.**
+New client island `studio-approval-banner.tsx` consumes the shared auto-save status
+(`useSaveStatus`) inside the existing `SaveStatusProvider`. `schedule-settings-page.tsx`
+(server) detects a studio master via `Provider.studioId`, loads the studio name (from
+the studio's provider row) + whether a `ScheduleChangeRequest` is already PENDING, and
+passes `studioApproval={ studioName, pending }` to `ScheduleSettingsBody`. The banner:
+(a) shows a persistent info line "Вы в команде студии «{studio}». Изменения расписания
+отправляются на одобрение…" + a **«Ожидает одобрения»** badge when a request is already
+pending at load; (b) on a successful save flips to "Изменения отправлены на одобрение
+студии «{studio}»…" and shows the pending badge. **Independent masters (`studioId`
+NULL) → `studioApproval` is `null` → no banner (no regression).** Approval mechanics +
+schedule engine UNTOUCHED — only the already-returned state is surfaced. Strings:
+`UI_TEXT.cabinetMaster.scheduleSettings.studioApproval.{infoTemplate,sentTemplate,pendingBadge}`.
+
 `QA-115 · studio affiliation invisibility (studio master) · 🟡 Medium · repro:
 view Marina's master cabinet dashboard AND her public profile (/u/vision-marina-lebedeva-1)
 · expected: some indication she belongs to Vision Beauty Studio (team/branding on
@@ -416,6 +592,44 @@ the cabinet and to clients on her public profile. May be an intentional
 master-centric design, but flagged: for a studio member the total absence of studio
 context (esp. on the public profile, where clients can't tell she's studio-backed)
 is likely a gap. · covered-by-test: no.`
+
+**✅ QA-115 — RESOLVED in FIX-06 (2026-06-15): affiliation on public profile + cabinet.**
+- **Data layer** (`public-profile-view.service.ts`): `MasterPublicProfileView` gains
+  `studio: { name; publicUsername | null } | null` via the `Provider.studio` relation
+  (`select { name, publicUsername, isPublished }`). `publicUsername` is exposed **only
+  when the studio is `isPublished`** (else `null`) — rule 12: never an internal CUID;
+  unpublished studios show the name without a link. `null` for independent masters.
+- **Public profile** (`hero-block.tsx`): renders a "Часть студии «{name}»" pill under
+  the tagline. Links to **`/u/{publicUsername}`** (studio's public profile) when
+  linkable; plain chip otherwise. String: `UI_TEXT.publicProfile.hero.studioAffiliationTemplate`.
+  **No internal id in the link** (verify: inspect href — `/u/<publicUsername>`).
+- **Cabinet** (`master-dashboard-page.tsx` + `dashboard.service.ts`): the dashboard
+  service now returns `master.studio: { name } | null` (via the same relation); the
+  dashboard renders a "Студия «{name}»" chip above the greeting for studio masters.
+  String: `UI_TEXT.cabinetMaster.dashboard.studioChipTemplate`. Independent masters →
+  nothing shown. Public profile + booking flow otherwise unchanged.
+- **Validation:** typecheck ✅ · lint baseline preserved (1 error / 3 warnings — all
+  pre-existing in email-verify-modal/client-profile-page/use-active-role; FIX-06 added
+  zero new lint problems) · encoding ✅ · mojibake ✅.
+
+**✅ FIX-06-VERIFY (2026-06-15, dev server, Playwright `chromium` + storageState) — 12/12 PASS.**
+Phase 0: docker up, `/api/health` green, `post-seed.dump` restored (SCR `seed-vision-scr-01`
+PENDING), Marina/Anna sessions refreshed via `smoke.spec.ts` (the stored states had expired →
+cabinet redirected to /login; **not a FIX-06 defect**). Script: `.qa/diagnostics/fix-06/verify-fix-06.mjs`.
+- **QA-114 PASS** — Marina: info banner «Вы в команде студии «Vision Beauty Studio»…» + **«Ожидает
+  одобрения»** badge at load; editing slot-step (30→60) in the Hours tab flipped the banner to
+  «Изменения отправлены на одобрение студии…». **Live schedule UNCHANGED** (DB: `Provider.slotStepMin`
+  stayed **30**, WeeklyScheduleDay untouched) while the edit routed into the pending SCR (`updatedAt`
+  advanced 06-14 21:56 → 06-15, status still PENDING) — master cannot bypass approval. **Anna** (independent):
+  no banner (no regression). Banner renders + stacks correctly at mobile 390×844.
+- **QA-115 PASS** — Marina public profile shows the «Часть студии «Vision Beauty Studio»» pill; link
+  href = **`/u/vision-studio`** (studio's publicUsername — **no internal CUID**, rule 12 ✅) and navigates
+  to the studio's public page (renders «Vision Beauty Studio»). Marina dashboard shows the «Студия «…»»
+  chip. **Anna**: profile + cabinet clean (nothing studio-related). Both themes (light/dark) + mobile —
+  no contrast/overflow issues on banner/badge/chip.
+- Screenshots → `.qa/diagnostics/fix-06/` (qa114-marina-settings-{light,dark,mobile}, qa114-marina-edit-sent,
+  qa114-anna-settings-light, qa115-marina-profile-{light,dark,mobile}, qa115-marina-dashboard-{light,dark},
+  qa115-anna-profile-light). No FIX-06 source changed during verification.
 
 
 ## 4. Client
@@ -834,8 +1048,9 @@ verified live (baseline restored):
   legacy `studio-settings-page` Services tab, which the live route (`/cabinet/studio/settings/services`)
   redirects away from (unreachable in practice). Bundled into the legacy-page retirement sweep (likely a
   genuine inflation, but out of this mechanical pass's reach).
-- `master/hot-slots-settings-section.tsx:279` (`moneyRUBPlain(effectivePrice)`) → **out of FIX-03 scope**
-  (not in the audited list; master cabinet). Flagged below as a follow-up to verify.
+- `master/hot-slots-settings-section.tsx:279` (`moneyRUBPlain(effectivePrice)`) → **✅ CLOSED by FIX-04 Phase 0**:
+  `effectivePrice` confirmed kopecks (`priceOverride ?? basePrice ?? price`) → swapped to `moneyRUBPlainFromKopeks`.
+  QA-109 now fully closed across master + public surfaces.
 - `search-by-time/slot-bubbles-row.tsx:30` (`moneyRUB(discountValue)`) → **correct** (`discountValue` is in
   rubles — `calcDiscountedPrice` multiplies it by 100 to reach kopecks). Left as-is.
 
@@ -844,9 +1059,9 @@ verified live (baseline restored):
 and carry their ÷100 marker (catches a future re-introduction).
 
 **`moneyRUB`/`moneyRUBPlain` deprecation:** NOT removable yet. `moneyRUB` retains 1 legitimate caller
-(`slot-bubbles-row`, value in rubles). `moneyRUBPlain` retains 2 (master `hot-slots-settings-section`,
-legacy `studio-services-page`) — both need review (likely additional QA-109-class instances outside this
-pass's scope) before either formatter can be deprecated.
+(`slot-bubbles-row`, value in rubles). After FIX-04 Phase 0 closed hot-slots-settings-section,
+`moneyRUBPlain` retains **1** caller — legacy `studio-services-page.tsx:617` (reachable only via the
+redirect-shadowed legacy settings tab; bundle into the legacy-page retirement before deprecating).
 
 `QA-110 · booking widget slot grid (time-grid.tsx) · 🟠 High · repro: open a
 master profile, add a service, select a day → the time grid shows ~2 days of
@@ -867,6 +1082,16 @@ can believe they're booking a different day than they are (until the success
 card); confusing grid. Fix: filter slots to `slot.dayKey === dateKey` OR make
 `to` exclusive. · screenshot: galina-booking-slots.png · covered-by-test: no.`
 
+**✅ RESOLVED — FIX-05 (2026-06-15). Day-handling choice: SINGLE-DAY** (reference-aligned —
+`time-grid.tsx` JSDoc is "3-column time grid for a single chosen day"; the widget has a
+separate `DateGrid` day selector). Fix in `time-grid.tsx`: request `to = dateKey` (the API
+treats `to` inclusive, so `from===to` returns exactly that day — dropped the `to = dateKey + 1`
+bleed) **plus** a defensive `.filter(slot => slot.dayKey === dateKey)`. The summary already
+labels the day from `selectedDateKey` (not the slot), so with single-day slots the mislabel is
+structurally gone (you can no longer pick a different day's slot). **Proven live:** the widget's
+network request is now `from=2026-06-16&to=2026-06-16`, and the grid renders only that day's
+slots (no next-day bleed). Screenshot `fix-05/galina-grid-single-day-15min.png`.
+
 `QA-111 · slot grid granularity (schedule engine) · 🟡 Medium · repro: Galina
 has slotPrecision=`exact`, slotStepMin=15, but the offered slot grid is 30-min
 (10:00, 10:30, …). · expected: respect slotStepMin (15-min grid). · actual:
@@ -876,6 +1101,18 @@ the slot loop. slotPrecision="exact" display IS honoured (exact times shown).
 This confirms the BACKLOG "slotPrecision/slotStepMin not enforced" item for
 slotStepMin specifically. Not a booking break (30-min slots are valid) but a
 master who configured 15-min steps doesn't get them. · covered-by-test: no.`
+
+**✅ RESOLVED — FIX-05 (2026-06-15).** `slots.ts buildSlotsForDay` now reads `slotStepMin`
+(new optional input, fallback 30 only when a caller omits it) instead of the hardcoded 30.
+Plumbed `normalizeSlotStepMin(provider.slotStepMin)` through all 3 production callers:
+`usecases.ts` (×2 — the slots API + paginated grid) + `public-profile-view.service.ts`
+(next-availability hint). **Proven live (Galina):** slotStepMin **15 → 34 slots, 15-min grid**
+(10:00, 10:15, 10:30…); **30 → 17 slots, 30-min grid** (10:00, 10:30…) — honoured + reactive
+(cache busts on the provider `updatedAt` bump). **Booking integrity re-verified at the 15-min
+step:** booked 14:00–14:45 → slot consumed; overlapping 15-min slots (13:45/14:15/14:30) all
+blocked; first non-overlap (14:45) offered; double-book backstop (`ensureNoConflicts`, unchanged)
+holds; success-card time correct; `booking-happy-path.spec.ts` passes. Regression test added to
+`slots.test.ts` (15-min/60-min/omitted-fallback). covered-by-test: **yes**.
 
 `QA-001 (cross-cutting) during QA-04: phone input on /login stuck on the FIRST
 type this session (no hydration input-wipe observed). The first OTP attempt
@@ -975,12 +1212,30 @@ remove → reload = false; re-add → reload = true. Anna restored to favorited.
   `/cabinet/bookings` → scroll to bottom → tap the last card's "Отменить". Fix: add
   bottom padding to the client cabinet scroll container (e.g. `pb-24`) to clear the
   fixed nav. Evidence: `.qa/diagnostics/qa10-mobile/`. covered-by-test: no.
+  **✅ RESOLVED — FIX-07 (2026-06-15).** **Root cause refined by a behaviour-level
+  re-audit:** the QA-10 "client `main` is `pb-0`" was a mis-measurement — `querySelector('main')`
+  returned the *outer* app-shell `<main>` (`flex-1 w-full`, pb-0); the inner cabinet `<main>`
+  already had `pb-24 lg:pb-0`. The genuine, consistent gap: **`CabinetBottomNav` was the only one
+  of the 4 bottom-navs missing the `<div className="h-16 lg:hidden" aria-hidden />` clearance
+  spacer** that `bottom-nav.tsx` / `master-bottom-nav.tsx` / `studio-bottom-nav.tsx` all render
+  (completing the master pattern = main `pb-24` + nav `h-16` spacer). Fix: added that spacer to
+  `CabinetBottomNav`. Verified live (390×844): spacer present; the upcoming-booking action row
+  (incl. destructive "Отменить") sits at viewport y≈400, well clear of navTop 792; desktop 1440
+  unaffected (spacer + pb both `lg:hidden`/`lg:pb-0` → 0px, no dead space). **Separate finding noted
+  (NOT fixed — out of scope):** two mobile bottom-navs co-render on cabinet pages (`CabinetBottomNav`
+  + the global `bottom-nav.tsx`) — see new BACKLOG item `QA-121`.
 - **NEW 🟡 QA-120 — booking action controls below mobile tap-target guideline.**
   Чат / Перенести / В календарь / Маршрут / Отменить / Повторить / Связаться all
   render at **30px height** at 390-wide (below the 44px Apple-HIG / 48dp-Material
   guideline), several packed in one row incl. the destructive "Отменить" → mis-tap
   risk on a mobile-first surface. (Echoes the sprint's existing TAP-TARGET-AUDIT-A
   backlog item.) covered-by-test: no.
+  **✅ RESOLVED — FIX-07 (2026-06-15)** for this instance. `ActionButton` + `ActionLink`
+  (client bookings) now `min-h-[44px]` + `px-3 py-2` (was `px-2.5 py-1.5 text-xs` ≈30px) → verified
+  **44px** live (light + dark); action row gap bumped `gap-1.5`→`gap-2` so the destructive "Отменить"
+  is clearly separated when the row wraps on mobile. Text size kept `text-xs` (compact toolbar chips,
+  not CTAs). **The broader app-wide `TAP-TARGET-AUDIT-A` remains open** — this fix is the QA-120
+  booking-controls instance only. Evidence `.qa/diagnostics/fix-07/`.
 
 #### Verdict
 Cancel + late-cancel: **graceful, integrity-safe, no penalty (as designed).**
@@ -1004,6 +1259,12 @@ roll-in (QA-109 ×3 surfaces, QA-107 client-TZ).
   the post-login landing · covered-by-test: yes.` By design today, but flagged
   so the admin deep-test prompt navigates to `/admin` explicitly rather than
   expecting an auto-redirect.
+  **✅ RESOLVED — FIX-08 (2026-06-15).** Added an ADMIN/SUPERADMIN branch to
+  `resolveCabinetRedirect` (before the client fallback; master/studio branches
+  unchanged) → admin lands on `/admin`. Verified: 5-role login smoke all PASS —
+  site-admin `/admin`, master `/cabinet/master/dashboard`, studio `/cabinet/studio`,
+  master-in-studio `/cabinet/master/dashboard`, client `/cabinet/profile` (no
+  regression). Files: `src/lib/auth/cabinet-redirect.ts` (+ `.qa/roles.ts` expected-landing).
 ### QA-09 deep-test (site admin breadth + privilege-escalation) — 2026-06-15
 
 **Subject:** Платформа Админ (`+79994000000`, roles {CLIENT, ADMIN}). Live UI via

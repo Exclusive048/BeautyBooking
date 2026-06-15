@@ -56,17 +56,30 @@ test("client completes a booking end-to-end via the UI", async ({ page, baseURL 
   const widget = page.locator("#booking");
   await expect(widget.getByText("Дата")).toBeVisible({ timeout: 30_000 });
 
-  // 4) Pick the first enabled day in the date strip (past/day-off render
-  //    disabled). Scoped + simple locator keeps it deterministic.
-  const enabledDay = widget
+  // 4+5) Pick the first enabled day that ACTUALLY has selectable slots, not just
+  //    the first enabled day. The date strip can mark "today" enabled while all
+  //    of today's slots are already past the booking cutoff (0 slots → empty
+  //    state) — picking blindly was time-of-day flaky (FIX-09 hit it at 00:54
+  //    MSK). Iterate enabled days, click each, and stop at the first that renders
+  //    a time slot. (QA-122: an exhausted today now shows a clear empty state.)
+  const enabledDays = widget
     .locator("button:not([disabled])")
-    .filter({ hasText: /^(Пн|Вт|Ср|Чт|Пт|Сб)\s*\d+$/ })
-    .first();
-  await expect(enabledDay).toBeVisible({ timeout: 30_000 });
-  await enabledDay.click();
+    .filter({ hasText: /^(Пн|Вт|Ср|Чт|Пт|Сб)\s*\d+$/ });
+  await expect(enabledDays.first()).toBeVisible({ timeout: 30_000 });
+  const slotLocator = widget.getByRole("button", { name: /^\d{1,2}:\d{2}$/ });
+  const dayCount = await enabledDays.count();
+  let pickedDay = false;
+  for (let i = 0; i < dayCount; i += 1) {
+    await enabledDays.nth(i).click();
+    await page.waitForTimeout(2500); // let the time-grid fetch + render settle
+    if ((await slotLocator.count()) > 0) {
+      pickedDay = true;
+      break;
+    }
+  }
+  expect(pickedDay, "no enabled day in the date strip offered any selectable slots").toBe(true);
 
-  // 5) Pick the first offered time slot (web-first wait for the grid to load).
-  const slot = widget.getByRole("button", { name: /^\d{1,2}:\d{2}$/ }).first();
+  const slot = slotLocator.first();
   await expect(slot).toBeVisible({ timeout: 30_000 });
   await slot.click();
 

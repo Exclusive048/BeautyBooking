@@ -9,6 +9,7 @@ import { createScheduleContext } from "@/lib/schedule/engine-context";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { logError } from "@/lib/logging/logger";
 
@@ -47,6 +48,14 @@ export type MasterPublicProfileView = {
   planTier: PlanTier | null;
   experienceMonths: number | null;
   availability: AvailabilityHint;
+  /**
+   * QA-115 (FIX-06): studio affiliation when the master belongs to a studio.
+   * `publicUsername` is the studio's *public* identifier for the profile link
+   * (rule 12 — never an internal id); `null` when the studio isn't publicly
+   * linkable (unpublished / no username) → name shown without a link.
+   * `null` overall for independent masters.
+   */
+  studio: { name: string; publicUsername: string | null } | null;
 };
 
 const AVAILABILITY_PROBE_DURATION_MIN = 30;
@@ -67,7 +76,13 @@ export const getMasterPublicProfileView = cache(
     const [ownerRow, packages] = await Promise.all([
       prisma.provider.findUnique({
         where: { id: provider.id },
-        select: { ownerUserId: true, createdAt: true },
+        select: {
+          ownerUserId: true,
+          createdAt: true,
+          slotStepMin: true,
+          // QA-115: studio affiliation (studioId references the studio's provider row).
+          studio: { select: { name: true, publicUsername: true, isPublished: true } },
+        },
       }),
       prisma.servicePackage.findMany({
         where: { masterId: provider.id, isEnabled: true },
@@ -99,7 +114,11 @@ export const getMasterPublicProfileView = cache(
       ownerUserId
         ? getCurrentPlan(ownerUserId, SubscriptionScope.MASTER).catch(() => null)
         : Promise.resolve(null),
-      computeAvailabilityHint(provider.id, provider.timezone),
+      computeAvailabilityHint(
+        provider.id,
+        provider.timezone,
+        normalizeSlotStepMin(ownerRow?.slotStepMin),
+      ),
     ]);
 
     const bundles = packages
@@ -151,12 +170,23 @@ export const getMasterPublicProfileView = cache(
       ? computeMonthsBetween(createdAt, new Date())
       : null;
 
+    // QA-115: only expose a public link when the studio is published + has a
+    // public username; otherwise show the name without a link (no CUID leak).
+    const studioRow = ownerRow?.studio ?? null;
+    const studio = studioRow
+      ? {
+          name: studioRow.name,
+          publicUsername: studioRow.isPublished ? studioRow.publicUsername : null,
+        }
+      : null;
+
     return {
       provider,
       bundles,
       planTier: planInfo?.tier ?? null,
       experienceMonths,
       availability,
+      studio,
     };
   },
 );
@@ -170,6 +200,7 @@ function computeMonthsBetween(from: Date, to: Date): number {
 async function computeAvailabilityHint(
   providerId: string,
   timezone: string,
+  slotStepMin: number,
 ): Promise<AvailabilityHint> {
   try {
     const now = new Date();
@@ -217,6 +248,7 @@ async function computeAvailabilityHint(
           bufferMin: 0,
           bookings: bookingsByDateKey.get(cursor) ?? [],
           now,
+          slotStepMin,
         });
         const upcoming = slots.find((slot) => slot.startAtUtc.getTime() >= now.getTime());
         if (upcoming) {

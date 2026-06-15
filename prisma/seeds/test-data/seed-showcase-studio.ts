@@ -609,8 +609,11 @@ async function ensureMasterSchedule(providerId: string) {
     update: {},
     create: { providerId },
   });
-  for (let weekday = 0; weekday < 7; weekday++) {
-    const isWorkday = weekday !== 0; // Sunday off
+  // QA-116: ISO 1=Mon … 7=Sun (engine/editor/analytics convention; matches the
+  // showcase-master seed). Was 0–6 (0=Sun) which left Sunday-off as an orphan
+  // weekday-0 row the engine never reads.
+  for (let weekday = 1; weekday <= 7; weekday++) {
+    const isWorkday = weekday !== 7; // Sunday (7) off
     await prisma.weeklyScheduleDay.upsert({
       where: { configId_weekday: { configId: config.id, weekday } },
       update: {

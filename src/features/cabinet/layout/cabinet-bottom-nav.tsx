@@ -23,6 +23,7 @@ export function CabinetBottomNav() {
   const reduce = useReducedMotion();
 
   return (
+    <>
     <nav className="fixed inset-x-0 bottom-0 z-40 lg:hidden">
       {/* Blur backdrop */}
       <div className="absolute inset-0 border-t border-border-subtle/60 bg-bg-card/90 backdrop-blur-xl" />
@@ -60,5 +61,12 @@ export function CabinetBottomNav() {
         })}
       </div>
     </nav>
+    {/* FIX-07 (QA-119): in-flow clearance spacer so page content (esp. the last
+        booking card's action row, incl. the destructive "Отменить") scrolls
+        clear of the fixed bottom-nav on mobile. Matches the master/studio/global
+        bottom-navs, which all render this spacer — the client nav was the only
+        one missing it. `lg:hidden` → no desktop dead space (nav is mobile-only). */}
+    <div className="h-16 lg:hidden" aria-hidden="true" />
+    </>
   );
 }

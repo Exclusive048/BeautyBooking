@@ -62,6 +62,30 @@ describe("schedule/slots", () => {
     expect(slots[0]?.label).toBe("2026-03-03 11:00");
   });
 
+  // FIX-05 (QA-111): the grid step must honour the master's slotStepMin.
+  it("honours slotStepMin=15 (15-min grid), default 30 when omitted", () => {
+    const args = {
+      dayPlan: basePlan,
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [],
+      now: new Date("2026-03-03T08:00:00Z"),
+    };
+
+    const fine = buildSlotsForDay({ ...args, slotStepMin: 15 }).map((s) => s.label.slice(-5));
+    // 10:00..11:30 start window (service 30m, interval ends 12:00) at 15-min step.
+    expect(fine).toEqual(["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30"]);
+
+    const coarse = buildSlotsForDay({ ...args, slotStepMin: 60 }).map((s) => s.label.slice(-5));
+    expect(coarse).toEqual(["10:00", "11:00"]);
+
+    // Omitting slotStepMin falls back to the legacy 30-min step.
+    const fallback = buildSlotsForDay(args).map((s) => s.label.slice(-5));
+    expect(fallback).toEqual(["10:00", "10:30", "11:00", "11:30"]);
+  });
+
   it("returns no slots for past dateKey", () => {
     const slots = buildSlotsForDay({
       dayPlan: basePlan,

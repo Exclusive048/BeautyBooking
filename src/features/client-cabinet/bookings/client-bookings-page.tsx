@@ -474,7 +474,10 @@ function BookingActions({
     : null;
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    // FIX-07 (QA-120): action chips are ≥44px (min-h-[44px]) + gap-2 so the
+    // destructive "Отменить" isn't mis-tapped next to the others when the row
+    // wraps on mobile.
+    <div className="mt-2 flex flex-wrap items-center gap-2">
       {booking.isUpcoming ? (
         <>
           {chatHref ? (
@@ -553,7 +556,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-xl border border-transparent px-2.5 py-1.5 text-xs font-medium transition ${actionClass(
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition ${actionClass(
         variant,
       )}`}
     >
@@ -586,7 +589,7 @@ function ActionLink({
         target={target}
         rel={external ? "noopener noreferrer" : undefined}
         download={download}
-        className={`inline-flex items-center gap-1.5 rounded-xl border border-transparent px-2.5 py-1.5 text-xs font-medium transition ${actionClass(
+        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition ${actionClass(
           variant,
         )}`}
       >
@@ -598,7 +601,7 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className={`inline-flex items-center gap-1.5 rounded-xl border border-transparent px-2.5 py-1.5 text-xs font-medium transition ${actionClass(
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition ${actionClass(
         variant,
       )}`}
     >

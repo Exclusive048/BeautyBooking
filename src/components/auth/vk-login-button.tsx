@@ -9,6 +9,13 @@ import { env } from "@/lib/env";
 type VkLoginButtonProps = {
   iconOnly?: boolean;
   className?: string;
+  /**
+   * QA-001: VK-enabled flag resolved SERVER-side and passed down so server +
+   * client render the same branch (env-via-alias is `undefined` on the client →
+   * server renders the button, client renders `null` → hydration mismatch). When
+   * provided the prop wins; omitting it keeps the legacy env fallback.
+   */
+  enabled?: boolean;
 };
 
 function VkIcon({ className }: { className?: string }) {
@@ -19,8 +26,9 @@ function VkIcon({ className }: { className?: string }) {
   );
 }
 
-export default function VkLoginButton({ iconOnly = false, className }: VkLoginButtonProps) {
-  const vkEnabled = String(env.NEXT_PUBLIC_VK_ENABLED) === "true";
+export default function VkLoginButton({ iconOnly = false, className, enabled }: VkLoginButtonProps) {
+  // QA-001: prefer the server-passed prop (deterministic across SSR/CSR).
+  const vkEnabled = enabled !== undefined ? enabled : String(env.NEXT_PUBLIC_VK_ENABLED) === "true";
   if (!vkEnabled) return null;
 
   const label = UI_TEXT.auth.vk.loginButton;

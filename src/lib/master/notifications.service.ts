@@ -15,6 +15,9 @@ import {
   type NotificationDayGroup,
   type NotificationSort,
 } from "@/features/master/components/notifications/lib/group-by-day";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
+
+const DEFAULT_DISPLAY_TIMEZONE = "Europe/Moscow";
 
 export type MasterNotificationsKpi = {
   unreadCount: number;
@@ -54,13 +57,10 @@ export function parseSort(value: string | undefined | null): NotificationSort {
   return value === "oldest" ? "oldest" : "newest";
 }
 
-function isToday(iso: string, now: Date): boolean {
-  const target = new Date(iso);
-  return (
-    target.getFullYear() === now.getFullYear() &&
-    target.getMonth() === now.getMonth() &&
-    target.getDate() === now.getDate()
-  );
+// FIX-04 (QA-113): "today" computed in the master's own timezone (self-view),
+// not the Node process TZ.
+function isToday(iso: string, now: Date, timeZone: string): boolean {
+  return toLocalDateKey(new Date(iso), timeZone) === toLocalDateKey(now, timeZone);
 }
 
 function applyTabFilter(
@@ -104,18 +104,20 @@ export async function getMasterNotificationsData(input: {
 }): Promise<MasterNotificationsData> {
   const now = input.now ?? new Date();
 
-  const [center, pendingBookings, unansweredReviews, pushEnabled] = await Promise.all([
+  const [center, pendingBookings, unansweredReviews, pushEnabled, providerTz] = await Promise.all([
     getNotificationCenterData({ userId: input.userId, phone: input.phone }),
     getPendingBookingsCountForMaster(input.masterId),
     getUnansweredReviewsCountForMaster(input.masterId),
     getPushEnabled(input.userId),
+    prisma.provider.findUnique({ where: { id: input.masterId }, select: { timezone: true } }),
   ]);
 
+  const timeZone = providerTz?.timezone ?? DEFAULT_DISPLAY_TIMEZONE;
   const masterItems = center.notifications.filter((item) => item.channel === "MASTER");
 
   const totalCount = masterItems.length;
   const unreadCount = masterItems.filter((item) => !item.isRead).length;
-  const todayCount = masterItems.filter((item) => isToday(item.createdAt, now)).length;
+  const todayCount = masterItems.filter((item) => isToday(item.createdAt, now, timeZone)).length;
   const waitingCount = pendingBookings + unansweredReviews;
 
   const tabCounts: Record<NotificationTabId, number> = {
@@ -135,7 +137,7 @@ export async function getMasterNotificationsData(input: {
   }
 
   const filtered = applyTabFilter(masterItems, input.activeTab);
-  const groups = groupNotificationsByDay(filtered, input.sort, now);
+  const groups = groupNotificationsByDay(filtered, input.sort, now, timeZone);
 
   return {
     kpi: { unreadCount, totalCount, todayCount, waitingCount, pushEnabled },

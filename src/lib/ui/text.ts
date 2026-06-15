@@ -1808,6 +1808,13 @@ export const UI_TEXT = {
       title: "Настройки расписания",
       subtitle: "Часы, перерывы, исключения и правила бронирования",
       previewCta: "Превью клиента",
+      studioApproval: {
+        infoTemplate:
+          "Вы в команде студии «{studio}». Изменения расписания отправляются на одобрение студии — текущее расписание не меняется, пока студия не подтвердит.",
+        sentTemplate:
+          "Изменения отправлены на одобрение студии «{studio}». Текущее расписание не изменится, пока студия не подтвердит.",
+        pendingBadge: "Ожидает одобрения",
+      },
       saveStatus: {
         idle: "",
         saving: "Сохраняем",
@@ -3191,6 +3198,8 @@ export const UI_TEXT = {
       },
     },
     dashboard: {
+      // QA-115 (FIX-06): studio context for a studio master (null for independent).
+      studioChipTemplate: "Студия «{name}»",
       hero: {
         nextClientLabel: "Следующий клиент",
         nextClientIn: "через",
@@ -3199,7 +3208,10 @@ export const UI_TEXT = {
       },
       kpi: {
         todayRevenue: "Выручка сегодня",
-        todayRevenueSub: "vs прошлая суббота",
+        // QA-112: was a hardcoded "vs прошлая суббота" — a comparison that is
+        // never computed (KPI tiles carry no trend deltas yet). Honest
+        // descriptive sublabel instead of a false/misleading comparison.
+        todayRevenueSub: "По записям на сегодня",
         todayBookings: "Записей сегодня",
         todayBookingsSub: "загрузка дня",
         todayBookingsValueTemplate: "{count} из {capacity}ч",
@@ -5307,6 +5319,8 @@ export const UI_TEXT = {
       yearUnitFew: "года",
       yearUnitMany: "лет",
       breadcrumbCatalog: "Каталог",
+      // QA-115 (FIX-06): studio affiliation shown when the master belongs to a studio.
+      studioAffiliationTemplate: "Часть студии «{name}»",
     },
     tabs: {
       services: "Услуги",
@@ -5484,7 +5498,12 @@ export const UI_TEXT = {
       prevWeek: "Предыдущая неделя",
       nextWeek: "Следующая неделя",
       daysLoadFailed: "Не удалось загрузить дни.",
-      emptyDay: "В этот день мастер занят",
+      // QA-122 (FIX-10): clear, accurate empty state for a 0-slot day. The old
+      // "мастер занят" implied the master is busy; for an exhausted today the
+      // window has simply passed. `emptyDayToday` is shown when the selected day
+      // is today (provider tz) and no bookable slots remain.
+      emptyDay: "Свободных окон в этот день нет",
+      emptyDayToday: "На сегодня свободных окон не осталось",
       summaryTotal: "Итого",
       summaryDateTimePending: "Выберите дату и время",
       continueCta: "Продолжить",

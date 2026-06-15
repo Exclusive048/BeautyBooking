@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Building2 } from "lucide-react";
 import { env } from "@/lib/env";
 import { AnnouncementsSection } from "@/features/master/components/dashboard/announcements-section";
 import { AttentionSection } from "@/features/master/components/dashboard/attention-section";
@@ -13,6 +14,7 @@ import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
 import { getUnreadBadgeCount } from "@/lib/notifications/badge";
+import { getDayOfWeek } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 
 /**
@@ -54,7 +56,9 @@ export async function MasterDashboardPage() {
     "мастер";
 
   const now = new Date();
-  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  // FIX-04 (QA-113): weekend computed in the master's own timezone, not the host TZ.
+  const masterWeekday = getDayOfWeek(now, data.master.timezone);
+  const isWeekend = masterWeekday === 0 || masterWeekday === 6;
   const adviceContext = {
     bookingsCount: data.todayBookings.length,
     hasPendingBookings: data.pendingBookings.length > 0,
@@ -100,6 +104,19 @@ export async function MasterDashboardPage() {
       />
 
       <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+        {/* QA-115 (FIX-06): studio context for a studio master (nothing for independent). */}
+        {data.master.studio ? (
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-sec">
+            <Building2 className="h-3.5 w-3.5 text-primary" aria-hidden strokeWidth={1.6} />
+            <span>
+              {UI_TEXT.cabinetMaster.dashboard.studioChipTemplate.replace(
+                "{name}",
+                data.master.studio.name,
+              )}
+            </span>
+          </div>
+        ) : null}
+
         <GreetingHero
           firstName={firstName}
           now={now}
