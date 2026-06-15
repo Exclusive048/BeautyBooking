@@ -334,6 +334,309 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 
 ## 🔴 PRE-LAUNCH BLOCKERS
 
+### QA (from QA-01 self-QA harness, 2026-06-05)
+
+- 🔴 **PROD-BUILD-SMOKE-SUBSET (watch-item) — PARTIALLY EXERCISED 2026-06-13 (QA-03).**
+  The QA-01/02 smoke ran only against the **dev** server. A prod-build pass (QA-03) has now
+  been run manually and **immediately paid off**: it (a) cleared QA-101/QA-001/QA-102 as
+  dev-only and (b) **uncovered QA-108** — a 🔴 prod-only client crash (`env.ts process.exit`
+  in the browser) that breaks **every page** and is invisible in dev. This is exactly the
+  bug class this watch-item predicted. **Still TODO before launch:** wire the prod-build
+  smoke into the harness/CI (not just a manual QA-03 run), covering login + a per-cabinet
+  subset against the prod bundle. **Key learnings for whoever automates it:**
+  (1) prod-start needs the prod-required env vars or env.ts `process.exit(1)`s at boot
+  (`MEDIA_DELIVERY_SECRET`, `NEXT_PUBLIC_APP_URL`, `WORKER_SECRET`, …) — see
+  `.qa/diagnostics/prod-server.mjs`; (2) `output: standalone` means `npm run start` doesn't
+  work — use `node .next/standalone/server.js` **with `.next/static` + `public` copied in**,
+  OR `next start` (serves static itself) — the standalone server alone 404s `/_next/static`
+  so client JS never loads (false-green smoke); (3) original QA-001 evidence (login hydration
+  mismatch) is **dev-only** per this run. (See `QA-FINDINGS.md` → QA-03 section + QA-108.)
+- Note (NOT a new blocker): OTP plaintext in dev logs is intentional and already
+  handled — `OTP-LOG-DEV-GUARD-A` strips the code in production
+  (`isProduction ? {} : { code }`). Phone OTP is the production login path; the
+  only dev-only affordance is the logged code, which production already removes.
+
+### QA (from QA-02 client discovery→booking funnel, 2026-06-06)
+
+> Full repro/evidence in `QA-FINDINGS.md` → §4 Client (QA-02). The client
+> conversion funnel — the product thesis — is non-functional in this env:
+> discovery crashes and every master profile + booking page 500s. The booking
+> *backend* (POST /api/bookings) is sound (data-integrity anchors all hold).
+> ⚠️ Both 🔴 below manifest as DEV symptoms (next/image host validation; dev
+> jest-worker crash) — confirm against a production build before final triage
+> (ties into PROD-BUILD-SMOKE-SUBSET above). Route-specificity makes QA-101 very
+> likely a genuine module-graph defect, not dev flakiness.
+
+- 🔵 **QA-101 — slot/availability engine 500s — PROD-DIAGNOSED 2026-06-13 → DOWNGRADED 🔴→🔵 (DEV-ONLY).**
+  Original dev symptom: every `/u/[username]`, `/u/[username]/booking`, and
+  `/api/public/providers/[id]/slots` returned **500** in `npm run dev` (5/5 masters),
+  masked by the Next dev jest-worker wrapper. **Prod-build diagnostic verdict (QA-03):**
+  `npm run build` → **exit 0** (compiled 79s, all three routes registered as dynamic
+  `ƒ` functions — no module-graph/RSC/import-boundary defect). Production runtime
+  (`node .next/standalone/server.js`, DB+Redis up): slots API **no-serviceId → 400**
+  (handler runs → module loads; the dev "500-not-400" was worker contamination),
+  slots API real serviceId → **200 with real slots** (Europe/Moscow TZ + Redis cache
+  correct), galina profile **200**, galina booking **200**, anna profile **200**.
+  **Root cause: dev `npm run dev` jest render-worker instability** on the
+  **Next 16 + React 19 + Node v24 + Windows** stack — a worker that dies once poisons
+  the following requests on the same worker; the real error doesn't exist in the prod
+  build. **Does NOT break Linux prod server-side.** Static trace + full evidence:
+  `.qa/diagnostics/qa-101-trace.md`. Proposed fix (described, not applied): no fix
+  needed for prod correctness; for dev DX, pin a Next 16.x patch / test on Node 22 LTS
+  / reduce dev render-worker concurrency. **NOTE:** the client funnel **is** still dead
+  in the prod build — but for QA-108 (env.ts client `process.exit`), a broader root
+  that kills *every* page, not the slot engine. Guard: `.qa/specs/client/funnel-blockers.spec.ts`.
+- ✅ **QA-108 — env.ts `process.exit(1)` crashed every page in PROD — RESOLVED in FIX-01 (2026-06-14).**
+  Was 🔴 prod-wide blocker (found by QA-03): a production build hydrated `/login` (and every
+  page) into the root error boundary "Что-то пошло не так" with `TypeError: i.exit is not a
+  function` — `src/lib/env.ts` ran `process.exit(1)` in the **client** bundle (NODE_ENV
+  inlines to "production" → `isProdRuntime` true; client parse always fails because
+  `DATABASE_URL`/`AUTH_JWT_SECRET`/`OTP_HMAC_SECRET` are server-only secrets never sent to the
+  browser; `process.exit` is absent in a browser → throw). **Fix (PREFERRED, single file
+  `src/lib/env.ts`):** gated the full-schema validation + fail-fast to the server only —
+  `const isServerRuntime = typeof window === "undefined"; const _parsed = isServerRuntime ?
+  refinedSchema.safeParse(process.env) : null;` and the `console.error`/`process.exit(1)`/
+  `console.warn` block now runs under `if (isServerRuntime && _parsed && !_parsed.success)`;
+  client `env` falls back to `process.env` exactly as before → zero client behavior change.
+  **Bonus:** the literal `typeof window === "undefined"` lets Next/webpack **DCE the block out
+  of the client bundle** — post-fix `.next/static/chunks/` contains none of `process.exit` /
+  `exit is not a function` / "Invalid environment variables". **Server fail-fast PRESERVED**
+  (verified: `NODE_ENV=production` + missing `AUTH_JWT_SECRET` → `process.exit(1)` + the named
+  field). **Prod re-verified** (`next start`, assets served): `/login` 200 with the login form
+  back (1 phone input), no boundary, 0 exit/env errors; `/u/galina-stepanova-26` 200 renders.
+  Validation: typecheck ✅ / lint baseline 1err/3warn preserved (env.ts not flagged) /
+  encoding ✅ / mojibake ✅ / `npm run build` exit 0. Evidence: `.qa/diagnostics/qa-108-fixed/`
+  (verify.log, failfast.log, login-fixed.png, profile-fixed.png).
+  **Side effect:** the fix **unmasked QA-001** (hydration mismatch / React #418 on `/login`)
+  that QA-108 had been crashing-before-it-could-fire → QA-001 corrected from "dev-only" to
+  "reproduces in prod" (still 🟡, page renders/recovers; out of FIX-01 scope, see below).
+  - 🟡 **Spawned (defense-in-depth, deferred — not pre-launch):** the project has **no
+    structural guard** against server-side side-effects leaking into the client bundle
+    (rules 11/13). Consider a CI check (grep / ESLint rule) that fails when `process.exit`
+    or other Node-only side-effects are reachable from a client chunk — same shape as
+    `check:schema-drift`. (`worker.ts` also has `process.exit` but is server-only — queue
+    worker entry + a server API route — and is correctly NOT in any client chunk.)
+- 🟡 **QA-102 — unconfigured `next/image` host — PROD-DIAGNOSED 2026-06-13 → DOWNGRADED 🔴→🟡.**
+  The dev hard-crash (`Invalid src prop … hostname picsum.photos is not configured` →
+  error boundary swallows the WHOLE `/catalog` route) is **dev-only**. **Prod behavior
+  (QA-03):** `next/image` **accepts** the picsum src and rewrites it to
+  `/_next/image?url=…picsum…`; the route renders **200, no error boundary** (anna profile
+  SSR'd 200 with 10 such optimizer URLs); the browser then gets **`/_next/image` → HTTP 400**
+  per image (optimizer rejects the unconfigured host) → **broken images per-card, NOT a
+  dead route.** Residual real prod issues (kept open): (1) every Anna surface shows broken
+  portfolio images; (2) per-card resilience gap — `focal-image.tsx` `needsUnoptimized()` is
+  now a **no-op returning `false`** (`focal-image.tsx:52-57`), so nothing guards/bypasses the
+  host; (3) config/seed — `next.config.ts` `images.remotePatterns` allows only
+  `storage.yandexcloud.net`; seed's only picsum source is 6 PortfolioItems, all Anna's.
+  In real prod with S3 data the host is configured, so this is demo/seed-driven + a
+  resilience gap, not a route crash. Evidence: `.qa/diagnostics/anna-profile-prod.html`,
+  `prod-client-check.log`.
+  **◑ FIX-02 (2026-06-14): layer 2 (seed/config) RESOLVED, layer 1 still open 🟡.**
+  Seed images now point at bundled local placeholders `/public/portfolio-placeholders/<seed>.png`
+  (same-origin → no `remotePatterns` entry, offline-safe, valid PNG rasters). Only the
+  showcase `mediaUrl` line changed; `next.config.ts` NOT modified (preferred option over the
+  "add picsum host" last resort); no unconfigured external host left in the seed.
+  **Still open (layer 1):** per-card route resilience — `focal-image.tsx` `needsUnoptimized()`
+  no-op (returns `false`) so one bad host can still degrade a card; route-level guard is a
+  separate hardening item. Evidence: `.qa/diagnostics/fix-02/EVIDENCE.md`.
+  **✅ Layer 2 VERIFIED LIVE (QA-04, 2026-06-15):** Anna's portfolio images load via
+  `/_next/image?url=/portfolio-placeholders/*` (optimized, no 400). Layer 1 still open 🟡.
+- 🟡 **QA-001 — login hydration mismatch — PROD VERDICT CORRECTED (2026-06-14, after FIX-01): reproduces in prod.**
+  The QA-03 read ("dev-only, 0 hydration errors in prod") was **wrong** — QA-108's
+  `process.exit` crash was killing the page *before* React could finish hydrating, so the
+  mismatch never fired. **Once FIX-01 removed QA-108, the prod `/login` showed `Minified React
+  error #418`** (hydration / text-content mismatch) — the original QA-001. Confirmed **shared
+  root with QA-108**: env.ts runs client-side with values diverging from the server (parsed env
+  vs raw `process.env` fallback). Page still renders (login form present, React recovers by
+  regenerating the subtree) → **not a blocker (🟡)**, but a real prod SSR/CSR divergence, not
+  a dev artifact. `/login`-specific (galina profile had 0 pageerrors). **Open — not in FIX-01
+  scope** (FIX-01 = QA-108 only). Fixing it = removing env.ts (or its diverging values) from
+  the client render path / making the divergent flags deterministic across SSR+CSR.
+- 🟠 **QA-103 — internal CUID leak on public `/api/catalog/search` (rule 12).**
+  Every `data.items[]` returns internal `id` (`cmprg…`) alongside `publicUsername`
+  (20/20). Pre-launch privacy item. Cross-ref CLAUDE.md rule 12.
+- 🟠 **QA-104 — home/footer → catalog deep-link param mismatch.** Hero search
+  builds `?q=`, category tiles `?category=`, footer `?available=today`, but the
+  catalog reads `serviceQuery` / `globalCategoryId` / `availableToday` → all three
+  dropped. The primary "I need a service now" search does nothing. (Catalog's own
+  in-UI filters + the backend filter are correct; only external deep-links break.)
+- ✅ **QA-105 — bulk-seed price scale (100× too cheap) — RESOLVED in FIX-02 (2026-06-14).**
+  Root cause: `data/service-templates.ts` declares `priceMin/priceMax` in RUB; the
+  bulk generator wrote them straight into `Service.price` (kopeks). Fix:
+  `seed-providers.ts` `ensureServices` converts to kopeks at write (`*100`); bulk
+  range now 1000–14000 ₽, price filter + `priceDistribution` sane. Showcase seed
+  (Anna) untouched. Static proof (18 ₽→1800 ₽) + env-blocked re-seed steps in
+  `.qa/diagnostics/fix-02/EVIDENCE.md`.
+  **✅ VERIFIED LIVE (QA-04, 2026-06-15):** re-seeded; profile + booking widget +
+  success card show correct ÷100 prices. ⚠️ Exposed **QA-109** (catalog/cabinet/
+  favorites use `moneyRUB` w/o ÷100 → 100× inflated there — separate formatter bug).
+- ✅ **QA-109 — kopeks shown without ÷100 on catalog + cabinet + favorites (100× inflated). Выполнено FIX-03 (2026-06-15).**
+  Swapped 9 public callsites to the ÷100 formatter (`moneyRUBFromKopeks`, or `moneyRUBPlainFromKopeks`
+  for the plain home helper; histogram-slider display ÷100 with the slider value pipeline kept in kopecks).
+  Verified live: catalog cards 1 000–3 801 ₽, slider chips "1 000 ₽", public studio "от 1 300 ₽" (was "от 130 000 ₽").
+  Regression test `src/lib/format.test.ts` (formatter output + source guard). **False positives left untouched:**
+  `admin-body-templates` (already ÷100 — QA-09 confirmed clean), `slot-bubbles-row` (`discountValue` in rubles).
+  **Deferred (out of FIX-03 scope, likely additional instances — review in legacy/follow-up sweep):**
+  legacy `studio-services-page.tsx:617` (`moneyRUBPlain(basePrice)` — reachable only via the redirect-shadowed
+  legacy settings tab) + master `hot-slots-settings-section.tsx:279` (`moneyRUBPlain(effectivePrice)`). Neither
+  `moneyRUB` nor `moneyRUBPlain` is deprecatable yet (moneyRUB: 1 legit rubles caller; moneyRUBPlain: 2 callers to review).
+  _Original finding (for reference):_
+  Found in QA-04 after FIX-02 made `Service.price` correct kopeks. `src/lib/format.ts`
+  `moneyRUB(value)` does NOT divide by 100, but is called on kopeks at: catalog-card.tsx:135,137;
+  catalog-map-sidebar.tsx:79,140; client-bookings-page.tsx:216,366; client-favorites-page.tsx:309;
+  price-range histogram-slider.tsx:18. Result: catalog "от 279 400 ₽", cabinet booking "218 000 ₽",
+  "Потрачено 1 450 000 ₽" (all 100× too high). The profile + booking widget + success card use the
+  correct `moneyRUBFromKopeks`/`UI_FMT.priceLabel` (÷100) and are right. Fix = swap the `moneyRUB`
+  callsites to `moneyRUBFromKopeks`. Pre-existing bug exposed by FIX-02 (data now correct kopeks).
+  Not a booking-integrity break (stored price + confirmation correct) but the primary discovery
+  surface + clients' own booking history show wrong prices. Pre-launch should-fix.
+  **Full scope (QA-05 grep audit, all roles) — INFLATED surfaces to fix:** catalog-card.tsx:135,137;
+  catalog-map-sidebar.tsx:79,140; histogram-slider.tsx:18; client-bookings-page.tsx:216,366;
+  client-favorites-page.tsx:309; chat/system-message.tsx:104; search-by-time/provider-result-card.tsx:20,22;
+  public-studio/details-section.tsx:67; home/recent-masters-section.tsx:74 (local formatPrice);
+  legacy studio/studio-services-page.tsx:617 (`moneyRUBPlain`). Verify: notifications/admin-body-templates.ts:9.
+  **CLEAN:** entire master + studio-cabinet (use `priceLabel`), booking flow, pricing, analytics/billing
+  (`moneyRUBFromKopeks`), hot-slots-preview, search slot-bubbles (discountValue=rubles). Comprehensive
+  fix = swap every inflated call to `moneyRUBFromKopeks`. Full per-site list in QA-FINDINGS.md QA-109.
+  **✅ QA-09 admin panel CLEAN:** `admin-cabinet` uses its own correct helpers
+  (`dashboard/server/shared.ts` + `billing/lib/kopeks.ts` — all `formatRubles*` ÷100);
+  no `moneyRUB`/`moneyRUBPlain` anywhere in admin. QA-109 confirmed **confined to public surfaces**.
+  **✅ QA-10 re-confirmed live (client cabinet):** Elena's `/cabinet/bookings` ("Потрачено
+  1 450 000 ₽", per-booking "400 000 ₽"…), `/cabinet/favorites` ("200 000 ₽"), and chat
+  `system-message` ("400 000 ₽") all 100× inflated — exactly the listed callsites. Fix scope unchanged.
+- 🟠 **QA-110 — booking widget slot grid intermixes two days, unlabeled.**
+  `time-grid.tsx:60-72` sets `to = dateKey+1` but `/api/public/providers/[id]/slots` treats `to`
+  **inclusive** → returns selected day + next day; TimeGrid renders ALL of them (line 126) without
+  filtering by `slot.dayKey` (computed line 86, ignored). Net: selecting "Пн 15" shows Mon 15 + Tue 16
+  slots together with no day separator. After booking, the booked day's slot is correctly removed but
+  the next day's same time remains → booked time looks still free. Selection/form summary labels a
+  next-day slot with the date-strip's day (success card uses the real booking time, so final + stored
+  data are correct). Fix: filter `slot.dayKey === dateKey` OR make `to` exclusive. Confusing UX; can
+  mislead about appointment day until the success card.
+- 🟡 **QA-111 — slotStepMin ignored (slot grid hardcoded 30-min).** `src/lib/schedule/slots.ts:69`
+  `const stepMin = 30` is hardcoded; `buildSlotsForDay` never reads `provider.slotStepMin`. Galina's
+  slotStepMin=15 yields a 30-min grid. slotPrecision="exact" display IS honoured. Confirms the
+  BACKLOG "slotPrecision/slotStepMin not enforced" item for slotStepMin specifically. Not a booking
+  break; a master configuring 15-min steps doesn't get them.
+  **✅ CONFIRMED master-side (QA-05):** changed slot step 30→15 in master settings → DB persisted
+  `slotStepMin=15` but the offered grid stayed 30-min (no 10:15/10:45). The setting is inert.
+- 🟠 **QA-113 — master booking-time labels use server-process TZ (wrong on non-MSK hosts).**
+  Found QA-05. `src/lib/master/bookings.service.ts:83` `formatWhenLabel` formats with
+  `date.getHours()/getMinutes()/getDay()/getDate()` — JS local-time methods bound to the **Node
+  server process TZ**, with no conversion to provider/viewer TZ (JSDoc "computed against the master
+  timezone" is inaccurate). On the MSK dev host labels show MSK; on a **UTC prod host they'd render
+  in UTC** → every master sees shifted booking times. Likely same pattern in dashboard.service.ts.
+  Distinct from the QA-107 per-viewer feature gap. MUST be confirmed against a UTC prod build. Fix =
+  format with a TZ-aware formatter (Intl + explicit timeZone) instead of `Date.get*`.
+  **Full server-side scope (QA-06 grep audit):** bookings.service.ts:83; schedule.service.ts:103
+  (grid offset); model-offers-stats.ts:64-68 (label); model-offers-view.service.ts:661-663 (date key);
+  notifications.service.ts:60-62 + studio-cabinet/notifications/server/notifications-data.service.ts:67-69
+  ("today" grouping); schedule-utils.ts:41-43,49,58-60 (date keys/week math); reviews-stats.ts:40,44
+  (month bucketing, low-pri); master-dashboard-page.tsx (verify). Benign: email templates (year only),
+  recent-masters.ts:62. Client-only (browser TZ, not this class): ~20 .tsx modals/helpers. Full list +
+  client/server split in QA-FINDINGS.md QA-113.
+  **✅ QA-07 TZ=UTC diagnostic verdict: stays 🟠 (NOT 🔴).** Ran the server under `TZ=UTC` (prod-like host).
+  **Availability is TZ-SAFE** — Galina slots identical (first 10:00/`07:00Z`, Sunday day-off=0); the public
+  slot engine resolves against the provider's explicit `timezone`, not process TZ → clients are offered
+  correct slots + bookings store correct UTC on the UTC prod host (no booking-integrity/data shift, no 🔴).
+  **Display + grouping DO shift on UTC:** master kanban/dashboard/schedule-grid labels render UTC
+  (Виктория 11:00Z shows "11:00" not "14:00") + grid card positions shift; "today" count stable mid-day
+  but greeting/capacity compute against UTC (near-midnight bookings would misbucket). **High-impact 🟠 /
+  strong pre-launch fix** (masters see wrong appointment times on prod → real-world no-show risk), but the
+  fix surface is unchanged (server-side `Date.get*` sites). Evidence: `.qa/diagnostics/qa07-tz-utc/`.
+  **✅ QA-09 adds admin to the family:** the `/admin` dashboard LIVE-feed timestamps + 7-day chart date
+  labels are server-formatted → shift on a UTC host like the rest. No booking integrity → stays 🟠.
+- 🔵 **QA-117 — admin/reviews "Все" tab slow first-render in dev (NOT a defect).** Found QA-09.
+  Reading `/admin/reviews?tab=all` within ~1.5s shows only "Загрузить ещё" (no cards); clicking it
+  advanced the cursor to an empty "Нет отзывов" state. Root cause = dev slow-first-compile of the
+  reviews data route — a 3.5s wait renders all 46 reviews correctly and `GET /api/admin/reviews?tab=all`
+  returns 200 with `data.reviews[]`. Dev-only latency artifact; compiled prod routes won't exhibit it.
+  No fix needed; logged so a future run doesn't mistake it for a broken list.
+- 🟠 **QA-119 — mobile: fixed bottom-nav overlaps bottom content in the client cabinet (incl. destructive "Отменить").**
+  Found QA-10 (390×844). The client cabinet `<main>` has `padding-bottom: 0` while a `position:fixed`
+  52px mobile bottom-nav (`nav.fixed.bottom-0 … lg:hidden`) sits over it. On `/cabinet/bookings`, scrolling
+  to the end leaves the **last booking card's action row — including "Отменить" — behind the nav, and taps
+  are intercepted by it** (reproduced: Playwright resolved the button but the nav subtree ate the pointer
+  event). Root cause is shell-wide — the **master** cabinet uses `pb-24` for exactly this clearance; the
+  client `main` is `pb-0`. Impact varies by page (worst on long lists like bookings; on profile it overlaps
+  only redundant in-page nav links). Mobile-first is a project mandate + this hides a destructive action on
+  a high-traffic surface. Fix = add bottom padding (e.g. `pb-24`) to the client cabinet scroll container.
+  Evidence: `.qa/diagnostics/qa10-mobile/`. covered-by-test: no.
+- 🟡 **QA-120 — mobile: booking action controls below the tap-target guideline (30px).** Found QA-10.
+  Чат / Перенести / В календарь / Маршрут / Отменить / Повторить / Связаться render at **30px height** at
+  390-wide (below 44px Apple-HIG / 48dp Material), several packed in one row incl. destructive "Отменить"
+  → mis-tap risk. Echoes the existing sprint TAP-TARGET-AUDIT-A backlog item; bundle the client-cabinet
+  booking actions into that audit. covered-by-test: no.
+- 🟠 **QA-114 — studio master's schedule edits need approval, but the settings UI gives zero feedback.**
+  Found QA-06. The schedule approval flow itself WORKS (studio master edits route into a pending
+  ScheduleChangeRequest; live schedule unchanged; cannot bypass — verified via `PATCH /api/cabinet/master/schedule`
+  200 with `approval:{mode:STUDIO_MASTER,requestStatus:PENDING,pendingRequestId,lastAction:REQUEST_UPDATED}`).
+  BUT `/cabinet/master/schedule/settings` presents the editor as freely self-editable with **no
+  "requires studio approval" banner, no pending-request badge, no save-status chip** — the UI ignores
+  the server's `approval` block. The studio master sees her draft change and believes it applied; it
+  did not (pending studio approval). Trust/clarity gap on a core flow. Fix = surface the `approval`
+  state (mode/requestStatus/pendingRequestId/rejectedComment) in the settings UI for studio members.
+- 🟡 **QA-115 — studio affiliation invisible for a studio master.** Found QA-06. Neither Marina's
+  master cabinet (dashboard) nor her public profile (`/u/vision-marina-lebedeva-1`) shows she belongs
+  to Vision Beauty Studio — no studio name/branding/link anywhere. Studio members are visually
+  identical to independent masters, to themselves and to clients. May be intentional (master-centric
+  cabinet) but flagged — esp. the public profile, where clients can't tell she's studio-backed.
+  **QA-08:** the *studio's* public profile (`/u/vision-studio`) DOES list its 7 member masters, and the
+  studio cabinet shows the studio name — so the gap is one-directional (master→studio invisibility).
+- 🔵 **QA-116 — WeeklyScheduleDay weekday convention drift (seed vs engine).** Found QA-08. Seed
+  (seed-providers.ts) writes `weekday` **0–6 (0=Sun)**; engine + apply path use **ISO 1–7 (7=Sun)**
+  (`engine-context.ts:90`, `unified.ts:162`). Benign for the standard Mon–Sat/Sun-off pattern (1–6
+  align; Sunday-off coincides with engine default-off) and rows migrate to 1–7 on first
+  applyScheduleSnapshot/approval. Latent risk only if a seed master worked Sundays. No current impact;
+  seed should emit 1–7. covered-by-test: no.
+- ✅ **QA-08 closed the QA-06 approval loop + verified two priority areas (both PASS):**
+  (1) **Approval loop works** — studio admin surfaces pending requests (nav badge + list, the QA-114
+  admin-side counterpart that the master side lacks), approve applies correctly to the master's live
+  schedule (`seed-vision-scr-01` APPROVED → Marina Mon-off/Tue–Sun-on, matching the request, ISO 1–7).
+  (2) **Cross-tenant security HELD** — `ensureStudioRole` denies foreign-studio access (403) and foreign
+  master via own studio (404); no leakage. QA-109 also confirmed live on `/u/vision-studio` ("от 130 000 ₽"
+  priceFrom via `details-section.tsx:67`). Studio dashboard/services/settings prices otherwise correct.
+- ✅ **QA-09 site-admin breadth + privilege-escalation (PRIORITY) — BOUNDARY HELD, no 🔴/new-🟠.**
+  (1) **No privilege-escalation path** — admin pages: anon→307 `/login`, authed-client→`/403`; admin APIs:
+  anon→401, authed-client→403 on every read AND mutation (`PATCH users/<id>/plan` + `POST reviews/<id>/approve`
+  both 403 *before* acting). 403-vs-401 split proves role-based guarding → master (non-admin session) denied
+  by the same check. (2) **All 7 sections render, 0 console errors** (dashboard/users-61/billing/reviews-46/
+  cities-8/catalog-14/settings). (3) **Destructive mechanics enumerated, none executed** (review-delete,
+  category approve/reject ×2 pending, plan grant, sub cancel, 3 system flags, queue retry/delete, media cleanup,
+  reindex). (4) Corroborations: QA-107 (9 providers need geocoding), QA-08 (Victoria's 2 pending categories),
+  QA-109 (admin clean → public-only), QA-113 (admin dashboard joins the family). Full write-up: QA-FINDINGS.md §5.
+- 🔵 **Schema note (QA-06):** `Provider.studioId` stores the studio's **provider** id, not the
+  `Studio` model id. Consistent but a query footgun. No user impact.
+- 🔵 **QA-112 — master dashboard KPI copy/calc oddities.** "Записей сегодня 3 из 0ч" (day-capacity
+  denominator computed as 0ч) + "Выручка сегодня … vs прошлая суббота" (comparison baseline is last
+  Saturday on a Monday). Cosmetic; dashboard otherwise correct. May be partly TZ-related.
+- 🟠 **QA-107 — per-viewer-city timezone rendering NOT implemented (multi-zone RU+KZ market).**
+  Intended model: store UTC (✓ rule 8) + render each time in the VIEWING user's TZ derived from their
+  profile city/address. Reality (QA-05): client-side surfaces use `getViewerTimeZone()` = the
+  **browser** Intl TZ (fallback Europe/Moscow), NOT the viewer's profile city; server-side labels use
+  the **server process** TZ (→ QA-113). Neither is profile-city-derived. So an Almaty master / Moscow
+  client see times based on browser/host, not their city. Data is fine (Anna's `timezone=Asia/Almaty`
+  matches her Almaty address; her `cityId` is NULL though). Single feature item; all per-surface TZ
+  observations roll up here. Pre-launch 🟠 candidate (wrong times across timezones erode booking trust).
+  (Note: this supersedes the earlier assumption that surfaces render in the provider's fixed TZ — they
+  don't; they render in browser/host TZ.) **QA-06:** Marina's data also consistent
+  (`timezone=Asia/Almaty` ↔ Almaty address "ул. Жибек Жолы, Алмалинский район"; `cityId` NULL) — no
+  data mismatch for either seeded Almaty master. The discrete-bug trigger (timezone≠city) has not appeared.
+  **QA-10 (client side):** Elena sees the 12:00 UTC Almaty-salon booking as "15:00" (MSK browser TZ) across
+  bookings/chat — confirms client surfaces use browser TZ. Also: **Elena has NO city/address set**
+  (`UserProfile.address` NULL; there's no `city` column — the profile "Город" field maps to `address`), so
+  even once per-viewer-city TZ ships, this client would fall back to browser/default TZ. Reinforces that the
+  feature needs a sensible fallback when the viewer's city is empty.
+- ℹ️ **Booking-policy enforcement status (corrected 2026-06-13, QA-02/03).** Earlier notes
+  implied the `Provider` booking-rules fields were "not enforced". **Corrected:**
+  `minBookingHoursAhead` + `maxBookingDaysAhead` **ARE enforced** on the create path —
+  QA-02 verified `BOOKING_TOO_SOON` / `BOOKING_TOO_FAR` 400s (BOOKING-WIDGET-A's
+  `assertBookingWindow` works), and `acceptNewClients` gates via `NEW_CLIENTS_CLOSED`.
+  **Updated (QA-04, 2026-06-15):** the slots UI now works (QA-101 dev-only). `slotStepMin`
+  is confirmed **NOT enforced** — hardcoded 30-min grid (→ QA-111). `slotPrecision="exact"`
+  display IS honoured (exact times shown). **`lateCancelAction` remains unverified** — needs
+  the cancel-penalty flow (deferred to QA-05).
+
 ### Schema discipline
 
 ### ~~🔴 MIGRATION-RECONCILIATION~~ ✅ CLOSED (MIGRATION-RECONCILIATION-BATCH 2026-05-30)

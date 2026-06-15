@@ -189,9 +189,26 @@ const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 const isTestEnv = process.env.NODE_ENV === "test";
 const isProdRuntime = process.env.NODE_ENV === "production" && !isBuildPhase;
 
-const _parsed = refinedSchema.safeParse(process.env);
+// QA-108 fix — validate the full schema + fail-fast ONLY on the server.
+//
+// This module is also evaluated in the CLIENT bundle so the browser can read the
+// `NEXT_PUBLIC_*` values. But the full schema requires server-only secrets
+// (`DATABASE_URL` / `AUTH_JWT_SECRET` / `OTP_HMAC_SECRET`) that are never sent to
+// the browser, so a client-side parse ALWAYS fails. In a production build
+// `NODE_ENV` inlines to "production" on the client too, so the previous
+// unconditional fail-fast ran `process.exit(1)` in the browser — where
+// `process.exit` does not exist — throwing at module-eval and replacing EVERY
+// page with the error boundary.
+//
+// Gating on `typeof window === "undefined"` (a) preserves the real server-side
+// fail-fast for a genuinely misconfigured server, and (b) lets Next/webpack
+// dead-code-eliminate the validation + `process.exit` (incl. the error string)
+// out of the client bundle. The client falls back to `process.env` (with the
+// `NEXT_PUBLIC_*` values inlined) exactly as before. CLAUDE.md rules 11 & 13.
+const isServerRuntime = typeof window === "undefined";
+const _parsed = isServerRuntime ? refinedSchema.safeParse(process.env) : null;
 
-if (!_parsed.success) {
+if (isServerRuntime && _parsed && !_parsed.success) {
   const lines = _parsed.error.issues
     .map((i) => `  • ${i.path.length ? i.path.join(".") : "root"}: ${i.message}`)
     .join("\n");
@@ -206,9 +223,8 @@ if (!_parsed.success) {
 
 export type AppEnv = z.infer<typeof refinedSchema>;
 
-export const env: AppEnv = _parsed.success
-  ? _parsed.data
-  : (process.env as unknown as AppEnv);
+export const env: AppEnv =
+  _parsed && _parsed.success ? _parsed.data : (process.env as unknown as AppEnv);
 
 // ── Computed flags ────────────────────────────────────────────────────────────
 export const isPushEnabled = Boolean(

@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FocalImage } from "@/components/ui/focal-image";
 import { useConfirm } from "@/hooks/use-confirm";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
   ClientBookingDTO,
@@ -213,7 +213,7 @@ function KpiCards({
       <KpiCard
         icon={Wallet}
         label={T.kpiSpent3m}
-        value={isLoading ? "—" : moneyRUB(kpi?.spentLast90dKopeks ?? 0)}
+        value={isLoading ? "—" : moneyRUBFromKopeks(kpi?.spentLast90dKopeks ?? 0)}
       />
     </div>
   );
@@ -363,7 +363,7 @@ function BookingRow({
 
       <div className="text-right sm:min-w-[6rem]">
         <div className="font-mono text-lg font-semibold text-text-main">
-          {moneyRUB(booking.service.priceSnapshot)}
+          {moneyRUBFromKopeks(booking.service.priceSnapshot)}
         </div>
       </div>
     </Card>

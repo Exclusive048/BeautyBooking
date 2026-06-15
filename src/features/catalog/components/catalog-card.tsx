@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Heart, Star } from "lucide-react";
 import { FocalImage } from "@/components/ui/focal-image";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
@@ -132,9 +132,9 @@ export function CatalogCard({
   const hasServiceQuery = serviceQuery.trim().length > 0;
   const priceText =
     hasServiceQuery && item.primaryService && item.primaryService.price > 0
-      ? moneyRUB(item.primaryService.price)
+      ? moneyRUBFromKopeks(item.primaryService.price)
       : item.minPrice && item.minPrice > 0
-        ? moneyRUB(item.minPrice)
+        ? moneyRUBFromKopeks(item.minPrice)
         : "—";
 
   // CATALOG-ENHANCEMENTS-A: availability is now precision-aware. The

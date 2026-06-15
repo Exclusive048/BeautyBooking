@@ -1118,9 +1118,10 @@ async function ensureModelOffers(args: {
  *   - sortOrder 0..5 — explicit so reorder testing has a known starting state
  *
  * Idempotent: deletes any seed-prefixed portfolio rows for this master
- * first, then re-creates. Public photos use a stable picsum seed so the
- * URLs survive reruns. Categories looked up by slug; gracefully no-ops
- * if the category seed hasn't run yet.
+ * first, then re-creates. Photos point at bundled local placeholders under
+ * /public/portfolio-placeholders/<seed>.png (same-origin, offline-safe, no
+ * next.config remote host needed — QA-102). Categories looked up by slug;
+ * gracefully no-ops if the category seed hasn't run yet.
  */
 /**
  * 2 service packages (bundles) for the showcase master, used by 31c
@@ -1240,7 +1241,10 @@ async function ensurePortfolio(args: {
       data: {
         id: `${idPrefix}${seed.suffix}`,
         masterId: args.providerId,
-        mediaUrl: `https://picsum.photos/seed/${seed.seed}/640/640`,
+        // QA-102: bundled local placeholders under /public (same-origin, so
+        // next/image needs no remotePatterns entry and they load offline).
+        // Replaces picsum.photos (unconfigured host → broken images / 400).
+        mediaUrl: `/portfolio-placeholders/${seed.seed}.png`,
         caption: null,
         globalCategoryId: categoryId,
         categorySource: categoryId ? "user" : null,

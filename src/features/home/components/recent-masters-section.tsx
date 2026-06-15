@@ -7,11 +7,14 @@ import { Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
+import { moneyRUBPlainFromKopeks } from "@/lib/format";
 import type { RecentMasterItem } from "@/lib/bookings/recent-masters";
 import type { ApiResponse } from "@/lib/types/api";
 
-function formatPrice(price: number): string {
-  return `${price} ${UI_TEXT.common.currencyRub}`;
+// FIX-03 (QA-109): `lastService.price` is kopecks — render ÷100 (plain number
+// + ₽ suffix, preserving the original presentation).
+function formatPrice(priceKopeks: number): string {
+  return `${moneyRUBPlainFromKopeks(priceKopeks)} ${UI_TEXT.common.currencyRub}`;
 }
 
 function formatDate(dateStr: string): string {

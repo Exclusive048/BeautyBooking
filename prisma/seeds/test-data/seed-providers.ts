@@ -224,7 +224,12 @@ async function ensureServices(args: {
       const chosen = args.rng.shuffle(templates).slice(0, args.rng.int(1, Math.min(3, templates.length)));
       const category = args.categoriesBySlug.get(subSlug) ?? args.categoriesBySlug.get(topSlug) ?? null;
       for (const t of chosen) {
-        const price = args.rng.int(t.priceMin, t.priceMax);
+        // Templates declare prices in RUB for readability; `Service.price` is
+        // stored in **kopeks** (DB convention — see UI_FMT.priceLabel which
+        // divides by 100). Convert here so bulk-seeded prices match the
+        // showcase seed (Anna uses kopeks directly, e.g. 250000 → 2500 ₽).
+        // QA-105: previously written ruble-scale → rendered 100× too cheap.
+        const price = args.rng.int(t.priceMin, t.priceMax) * 100;
         if (price < minPrice) minPrice = price;
         // Service identity is (providerId, name) — Prisma doesn't have a
         // unique on it, so we look up first to keep idempotency.

@@ -14,8 +14,12 @@ type Props = {
   distribution: ReadonlyArray<CatalogPriceBucket>;
 };
 
+// FIX-03 (QA-109): the slider domain/value are in kopecks (the catalog price
+// filter compares priceMin/priceMax directly against the kopecks `priceFrom`
+// column, and the histogram buckets are built from kopecks). Only the displayed
+// chip label needs ÷100 — the slider value passed to onChange stays in kopecks.
 function formatRub(n: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(Math.round(n))} ₽`;
+  return `${new Intl.NumberFormat("ru-RU").format(Math.round(n / 100))} ₽`;
 }
 
 /**
