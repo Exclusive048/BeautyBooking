@@ -187,25 +187,29 @@ export async function createScheduleContext(input: {
   const timezone = normalizeTimezone(input.timezoneHint, provider.timezone);
   const scheduleWindow = await getScheduleWindow(provider.id, timezone);
 
-  const [weeklyConfig, templates] = await prisma.$transaction([
-    prisma.weeklyScheduleConfig.findUnique({
-      where: { providerId: provider.id },
-      select: {
-        id: true,
-        days: { select: { weekday: true, templateId: true, isActive: true } },
-      },
-    }),
-    prisma.scheduleTemplate.findMany({
-      where: { providerId: provider.id },
-      select: {
-        id: true,
-        startLocal: true,
-        endLocal: true,
-        breaks: { select: { startLocal: true, endLocal: true, sortOrder: true } },
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-  ]);
+  // RULE-12-SCHEDULE (FIX-19): these are read-only schedule loads. They were a
+  // `prisma.$transaction([...])` whose raw row results (with the WeeklyScheduleConfig
+  // id + template CUIDs) were being RSC-flight-serialized into `/u/<master>` — the
+  // same mechanism FIX-17 saw for `ownerUserId`. Sequential awaits keep the data +
+  // engine output byte-identical (TZ=UTC slots proof) while removing the combined
+  // tuple promise that React captured. Also drop the unused `WeeklyScheduleConfig.id`
+  // from the select (defense-at-source — never read; only `.days` is used below).
+  const weeklyConfig = await prisma.weeklyScheduleConfig.findUnique({
+    where: { providerId: provider.id },
+    select: {
+      days: { select: { weekday: true, templateId: true, isActive: true } },
+    },
+  });
+  const templates = await prisma.scheduleTemplate.findMany({
+    where: { providerId: provider.id },
+    select: {
+      id: true,
+      startLocal: true,
+      endLocal: true,
+      breaks: { select: { startLocal: true, endLocal: true, sortOrder: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
   const templatesById = new Map<string, { startLocal: string; endLocal: string; breaks: ScheduleBreakInterval[] }>();
   templates.forEach((template) => {
@@ -240,30 +244,31 @@ export async function createScheduleContext(input: {
     const fromUtc = dateKeyToUtcStart(input.range.fromKey);
     const toUtcExclusive = dateKeyToUtcStart(input.range.toKeyExclusive);
 
-    const [overrideRows, breakRows] = await prisma.$transaction([
-      prisma.scheduleOverride.findMany({
-        where: { providerId: provider.id, date: { gte: fromUtc, lt: toUtcExclusive } },
-        select: {
-          date: true,
-          kind: true,
-          isDayOff: true,
-          startLocal: true,
-          endLocal: true,
-          templateId: true,
-          isActive: true,
-          note: true,
-          reason: true,
-        },
-      }),
-      prisma.scheduleBreak.findMany({
-        where: {
-          providerId: provider.id,
-          kind: "OVERRIDE",
-          date: { gte: fromUtc, lt: toUtcExclusive },
-        },
-        select: { date: true, startLocal: true, endLocal: true },
-      }),
-    ]);
+    // RULE-12-SCHEDULE (FIX-19): sequential read-only awaits (was a $transaction
+    // tuple) — keeps override.templateId internal to the engine while removing the
+    // combined tuple promise from RSC flight serialization. Engine output identical.
+    const overrideRows = await prisma.scheduleOverride.findMany({
+      where: { providerId: provider.id, date: { gte: fromUtc, lt: toUtcExclusive } },
+      select: {
+        date: true,
+        kind: true,
+        isDayOff: true,
+        startLocal: true,
+        endLocal: true,
+        templateId: true,
+        isActive: true,
+        note: true,
+        reason: true,
+      },
+    });
+    const breakRows = await prisma.scheduleBreak.findMany({
+      where: {
+        providerId: provider.id,
+        kind: "OVERRIDE",
+        date: { gte: fromUtc, lt: toUtcExclusive },
+      },
+      select: { date: true, startLocal: true, endLocal: true },
+    });
 
     overrides = overrideRows as OverrideRow[];
     overrideBreaks = breakRows as BreakRow[];

@@ -128,16 +128,21 @@ export const getMasterPublicProfileView = cache(
       )?.ownerUserId ?? null;
     const createdAt = ownerMeta?.createdAt ?? null;
 
-    const [planInfo, availability] = await Promise.all([
-      ownerUserId
-        ? getCurrentPlan(ownerUserId, SubscriptionScope.MASTER).catch(() => null)
-        : Promise.resolve(null),
-      computeAvailabilityHint(
-        provider.id,
-        provider.timezone,
-        normalizeSlotStepMin(ownerMeta?.slotStepMin),
-      ),
-    ]);
+    // RULE-12-SCHEDULE (FIX-19): `getCurrentPlan` returns a rich `CurrentPlanInfo`
+    // (with the BillingPlan `planId` CUID) but only `.tier` is needed here. The old
+    // `Promise.all([planInfo, availability])` tuple flight-serialized the whole
+    // `planInfo` (leaking `planId`) — same RSC mechanism as `ownerUserId`/schedule.
+    // Extract the `tier` primitive immediately; never keep the rich object in a
+    // flight-reachable structure. Sequential awaits (read-only) keep behaviour identical.
+    const planInfoRaw = ownerUserId
+      ? await getCurrentPlan(ownerUserId, SubscriptionScope.MASTER).catch(() => null)
+      : null;
+    const planTier: PlanTier | null = planInfoRaw?.tier ?? null;
+    const availability = await computeAvailabilityHint(
+      provider.id,
+      provider.timezone,
+      normalizeSlotStepMin(ownerMeta?.slotStepMin),
+    );
 
     const bundles = packages
       .map((pkg) => {
@@ -199,7 +204,7 @@ export const getMasterPublicProfileView = cache(
     return {
       provider,
       bundles,
-      planTier: planInfo?.tier ?? null,
+      planTier,
       experienceMonths,
       availability,
       studio,

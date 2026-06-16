@@ -920,7 +920,43 @@ Cross-surface raw-CUID sweep of `/`, `/catalog`, `/u/<master>`, `/u/<studio>` fl
   `RULE-12-BOOKING-CONTRACT-OPTIONAL`; taxonomy ids; pagination cursors). **One** new low-severity
   undocumented leak remains: **`RULE-12-SCHEDULE`**. Rule-12 is therefore **not 100% closed**, but the
   **complete remaining list is now known in one shot** (RULE-12-SCHEDULE + the booking-contract decision)
-  — the per-leak incremental discovery is over.
+  — the per-leak incremental discovery is over. *(Closed FIX-19 — see below.)*
+
+**✅ RULE-12-SCHEDULE RESOLVED — FIX-19 (2026-06-17). Boundary fix; engine math untouched (TZ-proof). 🎉 rule-12 FULLY CLOSED.**
+`/u/<master>` flight carried a `WeeklyScheduleConfig` id + `days[].templateId`/`templates[].id` CUIDs.
+Root vector: `createScheduleContext` (`src/lib/schedule/engine-context.ts`) used `prisma.$transaction([...])`
+whose **raw row results** were RSC-flight-serialized (same mechanism FIX-17 saw for `ownerUserId`),
+even though the returned `ScheduleContext` is transformed (no ids) and `getMasterPublicProfileView`
+returns only a clean `AvailabilityHint`.
+- **Engine-consumption verdict:** `weeklyConfig.id` = **UNUSED** (only `.days` read) → dropped from select.
+  `templates[].id`/`templateId` = **engine-load-bearing** (`templatesById` Map consumed by
+  `engine.ts:34`, `resolve.ts:52`, `rule-adapters.ts:160` for override→template resolution) → kept in select.
+- **Boundary fix (no engine math change):** converted the two read-only `$transaction([...])` calls inside
+  `createScheduleContext` (weeklyConfig+templates; overrides+breaks) to **sequential awaits** — identical
+  data, identical `ctx` the engine reads, but the combined-tuple promise React was serializing is gone.
+  Dropped the unused `WeeklyScheduleConfig.id` (defense-at-source).
+- **Bonus (same mechanism, same file):** the residual `cmprfcdn7000x…` (unidentified across FIX-17/18) was a
+  **BillingPlan `planId`** (`{"planId":…,"planCode":"MASTER_PRO","tier":…}`) leaking via
+  `getMasterPublicProfileView`'s `Promise.all([planInfo, availability])` (the same FIX-17 tuple; FIX-17
+  cleaned `ownerMeta`, not `planInfo`). `getCurrentPlan` returns rich `CurrentPlanInfo` but only `.tier`
+  is used → sequentialized + extracted the `tier` primitive; the rich object (with `planId`) no longer
+  reaches flight.
+- **Verified (`.qa/diagnostics/fix-19/`):** `/u/anna-sokolova` flight — `weeklyConfig.id` **1→0**,
+  `templateId`/`weekday` schedule shape **→0**, `planId` **→0**. **FULL residual raw-CUID sweep:
+  ONLY provider+service ids remain** (booking-flow exception) — **zero undocumented CUIDs**. Other public
+  surfaces (`/u/<studio>`, `/catalog`, `/`) — 0 schedule/plan CUIDs. Availability hint ("Сегодня свободно")
+  + PREMIUM/PRO ring still render, both themes.
+- **🔴 ENGINE-SAFETY PROOF (mandatory, FIX-11 style) — PASSED:** public slots for the showcase master over
+  a 14-day range, captured under **TZ=UTC** and **TZ=Europe/Moscow** (separate server processes), are
+  **byte-identical** (SHA256 `8458b2352aed…`, 35 slots each). The engine is TZ-invariant (reads entity tz
+  Asia/Almaty, not process tz) — proves the boundary fix did not disturb slot generation. Gates:
+  typecheck/lint(1err/3warn)/encoding/mojibake/test(703)/build ✅.
+- **🎉 FINAL rule-12 closure (true final state):** **rule-12 is FULLY CLOSED.** Every public response body
+  + every public-page RSC flight is **clean** OR a **documented accepted exception**:
+  (1) booking-flow provider/service/studio ids — kept-and-documented; encoding them = `RULE-12-BOOKING-CONTRACT-OPTIONAL`
+  (deliberate non-action: a conversion-path contract change, not a leak); (2) taxonomy ids (GlobalCategory,
+  review tags, BillingPlan catalog `planCode`); (3) base64url pagination cursors. **No undocumented/unnecessary
+  internal CUID is emitted on any public surface.** The incremental per-leak discovery (FIX-13→19) is over.
 
 `QA-105 · catalog prices + price filter (bulk-seeded providers) · 🟡 Medium
 (seed data) · repro: home "Топ мастеров" / catalog cards show "Окрашивание бровей

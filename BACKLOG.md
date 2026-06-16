@@ -610,19 +610,24 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   repointed (public guard `!isOwnReview`; master avatar seed `authorName`). Studio/admin/client cabinets
   use own mappers (raw cuids — exempt). **Verified:** public payload + `/u/<master>` flight carry 0
   author/review/booking CUIDs; authed report via encoded token → 200; both themes render; 703 tests + build ✅.
-- 🟡 **RULE-12-SCHEDULE — `WeeklyScheduleConfig`/`WeeklyScheduleDay`/`templateId` ids on `/u/<master>` flight. NEW, found in FIX-18 Phase A (exhaustive audit). LOW severity.**
-  `/u/<master>` flight carries a `WeeklyScheduleConfig` id (+ day/template ids), e.g.
-  `{"id":"cmqfn1l4z…","days":[{"weekday":1,"templateId":…}]}`. Source: `computeAvailabilityHint`
-  (`src/lib/master/public-profile-view.service.ts`) → `createScheduleContext`
-  (`src/lib/schedule/engine-context.ts:191`, `prisma.weeklyScheduleConfig.findUnique`); the rich context
-  object is RSC-flight-serialized (same mechanism FIX-17 fixed for `ownerUserId`) though the function
-  returns only a clean `AvailabilityHint`. **Severity LOW** — internal scheduling-structure ids (not
-  user/booking/review/payment), not directly actionable (no public endpoint resolves them). **Not
-  mechanical** — `engine-context` is shared engine infra (slots/booking); a safe fix needs an audit of
-  whether the engine consumes config/day/template ids downstream, then select-tighten or FIX-17-style
-  transient handling so the context stays out of flight. **Flagged** (user decision 2026-06-17) for a
-  small dedicated pass — NOT expanded into FIX-18 (flag-don't-expand discipline). **This is the one
-  remaining undocumented rule-12 leak — the complete remaining list is now known (no more incremental discovery).**
+- ✅ **RULE-12-SCHEDULE — `WeeklyScheduleConfig`/`templateId` + BillingPlan `planId` ids on `/u/<master>` flight. Выполнено FIX-19 (2026-06-17). 🎉 rule-12 FULLY CLOSED.**
+  Root vector: `createScheduleContext` (`src/lib/schedule/engine-context.ts`) used `prisma.$transaction([...])`
+  whose raw row results (WeeklyScheduleConfig id + template CUIDs) were RSC-flight-serialized (same mechanism
+  as `ownerUserId`). **Engine verdict:** `weeklyConfig.id` UNUSED → dropped from select; `templates[].id`/
+  `templateId` engine-load-bearing (`templatesById` Map in `engine.ts`/`resolve.ts`/`rule-adapters.ts`) → kept.
+  **Boundary fix (no engine math change):** the two read-only `$transaction` calls → **sequential awaits**
+  (identical data + engine `ctx`; the combined-tuple promise React serialized is gone). **Bonus same-mechanism
+  fix:** BillingPlan `planId` leaked via `getMasterPublicProfileView`'s `Promise.all([planInfo, availability])`
+  (only `.tier` used) → sequentialized + extracted the `tier` primitive. **Verified:** `/u/<master>` flight
+  full residual CUID sweep = ONLY provider+service ids (booking-flow exception); schedule/plan CUIDs → 0;
+  studio/catalog/home → 0. **🔴 ENGINE-SAFETY PROOF PASSED:** 14-day public slots byte-identical under
+  TZ=UTC vs TZ=Europe/Moscow (SHA `8458b2352aed…`, 35 slots) — engine untouched. Availability hint + PREMIUM
+  ring render both themes. 703 tests + build ✅.
+- ✅ **rule-12 — FULLY CLOSED (FIX-13→19, 2026-06-17).** Every public response body + public-page RSC flight
+  is clean OR a documented accepted exception: (1) booking-flow provider/service/studio ids — kept-and-documented
+  (`RULE-12-BOOKING-CONTRACT-OPTIONAL` deliberate non-action below); (2) taxonomy ids (GlobalCategory, review
+  tags, BillingPlan `planCode`); (3) base64url pagination cursors. No undocumented internal CUID is emitted on
+  any public surface. Per-leak incremental discovery is over.
 - 🟡 **RULE-12-BOOKING-CONTRACT-OPTIONAL — encode the booking-flow provider/service ids (decision).**
   To make rule-12 *fully* encode-closed (no booking-flow exception), the slots endpoint
   (`/api/public/providers/[providerId]/slots`), `createBooking`, the favorite toggle, and the
