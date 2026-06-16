@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -92,7 +93,7 @@ export function PopularCategoriesSection() {
         {categories.map((cat) => (
           <motion.div key={cat.id} variants={item}>
             <Link
-              href={`/catalog?category=${cat.slug ?? cat.id}`}
+              href={buildCatalogUrl({ globalCategoryId: cat.id })}
               className="group flex flex-col items-center gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"
             >
               {cat.icon ? (

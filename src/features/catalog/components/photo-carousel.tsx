@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PhotoCarouselProps = {
@@ -20,10 +20,9 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[24px] bg-muted">
       {current ? (
-        <Image
+        <FocalImage
           src={current}
           alt={alt}
-          fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />

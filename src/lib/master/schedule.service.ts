@@ -2,6 +2,7 @@ import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
+import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
   addWeeks,
@@ -99,8 +100,22 @@ function bookingPrice(item: {
   return item.service.price;
 }
 
-function minuteOfDay(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
+/**
+ * Minute-of-day for grid card positioning, computed in the schedule
+ * owner's OWN timezone (not the host process tz).
+ *
+ * QA-113 (FIX-11): `date.getHours()` reads the host process timezone.
+ * On the MSK production host this happened to equal the master tz, so
+ * the grid looked correct; on a UTC host the cards shifted by the tz
+ * offset (e.g. −3h for Europe/Moscow) even though the availability
+ * engine stayed TZ-safe (QA-07). Grid positions must be derived from
+ * the entity's own tz to stay stable regardless of where the server
+ * runs. GRID-ONLY: the availability engine never calls this helper —
+ * its working intervals arrive as entity-local HH:MM strings.
+ */
+function minuteOfDay(date: Date, timeZone: string): number {
+  const { hour, minute } = getLocalTimeParts(date, timeZone);
+  return hour * 60 + minute;
 }
 
 /**
@@ -152,9 +167,10 @@ function parseInterval(s: string, e: string): { startMin: number; endMin: number
 function computeFreeSlotsToday(input: {
   today: ScheduleDay | undefined;
   now: Date;
+  timeZone: string;
 }): { count: number; firstFreeAfter: string | null } {
   if (!input.today || input.today.isOff) return { count: 0, firstFreeAfter: null };
-  const nowMin = minuteOfDay(input.now);
+  const nowMin = minuteOfDay(input.now, input.timeZone);
   let count = 0;
   let firstFree: string | null = null;
   const occupied: Array<{ startMin: number; endMin: number }> = [
@@ -312,8 +328,8 @@ export const getMasterScheduleWeek = cache(
         durationMin: row.service.durationMin,
         startAtUtc: row.startAtUtc,
         endAtUtc: row.endAtUtc,
-        startMinuteOfDay: minuteOfDay(row.startAtUtc),
-        endMinuteOfDay: minuteOfDay(row.endAtUtc),
+        startMinuteOfDay: minuteOfDay(row.startAtUtc, master.timezone),
+        endMinuteOfDay: minuteOfDay(row.endAtUtc, master.timezone),
         price: bookingPrice(row),
         actionRequiredBy: row.actionRequiredBy ?? null,
       };
@@ -331,8 +347,8 @@ export const getMasterScheduleWeek = cache(
         note: row.note,
         startAtUtc: row.startAt,
         endAtUtc: row.endAt,
-        startMinuteOfDay: minuteOfDay(row.startAt),
-        endMinuteOfDay: minuteOfDay(row.endAt),
+        startMinuteOfDay: minuteOfDay(row.startAt, master.timezone),
+        endMinuteOfDay: minuteOfDay(row.endAt, master.timezone),
       };
       const list = timeBlocksByDay.get(iso) ?? [];
       list.push(item);
@@ -383,6 +399,7 @@ export const getMasterScheduleWeek = cache(
     const { count: freeSlotsToday, firstFreeAfter } = computeFreeSlotsToday({
       today,
       now,
+      timeZone: master.timezone,
     });
 
     return {

@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { PublicStats } from "@/lib/stats/public-stats";
 
@@ -53,8 +54,8 @@ export function HeroSection({ stats }: Props) {
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const trimmed = query.trim();
-    router.push(trimmed ? `/catalog?q=${encodeURIComponent(trimmed)}` : "/catalog");
+    // QA-104: emit the param the catalog reads (`serviceQuery`), not `q`.
+    router.push(buildCatalogUrl({ serviceQuery: query }));
   }
 
   return (

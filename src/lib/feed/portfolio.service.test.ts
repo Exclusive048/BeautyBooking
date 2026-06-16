@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { encodePublicId } from "@/lib/public-id";
 
 /**
  * FEED-PORTFOLIO-N1-FIX-A — PERF-1 regression coverage.
@@ -140,14 +141,16 @@ describe("listPortfolioFeed (FEED-PORTFOLIO-N1-FIX-A — site 1 of 4)", () => {
     const result = await listPortfolioFeed({ limit: 10 });
 
     expect(result.items).toHaveLength(1);
+    // RULE-12-REMAINDER (FIX-15): id is now an opaque token; masterId/serviceIds
+    // are no longer emitted on the public payload.
     expect(result.items[0]).toMatchObject({
-      id: "p-1",
-      masterId: "m-1",
-      serviceIds: ["s-1"],
+      id: encodePublicId("p-1"),
       totalPrice: 55555, // override wins
       totalDurationMin: 45, // override wins
       primaryServiceTitle: "Service s-1",
     });
+    expect(result.items[0]).not.toHaveProperty("masterId");
+    expect(result.items[0]).not.toHaveProperty("serviceIds");
     // Exactly ONE batched MasterService query — proves N+1 collapse.
     expect(masterServiceFindMany).toHaveBeenCalledTimes(1);
     expect(masterServiceFindMany).toHaveBeenCalledWith(
@@ -214,14 +217,13 @@ describe("listHomePortfolioFeed (FEED-PORTFOLIO-N1-FIX-A — site 2 of 4)", () =
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
-      id: "home-p-1",
-      masterId: "m-home",
-      serviceIds: ["s-home-1", "s-home-2"],
+      id: encodePublicId("home-p-1"),
       // s-home-1 uses override (60000 + 40), s-home-2 uses fallback (70000 + 45).
       totalPrice: 60000 + 70000,
       totalDurationMin: 40 + 45,
       primaryServiceTitle: "Стрижка",
     });
+    expect(result.items[0]).not.toHaveProperty("masterId");
     expect(masterServiceFindMany).toHaveBeenCalledTimes(1);
   });
 });
@@ -239,11 +241,11 @@ describe("getPortfolioDetail (FEED-PORTFOLIO-N1-FIX-A — sites 3 + 4 of 4)", ()
 
     const detail = await getPortfolioDetail("detail-1");
 
-    expect(detail.id).toBe("detail-1");
+    expect(detail.id).toBe(encodePublicId("detail-1"));
     expect(detail.serviceOptions).toHaveLength(1);
     expect(detail.similarItems).toHaveLength(1);
     expect(detail.similarItems[0]).toMatchObject({
-      id: "sim-1",
+      id: encodePublicId("sim-1"),
       masterName: "Master m-sim",
     });
     // Two distinct batched calls: one for main item, one for similar rows.

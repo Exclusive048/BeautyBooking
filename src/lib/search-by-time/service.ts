@@ -289,7 +289,10 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
   });
 
   const now = new Date();
-  const items: AvailabilityProviderItem[] = [];
+  // Internal working shape keeps `providerId` for the smart-count lookup +
+  // ranking; it is stripped before the public response (rule 12).
+  type RankableItem = AvailabilityProviderItem & { providerId: string };
+  const items: RankableItem[] = [];
 
   await Promise.all(
     providers.map(async (provider) => {
@@ -382,5 +385,12 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
     .map((entry) => entry.item)
     .slice(0, limit);
 
-  return { items: ranked };
+  // Strip the internal provider CUID from the public response (rule 12).
+  const publicItems: AvailabilityProviderItem[] = ranked.map((item) => {
+    const { providerId, ...rest } = item;
+    void providerId; // internal-only (smart-count lookup) — never exposed
+    return rest;
+  });
+
+  return { items: publicItems };
 }

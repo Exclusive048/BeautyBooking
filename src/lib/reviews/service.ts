@@ -415,7 +415,8 @@ export async function createReview(input: {
     await invalidateAdvisorCache(created.targetId);
   }
 
-  return toReviewDto(created);
+  // RULE-12-REVIEWS (FIX-18): creator is the author → isOwnReview true; id encoded.
+  return toReviewDto(created, { currentUserId: input.currentUserId });
 }
 
 export async function listReviews(input: {
@@ -442,7 +443,13 @@ export async function listReviews(input: {
     skip: input.offset,
     include: reviewInclude,
   });
-  return reviews.map((review) => toReviewDto(review, { includePrivateTags }));
+  return reviews.map((review) =>
+    toReviewDto(review, {
+      includePrivateTags,
+      // RULE-12-REVIEWS (FIX-18): per-viewer own-review flag computed server-side.
+      currentUserId: input.currentUser?.id ?? null,
+    })
+  );
 }
 
 export async function getReviewAvailabilityForBooking(input: {

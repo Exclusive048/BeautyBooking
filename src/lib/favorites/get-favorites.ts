@@ -16,6 +16,23 @@ export const getFavoriteProviderIds = cache(async (userId: string): Promise<Set<
 });
 
 /**
+ * Favorited providers keyed by `publicUsername` — for public surfaces that
+ * must not handle the internal CUID (catalog cards, QA-103). Skips favorites
+ * whose provider has no publicUsername (cannot be matched on a public card).
+ */
+export const getFavoriteProviderUsernames = cache(async (userId: string): Promise<Set<string>> => {
+  const rows = await prisma.userFavorite.findMany({
+    where: { userId },
+    select: { provider: { select: { publicUsername: true } } },
+  });
+  return new Set(
+    rows
+      .map((r) => r.provider?.publicUsername)
+      .filter((u): u is string => Boolean(u)),
+  );
+});
+
+/**
  * Total count of provider favorites for the given user. Used by the cabinet
  * sidebar nav badge. The count is cheap (indexed by userId) but cabinet
  * layout fires on every page navigation — if this becomes a hot path, add a

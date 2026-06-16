@@ -79,6 +79,11 @@ const nextConfig = {
     "@aws-sdk/client-s3",
   ],
   images: {
+    // 🔁 Keep this host list in sync with
+    // src/components/ui/image-host.ts → ALLOWED_REMOTE_IMAGE_HOSTS.
+    // FocalImage degrades any host NOT listed here to a local placeholder
+    // (QA-102-L1) — an unlisted host would otherwise make next/image throw
+    // and break the whole route instead of just the one card.
     remotePatterns: [
       {
         protocol: "https",

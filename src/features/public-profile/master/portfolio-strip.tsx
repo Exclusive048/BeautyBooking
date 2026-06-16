@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -111,10 +111,9 @@ export function PortfolioStrip({ items }: Props) {
                       {UI_TEXT.publicProfile.portfolio.indexedBadge}
                     </div>
                   ) : null}
-                  <Image
+                  <FocalImage
                     src={item.mediaUrl}
                     alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
-                    fill
                     sizes="(max-width: 640px) 50vw, 33vw"
                     quality={90}
                     className="object-cover transition duration-300 group-hover:scale-[1.03]"
@@ -176,14 +175,13 @@ export function PortfolioStrip({ items }: Props) {
                 {selectedItem ? (
                   <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                     <div className="relative aspect-[3/4] max-h-[72vh] w-full">
-                      <Image
+                      <FocalImage
                         src={selectedItem.mediaUrl}
                         alt={
                           selectedItem.caption ??
                           selectedItem.primaryServiceTitle ??
                           UI_TEXT.publicProfile.portfolio.untitledWork
                         }
-                        fill
                         sizes="(max-width: 1024px) 90vw, 50vw"
                         quality={90}
                         className="rounded-2xl object-contain"

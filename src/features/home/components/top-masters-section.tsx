@@ -9,7 +9,7 @@ import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type TopMaster = {
-  id: string;
+  // QA-103: no internal CUID — key/link off publicUsername.
   publicUsername: string | null;
   title: string;
   tagline: string | null;
@@ -32,7 +32,6 @@ async function loadTopMasters(): Promise<TopMaster[] | null> {
       .filter((it): it is CatalogProviderItem => it.type === "master")
       .slice(0, 4)
       .map<TopMaster>((m) => ({
-        id: m.id,
         publicUsername: m.publicUsername,
         title: m.title,
         tagline: m.tagline,
@@ -56,7 +55,7 @@ function formatPriceRub(kopeks: number): string {
 
 function MasterCard({ master }: { master: TopMaster }) {
   const profileHref = providerPublicUrl(
-    { id: master.id, publicUsername: master.publicUsername },
+    { id: master.publicUsername ?? "", publicUsername: master.publicUsername },
     "card",
   ) ?? "#";
 
@@ -134,8 +133,8 @@ export async function TopMastersSection() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {masters.map((master) => (
-          <MasterCard key={master.id} master={master} />
+        {masters.map((master, index) => (
+          <MasterCard key={master.publicUsername ?? index} master={master} />
         ))}
       </div>
 

@@ -24,7 +24,10 @@ import { UI_TEXT } from "@/lib/ui/text";
 const STORY_DURATION_MS = 5000;
 
 function profileHrefFor(group: StoriesGroup): string {
-  return group.username ? `/u/${group.username}` : `/providers/${group.masterId}`;
+  // Rule 12: link only via public username. `masterId` is now an opaque token
+  // (not a real provider id), so the legacy `/providers/<id>` fallback is gone;
+  // stories require published masters, which always have a publicUsername.
+  return group.username ? `/u/${group.username}` : "#";
 }
 
 function preload(url: string): void {

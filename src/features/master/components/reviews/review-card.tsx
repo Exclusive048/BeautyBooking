@@ -47,7 +47,9 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
           <span
             className={cn(
               "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-              pickAvatarColor(review.authorId)
+              // RULE-12-REVIEWS (FIX-18): authorId removed from DTO; seed the
+              // cosmetic avatar colour from the author name instead.
+              pickAvatarColor(review.authorName)
             )}
             aria-hidden
           >

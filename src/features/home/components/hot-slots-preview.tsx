@@ -6,6 +6,7 @@ import { Flame, Clock } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
+import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
 import type { ApiResponse } from "@/lib/types/api";
 
 type HotSlotItem = {
@@ -125,7 +126,7 @@ export function HotSlotsPreview() {
             </p>
           </div>
         </div>
-        <Link href="/catalog?hot=true" className="shrink-0 text-sm font-medium text-primary hover:underline">
+        <Link href={buildCatalogUrl({ hot: true })} className="shrink-0 text-sm font-medium text-primary hover:underline">
           {UI_TEXT.home.hotSlotsPreview.showAll}
         </Link>
       </div>

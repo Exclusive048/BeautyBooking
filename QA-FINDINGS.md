@@ -350,7 +350,7 @@ Each QA-113 offender classified (fix self-view / leave engine-internal / defer t
 | `studio-cabinet/.../notifications-data.service.ts isToday` + grouping | **FIX** (studio self-view) | Same, using the studio's provider tz; `loadStudioNotificationsData` now takes `studioProviderId` (page passes `resolveCurrentStudioAccess().providerId`). |
 | `group-by-day.ts` (shared by master+studio, **no client caller**) | **FIX** (plumbing) | `groupNotificationsByDay` + `describeDay` gained an optional `timeZone`; TZ-aware "today/yesterday/dated" when supplied, legacy process-TZ fallback otherwise. |
 | `master-dashboard-page.tsx isWeekend` | **FIX** (master self-view) | `getDayOfWeek(now, data.master.timezone)` instead of `now.getDay()`. |
-| `schedule.service.ts:103 minuteOfDay` (+ grid hour-range) | **LEAVE — engine-coupled** | Grid-positioning math tied to the engine's working-interval placement; explicitly do-not-touch. Still shifts under UTC but a safe fix needs coordinated grid+intervals change with grid-specific regression tests → separate task (noted under QA-113 residual). |
+| `schedule.service.ts:103 minuteOfDay` (+ grid hour-range) | **✅ FIXED — FIX-11 (QA-113 residual, 2026-06-16)** | **Classified GRID-ONLY, not engine-coupled.** Grep proved `minuteOfDay` is a private helper in `schedule.service.ts`, consumed only within that file (booking/timeblock grid offsets + `freeSlotsToday`/`loadPct` KPIs) and surfaced only via `getMasterScheduleWeek` → `master-schedule-page.tsx`. The availability engine (`src/lib/schedule/*`) has zero `getHours`/`minuteOfDay` usage — its working intervals arrive as entity-local HH:MM strings (`hhmmToMinutes`). Fix: `minuteOfDay(date, timeZone)` now uses `getLocalTimeParts(date, master.timezone)` so grid card offsets are stable & correct regardless of host tz. Engine untouched (proved: TZ=UTC slots byte-identical to MSK, same SHA256). UTC grid screenshots now match MSK (diff <0.18%, only top-nav chrome). `.qa/diagnostics/fix-11/`. |
 | `schedule-utils.ts` date keys/week math | **LEAVE — engine internal** | TZ-safe per QA-07; do-not-touch. |
 | `model-offers-stats.ts formatOfferDate` | **LEAVE — false positive** | Operates on a `dateLocal` string via `new Date(y,m-1,d)` read back in the same process TZ → TZ-stable (no UTC instant). Comment confirms intent. |
 | `model-offers-view.service.ts:661 formatDateKey` | **LEAVE — internal key** | Grouping key, not a display label (per "only if display"). |
@@ -724,6 +724,204 @@ home/footer deep-links are broken. Backend filter itself is correct: API with
 serviceQuery=стрижка narrows 43→14 and excludes Anna (verified via curl). ·
 covered-by-test: yes (funnel-blockers.spec.ts QA-104, test.fail guard).`
 
+**✅ QA-103 RESOLVED — FIX-13 (2026-06-16).** Removed internal `id` from the
+public `CatalogProviderItem` DTO (`catalog.service.ts` type + mapping). The
+pagination cursor was already opaque base64url (`encodeCursor`) — unchanged.
+All consumers repointed to `publicUsername`: catalog-card (profile link =
+`providerPublicUrl` → `/u/<username>`; hue placeholder = `hueFromId(publicUsername)`;
+favorite POST sends `providerUsername`), catalog-page-client (local item type +
+React keys + `favoriteSet` membership + map-point key), top-masters-section,
+catalog-page (`getFavoriteProviderUsernames`). Favorites endpoint now accepts
+`providerId` **or** `providerUsername` (`favoriteToggleSchema` union →
+`toggleProviderFavorite` resolves username→id; authed cabinet / public-profile
+hero keep using `providerId`). **No booking-flow dependency on the raw id** —
+booking starts from `/u/<username>/booking`. **Verified** (`.qa/diagnostics/fix-13/`):
+`/api/catalog/search` → 20 items, **0 `id` keys**, 0 CUIDs in JSON, 20
+`publicUsername`; cursor round-trips to page 2 (no id leak); catalog cards link
+`/u/<username>` (0 `/providers/<id>` links); favorites toggle POSTs
+`providerUsername` and returns 200.
+
+**✅ QA-104 RESOLVED — FIX-13 (2026-06-16).** New shared builder
+`src/features/catalog/lib/catalog-url.ts` (`buildCatalogUrl`) emits the names the
+catalog reader is canonical for — `serviceQuery`, `globalCategoryId` (a real
+GlobalCategory **id**, resolved via `findUnique({where:{id}})`, not a slug),
+`availableToday=true`, `hot=true`, `sort`. Repointed all builders: hero search
+(`q` → `serviceQuery`), category tiles (`category=<slug>` → `globalCategoryId=<id>`),
+footer "Мастера рядом" (`available=today` → `availableToday=true`); hot-slots +
+footer "popular" routed through the builder too (drift-proofing). Reader applies
+all three (`catalog-page-client.tsx:344-353`) → schema accepts → service filters.
+**Verified** (Playwright, desktop + mobile, `.qa/diagnostics/fix-13/`): footer href
+= `availableToday=true`; category href = `globalCategoryId=`; hero search lands
+`/catalog?serviceQuery=…` (no `q=`); available-today deep-link lands with the
+"Свободно сегодня" toggle ON (filter applied) + reload preserves the param.
+
+**✅ RULE-12-SWEEP RESOLVED — FIX-14 (2026-06-16).** Two more public CUID leaks
+(found by FIX-13's audit), each fixed with the QA-103 pattern:
+- **Surface 1 — search-by-time `AvailabilityProviderItem.providerId`:** stripped from
+  the public response (`service.ts` keeps it internal-only for smart-count ranking,
+  omits it from output). Consumers → `publicUsername` (profile link, slot-bubble
+  provider, map-point key; `toMapPoint` discriminant `"providerId" in item` →
+  `"slots" in item`; card key). `service.id` kept = documented booking-flow exception
+  (slot deep-link `/u/<username>?serviceId=` preselects the service). Verified:
+  `/api/search/availability` JSON has **0 `providerId`**, the only CUID is `service.id`,
+  `publicUsername` present, slots correct. (search-by-time cards have no favorite button
+  — the "favorite 200" check is N/A for this surface.)
+- **Surface 2 — `/models/[code]` `public.service.ts`:** `service.id` / `category.id` /
+  `master.id` were **unnecessary leaks** (no public consumer; apply/booking is
+  `publicCode`-addressed and resolves master+service server-side — `applyModelOfferSchema`
+  = `{consentToShoot, note?, mediaIds}`). Stripped all three. Verified: rendered page has
+  **0** of the offer's master/service/category CUIDs; master links `/u/<username>`;
+  **booking completes end-to-end** (Playwright apply → 2xx + "Заявка отправлена!", body
+  carries no serviceId/masterId).
+- **Thoroughness note — rule-12 is NOT yet fully clean.** The sweep grep found **two
+  further** surfaces (filed `🟡 RULE-12-REMAINDER` in BACKLOG): portfolio-feed item id
+  (`feed/portfolio.service.ts`, used in `/api/home/portfolio/[id]` + `/api/portfolio/[id]/favorite`)
+  and stories item id (`feed/stories.service.ts`, client-side view-tracking). Accepted
+  patterns (not leaks): `GlobalCategory.id` as the category-filter param (app-wide,
+  catalog + models), `serviceId`-in-URL booking-flow exception, provider id in
+  `/api/public/providers/[id]/*` path (booking-flow exception).
+
+**✅ RULE-12-REMAINDER RESOLVED — FIX-15 (2026-06-16).** Portfolio feed + stories ids
+now opaque (shared `src/lib/public-id.ts` `encodePublicId`/`decodePublicId` — base64url
++ `e_` prefix, reversible, backward-compatible).
+- **Portfolio** — `id`/similarItems.id opaque-encoded; 3 routes decode server-side;
+  pagination cursor decodes on input; `masterId` stripped (link via `masterPublicUsername`),
+  unused `serviceIds` stripped; `serviceOptions[].serviceId` kept (booking-flow exception).
+  Verified: feed/detail JSON 0 raw CUIDs (only serviceId), detail decodes (200; bad token→404),
+  favorite toggles via token (200, idempotent).
+- **Stories** — `id` + `masterId` opaque-encoded (client-side keys/dedup/localStorage view-
+  tracking; no server route); `/providers/<masterId>` fallback link dropped (→ `/u/<username>`).
+  Verified: feed JSON 0 raw CUIDs; view-tracking stores the opaque token (no CUID in localStorage).
+- **Rule-12 status (honest):**
+  - ✅ **CLEAN (fixed):** `/api/catalog/search` (FIX-13), `/api/search/availability` (FIX-14),
+    `/models/[code]` (FIX-14), `/api/feed/portfolio` + `/api/portfolio/[id]*` (FIX-15),
+    `/api/feed/stories` (FIX-15).
+  - ✅ **ACCEPTED EXCEPTIONS:** `serviceId`-in-URL (booking-flow preselect — catalog/search/
+    models/portfolio-detail); `GlobalCategory.id` as the taxonomy filter param (catalog + models);
+    pagination cursors (`encodeCursor` / `encodePublicId`).
+  - 🟡 **REMAINING (filed `RULE-12-PROVIDERS`):** studio public profile leaks master provider
+    CUIDs via `/api/providers/[studioId]/masters` → `studio-masters-carousel` (fetches
+    `/api/providers/<id>` + portfolio by id); `/api/providers/[id]` read-by-CUID;
+    `public-profile-view` ServicePackage/bundle ids (latent, unused). So FIX-15 is **not** the
+    last rule-12 entry — the `/api/providers/*` provider-id family is the next sweep.
+
+**✅ RULE-12-PROVIDERS RESOLVED — FIX-16 (2026-06-16). Comprehensive provider/studio/service
+id pass.** Enumerated the whole `/api/providers/*` + provider-id family; classified each surface.
+| Surface | internal id | fix |
+|---|---|---|
+| `/api/catalog/search`, `/api/feed/portfolio`, `/api/feed/stories` | — | **clean** (FIX-13/15), closing grep = 0 CUIDs |
+| `public-profile-view` `PublicBundleView.id` | package CUID (React key only) | **stripped** |
+| `public-profile-view` `servicePackage.findMany` raw row | id/masterId/createdAt/updatedAt | **`include`→`select`** (row no longer carries them; verified seed pkg CUID gone from `/u/<master>`) |
+| `ProviderProfileDto.id` + `ProviderServiceDto.id` | provider/service CUID | **booking-flow exception** — slots (`/api/public/providers/<id>/slots`) + `createBooking({providerId})` + favorite all keyed by these (rule 12 exempts); documented in `dto.ts` |
+| `ProviderProfileDto.studioId` | studio CUID | **booking-flow exception** — master-in-studio "book at studio" link |
+| `/api/providers/[id]`, `/api/providers/[studioId]/masters` (masters[].id) | provider CUID | **booking-flow / browse→book exception** (carousel fetches each master's profile/portfolio to book) |
+| `/api/feed/portfolio?masterId=<providerId>` | provider CUID (query) | **profile-fetch exception** (profile fetching its own portfolio) |
+- **Fixed (genuine):** bundle.id + raw ServicePackage row fields. **Documented (booking-flow
+  exception, rule 12 explicit):** provider/service/studio ids on the conversion path. Encoding
+  these = a booking-endpoint CONTRACT change → flagged (`RULE-12-BOOKING-CONTRACT-OPTIONAL`),
+  NOT done unilaterally (per FIX-14's principle).
+- **Closing grep:** `/api/catalog/search`, `/api/feed/portfolio`, `/api/feed/stories` → **0 raw
+  CUIDs**. `/api/providers/[id]` → only provider.id + service.ids (documented exception). Feature
+  preserved: studio profile + masters carousel + provider read all 200.
+- **🟡 NEW residual found (filed `RULE-12-OWNERUSERID-RSC`):** `getMasterPublicProfileView`'s
+  internal `Promise.all([ownerRow, packages])` is RSC-flight-serialized on `/u/<master>` even
+  though the function's RETURN is clean — leaking `ownerRow.ownerUserId` (owner UserProfile CUID).
+  FIX-16 cleaned the packages half; the ownerUserId half persists (mechanism needs a runtime
+  flight/`cache()` trace — no client prop carries it statically). Not guess-fixed.
+- **Rule-12 status (honest):** every public response body is **clean** OR a **documented
+  accepted exception** (booking-flow provider/service/studio ids; serviceId-in-URL; GlobalCategory
+  taxonomy filter; pagination cursors). **NOT 100% encode-closed:** the booking-flow id family is
+  kept-and-documented (encoding it = flagged contract change), and one RSC-serialization residual
+  (`ownerUserId`) remains flagged. No *undocumented/unnecessary* leaks remain.
+
+**✅ RULE-12-OWNERUSERID-RSC RESOLVED — FIX-17 (2026-06-16). Fixed at source.**
+`getMasterPublicProfileView`'s internal `Promise.all([ownerRow, packages])` flight-serialized
+`ownerRow.ownerUserId` (owner UserProfile CUID) into `/u/<master>` despite a clean return. Fix:
+tightened the first query's `select` to drop `ownerUserId` (now `ownerMeta` = createdAt/slotStepMin/studio
+only) and fetched the owner id separately into a **transient primitive** (`string | null`) used solely
+as the `getCurrentPlan` arg — never on a row/tuple that reaches flight.
+- **Verified:** flight payload capture of `/u/anna-sokolova`, owner CUID `cmqfmyf2n00w1vlfkgquc0nhq`
+  occurrences **1 → 0** (`.qa/diagnostics/fix-17/{before,after}.html`). Page renders both themes
+  (`render-light.png` / `render-dark.png`). `getCurrentPlan` / PREMIUM ring intact.
+- **⚠️ Phase A "any OTHER internal user/profile CUID riding along?" → YES, a NEW cluster found.**
+  The `/u/<master>` flight ALSO carries reviews-section CUIDs — but these come from a **different
+  surface**: the reviews are fetched **client-side** via `GET /api/reviews?targetType=provider&targetId=…`
+  (`reviews-section.tsx:17,81`), NOT through `getMasterPublicProfileView`. The leaking fields are in
+  `listReviews` (`src/lib/reviews/service.ts`) DTO:
+  - `review.authorId` (review author **UserProfile CUID**, 6× from showcase-client-05/06 reviews) —
+    **pre-existing** (before=after=1, untouched by FIX-17). Used client-side for the own-review guard
+    `currentUserId !== review.authorId` (`reviews-preview.tsx:43,60`).
+  - `review.id` (Review CUID) — **pre-existing**. Used client-side for the report mutation
+    `onReport(review.id)` → `POST /api/reviews/[id]/report`.
+  - one request-variable id (`cmprfcdn7000x…`, before=0/after=1) — review-associated (varies per
+    request; not in Provider/UserProfile/Review/Service tables checked), folded into the same item.
+- **Why flagged, not fixed here:** `/api/reviews` is shared by master/client/studio cabinets + the
+  public profile + the report route. `authorId`→server-computed `isOwnReview` boolean and
+  `review.id`→opaque-encode (+ decode in `/api/reviews/[id]/report`) is a reviews-subsystem + report
+  **mutation-contract** change across all consumers — exactly the class FIX-14/15/16 flag rather than
+  expand inside a fix named "ownerUserId". Filed `🟡 RULE-12-REVIEWS` in BACKLOG.
+- **Rule-12 line — HONEST status: NOT fully closed.** RULE-12-OWNERUSERID-RSC is the last leak on
+  the `getMasterPublicProfileView` aggregator and it is **fixed**. But the diligent full-flight audit
+  the prompt requested surfaced a genuine pre-existing reviews-author/review-id leak on the
+  `/api/reviews` surface → rule-12 **cannot** be declared 100% closed. Accepted-exception list stands
+  (booking-flow provider/service/studio ids; serviceId-in-URL; taxonomy filter; cursors). Deliberate
+  non-action stands (`RULE-12-BOOKING-CONTRACT-OPTIONAL`). New flagged remainder: `RULE-12-REVIEWS`.
+
+**✅ RULE-12-REVIEWS RESOLVED — FIX-18 (2026-06-17). + exhaustive whole-app rule-12 audit.**
+`/api/reviews` (public; consumed by `/u/<master>` + `/u/<studio>` client-side) leaked
+`review.authorId` (author UserProfile CUID), `review.id` (Review CUID), and `review.bookingId`
+(Booking CUID). Fixed at source in the **shared** `toReviewDto` (`src/lib/reviews/types.ts`):
+  - `authorId` → **dropped**; replaced by `isOwnReview: boolean` computed per-viewer server-side
+    (`options.currentUserId === review.authorId`; anon → false). `listReviews` + `createReview`
+    pass `currentUserId`. Public guard now `!review.isOwnReview` (`reviews-preview.tsx`).
+  - `review.id` → **opaque-encoded** via `encodePublicId`. All `/api/reviews/[id]/{report,reply
+    (POST+PATCH),suggest-reply,route(PATCH/DELETE)}` decode with `decodePublicId` (backward-compat:
+    raw cabinet cuids pass through unchanged).
+  - `bookingId` → made optional + **gated on `includePrivateTags`** (master/admin only); public/anon omit it.
+  - Master cabinet shares the DTO: avatar seed `authorId`→`authorName`; reply/edit use the encoded
+    id (routes decode). Studio/admin/client cabinets use their OWN mappers (raw cuids — exempt) → untouched.
+- **Verified (`.qa/diagnostics/fix-18/`):** public `/api/reviews` payload keys = id(`e_…`)/isOwnReview/
+  authorName/targetType/targetId/rating/text/publicTags/replyText/repliedAt/reportedAt/createdAt —
+  **no authorId, no bookingId**. `/u/anna-sokolova` flight: **0** `"authorId"`, **0** author CUIDs,
+  **0** raw review CUIDs (14 `e_` tokens only). Authed report via the **encoded** token → **200**
+  (decode→write); legacy raw id → 401-not-400 (passthrough). Report row created → **baseline restored**
+  (0 reported). Own-review guard works (anon=false asserted; creator=true via createReview). Both
+  themes render with reviews + replies. Gates: typecheck/lint(1err/3warn)/encoding/mojibake/test(703)/build ✅.
+
+**📋 Phase A — EXHAUSTIVE rule-12 inventory (definitive; ends incremental discovery).**
+Cross-surface raw-CUID sweep of `/`, `/catalog`, `/u/<master>`, `/u/<studio>` flight + public APIs:
+
+| id family / surface | internal id | classification |
+|---|---|---|
+| Provider id (`/api/providers`, profile, catalog) | provider CUID | **booking-flow exception** (rule 12 explicit) |
+| Service id (services menu, `"isActive"`) | service CUID | **booking-flow exception** |
+| `ProviderProfileDto.studioId` (master-in-studio) | studio CUID | **booking-flow exception** |
+| Review `targetId` (= the viewed provider/studio) | provider/studio CUID | **booking-flow exception** (same id the viewer already has) |
+| `publicTags[].id`, GlobalCategory.id | taxonomy CUID | **taxonomy exception** (parallels category filter) |
+| pagination cursors (feed/portfolio/stories) | base64url | **accepted** |
+| `/api/catalog/search`, `/api/feed/{portfolio,stories}`, search-by-time, `/models/[code]` | — | **clean** (FIX-13/14/15) |
+| review `id` / `authorId` / `bookingId` | Review/User/Booking CUID | **✅ FIXED FIX-18** (encoded / isOwnReview / gated) |
+| `getMasterPublicProfileView` `ownerUserId` + package row | User/package CUID | **✅ FIXED FIX-16/17** |
+| **`WeeklyScheduleConfig` id + `days[].templateId`/day ids on `/u/<master>`** | schedule CUID | **🟡 NEW genuine leak → `RULE-12-SCHEDULE`** |
+
+- **NEW: `RULE-12-SCHEDULE` (🟡 LOW).** `/u/<master>` flight carries a `WeeklyScheduleConfig` id
+  (+ day/template ids), e.g. `{"id":"cmqfn1l4z…","days":[{"weekday":1,"templateId":…}]}`. Source:
+  `computeAvailabilityHint` (`src/lib/master/public-profile-view.service.ts`) → `createScheduleContext`
+  (`src/lib/schedule/engine-context.ts:191`); the rich context object is flight-serialized (same RSC
+  mechanism FIX-17 fixed for `ownerUserId`) though the function returns only a clean `AvailabilityHint`.
+  Severity **low** (internal scheduling-structure ids, not user/booking/review/payment; no public
+  endpoint resolves them). **Not mechanical** — `engine-context` is shared engine infra (slots/booking);
+  a safe fix needs an audit of downstream id usage before select-tightening / FIX-17-style transient
+  handling. **Flagged** (user decision 2026-06-17), filed `🟡 RULE-12-SCHEDULE` in BACKLOG — NOT
+  expanded into FIX-18 (flag-don't-expand discipline, FIX-14/15/16/17).
+- **🔚 FINAL rule-12 statement (honest, complete — no more "and one more surfaced"):** the reviews
+  surface is **closed**. Every other public egress is **clean** OR a **documented accepted exception**
+  (booking-flow provider/service/studio ids — kept-and-documented, encoding = flagged
+  `RULE-12-BOOKING-CONTRACT-OPTIONAL`; taxonomy ids; pagination cursors). **One** new low-severity
+  undocumented leak remains: **`RULE-12-SCHEDULE`**. Rule-12 is therefore **not 100% closed**, but the
+  **complete remaining list is now known in one shot** (RULE-12-SCHEDULE + the booking-contract decision)
+  — the per-leak incremental discovery is over.
+
 `QA-105 · catalog prices + price filter (bulk-seeded providers) · 🟡 Medium
 (seed data) · repro: home "Топ мастеров" / catalog cards show "Окрашивание бровей
 хной · от 28 ₽" · expected: realistic prices · actual: bulk-seeded Service.price
@@ -882,6 +1080,46 @@ server-side — this does **not** affect any verdict below.
   load via `/_next/image?url=/portfolio-placeholders/anna-*.png` (optimized, no
   400, 0 console errors). Catalog renders without the dev hard-crash.
   `.qa/diagnostics/fix-02-live/anna-portfolio-images-load.png`. Layer 1 still open 🟡.
+
+**✅ QA-102-L1 (per-card resilience) RESOLVED — FIX-12 (2026-06-16).**
+- **Root cause path:** the shared focal/portfolio renderer `FocalImage`
+  (39 consumers — catalog card, master profile hero, studio carousel/gallery/
+  details, …) wrapped `next/image` with **no host-guard and no `onError`**.
+  Three in-scope surfaces bypassed it entirely with raw `next/image`:
+  `catalog/photo-carousel.tsx` (search-by-time result cards), `public-profile/
+  master/portfolio-strip.tsx` (grid + lightbox), `public-studio/sections/
+  photos-section.tsx`. An unconfigured-host URL → `next/image` throws at render
+  (dev: whole route; SSR profile: error boundary risk); a 404 on an allowed host
+  → broken-image icon, no fallback.
+- **Fix:** `FocalImage` is now a resilient **client** component handling BOTH
+  failure modes: (1) server-side sanitization — `isOptimizableImageSrc(src)`
+  (new client-safe `src/components/ui/image-host.ts`, mirrors `next.config`
+  `remotePatterns`) routes any unsafe host to a local placeholder **before** it
+  reaches `next/image`, so the throw can never happen (SSR or client);
+  (2) `onError` → placeholder for dead/404 URLs on an allowed host. Placeholder
+  = `/portfolio-placeholders/placeholder.svg` (new neutral asset) rendered as a
+  CSS background on a same-dimension box → no layout shift, no raw `<img>`,
+  theme-neutral. The 3 bypass surfaces were migrated onto `FocalImage`. Rule 13
+  honored — `FocalImage` + `image-host.ts` carry no server-only imports.
+- **Verified (`.qa/diagnostics/fix-12/`, both themes):**
+  - **Sub-case A — unconfigured host** (`evil.example.com`): `/u/anna-sokolova`
+    SSR **200**, **6 placeholder divs** rendered server-side, `evil` host appears
+    only in JSON-LD / OG meta / RSC data payload — **zero** in any rendered `src=`
+    / `background-image`; server log clean of "Invalid src". `/catalog` **200**,
+    Anna's card shows the placeholder while all **43** other cards render.
+  - **Sub-case B — 404 on allowed host** (`storage.yandexcloud.net/…missing`):
+    profile SSR **200** (host allowed → SSR emits `_next/image`), client `onError`
+    swaps every failed image to the placeholder; page intact.
+  - Playwright spec asserts **0** next/image "Invalid src" throws in console for
+    both surfaces. Baseline restored from `post-seed.dump` after (0 injected URLs
+    remain). 698/698 vitest + build green.
+- **🚨 Out-of-scope bypass surfaces (flagged for BACKLOG):** other public image
+  surfaces still render user-supplied URLs via raw `next/image` and should route
+  through `FocalImage` so this class can't recur — `home/{feed-card,portfolio-
+  card,stories-rail,stories-viewer-overlay,top-masters-section,recent-masters-
+  section}`, `chat/{window-header,conversation-row}` avatars, `models/[code]`,
+  `studio-booking-flow`, `crm/client-card-drawer`, `media/portfolio-editor`
+  (admin), `notifications/studio-invite-cards`.
 
 `QA-108 · ALL client pages (/login, /catalog, /u/*, booking, cabinets) · 🔴 Blocker
 (PROD-ONLY, dev-invisible) · repro: build (`npm run build`) + run the prod bundle with

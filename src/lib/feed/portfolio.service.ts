@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { decodePublicId, encodePublicId } from "@/lib/public-id";
 import { Prisma } from "@prisma/client";
 
 type PortfolioServiceOption = {
@@ -10,19 +11,22 @@ type PortfolioServiceOption = {
 };
 
 export type PortfolioFeedItem = {
+  // Rule 12 (RULE-12-REMAINDER): opaque public token, NOT the raw portfolio
+  // CUID. The read/favorite routes decode it via `decodePublicId`.
   id: string;
   mediaUrl: string;
   visualSearchReady: boolean;
   caption: string | null;
   width: number | null;
   height: number | null;
-  masterId: string;
+  // `masterId` removed (rule 12) — link via `masterPublicUsername`.
   masterName: string;
   masterPublicUsername: string | null;
   masterAvatarUrl: string | null;
   masterRatingAvg: number;
   studioName: string | null;
-  serviceIds: string[];
+  // `serviceIds` removed (rule 12) — unused publicly; the booking deep-link
+  // uses `serviceOptions[].serviceId` (booking-flow exception) on the detail.
   primaryServiceTitle: string | null;
   totalDurationMin: number;
   totalPrice: number;
@@ -342,7 +346,7 @@ export async function listPortfolioFeed(input: {
 
   const rows = await (async () => {
     try {
-      return await loadRows(input.cursor);
+      return await loadRows(input.cursor ? decodePublicId(input.cursor) : undefined);
     } catch (error) {
       if (!input.cursor || !isDeletedCursorError(error)) throw error;
       return loadRows();
@@ -362,19 +366,17 @@ export async function listPortfolioFeed(input: {
       overrides,
     });
     return {
-      id: row.id,
+      id: encodePublicId(row.id),
       mediaUrl: row.mediaUrl,
       visualSearchReady: visualReadyByUrl.get(row.mediaUrl) === true,
       caption: row.caption ?? null,
       width: row.width ?? null,
       height: row.height ?? null,
-      masterId: row.master.id,
       masterName: row.master.name,
       masterPublicUsername: row.master.publicUsername ?? null,
       masterAvatarUrl: row.master.avatarUrl ?? null,
       masterRatingAvg: row.master.ratingAvg,
       studioName: row.master.studio?.name ?? null,
-      serviceIds: snapshot.serviceIds,
       primaryServiceTitle: snapshot.primaryServiceTitle,
       totalDurationMin: snapshot.totalDurationMin,
       totalPrice: snapshot.totalPrice,
@@ -465,7 +467,7 @@ export async function listHomePortfolioFeed(input: {
 
   const rows = await (async () => {
     try {
-      return await loadRows(input.cursor);
+      return await loadRows(input.cursor ? decodePublicId(input.cursor) : undefined);
     } catch (error) {
       if (!input.cursor || !isDeletedCursorError(error)) throw error;
       return loadRows();
@@ -485,19 +487,17 @@ export async function listHomePortfolioFeed(input: {
       overrides,
     });
     return {
-      id: row.id,
+      id: encodePublicId(row.id),
       mediaUrl: row.mediaUrl,
       visualSearchReady: visualReadyByUrl.get(row.mediaUrl) === true,
       caption: row.caption ?? null,
       width: row.width ?? null,
       height: row.height ?? null,
-      masterId: row.master.id,
       masterName: row.master.name,
       masterPublicUsername: row.master.publicUsername ?? null,
       masterAvatarUrl: row.master.avatarUrl ?? null,
       masterRatingAvg: row.master.ratingAvg,
       studioName: row.master.studio?.name ?? null,
-      serviceIds: snapshot.serviceIds,
       primaryServiceTitle: snapshot.primaryServiceTitle,
       totalDurationMin: snapshot.totalDurationMin,
       totalPrice: snapshot.totalPrice,
@@ -614,7 +614,7 @@ export async function getPortfolioDetail(
       overrides: similarOverrides,
     });
     return {
-      id: similar.id,
+      id: encodePublicId(similar.id),
       mediaUrl: similar.mediaUrl,
       masterName: similar.master.name,
       totalPrice: similarSnapshot.totalPrice,
@@ -622,19 +622,17 @@ export async function getPortfolioDetail(
   });
 
   return {
-    id: item.id,
+    id: encodePublicId(item.id),
     mediaUrl: item.mediaUrl,
     visualSearchReady: visualReadyByUrl.get(item.mediaUrl) === true,
     caption: item.caption ?? null,
     width: item.width ?? null,
     height: item.height ?? null,
-    masterId: item.master.id,
     masterName: item.master.name,
     masterPublicUsername: item.master.publicUsername ?? null,
     masterAvatarUrl: item.master.avatarUrl ?? null,
     masterRatingAvg: item.master.ratingAvg,
     studioName: item.master.studio?.name ?? null,
-    serviceIds: snapshot.serviceIds,
     primaryServiceTitle: snapshot.primaryServiceTitle,
     totalDurationMin: snapshot.totalDurationMin,
     totalPrice: snapshot.totalPrice,

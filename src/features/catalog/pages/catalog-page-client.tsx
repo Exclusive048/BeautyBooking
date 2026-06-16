@@ -34,7 +34,8 @@ type TimePresetValue = "morning" | "day" | "evening";
 
 type CatalogSearchItem = {
   type: "master" | "studio";
-  id: string;
+  // QA-103: public search no longer returns the internal CUID — key off
+  // publicUsername (profile link, favorites, React key).
   publicUsername: string | null;
   title: string;
   tagline: string | null;
@@ -136,10 +137,13 @@ function pluralizeMasters(count: number): string {
 function toMapPoint(
   item: CatalogSearchItem | AvailabilitySearchData["items"][number]
 ): CatalogMapPoint | null {
-  if ("providerId" in item) {
+  // Availability (search-by-time) items are discriminated by `slots`; the
+  // catalog item has `nextSlot` (singular), not `slots`.
+  if ("slots" in item) {
     if (typeof item.geoLat !== "number" || typeof item.geoLng !== "number") return null;
     return {
-      id: item.providerId,
+      // QA/rule-12: map point key is the public username, never the CUID.
+      id: item.publicUsername ?? "",
       title: item.name,
       type: item.providerType === "STUDIO" ? "studio" : "master",
       avatarUrl: item.avatarUrl,
@@ -153,7 +157,8 @@ function toMapPoint(
 
   if (typeof item.geoLat !== "number" || typeof item.geoLng !== "number") return null;
   return {
-    id: item.id,
+    // QA-103: map point key is the public username, never the CUID.
+    id: item.publicUsername ?? "",
     title: item.title,
     type: item.type,
     avatarUrl: item.avatarUrl,
@@ -199,14 +204,14 @@ type CatalogPageClientProps = {
   visualSearchEnabled: boolean;
   /** Whether the visitor has an active session — gates the favorites toggle. */
   isAuthenticated: boolean;
-  /** Provider IDs the current user has favorited. Empty for anonymous visitors. */
-  favoriteIds: string[];
+  /** publicUsernames the current user has favorited. Empty for anonymous visitors. */
+  favoriteUsernames: string[];
 };
 
 export default function CatalogPageClient({
   visualSearchEnabled,
   isAuthenticated,
-  favoriteIds,
+  favoriteUsernames,
 }: CatalogPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -264,7 +269,7 @@ export default function CatalogPageClient({
   // O(1) lookup for `initialFavorited` per card. Memoized from the server-
   // supplied array; the catalog page is fully re-rendered on auth change so
   // we don't try to keep this set in sync after mount.
-  const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+  const favoriteSet = useMemo(() => new Set(favoriteUsernames), [favoriteUsernames]);
   const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
   const [mapSearchApplied, setMapSearchApplied] = useState(false);
   const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
@@ -816,24 +821,24 @@ export default function CatalogPageClient({
               variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
             >
               {timeModeActive
-                ? availabilityData.items.map((item) => (
+                ? availabilityData.items.map((item, index) => (
                     <motion.div
-                      key={item.providerId}
+                      key={item.publicUsername ?? index}
                       variants={reduce ? undefined : { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
                     >
                       <ProviderResultCard item={item} />
                     </motion.div>
                   ))
-                : data.items.map((item) => (
+                : data.items.map((item, index) => (
                     <motion.div
-                      key={item.id}
+                      key={item.publicUsername ?? index}
                       variants={reduce ? undefined : { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
                     >
                       <CatalogCard
                         item={item}
                         serviceQuery={serviceQuery}
                         isAuthenticated={isAuthenticated}
-                        initialFavorited={favoriteSet.has(item.id)}
+                        initialFavorited={item.publicUsername ? favoriteSet.has(item.publicUsername) : false}
                         onLoginRequired={() => setLoginModalOpen(true)}
                       />
                     </motion.div>

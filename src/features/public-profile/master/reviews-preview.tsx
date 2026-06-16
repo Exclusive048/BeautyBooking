@@ -40,7 +40,8 @@ function ReviewCard({
   currentUserId?: string | null;
   onReport?: (id: string) => void;
 }) {
-  const canReport = currentUserId && currentUserId !== review.authorId && !review.reportedAt;
+  // RULE-12-REVIEWS (FIX-18): own-review check via server-computed flag (no authorId leak).
+  const canReport = currentUserId && !review.isOwnReview && !review.reportedAt;
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -57,7 +58,7 @@ function ReviewCard({
             >
               <Flag className="h-3.5 w-3.5" aria-hidden />
             </button>
-          ) : review.reportedAt && currentUserId && currentUserId !== review.authorId ? (
+          ) : review.reportedAt && currentUserId && !review.isOwnReview ? (
             <span className="text-[10px] text-text-sec/50">{masterReviewText.reportedAt}</span>
           ) : null}
         </div>

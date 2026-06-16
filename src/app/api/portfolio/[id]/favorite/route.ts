@@ -2,6 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { togglePortfolioFavorite } from "@/lib/feed/portfolio.service";
+import { decodePublicId } from "@/lib/public-id";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 type RouteContext = {
@@ -18,7 +19,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
 
-    const result = await togglePortfolioFavorite({ portfolioId: id, userId: user.id });
+    const result = await togglePortfolioFavorite({ portfolioId: decodePublicId(id), userId: user.id });
     return jsonOk(result);
   } catch (error) {
     const appError = toAppError(error);

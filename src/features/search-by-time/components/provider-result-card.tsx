@@ -22,7 +22,7 @@ export function ProviderResultCard({ item }: Props) {
         ? `${UI_TEXT.catalog.priceFrom} ${moneyRUBFromKopeks(item.priceFrom)}`
         : UI_TEXT.catalog.priceOnRequest;
 
-  const href = providerPublicUrl({ id: item.providerId, publicUsername: item.publicUsername }, "search-result-card") ?? "#";
+  const href = providerPublicUrl({ id: item.publicUsername, publicUsername: item.publicUsername }, "search-result-card") ?? "#";
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card">
@@ -60,7 +60,7 @@ export function ProviderResultCard({ item }: Props) {
 
         <div className="text-xs text-text-sec">{UI_TEXT.catalog.timeSearch.freeInTime}</div>
         <SlotBubblesRow
-          provider={{ id: item.providerId, publicUsername: item.publicUsername }}
+          provider={{ id: item.publicUsername, publicUsername: item.publicUsername }}
           serviceId={item.service.id}
           slots={item.slots}
         />

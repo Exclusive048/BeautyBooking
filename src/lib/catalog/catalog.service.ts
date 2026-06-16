@@ -37,7 +37,10 @@ type ServiceLite = {
 
 export type CatalogProviderItem = {
   type: "master" | "studio";
-  id: string;
+  // Rule 12 (QA-103): public search NEVER emits the internal CUID `id` —
+  // it enables enumeration + exposes record identity/order. Consumers key
+  // off `publicUsername` (profile links, favorites, React keys). The
+  // pagination cursor is already opaque (encodeCursor base64url).
   publicUsername: string | null;
   title: string;
   tagline: string | null;
@@ -711,7 +714,6 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
 
     return {
       type: provider.type === ProviderType.STUDIO ? "studio" : "master",
-      id: provider.id,
       publicUsername: provider.publicUsername ?? null,
       title: provider.name,
       tagline: provider.tagline?.trim() || null,

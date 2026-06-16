@@ -47,8 +47,8 @@ export function ServicesSectionClient({ services, bundles, initialServiceId }: P
             <h2 className="font-display text-lg text-text-main">{T.heading}</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {bundles.map((bundle) => (
-              <BundleCard key={bundle.id} bundle={bundle} />
+            {bundles.map((bundle, index) => (
+              <BundleCard key={`${bundle.name}-${index}`} bundle={bundle} />
             ))}
           </div>
         </section>

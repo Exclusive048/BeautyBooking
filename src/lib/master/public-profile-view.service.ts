@@ -26,7 +26,8 @@ import { logError } from "@/lib/logging/logger";
  */
 
 export type PublicBundleView = {
-  id: string;
+  // Rule 12 (RULE-12-PROVIDERS): no internal package CUID on the public profile —
+  // the bundle is display-only (no per-bundle action keyed by id).
   name: string;
   serviceNames: string[];
   totalDurationMin: number;
@@ -73,11 +74,14 @@ export const getMasterPublicProfileView = cache(
     }
     if (provider.type !== "MASTER") return null;
 
-    const [ownerRow, packages] = await Promise.all([
+    // Rule 12 (RULE-12-OWNERUSERID-RSC, FIX-17): the serialized row must carry
+    // NO internal user CUID. `ownerUserId` is needed only as a server-side arg
+    // for `getCurrentPlan`, so it's fetched separately into a local primitive
+    // below — never kept on a row that crosses into the RSC flight payload.
+    const [ownerMeta, packages] = await Promise.all([
       prisma.provider.findUnique({
         where: { id: provider.id },
         select: {
-          ownerUserId: true,
           createdAt: true,
           slotStepMin: true,
           // QA-115: studio affiliation (studioId references the studio's provider row).
@@ -87,9 +91,15 @@ export const getMasterPublicProfileView = cache(
       prisma.servicePackage.findMany({
         where: { masterId: provider.id, isEnabled: true },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-        include: {
+        // Rule 12 (RULE-12-PROVIDERS): explicit select — the bundle mapping only
+        // needs name/discount + items; never expose the raw row's internal
+        // CUIDs/timestamps (id, masterId, createdAt, updatedAt) to the client.
+        select: {
+          name: true,
+          discountType: true,
+          discountValue: true,
           items: {
-            include: {
+            select: {
               service: {
                 select: {
                   id: true,
@@ -107,8 +117,16 @@ export const getMasterPublicProfileView = cache(
       }),
     ]);
 
-    const ownerUserId = ownerRow?.ownerUserId ?? null;
-    const createdAt = ownerRow?.createdAt ?? null;
+    // Transient primitive — the intermediate row is discarded immediately, so
+    // the owner UserProfile CUID never persists on an object that reaches flight.
+    const ownerUserId =
+      (
+        await prisma.provider.findUnique({
+          where: { id: provider.id },
+          select: { ownerUserId: true },
+        })
+      )?.ownerUserId ?? null;
+    const createdAt = ownerMeta?.createdAt ?? null;
 
     const [planInfo, availability] = await Promise.all([
       ownerUserId
@@ -117,7 +135,7 @@ export const getMasterPublicProfileView = cache(
       computeAvailabilityHint(
         provider.id,
         provider.timezone,
-        normalizeSlotStepMin(ownerRow?.slotStepMin),
+        normalizeSlotStepMin(ownerMeta?.slotStepMin),
       ),
     ]);
 
@@ -141,7 +159,6 @@ export const getMasterPublicProfileView = cache(
         );
         const hasDisabledComponent = items.some((item) => !item.service.isEnabled);
         return {
-          id: pkg.id,
           name: pkg.name,
           serviceNames,
           totalDurationMin,
@@ -155,7 +172,6 @@ export const getMasterPublicProfileView = cache(
       })
       .filter((bundle) => !bundle.hasDisabledComponent)
       .map((bundle): PublicBundleView => ({
-        id: bundle.id,
         name: bundle.name,
         serviceNames: bundle.serviceNames,
         totalDurationMin: bundle.totalDurationMin,
@@ -172,7 +188,7 @@ export const getMasterPublicProfileView = cache(
 
     // QA-115: only expose a public link when the studio is published + has a
     // public username; otherwise show the name without a link (no CUID leak).
-    const studioRow = ownerRow?.studio ?? null;
+    const studioRow = ownerMeta?.studio ?? null;
     const studio = studioRow
       ? {
           name: studioRow.name,

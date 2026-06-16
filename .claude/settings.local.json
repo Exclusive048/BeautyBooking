@@ -143,7 +143,27 @@
       "Bash(curl -s -o /dev/null -w \"login=%{http_code}\\\\n\" http://localhost:3000/login)",
       "Bash(taskkill //F //PID 28424)",
       "Bash(PORT=3000 npm run *)",
-      "Bash(QA_BASE_URL=http://localhost:3000 npx playwright test .qa/specs/client/booking-happy-path.spec.ts)"
+      "Bash(QA_BASE_URL=http://localhost:3000 npx playwright test .qa/specs/client/booking-happy-path.spec.ts)",
+      "Bash(curl -s \"http://localhost:3000/api/catalog/search?city=moscow\" -o /tmp/cat_api.json -w \"status=%{http_code} bytes=%{size_download}\\\\n\")",
+      "Read(//tmp/**)",
+      "Bash(python -c \"import json;d=json.load\\(open\\('/tmp/cat_api.json'\\)\\);items=d.get\\('data',{}\\).get\\('items',d.get\\('items',[]\\)\\);print\\('items:',len\\(items\\)\\); print\\('anna idx:', next\\(\\(i for i,x in enumerate\\(items\\) if 'anna' in str\\(x.get\\('username',''\\)\\)+str\\(x.get\\('title',''\\)\\)\\),'not-found'\\)\\)\")",
+      "Bash(curl -s -o /tmp/prof_a.html -w \"status=%{http_code} bytes=%{size_download}\\\\n\" \"http://localhost:3000/u/anna-sokolova\")",
+      "Bash(echo \"restore exit=$?\")",
+      "Bash(powershell.exe -NoProfile -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(powershell.exe -NoProfile -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1; \\(Get-Process node -ErrorAction SilentlyContinue|Measure-Object\\).Count\")",
+      "Bash(echo \"restore exit=$?; providers=$\\(docker exec masterryadom-db sh -c 'PGPASSWORD=master123 psql -U master -d masterryadom -tAc \"select count\\(*\\) from \\\\\"Provider\\\\\";\"'\\)\")",
+      "Bash(FIX13_OUT=.qa/diagnostics/fix-13 npx playwright test fix-13 --reporter=list)",
+      "Bash(curl -s \"http://localhost:3000/api/feed/stories\" -o .qa/diagnostics/fix-15/stories-feed.json -w \"status=%{http_code} bytes=%{size_download}\\\\n\")",
+      "Bash(PYTHONUTF8=1 python -c ' *)",
+      "Bash(curl -s \"http://localhost:3000/u/vision-studio\" -o /dev/null -w \"studio profile status=%{http_code}\\\\n\")",
+      "Bash(curl -s \"http://localhost:3000/u/anna-sokolova\" -o .qa/diagnostics/fix-17/after.html -w \"status=%{http_code} bytes=%{size_download}\\\\n\")",
+      "Bash(grep -oE 'cm[a-z0-9]{22,}' .qa/diagnostics/fix-17/after.html)",
+      "Bash(echo \"dev started pid $!\")",
+      "Bash(awk '/export function toReviewDto/,/^}/' src/lib/reviews/types.ts)",
+      "Bash(awk '/const reviewInclude/,/^};/' src/lib/reviews/service.ts)",
+      "Bash(curl -s 'http://localhost:3000/api/reviews?targetType=provider&targetId=__CMDSUB_OUTPUT__&limit=3&offset=0')",
+      "Bash(curl -s -o /dev/null -w \"anon report POST: %{http_code}\\\\n\" -X POST \"http://localhost:3000/api/reviews/e_Y21xZm15aDIwMDFjbHZsZmtmeXN4aGE4bg/report\" -H \"Content-Type: application/json\" -d '{\"reason\":\"SPAM\"}')",
+      "Bash(curl -s -o /dev/null -w 'anon report POST \\(raw id\\): %{http_code}\\\\n' -X POST http://localhost:3000/api/reviews/__CMDSUB_OUTPUT__/report -H 'Content-Type: application/json' -d '{\"reason\":\"SPAM\"}')"
     ]
   }
 }

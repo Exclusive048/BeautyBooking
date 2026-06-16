@@ -5,6 +5,7 @@ import { FooterCTA } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
 import { FooterSocials } from "@/components/layout/footer/FooterSocials";
+import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const APP_ROOT = path.join(process.cwd(), "src", "app");
@@ -31,8 +32,8 @@ function buildFooterLinks() {
 
   const clients: FooterLinkItem[] = [
     { label: UI_TEXT.footer.links.howToBook, href: "/how-to-book" },
-    { label: UI_TEXT.footer.links.popularServices, href: "/catalog?sort=popular" },
-    { label: UI_TEXT.footer.links.mastersNearby, href: "/catalog?available=today" },
+    { label: UI_TEXT.footer.links.popularServices, href: buildCatalogUrl({ sort: "popular" }) },
+    { label: UI_TEXT.footer.links.mastersNearby, href: buildCatalogUrl({ availableToday: true }) },
     { label: UI_TEXT.footer.links.offersForModels, href: "/models" },
   ];
 
