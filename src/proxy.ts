@@ -253,6 +253,12 @@ export async function proxy(request: NextRequest) {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "object-src 'none'",
+    // FIX-24 (Item 2a): the Telegram Login widget renders its button as an
+    // <iframe> from oauth.telegram.org. default-src 'self' (the frame fallback)
+    // blocked it → telegram login/connect dead in prod. Scoped to the exact
+    // host only (keeps same-origin frames; no wildcard). VK uses a top-level
+    // redirect (no frame), so it needs nothing here.
+    "frame-src 'self' https://oauth.telegram.org",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https:`,
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",

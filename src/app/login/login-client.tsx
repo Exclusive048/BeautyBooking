@@ -205,6 +205,16 @@ export default function LoginClient({
 }: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
+  // FIX-23: the Telegram widget now uses redirect mode (`data-auth-url`) to
+  // avoid the CSP `unsafe-eval`; auth failures bounce back here with
+  // `?error=telegram`, surfaced once on mount via the initial error state.
+  const initialTelegramError = useMemo(
+    () =>
+      (searchParams.get("error") ?? "").startsWith("telegram")
+        ? UI_TEXT.auth.telegram.loginFailed
+        : null,
+    [searchParams],
+  );
   const reduce = useReducedMotion();
   const panelAnim = reduce ? undefined : panelVariants;
   const panelItemAnim = reduce ? undefined : panelItemVariants;
@@ -216,7 +226,7 @@ export default function LoginClient({
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"input" | "code">("input");
   const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
+  const [errorText, setErrorText] = useState<string | null>(initialTelegramError);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);

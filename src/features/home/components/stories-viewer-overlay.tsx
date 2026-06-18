@@ -10,11 +10,11 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { useStoriesViewer, type ViewerState } from "@/features/home/stories-viewer-context";
 import { markItemViewed } from "@/features/home/stories-viewed-storage";
 import type { StoriesGroup, StoryItem } from "@/features/home/types/stories";
@@ -243,11 +243,11 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
                 transition={{ duration: reduceMotion ? 0 : 0.15 }}
                 className="absolute inset-0"
               >
-                <Image
+                <FocalImage
                   src={item.mediaUrl}
                   alt=""
-                  fill
                   sizes="(max-width: 768px) 100vw, 480px"
+                  fit="contain"
                   className="object-contain"
                   priority
                   onLoad={() => {
@@ -331,10 +331,9 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
           >
             <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full ring-2 ring-white/40 transition group-hover:ring-white">
               {group.avatarUrl ? (
-                <Image
+                <FocalImage
                   src={group.avatarUrl}
                   alt=""
-                  fill
                   sizes="32px"
                   className="object-cover"
                 />

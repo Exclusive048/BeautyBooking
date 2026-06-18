@@ -24,6 +24,8 @@ import { FocalImage } from "@/components/ui/focal-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type {
   ClientBookingDTO,
   ClientBookingsPayload,
@@ -197,7 +199,7 @@ function KpiCards({
           {T.kpiUpcoming}
         </div>
         <div className="mt-1 font-display text-base text-text-main">
-          {isLoading ? "—" : next ? formatRelativeDateTime(next.whenIso) : "—"}
+          {isLoading ? "—" : next ? formatRelativeDateTime(next.whenIso, next.timeZone) : "—"}
         </div>
         {next ? (
           <div className="mt-0.5 truncate text-xs text-text-sec">
@@ -315,13 +317,29 @@ function BookingRow({
   onReschedule: () => void;
   onReview: () => void;
 }) {
+  // QA-107/FIX-22: the time is shown in the SALON's timezone everywhere; show
+  // the explicit «(город, GMT+N)» label only when the viewer's zone differs
+  // (same-zone case stays clean).
+  const viewerTz = useViewerTimeZoneContext();
+  const salonTz = booking.provider.timezone;
+  const showZone =
+    !!booking.startAtUtc &&
+    zonesDifferForViewer({
+      iso: booking.startAtUtc,
+      salonTimeZone: salonTz,
+      viewerTimeZone: viewerTz,
+    });
+  const zoneLabel = showZone
+    ? formatZoneLabel({ iso: booking.startAtUtc, timeZone: salonTz })
+    : "";
+
   return (
     <Card
       className={`flex flex-col gap-4 p-4 transition sm:flex-row sm:items-start ${
         booking.isToday ? "border-primary/40 ring-1 ring-primary/20" : ""
       }`}
     >
-      <DateBadge isoStart={booking.startAtUtc} highlight={booking.isToday} />
+      <DateBadge isoStart={booking.startAtUtc} timezone={salonTz} highlight={booking.isToday} />
 
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -332,6 +350,15 @@ function BookingRow({
         </div>
 
         <div className="font-semibold text-text-main">{booking.service.name}</div>
+
+        {zoneLabel ? (
+          <div className="flex items-center gap-1 text-xs font-medium text-primary">
+            <Calendar className="h-3 w-3 shrink-0" aria-hidden />
+            <span>
+              {T.salonTimeNote} {zoneLabel}
+            </span>
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-2 text-sm text-text-sec">
           {booking.provider.avatarUrl ? (
@@ -372,9 +399,11 @@ function BookingRow({
 
 function DateBadge({
   isoStart,
+  timezone,
   highlight,
 }: {
   isoStart: string | null;
+  timezone: string;
   highlight: boolean;
 }) {
   if (!isoStart) {
@@ -384,12 +413,18 @@ function DateBadge({
       </div>
     );
   }
+  // QA-107/FIX-22: render in the SALON's timezone (not the viewer's host tz).
   const d = new Date(isoStart);
-  const month = d.toLocaleString("ru-RU", { month: "short" }).toUpperCase().replace(".", "");
-  const day = d.getDate();
+  const month = d
+    .toLocaleString("ru-RU", { month: "short", timeZone: timezone })
+    .toUpperCase()
+    .replace(".", "");
+  const day = d.toLocaleString("ru-RU", { day: "numeric", timeZone: timezone });
   const time = d.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
+    timeZone: timezone,
   });
   return (
     <div
@@ -641,24 +676,26 @@ function BookingsListSkeleton() {
 
 /* -------------------------------------------------------------------------- */
 
-function formatRelativeDateTime(iso: string): string {
+// FIX-20 (Item 2): format the «Ближайшая» tile in the SALON timezone — both the
+// time AND the «Сегодня»/«Завтра» relative day are computed in `timeZone`, so the
+// tile matches the list row's salon-tz time (one number per booking, QA-107).
+function formatRelativeDateTime(iso: string, timeZone: string): string {
   const d = new Date(iso);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const dayAfter = new Date(today);
-  dayAfter.setDate(today.getDate() + 2);
-
   const time = d.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
+  // Salon-tz date key (en-CA → YYYY-MM-DD) for relative-day comparison.
+  const dayKey = (date: Date) => date.toLocaleDateString("en-CA", { timeZone });
+  const now = new Date();
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const bookingKey = dayKey(d);
 
-  if (d >= today && d < tomorrow) return `Сегодня, ${time}`;
-  if (d >= tomorrow && d < dayAfter) return `Завтра, ${time}`;
+  if (bookingKey === dayKey(now)) return `Сегодня, ${time}`;
+  if (bookingKey === dayKey(tomorrow)) return `Завтра, ${time}`;
   return (
-    d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) +
+    d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone }) +
     ", " +
     time
   );

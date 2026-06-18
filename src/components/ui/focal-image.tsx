@@ -24,6 +24,21 @@ type FocalImageProps = {
   quality?: number;
   priority?: boolean;
   loading?: "lazy" | "eager";
+  /**
+   * Skip `next/image` optimization (serves the raw URL). Mirrors the
+   * `next/image` `unoptimized` flag — used where a caller deliberately wants
+   * the original bytes (e.g. a full-screen lightbox view).
+   */
+  unoptimized?: boolean;
+  /** Forwarded to `next/image` (e.g. story viewer marks an item viewed). */
+  onLoad?: () => void;
+  /**
+   * Object-fit of the PLACEHOLDER fallback only. The real image's object-fit
+   * stays driven by `className` (as before) so existing callers are unchanged;
+   * `fit` keeps the fallback faithful for `object-contain` surfaces. Default
+   * `"cover"` preserves prior behaviour.
+   */
+  fit?: "cover" | "contain";
   className?: string;
   style?: CSSProperties;
   /** Override the local placeholder shown when the image is unavailable. */
@@ -80,6 +95,9 @@ export function FocalImage({
   quality,
   priority,
   loading,
+  unoptimized,
+  onLoad,
+  fit = "cover",
   className,
   style,
   fallbackSrc,
@@ -95,7 +113,7 @@ export function FocalImage({
     const fallbackStyle: CSSProperties = {
       ...style,
       backgroundImage: `url("${placeholder}")`,
-      backgroundSize: "cover",
+      backgroundSize: fit,
       backgroundPosition: objectPosition,
       backgroundRepeat: "no-repeat",
     };
@@ -133,9 +151,11 @@ export function FocalImage({
         quality={quality}
         priority={priority}
         loading={loading}
+        unoptimized={unoptimized}
         className={className}
         style={combinedStyle}
         onError={() => setErrored(true)}
+        onLoad={onLoad}
       />
     );
   }
@@ -149,9 +169,11 @@ export function FocalImage({
       quality={quality}
       priority={priority}
       loading={loading}
+      unoptimized={unoptimized}
       className={className}
       style={combinedStyle}
       onError={() => setErrored(true)}
+      onLoad={onLoad}
     />
   );
 }

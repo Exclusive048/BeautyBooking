@@ -188,7 +188,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <SWRProvider>
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <ViewerTimeZoneProvider>
             <DevServiceWorkerReset />
             <NetworkBanner />

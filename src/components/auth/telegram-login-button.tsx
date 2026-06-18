@@ -1,20 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
-import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { env } from "@/lib/env";
-
-type TelegramAuthUser = {
-  id: number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: number;
-  hash: string;
-};
 
 type TelegramLoginButtonProps = {
   iconOnly?: boolean;
@@ -32,12 +21,6 @@ type TelegramLoginButtonProps = {
   botUsername?: string;
 };
 
-declare global {
-  interface Window {
-    onTelegramAuth?: (user: TelegramAuthUser) => void;
-  }
-}
-
 function TelegramIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -54,40 +37,12 @@ export default function TelegramLoginButton({
 }: TelegramLoginButtonProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didInitRef = useRef(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   // QA-001: prefer the server-passed prop (deterministic across SSR/CSR); fall
   // back to env only for callers that don't pass it.
   const botUsername =
     botUsernameProp !== undefined ? botUsernameProp : env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
   const label = UI_TEXT.auth.telegram.loginButton;
-
-  useEffect(() => {
-    if (window.onTelegramAuth) return;
-
-    window.onTelegramAuth = async (user: TelegramAuthUser) => {
-      setErrorText(null);
-      setLoading(true);
-      try {
-        const res = await fetch("/api/auth/telegram/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(user),
-        });
-
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ redirect: string }> | null;
-        if (!res.ok || !json || !json.ok) {
-          setErrorText(json && !json.ok ? json.error.message : UI_TEXT.auth.telegram.loginFailed);
-          return;
-        }
-
-        window.location.assign(json.data.redirect);
-      } finally {
-        setLoading(false);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!botUsername) return;
@@ -102,7 +57,13 @@ export default function TelegramLoginButton({
     script.setAttribute("data-telegram-login", botUsername);
     script.setAttribute("data-size", "large");
     script.setAttribute("data-userpic", "false");
-    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+    // FIX-23 (CSP unsafe-eval): redirect mode (`data-auth-url`) instead of the
+    // callback mode (`data-onauth`). `data-onauth` makes telegram-widget.js
+    // compile the callback string via `new Function`/`eval` at widget-init —
+    // the prod-only `unsafe-eval` pageerror on /login under strict-dynamic CSP.
+    // In redirect mode the widget navigates to this GET callback with the
+    // signed auth params; the server verifies the HMAC and issues the session.
+    script.setAttribute("data-auth-url", "/api/auth/telegram/login");
     containerRef.current.appendChild(script);
   }, [botUsername]);
 
@@ -123,13 +84,13 @@ export default function TelegramLoginButton({
     <button
       type="button"
       onClick={botUsername ? handleClick : undefined}
-      disabled={!botUsername || loading}
+      disabled={!botUsername}
       aria-label={label}
       title={botUsername ? label : UI_TEXT.auth.telegram.botNotConfigured}
       className={cn(className, !botUsername && "opacity-50")}
     >
       <TelegramIcon className="h-5 w-5 text-[#2AABEE]" />
-      <span className="sr-only">{loading ? UI_TEXT.common.loading : label}</span>
+      <span className="sr-only">{label}</span>
     </button>
   );
 
@@ -167,15 +128,12 @@ export default function TelegramLoginButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={loading}
         aria-label={label}
         className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border-subtle/80 bg-bg-input px-4 text-sm font-medium text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/45 disabled:pointer-events-none disabled:opacity-50"
       >
         <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
-        {loading ? UI_TEXT.common.loading : label}
+        {label}
       </button>
-
-      {errorText ? <div className="text-center text-xs text-red-500">{errorText}</div> : null}
     </div>
   );
 }

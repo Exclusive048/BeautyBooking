@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { moneyRUBPlainFromKopeks } from "@/lib/format";
@@ -25,7 +25,7 @@ function formatDate(dateStr: string): string {
 function AvatarCircle({ name, url }: { name: string; url: string | null }) {
   if (url) {
     return (
-      <Image
+      <FocalImage
         src={url}
         alt={name}
         width={48}

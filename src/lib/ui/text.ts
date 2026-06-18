@@ -5078,6 +5078,7 @@ export const UI_TEXT = {
       actionRebook: "Повторить",
       actionContact: "Связаться",
       monthHeading: "{month}",
+      salonTimeNote: "Время салона",
       empty: "Записей пока нет — самое время найти мастера.",
       emptyCta: "Открыть каталог",
       cancelConfirmTitle: "Отменить запись?",
@@ -7184,7 +7185,11 @@ export const UI_TEXT = {
       freeCancelHint: "Мы напомним о записи",
     },
     errors: {
-      slotTaken: "Это время только что заняли. Выберите другое.",
+      // FIX-25 (QA-106): SLOT_CONFLICT covers both "taken" and off-schedule
+      // (outside working hours / day-off) — the old «только что заняли» falsely
+      // implied someone took it. Plain "not available, pick another" reads
+      // correctly for both.
+      slotTaken: "Это время недоступно для записи. Выберите другое свободное окно.",
       tooSoon: "Запись возможна не раньше чем за {hours} ч. Выберите время позже.",
       tooFar: "Запись возможна не далее чем на {days} дней вперёд.",
       newClientsClosed: "Мастер временно не принимает новых клиентов.",

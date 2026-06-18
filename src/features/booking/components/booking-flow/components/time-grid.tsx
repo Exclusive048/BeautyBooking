@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
@@ -50,6 +52,22 @@ export function TimeGrid({
   const [slots, setSlots] = useState<BookingFlowSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const viewerTz = useViewerTimeZoneContext();
+
+  // QA-107/FIX-22: slot times are the SALON's local time. When the viewer's
+  // zone differs, surface the explicit «(город, GMT+N)» label next to the time
+  // header so they read the times against the salon's clock, not their own. Use
+  // a real slot instant for a DST-correct offset.
+  const refInstant = slots[0]?.startAtUtc ?? null;
+  const zoneLabel =
+    refInstant &&
+    zonesDifferForViewer({
+      iso: refInstant,
+      salonTimeZone: providerTimezone,
+      viewerTimeZone: viewerTz,
+    })
+      ? formatZoneLabel({ iso: refInstant, timeZone: providerTimezone })
+      : "";
 
   const loadSlots = useCallback(async () => {
     setLoading(true);
@@ -111,8 +129,11 @@ export function TimeGrid({
 
   return (
     <div>
-      <div className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-sec">
-        {T.timeLabel}
+      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-medium uppercase tracking-wider text-text-sec">
+        <span>{T.timeLabel}</span>
+        {zoneLabel ? (
+          <span className="font-mono normal-case text-primary">{zoneLabel}</span>
+        ) : null}
       </div>
       {loading ? (
         <div className="grid grid-cols-3 gap-1.5">

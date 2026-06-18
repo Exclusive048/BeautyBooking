@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { FocalImage } from "@/components/ui/focal-image";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { Star } from "lucide-react";
@@ -37,10 +37,9 @@ export function FeedCard({ item, index }: Props) {
       className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle/60 bg-bg-card shadow-card transition-shadow duration-200 hover:shadow-hover"
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-        <Image
+        <FocalImage
           src={item.mediaUrl}
           alt={altText}
-          fill
           sizes="(min-width: 1024px) 33vw, (min-width: 768px) 33vw, 50vw"
           className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
           priority={index < 3}

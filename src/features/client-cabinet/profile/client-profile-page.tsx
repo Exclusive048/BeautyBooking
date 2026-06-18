@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import {
   Calendar,
@@ -52,6 +53,24 @@ const fetcher = (url: string) =>
     return json.data as ProfileDTO;
   });
 
+type TelegramConnectToast = { tone: "success" | "error"; text: string };
+
+// FIX-24 (Item 2b): map the redirect-mode connect result (`?telegram=…`) to a toast.
+function telegramConnectResult(value: string | null): TelegramConnectToast | null {
+  switch (value) {
+    case "connected":
+      return { tone: "success", text: "Telegram подключён." };
+    case "conflict":
+      return { tone: "error", text: "Этот Telegram-аккаунт уже привязан к другому пользователю." };
+    case "unconfigured":
+      return { tone: "error", text: "Подключение Telegram временно недоступно. Попробуйте позже." };
+    case "error":
+      return { tone: "error", text: "Не удалось подключить Telegram. Попробуйте ещё раз." };
+    default:
+      return null;
+  }
+}
+
 export function ClientProfilePage({ userId }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
@@ -60,6 +79,24 @@ export function ClientProfilePage({ userId }: Props) {
   const [stubMessage, setStubMessage] = useState<string | null>(null);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [tgModalOpen, setTgModalOpen] = useState(false);
+
+  // FIX-24 (Item 2b): the Telegram connect flow is now a redirect that lands
+  // back here with `?telegram=<result>`. Read it once on mount, surface a toast,
+  // and strip the param so a refresh doesn't re-show it (replaceState only — no
+  // setState in the effect). The connected state itself re-renders from fresh
+  // SSR/SWR data after the full-navigation round-trip.
+  const searchParams = useSearchParams();
+  const [tgResult, setTgResult] = useState(() =>
+    telegramConnectResult(searchParams.get("telegram")),
+  );
+  const tgUrlCleaned = useRef(false);
+  useEffect(() => {
+    if (tgUrlCleaned.current) return;
+    tgUrlCleaned.current = true;
+    if (searchParams.get("telegram")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [searchParams]);
 
   const { status, scheduleSave } = useProfileAutosave({
     onSaved: (next) => {
@@ -170,6 +207,26 @@ export function ClientProfilePage({ userId }: Props) {
               type="button"
               onClick={() => setStubMessage(null)}
               className="ml-3 text-text-sec hover:text-text-main"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
+
+        {tgResult ? (
+          <div
+            role="status"
+            className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border px-4 py-2 text-sm shadow-card ${
+              tgResult.tone === "success"
+                ? "border-emerald-300/60 bg-emerald-50/90 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-950/40 dark:text-emerald-200"
+                : "border-rose-300/60 bg-rose-50/90 text-rose-800 dark:border-rose-400/30 dark:bg-rose-950/40 dark:text-rose-200"
+            }`}
+          >
+            {tgResult.text}
+            <button
+              type="button"
+              onClick={() => setTgResult(null)}
+              className="ml-3 opacity-70 hover:opacity-100"
             >
               ×
             </button>

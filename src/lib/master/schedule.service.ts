@@ -2,7 +2,7 @@ import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
-import { getLocalTimeParts } from "@/lib/schedule/timezone";
+import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
   addWeeks,
@@ -216,8 +216,6 @@ export const getMasterScheduleWeek = cache(
   async (input: { masterId: string; weekStart: Date; now?: Date }): Promise<ScheduleWeekData> => {
     const now = input.now ?? new Date();
     const weekEnd = addWeeks(input.weekStart, 1);
-    const weekDays = getWeekDays(input.weekStart, now);
-    const todayIso = toIsoDateKey(now);
 
     const master = await prisma.provider.findUnique({
       where: { id: input.masterId },
@@ -226,6 +224,14 @@ export const getMasterScheduleWeek = cache(
     if (!master) {
       throw new Error(`Master not found: ${input.masterId}`);
     }
+
+    // FIX-20 (QA-123): day-grouping + "today" computed in the MASTER's own
+    // timezone, not the host process tz. On a UTC prod host, a booking in the
+    // master's early-morning hours (east of UTC) otherwise lands in the previous
+    // UTC day column. The vertical offset already uses master.timezone (FIX-11);
+    // this is the sibling day-grouping axis. Slot generation is untouched.
+    const todayIso = toLocalDateKey(now, master.timezone);
+    const weekDays = getWeekDays(input.weekStart, now, todayIso);
 
     // Day plans, bookings, and time blocks all in one parallel batch.
     const ctx = await ScheduleEngine.createContext({
@@ -301,15 +307,14 @@ export const getMasterScheduleWeek = cache(
       if (row.clientUserId) visitCountByClient.set(row.clientUserId, row._count._all);
     }
 
-    // Group bookings by day iso. We assume booking startAt and the week-day
-    // share the same calendar day in the master timezone — for an MVP this
-    // is the same boundary the seed data uses, so timezone subtleties don't
-    // bite. Production callers running in foreign locales will want the
-    // master.timezone applied via Intl.DateTimeFormat here.
+    // Group bookings by day iso in the MASTER's own timezone (FIX-20/QA-123) —
+    // `toLocalDateKey(startAtUtc, master.timezone)` so the column is correct on
+    // a UTC host for an east-of-UTC master (was a host-tz `toIsoDateKey`).
     const bookingsByDay = new Map<string, ScheduleBookingItem[]>();
     for (const row of bookingRows) {
       if (!row.startAtUtc || !row.endAtUtc) continue;
-      const iso = toIsoDateKey(row.startAtUtc);
+      // FIX-20 (QA-123): group by the booking's day in the MASTER's tz.
+      const iso = toLocalDateKey(row.startAtUtc, master.timezone);
       const visitCount = row.clientUserId
         ? visitCountByClient.get(row.clientUserId) ?? 0
         : 0;
@@ -340,7 +345,8 @@ export const getMasterScheduleWeek = cache(
 
     const timeBlocksByDay = new Map<string, ScheduleTimeBlockItem[]>();
     for (const row of timeBlockRows) {
-      const iso = toIsoDateKey(row.startAt);
+      // FIX-20 (QA-123): group by the block's day in the MASTER's tz.
+      const iso = toLocalDateKey(row.startAt, master.timezone);
       const item: ScheduleTimeBlockItem = {
         id: row.id,
         type: row.type as "BREAK" | "BLOCK",

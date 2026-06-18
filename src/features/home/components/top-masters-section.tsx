@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { FocalImage } from "@/components/ui/focal-image";
 import { searchCatalog, type CatalogProviderItem } from "@/lib/catalog/catalog.service";
 import { logError } from "@/lib/logging/logger";
 import { providerPublicUrl } from "@/lib/public-urls";
@@ -65,18 +65,16 @@ function MasterCard({ master }: { master: TopMaster }) {
         {/* Cover photo */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
           {master.photo ? (
-            <Image
+            <FocalImage
               src={master.photo}
               alt={master.title}
-              fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
           ) : master.avatarUrl ? (
-            <Image
+            <FocalImage
               src={master.avatarUrl}
               alt={master.title}
-              fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />

@@ -1,6 +1,7 @@
 import { BookingStatus, type ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
@@ -42,6 +43,9 @@ export type ClientBookingDTO = {
     publicUsername: string | null;
     type: ProviderType;
     avatarUrl: string | null;
+    /** QA-107/FIX-22: salon (entity) timezone — client surfaces render the time
+     * in THIS zone, never the viewer's host tz, with an explicit zone label. */
+    timezone: string;
   };
   service: {
     id: string;
@@ -57,6 +61,9 @@ export type ClientBookingsKpi = {
     whenIso: string;
     providerName: string;
     serviceName: string;
+    // FIX-20 (Item 2): salon tz so the «Ближайшая» tile renders the salon-tz
+    // time + relative day (matching the list), not the viewer/host tz.
+    timeZone: string;
   } | null;
   finishedCount: number;
   spentLast90dKopeks: number;
@@ -66,18 +73,6 @@ export type ClientBookingsPayload = {
   bookings: ClientBookingDTO[];
   kpi: ClientBookingsKpi;
 };
-
-function startOfTodayUtc(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfTodayUtc(): Date {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
 
 function statusGroup(status: BookingStatus): "upcoming" | "finished" | "cancelled" {
   if (FINISHED_STATUSES.includes(status)) return "finished";
@@ -90,8 +85,6 @@ export async function listClientBookings(
   filter: ClientBookingFilter = {},
 ): Promise<ClientBookingsPayload> {
   const now = new Date();
-  const todayStart = startOfTodayUtc();
-  const todayEnd = endOfTodayUtc();
   const fourteenDaysAgo = new Date(Date.now() - FOURTEEN_DAYS_MS);
   const ninetyDaysAgo = new Date(Date.now() - NINETY_DAYS_MS);
 
@@ -117,6 +110,7 @@ export async function listClientBookings(
           type: true,
           avatarUrl: true,
           address: true,
+          timezone: true,
         },
       },
       masterProvider: {
@@ -127,6 +121,7 @@ export async function listClientBookings(
           type: true,
           avatarUrl: true,
           address: true,
+          timezone: true,
         },
       },
       serviceItems: {
@@ -157,11 +152,16 @@ export async function listClientBookings(
     // master who'll actually do the work — fall back to the studio provider
     // when no master is assigned yet (NEW/PENDING).
     const displayProvider = r.masterProvider ?? r.provider;
+    // Salon tz of the master who'll do the work (falls back to the booked
+    // provider). Drives QA-107 salon-tz rendering + zone label.
+    const salonTz = displayProvider.timezone ?? r.provider.timezone;
     const start = r.startAtUtc;
     const end = r.endAtUtc;
     const group = statusGroup(r.status);
+    // FIX-20 (Item 2): "today" in the SALON's tz (not host/server tz) so the
+    // «Сегодня» badge/highlight matches the salon-tz time shown in the list.
     const isToday =
-      !!start && start.getTime() >= todayStart.getTime() && start.getTime() <= todayEnd.getTime();
+      !!start && toLocalDateKey(start, salonTz) === toLocalDateKey(now, salonTz);
     const serviceItem = r.serviceItems[0];
     const titleSnapshot = serviceItem?.titleSnapshot ?? r.service.name;
     const priceSnapshot = serviceItem?.priceSnapshot ?? r.service.price;
@@ -198,6 +198,7 @@ export async function listClientBookings(
         publicUsername: displayProvider.publicUsername,
         type: displayProvider.type,
         avatarUrl: displayProvider.avatarUrl,
+        timezone: salonTz,
       },
       service: {
         id: r.service.id,
@@ -262,6 +263,7 @@ export async function listClientBookings(
         whenIso: upcomingDtos[0].startAtUtc!,
         providerName: upcomingDtos[0].provider.name,
         serviceName: upcomingDtos[0].service.name,
+        timeZone: upcomingDtos[0].provider.timezone,
       }
     : null;
 

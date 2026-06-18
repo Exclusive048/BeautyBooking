@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -33,21 +32,26 @@ export default function VkLoginButton({ iconOnly = false, className, enabled }: 
 
   const label = UI_TEXT.auth.vk.loginButton;
 
+  // FIX-24 (Item 3): plain <a>, NOT next/link. `/api/auth/vk/start` 302s to
+  // id.vk.ru — a next/link RSC-prefetches it (cross-origin fetch → CORS error),
+  // and a client-side nav can't follow the external redirect. A plain anchor
+  // does a top-level browser navigation that follows the redirect cleanly and
+  // is never prefetched.
   if (iconOnly) {
     return (
-      <Link href="/api/auth/vk/start" aria-label={label} title={label} className={cn(className)}>
+      <a href="/api/auth/vk/start" aria-label={label} title={label} className={cn(className)}>
         <VkIcon className="h-5 w-5 text-[#0077FF]" />
         <span className="sr-only">{label}</span>
-      </Link>
+      </a>
     );
   }
 
   return (
     <Button asChild variant="secondary" size="lg" className="w-full gap-2">
-      <Link href="/api/auth/vk/start" aria-label={label}>
+      <a href="/api/auth/vk/start" aria-label={label}>
         <VkIcon className="h-4 w-4 text-[#0077FF]" />
         {label}
-      </Link>
+      </a>
     </Button>
   );
 }

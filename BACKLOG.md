@@ -23,6 +23,16 @@
 - 🔬 **Фоновый трек:** TEST-COVERAGE-A завершён (358/358 tests; +84 новых). Следующее фоновое — BOOKING-ENFORCEMENT после QA Этапа 2.1, потом multi-recipient notif после notif QA
 - 🚀 **Перед launch:** проработать 🔴 PRE-LAUNCH BLOCKERS ниже (SMS gateway, deployment, monitoring, complaint model)
 
+> 🏁 **Pre-launch self-QA campaign CLOSED (FIX-25, 2026-06-18).** FIX-01…FIX-25 done. Full findings ledger
+> (fixed / documented dev-only / flagged-residual / deploy-checklist / deliberate non-action) is in
+> [`QA-FINDINGS.md`](QA-FINDINGS.md) → **«🏁 CAMPAIGN-CLOSURE LEDGER»**. Highlights this final pass (FIX-25):
+> QA-106 off-schedule UI copy ✅ (UI_TEXT); QA-101 (jest-worker 500s) + QA-117 (dev latency) → ✅ **documented
+> dev-only, prod 200 confirmed, no code change**; legacy sweep → **3 proven-orphan deletions** (old studio
+> `studio-clients-page` / `studio-reviews-page` / `studio-profile-page`), the named `studio-services-page` /
+> `moneyRUBPlain` / `@deprecated` candidates **left (still imported) + flagged**. **Remaining before launch is
+> operational, not code:** deploy-env (VK redirect_uri/domain, live social-auth creds, SMS creds) + DevOps
+> infra (Postgres/TLS/backups/rollback) + 🔵 residuals (`STUDIO-SCHEDULE-UTC-DAY-GROUPING`, `FOOTER-VK-HANDLE-FIX`).
+
 > Детальный changelog всех 50+ коммитов — в [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15**. История выполненного в этом файле — внизу, в виде краткого хронологического индекса.
 
 ---
@@ -367,6 +377,9 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 > (ties into PROD-BUILD-SMOKE-SUBSET above). Route-specificity makes QA-101 very
 > likely a genuine module-graph defect, not dev flakiness.
 
+- ✅ **QA-101 — CLOSED dev-only (FIX-25, 2026-06-18). No code change.** Re-confirmed on the current prod
+  build (`next start`): `/u/[username]` 200, `/u/[username]/booking` 200, `/api/public/providers/[id]/slots`
+  200 with real slot data. Definitively a DEV jest-worker artifact, not a prod defect. History ⤵
 - 🔵 **QA-101 — slot/availability engine 500s — PROD-DIAGNOSED 2026-06-13 → DOWNGRADED 🔴→🔵 (DEV-ONLY).**
   Original dev symptom: every `/u/[username]`, `/u/[username]/booking`, and
   `/api/public/providers/[id]/slots` returned **500** in `npm run dev` (5/5 masters),
@@ -456,15 +469,38 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   with 6 placeholder divs, evil host only in JSON-LD/OG/RSC-payload (0 in rendered src),
   `/catalog` 200 with Anna's card placeholder + 43 others render; B) 404-on-allowed-host →
   client `onError` swaps to placeholder. Baseline restored after. 698/698 tests + build green.
-- 🟡 **IMG-RESILIENCE-SWEEP — route remaining public image surfaces through `FocalImage`
-  (spawned by FIX-12, QA-102-L1).** So the unconfigured/dead-host class can't recur, the
-  surfaces still rendering user-supplied URLs via raw `next/image` should adopt the resilient
-  `FocalImage`: `home/{feed-card,portfolio-card,stories-rail,stories-viewer-overlay,
-  top-masters-section,recent-masters-section}`, `chat/{window-header,conversation-row}` avatars,
-  `models/[code]`, `studio-booking-flow`, `crm/client-card-drawer`, `media/portfolio-editor`
-  (admin), `notifications/studio-invite-cards`. Mechanical per-file migration; out of QA-102-L1
-  scope (catalog/profile/portfolio) but same bug class. Not launch-blocking (real prod hosts are
-  S3/configured), но closes the class structurally.
+- ✅ **IMG-RESILIENCE-SWEEP — Выполнено (FIX-21, 2026-06-17): remaining user-URL image
+  surfaces routed through the resilient `FocalImage`; broken-host class closed for all
+  remote-URL surfaces.** Audit-first per surface (NOT mechanical): `FocalImage` gained 3
+  backward-compatible props — `onLoad` (story viewer marks-viewed), `unoptimized` (portfolio
+  lightbox full-res), `fit` cover|contain default cover (keeps the placeholder faithful for
+  `object-contain` surfaces; real-image fit stays className-driven). **Migrated (15 files):**
+  home `{feed-card, portfolio-card×2, stories-rail, stories-viewer-overlay×2 [main photo
+  object-contain+onLoad; header avatar], top-masters-section[SERVER], recent-masters-section}`,
+  chat `{window-header, conversation-row}` avatars, `models/[code][SERVER]` avatar,
+  `crm/client-card-drawer` photos, `media/portfolio-editor` `{grid thumb; lightbox
+  object-contain+unoptimized}`, `notifications/studio-invite-cards` avatar, plus raw-`<img>`
+  conversions `master/portfolio/portfolio-card` + `profile/.../portfolio-readonly-section`
+  (→ fill; button/Link already define the box) + `model-offers/application-photos` (→ fixed
+  64×64; dropped its `no-img-element` eslint-disable). Each surface keeps its **exact** treatment
+  (crop/fit/aspect/rounding/size) — only the failure-path placeholder is added. **Flagged & NOT
+  migrated (would regress / wrong class):** `studio-booking-flow` reference preview + `crop-picker`
+  + chat `composer` + portfolio `upload-modal` + `visual-search-modal` query img are `blob:`/`data:`
+  **local previews** (`isOptimizableImageSrc` rejects → would force the placeholder); `chat/message-bubble`
+  attachment is **intentionally raw** (cookie-auth token URL — `next/image` would strip the token; it
+  already has its own `onError`/`onLoad` fallback). **Coverage:** every public/remote-URL image surface
+  now routes through `FocalImage`; the only remaining raw `<img>` are the local-blob previews + the
+  token-auth chat attachment (both correctly outside the remote-host class). **Verified:** typecheck ✅,
+  lint baseline preserved (1 err/3 warn, all pre-existing, none in touched files), encoding/mojibake ✅,
+  710/710 vitest (+7 new `image-host.test.ts` locking the host-guard contract), `npm run build` ✅
+  (238/238 pages; migrated SERVER components render the client `FocalImage` with no RSC-boundary break).
+  Live visual (`.qa/diagnostics/fix-21/`, both themes): `/catalog` (shared `FocalImage`) renders real
+  seeded images optimized via `/_next/image`, 0 spurious placeholders; resilience injection on a live
+  `FocalImage` (`onError` fire) → swapped to placeholder div, route stayed interactive; `/models/[code]`
+  SERVER component renders (the 1 console error is a pre-existing unrelated `icon=` RSC warning). Cover/
+  fixed migrations are pixel-equivalent **by construction** (same `<Image>` rendered, only `onError`
+  added); auth-gated surfaces (chat/crm/portfolio-editor/notifications/master cabinet) verified via
+  build+typecheck+construction, not screenshot. Not launch-blocking (real prod hosts are S3/configured).
 - ✅ **FIX-10 — Выполнено (2026-06-16): three quick wins + a FIX-09 regression catch.**
   (1) **Maps-key "typo" = false alarm** — dotenv parses `KEY = value` fine; key already inlined (4 chunks);
   runtime-verified /catalog fires `api-maps…&apikey=b9f5c172…`; tracked templates already correct; normalized
@@ -506,6 +542,45 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   from literal `process.env.NEXT_PUBLIC_X` refs so every client consumer (push-manager, catalog-map,
   telegram-connect-modal) gets real values — own prompt. **New observation:** `/login` prod CSP
   `unsafe-eval` pageerror (non-blocking, login works) — separate CSP/eval pass. Original finding ⤵
+- ✅ **CSP `unsafe-eval` on /login — ВЫПОЛНЕНО (FIX-23, 2026-06-17). Approach: eval ELIMINATED
+  (not weakened CSP).** Source-confirmed culprit = the embedded Telegram widget: `data-onauth`
+  makes `telegram-widget.js` compile the callback string via `new Function`/`eval` (`__parseFunction`)
+  at widget-init → blocked under strict-dynamic (`script-src` has no unsafe-eval). **Fix:** widget now
+  uses **`data-auth-url` (redirect mode)** — the eval-free branch — with a new **GET callback** at
+  `/api/auth/telegram/login` that verifies the **same HMAC hash** + issues the session (identical
+  auth guarantees to the POST path). CSP left fully strict (no `unsafe-eval` added anywhere). Files:
+  `telegram-login-button.tsx`, `api/auth/telegram/login/route.ts`, `login-client.tsx`. **Prod-verified**
+  (`next start` :3001): live /login console = 0 unsafe-eval + 0 hydration #418 (QA-001 stays green),
+  all auth buttons render, login works E2E (phone OTP → /cabinet/profile). Captures `.qa/diagnostics/fix-23/csp/`.
+  **🚨 Other prod-only CSP violations found (last-pass candidates, NOT fixed):** (1) inline theme
+  no-flash IIFE (root layout) lacks the nonce → blocked **app-wide** (`/login:31`); (2) framing
+  `oauth.telegram.org` blocked by `default-src` (no `frame-src`) → telegram widget iframe button
+  can't render → telegram login non-functional in prod (pre-existing, independent of this fix);
+  (3) VK start prefetch to `id.vk.ru` CORS-blocked + stale `beautyhub.art` redirect_uri; (4) **2nd
+  surface:** `telegram-connect-modal` (cabinet profile) still uses `data-onauth` → same latent
+  `unsafe-eval` there — same `data-auth-url`/redirect remediation applies if that flow is reworked.
+- ✅ **Prod CSP + social-auth cluster — ВЫПОЛНЕНО (FIX-24, 2026-06-18). All 4 items above closed,
+  verified on a real prod build (`next start`). CSP kept strict (only `frame-src` scoped to the
+  telegram host; no wildcard, no `unsafe-eval`).**
+  - **Item 1 (theme nonce, 🔴 app-wide):** the unnonced inline script was **next-themes'** no-flash
+    script → `<ThemeProvider nonce={nonce}>` (next-themes 0.4.6 supports `nonce`). Prod: 0 unnonced
+    inline scripts on /login + / + /cabinet/profile; dark stays dark on refresh (no FOUC), both themes.
+  - **Item 2a (frame-src, 🔴):** `frame-src 'self' https://oauth.telegram.org` in `src/proxy.ts` —
+    scoped to the exact host; telegram widget iframe now renders (login + connect).
+  - **Item 2b (connect eval, 🔴):** connect-modal `data-onauth` → `data-auth-url` + **new GET on
+    `/api/auth/telegram/link`** that links to the **existing** session (connect path, not login) +
+    redirects `/cabinet/profile?telegram=<result>` (profile surfaces a toast). Prod: modal opens with
+    0 console errors (eval gone); LOGIN + CONNECT callbacks proven E2E with a crafted valid HMAC
+    (→ session created / → `?telegram=connected`); UI phone-OTP login still works E2E.
+  - **Item 3 (VK, 🔴) + stale domain:** VK button `next/link` → plain `<a>` (no RSC prefetch of the
+    API route → CORS gone; top-level nav follows the 302). `redirect_uri` read **verbatim from env**;
+    stale `beautyhub.art` lives ONLY in `.env`/`.env.local` (gitignored) — **0 `beautyhub.art` in
+    tracked code/config**. → **🚩 DEPLOY-CHECKLIST: set `VK_ID_REDIRECT_URI` + `APP_PUBLIC_URL` to the
+    current domain (`мастеррядом.online`)** before launch; live VK round-trip needs registered creds
+    (deploy QA). Code verified via local override (correct redirect_uri shape, no CORS).
+  - Files: `theme-provider.tsx`, `layout.tsx`, `proxy.ts`, `telegram-connect-modal.tsx`,
+    `api/auth/telegram/link/route.ts`, `client-profile-page.tsx`, `vk-login-button.tsx`. Captures
+    `.qa/diagnostics/fix-24/`.
 - 🟡 **QA-001 — login hydration mismatch — PROD VERDICT CORRECTED (2026-06-14, after FIX-01): reproduces in prod.**
   The QA-03 read ("dev-only, 0 hydration errors in prod") was **wrong** — QA-108's
   `process.exit` crash was killing the page *before* React could finish hydrating, so the
@@ -726,7 +801,13 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   master + studio schedule editors, both themes, UTC vs MSK pixel-diff <0.18% (only top-nav chrome / moving now-line;
   grid region 0.00–0.13%). 698/698 vitest + build green. Studio grid was already host-independent (pure UTC `getTime()`
   deltas in `time-grid.ts`) — confirmed by screenshot, no change needed.
-  **🚨 Related (out of QA-113 scope, flagged for QA-107):** the sibling **day-grouping** key `schedule-utils.ts
+  **✅ Sibling day-grouping (QA-123) CLOSED — FIX-20 Item 1 (2026-06-18):** `schedule.service.ts` now groups
+  bookings/time-blocks + "today" via `toLocalDateKey(date, master.timezone)` (was host-tz `toIsoDateKey`);
+  `getWeekDays` gained a master-tz `todayIsoOverride`. Slot generation untouched (engine range left as a
+  calendar-date boundary). Prod-verified host-independent (TZ=UTC ≡ TZ=MSK) + salon-correct via a synthetic
+  near-Almaty-midnight instant. **Studio schedule FLAGGED, not changed** — it uses UTC-based `toDateKey`
+  (host-independent, NOT the host-tz bug); studio-tz alignment = separate `STUDIO-SCHEDULE-UTC-DAY-GROUPING`
+  (🔵 below). _Original flag ⤵:_ the sibling **day-grouping** key `schedule-utils.ts
   toIsoDateKey` (`getFullYear/Month/Date`) is host-tz too, governing *which day column* a booking lands in (a different
   axis from vertical offset). Per-viewer/entity tz day-grouping rolls into the larger **QA-107** per-viewer-TZ effort;
   not fixed in FIX-11 to keep scope on positioning.
@@ -756,6 +837,7 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   fix surface is unchanged (server-side `Date.get*` sites). Evidence: `.qa/diagnostics/qa07-tz-utc/`.
   **✅ QA-09 adds admin to the family:** the `/admin` dashboard LIVE-feed timestamps + 7-day chart date
   labels are server-formatted → shift on a UTC host like the rest. No booking integrity → stays 🟠.
+- ✅ **QA-117 — CLOSED documented dev-only (FIX-25, 2026-06-18). No code change** (dev compile-latency, prod unaffected). History ⤵
 - 🔵 **QA-117 — admin/reviews "Все" tab slow first-render in dev (NOT a defect).** Found QA-09.
   Reading `/admin/reviews?tab=all` within ~1.5s shows only "Загрузить ещё" (no cards); clicking it
   advanced the cursor to an empty "Нет отзывов" state. Root cause = dev slow-first-compile of the
@@ -825,13 +907,27 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
   already 1–7. Verified: fresh re-seed → only weekday 1–7, and Sunday renders day-off (public slots
   API: Sun 0 slots, Tue/Sat slots present, no off-by-one). Note: `reset.ts` doesn't clear
   WeeklyScheduleConfig (Provider survives via `ownerUserId` SetNull) → reseed-over-existing leaves stale
-  weekday-0; fresh DB is clean. Original finding ⤵
+  weekday-0; fresh DB is clean. **✅ This reset.ts gap CLOSED — FIX-20 Item 3 (2026-06-18):** reset now
+  deletes seed-owned providers explicitly (cascades schedule config) + a clean `post-seed.dump` baseline
+  was regenerated (old → `post-seed.pre-fix20.dump`); reseed → 1–7 only, no weekday-0, 43 config ↔ 43
+  providers. Original finding ⤵
 - 🔵 **QA-116 — WeeklyScheduleDay weekday convention drift (seed vs engine).** Found QA-08. Seed
   (seed-providers.ts) writes `weekday` **0–6 (0=Sun)**; engine + apply path use **ISO 1–7 (7=Sun)**
   (`engine-context.ts:90`, `unified.ts:162`). Benign for the standard Mon–Sat/Sun-off pattern (1–6
   align; Sunday-off coincides with engine default-off) and rows migrate to 1–7 on first
   applyScheduleSnapshot/approval. Latent risk only if a seed master worked Sundays. No current impact;
   seed should emit 1–7. covered-by-test: no.
+- 🔵 **STUDIO-SCHEDULE-UTC-DAY-GROUPING (flagged by FIX-20 Item 1, 2026-06-18).** The studio schedule view
+  (`studio-cabinet/schedule/server/schedule-data.service.ts` + `lib/time-grid.ts toDateKey`) groups bookings
+  into day columns by **UTC day** (`getUTCFullYear/Month/Date`, week offset via UTC `getTime()` deltas,
+  `isSameUtcDay`). This is host-**independent** (deterministic — NOT the FIX-11/host-tz bug that FIX-20 fixed
+  for the master view), so it was intentionally left unchanged. But it is also NOT studio-tz-aligned: for a
+  studio east of UTC (e.g. Almaty +5/+6), a booking in the early studio-local morning (previous UTC day) lands
+  in the previous day column / the single-day view's UTC `[startOfUtcDay, +24h)` window misses it. Aligning it
+  to studio tz is a larger rework of the UTC-day boundary + query model (parseDateKey → UTC midnight, the day
+  query range, the week offset, isToday) — separate from FIX-20's targeted `toIsoDateKey` swap. Per the QA-107
+  model (client-facing times are salon-tz), the studio self-view day-grouping should likely be studio-tz too.
+  Not launch-blocking (deterministic + the common-hours case is correct). covered-by-test: no.
 - ✅ **QA-08 closed the QA-06 approval loop + verified two priority areas (both PASS):**
   (1) **Approval loop works** — studio admin surfaces pending requests (nav badge + list, the QA-114
   admin-side counterpart that the master side lacks), approve applies correctly to the master's live
@@ -862,23 +958,50 @@ All cabinet studio surfaces shipped: shell + dashboard + masters + schedule + bo
 - 🔵 **QA-112 — master dashboard KPI copy/calc oddities.** "Записей сегодня 3 из 0ч" (day-capacity
   denominator computed as 0ч) + "Выручка сегодня … vs прошлая суббота" (comparison baseline is last
   Saturday on a Monday). Cosmetic; dashboard otherwise correct. May be partly TZ-related.
-- 🟠 **QA-107 — per-viewer-city timezone rendering NOT implemented (multi-zone RU+KZ market).**
-  Intended model: store UTC (✓ rule 8) + render each time in the VIEWING user's TZ derived from their
-  profile city/address. Reality (QA-05): client-side surfaces use `getViewerTimeZone()` = the
-  **browser** Intl TZ (fallback Europe/Moscow), NOT the viewer's profile city; server-side labels use
-  the **server process** TZ (→ QA-113). Neither is profile-city-derived. So an Almaty master / Moscow
-  client see times based on browser/host, not their city. Data is fine (Anna's `timezone=Asia/Almaty`
-  matches her Almaty address; her `cityId` is NULL though). Single feature item; all per-surface TZ
-  observations roll up here. Pre-launch 🟠 candidate (wrong times across timezones erode booking trust).
-  (Note: this supersedes the earlier assumption that surfaces render in the provider's fixed TZ — they
-  don't; they render in browser/host TZ.) **QA-06:** Marina's data also consistent
-  (`timezone=Asia/Almaty` ↔ Almaty address "ул. Жибек Жолы, Алмалинский район"; `cityId` NULL) — no
-  data mismatch for either seeded Almaty master. The discrete-bug trigger (timezone≠city) has not appeared.
-  **QA-10 (client side):** Elena sees the 12:00 UTC Almaty-salon booking as "15:00" (MSK browser TZ) across
-  bookings/chat — confirms client surfaces use browser TZ. Also: **Elena has NO city/address set**
-  (`UserProfile.address` NULL; there's no `city` column — the profile "Город" field maps to `address`), so
-  even once per-viewer-city TZ ships, this client would fall back to browser/default TZ. Reinforces that the
-  feature needs a sensible fallback when the viewer's city is empty.
+- ✅ **QA-107 — Выполнено (FIX-22, 2026-06-17): salon-city timezone + explicit zone label, uniform.**
+  **Product decision (Artem) pivoted the model** from the originally-assumed "per-viewer-city TZ" to:
+  client-facing appointment times are shown in the **salon's (entity) timezone** — NEVER silently
+  converted to the viewer's zone — annotated with an explicit **«(город, GMT+N)»** label, as ONE
+  uniform rule across slot picker / confirmation / «Мои записи» / reminders. Rationale: appointments are
+  physical/in-person, so the salon's wall clock is the single source of truth; showing viewer-local time
+  risks missed visits across zones. Store UTC (rule 8 ✓), render in entity tz, append the label.
+  - **Centralized helper** [`src/lib/ui/zone-label.ts`](src/lib/ui/zone-label.ts) — single source of truth:
+    `getZoneOffsetMinutes` (DST-aware via `Intl` `longOffset`, computed for the appointment instant),
+    `formatGmtOffset` (GMT+5 / GMT+5:30 / GMT / GMT-3), `formatZoneLabel({iso,timeZone,city?})` →
+    «(Алматы, GMT+5)» | «(GMT+5)», `zonesDifferForViewer` (emphasis decision). `TZ_CITY_RU` map (bounded
+    RU/CIS set) gives the city **uniformly per tz** so the SAME booking shows the SAME label everywhere,
+    with offset-only fallback for unmapped tz and an optional explicit-`city` override. 12 node-safe vitest.
+  - **Fixed a real bug:** «Мои записи» `DateBadge` (+ `group-by-month`) rendered the month/day/time in the
+    **viewer's host/browser tz** (`new Date().getDate()/toLocaleTimeString` with no `timeZone`) → wrong
+    day/time for every cross-zone viewer. Now renders in `provider.timezone` (threaded into `ClientBookingDTO`).
+  - **Label added** to slot picker (`time-grid` header, emphasized only when viewer tz ≠ salon tz),
+    confirmation (`success-phase`), and **server-side reminders** (`booking-notifications.formatDateLabel`,
+    always shown — no viewer context). `summary-block` left unlabeled (same flow already labels the time-grid).
+  - **Verified:** 🔴 engine-safety — public slots over 14 days under `TZ=UTC` vs `TZ=Europe/Moscow` are
+    **byte-identical (same SHA256)** → render/label-only, slot generation untouched. Live cross-zone
+    (`.qa/diagnostics/fix-22/`, both themes): viewer=Moscow + salon=Yekaterinburg → slot times stay
+    **10:00–18:00 salon-local** (NOT converted to Moscow 08:00) with «(Екатеринбург, GMT+5)» shown; viewer=Moscow
+    + salon=Moscow → **no label** (clean). typecheck/lint-baseline/encoding/mojibake/**722 vitest**/build all green.
+  - **Uniformity** holds by construction — all four surfaces call the SAME `formatZoneLabel` with the SAME
+    `provider.timezone`. Slot picker live-proven; confirmation/«Мои записи»/reminders share the identical
+    helper+tz (code+typecheck-verified; a logged-in screenshot of «Мои записи» + a sent reminder are residual
+    manual-QA). **Note on the city label:** it's the timezone's representative RU city (zone identity, uniform
+    by construction) — the salon's exact address/city is shown separately; switching the label to the exact
+    `Provider.city.name` is a low-risk follow-up (the helper already takes an explicit `city`).
+  - ✅ **Residual flag CLOSED — FIX-20 Item 2 (2026-06-18).** `ClientBookingDTO.isToday` now computes in
+    the **salon (provider) tz** (`toLocalDateKey(start, salonTz)` vs now); the «Ближайшая» KPI tile carries
+    the salon `timeZone` and `formatRelativeDateTime(iso, timeZone)` renders the time + «Сегодня»/«Завтра»
+    in salon tz. **Prod-verified (viewer Europe/Moscow browser, salon Asia/Almaty):** tile = «21 июн., 17:00»
+    (salon) matching the list row's 17:00 + «Время салона (Алматы, GMT+5)», not the Moscow-viewer 15:00 —
+    both themes. (QA-123 Item 1 + reset.ts Item 3 also done in FIX-20.) _Original flag ⤵_
+  - **Residual flag (NOT in QA-107 scope) → was FOLD INTO FIX-20 (next to QA-123).** `ClientBookingDTO.isToday`
+    is still computed in host/server tz (`setHours` on server) — same **day-grouping-by-tz** class as QA-123
+    (`schedule-utils.ts toIsoDateKey` host-tz day-column key). Both should be fixed together in **FIX-20**
+    (QA-123 + `reset.ts` + this isToday residual). **Live evidence (FIX-23 pass, prod, viewer Москва / salon
+    Almaty GMT+5, booking 12:00 UTC):** the «Мои записи» list row correctly shows salon **17:00 (Алматы, GMT+5)**,
+    but the **«Ближайшая» KPI tile + day-group header** render host/viewer-tz **«Сегодня, 15:00»** (Moscow), not
+    salon 17:00 — exactly this residual. Display tz on the list/reminder is correct (QA-107 closed); isToday /
+    nearest-tile / day-grouping salon-tz-awareness is the FIX-20 follow-up.
 - ℹ️ **Booking-policy enforcement status (corrected 2026-06-13, QA-02/03).** Earlier notes
   implied the `Provider` booking-rules fields were "not enforced". **Corrected:**
   `minBookingHoursAhead` + `maxBookingDaysAhead` **ARE enforced** on the create path —

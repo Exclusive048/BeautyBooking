@@ -1,3 +1,5 @@
+import { NextResponse, type NextRequest } from "next/server";
+
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -106,5 +108,85 @@ export async function POST(req: Request) {
       });
     }
     return jsonFail(appError.status, appError.message, appError.code, appError.details);
+  }
+}
+
+const CABINET_PROFILE_PATH = "/cabinet/profile";
+
+/**
+ * FIX-24 (Item 2b) — redirect-mode Telegram CONNECT callback.
+ *
+ * The cabinet `telegram-connect-modal` is switched from `data-onauth` (which
+ * makes telegram-widget.js compile the callback string via `new Function`/`eval`
+ * at widget-init — the same prod CSP `unsafe-eval` FIX-23 removed from /login)
+ * to `data-auth-url` pointing here. **Connect ≠ login:** this links Telegram to
+ * the ALREADY-authenticated caller (no session rotation) — it must NOT call the
+ * login path. The widget navigates the cabinet here with the signed params; we
+ * verify the same HMAC hash + freshness, link to the session user, and redirect
+ * back to the profile with a `?telegram=<result>` flag the page surfaces.
+ */
+export async function GET(req: NextRequest) {
+  const backToProfile = (result: string) =>
+    NextResponse.redirect(new URL(`${CABINET_PROFILE_PATH}?telegram=${result}`, req.url));
+
+  try {
+    const user = await getSessionUser();
+    if (!user) {
+      // Connect requires an existing session; bounce to login if it's gone.
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    const params = new URL(req.url).searchParams;
+    const parsed = telegramLoginSchema.safeParse({
+      id: params.get("id"),
+      first_name: params.get("first_name"),
+      last_name: params.get("last_name") ?? undefined,
+      username: params.get("username") ?? undefined,
+      photo_url: params.get("photo_url") ?? undefined,
+      auth_date: params.get("auth_date"),
+      hash: params.get("hash"),
+    });
+    if (!parsed.success) return backToProfile("error");
+    const body = parsed.data;
+
+    const botToken = env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) return backToProfile("unconfigured");
+    if (!verifyTelegramLogin(body, botToken)) return backToProfile("error");
+    if (!isAuthDateFresh(body.auth_date, Math.floor(Date.now() / 1000))) {
+      return backToProfile("error");
+    }
+
+    const telegramId = String(body.id);
+    const otherOwner = await prisma.userProfile.findFirst({
+      where: { telegramId, id: { not: user.id } },
+      select: { id: true },
+    });
+    if (otherOwner) return backToProfile("conflict");
+
+    const linked = new Date();
+    await prisma.$transaction([
+      prisma.userProfile.update({
+        where: { id: user.id },
+        data: { telegramId, telegramUsername: body.username ?? null },
+      }),
+      prisma.telegramLink.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, telegramUserId: telegramId, isEnabled: true, linkedAt: linked },
+        update: { telegramUserId: telegramId, isEnabled: true, linkedAt: linked },
+      }),
+    ]);
+
+    logInfo("Telegram link completed (redirect)", { userId: user.id, telegramId });
+    return backToProfile("connected");
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.status >= 500) {
+      logError("GET /api/auth/telegram/link failed", {
+        requestId: getRequestId(req),
+        route: "GET /api/auth/telegram/link",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return backToProfile("error");
   }
 }

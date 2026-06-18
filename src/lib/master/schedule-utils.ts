@@ -82,9 +82,20 @@ export function parseWeekStart(value: string | undefined): Date {
   return startOfDay(dt);
 }
 
-/** Build the seven `WeekDay` rows for a given Monday-aligned `weekStart`. */
-export function getWeekDays(weekStart: Date, now: Date = new Date()): WeekDay[] {
-  const todayIso = toIsoDateKey(startOfDay(now));
+/**
+ * Build the seven `WeekDay` rows for a given Monday-aligned `weekStart`.
+ *
+ * FIX-20 (QA-123): `todayIsoOverride` lets the caller pass "today" computed in
+ * the **entity's own timezone** (via `toLocalDateKey(now, master.timezone)`) so
+ * the `isToday` column highlight is correct on a UTC host for a master east of
+ * UTC. Without it, "today" falls back to the host-tz calendar day.
+ */
+export function getWeekDays(
+  weekStart: Date,
+  now: Date = new Date(),
+  todayIsoOverride?: string,
+): WeekDay[] {
+  const todayIso = todayIsoOverride ?? toIsoDateKey(startOfDay(now));
   const days: WeekDay[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);

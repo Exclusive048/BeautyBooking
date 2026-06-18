@@ -1,7 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { Camera, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { cn } from "@/lib/cn";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -59,10 +59,11 @@ export function PortfolioReadonlySection({ data }: Props) {
               href="/cabinet/master/portfolio"
               className="relative block h-full w-full overflow-hidden rounded-xl bg-bg-input transition-shadow hover:shadow-card"
             >
-              <img
+              <FocalImage
                 src={item.mediaUrl}
                 alt=""
-                className="h-full w-full object-cover"
+                className="object-cover"
+                sizes="(min-width: 640px) 16vw, 33vw"
                 loading="lazy"
               />
               {!item.isPublic ? (

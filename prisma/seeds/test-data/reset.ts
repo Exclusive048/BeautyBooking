@@ -8,9 +8,17 @@ import {
 /**
  * Delete every UserProfile created by the test-data seed, identified by
  * email domain, the generic phone prefix, OR any showcase phone prefix.
- * Cascade FKs on UserProfile (Provider → MasterProfile / Studio / Service
- * / Booking / UserSubscription / Review / UserFavorite) wipe out
- * everything that depended on those rows.
+ *
+ * FIX-20 (Item 3): `Provider.ownerUserId` and `Studio.ownerUserId` are
+ * `onDelete: SetNull` — so deleting the seed users does NOT delete their
+ * providers; it ORPHANS them (ownerUserId → null). Their `WeeklyScheduleConfig`
+ * / `WeeklyScheduleDay` / templates / services / bookings then SURVIVE a reseed
+ * (this previously left a stale weekday-0 row that masked a bug). So we now
+ * delete the seed-owned **providers** explicitly first — that cascades
+ * `WeeklyScheduleConfig`→`WeeklyScheduleDay`, `ScheduleTemplate`→breaks,
+ * `ScheduleOverride`, `ScheduleBreak`, `Service`, `Studio`→memberships. Booking
+ * has a Restrict FK on `serviceId`, so seed-provider bookings are cleared before
+ * the provider cascade removes their services.
  *
  * After SEED-CONSOLIDATION-A the OR clause also covers the four
  * showcase phone prefixes (+79991/+79992/+79993/+79994) so the reset
@@ -44,9 +52,34 @@ async function main() {
     return;
   }
 
-  console.log(`Deleting ${seedUsers.length} seed users (cascade clears related rows)...`);
+  const seedUserIds = seedUsers.map((u) => u.id);
+
+  // FIX-20 (Item 3): delete seed-owned providers explicitly (ownerUserId is
+  // SetNull, so a user delete would orphan them and leave their schedule config
+  // behind). Clear seed-provider bookings first (Booking.serviceId is Restrict),
+  // then the providers — that cascades schedule config / services / studios.
+  const seedProviderIds = (
+    await prisma.provider.findMany({
+      where: { ownerUserId: { in: seedUserIds } },
+      select: { id: true },
+    })
+  ).map((p) => p.id);
+
+  if (seedProviderIds.length > 0) {
+    const bookings = await prisma.booking.deleteMany({
+      where: { providerId: { in: seedProviderIds } },
+    });
+    const providers = await prisma.provider.deleteMany({
+      where: { id: { in: seedProviderIds } },
+    });
+    console.log(
+      `Cleared ${bookings.count} bookings + deleted ${providers.count} seed providers (cascade clears schedule config / services / studios).`,
+    );
+  }
+
+  console.log(`Deleting ${seedUsers.length} seed users (cascade clears remaining related rows)...`);
   const deleted = await prisma.userProfile.deleteMany({
-    where: { id: { in: seedUsers.map((u) => u.id) } },
+    where: { id: { in: seedUserIds } },
   });
   console.log(`Done. Deleted ${deleted.count} users.`);
   await prisma.$disconnect();
