@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { Lock, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { cn } from "@/lib/cn";
 import type { HotSlotsDto } from "@/lib/schedule/editor-shared";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -64,16 +63,16 @@ export function HotSlotsSection({ hotSlots, onChange, isLocked }: Props) {
           </span>
         </div>
         <h2 className="mt-2 font-display text-lg text-text-sec">{T.title}</h2>
-        <p className="mt-1 max-w-prose text-sm text-text-sec">{T.body}</p>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-input px-2.5 py-1 text-xs text-text-sec">
-            <Lock className="h-3 w-3" aria-hidden />
-            {T.locked}
-          </span>
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link href="/cabinet/billing">{T.lockedCta}</Link>
-          </Button>
-        </div>
+        <FeatureGate
+          feature="hotSlots"
+          scope="MASTER"
+          available={false}
+          variant="inline"
+          description={T.body}
+          className="mt-3"
+        >
+          <span aria-hidden />
+        </FeatureGate>
       </section>
     );
   }

@@ -1,4 +1,5 @@
 import { Smartphone } from "lucide-react";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -6,6 +7,7 @@ import { SectionCard } from "../section-card";
 import type { StudioNotificationsData } from "../../lib/types";
 
 const T = UI_TEXT.studioCabinet.settingsV2.notifications;
+const FG = UI_TEXT.billing.featureGate;
 
 type Props = {
   data: StudioNotificationsData;
@@ -54,11 +56,25 @@ export function NotificationsSection({ data }: Props) {
       </SectionCard>
 
       <SectionCard title={T.telegramTitle} description={T.telegramDesc}>
-        <TelegramNotificationsSection embedded />
+        <FeatureGate
+          feature="tgNotifications"
+          scope="STUDIO"
+          variant="inline"
+          description={FG.telegramLocked}
+        >
+          <TelegramNotificationsSection embedded />
+        </FeatureGate>
       </SectionCard>
 
       <SectionCard title={T.vkTitle} description={T.vkDesc}>
-        <VkNotificationsSection embedded />
+        <FeatureGate
+          feature="vkNotifications"
+          scope="STUDIO"
+          variant="inline"
+          description={FG.vkLocked}
+        >
+          <VkNotificationsSection embedded />
+        </FeatureGate>
       </SectionCard>
     </div>
   );

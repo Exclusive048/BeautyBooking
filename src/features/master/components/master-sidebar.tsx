@@ -17,12 +17,10 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { LockBadge } from "@/components/billing/PaywallCard";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { MasterUserChip } from "@/features/master/components/master-user-chip";
 import { NavGroup } from "@/features/master/components/nav-group";
-import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Counts = {
@@ -86,8 +84,6 @@ type NavItem = {
   badge?: number;
   badgeAriaLabel?: string;
   target?: "_blank";
-  /** Optional billing feature that gates this entry — falls back to lock badge when missing. */
-  featureKey?: "analytics_dashboard";
   /** Override the path used for the «active» highlight match. Useful
    * when `href` deep-links into a default sub-page (e.g. `/account/
    * notifications`) but the highlight should stay on regardless of
@@ -110,13 +106,9 @@ export function MasterSidebar({
   publicUsername,
 }: Props) {
   const pathname = usePathname();
-  const plan = usePlanFeatures("MASTER");
 
   const renderItem = (item: NavItem) => {
     const active = isActive(pathname, item.activeMatch ?? item.href, item.exact);
-    const locked = item.featureKey
-      ? !plan.can(item.featureKey) && !plan.loading
-      : false;
 
     return (
       <li key={item.href} className="relative">
@@ -129,11 +121,6 @@ export function MasterSidebar({
           badgeAriaLabel={item.badgeAriaLabel}
           target={item.target}
         />
-        {locked ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-            <LockBadge tooltip={UI_TEXT.master.sidebar.lockedHint} />
-          </span>
-        ) : null}
       </li>
     );
   };
@@ -219,7 +206,6 @@ export function MasterSidebar({
             href: HREF.analytics,
             label: T.nav.items.analytics,
             icon: LineChart,
-            featureKey: "analytics_dashboard",
           })}
         </NavGroup>
 

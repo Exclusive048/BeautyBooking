@@ -1867,3 +1867,99 @@ categories, QA-109 public-only, QA-113 family) + one dev-latency 🔵 (QA-117).
 - **Dev DB pollution:** deep-test passes that create bookings/reviews/messages
   mutate the shared dev DB. Consider `npm run seed:test:reset && npm run
   seed:test` between heavy passes (see BACKLOG watch-item).
+
+---
+
+# 🔄 ROUND 2 (post-gating, post-FIX-28)
+
+Environment: **prod build** (`next start` :3001) · Playwright MCP · baseline `.qa/snapshots/post-seed.dump` (post-FIX-28). READ-ONLY on app code; live mutations restored after. Captures: `.qa/diagnostics/r2-01/`.
+
+## R2-01 — reschedule (перенос) + manual booking (ручная запись)
+
+### Phase A — flow map
+
+**Reschedule (client + master/studio-admin)** — endpoint `POST /api/bookings/[id]/reschedule` → `rescheduleBooking` (`lib/bookings/usecases.ts`).
+- **Model = CHANGE-REQUEST, not direct move.** The reschedule UPDATE sets `status: CHANGE_REQUESTED` + `proposedStartAt/End`; the real `startAtUtc/endAtUtc` **stay** → the booking **keeps holding the old slot**, the new time is only *proposed* (not reserved). `actionRequiredBy` = the opposite party. The actual move happens at **approval** (`confirmBooking.ts` CHANGE_REQUESTED branch: `startAtUtc = proposedStartAt` inside a `$transaction` + nulls reminder24h/2hSentAt).
+- **Atomicity:** the move is one single-row UPDATE (startAtUtc/endAtUtc → proposed) → **no orphan / no ghost** (old slot is freed by the same UPDATE that takes the new). Approval RE-checks conflicts before moving (handles the request↔approval TOCTOU).
+- **Invariant re-check table (NEW slot):**
+
+  | Invariant | At reschedule-REQUEST | At APPROVAL |
+  |---|---|---|
+  | overlap / double-book (`ensureNoConflictsExcluding`, excludes self, buffer-aware) | ✅ re-checked | ✅ re-checked |
+  | min/max booking hours (`assertBookingWindow`) | ✅ on new time | — (already validated) |
+  | 60-min action window (`ensureBookingActionWindow`) | ✅ on old time | — |
+  | acceptNewClients | ⊘ skipped by design (returning client) | ⊘ |
+  | CHANGE_REQUESTED blocks repeat + 3-request limit | ✅ | n/a |
+  | reminders re-scheduled to new time | n/a | ✅ (reset to null) |
+  | Serializable isolation + in-tx re-check | ⚠ **NO** (create has it) | ⚠ **NO** (re-check is *outside* the tx) |
+- **Studio variant:** `POST /api/studio/bookings/[id]/move` → `moveStudioBooking` = **DIRECT atomic move** (admin authority, invariant #22), enforces `assertMasterPerformsService` (same-service when moving between masters) + `assertWithinMasterWorkHours` + conflict, all in a `$transaction`. (Full studio coverage = R2-04.)
+- **Privilege** (`requireBookingRescheduleAccess`): CLIENT → only own booking; MASTER → only own provider/master; studio-admin → only own studio; else **403**. Approval gated by `actionRequiredBy` (only the awaited side can confirm).
+
+**Manual booking (solo master)** — endpoint `POST /api/master/bookings` → `createSoloMasterBooking` (`lib/master/day.service.ts`). `masterId` is **session-derived** (`getCurrentMasterProviderId`) → can only book own schedule. Solo-only (studio masters 403). Creates `source: MANUAL, status: PENDING, actionRequiredBy: MASTER`, walk-in client (clientName + optional phone, **no clientUserId** → no client notification).
+- **Bypasses:** min/max hours (no `assertBookingWindow`), work-hours/off-schedule, registered-client requirement — **intentional operator convenience**.
+- **DOES NOT bypass (should not):** overlap/double-book — but it **has NO conflict check at all** (see R2-01-A). Contrast: studio manual booking (`createStudioBooking`) DOES check conflict + work-hours; the client funnel + reschedule both check.
+
+### Phase B — live results
+- ✅ **Reschedule onto a TAKEN slot blocked** — master reschedule of anna-02 onto a slot overlapping a CONFIRMED booking → **409 SLOT_CONFLICT**.
+- ✅ **Failed reschedules leave the booking untouched** — anna-02 stayed PENDING 14:00, no proposed set, no corruption.
+- ✅ **Change-request model** — valid master reschedule → 200, `status: CHANGE_REQUESTED`, `startAtUtc` still 14:00 (old slot held), `proposedStartAtUtc` = new time, `requestedBy: MASTER`, `actionRequiredBy: CLIENT`, `masterChangeRequestsCount: 1`.
+- ✅ **Privilege** — master rescheduling a **foreign** provider's booking → **403 FORBIDDEN**. Manual booking masterId is session-derived (no foreign id to spoof).
+- ✅ **Reschedule notifications salon-tz** — `bookingWhenLabel`/`bookingRequestedLabel` format via `formatDateLabel(date, provider.timezone)` → consistent with create (FIX-22), no regression on the newer reschedule path.
+- ✅ **Reminder reset** — confirmBooking nulls reminder24h/2hSentAt on the move → re-scheduled to new time (code-confirmed).
+- 🟠 **Manual booking DOUBLE-BOOKS** — `POST /api/master/bookings` startAt 11:30 UTC (overlapping an existing 11:00–12:30 booking) → **201 Created**; DB then held **two overlapping PENDING bookings** for the same master. No block. (Approval-move live-confirm skipped — client login verify-locked; the move is code-confirmed in `confirmBooking`.)
+
+### Phase C — findings ledger (slot-integrity first)
+
+- ✅ **R2-01-A · master manual booking · double-book** — **ЗАКРЫТО FIX-R2-01-A (2026-06-19).** Was: `createSoloMasterBooking` created the booking with **zero conflict check** → solo master could silently double-book their own slot (confirmed live: 201 + two overlapping PENDING rows). **Fix:** mirror the create funnel — the shared buffer-aware `ensureNoConflicts` (booking-core) now runs BOTH pre-transaction (fast-fail) AND inside a **Serializable** `$transaction` before the insert (no TOCTOU); on overlap → **409 SLOT_CONFLICT** (consistent with funnel/reschedule/studio). Scope `{ providerId, masterProviderId: masterId }` matches how solo-master bookings are stored. **Intentional relaxations preserved** — min-hours / work-hours/off-schedule / walk-in stay. **Verified live:** overlap → 409 (DB holds only the original, nothing created); free slot → 201; late-night off-schedule → 201; <2h-ahead (funnel would BOOKING_TOO_SOON) → 201; rapid double-submit → one 201 + one 409 (no race). 722/722 tests, build ✅. Covered-by-test: no (live-verified; unit test would need Prisma-touching infra — same backlog as other integration gaps).
+- ✅ **R2-01-B · reschedule approval · concurrency parity** — **ЗАКРЫТО FIX-R2-01-B (2026-06-19).** Was: `confirmBooking` re-checked the conflict **outside** the `$transaction` with no Serializable isolation → TOCTOU window at approval (two concurrent approvals onto overlapping slots could both pass the outside-tx pre-check and both commit → double-book, the same class FIX-R2-01-A closed). **Fix:** relocated the **existing exclude-self** inline conflict check (`id: { not: booking.id }` — kept, because a reschedule still holds its OLD slot at approval so it must not conflict with its own row; `ensureNoConflicts` has no exclude-self and was deliberately NOT adopted) **inside** the move tx, set `isolationLevel: Serializable`, and wrapped the tx mapping commit-time `P2034`/`P2002` → clean **409 SLOT_CONFLICT** (never a 500) — mirroring `mapPrismaBookingConflict` in `createBooking`. **Verified live (prod build):** (1) client requests reschedule → CHANGE_REQUESTED → master approves → moved to proposed, **old slot freed**, new consumed, **reminders reset** (r24/r2 NULL), single row (no orphan); (2) target taken before approval → **409**, booking left **intact** (still CHANGE_REQUESTED, proposal preserved); (3) two parallel approvals onto a verified-empty slot → **one 200 / one 409**, target ends with **exactly 1 occupant** (no double-book), **no 500**. 722/722 tests, build ✅. Covered-by-test: no (live-verified; same Prisma-touching integration-infra gap). **→ Every booking write path now shares the same buffer-aware, in-tx Serializable conflict discipline (funnel · manual · studio create/move · reschedule request + approval) — the booking-integrity class is consistent.**
+- 🔵 **R2-01-C · manual booking · intentional relaxations (documented, not a bug).** Solo-master manual booking relaxes min/max-hours + work-hours/off-schedule + accepts walk-ins (no client account → no client notification). Operator convenience. **Asymmetry note:** studio manual booking enforces work-hours; solo-master does not. Confirm intended.
+- 🔵 **R2-01-D · manual booking · self-action quirk.** A master-created manual booking is `status: PENDING, actionRequiredBy: MASTER` — requires action from the master who just created it (redundant). Minor UX.
+- ✅ **Verified-good (no finding):** reschedule slot-integrity (old-freed/new-consumed at approval, no orphan/ghost, conflict blocked at request AND approval), change-request model, 3-request limit + CHANGE_REQUESTED repeat-block, privilege (403 foreign), salon-tz on reschedule notifications, reminder reset, studio direct-move with service-compat+work-hours+conflict.
+
+### Harness improvement (FIX-R2-01-A)
+- **OTP-lockout bypass** — `bash .qa/diagnostics/clear-otp-state.sh` clears all `otp:*` Redis keys (request rate-limit `otp:request:*` + verify-lockout `otp:verify:lock:*`/`otp:verify:fail:*`). Run it before any test-account login that re-authenticates repeatedly — especially **reschedule-approval / confirm flows that need two different accounts in one pass** (the 5-fail / 15-min verify lock blocked R2-01's live approval-move). Dev/QA only; touches ONLY `otp:*` (no plan cache / sessions / slot cache → won't log anyone out).
+
+---
+
+## R2-02 — onboarding-from-scratch (empty-state / first-run / premature-public blind spot)
+
+> READ-ONLY discovery (no app-code changes). Live via Playwright MCP with **genuinely new** accounts (phones `+79995550001/2/3`, never seeded). Code-audit of all three onboarding paths + live walk of the public readiness surfaces. Baseline restored after (0 test users/providers left, 157/43/61). Captures: `.qa/diagnostics/r2-02/`.
+
+### Post-registration redirects (all sensible ✅)
+| New account | Onboard | Lands on |
+|---|---|---|
+| Client (OTP verify only, CLIENT role auto-added) | — | `/cabinet/profile` |
+| Master (`POST /api/onboarding/professional/master`) | 303 | `/cabinet/master` |
+| Studio (`POST /api/onboarding/professional/studio`) | 303 | `/cabinet/studio` |
+
+### Create-time defaults (DB-verified on the two fresh providers)
+Both MASTER + STUDIO providers created with: `timezone=Asia/Almaty`, `isPublished=false`, `cityId=null`, empty `name`/`address`, `slotStepMin=15`, `bufferBetweenBookingsMin=0`, `minBookingHoursAhead=2`, `maxBookingDaysAhead=90`, `acceptNewClients=true`, `autoConfirmBookings=false`, `scheduleMode=FLEXIBLE`. Fresh master = 0 services / 0 schedule; fresh studio = 0 masters / 0 services. **`isPublished=false` default is the safe, correct gate.**
+
+### Readiness gate — live walk (the headline question: can an unconfigured subject go public/bookable?)
+- **Unconfigured master, `isPublished=false`** → `/u/<name>` shows "Мастер не найден / Профиль временно скрыт" + catalog CTA; `/u/<name>/booking` shows "не опубликован", **no booking flow**. ✅ correctly gated.
+- **Unconfigured studio, `isPublished=false`** → "Студия не найдена". ✅ correctly gated.
+- **Published master + address but ZERO services/schedule** (simulated) → `/u/<name>` renders a **full, graceful** profile (empty states "Пока нет работ"/"Отзывов пока нет"/"Мастер пока не добавил описание", "Ближайших окон нет"); `/u/<name>/booking` **redirects to the profile** (no dead-end). **NOT in catalog** (search requires ≥1 enabled service).
+- **Published studio, ZERO masters/services** (simulated) → `/u/<name>` renders a full graceful profile ("Услуги пока не добавлены", "Пока нет доступных мастеров", "от 0 ₽"); `/u/<name>/booking` renders the **full 4-step wizard stuck at step 1** ("0 мастеров / 0 услуг / Услуги пока не добавлены", "Заполните все шаги") — `looksBroken:false`, but a non-functional dead-end (unlike master, which redirects away). **NOT in catalog.**
+- **Verdict:** the *premature-bookable-by-discovery* risk is **mitigated** — `isPublished` defaults false AND catalog search requires ≥1 enabled service, so neither an unconfigured master nor an empty studio appears in catalog or is reachable via discovery. No crashes, no broken layout. The residual is **direct-URL reachability of a published-but-incomplete subject** → UX gaps, not bugs. **No 🔴.**
+
+### Findings ledger
+
+**🟠 BUGS / landmines:**
+- **R2-02-A · TIMEZONE default landmine (master + studio).** New `Provider.timezone` = **`Asia/Almaty`** (schema default `provider.prisma`), **not inferred** from city/address. `City.timezone` (own default `Europe/Moscow`) is **never propagated** to the provider on address-save/geocode (grep: no city→provider timezone write anywhere). The ONLY writer is `src/lib/studios/studio.ts:125` (conditional `input.timezone`), and **no timezone selector exists in the master OR studio cabinet UI** (`profile.service.ts`/`schemas.ts` have no timezone field; the schedule editor only *reads* it). → A Moscow provider permanently runs on Almaty (UTC+5 vs +3 = **2-hour skew**) across all slot generation / today-working-window / reminders, with **no in-product way to fix it** (admin/DB only). Matches the long-standing T4 schema(Asia/Almaty)-vs-`DEFAULT_TIMEZONE`(Europe/Moscow) inconsistency. *Fix candidates:* derive `Provider.timezone` from `City.timezone` on address-save (geocode already resolves cityId), OR surface a timezone selector in cabinet settings, OR flip the schema default to `Europe/Moscow`. **Highest-value R2-02 finding** given the whole booking-time arc.
+
+**🟡 UX gaps (graceful but incomplete — no crash):**
+- **R2-02-B · Studio publish is UNGATED.** `updateStudioProviderProfile` (`src/lib/studios/studio.ts:124`) sets `isPublished` straight from input with **no validation** — no address / services / masters required. Asymmetric with **master**, which throws `ADDRESS_REQUIRED` (`src/lib/master/profile.service.ts:404-420`) unless address+cityId are present. An empty studio (zero masters/services, even blank address) can be published. (Catalog ≥1-service filter still hides it from search.) *Fix candidate:* mirror the master gate — require ≥1 service (or ≥1 active master with a service) before allowing `isPublished=true`.
+- **R2-02-C · Published-but-incomplete subject reachable by direct URL.** Master (address, no services) and studio (no masters/services) are reachable at `/u/<username>` once published — graceful but incomplete. Master booking redirects to profile; **studio booking exposes a dead-end 4-step wizard** (worse than master). *Fix candidate:* show a "профиль ещё настраивается" state (or redirect, like the master booking page) instead of a non-functional wizard for an empty studio.
+
+**🔵 polish:**
+- **R2-02-D · PREMIUM badge + "На платформе 1 мес." on a brand-new master's PUBLIC profile.** The onboarding trial subscription surfaces a PREMIUM badge publicly on a 1-day-old master, and the tenure copy reads "1 мес." for a just-created account. Cosmetic, but a fresh empty master flashing PREMIUM is odd.
+- **R2-02-E · Master-facing copy on the public profile.** The empty booking section on a client-viewed public master profile reads "**Добавьте хотя бы одну услугу**, и мы покажем итог и ближайшие окошки." — that instruction is meant for the master, not the client viewing the page.
+- **R2-02-F · Empty-name metadata.** Public profile `<title>` renders "— запись онлайн…" when the provider name is blank (cosmetic SEO/title artifact).
+
+### ✅ CLEAN (no findings)
+- **Client onboarding (sub-flow 1):** redirect `/cabinet/profile`; all profile fields `.optional().nullable()` (no required-field gate blocking save); empty-states present + early-returned across every client cabinet page (bookings / favorites / messages / reviews / model-applications / notifications) and the booking funnel makes no client-history assumption (rebook/favorites only render when data exists). Code-audited + redirect live-confirmed.
+- **Master + studio cabinet empty-states (code-audited):** `ServicesEmptyState`, `PortfolioEmptyState`, `MasterDetailEmpty`, `ServiceDetailEmpty` etc. handle zero-data gracefully — no blank/crash screens.
+- **Catalog discovery gate holds:** `isPublished=true` AND ≥1 enabled service required (`src/lib/catalog/catalog.service.ts:275-299`) → unconfigured subjects never appear in search.
+
+### Captures (`.qa/diagnostics/r2-02/`)
+`r2-02-master-published-no-services-light.png`, `r2-02-studio-published-empty-light.png`, `r2-02-studio-published-empty-booking-light.png` (dead-end wizard), `r2-02-studio-published-empty-dark.png` (both-themes). Driver: `r2-02/onboard.mjs`.

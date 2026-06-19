@@ -19,6 +19,7 @@ export async function sendTrialEndingSoonNotification(input: {
   return createBillingNotification({
     userId: input.userId,
     type: NotificationType.BILLING_TRIAL_ENDING_SOON,
+    scope: input.scope,
     title: "Пробный период скоро закончится",
     body:
       `Через ${input.daysLeft} ${dayWord} тариф PREMIUM для кабинета ${scopeLabel} закончится. ` +
@@ -42,6 +43,7 @@ export async function sendTrialExpiredNotification(input: {
   return createBillingNotification({
     userId: input.userId,
     type: NotificationType.BILLING_TRIAL_EXPIRED,
+    scope: input.scope,
     title: "Пробный период закончился",
     body:
       `Пробный месяц PREMIUM для кабинета ${scopeLabel} закончился — аккаунт переведён на бесплатный тариф. ` +

@@ -1,4 +1,5 @@
 import { NotificationType, Prisma } from "@prisma/client";
+import { billingUpgradeHref } from "@/lib/billing/upgrade-href";
 import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { createNotification, publishNotifications } from "@/lib/notifications/service";
@@ -115,7 +116,7 @@ export async function processPlanEditedMassNotification(payload: {
 }): Promise<{ recipients: number; failures: number }> {
   const subs = await prisma.userSubscription.findMany({
     where: { planId: payload.planId, status: "ACTIVE" },
-    select: { userId: true },
+    select: { userId: true, scope: true },
   });
 
   let failures = 0;
@@ -130,7 +131,7 @@ export async function processPlanEditedMassNotification(payload: {
           type: NotificationType.BILLING_PLAN_EDITED,
           title: "Изменения в вашем тарифе",
           body: payload.summary,
-          url: "/cabinet/billing",
+          url: billingUpgradeHref(sub.scope),
           payload: { planId: payload.planId, planCode: payload.planCode },
         }),
       ),

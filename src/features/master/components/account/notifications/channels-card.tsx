@@ -1,9 +1,11 @@
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.notifications;
+const FG = UI_TEXT.billing.featureGate;
 
 /**
  * Wraps the three channel-specific sections (Telegram / VK / Email)
@@ -23,8 +25,22 @@ export function ChannelsCard() {
         <p className="mt-1 text-sm text-text-sec">{T.channelsSubtitle}</p>
       </header>
       <div className="space-y-3">
-        <TelegramNotificationsSection embedded />
-        <VkNotificationsSection embedded />
+        <FeatureGate
+          feature="tgNotifications"
+          scope="MASTER"
+          variant="inline"
+          description={FG.telegramLocked}
+        >
+          <TelegramNotificationsSection embedded />
+        </FeatureGate>
+        <FeatureGate
+          feature="vkNotifications"
+          scope="MASTER"
+          variant="inline"
+          description={FG.vkLocked}
+        >
+          <VkNotificationsSection embedded />
+        </FeatureGate>
         <EmailNotificationsSection />
       </div>
     </section>

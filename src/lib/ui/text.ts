@@ -806,6 +806,13 @@ export const UI_TEXT = {
       notificationsTitle: "Уведомления в Telegram и ВКонтакте — тариф Про",
       notificationsHint: "Подключите Telegram или ВКонтакте, чтобы не пропустить ни одной записи",
       cta: "Перейти на Про",
+      // FIX-27 — unified locked-state card. {plan} is the required tier derived
+      // from the live plan-config (findMinPlanName over /api/billing/plans),
+      // never a hardcoded string (closes PLAN-GATE-HINT-DIVERGENCE).
+      tierBadge: "Доступно на тарифе {plan}",
+      upgradeCta: "Перейти на {plan}",
+      telegramLocked: "Уведомления в Telegram доступны на платном тарифе.",
+      vkLocked: "Уведомления во ВКонтакте доступны на платном тарифе.",
     },
     period: {
       month: "1 месяц",

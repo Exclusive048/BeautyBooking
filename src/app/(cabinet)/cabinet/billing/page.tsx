@@ -27,14 +27,22 @@ export default async function Page({ searchParams }: PageProps) {
 
   const params = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const rawScope = Array.isArray(params.scope) ? params.scope[0] : params.scope;
-  const scope = rawScope === "MASTER" || rawScope === "STUDIO" ? rawScope : null;
+  const requestedScope = rawScope === "MASTER" || rawScope === "STUDIO" ? rawScope : null;
+
+  const hasMaster = user.roles.includes(AccountType.MASTER);
+  const hasStudio = user.roles.includes(AccountType.STUDIO) || user.roles.includes(AccountType.STUDIO_ADMIN);
+
+  // FIX-26 (PLAN-GATE-CTA-BROKEN): a scope-less /cabinet/billing visit — e.g. a
+  // billing-event notification deep-link — used to dead-end at /cabinet/profile.
+  // Resolve it to the user's own billing by role instead. Gate CTAs are now
+  // scope-explicit (billingUpgradeHref), so a both-provider-roles user only
+  // reaches here scope-less from non-gate links; pick MASTER deterministically.
+  // A client-only user (no provider role) still belongs on /cabinet/profile.
+  const scope = requestedScope ?? (hasMaster ? "MASTER" : hasStudio ? "STUDIO" : null);
 
   if (!scope) {
     redirect("/cabinet/profile");
   }
-
-  const hasMaster = user.roles.includes(AccountType.MASTER);
-  const hasStudio = user.roles.includes(AccountType.STUDIO) || user.roles.includes(AccountType.STUDIO_ADMIN);
 
   if (scope === "MASTER" && !hasMaster) {
     redirect("/cabinet/profile");

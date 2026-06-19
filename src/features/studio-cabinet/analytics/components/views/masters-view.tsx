@@ -1,5 +1,5 @@
 import { Users } from "lucide-react";
-import { FeatureGate } from "@/features/master/components/analytics/feature-gate";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioAnalyticsViewData } from "../../lib/types";
@@ -23,7 +23,7 @@ type Props = {
 export function MastersView({ data }: Props) {
   const masters = data.masters;
   return (
-    <FeatureGate available={data.features.revenue}>
+    <FeatureGate scope="STUDIO" feature="analytics_revenue" available={data.features.revenue} description={UI_TEXT.cabinetMaster.analytics.lock.body}>
       <section className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
         {!masters || masters.length === 0 ? (
           <div className="flex flex-col items-center gap-2 p-10 text-center">

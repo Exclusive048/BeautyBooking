@@ -1,4 +1,4 @@
-import { FeatureGate } from "@/features/master/components/analytics/feature-gate";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { UI_TEXT } from "@/lib/ui/text";
 import { HoursHeatmap } from "../charts/hours-heatmap";
 import { RevenueLineChart } from "../charts/revenue-line-chart";
@@ -17,7 +17,7 @@ export function OverviewView({ data }: Props) {
 
   return (
     <div className="space-y-4">
-      <FeatureGate available={data.features.revenue}>
+      <FeatureGate scope="STUDIO" feature="analytics_revenue" available={data.features.revenue} description={UI_TEXT.cabinetMaster.analytics.lock.body}>
         <section className="rounded-2xl border border-border-subtle bg-bg-card p-4">
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h2 className="font-display text-base font-semibold text-text-main">
@@ -48,7 +48,7 @@ export function OverviewView({ data }: Props) {
           <SourcesDonut sources={overview.sources} />
         </section>
 
-        <FeatureGate available={data.features.bookingInsights}>
+        <FeatureGate scope="STUDIO" feature="analytics_booking_insights" available={data.features.bookingInsights} description={UI_TEXT.cabinetMaster.analytics.lock.body}>
           <section className="rounded-2xl border border-border-subtle bg-bg-card p-4">
             <header className="mb-3">
               <h2 className="font-display text-base font-semibold text-text-main">

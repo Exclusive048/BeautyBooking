@@ -173,6 +173,7 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
       await createBillingNotification({
         userId: billingPayment.subscription.userId,
         type: NotificationType.BILLING_PAYMENT_SUCCEEDED,
+        scope: billingPayment.subscription.scope,
         title: "Оплата прошла",
         body: "Оплата подписки успешно завершена.",
         payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },
@@ -212,6 +213,7 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
     await createBillingNotification({
       userId: billingPayment.subscription.userId,
       type: NotificationType.BILLING_PAYMENT_FAILED,
+      scope: billingPayment.subscription.scope,
       title: "Платёж не прошёл",
       body: "Не удалось завершить оплату подписки.",
       payloadJson: { scope: billingPayment.subscription.scope, subscriptionId: billingPayment.subscriptionId },

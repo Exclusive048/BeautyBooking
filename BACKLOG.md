@@ -37,6 +37,106 @@
 
 ---
 
+## 🔬 PLAN-GATING-AUDIT (2026-06-19) — тариф ↔ фича: parity / enforcement / UI
+
+> **READ-ONLY** аудит. Источник правды = код + seed (`prisma/seeds/test-data/seed-billing-plans.ts`). `Идея_продукта.docx` **отсутствует в репо** → docx cross-check N/A (seed-конфиг = canonical, как и задано). Тарифы: **FREE / PRO / PREMIUM** × **MASTER / STUDIO** (6 планов). План читается через `getCurrentPlan` (cache 300s) + аналитика через `getPlanFeaturesForUser`; ACTIVE/PAST_DUE → plan, иначе FREE fallback. Captures: `.qa/diagnostics/plan-gating-audit/`. Subjects: master `+79991000000`, studio `+79992000000` (baseline восстановлен из `.qa/snapshots/post-seed.dump`).
+
+### Axis 2 — Enforcement: ✅ STRONG, утечек НЕ найдено
+Каждая платная фича с поверхностью **enforced server-side**. Live direct-API proofs (FREE subject, prod build :3001, не UI):
+
+| Endpoint (insufficient tier) | Результат | Гейт |
+|---|---|---|
+| `GET /api/analytics/revenue/timeline` (MASTER FREE) | **403 FEATURE_GATE** | `ensureFeatureAccess(analytics_revenue)` |
+| `GET /api/analytics/clients/segments` (MASTER FREE) | **403 FEATURE_GATE** | `ensureFeatureAccess(analytics_clients)` |
+| `GET /api/analytics/bookings/funnel` (MASTER/STUDIO FREE) | **403 FEATURE_GATE** | `ensureFeatureAccess(analytics_booking_insights)` |
+| `GET /api/analytics/cohorts/retention` (FREE) | **403 FEATURE_GATE** | `ensureFeatureAccess(analytics_cohorts)` |
+| `GET /api/provider/hot-slots/rule` (MASTER FREE) | **403 FEATURE_GATE** | `getCurrentPlan → createFeatureGateError(hotSlots)` |
+| `GET /api/master/clients/[key]/card` (MASTER FREE) | **403 FEATURE_GATE** | `ensureClientCardAccess` (clientVisitHistory‖clientNotes) |
+| `GET /api/master/clients` (list) | 200 | by design — list = booking-aggregate, paid гейт на card |
+| flip → PREMIUM, те же endpoints | **200** | gating tracks real plan (cache invalidated) |
+
+Code-proven (не POST-мутировал в read-only): `onlinePayments` (`master/services/route.ts:105` — гейт ПЕРЕД upsert + system-flag), `tgNotifications`/`vkNotifications` (settings-write `telegram/settings:23`,`vk/settings:35` + tg-delivery `delivery.ts:117`), лимиты `maxPortfolioPhotos*`/`maxTeamMasters` (409 `createLimitReachedError` в `media/service.ts:196`, `profile.service.ts:853`, `studio/team-limits.ts:30`), `highlightCard` (catalog ranking `catalog.service.ts:518`). **Вывод: ни одной UI-only-gated платной фичи (нет «фронт прячет — API отдаёт»).**
+
+### Axis 1 — Parity matrix (master artifact)
+Boolean-фичи (base always-on опущены: onlineBooking/catalogListing/profilePublicPage/pwaPush/notifications). ✅=granted.
+
+| Фича | M-FREE | M-PRO | M-PREM | S-FREE | S-PRO | S-PREM | Gate (server) |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|---|
+| analytics_dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ensureFeatureAccess |
+| analytics_revenue | — | ✅ | ✅ | — | ✅ | ✅ | ensureFeatureAccess |
+| analytics_clients | — | ✅ | ✅ | — | ✅ | ✅ | ensureFeatureAccess |
+| analytics_booking_insights | — | ✅ | ✅ | — | **—** | ✅ | ensureFeatureAccess ⚠ M-PRO≠S-PRO |
+| analytics_cohorts | — | — | ✅ | — | — | ✅ | ensureFeatureAccess |
+| analytics_forecast | — | — | ✅ | — | — | ✅ | ensureFeatureAccess |
+| onlinePayments | — | ✅ | ✅ | — | ✅ | ✅ | createFeatureGateError + system-flag |
+| hotSlots | — | ✅ | ✅ | — | ⚠✅ | ⚠✅ | createFeatureGateError (catalog=MASTER-only) |
+| tgNotifications | — | ✅ | ✅ | — | ✅ | ✅ | settings-write + tg-delivery |
+| vkNotifications | — | ✅ | ✅ | — | ✅ | ✅ | settings-write ⚠ нет delivery-канала |
+| clientVisitHistory | — | ✅ | ✅ | — | ✅ | ✅ | ensureClientCardAccess |
+| clientNotes | — | ✅ | ✅ | — | ✅ | ✅ | ensureClientCardAccess (catalog=MASTER-only) |
+| financeReport | — | ⚠✅ | ⚠✅ | — | ⚠✅ | ⚠✅ | **НЕТ consumer (dead gate)** |
+| highlightCard | — | — | ✅ | — | — | ✅ | catalog ranking (passive, no UI toggle) |
+| maxTeamMasters (limit) | — | — | — | 2 | 8 | 30 | createLimitReachedError 409 |
+| maxPortfolioPhotosSolo (limit) | 15 | 60 | 200 | — | — | — | createLimitReachedError 409 |
+| maxPortfolioPhotos*Studio* (limit) | — | — | — | 15/10 | 60/40 | 200/100 | createLimitReachedError 409 |
+| maxNotifications / smsNotifications / clientImport | — | — | — | — | — | — | `status:planned` — 0 grants, 0 consumers ✅ |
+
+### Findings ledger (по severity — enforcement-leak'ов нет, поэтому 🟠 = revenue-funnel, дальше parity/UI)
+
+- ✅ **PLAN-GATE-CTA-BROKEN** — **ЗАКРЫТО FIX-26 (2026-06-19).** Было: ВСЕ живые upsell-CTA Lock-гейтов вели на голый `/cabinet/billing` (без `?scope=`) → `cabinet/billing/page.tsx:32` редиректил на `/cabinet/profile` (dead-end для платящего). **Fix at the right layer:** новый единый helper `src/lib/billing/upgrade-href.ts` (`billingUpgradeHref(scope)` → `/cabinet/{master,studio}/billing`, pure/zero-import → client-safe). Live Lock-гейт `feature-gate.tsx` получил **required** `scope` prop (compile-time guard — typecheck падает если caller без scope) → все 11 callers прокидывают scope (6 master MASTER, 5 studio STUDIO). Хардкоды `hot-slots-section.tsx` + `plan-card.tsx` → helper("MASTER"). Мёртвый canonical `components/billing/FeatureGate` тоже переведён на helper (one source of truth). **Secondary:** `billing/page.tsx` scope-less визит резолвится по роли (single-role → своя billing; both-role → MASTER deterministic; client-only → profile) — закрывает dead-end и для billing-notification deep-links. **Verified live (prod build :3001):** master gate → `/cabinet/master/billing` (click-through открывает план-опции Free/Pro/Premium); studio gate → `/cabinet/studio/billing`; scope follows surface (0 master-leak на studio); bare `/cabinet/billing` (studio) → studio billing (был profile); both themes; 0 scope-less CTA остаётся. **Enforcement не тронут** (гейты держат, FREE по-прежнему 403). **Flag (tiny follow-up):** notification push `url:"/cabinet/billing"` в `billing/notifications.ts:25` + `admin-initiated.ts:133` остались scope-less — теперь функциональны через secondary-fix (резолв по роли recipient), но в идеале scope-explicit `billingUpgradeHref(subscriptionScope)`.
+
+- ✅ **PLAN-GATE-UI-INCONSISTENT** — **ЗАКРЫТО FIX-27 (2026-06-19).** Section/feature-локи унифицированы в один shared `src/components/billing/FeatureGate.tsx` (adopt+extend canonical): один визуальный язык (Lock + «Доступно на тарифе {TIER}» mono-badge + reason + Button-CTA → `billingUpgradeHref`), два layout-варианта — `section` (blur-overlay над children, для аналитики) и `inline` (компактная строка, для одиночного контрола: hotSlots, tg/vk). Мигрированы: master analytics (6) + studio analytics (5, 4 файла) + schedule-hotSlots + tg/vk (master `channels-card` + studio `notifications-section`). Live: один консистентный card-стиль везде, 0 старых стилей. **Намеренно НЕ форс-фит** (разная семантика, per ui-ux skill — не оверлеить модальный тоггл / quota-счётчик): (3) services `onlinePayments` = in-form disabled toggle + tooltip «Доступно в PRO» (тариф верный — onlinePayments=PRO); (5) portfolio = numeric quota «X/Y» + disabled uploader (это limit-reached, не tier-lock); (6) studio-legacy `studio-settings-page.tsx` = retiring 837-LOC файл (умрёт вместе с файлом). Удалены: живой `master/components/analytics/feature-gate.tsx` + route-less `features/analytics/ui/analytics-page.tsx`.
+
+- ✅ **PLAN-GATE-NOTIF-NO-AFFORDANCE** — **ЗАКРЫТО FIX-27 (2026-06-19).** Tg/vk-on-FREE теперь показывают unified inline lock-card (Lock + «Доступно на тарифе PRO» + «Уведомления в Telegram/ВКонтакте доступны на платном тарифе» + CTA → scope-correct billing) вместо мёртвого тоггла-который-403-ит. Гейтинг на уровне **wrapper** (`master/.../channels-card.tsx` scope=MASTER + `studio-cabinet/.../notifications-section.tsx` scope=STUDIO) — shared `telegram/vk-notifications.tsx` НЕ тронуты (клиентский кабинет сохраняет своё поведение). Email — НЕ гейтится (base feature). Confirmed live (master + studio FREE). Enforcement не тронут (server-side гейты держат; entitled → live-контролы).
+
+- ✅ **PLAN-PARITY-DEAD-GATE-financeReport** — **ЗАКРЫТО FIX-28 (2026-06-19) = REMOVE.** Аудит: 0 runtime consumers + feature не shipped (Finance page удалён STUDIO-FINANCE-REMOVE-A). Решение — catalog `feature-catalog.ts` financeReport `status: "active" → "planned"` (matches maxNotifications/smsNotifications/clientImport pattern) + удалён `financeReport` grant из ВСЕХ 6 seed-планов. **Proven live:** features-page показывает «Финансовый отчет … Скоро» (как известная planned-фича SMS), больше НЕ рекламируется как PRO-benefit. Wire-to-tier когда реальный finance-отчёт зашипится.
+
+- ✅ **PLAN-PARITY-DEAD-STUDIO-HOTSLOTS** — **ЗАКРЫТО FIX-28 (2026-06-19) = REMOVE.** hotSlots — master-only (`appliesTo: MASTER`, нет studio-surface; rule-endpoint master-provider-scoped). `hotSlots` grant удалён из ВСЕХ 3 STUDIO seed-планов (master-планы сохраняют). **Latent fix:** studio-юзер раньше проходил `getCurrentPlan(STUDIO).features.hotSlots` гейт на `/api/provider/hot-slots/rule?scope=STUDIO` (dead grant=true) — теперь закрыто. **Proven live:** «Горящие окошки» НЕ показывается в studio features-page (appliesTo:MASTER фильтрует), показывается в master. Existing prod-rows admin-tunable; seed governs fresh.
+
+- ✅ **PLAN-DEAD-CANONICAL-FEATUREGATE** — **РЕШЕНО FIX-27 = ADOPT (2026-06-19).** `src/components/billing/FeatureGate.tsx` extended (section+inline варианты, `available` override, derived tier) и стал **единственным** plan-gate locked-state компонентом, используемым всеми surface'ами. Его единственный route-less консьюмер `features/analytics/ui/analytics-page.tsx` **удалён** (0 реальных importer'ов). Больше не dead — это THE gate.
+
+- ✅ **PLAN-STUDIO-PRO-BI-ASYMMETRY** — **ЗАКРЫТО FIX-28 (2026-06-19) = DOCUMENTED-INTENTIONAL.** MASTER_PRO даёт `analytics_booking_insights` + `_cohorts`/`_forecast` остаются PREMIUM; STUDIO_PRO даёт только dashboard/revenue/clients, booking_insights/cohorts/forecast — STUDIO_PREMIUM. Это **coherent plan-design** (студийный «полный analytics» = PREMIUM tier, не баг). Изменение grants = product/pricing-решение, не код-фикс. Документировано как намеренное; если продукт захочет симметрии — поднять grant в `seed-billing-plans.ts` STUDIO_PRO. FIX-27 derived-tier корректно показывает PRO vs PREMIUM per-feature.
+
+- ✅ **PLAN-GATE-HINT-DIVERGENCE** — **ЗАКРЫТО FIX-27 (2026-06-19).** Unified FeatureGate выводит required-tier через `requiredTierLabel` (lowest-sortOrder план scope'а, который грантит фичу, из live `/api/billing/plans`) — никогда не hardcode. **Proven live:** studio analytics FREE показывает revenue→«Доступно на тарифе PRO» И booking_insights→«Доступно на тарифе PREMIUM» одновременно (старый гейт хардкодил «PRO» для обоих). Серверный `FEATURE_REQUIRED_PLAN` в `analytics/domain/guards.ts` — это только error-hint metadata (не UI), оставлен как есть. Сопутствующее: services `onlinePayments` tooltip «Доступно в PRO» проверен — тариф верный (onlinePayments=PRO), не divergence.
+
+- ✅ **PLAN-PARITY-clientNotes-appliesTo** — **ЗАКРЫТО FIX-28 (2026-06-19) = FIX METADATA.** Verified против реального usage: studio CRM-card routes (`/api/studio/clients/[key]/card`, photos) гейтят на `canAccessClientCards(plan.features)` (= clientVisitHistory‖clientNotes) + STUDIO_PRO/PREMIUM грантят clientNotes. → catalog `clientNotes.appliesTo: "MASTER" → "BOTH"`. **Proven live:** «Заметки о клиенте» теперь показывается в studio features-page (раньше скрыто appliesTo:MASTER). FIX-27 tier-derivation не сломан (читает grants, не appliesTo).
+
+- 📋 **PLAN-VK-DELIVERY-STUB** — **FIX-28 (2026-06-19) = DEPLOY-CHECKLIST (известное ограничение, не код-фикс).** `vkNotifications` продаётся (PRO+) + server-gated на settings-write, НО `delivery.ts` не имеет VK send-пути (только in-app/push/telegram/email) + `isVkNotificationsEnabled` env-flag off by-default → VK-тоггл disabled даже для PRO. Building VK send = feature-work (VK Bot API integration), не gating-fix. **Deploy-checklist:** VK-доставка не реализована; tg/vk gate (FIX-27) корректно показывает affordance, но VK реально не доставляет пока flag+delivery не построены. Per VK-NOTIFICATIONS-FLAG-A.
+
+- ✅ **PLAN-SIDEBAR-VESTIGIAL-GATE** — **ЗАКРЫТО FIX-28 (2026-06-19) = REMOVE.** `master-sidebar.tsx` гейтил Analytics-nav на `analytics_dashboard` (FREE-granted → никогда не locked). Удалён весь dead mechanism: `featureKey` prop из NavItem + `locked` computation + `<LockBadge>` рендер + `usePlanFeatures("MASTER")` + 2 неиспользуемых import'а (`LockBadge`, `usePlanFeatures`). Nav рендерится без изменений (никогда не показывал lock).
+
+**Clean (без находок):** planned-фичи (0 grants/0 consumers); `highlightCard` (enforced в catalog, UI-toggle не нужен — passive); лимиты (409); `onlinePayments` (double-gate feature+system, 403 до мутации).
+
+**🏁 PLAN-GATING ПОЛНОСТЬЮ ДИСПОЗИЦИОНИРОВАН (FIX-26 + FIX-27 + FIX-28):**
+- (a) ✅ **PLAN-GATE-CTA-BROKEN — FIX-26** (scoped upgrade-CTA via `billingUpgradeHref`).
+- (b) ✅ **PLAN-GATE-UI-INCONSISTENT + NOTIF-NO-AFFORDANCE + HINT-DIVERGENCE + DEAD-CANONICAL — FIX-27** (единый locked-state компонент, derived-tier, tg/vk affordance, canonical adopted).
+- (c) ✅ **FIX-28 (closing):** financeReport dead-gate REMOVED (catalog planned + seed) · studio-hotSlots dead-grant REMOVED (master-only) · clientNotes `appliesTo` → BOTH · sidebar vestigial gate REMOVED · billing-notification deep-links scope-threaded (`createBillingNotification` + trial ×2 + webhook ×2 + admin-initiated → `billingUpgradeHref(scope)`) · STUDIO-PRO-BI-ASYMMETRY documented-intentional · VK-DELIVERY-STUB → deploy-checklist.
+- **Канонический baseline `.qa/snapshots/post-seed.dump` регенерирован** (FIX-28 plan-grants; старый → `.pre-fix28-superseded`).
+- **Enforcement НЕ тронут во всех трёх** — server-side гейты держат (FIX-26 proven 403/409). **Gating-работа ЗАВЕРШЕНА → blitz.**
+
+---
+
+## 🔄 ROUND 2 (blitz) — booking-lifecycle sweeps
+
+> Detailed findings in [`QA-FINDINGS.md`](QA-FINDINGS.md) → «🔄 ROUND 2». Each sweep = discovery → fix decided after.
+
+**R2-01 — reschedule + manual booking (done):**
+- ✅ **R2-01-A** — master manual-booking **double-book** (no conflict check) → **ЗАКРЫТО FIX-R2-01-A (2026-06-19).** `createSoloMasterBooking` now runs the shared `ensureNoConflicts` pre-tx + inside a Serializable `$transaction` → 409 SLOT_CONFLICT on overlap, consistent with funnel/reschedule/studio; intentional relaxations (min-hours/work-hours/walk-in) preserved. Live-verified + 722 tests + build. Harness: `.qa/diagnostics/clear-otp-state.sh` added (OTP-lockout bypass).
+- ✅ **R2-01-B** — reschedule **approval** TOCTOU → **ЗАКРЫТО FIX-R2-01-B (2026-06-19).** `confirmBooking`'s exclude-self conflict re-check moved INSIDE the move tx + `isolationLevel: Serializable` + commit-time `P2034`/`P2002` → clean 409 (mirrors `createBooking`). Exclude-self preserved (reschedule holds its old slot at approval); `ensureNoConflicts` deliberately not adopted (it has no exclude-self). Live-verified: approval-move works (old-freed/new-taken/reminders-reset/single-row), conflict blocked at approval (409, booking intact), concurrent race → one 200/one 409, no double-book, no 500. 722 tests + build. **→ all booking write paths (funnel · manual · studio create/move · reschedule request + approval) now share the same in-tx Serializable conflict discipline — booking-integrity class closed.**
+- 🔵 **R2-01-D** — master-created manual booking is `status: PENDING, actionRequiredBy: MASTER` (redundant self-action). Minor UX. Deferred.
+- 📋 **R2-01-C** — manual-booking relaxations (min-hours/work-hours/walk-in) documented-intentional; **asymmetry to confirm:** studio manual booking enforces work-hours, solo-master does not.
+
+**R2-02 — onboarding-from-scratch (discovery done; READ-ONLY, no fixes):** new-account first-run + empty-state + premature-public sweep. Full ledger in `QA-FINDINGS.md` → R2-02. **Premature-bookable-by-discovery is mitigated** (`isPublished` defaults false + catalog requires ≥1 service → unconfigured subjects never in search; no crashes). Residual = direct-URL reachability of published-but-incomplete subjects (UX, not bugs). Findings:
+- 🟠 **R2-02-A** — TIMEZONE landmine. New master/studio `Provider.timezone` defaults `Asia/Almaty` (schema), never inferred from `City.timezone` (own default Europe/Moscow) on address-save, and **no timezone selector in master/studio cabinet UI** → a Moscow provider runs permanently on Almaty (2h skew) across all slot/working-window/reminder math, fixable only via admin/DB. Long-standing T4 schema-vs-`DEFAULT_TIMEZONE` inconsistency. *Fix:* derive timezone from City on address-save OR surface a selector OR flip schema default. **Highest-value.**
+- 🟡 **R2-02-B** — studio publish is **ungated** (`studio.ts:124` sets `isPublished` from input, no address/service/master check) — asymmetric with master's `ADDRESS_REQUIRED` gate. *Fix:* require ≥1 service before publish.
+- 🟡 **R2-02-C** — published empty studio's `/booking` renders a **dead-end 4-step wizard** (master booking redirects to profile instead — better). *Fix:* show "настраивается" / redirect for an empty studio booking page.
+- 🔵 **R2-02-D/E/F** — PREMIUM badge + "На платформе 1 мес." on a 1-day-old master's public profile; master-facing "Добавьте хотя бы одну услугу" copy shown to client viewers; empty-name `<title>` artifact.
+- ✅ Client onboarding clean; master/studio cabinet empty-states clean; catalog discovery gate holds.
+
+**R2-03…R2-06 — queued** (analytics-correctness → studio complex flows → admin operational → notification CTAs + review-submit).
+
+---
+
 ## 🗺 ЗАВЕРШЁННЫЕ WORKSTREAMS (краткая карта)
 
 > Полная карта sprint'а — выполненные направления. Детали по каждому коммиту в AI_CONTEXT раздел 15.
