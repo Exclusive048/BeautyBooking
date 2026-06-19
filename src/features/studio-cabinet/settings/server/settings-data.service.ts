@@ -38,6 +38,7 @@ export async function loadStudioSettingsData(input: {
           description: true,
           avatarUrl: true,
           isPublished: true,
+          timezone: true,
           address: true,
           district: true,
           geoLat: true,
@@ -123,6 +124,7 @@ export async function loadStudioSettingsData(input: {
       description: studio.provider.description ?? null,
       avatarUrl: studio.provider.avatarUrl ?? null,
       isPublished: studio.provider.isPublished,
+      timezone: studio.provider.timezone,
       address: {
         cityName: studio.provider.city?.name ?? null,
         address: studio.provider.address ?? null,

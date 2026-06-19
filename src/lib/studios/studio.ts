@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
 
 export type StudioProviderPrivateDto = {
@@ -107,6 +108,25 @@ export async function updateStudioProviderProfile(
   providerId: string,
   input: StudioProfileUpdate
 ): Promise<StudioProviderPrivateDto | null> {
+  // FIX-R2-02-A — when the studio's address is (re)set, resolve it to a City and
+  // derive both `cityId` and `timezone` from that city (mirrors the master flow,
+  // which previously was the only path that linked a provider to a city). The
+  // studio otherwise never got a cityId and kept the stale Asia/Almaty default.
+  // Conservative on failure: leave cityId/timezone untouched so a working studio
+  // is never disrupted by a transient geocoder outage. An explicit selector
+  // value (`input.timezone`) always wins over the derived one.
+  let derivedCityId: string | undefined;
+  let derivedTimezone: string | undefined;
+  if (typeof input.address === "string" && input.address.trim()) {
+    const detection = await detectCityFromAddress(input.address);
+    if (detection.ok) {
+      derivedCityId = detection.cityId;
+      derivedTimezone = detection.timezone;
+    }
+  }
+  const resolvedTimezone =
+    input.timezone !== undefined ? input.timezone : derivedTimezone;
+
   const provider = await prisma.provider.update({
     where: { id: providerId },
     data: {
@@ -122,7 +142,8 @@ export async function updateStudioProviderProfile(
       ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
       ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
       ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
-      ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+      ...(derivedCityId !== undefined ? { cityId: derivedCityId } : {}),
+      ...(resolvedTimezone !== undefined ? { timezone: resolvedTimezone } : {}),
       ...(input.cancellationDeadlineHours !== undefined
         ? { cancellationDeadlineHours: input.cancellationDeadlineHours }
         : {}),

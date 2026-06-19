@@ -106,6 +106,7 @@ describe("detectCityFromAddress", () => {
       ok: true,
       cityId: "city-moskva",
       cityName: "Москва",
+      timezone: "Europe/Moscow",
       geoLat: 55.75,
       geoLng: 37.62,
       wasCreated: false,
@@ -147,6 +148,7 @@ describe("detectCityFromAddress", () => {
       ok: true,
       cityId: "city-krasnodar",
       cityName: "Краснодар",
+      timezone: "Europe/Moscow",
       geoLat: 45.04,
       geoLng: 38.97,
       wasCreated: true,
@@ -189,6 +191,7 @@ describe("detectCityFromAddress", () => {
       ok: true,
       cityId: "city-krasnodar",
       cityName: "Краснодар",
+      timezone: "Europe/Moscow",
       geoLat: 45.04,
       geoLng: 38.97,
       wasCreated: false, // we didn't create — the racing request did

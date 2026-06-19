@@ -9,6 +9,13 @@ export type DetectCityResult =
       ok: true;
       cityId: string;
       cityName: string;
+      /**
+       * The resolved `City.timezone` (IANA). FIX-R2-02-A — providers derive
+       * their `Provider.timezone` from this so a Moscow provider runs on
+       * Europe/Moscow, not the stale Asia/Almaty schema default. Callers write
+       * it onto the provider on address-save.
+       */
+      timezone: string;
       geoLat: number;
       geoLng: number;
       wasCreated: boolean;
@@ -76,6 +83,7 @@ export async function detectCityFromAddress(
       ok: true,
       cityId: city.id,
       cityName: city.name,
+      timezone: city.timezone,
       geoLat: geo.geoLat,
       geoLng: geo.geoLng,
       wasCreated: false,
@@ -106,6 +114,7 @@ export async function detectCityFromAddress(
       ok: true,
       cityId: city.id,
       cityName: city.name,
+      timezone: city.timezone,
       geoLat: geo.geoLat,
       geoLng: geo.geoLng,
       wasCreated: true,
@@ -122,6 +131,7 @@ export async function detectCityFromAddress(
           ok: true,
           cityId: existing.id,
           cityName: existing.name,
+          timezone: existing.timezone,
           geoLat: geo.geoLat,
           geoLng: geo.geoLng,
           wasCreated: false,
