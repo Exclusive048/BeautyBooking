@@ -1,0 +1,114 @@
+# BACKLOG-DONE.md — Архив выполненного (МастерРядом)
+
+> Это **архив** завершённых задач из `BACKLOG.md`. Активные задачи — в [`BACKLOG.md`](BACKLOG.md).
+> Полная прозовая история фиксов живёт в [`QA-FINDINGS.md`](QA-FINDINGS.md) (Round 1 + Round 2 ledger) и
+> [`MASTERRYADOM_AI_CONTEXT.md`](MASTERRYADOM_AI_CONTEXT.md) **раздел 15** (per-commit changelog) + git history.
+> Здесь — индекс (id · краткое описание · дата), чтобы ничего не потерять при trim активного бэклога.
+>
+> Создан: **23 июня 2026** (DOCS-CLEANUP / CONTEXT-REFRESH-R2 split).
+
+---
+
+## Round 2 (blitz) — booking-lifecycle / billing / catalog / notifications (июнь 2026)
+
+### R2-01 — reschedule + manual booking
+- ✅ **R2-01-A** 🔴 — solo-master manual-booking double-book → `ensureNoConflicts` pre-tx + in-tx Serializable (FIX-R2-01-A, 2026-06-19)
+- ✅ **R2-01-B** 🔴 — reschedule approval TOCTOU → exclude-self conflict re-check INSIDE move-tx + Serializable + commit-time 409 (FIX-R2-01-B, 2026-06-19). *Все booking-write пути теперь имеют единую in-tx Serializable conflict-дисциплину.*
+- ✅ **R2-01-C** 📋 — manual-booking relaxations (min-hours/work-hours/walk-in) — documented-intentional
+
+### R2-02 — onboarding-from-scratch
+- ✅ **R2-02-A** 🔴 — timezone landmine → city-derived `Provider.timezone` + cabinet selector + schema default Moscow + миграция `20260619000000_provider_timezone_default_moscow` (FIX-R2-02-A, 2026-06-19). T4 resolved.
+
+### BILLING-CYCLE
+- ✅ **BC-1** 🟠 — renewal price source ≠ checkout → единый `resolvePlanPrice` (FIX-BC-1-2, 2026-06-20)
+- ✅ **BC-2** 🟠 — pre-payment plan mutation removed; upgrade применяется только success-webhook (FIX-BC-1-2)
+- ✅ **BC-3** 🟠 — webhook idempotency: `payment.succeeded` early-return на уже-SUCCEEDED (FIX-BC-1-2)
+- ✅ **BC-4** 🟠 — период+план из authoritative DB-payment-row, не из mutable metadata (FIX-BC-1-2)
+
+### R2-04 — studio complex flows
+- ✅ **R2-04-A** 🟠 — studio create/move conflict re-check внутри tx (Serializable, exclude-self, 409) (FIX-R2-04-BA, 2026-06-21)
+- ✅ **R2-04-B** 🟠 — studio work-hours guard в salon-tz (`resolveSalonLocalParts`) + `parseDateKeyToUtcStart` override-day fix (latent 500) (FIX-R2-04-BA, 2026-06-21)
+
+### R2-05 — admin operational flows
+- ✅ **R2-05-A** 🔴 — category approve never published → `APPROVED⟺visibleToAll` lockstep на approve/reject/PATCH (FIX-R2-05-AB, 2026-06-23)
+- ✅ **R2-05-B** 🔴 (money) — plan-edit 0-price продавал длинные термы бесплатно → `isPriceable`>0 + upsert удаляет ≤0 row + marketing через тот же resolver + FREE до резолвера (FIX-R2-05-AB, 2026-06-23)
+
+### R2-06 — notification CTAs + review-submit (FIX-R2-06-quick, 2026-06-23)
+- ✅ **R2-06-E** 🟠 — `REVIEW_LEFT` dead notification → `decodePublicId(review.id)` перед lookup
+- ✅ **R2-06-C** 🟡 — model-offer deeplink `?offerId=` → `?filterOffer=` (4 emitter-сайта)
+- ✅ **R2-06-D** 🟡 — `SCHEDULE_REQUEST` "Открыть заявку" → `/cabinet/studio/schedule-requests`
+- ✅ **R2-06-G** 🔵 — `HOT_SLOT_*` fallback `/hot-slots` 404 → `/catalog?hot=true`
+
+---
+
+## Round 1 — pre-launch self-QA campaign (FIX-01…FIX-25, июнь 2026)
+
+> Полный ledger — `QA-FINDINGS.md` → «🏁 CAMPAIGN-CLOSURE LEDGER». Каждая QA-NNN закрыта соответствующим FIX.
+
+- ✅ **QA-108** 🔴 — env.ts `process.exit` крашил prod client → guard prod-exit (FIX-01, 2026-06-14)
+- ✅ **QA-001** 🟡 — /login hydration mismatch (Telegram/VK env-via-alias) → props + env.ts client literal-inlining (FIX-09, 2026-06-16) + CSP unsafe-eval removal (FIX-23, 2026-06-17)
+- ✅ **QA-105** 🟡 — bulk-seed цены в рублях не копейках (FIX-02, 2026-06-14)
+- ✅ **QA-102** 🟠 — catalog image resilience (unconfigured hosts) (FIX-02/12/21)
+- ✅ **QA-109** 🟠 — цены 100× inflated (moneyRUB не ÷100) на 9 callsites (FIX-03, 2026-06-15)
+- ✅ **QA-110** 🟠 — booking time-grid показывал 2 дня вперемешку (FIX-05, 2026-06-15)
+- ✅ **QA-111** 🟡 — `slotStepMin` hardcoded 30 → plumbing (FIX-05)
+- ✅ **QA-103** 🟠 — catalog search CUID leak → opaque id (FIX-13, 2026-06-16)
+- ✅ **QA-104** 🟠 — home hero/footer deep-link param mismatch (FIX-13)
+- ✅ **QA-112** 🔵 — dashboard capacity «0ч» + comparison label (FIX-08, 2026-06-15)
+- ✅ **QA-113** 🟠 — master schedule labels в host-tz не provider-tz (FIX-04/11/20)
+- ✅ **QA-114** 🟠 — studio master schedule-edit без approval-feedback (FIX-06, 2026-06-15)
+- ✅ **QA-115** 🟡 — studio affiliation невидим на master cabinet/profile (FIX-06)
+- ✅ **QA-116** 🔵 — seed weekday 0–6 vs ISO 1–7 (FIX-08)
+- ✅ **QA-119** 🟠 — client mobile bottom-nav перекрывал контент (FIX-07, 2026-06-15)
+- ✅ **QA-120** 🟡 — client booking action-buttons < 44px tap-target (FIX-07)
+- ✅ **QA-122** 🟡 — time-grid exhausted-today empty state (FIX-10, 2026-06-16)
+- ✅ **QA-123** 🟠 — master day-grouping в host-tz (FIX-20, 2026-06-18)
+- ✅ **QA-002** — admin redirect/landing (FIX-08)
+- ✅ **QA-106** 🔵 — off-schedule slot rejection copy (UI_TEXT only) (FIX-25, 2026-06-18)
+- ✅ **RULE-12-SWEEP** (FIX-14…19) — public CUID leaks закрыты через `src/lib/public-id.ts` opaque encoding (search/models/portfolio/stories/providers/reviews/schedule)
+- ✅ **IMG-RESILIENCE-SWEEP** (FIX-21) — 15 remote-image surfaces через FocalImage onError
+- ✅ **QA-107** (частично, FIX-22) — salon-tz display + «Время салона (город, GMT+N)» label; `isToday`/«Ближайшая» salon-tz (FIX-20)
+- ✅ **CSP/social-auth cluster** (FIX-24, 2026-06-18) — theme-nonce + Telegram frame-src/connect + VK CORS
+
+### Plan-gating (FIX-26/27/28, 2026-06-19)
+- ✅ **PLAN-GATE-CTA-BROKEN** (FIX-26) — scoped upgrade-CTA via `billingUpgradeHref`
+- ✅ **PLAN-GATE-UI-INCONSISTENT / NOTIF-NO-AFFORDANCE / HINT-DIVERGENCE / DEAD-CANONICAL** (FIX-27) — единый `FeatureGate` (section+inline), derived-tier
+- ✅ **PLAN-PARITY-DEAD-GATE-financeReport / DEAD-STUDIO-HOTSLOTS / clientNotes-appliesTo / SIDEBAR-VESTIGIAL-GATE** (FIX-28) + billing-notification deep-links scope-threaded
+- ✅ **PLAN-STUDIO-PRO-BI-ASYMMETRY** — documented-intentional (FIX-28)
+
+### Dev-only (no code change, prod-confirmed safe)
+- ✅ **QA-101** — `/u/[username]` + slots API 500 = jest-worker dev artifact (prod 200 confirmed)
+- ✅ **QA-117** — `/admin/reviews` slow-first-render = dev compile latency
+
+---
+
+## Завершённые workstreams и аудиты (май–июнь 2026)
+
+> Детали каждого — `MASTERRYADOM_AI_CONTEXT.md` §15.
+
+- ✅ **Cabinet Master** — полный redesign (sidebar shell / dashboard / bookings kanban / schedule / settings 5 tabs / clients / reviews / analytics / profile / messages / portfolio / services)
+- ✅ **Cabinet Client** — полный redesign (bookings/favorites/messages/model-applications/notifications/profile/reviews/roles/settings/faq)
+- ✅ **Cabinet Studio** — 19 коммитов (shell / dashboard / masters / schedule / bookings / services / packages / clients / reviews / notifications / analytics / settings + showcase seed + bug-fix/polish)
+- ✅ **Admin Panel** — Shell / Dashboard / Catalog / Cities / Users / Billing / Settings / Reviews + AdminAuditLog integration + MRR snapshots
+- ✅ **Public surfaces** — public master profile `/u/[username]` + booking widget (foundation + UX redesign) + public studio profile
+- ✅ **Chat foundation** (3 коммита, 2026-05-19) — universal chat + SSE + read receipts + attachments
+- ✅ **OpenAI → Yandex AI migration** — Phase 4a–4e (review-summary/reply/service-description/advisor) + wrapper + cleanup + prompt-tune (2026-05-31)
+- ✅ **MIGRATION-RECONCILIATION-BATCH** (2026-05-30) — 24-op drift reconciled + `check:schema-drift` CI-гейт добавлен + `db push` запрещён (CLAUDE.md rule 16)
+- ✅ **BUCKET-A-BATCH** (2026-05-29) — VAPID-NON-NULL-FIX · CONTEXT-FRESHNESS-CI-CHECK · RUNBOOK-INDEX-A · DRILL-PASS-CRITERIA-A · OPENAPI-ROUTE-CI · PORTFOLIO-EDITOR-NEXT-IMAGE
+- ✅ **STRUCTURAL-PREVENTION-AUDIT** (capstone) + **CONTEXT-REFRESH-V3** (2026-05-29)
+- ✅ **Audit-волна 11/11** — LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION + sprint-retrospective
+- ✅ **Audit-волна fix-prompts** — PROD-ENV-EXAMPLE-SYNC-A (DR-1) · **FEED-PORTFOLIO-N1-FIX-A** (PERF-1; `loadMasterServiceOverridesMap` + tests) · **MODAL-A11Y-BATCH-A** (UI-1+UI-3 = инвариант #27, закрыл MODAL-FOCUS-TRAP) · EMAIL-VERIFY-FIX-A · OTP-LOG-DEV-GUARD-A (SEC-1) · ENV-DISCIPLINE-SWEEP-A (CC-1) · FAST-WINS-BATCH-A · SECURITY-SURFACE-TESTS-A · SMS-GATEWAY-A (P1; SMS provider abstraction — live creds = deploy item)
+- ✅ **Email/CORS/quick-wins** (май–июнь) — EMAIL-MODULE-AUDIT-A · EMAIL-BRAND-URL-FIX-A · EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A · CORS-FIXES-BATCH-A · PRE-LAUNCH-QUICK-AUDITS-A · EMPTY-STATE-COMPONENT-A · SENSITIVE-DATA-LOGS-AUDIT-A (audit; fix → PII-LOGGING-FIX-A остаётся OPEN)
+- ✅ **GRAPHIFY-SETUP** + **PRE-LAUNCH-CHECKLIST-DOCUMENT** (2026-05-31)
+- ✅ **Legacy sweep** (FIX-25) — 3 proven-orphan deletions (старые studio `studio-clients-page`/`studio-reviews-page`/`studio-profile-page`)
+
+### Phases
+- ✅ Phase 1 — Cabinet Master · Phase 1.5 — Cabinet Client + Public + Chat + Multi-city · Phase 2 — Admin Panel · Phase 3 — Cabinet Studio · Phase 4 — Public surfaces · Phase 5 — Chat enhancements
+
+---
+
+## Code-vs-backlog reconciliation (закрыто при DOCS-CLEANUP 2026-06-23)
+Эти пункты числились OPEN в старом `BACKLOG.md`, но код подтверждает их завершённость:
+- ✅ **SCHEMA-DRIFT-CI-CHECK** — `scripts/check-schema-drift.mjs` существует + wired в `npm run check` (MIGRATION-RECONCILIATION-BATCH)
+- ✅ **FEED-PORTFOLIO-N1-FIX-A** — landed (`src/lib/feed/portfolio.service.ts` `loadMasterServiceOverridesMap` + regression test)
+- ✅ **MODAL-FOCUS-TRAP-FIX-A** — закрыт MODAL-A11Y-BATCH-A (инвариант #27 `use-modal-a11y`)

@@ -1,12 +1,21 @@
 # МастерРядом — Контекст проекта для ИИ
-> Дата аудита: **29 мая 2026** (refresh — CONTEXT-REFRESH-V3; предыдущий snapshot был 13 мая 2026 — V2)
-> Файлов проверено: **621 features tsx + 65 components tsx + 277 route.ts + 90 page.tsx + 74 test files** (counts verified by parallel inspectors)
-> Коммит/ветка: `auditandaction`. Последний значимый: MODAL-A11Y-BATCH-A (a11y закрытие 55+ модалов через shared use-modal-a11y hooks).
-> Моделей: **65**, enum'ов: **36**, миграций: **16** (без новых миграций за всю audit-волну — design discipline maintained).
-> Тестов: **629** (рост 358 → 629 за audit-волну, +271).
-> Error codes: **113** typed (`EMAIL_ALREADY_USED` добавлен по EMAIL-VERIFY-FIX-A).
+> Дата аудита: **23 июня 2026** (refresh — **CONTEXT-REFRESH-R2**; предыдущие: 29 мая 2026 — V3, 13 мая — V2).
+> Ветка: `testloop` (pre-launch self-QA). Моделей: **65**, enum'ов: **36**, миграций: **19** (последняя — `20260619000000_provider_timezone_default_moscow`, FIX-R2-02-A; **🚩 применить на проде до regen seed-snapshot**). Test-файлов: **84**. Error codes: **113** typed.
 >
-> **🎉 Sprint phase: AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness.**
+> **🏁 Pre-launch self-QA — Round 1 + Round 2 (blitz) пройдены.** Полный ledger всех находок и фиксов (fixed / dev-only / flagged-residual / deploy-checklist / deliberate-non-action) — в [`QA-FINDINGS.md`](QA-FINDINGS.md) → «🏁 CAMPAIGN-CLOSURE LEDGER» + «🔄 ROUND 2». Активные открытые задачи — в [`BACKLOG.md`](BACKLOG.md) (trimmed; завершённое — в [`BACKLOG-DONE.md`](BACKLOG-DONE.md)). **Этот файл — снапшот текущего состояния, НЕ changelog** (история фиксов живёт в QA-FINDINGS / BACKLOG-DONE).
+>
+> **Что закрепил Round 2 (структурные изменения, отражены в разделах ниже):**
+> - **Timezone (FIX-R2-02-A):** `Provider.timezone` теперь **derived из `City.timezone`** при сохранении адреса (master + studio; studio пишет недостающий `cityId`); cabinet **tz-селектор** (master profile + studio settings, shared `src/lib/ui/timezone-options.ts`); `DEFAULT_TIMEZONE = Europe/Moscow` как default create-пути; schema `@default` сменён Almaty→Moscow (миграция выше). Engine-safety byte-identical (существующие провайдеры не сдвинуты).
+> - **Billing (FIX-BC-1-2 + FIX-R2-05-AB):** единый `resolvePlanPrice` (`src/lib/billing/pricing.ts`) — один источник цены для checkout + renewal + cabinet display + marketing `/pricing` (display==signup==renewal by construction); **0/неположительная сохранённая цена трактуется как «нет цены» → fallback monthly×N (12mo = floor(monthly·12·0.8)), никогда не бесплатно**; upgrade-cancel-флаг отложен в success-webhook; webhook идемпотентен (early-return на SUCCEEDED); период/план берутся из authoritative DB-payment-row, не из mutable metadata. `maxTeamMasters` cap (STUDIO_FREE=2, PRO/PREMIUM admin-set, `null`=unlimited) + `ensureStudioTeamLimit`.
+> - **Catalog (FIX-R2-05-AB):** инвариант **`APPROVED ⟺ visibleToAll=true`** enforced на всех status-write путях (approve/reject/PATCH) — approved-категория больше не отсутствует в публичной выдаче.
+> - **Studio booking (FIX-R2-04-BA + FIX-R2-01-A/B):** manual-create + move делят **salon-tz work-hours guard** (`resolveSalonLocalParts`) + **in-tx Serializable conflict re-check** с funnel/manual/reschedule путями; `assertMasterPerformsService` (same-service); `parseDateKeyToUtcStart` override-day fix. Все booking-write пути теперь имеют единую in-tx Serializable conflict-дисциплину.
+> - **Public-ID / rule-12 (FIX-14…19 + FIX-R2-06-quick):** `src/lib/public-id.ts` (`encodePublicId`/`decodePublicId`, base64url, prefix `e_`) — shared primitive; публичные поверхности отдают только opaque id; закрыт decode-хвост в review-нотификации.
+> - **Notifications (FIX-R2-06-quick):** `REVIEW_LEFT` теперь срабатывает (decode-fix); CTA-параметры/таргеты исправлены (`?filterOffer=`, `/schedule-requests`, `/catalog?hot=true`).
+> - **Auth/CSP (FIX-23/24):** `/login` без `unsafe-eval`; Telegram через `data-auth-url` redirect-mode + scoped `frame-src`; theme no-flash nonce; VK через plain `<a>` (без RSC-prefetch CORS). `env.ts` client-branch инлайнит `NEXT_PUBLIC_*` литерально (FIX-09).
+>
+> ---
+>
+> **🎉 Sprint phase (предшествующее, сохранено для контекста): AUDIT-ВОЛНА 11/11 COMPLETE — prevention-plan + ops readiness.**
 > Tier 1 audits (items 1-6): LEGACY-CLEANUP / SECURITY / CODE-CONSISTENCY / TEST-COVERAGE / ERROR-HANDLING / SPRINT-RETROSPECTIVE-DOC
 > Tier 2 audits (items 7-11): DEPLOYMENT-READINESS / BUSINESS-LOGIC / PERFORMANCE / UI-UX / DOCUMENTATION
 > Fix-prompts закрывшие критические находки во время волны: PROD-ENV-EXAMPLE-SYNC-A (DR-1), FEED-PORTFOLIO-N1-FIX-A (PERF-1), MODAL-A11Y-BATCH-A (UI-1 + UI-3), EMAIL-VERIFY-FIX-A (🔴 #1), OTP-LOG-DEV-GUARD-A (SEC-1), ENV-DISCIPLINE-SWEEP-A (CC-1), FAST-WINS-BATCH-A (TC-2 + SEC-2 + proxy.ts), SECURITY-SURFACE-TESTS-A (TC-1).
@@ -58,7 +67,7 @@
 
 **Описание:** Маркетплейс-агрегатор для онлайн-записи к мастерам красоты (маникюр, стрижки, массаж и пр.). Клиенты находят мастеров или студии, смотрят портфолио, записываются онлайн. Мастера управляют расписанием, бронированием, профилем.
 
-**Рынок:** Россия / СНГ. Timezone по умолчанию — Asia/Almaty (указан в схеме), конфиг DEFAULT_TIMEZONE = Europe/Moscow. Цены в рублях (RUB, копейках в БД).
+**Рынок:** Россия / СНГ. Timezone: `DEFAULT_TIMEZONE = Europe/Moscow` (он же schema `@default` после FIX-R2-02-A); рабочая tz провайдера **derived из города** (`City.timezone`) при сохранении адреса, с явным cabinet-селектором для override. Цены в рублях (RUB, хранятся в **копейках**; на всех публичных/cabinet-поверхностях форматируются ÷100 — FIX-03).
 
 **Роли пользователей:**
 | Роль | Описание |
@@ -75,7 +84,8 @@
 - Периоды оплаты: 1, 3, 6, 12 месяцев (скидка 20% за год)
 - Платежи через ЮКасса (YooKassa)
 - Grace-period 7 дней при просрочке (PAST_DUE_GRACE_DAYS = 7)
-- Ограничения по плану: maxTeamMasters, maxPortfolioPhotosSolo и др.
+- **Цена плана/периода — единый `resolvePlanPrice`** (`src/lib/billing/pricing.ts`): один источник для checkout / renewal / cabinet / `/pricing`. Сохранённая цена ≤0 → fallback monthly×N (12mo со скидкой 20%), никогда не бесплатно (FIX-BC-1-2 + FIX-R2-05-AB)
+- Ограничения по плану: `maxTeamMasters` (STUDIO_FREE=2, PRO/PREMIUM admin-set, `null`=unlimited; guard `ensureStudioTeamLimit`), maxPortfolioPhotosSolo и др.
 
 **Стадия:** Активная разработка / MVP-plus. SMS-шлюз НЕ интегрирован (OTP пишется в логи с комментарием "MVP"). Production launch — в активной подготовке (Q2-Q3 2026); идёт sprint редизайна кабинета мастера в ветке `newDesignSystem`.
 
@@ -412,7 +422,7 @@ src/
 >
 > **Chat foundation:** ✅ **завершён** (33a) — универсальный chat для master + client cabinets, агрегированные per-person threads, opaque conversation slugs (через `ConversationSlug` модель), SSE real-time updates. Booking-chat остаётся как separate concept.
 >
-> **Admin Panel UI:** 🔄 **в работе** (`designAdminCabinet` branch) — Shell ✅, Dashboard ✅, Catalog ✅. Cities/Users/Billing/Settings/Reviews — в очереди по одному per промпт.
+> **Admin Panel UI:** ✅ **завершён** (`designAdminCabinet`, merged) — Shell / Dashboard / Catalog / Cities / Users / Billing / Settings / Reviews. Все в `src/features/admin-cabinet/`.
 
 
 ### Аутентификация ✅
@@ -426,14 +436,13 @@ src/
 - Поддержка VK OAuth
 
 ### Бронирования ✅
-- **Файлы:** `src/lib/bookings/createBooking.ts`, `src/lib/bookings/booking-core.ts`, `src/lib/bookings/flow.ts`
-- Два пути создания: с UTC-временем (`createBooking`) и устаревший через slotLabel (`createClientBooking`)
-- Проверка конфликтов (`ensureNoConflicts` с `buildBookingOverlapWhere`)
-- Идемпотентность через `x-idempotency-key` header + Redis-lock
-- Rate limiting на создание
-- Инвалидация кэша слотов при создании бронирования
+- **Файлы:** `src/lib/bookings/createBooking.ts`, `src/lib/bookings/booking-core.ts`, `src/lib/bookings/flow.ts`, `src/lib/bookings/policy-enforcement.ts`, `src/lib/studio/bookings.service.ts`
+- Гостевой checkout: `/api/bookings` POST принимает гостя (nullable `clientUserId`), пост-signup link по телефону (BOOKING-WIDGET-FOUNDATION-A)
+- **Единая in-tx Serializable conflict-дисциплина на ВСЕХ write-путях** (funnel · solo-master manual · studio create/move · reschedule request+approval): `ensureNoConflicts`/exclude-self re-check **внутри** `$transaction` с `isolationLevel: Serializable` + commit-time P2034/P2002 → чистый 409 SLOT_CONFLICT, без double-book / без 500 (FIX-R2-01-A/B, FIX-R2-04-BA)
+- **Policy enforcement** (`policy-enforcement.ts`): `assertBookingWindow` (minBookingHoursAhead / maxBookingDaysAhead / acceptNewClients / visibleSlotDays — defense-in-depth на slots-endpoint + `resolveBookingCore`), `assertMasterPerformsService` (same-service при move между мастерами), studio work-hours guard через **salon-tz** `resolveSalonLocalParts` (минуты/weekday/dateKey в tz провайдера, engine-matching)
+- Идемпотентность через `x-idempotency-key` header + Redis-lock; rate limiting на создание; инвалидация кэша слотов
 - Напоминания: 24ч и 2ч до записи через очередь задач
-- Уведомления: Telegram + push после создания/подтверждения
+- Уведомления: Telegram + push после создания/подтверждения. Клиентские поверхности показывают время в **salon-tz** с явной меткой «Время салона (город, GMT+N)» (FIX-22)
 
 ### Расписание ✅
 - **Файлы:** `src/lib/schedule/engine.ts`, `src/lib/schedule/engine-core.ts`, `src/lib/schedule/slots.ts`
@@ -450,6 +459,8 @@ src/
 - Webhook: HMAC-SHA256 подпись + IP allowlist + optional Bearer token
 - Очередь задач: webhook → enqueue → worker → processYookassaWebhookPayload
 - BillingPayment.idempotenceKey `@unique` — идемпотентность платежей на уровне БД
+- **Webhook идемпотентен** — `payment.succeeded` early-return при уже-`SUCCEEDED` row (не re-anchor `currentPeriodEnd`); период+план берутся из authoritative DB-payment-row (period ∈ `BILLING_PERIODS`), а не из mutable webhook metadata; upgrade-plan-switch применяется ТОЛЬКО success-webhook'ом (abandoned upgrade не трогает активную подписку) — FIX-BC-1-2
+- **Цена — единый `resolvePlanPrice`** (`src/lib/billing/pricing.ts`): checkout + renewal + cabinet display + marketing `/pricing` зовут один резолвер → display==signup==renewal. Row учитывается только если `>0` (`isPriceable`), иначе fallback monthly×N / `null`; FREE-активация ДО резолвера (FREE никогда не 404; платный 404 на `null`, никогда бесплатно) — FIX-R2-05-AB
 - Планы наследуют фичи через `inheritsFromPlanId`
 - BillingAuditLog — журнал биллинговых событий
 - `BILLING_PERIODS = [1, 3, 6, 12]`, скидка 20% за год
@@ -461,6 +472,7 @@ src/
 - SSE stream: `/api/notifications/stream`
 - Push: web-push (VAPID)
 - Типов уведомлений: 40+ (все статусы бронирований, студийные события, биллинг, чат)
+- **R2 fixes (FIX-R2-06-quick):** `REVIEW_LEFT` теперь срабатывает (был dead — `decodePublicId(review.id)` перед lookup); CTA-deeplinks исправлены — model-offer `?filterOffer=` (4 emitter-сайта), `SCHEDULE_REQUEST` → `/cabinet/studio/schedule-requests` (inline approve/reject), `HOT_SLOT_*` fallback → `/catalog?hot=true`. **Известные open (R2-06):** in-app billing-CTA, `?focus=` deeplink-reader, reschedule inline accept/decline — см. BACKLOG
 
 ### Горячие слоты ✅
 - **Файлы:** `src/lib/hot-slots/`
@@ -754,10 +766,7 @@ src/
 - Cost+balance logged on every successful send (`messageId`, `cost`, `balanceLeft`) для retrospective monitoring.
 - **Pre-launch ops:** установить `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` в prod env, пополнить SMSC баланс, smoke-test (Beeline/MTS/Megafon RU + KZ). SMS-MONITORING-A (admin balance widget + daily low-balance cron) — отдельный 🟡 backlog.
 
-**P2: VAPID ключи использованы с `!` (non-null assertion) — crash при старте если не заданы** — Сделано: **ЧАСТИЧНО** (verified by CONTEXT-REFRESH-V3 2026-05-29). `isPushEnabled` computed flag в `src/lib/env.ts` теперь guards module-level usage. Residual risk: file-internal `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!` (vapid.ts:5-6) crashes если **только один** ключ задан (non-null assertion fires per-key). Fix: guard individual key assignments OR replace `!` с conditional return. **Backlog 🟡 — VAPID-NON-NULL-FIX** (~20 min).
-- Файл: `src/lib/notifications/push/vapid.ts:5-6`
-- `process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!`, `process.env.VAPID_PRIVATE_KEY!`
-- Если ключи не заданы, инициализация vapid упадёт с TypeError в production.
+**P2: ~~VAPID ключи с `!` (non-null assertion)~~** — ✅ **ЗАКРЫТО (VAPID-NON-NULL-FIX, BUCKET-A-BATCH 2026-05-29).** `isVapidConfigured` guard + trimmed-value side-effect; `env.ts` client-branch инлайнит `NEXT_PUBLIC_VAPID_PUBLIC_KEY` литерально (FIX-09).
 
 ### 🟠 Важные
 
@@ -808,9 +817,7 @@ src/
 **T3: Дублирующие поля в Provider**
 - `rating` / `ratingAvg`, `reviews` / `ratingCount` — два набора rating-полей (строка 632-637).
 
-**T4: timezone по умолчанию в schema.prisma — Asia/Almaty**
-- Файл: `prisma/schema.prisma:648` — `timezone String @default("Asia/Almaty")`
-- Но в `.env.example` — `DEFAULT_TIMEZONE=Europe/Moscow`. Несоответствие.
+**T4: ~~timezone по умолчанию Asia/Almaty~~** — ✅ **ЗАКРЫТО (FIX-R2-02-A, миграция `20260619000000_provider_timezone_default_moscow`).** Schema `@default("Europe/Moscow")`, tz derived из города при сохранении адреса, cabinet-селектор. 🚩 миграцию применить на проде до regen seed-snapshot.
 
 **T5: 22 вхождения `eslint-disable` в src/**
 - Преимущественно в UI-компонентах (focal-image, slot-picker, studio-calendar, etc.)
@@ -832,11 +839,9 @@ src/
 
 ### 🆕 Новые known limitations (после sprint редизайна)
 
-**L1: Booking enforcement новых полей** — Сделано: НЕТ. **Pre-launch task**.
-- `Provider.minBookingHoursAhead`, `maxBookingDaysAhead`, `acceptNewClients` — поля сохраняются через Schedule Settings, но enforcement в `createBooking` ещё не подключён. Booking flow допускает запись вне окна.
+**L1: ~~Booking enforcement новых полей~~** — ✅ **ЗАКРЫТО (BOOKING-WIDGET-A + R2).** `minBookingHoursAhead` / `maxBookingDaysAhead` / `acceptNewClients` / `visibleSlotDays` enforced server-side через `policy-enforcement.assertBookingWindow` (slots-endpoint + `resolveBookingCore`).
 
-**L2: Public catalog игнорирует новые visibility-поля** — Сделано: НЕТ. **Pre-launch task**.
-- `Provider.slotPrecision`, `visibleSlotDays` доступны через snapshot, но публичная витрина фильтрует только по `isPublished`. Клиент видит точное время даже если мастер выставил «только дата».
+**L2: Public catalog visibility-поля** — частично: slots-endpoint клампит `visibleSlotDays` + `slotPrecision` honored на booking-поверхностях; полный per-viewer-tz рендеринг (QA-107) остаётся backlog.
 
 **L3: `lateCancelAction === "fine"` без enforcement**
 - Поле сохраняется в Provider, но онлайн-платёжная логика штрафов не подключена. UI отображает опцию для будущей фичи.
@@ -1125,11 +1130,14 @@ The following architectural choices block 4 pre-launch runbooks. **Each decision
 | 21 | **Studio masters permissions работают по default правилам** | UX rule (STUDIO-MASTERS-A) | В studio masters detail panel НЕТ permissions toggles (schedule edit / services edit / notifications). Это intentional: schedule changes идут через approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A), services управляются по studio policy, notifications — через user-level preferences. Если permission gating потребуется в будущем — это новые schema fields + UI, не toggles в текущем дизайне. |
 | 22 | **Studio admin booking CRUD direct vs approval flow scope** | `src/lib/studio/bookings.service.ts` (`createStudioBooking`, `moveStudioBooking`) + `src/app/api/bookings/[id]/cancel/route.ts` (STUDIO-SCHEDULE-A) | Studio admin booking operations (создать / перенести / отменить запись) идут **прямо** через Booking CRUD — никакой ScheduleChangeRequest approval. Admin has authority over studio bookings. `ScheduleChangeRequest` approval flow (STUDIO-SCHEDULE-REQUEST-APPROVAL-A) — это **отдельный концепт**: применяется ТОЛЬКО к master-initiated working-hours / day-off changes (через `applyScheduleSnapshot` / week schedule edits), не к individual bookings. Confusing эти 2 scope ломает либо UX (admin не может быстро управлять записями), либо authority model (master может обойти approval). |
 | 24 | **Studio master eligibility: INVITED не назначается на услуги, не принимает записи** | `src/lib/studio/master-eligibility.ts` (`isStudioMasterActive`, `requireActiveStudioMaster`) — applied in `assignMasterToService` + `createStudioBooking` + `moveStudioBooking` + `loadStudioServiceDetail.availableMasters` + schedule day/week `columns.isAvailable` + bookings page `loadShellExtras.scheduleMasters[].isAvailable` (STUDIO-BUGS-FIX-A) | Канонический предикат «мастер может работать в студии»: `Provider.ownerUserId !== null && Provider.isPublished === true`. INVITED (нет ownerUserId — приглашение не принято) и DISABLED (`!isPublished` — admin поставил на паузу) одинаково блокируются от назначения/приёма записей. Server-side enforcement в lib layer кидает 409 `MASTER_NOT_ACTIVE`. UI pickers фильтруют INVITED at source. Schedule grid рендерит INVITED как DisabledMasterOverlay column. Усиление #21: «no permissions toggles in UI» теперь дополнено runtime guard. Несоблюдение invariant приводит к bookings на призрачных мастеров, отображению INVITED в bookable pickers, и user confusion. |
-| 23 | **Category visibility: APPROVED = public; PENDING = creator scope only** | `src/features/studio-cabinet/services/server/services-data.service.ts` (`listAvailableCategoriesForStudio`) + `src/lib/master/services-view.service.ts` (`listAvailableGlobalCategories`) + `/api/catalog/global-categories` GET + `catalog.service.ts` filter (CATEGORY-UNIFICATION-A) | `GlobalCategory.status = APPROVED` AND `visibleToAll = true` → visible everywhere (public catalog, all studios, all masters). `GlobalCategory.status = PENDING` → visible ТОЛЬКО to creator (`createdByUserId` / `proposedBy` match `auth.user.id`) in their own service/portfolio picker. Public catalog (`/api/catalog/global-categories`) **строго** filters `status: APPROVED, visibleToAll: true` — pending drafts never leak. Master `service-modal.tsx` + studio `add-service-dialog.tsx` propose new categories via `POST /api/categories/propose` → создаёт `status: PENDING, visibleToAll: false`. Категория становится globally visible только после admin approval. **Никогда не filter catalog/public surfaces by `OR: [APPROVED, own-PENDING]`** — это сломает invariant (см. `catalog/global-categories/route.ts` services-category-creation-restore comment про prior bug). |
+| 23 | **Category visibility: APPROVED = public; PENDING = creator scope only** | `src/features/studio-cabinet/services/server/services-data.service.ts` (`listAvailableCategoriesForStudio`) + `src/lib/master/services-view.service.ts` (`listAvailableGlobalCategories`) + `/api/catalog/global-categories` GET + `catalog.service.ts` filter (CATEGORY-UNIFICATION-A) | `GlobalCategory.status = APPROVED` AND `visibleToAll = true` → visible everywhere (public catalog, all studios, all masters). `GlobalCategory.status = PENDING` → visible ТОЛЬКО to creator (`createdByUserId` / `proposedBy` match `auth.user.id`) in their own service/portfolio picker. Public catalog (`/api/catalog/global-categories`) **строго** filters `status: APPROVED, visibleToAll: true` — pending drafts never leak. Master `service-modal.tsx` + studio `add-service-dialog.tsx` propose new categories via `POST /api/categories/propose` → создаёт `status: PENDING, visibleToAll: false`. Категория становится globally visible только после admin approval. **Никогда не filter catalog/public surfaces by `OR: [APPROVED, own-PENDING]`** — это сломает invariant (см. `catalog/global-categories/route.ts` services-category-creation-restore comment про prior bug). **🔒 Write-path lockstep (FIX-R2-05-AB):** КАЖДЫЙ status-write путь держит `visibleToAll` в синхроне со `status` — approve → `visibleToAll: true` atomically, reject → `false`, admin PATCH → `= (status === APPROVED)` (`categories/[id]/{approve,reject,route}.ts`). Без этого approved-категория не появлялась в публичной выдаче (split-brain: feed/autocomplete фильтруют `visibleToAll`, а home-rail/search ключевались на `status`). |
 | 26 | **Chat attachment ACL = chat participants only (1:1 client↔master); studio admins/outsiders denied** | `src/lib/media/access.ts` (`ensureCanReadMedia` CHAT_MESSAGE case + `canReadChatAttachmentMedia` helper). Route `/api/chat/attachment/[token]` (MASTER-CHAT-ATTACHMENT-FIX-A) | MediaAsset rows tagged `entityType=CHAT_MESSAGE` + `entityId="chat-message:<msgId>"` могут читать ТОЛЬКО два участника беседы — `booking.clientUserId` (client) и `booking.masterProvider.ownerUserId` (master). Studio admin/owner — НЕТ (privacy 152-ФЗ, same boundary as `resolveChatAccess`). Outsiders → 403. Availability gate intentionally skipped для read (участники видят историю и после окончания брони — как сообщения). URL pattern: opaque token-only (`/api/chat/attachment/[token]`) — assetId cuid не в URL (signed payload embeds `aid`, `exp`, `purpose:"chat-attachment-read"`). Distinct purpose claim предотвращает cross-replay с generic `media-read` токенами. Защищён tests: `chat-attachment-acl.test.ts` (8 boundary scenarios) + `chat-attachment-token.test.ts` (11 token contract + URL-no-cuid). |
 | 25 | **Master CRM private fields никогда не появляются в client-facing API/DTO/SSR** | `src/lib/bookings/dto.ts` (`BookingDto` / `BookingClientDto` без `notes`/`tags`/`clientCard`), `src/lib/bookings/list.ts` (`listClientBookings` explicit-list select), `src/lib/client-cabinet/bookings.service.ts` (`ClientBookingDTO` + `listClientBookings`), `/api/cabinet/user/*`, `/api/bookings/my`, `/api/bookings/[id]/chat` — все explicit-list select без CRM-полей. Guarded by `src/lib/bookings/client-privacy.test.ts` (13 tests: type-level + source-level regex) (MASTER-PRIVACY-FIX-A) | Master CRM private поля — `Booking.notes` (мастер пишет при manual booking), `ClientCard.notes` / `ClientCard.tags` / `ClientCard.photos` (CRM-карточка клиента у мастера, providerId-scoped), `ClientNote.text` (отдельная модель notes by master) — **никогда не возвращаются клиенту** через API/DTO/SSR. Это 152-ФЗ-критичное: мастер обрабатывает персональные данные клиента для CRM-цели, в руки клиенту они не должны попадать (модель данных мастера, не клиента). **Что НЕ master-private** и легитимно в client DTO: `Booking.comment` (client-to-master comment, клиент сам написал), `Booking.changeComment` (bilateral reschedule communication), `ClientNote` model — приватна полностью, **никогда** не include в client paths. **Boundary защищается двумя слоями**: (1) TypeScript type-level — `extends keyof` assertions в `client-privacy.test.ts` fail at compile time если поле просочится в DTO type; (2) Source-level regex — тот же test читает байты 6 client-facing файлов и матчит `notes: true` / `clientCard:` / `clientNote:` паттерны (ловит даже `as`-cast обходы types). Расширение privacy-полей в схеме → расширить оба массива в test. |
 | 27 | **ModalSurface + Drawer enforce WCAG SC 2.4.3 + 2.3.3 + 3.2.1 для всех callers через `use-modal-a11y` hooks** | `src/components/ui/use-modal-a11y.ts` (`useReturnFocus` + `useInitialFocus` + `useFocusTrap` + `decideFocusTrap` pure helper) — applied в `src/components/ui/modal-surface.tsx` + `src/components/ui/drawer.tsx`. 50+ ModalSurface callers + 5 Drawer migrations inherit без per-caller code change (MODAL-A11Y-BATCH-A 2026-05-23). | Каждый модал / drawer enforced для WCAG: (1) **focus trap** — Tab cycles внутри modal panel; (2) **initial focus** — first focusable child OR explicit `initialFocusRef` prop OR container fallback с `tabIndex={-1}`; (3) **return focus** — opener element restored at close (guard against opener-removed-from-DOM); (4) **`useReducedMotion`** — animations collapse to opacity-only когда user prefers reduced motion. Custom focus trap (~50 LOC) вместо `@radix-ui/react-focus-scope` (не в deps). Mouse-user behavior identical (focus trap invisible). Default-user animations preserved. **Защищён tests**: `use-modal-a11y.test.ts` (18 tests — `FOCUSABLE_SELECTOR` discipline + `decideFocusTrap` pure helper across Tab/Shift+Tab × position × outside-container edge cases). React lifecycle integration deferred until TC-3 (jsdom + @testing-library infra). Pattern 14 largest fan-out leverage: 1 primitive fix → 55+ callers hardened. **Stories-viewer-overlay** keeps independent focus-trap (different concerns: arrow nav + swipe + progress bars — `STORIES-VIEWER-A11Y-CONSOLIDATE` 🔵 carryover). |
 | 28 | **Все Booking state-change endpoints idempotent через `x-idempotency-key` + Redis lock** | `src/lib/bookings/idempotency.ts` (`resolveBookingIdempotency` + `storeBookingIdempotency` + `clearBookingIdempotency`) — applied в `createBooking.ts` + `createClientBooking.ts` (rescheduleBooking + confirmBooking inherit via shared transaction patterns). TTL 600s. (BUSINESS-LOGIC-AUDIT-A confirmed) | Booking creation accepts optional `idempotencyKey` параметр — построение Redis key via `buildCreateBookingIdempotencyKey(namespaceKey, requestId)` namespaced by `clientUserId ?? \`guest:${clientPhone}\``. Lock-then-create pattern + on-failure cleanup (`clearBookingIdempotency`). Duplicate POST returns cached booking (если completed) OR throws `DUPLICATE_REQUEST 409` (если parallel insert race). **5-я P2002 surface** (booking + chat conversation-slug + cities + MRR snapshot + email-verify) mapped к user-friendly errors; OTP-EMAIL-LOGIN-RACE 6th site remains latent (low-probability — backlog 🟡 `OTP-EMAIL-LOGIN-RACE`). **Защищён tests**: `idempotency-key.test.ts` (6 tests pinning key composition + determinism + guest namespace + TTL constant). **Эмерджентный смежный invariant candidate** (formalize если 6th site OTP login race closes): «every P2002 → user-friendly error либо silent recovery, никогда 500». |
+| 29 | **Публичные id — opaque через `src/lib/public-id.ts`** (rule-12) | `src/lib/public-id.ts` (`encodePublicId`/`decodePublicId`, base64url, prefix `e_`) — applied в search / models / portfolio / stories / reviews DTO + RSC payloads (FIX-14…19) | Внутренние CUID/`id` не утекают на публичные поверхности (`/api/public/*`, `/api/catalog/*`, `/models/*`, reviews и пр.) — отдаём только opaque token. Любой route, принимающий публичный id, **декодирует через `decodePublicId` ПЕРЕД Prisma lookup** (decode-tail в review-нотификации был причиной dead `REVIEW_LEFT` — FIX-R2-06-quick). `decodePublicId` backward-compatible (без префикса возвращает raw — старые ссылки работают). Исключение: booking-flow legitimately нуждается во внутренних id клиентской стороне (invariant #12 exceptions, RULE-12-BOOKING-CONTRACT-OPTIONAL flagged). |
+| 30 | **Цена плана — единый `resolvePlanPrice`; 0/≤0 row → fallback, никогда не бесплатно** | `src/lib/billing/pricing.ts` (`resolvePlanPrice`, `isPriceable`) — зовут checkout, renewal, cabinet `billing-page.tsx`, marketing `marketing-pricing.ts` (FIX-BC-1-2 + FIX-R2-05-AB) | Один резолвер на всех путях → display==signup==renewal by construction. Сохранённый `BillingPlanPrice` row учитывается ТОЛЬКО если `kopeks > 0` (`isPriceable`); иначе fallback monthly×N (12mo = `floor(monthly·12·0.8)`), либо `null` если даже monthly отсутствует. Платный план при `null`/≤0 → checkout 404 (НЕ бесплатно); FREE-активация идёт ДО резолвера. Admin plan-edit с 0-ценой удаляет ≤0 period-row (fallback применяется), не продаёт длинные термы бесплатно. **Никогда не возвращать stored 0 verbatim и не показывать «0 ₽ −100%» на /pricing.** |
+| 31 | **Все booking-write пути: salon-tz work-hours guard + in-tx Serializable conflict re-check** | `src/lib/bookings/policy-enforcement.ts` (`resolveSalonLocalParts`, `assertMasterPerformsService`, `assertBookingWindow`) + `createBooking.ts` / `confirm.service.ts` / `studio/bookings.service.ts` (FIX-R2-01-A/B + FIX-R2-04-BA) | Funnel · solo-master manual · studio create/move · reschedule request+approval — все делают conflict-check **внутри** `$transaction` с `isolationLevel: Serializable` (+ commit-time P2034/P2002 → 409 SLOT_CONFLICT, exclude-self на move/reschedule). Work-hours/override проверяются в **salon (provider) tz** через `resolveSalonLocalParts` (engine-matching helpers; не `getUTCHours`). Override-дата читается `parseDateKeyToUtcStart(dateKey)` (Prisma 6 отвергает bare `"YYYY-MM-DD"`). Нарушение → double-book / 500 / off-hours bookings. |
 
 ---
 
@@ -1324,6 +1332,8 @@ graphify --help                    # Full CLI reference
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-06-23 — CONTEXT-REFRESH-R2** (ветка `testloop`, docs-only, no commit). Периодический refresh (rule 15) после Round 2 self-QA. **Только 3 `.md`-файла** (этот + `BACKLOG.md` split в новый `BACKLOG-DONE.md`); app-код не тронут. Снапшот переalign'ен с реальностью кода по 7 структурным R2-изменениям (все verified против исходников parallel-инспекторами): **timezone** (FIX-R2-02-A — derived из City + selector + schema default Moscow + миграция `20260619000000_provider_timezone_default_moscow`), **billing** (FIX-BC-1-2 + FIX-R2-05-AB — единый `resolvePlanPrice`, 0-price→fallback-never-free, webhook-idempotency, authoritative DB period), **catalog** (FIX-R2-05-AB — `APPROVED⟺visibleToAll` lockstep на всех status-write путях), **studio booking** (FIX-R2-04-BA + FIX-R2-01-A/B — salon-tz guard `resolveSalonLocalParts` + in-tx Serializable conflict re-check на всех write-путях), **public-id/rule-12** (`src/lib/public-id.ts` shared primitive), **notifications** (FIX-R2-06-quick — `REVIEW_LEFT` decode-fix + CTA-таргеты), **auth/CSP** (FIX-23/24 + FIX-09). Обновлены: header (дата/ветка/counts 19 миграций/84 test-файла), раздел 1 (timezone+цены), раздел 5 (бронирования/биллинг/уведомления/admin-panel done), раздел 8 (T4/L1/L2/P2 → ЗАКРЫТО), раздел 12 (#23 strengthened + новые #29 public-id, #30 resolvePlanPrice, #31 salon-tz+Serializable). **Детальная история фиксов — в [`QA-FINDINGS.md`](QA-FINDINGS.md) (Round 1 + Round 2 ledger) и [`BACKLOG-DONE.md`](BACKLOG-DONE.md); этот файл — снапшот, не changelog.** Открытые R2-задачи (R2-06-A/B/F/H/I, R2-02-B/C, R2-04-C/PKG, R2-03-A/B, R2-05-E/G/H/I/J, BC-CAP numbers, R2-05-C-v2 + deploy-checklist) — в `BACKLOG.md`. Validation: encoding/mojibake ✅, app-код 0 изменений.
 
 - **2026-06-02 — SENSITIVE-DATA-LOGS-AUDIT-A** (commit on `auditandaction`). **🟢 PRE-LAUNCH-CHECKLIST 3/10 quick-wins done.** Read-only PII exposure audit across 8 areas. **3 🔴 HIGH-severity findings** (raw phone/email в production logs) + **1 🟡 acceptable** (mock provider dev-only) + **NO 🚨 catastrophic** findings. Sentry integration prerequisites documented. Tier 2 predecessor для OBSERVABILITY-SENTRY-A.
   - **Logger inventory:** primary module `src/lib/logging/logger.ts` (canonical `logInfo`/`logError` exports, AsyncLocalStorage requestId, auto-Telegram-alert from logError). Masking helpers `src/lib/logging/masking.ts` (`maskPhone`/`maskEmail` from OTP-LOG-DEV-GUARD-A May 23). ~836 callsites (709 logError / 163 logInfo / 1 logWarn) across 549 api routes + 28 worker + 25 notifications + 18 bookings + 17 queue + 15 billing + 14 admin-cabinet + 13 profiles + 13 hot-slots + 12 ai. Direct `console.X` outside logger: 7 callsites (all production-safe — env validation crash, block-error formatters, alerting fallback)
