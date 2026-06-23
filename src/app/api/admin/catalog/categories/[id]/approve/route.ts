@@ -33,7 +33,12 @@ export async function POST(req: Request, ctx: RouteContext) {
     const updated = await prisma.$transaction(async (tx) => {
       const row = await tx.globalCategory.update({
         where: { id },
-        data: { status: "APPROVED", reviewedAt: new Date() },
+        // FIX-R2-05-A: publish on approve. A provider-proposed category is created
+        // `visibleToAll: false` (personal scope); approval MUST flip it to public in
+        // lockstep with the status — otherwise it stays absent from the public catalog
+        // filter feed + autocomplete (which gate on `visibleToAll=true`) while admin +
+        // proposer believe it's live. APPROVED ⟺ visibleToAll=true on every write path.
+        data: { status: "APPROVED", reviewedAt: new Date(), visibleToAll: true },
         select: { id: true, status: true },
       });
 

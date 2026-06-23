@@ -65,21 +65,19 @@ export async function POST(req: Request) {
     return fail("Тариф не относится к выбранному разделу.", 400, "VALIDATION_ERROR");
   }
 
-  // FIX-BC-1: one shared resolver — same amount the user is shown in the cabinet
-  // and the same amount renewal will charge (no signup↔renewal divergence, no
-  // silent renewal-expiry on a missing period row).
-  const priceKopeks = resolvePlanPrice(plan.prices, periodMonths);
-  if (priceKopeks === null) {
-    return fail("Цена для выбранного срока не найдена.", 404, "NOT_FOUND");
-  }
-
   const now = new Date();
   const existing = await prisma.userSubscription.findUnique({
     where: { userId_scope: { userId: user.id, scope } },
     select: { id: true, status: true, planId: true },
   });
 
-  if (priceKopeks <= 0 || plan.tier === "FREE") {
+  // FIX-R2-05-B: the FREE tier activates without payment — decided by TIER, not by a
+  // 0 price. This runs BEFORE the paid resolver so a FREE plan (which carries no
+  // positive price rows) never 404s on "цена не найдена". Only paid tiers go through
+  // `resolvePlanPrice`, where a 0/non-positive stored period now falls back to
+  // monthly×N (never free) — so an admin cannot give away a paid term by leaving a
+  // period at 0. A genuinely-free plan is the FREE tier, not a 0-priced PRO/PREMIUM.
+  if (plan.tier === "FREE") {
     const subscription = await prisma.userSubscription.upsert({
       where: { userId_scope: { userId: user.id, scope } },
       create: {
@@ -119,6 +117,15 @@ export async function POST(req: Request) {
     });
 
     return ok({ mode: "free-activated" });
+  }
+
+  // FIX-BC-1: one shared resolver — same amount shown in the cabinet and charged at
+  // renewal (no signup↔renewal divergence). FIX-R2-05-B: a 0/non-positive stored row
+  // is treated as "no price" → monthly fallback; a paid period can never resolve to 0,
+  // and the defensive `<= 0` guard ensures a paid checkout never creates a 0 payment.
+  const priceKopeks = resolvePlanPrice(plan.prices, periodMonths);
+  if (priceKopeks === null || priceKopeks <= 0) {
+    return fail("Цена для выбранного срока не найдена.", 404, "NOT_FOUND");
   }
 
   let subscriptionId = existing?.id ?? null;

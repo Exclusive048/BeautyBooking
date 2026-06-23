@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { get, set } from "@/lib/cache/cache";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
+import { BILLING_PERIODS } from "@/lib/billing/constants";
+import { resolvePlanPrice } from "@/lib/billing/pricing";
 
 /**
  * Single source of truth for marketing prices on /pricing and <PricingTeaser>.
@@ -58,6 +60,27 @@ function buildKey(scope: SubscriptionScope, tier: PlanTier): string {
   return `${scope}_${tier}`;
 }
 
+/**
+ * FIX-R2-05-B / FIX-BC-1-2 — resolve the standard checkout periods (1/3/6/12)
+ * through the SAME `resolvePlanPrice` that checkout/renewal/cabinet use, so the
+ * marketing /pricing page shows exactly what a user is charged: an explicit
+ * positive row wins, an absent-or-zero period falls back to monthly×N (×0.8 for
+ * 12mo), and a plan with no positive monthly resolves to an empty set
+ * ("Уточняется"). A 0/non-positive stored row is NEVER rendered as free.
+ */
+export function resolveMarketingPrices(
+  activePrices: ReadonlyArray<MarketingPlanPrice>,
+): MarketingPlanPrice[] {
+  const out: MarketingPlanPrice[] = [];
+  for (const periodMonths of BILLING_PERIODS) {
+    const priceKopeks = resolvePlanPrice(activePrices, periodMonths);
+    if (priceKopeks != null && priceKopeks > 0) {
+      out.push({ periodMonths, priceKopeks });
+    }
+  }
+  return out;
+}
+
 async function load(): Promise<MarketingPricingResult> {
   const plans = await prisma.billingPlan.findMany({
     where: { isActive: true },
@@ -94,7 +117,9 @@ async function load(): Promise<MarketingPricingResult> {
       tier: plan.tier,
       scope: plan.scope,
       features: resolved,
-      prices: plan.prices,
+      // FIX-R2-05-B: resolve to the displayed/charged per-period prices (fallback
+      // applied, 0-rows ignored) — /pricing now matches checkout/renewal exactly.
+      prices: resolveMarketingPrices(plan.prices),
       isFreePlan: plan.tier === "FREE",
     });
   }

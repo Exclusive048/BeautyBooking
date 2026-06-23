@@ -30,15 +30,32 @@ export type PlanPriceRow = { periodMonths: number; priceKopeks: number };
  * @param activePrices the plan's **active** `BillingPlanPrice` rows
  * @param periodMonths the term being purchased/renewed (1|3|6|12)
  */
+/**
+ * FIX-R2-05-B — a stored price counts as a real price only if it is a finite,
+ * POSITIVE kopeks amount. A 0 / negative / non-finite value means "no explicit
+ * price" → the resolver falls back (and ultimately to `null` if there is no
+ * positive monthly to derive from). A paid period must NEVER resolve to 0/free
+ * from an unset-or-zero row — a genuinely free plan is the FREE tier, not a
+ * 0-priced PRO/PREMIUM period. (The admin edit dialog used to persist 0 rows for
+ * untouched periods; combined with the old "return the row verbatim" this sold
+ * 3/6/12-month terms free — "0 ₽ −100%" on /pricing.)
+ */
+function isPriceable(kopeks: number | null | undefined): kopeks is number {
+  return typeof kopeks === "number" && Number.isFinite(kopeks) && kopeks > 0;
+}
+
 export function resolvePlanPrice(
   activePrices: ReadonlyArray<PlanPriceRow>,
   periodMonths: number,
 ): number | null {
+  // Only an explicit POSITIVE row wins; a stored 0/non-positive row is treated as
+  // "no price" and falls through to the monthly-derived fallback — identical on
+  // checkout, renewal, and display (the FIX-BC-1-2 single-source invariant).
   const exact = activePrices.find((p) => p.periodMonths === periodMonths);
-  if (exact) return exact.priceKopeks;
+  if (exact && isPriceable(exact.priceKopeks)) return exact.priceKopeks;
 
   const monthly = activePrices.find((p) => p.periodMonths === 1)?.priceKopeks;
-  if (monthly == null) return null;
+  if (!isPriceable(monthly)) return null;
 
   if (periodMonths === 12) {
     return Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT));

@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import {
   assertMasterPerformsService,
   assertWithinMasterWorkHours,
+  resolveSalonLocalParts,
   type MasterWorkWindow,
 } from "@/lib/bookings/policy-enforcement";
 
@@ -154,6 +155,105 @@ describe("assertWithinMasterWorkHours — #1в work hours boundary", () => {
         window: activeWindow,
       }),
     ).toThrow(AppError);
+  });
+});
+
+describe("FIX-R2-04-B — resolveSalonLocalParts (salon-tz work-hours derivation)", () => {
+  // Asia/Almaty is UTC+5 (no DST). The studio work-hours guard
+  // (`createStudioBooking` + `moveStudioBooking`) must read the real-UTC
+  // booking instant in the SALON timezone, NOT via getUTCHours() /
+  // getUTCDay() — which is the salon's UTC offset off the salon-local
+  // window. Each test contrasts the salon-local value with the old
+  // UTC-derived defect.
+  const ALMATY = "Asia/Almaty";
+
+  it("reads 06:00 UTC as 11:00 Almaty (660 min), not 06:00 (360 min)", () => {
+    // The in-hours-wrongly-rejected case: 11:00 Almaty is inside a 10-19
+    // window; pre-fix getUTCHours gave 360 (< 600) → wrongly rejected.
+    const parts = resolveSalonLocalParts(new Date("2026-06-25T06:00:00.000Z"), ALMATY);
+    expect(parts.minutesFromMidnight).toBe(11 * 60); // 660 salon-local
+    expect(parts.minutesFromMidnight).not.toBe(6 * 60); // not 360 (raw UTC)
+  });
+
+  it("reads 15:00 UTC as 20:00 Almaty (1200 min), not 15:00 (900 min)", () => {
+    // The out-of-hours-wrongly-allowed case: 20:00 Almaty is past a 10-19
+    // close; pre-fix getUTCHours gave 900 (inside [600,1140]) → wrongly allowed.
+    const parts = resolveSalonLocalParts(new Date("2026-06-25T15:00:00.000Z"), ALMATY);
+    expect(parts.minutesFromMidnight).toBe(20 * 60); // 1200 salon-local
+    expect(parts.minutesFromMidnight).not.toBe(15 * 60); // not 900 (raw UTC)
+  });
+
+  it("reads window-open boundary 05:00 UTC as 10:00 Almaty (600 min)", () => {
+    const parts = resolveSalonLocalParts(new Date("2026-06-25T05:00:00.000Z"), ALMATY);
+    expect(parts.minutesFromMidnight).toBe(10 * 60); // exactly window open
+  });
+
+  it("resolves weekday + dateKey in salon tz for a cross-midnight instant", () => {
+    // 2026-06-28 21:00 UTC = Monday 2026-06-29 02:00 Almaty. Pre-fix
+    // getUTCDay gave 0 (Sun) + UTC dateKey 2026-06-28 → looked up the wrong
+    // weekly day AND the wrong ScheduleOverride row. Salon-local gives
+    // Monday (1) + 2026-06-29.
+    const parts = resolveSalonLocalParts(new Date("2026-06-28T21:00:00.000Z"), ALMATY);
+    expect(parts.weekday).toBe(1); // Monday salon-local — UTC getUTCDay() = 0 (Sun)
+    expect(parts.dateKey).toBe("2026-06-29"); // UTC-derived would give 2026-06-28
+    expect(parts.minutesFromMidnight).toBe(2 * 60); // 02:00 local
+  });
+
+  it("Europe/Moscow (+3): 08:00 UTC reads as 11:00 MSK (660 min)", () => {
+    const parts = resolveSalonLocalParts(new Date("2026-06-25T08:00:00.000Z"), "Europe/Moscow");
+    expect(parts.minutesFromMidnight).toBe(11 * 60);
+  });
+
+  it("integration: salon-local minutes ACCEPT an in-hours time UTC wrongly rejected", () => {
+    // 10-19 Almaty window. 11:00 Almaty (06:00 UTC) is IN hours.
+    const window: MasterWorkWindow = { isActive: true, startMinutes: 10 * 60, endMinutes: 19 * 60 };
+    const instant = new Date("2026-06-25T06:00:00.000Z"); // 11:00 Almaty
+    const local = resolveSalonLocalParts(instant, ALMATY);
+
+    // Salon-tz minutes → PASSES (correct, post-fix).
+    expect(() =>
+      assertWithinMasterWorkHours({
+        bookingStartMinutes: local.minutesFromMidnight,
+        bookingEndMinutes: local.minutesFromMidnight + 60,
+        window,
+      }),
+    ).not.toThrow();
+
+    // UTC-derived minutes (the old defect) → THROWS (wrongly rejected).
+    const utcMinutes = instant.getUTCHours() * 60 + instant.getUTCMinutes(); // 360
+    expect(() =>
+      assertWithinMasterWorkHours({
+        bookingStartMinutes: utcMinutes,
+        bookingEndMinutes: utcMinutes + 60,
+        window,
+      }),
+    ).toThrow(AppError);
+  });
+
+  it("integration: salon-local minutes BLOCK an out-of-hours time UTC wrongly allowed", () => {
+    // 20:00 Almaty (15:00 UTC) is OUT of a 10-19 window.
+    const window: MasterWorkWindow = { isActive: true, startMinutes: 10 * 60, endMinutes: 19 * 60 };
+    const instant = new Date("2026-06-25T15:00:00.000Z"); // 20:00 Almaty
+    const local = resolveSalonLocalParts(instant, ALMATY);
+
+    // Salon-tz minutes → THROWS (correct, post-fix blocks out-of-hours).
+    expect(() =>
+      assertWithinMasterWorkHours({
+        bookingStartMinutes: local.minutesFromMidnight,
+        bookingEndMinutes: local.minutesFromMidnight + 60,
+        window,
+      }),
+    ).toThrow(AppError);
+
+    // UTC-derived minutes (the old defect) → PASSES (wrongly allowed).
+    const utcMinutes = instant.getUTCHours() * 60 + instant.getUTCMinutes(); // 900
+    expect(() =>
+      assertWithinMasterWorkHours({
+        bookingStartMinutes: utcMinutes,
+        bookingEndMinutes: utcMinutes + 60,
+        window,
+      }),
+    ).not.toThrow();
   });
 });
 

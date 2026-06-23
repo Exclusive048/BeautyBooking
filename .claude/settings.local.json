@@ -236,7 +236,27 @@
       "Bash(grep -rnA4 \"priceLabel\" src/lib/ui/fmt.ts)",
       "Bash(grep -nA10 \"export type AnalyticsContext\" src/features/analytics/domain/guards.ts)",
       "Bash(grep -nA14 \"export function buildScopeWhere\" src/features/analytics/domain/helpers.ts)",
-      "Bash(grep -nA6 \"export function buildStartAtRange\" src/features/analytics/domain/helpers.ts)"
+      "Bash(grep -nA6 \"export function buildStartAtRange\" src/features/analytics/domain/helpers.ts)",
+      "Bash(docker --version)",
+      "Bash(docker volume *)",
+      "Bash(tee .qa/diagnostics/fix-r2-04-ba/slots-utc.log)",
+      "Bash(tee .qa/diagnostics/fix-r2-04-ba/slots-msk.log)",
+      "Bash(cmd.exe /c \"set TZ=America/New_York&& node --env-file=.env --import tsx .qa\\\\diagnostics\\\\fix-r2-04-ba\\\\engine-safety-slots.mts\")",
+      "Bash(tee .qa/diagnostics/fix-r2-04-ba/live-service-proof.log)",
+      "Bash(PORT=3301 npm run dev)",
+      "Bash(echo \"dev server launching \\(PID $!\\) on port 3301, logging to devserver.log\")",
+      "mcp__playwright__browser_fill_form",
+      "Bash(mkdir -p .qa/diagnostics/r2-05)",
+      "Bash(echo \"restore exit: $?\")",
+      "Bash(curl -s -m 90 --retry 45 --retry-delay 2 --retry-connrefused http://localhost:3000/api/health)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "Bash(echo \"ENC=$?\")",
+      "Bash(echo \"MOJ=$?\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(echo \"rc=$?\")",
+      "Bash(rm -f .qa/diagnostics/r2-06-dev.log)",
+      "Bash(echo \"dev pid=$!\")"
     ]
   }
 }

@@ -53,4 +53,28 @@ describe("resolvePlanPrice (FIX-BC-1 — single source of truth)", () => {
     expect(resolvePlanPrice(prices, 3)).toBe(MONTHLY * 3);
     expect(resolvePlanPrice(prices, 12)).toBe(Math.floor(MONTHLY * 12 * 0.8));
   });
+
+  it("FIX-R2-05-B: a stored 0/non-positive period row is 'no price' → falls back, never free", () => {
+    // The footgun: editing only the monthly price persisted 0 rows for 3/6/12.
+    const prices = [
+      { periodMonths: 1, priceKopeks: MONTHLY },
+      { periodMonths: 3, priceKopeks: 0 },
+      { periodMonths: 6, priceKopeks: 0 },
+      { periodMonths: 12, priceKopeks: 0 },
+    ];
+    // 0 rows must NOT be returned verbatim — they fall back to monthly×N (×0.8 @ 12mo).
+    expect(resolvePlanPrice(prices, 3)).toBe(MONTHLY * 3);
+    expect(resolvePlanPrice(prices, 6)).toBe(MONTHLY * 6);
+    expect(resolvePlanPrice(prices, 12)).toBe(Math.floor(MONTHLY * 12 * 0.8));
+    // none resolve to 0/free; the explicit positive monthly is still honored
+    for (const p of [3, 6, 12]) expect(resolvePlanPrice(prices, p)).toBeGreaterThan(0);
+    expect(resolvePlanPrice(prices, 1)).toBe(MONTHLY);
+  });
+
+  it("FIX-R2-05-B: a 0/non-positive monthly is not a fallback base → null (not free)", () => {
+    expect(resolvePlanPrice([{ periodMonths: 1, priceKopeks: 0 }], 3)).toBeNull();
+    expect(resolvePlanPrice([{ periodMonths: 1, priceKopeks: -100 }], 12)).toBeNull();
+    // a 0 exact row with no monthly → null (never 0/free)
+    expect(resolvePlanPrice([{ periodMonths: 3, priceKopeks: 0 }], 3)).toBeNull();
+  });
 });

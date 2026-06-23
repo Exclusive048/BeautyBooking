@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import {
   assertMasterPerformsService,
   assertWithinMasterWorkHours,
+  resolveSalonLocalParts,
   type MasterWorkWindow,
 } from "@/lib/bookings/policy-enforcement";
 
@@ -88,6 +89,24 @@ describe("STUDIO-CLIENT-WRITE-DIALOG-A — create-booking rule reuse", () => {
         window: dayOff,
       }),
     ).toThrow(AppError);
+  });
+
+  it("FIX-R2-04-B: create path reads salon-tz minutes (mirror of reschedule)", () => {
+    // Both shells (`createStudioBooking` + `moveStudioBooking`) now feed
+    // `resolveSalonLocalParts(instant, master.timezone)` into the same
+    // `assertWithinMasterWorkHours` helper. So a +5 Almaty 11:00 create
+    // (06:00 UTC) is accepted in a 10-19 window — pre-fix BOTH paths read
+    // getUTCHours() and wrongly rejected it as 06:00.
+    const local = resolveSalonLocalParts(new Date("2026-06-25T06:00:00.000Z"), "Asia/Almaty");
+    expect(local.minutesFromMidnight).toBe(11 * 60); // 11:00 salon-local, not 06:00 UTC
+    const window: MasterWorkWindow = { isActive: true, startMinutes: 10 * 60, endMinutes: 19 * 60 };
+    expect(() =>
+      assertWithinMasterWorkHours({
+        bookingStartMinutes: local.minutesFromMidnight,
+        bookingEndMinutes: local.minutesFromMidnight + 60,
+        window,
+      }),
+    ).not.toThrow();
   });
 });
 

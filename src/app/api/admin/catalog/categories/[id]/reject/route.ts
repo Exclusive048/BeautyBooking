@@ -50,7 +50,10 @@ export async function POST(req: Request, ctx: RouteContext) {
     const updated = await prisma.$transaction(async (tx) => {
       const row = await tx.globalCategory.update({
         where: { id },
-        data: { status: "REJECTED", reviewedAt: new Date() },
+        // FIX-R2-05-A: explicit lockstep — a rejected category is hidden (mirrors
+        // approve setting visibleToAll=true). Reject only acts on PENDING (already
+        // visibleToAll=false), so this is defensive symmetry for the invariant.
+        data: { status: "REJECTED", reviewedAt: new Date(), visibleToAll: false },
         select: { id: true, status: true },
       });
 

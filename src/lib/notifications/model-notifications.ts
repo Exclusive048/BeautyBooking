@@ -65,7 +65,7 @@ export async function notifyModelApplicationReceived(
       offerId: application.offer.id,
       applicationId: application.id,
     },
-    pushUrl: `/cabinet/master/model-offers?offerId=${application.offer.id}`,
+    pushUrl: `/cabinet/master/model-offers?filterOffer=${application.offer.id}`,
     telegramText: buildTelegramText(title, body),
   });
 }
@@ -143,7 +143,7 @@ export async function notifyModelTimeConfirmed(
       applicationId: application.id,
       bookingId: application.bookingId ?? null,
     },
-    pushUrl: `/cabinet/master/model-offers?offerId=${application.offer.id}`,
+    pushUrl: `/cabinet/master/model-offers?filterOffer=${application.offer.id}`,
     telegramText: buildTelegramText(title, body),
   });
 }

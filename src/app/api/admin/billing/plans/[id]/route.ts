@@ -252,23 +252,34 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
       if (patch.prices && patch.prices.length > 0) {
         for (const entry of patch.prices) {
-          await tx.billingPlanPrice.upsert({
-            where: {
-              planId_periodMonths: {
+          // FIX-R2-05-B: only persist a row for a POSITIVE price. A 0/empty period
+          // input means "this period isn't explicitly priced" → remove any existing
+          // row so the resolver's monthly×N fallback applies, instead of storing a 0
+          // that would sell the term free. This prevents the footgun where setting
+          // only the monthly price created 0-rows for 3/6/12 → long terms charged 0.
+          if (entry.priceKopeks > 0) {
+            await tx.billingPlanPrice.upsert({
+              where: {
+                planId_periodMonths: {
+                  planId: id,
+                  periodMonths: entry.periodMonths,
+                },
+              },
+              create: {
                 planId: id,
                 periodMonths: entry.periodMonths,
+                priceKopeks: entry.priceKopeks,
+                isActive: true,
               },
-            },
-            create: {
-              planId: id,
-              periodMonths: entry.periodMonths,
-              priceKopeks: entry.priceKopeks,
-              isActive: true,
-            },
-            update: {
-              priceKopeks: entry.priceKopeks,
-            },
-          });
+              update: {
+                priceKopeks: entry.priceKopeks,
+              },
+            });
+          } else {
+            await tx.billingPlanPrice.deleteMany({
+              where: { planId: id, periodMonths: entry.periodMonths },
+            });
+          }
         }
       }
 

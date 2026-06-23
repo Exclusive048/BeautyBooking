@@ -3,6 +3,7 @@ import {
   calcSavingsPercent,
   findPrice,
   listIncludedFeatures,
+  resolveMarketingPrices,
   type MarketingPlan,
 } from "@/lib/billing/marketing-pricing";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
@@ -178,5 +179,44 @@ describe("billing/marketing-pricing — listIncludedFeatures", () => {
     const features = listIncludedFeatures(plan);
     expect(features[0].key).toBe(sorted[0]);
     expect(features[1].key).toBe(sorted[1]);
+  });
+});
+
+describe("billing/marketing-pricing — resolveMarketingPrices (FIX-R2-05-B)", () => {
+  const MONTHLY = 100_000;
+
+  it("ignores 0/non-positive period rows and shows the fallback instead of free", () => {
+    // the footgun: 1mo set, 3/6/12 left at 0 → must NOT render "0 ₽ −100%"
+    const resolved = resolveMarketingPrices([
+      { periodMonths: 1, priceKopeks: MONTHLY },
+      { periodMonths: 3, priceKopeks: 0 },
+      { periodMonths: 6, priceKopeks: 0 },
+      { periodMonths: 12, priceKopeks: 0 },
+    ]);
+    expect(resolved).toEqual([
+      { periodMonths: 1, priceKopeks: MONTHLY },
+      { periodMonths: 3, priceKopeks: MONTHLY * 3 },
+      { periodMonths: 6, priceKopeks: MONTHLY * 6 },
+      { periodMonths: 12, priceKopeks: Math.floor(MONTHLY * 12 * 0.8) },
+    ]);
+    expect(resolved.every((p) => p.priceKopeks > 0)).toBe(true);
+  });
+
+  it("a monthly-only plan offers all 4 periods via fallback", () => {
+    const resolved = resolveMarketingPrices([{ periodMonths: 1, priceKopeks: MONTHLY }]);
+    expect(resolved.map((p) => p.periodMonths)).toEqual([1, 3, 6, 12]);
+  });
+
+  it("a plan with no positive monthly resolves to an empty set ('Уточняется')", () => {
+    expect(resolveMarketingPrices([])).toEqual([]);
+    expect(resolveMarketingPrices([{ periodMonths: 1, priceKopeks: 0 }])).toEqual([]);
+  });
+
+  it("explicit positive rows win over the fallback", () => {
+    const resolved = resolveMarketingPrices([
+      { periodMonths: 1, priceKopeks: MONTHLY },
+      { periodMonths: 12, priceKopeks: 1_000_000 }, // explicit, ≠ monthly*12*0.8
+    ]);
+    expect(resolved.find((p) => p.periodMonths === 12)?.priceKopeks).toBe(1_000_000);
   });
 });
