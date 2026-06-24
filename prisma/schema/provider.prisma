@@ -101,6 +101,9 @@ model Provider {
 
   servicePackages ServicePackage[] @relation("MasterServicePackages")
 
+  // PACKAGE-BOOKING-MVP-1: packages booked at this provider.
+  bookingPackages BookingPackage[]
+
   bookings Booking[]
 
   masterBookings Booking[] @relation("BookingMaster")

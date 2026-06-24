@@ -15,9 +15,10 @@
 
 - **🎉 R2-06 sweep ЗАКРЫТ** (A–I все ✅, 2026-06-24). **🎉 EXP-волна затриажена** (33 находки в секции
   «🔍 EXPLORATORY» ниже) + **Group 1 (discovery/catalog) ЗАКРЫТ** (EXP-021/024/025/026/030, 2026-06-24).
-- Следующее: **package-booking MVP** (decision #4 — booking-foundation discovery defects на `/availability`+wizard
-  закрыты, можно строить) → затем оставшиеся EXP-группы (tz-cross-surface EXP-017/019/020/023, pricing-copy,
-  content/grammar, notifications, chat, a11y, seed-hygiene) → 🟡/🔵 consolidation sweep.
+- **🎉 PACKAGE-BOOKING MVP-1 (solo sequential) ЗАКРЫТ** (2026-06-24; см. BACKLOG-DONE.md) — atomic N-slot tx,
+  proportional discount (Σ exact), cancel-whole, reschedule-parts, cart UX. Schema + миграция `20260624140407_add_booking_package`.
+- Следующее: **PACKAGE-BOOKING MVP-2 (studio multi-master)** ↓ → затем оставшиеся EXP-группы (tz-cross-surface
+  EXP-017/019/020/023, pricing-copy, content/grammar, notifications, chat, a11y, seed-hygiene) → 🟡/🔵 consolidation sweep.
 - **Deploy / ops** (см. секцию ниже) — env-домены, live social-auth creds, SMS creds, geocoder key, DevOps infra,
   применить FIX-R2-02-A миграцию на проде до regen seed-snapshot.
 - **Product decisions решены Артёмом** (см. секцию ниже) → теперь это actionable code-задачи.
@@ -34,6 +35,11 @@
 
 ## 🟠 HIGH PRIORITY
 
+- **PACKAGE-BOOKING MVP-2 (studio multi-master)** — расширить пакетное бронирование на студии: per-component
+  выбор мастера клиентом (или авто), multi-master availability, каждый компонент через `assertMasterPerformsService`
+  + salon-tz guard, **параллельное** (не строго sequential) размещение когда компоненты у разных мастеров. Reuse
+  `createSoloPackageBooking` integrity-каркас (atomic tx + intra-package overlap **per master** + proportional discount
+  + cancel-whole). `loadSoloPackage` сейчас явно reject'ит studio (`PACKAGE_NOT_SOLO`) — снять для studio-пути.
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
 - **R2-05-H** — plan enable/disable toggle без confirmation guard (mis-click отключает план + рассылает «приостановлен»
@@ -98,7 +104,8 @@
 - **`YANDEX_GEOCODER_API_KEY`** в QA/prod env — prerequisite для tz-derivation walk на onboarding (FIX-R2-02-A).
 - **Seed `BillingPlanPrice` rows** — явные active rows для каждого предлагаемого периода (1/3/6/12mo) в QA/prod (BC-1 consistency; fallback есть, но явная row предпочтительнее).
 - **YooKassa** — replay `payment.succeeded`/`refund` + idempotency в live env.
-- **🚩 Применить миграцию `20260619000000_provider_timezone_default_moscow`** на проде **до** regen seed-snapshot.
+- **🚩 Применить миграции `20260619000000_provider_timezone_default_moscow` + `20260624140407_add_booking_package`** на проде (`prisma migrate deploy`) **до** regen seed-snapshot.
+- **🚩 Регенерировать `.qa/snapshots/post-seed.dump`** — текущий snapshot PRE-`add_booking_package` (нет таблицы `BookingPackage` / `ServicePackageItem.sortOrder`); restore вернёт схему назад. Пересоздать дамп после применения миграции.
 - **Email infra** — SMTP provider + DNS (DKIM/SPF/DMARC).
 - **DevOps infra (4 решения)** — Postgres hosting · TLS termination · backups · deploy-rollback policy.
 
@@ -107,7 +114,7 @@
 ## 🧩 PRODUCT DECISIONS — решены Артёмом → actionable code
 
 - **BC-CAP** → считать **ACTIVE-only** (сейчас `ensureStudioTeamLimit` считает INVITED/DISABLED+pending invites тоже) **+** задать числа cap для PRO/PREMIUM (FREE=2 есть).
-- **Package booking** (R2-04-PKG) → **wire booking** + **proportional discount**; пакет раскрывается в component-items + summed duration + один conflict-check. Нужен discovery-проход.
+- **Package booking** (R2-04-PKG) → **MVP-1 (solo sequential) ✅ ЗАКРЫТ 2026-06-24** (atomic tx + proportional discount + cancel-whole + reschedule-parts + cart UX; см. BACKLOG-DONE.md). **MVP-2 (studio multi-master)** — см. HIGH PRIORITY ниже.
 - **R2-05-C-v2** (opt-in renewal на росте цены) → при повышении цены — renewal **opt-in**: 2-дневный grace + reminders на 24h/2h.
 - **R2-05-I** (copy) → поведение «disable плана = блок новых signups, active subs не истекают» оставить; **поправить copy** «приостановлен» (вводит в заблуждение).
 - **Studio reschedule full parity** → studio-календарь получает «принять предложенное клиентом время» (сейчас только Move/Cancel) — пересекается с R2-06-A.

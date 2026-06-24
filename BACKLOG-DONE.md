@@ -9,6 +9,34 @@
 
 ---
 
+## 2026-06-24 — PACKAGE-BOOKING-MVP-1 (solo sequential)
+
+- ✅ **Solo-master sequential package booking — atomic + proportional + cancel-whole + reschedule-parts + cart UX.**
+  Composes the hardened single-booking integrity (NOT a fork): `resolveBookingCore` + `ensureNoConflicts(tx)` +
+  in-tx Serializable + P2034/P2002→409. Scope = solo master only (studio multi-master = MVP-2).
+  - **Schema + migration `20260624140407_add_booking_package`** (`migrate dev --create-only` → review → deploy; drift OK):
+    new model `BookingPackage` (servicePackageId SetNull / providerId / clientUserId / discountType+Value snapshot /
+    totalKopeks / status) + enum `BookingPackageStatus {ACTIVE,CANCELLED}` + `Booking.bookingPackageId` (SetNull) +
+    `ServicePackageItem.sortOrder` (backfilled by createdAt order).
+  - **Atomic create** (`createSoloPackageBooking`, `src/lib/bookings/package-booking.ts`): per-component
+    `resolveBookingCore` + **intra-package pairwise overlap** (siblings invisible to `ensureNoConflicts` mid-tx) +
+    one Serializable tx creating BookingPackage + N Booking + N BookingServiceItem; all-or-none.
+  - **Proportional discount** (`package-math.ts`, pure + unit-tested): largest-remainder split, Σ priceSnapshots ==
+    final total exactly (kopeks); `packageFinalTotal` byte-identical to `computeBundlePricing.finalPrice`.
+  - **Cancel-whole** (`cancelSoloPackageBooking`): one tx → all children REJECTED + pkg CANCELLED; lone-child cancel
+    blocked in `cancelBooking` (409 `PACKAGE_CANCEL_WHOLE`). **Reschedule-parts**: existing move path, no change —
+    `bookingPackageId` never touched, grouping survives (code + live verified).
+  - **Endpoints**: `POST /api/public/packages/[id]/propose` (sequential placement preview), `.../book` (atomic create,
+    guest-by-phone + 2-axis rate limit), `POST /api/bookings/package/[id]/cancel` (auth via child cancel-access).
+  - **UX**: bundle card "Записаться на пакет" CTA (solo only) → modal: pick start → review N components (times +
+    discounted prices + total) → confirm. `PublicBundleView` extended with `id` + `components` (booking-flow Rule-12 carve-out).
+  - **Verify**: engine-safety (0 schedule changes, `/slots` SHA `e44cd0c2bb7582f6` deterministic Almaty-anchored) ·
+    16 unit tests · live matrix (propose Σ-exact / atomic book + readback / atomic-fail no-partials / intra-overlap /
+    cancel-whole / lone-child guard / already-cancelled / reschedule-part grouping) · UX both themes. test 762/85 · build ✅.
+    Evidence: `.qa/diagnostics/package-mvp-1/`. **Deploy:** apply migration + regen snapshot (see BACKLOG deploy-ops).
+
+---
+
 ## 2026-06-24 — EXP-TRIAGE-AND-GROUP1 (discovery/catalog)
 
 - ✅ **EXP-волна затриажена** — все 33 `EXP-001…033` из `EXPLORATORY-FINDINGS.md` сведены в `BACKLOG.md` секцию

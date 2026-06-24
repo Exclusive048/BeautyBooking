@@ -2,19 +2,25 @@ import { Package, Clock, Sparkles } from "lucide-react";
 import type { PublicBundleView } from "@/lib/master/public-profile-view.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { PackageBookingButton } from "@/features/public-profile/master/components/package-booking-flow";
 
 type Props = {
   bundle: PublicBundleView;
+  providerId: string;
+  providerTimezone: string;
+  /** PACKAGE-BOOKING-MVP-1: solo master only (studio masters book via studio). */
+  bookable: boolean;
 };
 
 const T = UI_TEXT.publicProfile.bundles;
 
 /**
- * Read-only bundle preview card (31c). Booking is deferred until the
- * public booking flow integrates ServicePackage — for now the card is
- * informational only, with a small "coming soon" hint at the bottom.
+ * Bundle preview card. PACKAGE-BOOKING-MVP-1: when `bookable` (solo master),
+ * the card carries a "Записаться на пакет" CTA opening the atomic sequential
+ * package-booking flow. Otherwise it stays informational (studio packages →
+ * MVP-2).
  */
-export function BundleCard({ bundle }: Props) {
+export function BundleCard({ bundle, providerId, providerTimezone, bookable }: Props) {
   const savings = bundle.discountAmount > 0 ? UI_FMT.priceLabel(bundle.discountAmount) : null;
   return (
     <article className="bg-brand-gradient-soft relative overflow-hidden rounded-2xl border border-border-subtle/70 p-5">
@@ -63,10 +69,18 @@ export function BundleCard({ bundle }: Props) {
           </div>
         </div>
 
-        <p className="text-[11px] leading-relaxed text-text-sec/85">
-          <span className="font-medium text-text-sec">{T.bookingComingSoon}.</span>{" "}
-          {T.bookingComingSoonDesc}
-        </p>
+        {bookable ? (
+          <PackageBookingButton
+            bundle={bundle}
+            providerId={providerId}
+            providerTimezone={providerTimezone}
+          />
+        ) : (
+          <p className="text-[11px] leading-relaxed text-text-sec/85">
+            <span className="font-medium text-text-sec">{T.bookingComingSoon}.</span>{" "}
+            {T.bookingComingSoonDesc}
+          </p>
+        )}
       </div>
     </article>
   );

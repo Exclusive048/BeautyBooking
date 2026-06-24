@@ -12,11 +12,21 @@ type Props = {
   services: ProviderServiceDto[];
   bundles: PublicBundleView[];
   initialServiceId: string | null;
+  providerId: string;
+  providerTimezone: string;
+  packageBookable: boolean;
 };
 
 const T = UI_TEXT.publicProfile.bundles;
 
-export function ServicesSectionClient({ services, bundles, initialServiceId }: Props) {
+export function ServicesSectionClient({
+  services,
+  bundles,
+  initialServiceId,
+  providerId,
+  providerTimezone,
+  packageBookable,
+}: Props) {
   const { selectedServices, addService, setSelectedServices } = useSelectedServices();
   const initialAppliedRef = useRef(false);
 
@@ -48,7 +58,13 @@ export function ServicesSectionClient({ services, bundles, initialServiceId }: P
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {bundles.map((bundle, index) => (
-              <BundleCard key={`${bundle.name}-${index}`} bundle={bundle} />
+              <BundleCard
+                key={`${bundle.name}-${index}`}
+                bundle={bundle}
+                providerId={providerId}
+                providerTimezone={providerTimezone}
+                bookable={packageBookable}
+              />
             ))}
           </div>
         </section>

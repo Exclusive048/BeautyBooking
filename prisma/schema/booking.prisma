@@ -100,6 +100,15 @@ model Booking {
 
   serviceItems BookingServiceItem[]
 
+  // PACKAGE-BOOKING-MVP-1: when set, this Booking is one component of an
+  // atomically-created service package. The child stays a normal independent
+  // Booking (own reschedule path); the group id lets cancel-whole + analytics
+  // treat the package as a unit. SetNull so deleting the package row never
+  // orphan-deletes a real booking.
+  bookingPackageId String?
+
+  bookingPackage BookingPackage? @relation(fields: [bookingPackageId], references: [id], onDelete: SetNull)
+
   modelApplication ModelApplication? @relation("ModelApplicationBooking")
 
   // Cards rendered inline in chat threads reference this booking. Plural —
@@ -116,6 +125,7 @@ model Booking {
   @@index([studioId])
   @@index([masterId])
   @@index([status, startAtUtc])
+  @@index([bookingPackageId])
 }
 
 model BookingServiceItem {
@@ -146,6 +156,49 @@ model BookingServiceItem {
   @@index([bookingId])
   @@index([studioId])
   @@index([serviceId])
+}
+
+/// PACKAGE-BOOKING-MVP-1 — groups the N child Bookings created atomically
+/// from a ServicePackage. Money lives in each child `BookingServiceItem`
+/// (proportional discounted `priceSnapshot`); `totalKopeks` snapshots the
+/// sum so analytics + cancel-whole have a single authoritative total. The
+/// package + its discount config are snapshotted (servicePackageId is
+/// SetNull) so editing/deleting the source package never mutates booked
+/// money.
+model BookingPackage {
+  id String @id @default(cuid())
+
+  servicePackageId String?
+
+  servicePackage ServicePackage? @relation(fields: [servicePackageId], references: [id], onDelete: SetNull)
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  clientUserId String?
+
+  clientUser UserProfile? @relation("BookingPackageClient", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  /// Snapshot of the source package discount (reuses DiscountType enum).
+  discountType DiscountType @default(PERCENT)
+
+  discountValue Int @default(0)
+
+  /// Σ of the child BookingServiceItem.priceSnapshot (kopeks) == final price.
+  totalKopeks Int @default(0)
+
+  status BookingPackageStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+
+  @@index([providerId])
+  @@index([clientUserId])
+  @@index([servicePackageId])
 }
 
 model BookingChat {

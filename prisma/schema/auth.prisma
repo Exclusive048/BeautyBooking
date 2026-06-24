@@ -66,6 +66,9 @@ model UserProfile {
 
   bookings Booking[] @relation("BookingClient")
 
+  // PACKAGE-BOOKING-MVP-1: packages this client booked.
+  bookingPackages BookingPackage[] @relation("BookingPackageClient")
+
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
   refreshSessions   RefreshSession[]

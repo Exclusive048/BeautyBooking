@@ -26,10 +26,14 @@ import { logError } from "@/lib/logging/logger";
  */
 
 export type PublicBundleView = {
-  // Rule 12 (RULE-12-PROVIDERS): no internal package CUID on the public profile —
-  // the bundle is display-only (no per-bundle action keyed by id).
+  // PACKAGE-BOOKING-MVP-1: the bundle is now bookable, so the package `id` +
+  // component `serviceId`s are exposed (booking-flow carve-out to Rule 12,
+  // same as providerId/serviceId in the single-booking widget).
+  id: string;
   name: string;
   serviceNames: string[];
+  /** Components in package `sortOrder` — the sequence the booking places them in. */
+  components: Array<{ serviceId: string; name: string; price: number; durationMin: number }>;
   totalDurationMin: number;
   totalPrice: number;
   finalPrice: number;
@@ -91,15 +95,21 @@ export const getMasterPublicProfileView = cache(
       prisma.servicePackage.findMany({
         where: { masterId: provider.id, isEnabled: true },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-        // Rule 12 (RULE-12-PROVIDERS): explicit select — the bundle mapping only
-        // needs name/discount + items; never expose the raw row's internal
-        // CUIDs/timestamps (id, masterId, createdAt, updatedAt) to the client.
+        // Rule 12: explicit select. PACKAGE-BOOKING-MVP-1 — the package `id`
+        // and component `serviceId`s are now exposed because the bundle is
+        // bookable; this is the accepted booking-flow carve-out (same as
+        // providerId/serviceId already used by /api/public/bookings —
+        // RULE-12-BOOKING-CONTRACT-OPTIONAL). Still never expose masterId /
+        // timestamps.
         select: {
+          id: true,
           name: true,
           discountType: true,
           discountValue: true,
           items: {
             select: {
+              serviceId: true,
+              sortOrder: true,
               service: {
                 select: {
                   id: true,
@@ -146,8 +156,10 @@ export const getMasterPublicProfileView = cache(
 
     const bundles = packages
       .map((pkg) => {
+        // PACKAGE-BOOKING-MVP-1: order by the package's own item.sortOrder so
+        // the displayed sequence == the booked sequential placement order.
         const items = [...pkg.items].sort(
-          (a, b) => a.service.sortOrder - b.service.sortOrder,
+          (a, b) => a.sortOrder - b.sortOrder || a.service.sortOrder - b.service.sortOrder,
         );
         const totalPrice = items.reduce((sum, item) => sum + item.service.price, 0);
         const totalDurationMin = items.reduce(
@@ -162,10 +174,18 @@ export const getMasterPublicProfileView = cache(
         const serviceNames = items.map(
           (item) => item.service.title?.trim() || item.service.name,
         );
+        const components = items.map((item) => ({
+          serviceId: item.serviceId,
+          name: item.service.title?.trim() || item.service.name,
+          price: item.service.price,
+          durationMin: item.service.durationMin,
+        }));
         const hasDisabledComponent = items.some((item) => !item.service.isEnabled);
         return {
+          id: pkg.id,
           name: pkg.name,
           serviceNames,
+          components,
           totalDurationMin,
           totalPrice,
           finalPrice,
@@ -177,8 +197,10 @@ export const getMasterPublicProfileView = cache(
       })
       .filter((bundle) => !bundle.hasDisabledComponent)
       .map((bundle): PublicBundleView => ({
+        id: bundle.id,
         name: bundle.name,
         serviceNames: bundle.serviceNames,
+        components: bundle.components,
         totalDurationMin: bundle.totalDurationMin,
         totalPrice: bundle.totalPrice,
         finalPrice: bundle.finalPrice,

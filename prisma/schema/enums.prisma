@@ -357,6 +357,15 @@ enum DiscountType {
   FIXED
 }
 
+// PACKAGE-BOOKING-MVP-1: lifecycle of an atomically-booked service package.
+// ACTIVE = all child bookings live; CANCELLED = cancel-whole applied (all
+// children REJECTED in one tx). No partial state by design.
+enum BookingPackageStatus {
+  ACTIVE
+
+  CANCELLED
+}
+
 enum DiscountApplyMode {
   ALL_SERVICES
 
