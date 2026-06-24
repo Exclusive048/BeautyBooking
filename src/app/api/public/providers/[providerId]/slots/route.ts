@@ -1,15 +1,11 @@
 import { ok, fail } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
-import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { addDaysToDateKey, dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
-import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
+import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
-import {
-  clampVisibleSlotsHorizon,
-  earliestBookableUtc,
-} from "@/lib/bookings/policy-enforcement";
+import { clampVisibleSlotsHorizon } from "@/lib/bookings/policy-enforcement";
+import { listBookableSlots } from "@/lib/schedule/bookable-window";
 
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -23,26 +19,6 @@ function toDate(value: Date | string | null | undefined): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function normalizeFixedSlotTime(value: string): string | null {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
-    return null;
-  }
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function normalizeFixedSlotTimes(values: string[]): string[] {
-  const unique = new Set<string>();
-  for (const value of values) {
-    const normalized = normalizeFixedSlotTime(value);
-    if (normalized) unique.add(normalized);
-  }
-  return Array.from(unique).sort((left, right) => left.localeCompare(right));
 }
 
 function mapSlotsError(code?: string): string {
@@ -68,17 +44,6 @@ function mapSlotsError(code?: string): string {
       return "Не удалось загрузить окошки.";
   }
 }
-
-function dayIndexFromDateKey(dateKey: string): number {
-  const day = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
-  return day === 0 ? 6 : day - 1;
-}
-
-type EffectiveSchedule = {
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  fixedSlotSet: Set<string>;
-};
 
 export async function GET(
   req: Request,
@@ -130,27 +95,31 @@ export async function GET(
 
   // BOOKING-WIDGET-A: clamp the requested horizon to
   // `Provider.visibleSlotDays`. The cabinet-side schedule editor stores
-  // this value as the "catalog visibility" knob — without enforcement
-  // here, the public surface ignored it.
+  // this value as the "catalog visibility" knob — this clamp is
+  // public-discovery-specific and stays route-local (the authenticated
+  // `/availability` reschedule surface is bounded by `maxBookingDaysAhead`
+  // instead — see bookable-window.ts).
   const nowForPolicy = new Date();
   const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy);
   const effectiveToKeyExclusive = clampedToKey
     ? addDaysToDateKey(clampedToKey, 1)
     : toKey || undefined;
 
-  const result = await listAvailabilitySlotsPaginated(provider.id, serviceId, duration.data, {
-    fromKey,
-    toKeyExclusive: effectiveToKeyExclusive,
-    limit,
-  });
-  if (!result.ok) {
-    return fail(mapSlotsError(result.code), result.status, result.code);
-  }
-
-  const rangeFromUtc = dateFromLocalDateKey(result.data.meta.fromDate, provider.timezone, 0, 0);
-  const rangeToExclusiveUtc = dateFromLocalDateKey(result.data.meta.toDateExclusive, provider.timezone, 0, 0);
-
-  const [rule, weeklyConfig, overrides] = await Promise.all([
+  // EXP-025/026: the shared bookable-window primitive applies the
+  // `minBookingHoursAhead` cutoff + effective weekly/override schedule
+  // filter. `/availability` calls the SAME helper so the two endpoints
+  // can't re-diverge. The DiscountRule fetch stays here (hot-slot pricing
+  // is `/slots`-only) and runs in parallel.
+  const [bookable, rule] = await Promise.all([
+    listBookableSlots({
+      provider,
+      serviceId,
+      durationMinutes: duration.data,
+      fromKey,
+      toKeyExclusive: effectiveToKeyExclusive,
+      limit,
+      now: nowForPolicy,
+    }),
     prisma.discountRule.findUnique({
       where: { providerId: provider.id },
       select: {
@@ -163,101 +132,12 @@ export async function GET(
         serviceIds: true,
       },
     }),
-    prisma.weeklyScheduleConfig.findUnique({
-      where: { providerId: provider.id },
-      select: {
-        days: {
-          select: {
-            weekday: true,
-            isActive: true,
-            scheduleMode: true,
-            fixedSlotTimes: true,
-            templateId: true,
-          },
-        },
-      },
-    }),
-    prisma.scheduleOverride.findMany({
-      where: { providerId: provider.id, date: { gte: rangeFromUtc, lt: rangeToExclusiveUtc } },
-      select: {
-        date: true,
-        isDayOff: true,
-        isWorkday: true,
-        scheduleMode: true,
-        fixedSlotTimes: true,
-      },
-      orderBy: { date: "asc" },
-    }),
   ]);
-
-  const weekByDay = new Map<number, EffectiveSchedule>();
-  for (const day of weeklyConfig?.days ?? []) {
-    weekByDay.set(day.weekday, {
-      isWorkday: Boolean(day.isActive && day.templateId),
-      scheduleMode: day.scheduleMode ?? "FLEXIBLE",
-      fixedSlotSet: new Set(normalizeFixedSlotTimes(day.fixedSlotTimes ?? [])),
-    });
+  if (!bookable.ok) {
+    return fail(mapSlotsError(bookable.code), bookable.status, bookable.code);
   }
 
-  const exceptionsByDate = new Map<string, EffectiveSchedule>();
-  for (const row of overrides) {
-    const dateKey = toLocalDateKey(row.date, provider.timezone);
-    const fixedTimes = normalizeFixedSlotTimes(row.fixedSlotTimes ?? []);
-    exceptionsByDate.set(dateKey, {
-      isWorkday: row.isWorkday ?? !row.isDayOff,
-      scheduleMode: row.scheduleMode ?? (fixedTimes.length > 0 ? "FIXED" : "FLEXIBLE"),
-      fixedSlotSet: new Set(fixedTimes),
-    });
-  }
-
-  const effectiveCache = new Map<string, EffectiveSchedule>();
-  const getEffective = (dateKey: string): EffectiveSchedule => {
-    const cached = effectiveCache.get(dateKey);
-    if (cached) return cached;
-
-    const fromException = exceptionsByDate.get(dateKey);
-    if (fromException) {
-      effectiveCache.set(dateKey, fromException);
-      return fromException;
-    }
-
-    const weekday = dayIndexFromDateKey(dateKey) + 1;
-    const fromWeek = weekByDay.get(weekday);
-    if (fromWeek) {
-      effectiveCache.set(dateKey, fromWeek);
-      return fromWeek;
-    }
-
-    const fallback: EffectiveSchedule = {
-      isWorkday: true,
-      scheduleMode: "FLEXIBLE",
-      fixedSlotSet: new Set<string>(),
-    };
-    effectiveCache.set(dateKey, fallback);
-    return fallback;
-  };
-
-  // BOOKING-WIDGET-A: anything before `now + minBookingHoursAhead` is
-  // non-bookable. Drop those slots server-side so the catalog/widget
-  // never advertise an unbookable window — closes the long-standing
-  // enforcement gap on this surface.
-  const earliestBookable = earliestBookableUtc(provider, nowForPolicy);
-
-  const baseSlots = result.data.slots.filter((slot) => {
-    const startsAt = toDate(slot.startAtUtc);
-    if (!startsAt) return false;
-    if (startsAt.getTime() < earliestBookable.getTime()) return false;
-    const dateKey = toLocalDateKey(startsAt, provider.timezone);
-    const effective = getEffective(dateKey);
-
-    if (!effective.isWorkday) return false;
-    if (effective.scheduleMode !== "FIXED") return true;
-    if (effective.fixedSlotSet.size === 0) return false;
-
-    const { hour, minute } = getLocalTimeParts(startsAt, provider.timezone);
-    const localTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-    return effective.fixedSlotSet.has(localTime);
-  });
+  const baseSlots = bookable.slots;
 
   type SlotLike = (typeof baseSlots)[number] & {
     hotSlotId?: string | null;
@@ -312,5 +192,5 @@ export async function GET(
     endAtUtc: toIso(slot.endAtUtc),
   }));
 
-  return ok({ timezone: provider.timezone, slots: serializedSlots, meta: result.data.meta });
+  return ok({ timezone: provider.timezone, slots: serializedSlots, meta: bookable.meta });
 }

@@ -29,16 +29,52 @@ export async function GET(_req: Request, ctx: RouteContext) {
     }
 
     if (provider.type === ProviderType.MASTER) {
-      return ok({ masters: [{ id: provider.id, name: provider.name, publicUsername: provider.publicUsername }] });
+      // EXP-024: include the master's own enabled service ids so consumers
+      // (studio booking wizard) can list only masters who perform the
+      // selected service. A solo master performs its own catalog services.
+      const soloServices = await prisma.service.findMany({
+        where: { providerId: provider.id, isEnabled: true },
+        select: { id: true },
+      });
+      return ok({
+        masters: [
+          {
+            id: provider.id,
+            name: provider.name,
+            publicUsername: provider.publicUsername,
+            serviceIds: soloServices.map((s) => s.id),
+          },
+        ],
+      });
     }
 
     const masters = await prisma.provider.findMany({
       where: { studioId: provider.id, type: ProviderType.MASTER, isPublished: true },
-      select: { id: true, name: true, publicUsername: true },
+      // EXP-024: `masterServices` (enabled MasterService rows) is the source
+      // of truth for which team master performs which service. The booking
+      // wizard filters its picker on this — so it never lists (and never
+      // fires `/availability` for → no 409 `SERVICE_INVALID`) masters who
+      // aren't assigned to the chosen service.
+      select: {
+        id: true,
+        name: true,
+        publicUsername: true,
+        masterServices: {
+          where: { isEnabled: true },
+          select: { serviceId: true },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
 
-    return ok({ masters });
+    return ok({
+      masters: masters.map((m) => ({
+        id: m.id,
+        name: m.name,
+        publicUsername: m.publicUsername,
+        serviceIds: m.masterServices.map((s) => s.serviceId),
+      })),
+    });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
     logError("GET /api/providers/[id]/masters failed", { error: detail });

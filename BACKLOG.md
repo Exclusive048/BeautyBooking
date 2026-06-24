@@ -13,8 +13,11 @@
 
 ## 🎯 ТЕКУЩИЙ ФОКУС
 
-- **🎉 R2-06 sweep ЗАКРЫТ** (A–I все ✅, 2026-06-24). Следующее: **package-booking discovery** (decision #4) →
-  затем 🟡/🔵 consolidation sweep (R2-02-B/C, R2-04-C, R2-05-H/G/J/A2/E, R2-03-A, R2-06-A calendar-menu 🔵).
+- **🎉 R2-06 sweep ЗАКРЫТ** (A–I все ✅, 2026-06-24). **🎉 EXP-волна затриажена** (33 находки в секции
+  «🔍 EXPLORATORY» ниже) + **Group 1 (discovery/catalog) ЗАКРЫТ** (EXP-021/024/025/026/030, 2026-06-24).
+- Следующее: **package-booking MVP** (decision #4 — booking-foundation discovery defects на `/availability`+wizard
+  закрыты, можно строить) → затем оставшиеся EXP-группы (tz-cross-surface EXP-017/019/020/023, pricing-copy,
+  content/grammar, notifications, chat, a11y, seed-hygiene) → 🟡/🔵 consolidation sweep.
 - **Deploy / ops** (см. секцию ниже) — env-домены, live social-auth creds, SMS creds, geocoder key, DevOps infra,
   применить FIX-R2-02-A миграцию на проде до regen seed-snapshot.
 - **Product decisions решены Артёмом** (см. секцию ниже) → теперь это actionable code-задачи.
@@ -52,6 +55,7 @@
 - **R2-03-B** — analytics revenue без `Service.price` fallback (в отличие от `day.service.ts`). Latent (prod всегда пишет items). Fix: shared fallback или backfill.
 
 **Прочее:**
+- **CATALOG-AVAILABLE-TODAY-PIPELINE** (spawned by EXP-030) — `Provider.availableToday` — это snapshot, который **никто никогда не вычисляет** (все write-сайты ставят `false`). Это не disabled-cron, а **не построенный pipeline** (нужен job: для каждого published provider посчитать есть ли сегодня-окна через slot-engine + invalidate-хуки на booking-write + cron). Floor-fix уже закрыл user-facing dead-end (footer→/catalog, empty-state CTA). Пока pipeline нет — toggle «Свободно сегодня» гарантированно даёт 0 (опц. follow-up: скрыть toggle до построения pipeline, чтобы не предлагать заведомо-пустой фильтр). Размер: своя задача (cron+job+invalidation), не fix.
 - **OTP-EMAIL-LOGIN-RACE** — 6-й P2002 site (OTP email login `create`), latent low-probability. Fix: re-read recovery.
 - **MONEY-BRAND-TYPE-A** — brand-type `Kopeks` для compile-time защиты от рубли/копейки mix (~20 сайтов).
 - **PRISMA-INCLUDE-WHERE-CI-CHECK** — AST-гейт против nested-include без `where` (N+1 over-fetch class).
@@ -114,6 +118,67 @@
 
 - **MIGRATION-RECONCILIATION «full scope»** → **DONE.** `npm run check:schema-drift` = `OK — 0 drift` (schema.prisma ⟺ migrations history reconciled). *(`migrate status` показывает 1 not-yet-applied миграцию `…_provider_timezone_default_moscow` — это ОТДЕЛЬНАЯ deploy-ops задача «применить на проде», не reconciliation-gap; остаётся в «🚀 Deploy / ops».)*
 - **QA-26 suite** → **phantom (не существовало).** Это был misread Explore-агента: оригинальный бэклог имел заголовок секции `### QA (from QA-02 client discovery→booking funnel, 2026-06-06)`, чьи находки (QA-101 dev-only, QA-108 fixed, …) уже ✅ закрыты FIX-25/FIX-01. Нет «QA-26».
+
+---
+
+## 🔍 EXPLORATORY (EXP-001…033) — breadth-first whole-product Playwright pass (2026-06-23)
+
+> Источник: `EXPLORATORY-FINDINGS.md` (independent second-layer QA). Сгруппировано тематически; ничего не потеряно
+> (включая 🔵/seed/verify-on-prod). Dedup: ни один из EXP-001…022 не пересекается с прошлым backlog. Уточнение —
+> известный «studio flat services list» = это **public** профиль; studio **cabinet** services page уже группирует по
+> категориям. Известный «₽0 analytics revenue» = R2-03-A (не дублируем; EXP-014 — отдельная pricing-copy грань).
+
+**Discovery/catalog → Group 1 ✅ ЗАКРЫТ 2026-06-24 (EXP-TRIAGE-AND-GROUP1 Part 2; см. BACKLOG-DONE.md):**
+- ✅ 🟠 **EXP-024** — studio wizard теперь листит только assigned мастеров (masters endpoint отдаёт `serviceIds`; wizard фильтрует) → 0×409, нет dead-end. Live: «Маникюр классический» → 2/7 мастера, 0 console errors, 2× `/availability` 200.
+- ✅ 🟠 **EXP-021** — catalog route читает `getServerCity()` → `cityId` фильтр (зеркало `/models`). Live: no-city 40 → moscow 18 / spb 7. Ungeocoded исключены из city-view; нет города = все города.
+- ✅ 🟡 **EXP-025** — `/slots` + `/availability` теперь делят `listBookableSlots` (shared min-ahead + schedule filter) — не могут разойтись. Verified SHA-identical.
+- ✅ 🟡 **EXP-030** — *floor-fix*: footer «Мастера рядом» → `/catalog` (city-scoped, не dead-end); empty-state получил «Сбросить всё» CTA. *Pipeline сам не построен* → новый backlog `CATALOG-AVAILABLE-TODAY-PIPELINE` ниже.
+- ✅ 🔵 **EXP-026** — оба endpoint'а теперь трактуют `to` как **inclusive** (в shared primitive). Callers `to` не шлют → zero runtime impact, contract выровнен.
+
+**TZ cross-surface (out-of-scope для dev/MSK run; reported где cross-surface contradiction, не pure wrong-absolute-time):**
+- 🟡 **EXP-017** — одна бронь = два времени на master-поверхностях (dashboard 07:00 UTC vs kanban 12:00 salon-tz).
+- 🟡 **EXP-019** — master week-schedule: карточка нарисована в 12:00-слоте, а лейбл «10:00–11:00» (расхождение = Almaty/MSK offset).
+- 🟡 **EXP-023** — профиль chip «Сегодня свободно с 11:30» игнорит min-ahead+lunch (реальный earliest = 14:00).
+- 🔵 **EXP-020** *(verify-on-prod)* — studio calendar «today» = UTC-date, расходится с master/client (local-tz) на 1 день у local-midnight.
+
+**Pricing/billing copy:**
+- 🟡 **EXP-014** — public `/pricing` PRO/PREMIUM показывают «[Уточняется] · Цена будет настроена администратором» (admin-process copy наружу); admin/billing все планы «Бесплатно», MRR 0 (root = unset seed prices; см. deploy-ops «Seed BillingPlanPrice»).
+- 🔵 **EXP-015** — `/pricing` «Сравнить тарифы» CTA ведёт на `/become-master`, не на сравнение.
+
+**Content/grammar/SEO:**
+- 🟡 **EXP-001** — `<title>` дублирует бренд-суффикс («… — МастерРядом | МастерРядом») sitewide.
+- 🟡 **EXP-002** — login consent checkbox грамматически неверен (legal): «Я принимаю Пользовательск**им** соглашени**ем**…» (instrumental после accusative-глагола).
+- 🟡 **EXP-003** — «С нами с **июнь** 2026 г.» — nominative month после «с» (нужен genitive «июня»).
+- 🔵 **EXP-004** — нет пробела перед TZ-меткой в booking-success: «13:00**(Алматы, GMT+5)**».
+- 🔵 **EXP-005** — placeholder ИНН `1234567890` в footer (sitewide legal text).
+- 🔵 **EXP-008** — счётчик «43 мастера» включает студии (label accuracy).
+- 🔵 **EXP-016** — пустой service-label «— ·» в client review-карточках.
+- 🔵 **EXP-018** — master dashboard «Анонсы» с past-dated вебинаром (Чт 7 мая) + WhatsApp (не интегрированный канал).
+
+**Notifications/push UX:**
+- 🟡 **EXP-027** — нет user-facing push-контрола; prod авто-`requestPermission()` без user-gesture (браузеры душат) + нет re-enable после deny.
+- 🔵 **EXP-028** — у клиентов нет notification-preferences (меньше контроля чем у мастеров: только in-app центр).
+- 🔵 **EXP-029** — нет per-event-type routing (документированный «Скоро»); VK delivery WIP, SMS не wired.
+
+**Chat/UX:**
+- 🟡 **EXP-012** — chat conversation-list не рефрешится после первого сообщения в новом треде (нужен reload). *(смежно с FIX-R2-06-B `?focus=`/SSE-рефреш паттерном.)*
+- 🔵 **EXP-022** *(intermittent, low-confidence)* — React «setState on unmounted» + «Invalid token» при `/u/[master]/booking`→профиль redirect (solo-master), mobile. Не воспроизвёлся на retry.
+
+**a11y/PWA/cleanup:**
+- 🔵 **EXP-033** — viewport `user-scalable=no, maximum-scale=1` блокирует pinch-zoom (WCAG 1.4.4).
+- 🔵 **EXP-032** — orphan `/manifest.json` (200) со stale off-brand `theme_color #c6a97e` (живой = `/brand/manifest.webmanifest`).
+- 🔵 **EXP-013** *(seed-amplified)* — «Предстоящие» включает уже-прошедшие брони (split по статусу CONFIRMED/PENDING, не по datetime).
+
+**Seed-data hygiene:**
+- 🔵 **EXP-006** — Almaty адрес+TZ под Москва-городом (city/address mismatch; TZ-label by-design FIX-22).
+- 🔵 **EXP-007** — public review-preview: 3 отзыва все от одного автора (preview-ordering/seed).
+- 🔵 **EXP-010** — seed placeholder email `seed-client-…@test.masterryadom.local` виден в client profile.
+- 🔵 **EXP-011** — push delivery падает на invalid seed PushSubscription (`p256dh … 65 bytes`); log-noise, не user-visible.
+
+**Verify-on-prod (dev-config / dev-amplified — проверить на проде, не fix-в-dev):**
+- 🔵 **EXP-009** — Telegram login widget «Bot domain invalid» (TG bot domain не сконфижен на localhost). Проверить prod bot-domain. *(пересекается с deploy-ops «Telegram live round-trip».)*
+- 🔵 **EXP-031** — `/cabinet/studio/analytics` медленный (dev: 60s on-demand compile → ~5.9s SSR; агрегирует ~15 endpoints без кэша). Load-check на warm prod build.
+- 🔵 **PWA SW/push prod-only** — SW не регистрируется в dev (next-pwa off); offline-кэш / install-prompt / push delivery exercise-able только на prod build. Manifest/icons/meta в dev корректны.
 
 ---
 

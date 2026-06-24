@@ -810,6 +810,14 @@ export default function CatalogPageClient({
               <div className="mt-2 text-sm text-muted-foreground">
                 {timeModeActive ? UI_TEXT.catalog.timeSearch.emptyDesc : UI_TEXT.catalog.emptyDesc}
               </div>
+              {/* EXP-030: empty results shouldn't dead-end — offer a reset when
+                  filters are active (e.g. the never-computed "Свободно сегодня"
+                  snapshot always yields 0). */}
+              {!timeModeActive && activeFilterCount > 0 ? (
+                <Button onClick={resetFilters} variant="secondary" size="sm" className="mt-4">
+                  {UI_TEXT.catalog.sidebar.reset}
+                </Button>
+              ) : null}
             </div>
           ) : null}
 

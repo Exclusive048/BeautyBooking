@@ -107,6 +107,13 @@ export type CatalogSearchResult = {
 type CatalogSearchInput = {
   serviceQuery?: string;
   district?: string;
+  // EXP-021: the header city selector filters `/models` but was a no-op on
+  // `/catalog` (the search query never received the selected city). The route
+  // resolves the cookie via `getServerCity()` and passes `cityId` here.
+  // null/undefined = "all cities" (no filter); a value scopes to that city.
+  // Ungeocoded providers (cityId = null) are excluded from a city view —
+  // same semantics as `/models`.
+  cityId?: string;
   date?: string;
   priceMin?: number;
   priceMax?: number;
@@ -311,6 +318,12 @@ function buildWhere(
         mode: "insensitive",
       },
     });
+  }
+
+  // EXP-021: scope to the selected city when one is chosen. No city → no
+  // filter (all cities). Mirrors the `/models` city-scoping mechanism.
+  if (input.cityId) {
+    and.push({ cityId: input.cityId });
   }
 
   if (typeof input.availableToday === "boolean") {

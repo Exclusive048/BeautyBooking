@@ -1,7 +1,17 @@
 import type { ApiResponse } from "@/lib/types/api";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 
-export type StudioMaster = { id: string; name: string; publicUsername: string | null };
+export type StudioMaster = {
+  id: string;
+  name: string;
+  publicUsername: string | null;
+  // EXP-024: enabled MasterService ids — which services this master performs.
+  // The booking wizard lists only masters whose `serviceIds` include the
+  // chosen service, so it never offers (or probes `/availability` for) a
+  // master who'd return 409 `SERVICE_INVALID`. Optional for back-compat with
+  // any older payload shape; treated as "unknown → not assigned" when absent.
+  serviceIds?: string[];
+};
 export type SlotItem = { startAtUtc: string; endAtUtc: string; label: string };
 export type BookingUser = {
   id: string;

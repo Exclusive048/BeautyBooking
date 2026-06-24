@@ -9,6 +9,31 @@
 
 ---
 
+## 2026-06-24 — EXP-TRIAGE-AND-GROUP1 (discovery/catalog)
+
+- ✅ **EXP-волна затриажена** — все 33 `EXP-001…033` из `EXPLORATORY-FINDINGS.md` сведены в `BACKLOG.md` секцию
+  «🔍 EXPLORATORY», сгруппированы тематически (discovery 5 / tz 4 / pricing 2 / content 8 / notif 3 / chat 2 /
+  a11y 3 / seed 4 / verify-on-prod 2). Ничего не потеряно. Dedup: EXP-001…022 не пересекаются со старым backlog;
+  «studio flat services» = public-профиль (cabinet уже группирует); «₽0 analytics» = R2-03-A.
+
+- ✅ **Group 1 (discovery/catalog) — все 5 закрыты:**
+  - **EXP-024** 🟠 — studio wizard листил всех мастеров → 5×409 `SERVICE_INVALID` + dead-end. Fix: `/api/providers/[id]/masters`
+    отдаёт `serviceIds` (enabled MasterService); `booking-flow` фильтрует picker + availability-fetch на assigned-only.
+    Live: «Маникюр классический» → 2/7 мастера, 0 console errors, 2× `/availability` 200.
+  - **EXP-025 + EXP-026** 🟡/🔵 — `/availability` игнорил `minBookingHoursAhead` + расходился со `/slots` по `to`-inclusivity.
+    Fix: новый shared `src/lib/schedule/bookable-window.ts` (`listBookableSlots`) — min-ahead + weekly/override schedule
+    filter; оба endpoint'а зовут его (не могут разойтись). `/slots` byte-identical (engine untouched, verified SHA).
+    `to` теперь inclusive в обоих.
+  - **EXP-021** 🟠 — catalog city-selector был no-op. Fix: `/api/catalog/search` читает `getServerCity()` → `cityId` фильтр
+    в `searchCatalog` (зеркало `/models`). Live: no-city 40 → moscow 18 / spb 7. Ungeocoded исключены из city-view.
+  - **EXP-030** 🟡 — *floor-fix only*: `availableToday` = не построенный pipeline (всё пишет `false`). Footer «Мастера рядом»
+    → `/catalog` (city-scoped, не dead-end); empty-state получил «Сбросить всё» CTA. Pipeline вынесен в новый backlog
+    `CATALOG-AVAILABLE-TODAY-PIPELINE` (MEDIUM).
+  - Validation: typecheck/lint(baseline)/encoding/mojibake ✅; **test 746/84** ✅; build ✅; engine-safety SHA-identical;
+    live matrix (both themes spot). No DB mutations. Evidence: `.qa/diagnostics/exp-group1/`.
+
+---
+
 ## 2026-06-24 — PII redaction + verify-closures (DOCS-CLEANUP follow-up)
 
 - ✅ **R2-06-FI** (🟡 F + 🔵 I) — **closes the R2-06 sweep (A–I all ✅).** **F:** billing notifications gained an in-app

@@ -108,10 +108,19 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     [serviceId, studio?.services],
   );
 
-  const availableMasters = useMemo(() => {
+  // EXP-024: masters who actually perform the selected service (enabled
+  // MasterService). Drives both the picker and the availability fetch, so
+  // unassigned masters are never listed and never probed for slots (no more
+  // 5× 409 SERVICE_INVALID per service pick + no dead-end picker option).
+  const assignedMasters = useMemo(() => {
     if (!serviceId) return masters;
-    return masters.filter((master) => availabilityByMaster[master.id]?.serviceAvailable !== false);
-  }, [availabilityByMaster, masters, serviceId]);
+    return masters.filter((master) => (master.serviceIds ?? []).includes(serviceId));
+  }, [masters, serviceId]);
+
+  const availableMasters = useMemo(() => {
+    if (!serviceId) return assignedMasters;
+    return assignedMasters.filter((master) => availabilityByMaster[master.id]?.serviceAvailable !== false);
+  }, [assignedMasters, availabilityByMaster, serviceId]);
 
   const resolvedMasterId = useMemo(() => {
     if (masterId && masterId !== ANY_MASTER_ID) return masterId;
@@ -218,9 +227,11 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     setSlotLabel("");
   }, [serviceId]);
 
-  // Fetch availability per master when service or date changes
+  // Fetch availability per master when service or date changes.
+  // EXP-024: only assigned masters — no probing (and no 409s) for masters
+  // who don't perform the service.
   useEffect(() => {
-    if (!serviceId || masters.length === 0) {
+    if (!serviceId || assignedMasters.length === 0) {
       setAvailabilityByMaster({});
       return;
     }
@@ -230,7 +241,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
       setLoadingSlots(true);
       try {
         const results = await Promise.all(
-          masters.map(async (master) => ({
+          assignedMasters.map(async (master) => ({
             id: master.id,
             result: await fetchMasterAvailability(master.id, serviceId, selectedDate),
           })),
@@ -256,7 +267,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     return () => {
       cancelled = true;
     };
-  }, [masters, selectedDate, serviceId]);
+  }, [assignedMasters, selectedDate, serviceId]);
 
   // If service has a config (questions / reference photo) — load it
   useEffect(() => {
@@ -533,7 +544,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
             {step === "master" ? (
               <MasterStep
-                masters={masters}
+                masters={assignedMasters}
                 availabilityByMaster={availabilityByMaster}
                 selectedMasterId={masterId}
                 selectedServiceName={selectedService?.name ?? ""}

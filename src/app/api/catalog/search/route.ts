@@ -7,6 +7,7 @@ import { searchCatalog } from "@/lib/catalog/catalog.service";
 import { catalogSearchQuerySchema } from "@/lib/catalog/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/http/ip";
+import { getServerCity } from "@/lib/cities/server-city";
 
 export const runtime = "nodejs";
 const CATALOG_SEARCH_RATE_LIMIT = {
@@ -25,7 +26,10 @@ export async function GET(req: Request) {
     }
 
     const query = parseQuery(new URL(req.url), catalogSearchQuerySchema);
-    const data = await searchCatalog(query);
+    // EXP-021: apply the user's selected city (cookie-resolved, same source
+    // as `/models`). Absent cookie → null → catalog shows all cities.
+    const city = await getServerCity();
+    const data = await searchCatalog({ ...query, cityId: city?.id });
     return jsonOk(data);
   } catch (error) {
     const appError = toAppError(error);
