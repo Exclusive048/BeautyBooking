@@ -302,6 +302,101 @@ legacy sweep. Full suite green; verified on the current prod build.**
 **Remaining before launch is operational, not code:** the deploy-env items + live-creds social-auth QA +
 DevOps infra decisions above.
 
+**✅ FIX-R2-06-FI (2026-06-24) — billing in-app CTA + self-review block — CLOSES the R2-06 sweep (A–I all ✅).**
+- **F (billing in-app CTA):** `BILLING_*` notifications had a scoped push deep-link but no in-app CTA (the central
+  `resolveNotificationOpenHref` only handled BOOKING_*). Fix: `createBillingNotification` persists `billingScope` in the
+  payload; `resolveNotificationOpenHref` gains a BILLING branch → `billingUpgradeHref(scope)` (fallback role-resolved
+  `/cabinet/billing`); admin-initiated plan-edited threads scope too. No new mechanism (the `/notifications` center
+  already renders `openHref`). **Live (`/api/notifications/center`):** MASTER→`/cabinet/master/billing`,
+  STUDIO→`/cabinet/studio/billing`, none→`/cabinet/billing` ✅.
+- **I (self-review block, server-side):** `createReview` gains `isBookingProviderSide` guard (403 `REVIEW_NOT_ALLOWED`)
+  covering solo master, master-in-studio performer, and studio owner/admins — keyed on the **booking's** linkage (a
+  provider reviewing a *different* provider's booking is not blocked). **Live:** provider-as-client → 403, 0 reviews
+  created; legit client still 201 (FIX-R2-06-H) — no over-block. Studio cases code-verified (seed has 0 studio bookings).
+- **R2-06 COMPLETE:** A (reschedule parity) · B (`?focus=` reader) · C (filterOffer) · D (schedule-requests link) ·
+  E (REVIEW_LEFT decode) · F (billing CTA) · G (hot-slot fallback) · H (review gate) · I (self-review) — all ✅.
+- **Validation:** typecheck ✅ · lint baseline ✅ · test 746/746 ✅ · build ✅. Evidence: `.qa/diagnostics/fix-r2-06-fi/`.
+
+**✅ FIX-R2-06-H (2026-06-24) — UI review-button gate now mirrors the server can-leave gate exactly.**
+- **Divergence:** the review button showed on **persisted-FINISHED + 14d** while the server gate is **runtime-FINISHED
+  + 3d** → a CONFIRMED-past booking the server would accept showed no button (R2-06 observed). The rule was re-derived
+  in **three** server computations (`bookings.service.ts` DTO `canReview`, `reviews.service.ts` KPI/pending-list,
+  `sidebar-counts.ts` badge), all with 14d/persisted-FINISHED.
+- **Fix (single source):** extracted `reviewWindowFor` into `can-leave.ts` (`canLeaveReview` reuses it, behaviour
+  preserved) + exported `reviewCandidateWhere`. All three consumers now compute eligibility via the **shared
+  `canLeaveReview`** (the same predicate the `/api/reviews/can-leave` route uses) — no more 14d / persisted-FINISHED.
+  Server gate unchanged; predicate stays server-side (boolean crosses → rule 13 safe).
+- **Live (Playwright, real OTP):** UI `canReview` === server `/can-leave` for **all 9** of Elena's bookings,
+  **0 mismatches** — CONFIRMED-past-within-3d → button shows (the fix), already-reviewed/cancelled/no-show/not-finished →
+  no button. Eligible client-01 → `POST /api/reviews` **201**, then `canLeave` flips false (one-per); review + provider
+  rating restored. No false-show/false-hide. Evidence: `.qa/diagnostics/fix-r2-06-h/`.
+- **Validation:** typecheck ✅ · lint baseline ✅ · test 746/746 ✅ · build ✅.
+
+**✅ FIX-R2-06-A (2026-06-24) — studio reschedule parity (two-sided approval) with the solo master.**
+- **Gap:** a solo master can accept a client-proposed reschedule (kanban Confirm → `confirmBooking`), but a studio admin
+  could not — calendar menu = Move/Cancel only, `BOOKING_RESCHEDULE_REQUESTED` had no inline accept/decline, and the
+  decline path (`updateMasterBookingStatus`) was master-scoped. Two-sided-approval contract: a reschedule takes effect
+  only on consent (client proposes → provider accepts); admin **Move** (direct authority, invariant #22) is distinct.
+- **Fix (reuse, no drift):** **accept** = the studio admin reuses `POST /api/bookings/[id]/confirm` — its auth
+  `requireBookingConfirmAccess` already admits a studio admin as `actor:"MASTER"` (ownership.ts:145), and `confirmBooking`
+  is the same atomic, FIX-R2-01-B-re-checked path the solo master uses. **decline** = new shared
+  `declineClientRescheduleRequest(bookingId, actor)` (`src/lib/bookings/decline-reschedule.ts`, reverts CHANGE_REQUESTED→
+  CONFIRMED at the original time, clears the proposal); the master path was refactored to delegate to it (no drift); new
+  `POST /api/bookings/[id]/decline-reschedule` (same admitting auth) + `notifyBookingRejected` (same client notification
+  the master decline sends). **Surface:** inline Accept/Decline on the studio notifications page for
+  `BOOKING_RESCHEDULE_REQUESTED` (hidden once resolved). **Engine untouched** — no slot-gen / `confirmBooking` move-logic
+  change (git diff confirms).
+- **Live (Playwright, real OTP):** privilege — non-provider client `/decline-reschedule` → **403**; provider
+  `/decline-reschedule` → **200** → DB `CONFIRMED · actionRequiredBy=NULL · proposed=NULL · original time kept`; baseline
+  restored. **Studio actor code-certain** (same auth; accept = FIX-R2-01-B-proven `confirmBooking`) — not exercised live
+  because the seed baseline has **0 studio-master bookings** (documented limitation). Conflict-at-accept (409) inherited
+  from `confirmBooking`; admin Move not regressed (invariant #22). Evidence: `.qa/diagnostics/fix-r2-06-a/`.
+- **Validation:** typecheck ✅ · lint baseline ✅ · test 746/746 ✅ · build ✅.
+
+**✅ FIX-R2-06-B (2026-06-24) — shared `?focus=` deep-link reader (scroll-to + highlight) for the booking-CTA family.**
+- **Audit (matrix):** notification/chat/booking CTAs deep-linked with **divergent** params — most `?bookingId=`, some
+  `?focus=` (`notification-actions`, `client-detail-panel`), reviews `?focus=reviewId` — but the destination list
+  pages **read none** → land at list-top, nothing highlighted (R2-06-B). Surfaces: master bookings (kanban),
+  master dashboard (upcoming + attention), client bookings, master reviews. **Studio bookings = N/A** (its
+  notifications target `/cabinet/studio/calendar`, not the journal). None virtualized.
+- **Fix — one canonical param + one shared reader:** standardized **all** emitters to `?focus=<id>` (renamed 5
+  `?bookingId=` sites: `booking-notifications`, `presentation`, `conversation-aggregator` ×2, `chat/messages` route ×2,
+  `center.ts`; `&chat=open` preserved). New shared `useFocusHighlight()` (`src/hooks/use-focus-highlight.ts`) +
+  `<FocusHighlighter/>` island (`src/components/cabinet/focus-highlighter.tsx`) — reads `?focus=`, scrolls the
+  `[data-focus-id="<id>"]` row into view + transient `.focus-row-highlight` ring (globals.css, reduced-motion gated),
+  graceful no-op on missing/out-of-list id. Anchors added: kanban card, dashboard booking-row (upcoming) + task-row
+  (attention via `focusId`), client-bookings `<li>`, review-card. Client-bookings passes `bookings.length` as the
+  SWR-async ready-signal.
+- **Live matrix (Playwright, real OTP login, dev :3000):** master bookings ✅ (highlight+ring+scroll, 0 err), master
+  dashboard/attention ✅ (scroll 251px, 0 err), client bookings ✅ (SWR async, 0 err), bogus id ✅ graceful (0
+  highlighted, 0 err). Master reviews = identical island+anchor mechanism (ids raw both sides → match). Ring token
+  adapts both themes. Evidence: `.qa/diagnostics/fix-r2-06-b/`.
+- **No regression:** destinations read no focus param before → renaming `bookingId`→`focus` broke nothing; existing
+  `q`/`tab`/`client`/filter params untouched. **Validation:** typecheck ✅ · lint baseline ✅ · test 746/746 ✅ · build ✅.
+
+**✅ PII-LOGGING-FIX-A (2026-06-24) — raw email/phone redacted from logs (the lone 🔴 from DOCS-CLEANUP).**
+- **Source:** SENSITIVE-DATA-LOGS-AUDIT-A (2026-06-02) flagged 3 raw-PII log sites; the fix never landed. Under
+  production Sentry this leaks PII into an external service (152-ФЗ) → launch/Sentry blocker.
+- **Audit (READ-ONLY):** full sweep of `logInfo`/`logError`/`logWarn` payloads. **6 offenders** (raw):
+  `src/lib/email/sender.ts` ×3 (`to: opts.to` — SMTP-not-configured / sent / failed branches),
+  `src/lib/sms/index.ts` ×2 (`phone` — OTP SMS delivered / failed), cabinet
+  `src/app/api/cabinet/user/profile/email/verify/route.ts` ×1 (`email: normalizedEmail`).
+  Already-masked (no change): `otp/request` (maskPhone), `otp/email/request` + cabinet `request-verify` (maskEmail),
+  `link-guest-bookings.ts` (file-local maskPhone), `support/smtp.ts` (file-local maskEmailAddress). `professional.ts`
+  firstName/name = DB-write/fn-arg, not logs.
+- **Fix (redact at source, reuse shared helper):** `src/lib/logging/masking.ts` `maskEmail`/`maskPhone` already exist +
+  tested (`masking.test.ts`). Wrapped each of the 6 call-sites: `to: maskEmail(opts.to)`, `phone: maskPhone(phone)`,
+  `email: maskEmail(normalizedEmail)`. Masked-but-correlatable (`jo******@example.com`, `+7****67`).
+- **Preserved:** real `transport.sendMail({ to: opts.to })` + `provider.send(phone, …)` (sends to real address);
+  **OTP logging untouched (rule 9)** — the SMS `message: result.message` is the provider error string, the OTP text
+  lives in the unlogged local `message` var. No behaviour change beyond log output.
+- **External sink:** `logError → alertError → Telegram` (`logger.ts:72`) — call-site masking means the same masked
+  payload reaches the external sink; future Sentry (OBSERVABILITY-SENTRY-A) reads already-masked fields + own scrubber.
+- **Validation:** typecheck ✅ · lint ✅ (1 error / 4 warnings = pre-existing baseline, none in the 3 files) ·
+  encoding ✅ · mojibake ✅ · `npm run test` ✅ 746/746 · `npm run build` ✅. Evidence: `.qa/diagnostics/pii-logging-fix-a/`.
+- **Verified:** zero raw-email/phone log lines remain on the email/SMS/verify paths (the one residual `to: opts.to`
+  is the real `sendMail` call, not a log). Files: `email/sender.ts`, `sms/index.ts`, cabinet `email/verify/route.ts`.
+
 **✅ FIX-09 (2026-06-16) — env.ts client `NEXT_PUBLIC_*` inlining root fix (the QA-001 root, app-wide).**
 - **Bug:** the client branch was `env = process.env as AppEnv`; reading `env.NEXT_PUBLIC_X` via that
   alias defeats Next/webpack's static `process.env.NEXT_PUBLIC_X` inlining → **every** client consumer

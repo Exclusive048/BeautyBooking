@@ -9,6 +9,54 @@
 
 ---
 
+## 2026-06-24 — PII redaction + verify-closures (DOCS-CLEANUP follow-up)
+
+- ✅ **R2-06-FI** (🟡 F + 🔵 I) — **closes the R2-06 sweep (A–I all ✅).** **F:** billing notifications gained an in-app
+  CTA — `createBillingNotification` persists `billingScope`; `resolveNotificationOpenHref` maps `BILLING_*` →
+  `billingUpgradeHref(scope)` (fallback `/cabinet/billing`); admin-initiated plan-edited threads scope. Live: center API
+  returns MASTER/STUDIO/role-fallback hrefs. **I:** `createReview` self-review guard (`isBookingProviderSide`, 403)
+  covering solo master / master-in-studio / studio owner+admins, keyed on the booking's linkage. Live: provider-as-client
+  → 403; legit client still 201. typecheck/lint/test 746/build ✅. Evidence: `.qa/diagnostics/fix-r2-06-fi/`.
+  **R2-06 final:** A reschedule-parity · B `?focus=` reader · C filterOffer · D schedule-requests link · E REVIEW_LEFT
+  decode · F billing CTA · G hot-slot fallback · H review-gate · I self-review — all done.
+
+- ✅ **R2-06-H** 🟡 — UI review-button gate aligned to the server can-leave gate (runtime-FINISHED + `REVIEW_WINDOW_DAYS=3`)
+  via the single shared `canLeaveReview` predicate. Was: persisted-FINISHED + 14d re-derived in **3** places
+  (`bookings.service` DTO, `reviews.service` KPI/list, `sidebar-counts` badge) → CONFIRMED-past bookings the server would
+  accept showed no button. Extracted `reviewWindowFor` + `reviewCandidateWhere`; server gate unchanged. Live-verified:
+  UI `canReview` === server `/can-leave` for all 9 bookings (0 mismatches), eligible submit → 201. typecheck/lint/test
+  746/build ✅. Evidence: `.qa/diagnostics/fix-r2-06-h/`.
+
+- ✅ **R2-06-A** 🟠 — studio reschedule **parity** with solo master (two-sided approval). Studio admin can now
+  accept/decline a client-proposed reschedule. **Accept** reuses `POST /api/bookings/[id]/confirm` (auth already admits
+  studio admin; same atomic FIX-R2-01-B `confirmBooking`). **Decline** = new shared `declineClientRescheduleRequest`
+  (reverts to original time) + master path refactored to delegate to it (no drift) + new
+  `POST /api/bookings/[id]/decline-reschedule`. **Surface:** inline Accept/Decline on the studio notifications page for
+  `BOOKING_RESCHEDULE_REQUESTED`. Engine untouched. Live-verified (decline 200 + revert, privilege 403); studio actor
+  code-certain (same auth; seed has 0 studio-master bookings to exercise live). Optional follow-up (calendar/journal
+  action-menu surface) → active backlog 🔵. typecheck/lint/test 746/build ✅. Evidence: `.qa/diagnostics/fix-r2-06-a/`.
+
+- ✅ **R2-06-B** 🟠 — shared `?focus=<id>` deep-link reader (scroll-to + transient highlight) for the booking-CTA
+  family. Standardized all emitters to one canonical `?focus=` param (renamed 5 `?bookingId=` sites); new
+  `useFocusHighlight()` hook + `<FocusHighlighter/>` island + `data-focus-id` row anchors on master bookings /
+  dashboard (upcoming + attention) / client bookings / master reviews. Studio bookings N/A (notifications →
+  `/calendar`). Live-verified (Playwright, real OTP) across master bookings + dashboard-attention + client bookings +
+  graceful-degrade, 0 console errors; typecheck/lint/test 746/build ✅. Reusable for R2-06-A. Evidence:
+  `.qa/diagnostics/fix-r2-06-b/`.
+
+- ✅ **PII-LOGGING-FIX-A** 🔴 — raw email/phone в production logs замаскированы через shared `maskEmail`/`maskPhone`
+  (`src/lib/logging/masking.ts`). 6 call-sites: `email/sender.ts` ×3 (`to`), `sms/index.ts` ×2 (`phone`),
+  cabinet `email/verify/route.ts` ×1 (`email`). Реальный send (`sendMail`/`provider.send`) и OTP-логирование (rule 9)
+  не тронуты. Masking at call-site = тот же payload в Telegram-alert sink + будущий Sentry. typecheck/lint-baseline/
+  test 746/build ✅. Evidence: `.qa/diagnostics/pii-logging-fix-a/`. (Источник: SENSITIVE-DATA-LOGS-AUDIT-A 2026-06-02.)
+- ✅ **MIGRATION-RECONCILIATION «full scope»** — verified reconciled: `check:schema-drift = OK (0 drift)`, schema.prisma
+  ⟺ migrations history совпадают. *(Отдельная deploy-ops задача «применить `…_provider_timezone_default_moscow` на проде»
+  остаётся в активном бэклоге — это apply-step, не reconciliation-gap.)*
+- ✅ **QA-26 suite** — **не существовало** (phantom): Explore-агент misread заголовок `### QA (from QA-02 …, 2026-06-06)`
+  как «QA-26». Реальные находки той секции (QA-101 dev-only, QA-108 fixed) уже закрыты FIX-25/FIX-01.
+
+---
+
 ## Round 2 (blitz) — booking-lifecycle / billing / catalog / notifications (июнь 2026)
 
 ### R2-01 — reschedule + manual booking

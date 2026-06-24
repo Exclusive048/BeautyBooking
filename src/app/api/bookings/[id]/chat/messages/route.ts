@@ -150,8 +150,8 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
         payloadJson: payload,
         pushUrl:
           access.senderType === "CLIENT"
-            ? `/cabinet/master/dashboard?bookingId=${bookingId}&chat=open`
-            : `/cabinet/bookings?bookingId=${bookingId}&chat=open`,
+            ? `/cabinet/master/dashboard?focus=${bookingId}&chat=open`
+            : `/cabinet/bookings?focus=${bookingId}&chat=open`,
       });
     }
 

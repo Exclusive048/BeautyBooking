@@ -3,6 +3,7 @@ import { BookingsToolbar } from "@/features/master/components/bookings/bookings-
 import { KanbanBoard } from "@/features/master/components/bookings/kanban-board";
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
+import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import {
@@ -67,6 +68,7 @@ export async function MasterBookingsPage({ searchParams }: Props) {
         subtitle={T.bookings.subtitle}
         actions={<NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" />}
       />
+      <FocusHighlighter />
 
       <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
         <BookingsToolbar

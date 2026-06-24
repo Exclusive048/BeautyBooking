@@ -1,6 +1,8 @@
 import { cache } from "react";
 import { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { canLeaveReview } from "@/lib/reviews/can-leave";
+import { reviewCandidateWhere } from "@/lib/client-cabinet/reviews.service";
 import { MASTER_NOTIFICATION_TYPES } from "@/lib/notifications/groups";
 
 export type SidebarCounts = {
@@ -15,16 +17,16 @@ export type SidebarCounts = {
  * indexed count() — they run in parallel and we cache through React's request
  * scope so a single navigation only pays once.
  *
- * Pending reviews = FINISHED bookings in the last 14 days that don't yet have
- * a Review row authored by the client. Mirrors the 14-day review window so
- * the badge disappears the moment a review is published.
+ * Pending reviews = bookings the server's can-leave gate would accept a review
+ * for (runtime-FINISHED + REVIEW_WINDOW_DAYS, no existing review) — FIX-R2-06-H,
+ * shared `canLeaveReview` predicate, so the badge matches the bookings/reviews
+ * surfaces exactly and disappears when a review is published or the window ends.
  */
 export const getClientSidebarCounts = cache(
   async (userId: string): Promise<SidebarCounts> => {
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const now = new Date();
 
-    const [favorites, upcomingBookings, unreadNotifications, pendingReviews] =
+    const [favorites, upcomingBookings, unreadNotifications, pendingReviewCandidates] =
       await Promise.all([
         prisma.userFavorite.count({ where: { userId } }),
         prisma.booking.count({
@@ -59,15 +61,20 @@ export const getClientSidebarCounts = cache(
             type: { notIn: MASTER_NOTIFICATION_TYPES },
           },
         }),
-        prisma.booking.count({
-          where: {
-            clientUserId: userId,
-            status: BookingStatus.FINISHED,
-            endAtUtc: { gte: fourteenDaysAgo },
-            review: { is: null },
+        prisma.booking.findMany({
+          where: reviewCandidateWhere(userId, now),
+          select: {
+            status: true,
+            startAtUtc: true,
+            endAtUtc: true,
+            service: { select: { durationMin: true } },
           },
         }),
       ]);
+
+    const pendingReviews = pendingReviewCandidates.filter((b) =>
+      canLeaveReview({ booking: { ...b, clientUserId: userId }, currentUserId: userId, nowUtc: now }),
+    ).length;
 
     return {
       favorites,

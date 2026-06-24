@@ -1,10 +1,10 @@
 import { BookingStatus, type ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
+import { canLeaveReview } from "@/lib/reviews/can-leave";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 const FINISHED_STATUSES: BookingStatus[] = [BookingStatus.FINISHED];
 const CANCELLED_STATUSES: BookingStatus[] = [
@@ -85,7 +85,6 @@ export async function listClientBookings(
   filter: ClientBookingFilter = {},
 ): Promise<ClientBookingsPayload> {
   const now = new Date();
-  const fourteenDaysAgo = new Date(Date.now() - FOURTEEN_DAYS_MS);
   const ninetyDaysAgo = new Date(Date.now() - NINETY_DAYS_MS);
 
   const rows = await prisma.booking.findMany({
@@ -168,11 +167,21 @@ export async function listClientBookings(
     const durationSnapshotMin = serviceItem?.durationSnapshotMin ?? r.service.durationMin;
     const hasReview = !!r.review;
     const isFinished = group === "finished";
+    // FIX-R2-06-H: mirror the server can-leave gate exactly (runtime-FINISHED +
+    // REVIEW_WINDOW_DAYS), so the button shows iff the server would 201.
     const canReview =
-      isFinished &&
       !hasReview &&
-      !!end &&
-      end.getTime() >= fourteenDaysAgo.getTime();
+      canLeaveReview({
+        booking: {
+          clientUserId: userId,
+          status: r.status,
+          startAtUtc: start,
+          endAtUtc: end,
+          service: { durationMin: r.service.durationMin },
+        },
+        currentUserId: userId,
+        nowUtc: now,
+      });
 
     const address = displayProvider.address ?? r.provider.address ?? null;
 

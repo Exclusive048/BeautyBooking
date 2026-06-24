@@ -132,7 +132,8 @@ export async function processPlanEditedMassNotification(payload: {
           title: "Изменения в вашем тарифе",
           body: payload.summary,
           url: billingUpgradeHref(sub.scope),
-          payload: { planId: payload.planId, planCode: payload.planCode },
+          // R2-06-F: scope into the in-app payload too (CTA matches the push).
+          payload: { planId: payload.planId, planCode: payload.planCode, billingScope: sub.scope },
         }),
       ),
     );

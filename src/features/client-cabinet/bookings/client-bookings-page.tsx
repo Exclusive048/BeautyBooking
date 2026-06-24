@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FocalImage } from "@/components/ui/focal-image";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
@@ -69,6 +70,10 @@ export function ClientBookingsPage() {
   const bookings = useMemo(() => data?.bookings ?? [], [data]);
   const kpi = data?.kpi;
   const months = useMemo(() => groupBookingsByMonth(bookings), [bookings]);
+
+  // FIX-R2-06-B: honor `?focus=<bookingId>` deep-link — scroll-to + highlight
+  // the row once the SWR list has loaded (rows aren't in the DOM on mount).
+  useFocusHighlight(bookings.length);
 
   const statusCounts = useMemo(() => {
     const all = bookings.length;
@@ -131,7 +136,7 @@ export function ClientBookingsPage() {
               </div>
               <ul className="space-y-3">
                 {month.bookings.map((b) => (
-                  <li key={b.id}>
+                  <li key={b.id} data-focus-id={b.id}>
                     <BookingRow
                       booking={b}
                       onCancel={() => handleCancel(b)}

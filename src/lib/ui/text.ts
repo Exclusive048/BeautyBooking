@@ -6737,6 +6737,8 @@ export const UI_TEXT = {
         openChat: "К чату",
         openClient: "К клиенту",
         open: "Открыть",
+        acceptReschedule: "Принять перенос",
+        declineReschedule: "Отклонить перенос",
       },
       empty: {
         title: "Нет уведомлений",
@@ -6744,6 +6746,7 @@ export const UI_TEXT = {
       },
       errors: {
         scheduleRequest: "Не удалось выполнить действие. Попробуйте ещё раз.",
+        bookingReschedule: "Не удалось обработать перенос. Попробуйте ещё раз.",
       },
     },
     reviewsV2: {

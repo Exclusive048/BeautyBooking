@@ -30,6 +30,8 @@ type TaskItem = {
   description: string;
   cta: ReactNode;
   urgency: TaskUrgency;
+  /** FIX-R2-06-B: deep-link focus anchor (pending booking id) for `?focus=`. */
+  focusId?: string;
 };
 
 function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredReviews" | "freeSlot">): TaskItem[] {
@@ -49,6 +51,7 @@ function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredRev
       // navigation away from the dashboard.
       cta: <ConfirmBookingAction bookingId={pb.id} />,
       urgency: "high",
+      focusId: pb.id,
     });
   }
 
@@ -147,6 +150,7 @@ export function AttentionSection({
               description={task.description}
               cta={task.cta}
               urgency={task.urgency}
+              focusId={task.focusId}
             />
           ))}
         </div>

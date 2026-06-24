@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
+import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
   assertMasterPerformsService,
@@ -660,51 +661,47 @@ export async function updateMasterBookingStatus(input: {
     booking.requestedBy === "CLIENT" &&
     booking.actionRequiredBy === "MASTER";
 
-  if (!rejectsChangeRequest && (isRejectAction || isCancelAction)) {
+  // FIX-R2-06-A: declining a client-proposed reschedule reverts to the original
+  // time (no move, no slot change). Shared with the studio decline route so the
+  // two paths can't drift.
+  if (rejectsChangeRequest) {
+    return declineClientRescheduleRequest(booking.id, "MASTER");
+  }
+
+  if (isRejectAction || isCancelAction) {
     ensureBookingActionWindow(booking.startAtUtc);
   }
 
-  if (!rejectsChangeRequest && (isRejectAction || isCancelAction) && comment.length === 0) {
+  if ((isRejectAction || isCancelAction) && comment.length === 0) {
     throw new AppError("Comment is required", 400, "VALIDATION_ERROR");
   }
 
   const updated = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
       where: { id: booking.id },
-      data: rejectsChangeRequest
-        ? {
-            status: "CONFIRMED",
-            proposedStartAt: null,
-            proposedEndAt: null,
-            requestedBy: null,
-            actionRequiredBy: null,
-            changeComment: null,
-          }
-        : {
-            status: input.status,
-            cancelledBy: "PROVIDER",
-            cancelReason: comment || null,
-            cancelledAtUtc: new Date(),
-            requestedBy: "MASTER",
-            actionRequiredBy: null,
-            proposedStartAt: null,
-            proposedEndAt: null,
-            changeComment: comment || null,
-          },
+      data: {
+        status: input.status,
+        cancelledBy: "PROVIDER",
+        cancelReason: comment || null,
+        cancelledAtUtc: new Date(),
+        requestedBy: "MASTER",
+        actionRequiredBy: null,
+        proposedStartAt: null,
+        proposedEndAt: null,
+        changeComment: comment || null,
+      },
       select: { id: true, status: true },
     });
 
     return updated;
   });
 
-  if (!rejectsChangeRequest) {
-    await invalidateSlotsForBookingRange({
-      providerId: booking.providerId,
-      masterProviderId: booking.masterProviderId ?? null,
-      startAtUtc: booking.startAtUtc,
-      endAtUtc: booking.endAtUtc,
-    });
-  }
+  await invalidateSlotsForBookingRange({
+    providerId: booking.providerId,
+    masterProviderId: booking.masterProviderId ?? null,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
 
   return { id: updated.id, status: updated.status };
 }

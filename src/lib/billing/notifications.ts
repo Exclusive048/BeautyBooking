@@ -24,7 +24,13 @@ export async function createBillingNotification(input: BillingNotificationInput)
     type: input.type,
     title: input.title,
     body: input.body,
-    payloadJson: input.payloadJson ?? {},
+    // R2-06-F: persist the scope into the payload so the in-app notification
+    // center renders a scope-correct CTA (`billingUpgradeHref`) the same way
+    // the push deep-link already does (FIX-28).
+    payloadJson: {
+      ...((input.payloadJson as Record<string, unknown> | undefined) ?? {}),
+      ...(input.scope ? { billingScope: input.scope } : {}),
+    },
   });
   publishNotifications([record]);
   void sendPushToUser(input.userId, {

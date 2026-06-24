@@ -1,9 +1,26 @@
-import { BookingStatus, ReviewTargetType } from "@prisma/client";
+import { BookingStatus, type Prisma, ReviewTargetType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { canLeaveReview, reviewWindowFor } from "@/lib/reviews/can-leave";
+import { REVIEW_WINDOW_DAYS } from "@/lib/reviews/constants";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
-const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const EDIT_WINDOW_MS = 48 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// FIX-R2-06-H: candidate set for "can leave a review" — runtime-FINISHED (any
+// non-terminal status whose time has passed) within a coarse window; the exact
+// gate (runtime-FINISHED + REVIEW_WINDOW_DAYS) is applied in-memory via
+// `canLeaveReview`, the SAME predicate the server can-leave route uses.
+export function reviewCandidateWhere(userId: string, now: Date): Prisma.BookingWhereInput {
+  return {
+    clientUserId: userId,
+    status: {
+      notIn: [BookingStatus.REJECTED, BookingStatus.CANCELLED, BookingStatus.NO_SHOW],
+    },
+    endAtUtc: { not: null, lte: now, gte: new Date(now.getTime() - (REVIEW_WINDOW_DAYS + 1) * DAY_MS) },
+    review: { is: null },
+  };
+}
 
 export type ClientReviewItem = {
   id: string;
@@ -106,9 +123,9 @@ export async function listClientReviews(userId: string): Promise<ClientReviewIte
 }
 
 export async function computeReviewsKpi(userId: string): Promise<ClientReviewsKpi> {
-  const fourteenDaysAgo = new Date(Date.now() - FOURTEEN_DAYS_MS);
+  const now = new Date();
 
-  const [agg, respondedCount, pendingCount] = await Promise.all([
+  const [agg, respondedCount, pendingCandidates] = await Promise.all([
     prisma.review.aggregate({
       where: { authorId: userId, ...ACTIVE_REVIEW_FILTER },
       _count: { _all: true },
@@ -121,15 +138,20 @@ export async function computeReviewsKpi(userId: string): Promise<ClientReviewsKp
         ...ACTIVE_REVIEW_FILTER,
       },
     }),
-    prisma.booking.count({
-      where: {
-        clientUserId: userId,
-        status: BookingStatus.FINISHED,
-        endAtUtc: { gte: fourteenDaysAgo },
-        review: { is: null },
+    prisma.booking.findMany({
+      where: reviewCandidateWhere(userId, now),
+      select: {
+        status: true,
+        startAtUtc: true,
+        endAtUtc: true,
+        service: { select: { durationMin: true } },
       },
     }),
   ]);
+
+  const pendingCount = pendingCandidates.filter((b) =>
+    canLeaveReview({ booking: { ...b, clientUserId: userId }, currentUserId: userId, nowUtc: now }),
+  ).length;
 
   return {
     total: agg._count._all,
@@ -142,18 +164,13 @@ export async function computeReviewsKpi(userId: string): Promise<ClientReviewsKp
 export async function listPendingReviewBookings(
   userId: string,
 ): Promise<PendingReviewBooking[]> {
-  const fourteenDaysAgo = new Date(Date.now() - FOURTEEN_DAYS_MS);
+  const now = new Date();
 
   const rows = await prisma.booking.findMany({
-    where: {
-      clientUserId: userId,
-      status: BookingStatus.FINISHED,
-      endAtUtc: { gte: fourteenDaysAgo, not: null },
-      review: { is: null },
-    },
+    where: reviewCandidateWhere(userId, now),
     orderBy: { endAtUtc: "desc" },
-    take: 10,
     include: {
+      service: { select: { durationMin: true } },
       provider: {
         select: {
           id: true,
@@ -167,13 +184,16 @@ export async function listPendingReviewBookings(
     },
   });
 
-  const now = Date.now();
   return rows
-    .filter((r) => r.endAtUtc)
+    .filter((r) =>
+      canLeaveReview({ booking: { ...r, clientUserId: userId }, currentUserId: userId, nowUtc: now }),
+    )
+    .slice(0, 10)
     .map((r) => {
-      const endMs = r.endAtUtc!.getTime();
-      const elapsed = now - endMs;
-      const daysLeft = Math.max(0, Math.ceil((FOURTEEN_DAYS_MS - elapsed) / (24 * 60 * 60 * 1000)));
+      const window = reviewWindowFor(r);
+      const daysLeft = window
+        ? Math.max(0, Math.ceil((window.deadline.getTime() - now.getTime()) / DAY_MS))
+        : 0;
       return {
         bookingId: r.id,
         serviceName: r.serviceItems[0]?.titleSnapshot ?? null,

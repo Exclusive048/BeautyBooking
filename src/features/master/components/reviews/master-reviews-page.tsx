@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ProviderType } from "@prisma/client";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
+import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { getSessionUser } from "@/lib/auth/session";
 import {
   getMasterReviewsView,
@@ -102,6 +103,7 @@ export async function MasterReviewsPage({ searchParams }: Props) {
         title={T.reviews.title}
         subtitle={T.reviews.subtitle}
       />
+      <FocusHighlighter />
 
       <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

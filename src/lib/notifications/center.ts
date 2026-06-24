@@ -120,7 +120,7 @@ function resolveChatOpenHref(type: NotificationCenterNotificationItem["type"], p
   if (!payload || typeof payload !== "object") return undefined;
   const record = payload as { bookingId?: unknown; senderType?: unknown };
   if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return undefined;
-  const params = new URLSearchParams({ bookingId: record.bookingId, chat: "open" });
+  const params = new URLSearchParams({ focus: record.bookingId, chat: "open" });
   if (record.senderType === "CLIENT") {
     return `/cabinet/master/dashboard?${params.toString()}`;
   }

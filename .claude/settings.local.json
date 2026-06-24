@@ -256,7 +256,12 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(echo \"rc=$?\")",
       "Bash(rm -f .qa/diagnostics/r2-06-dev.log)",
-      "Bash(echo \"dev pid=$!\")"
+      "Bash(echo \"dev pid=$!\")",
+      "Bash(python -c \"import sys,json; print\\(json.loads\\(sys.stdin.read\\(\\)\\)['code']\\)\")",
+      "Bash(export MSYS_NO_PATHCONV=1)",
+      "mcp__playwright__browser_file_upload",
+      "Bash(curl -s -o /dev/null -w 'status=%{http_code} type=%{content_type} bytes=%{size_download}\\\\n' http://localhost:3000/api/chat/attachment/eyJhaWQiOiJjbXFyc3QxbncwMDRzdmw1bzRvcXp2czczIiwiZXhwIjoxNzgyMjg5ODY5LCJwdXJwb3NlIjoiY2hhdC1hdHRhY2htZW50LXJlYWQifQ.sE9dLcJ2HN2qzEpRdfEI9Hc-2_QI_0uhmTjmcUh3r1I)",
+      "Bash(python -c \"import base64,json; p='eyJhaWQiOiJjbXFyc3QxbncwMDRzdmw1bzRvcXp2czczIiwiZXhwIjoxNzgyMjg5ODY5LCJwdXJwb3NlIjoiY2hhdC1hdHRhY2htZW50LXJlYWQifQ'; print\\(json.loads\\(base64.urlsafe_b64decode\\(p+'=='*\\(-len\\(p\\)%4\\)\\)\\)\\)\")"
     ]
   }
 }

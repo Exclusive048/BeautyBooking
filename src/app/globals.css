@@ -348,3 +348,27 @@
 .rdp-theme .rdp-button_next:hover {
   background-color: rgb(var(--bg-input) / 0.7);
 }
+
+/* FIX-R2-06-B — transient highlight applied by useFocusHighlight to a
+   deep-linked (`?focus=`) list row. Brief ring pulse, then auto-removed. */
+.focus-row-highlight {
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 6px rgb(var(--primary) / 0.18);
+  scroll-margin-block: 96px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .focus-row-highlight {
+    animation: focus-row-pulse 1.1s ease-out 2;
+  }
+  @keyframes focus-row-pulse {
+    0% {
+      box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 0 rgb(var(--primary) / 0.35);
+    }
+    70% {
+      box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 10px rgb(var(--primary) / 0);
+    }
+    100% {
+      box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 0 rgb(var(--primary) / 0);
+    }
+  }
+}

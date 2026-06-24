@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { maskEmail } from "@/lib/logging/masking";
 
 type MailOptions = {
   to: string;
@@ -38,17 +39,17 @@ export function isEmailConfigured(): boolean {
 export async function sendEmail(opts: MailOptions): Promise<boolean> {
   const transport = getTransporter();
   if (!transport) {
-    logError("SMTP not configured — email not sent", { to: opts.to, subject: opts.subject });
+    logError("SMTP not configured — email not sent", { to: maskEmail(opts.to), subject: opts.subject });
     return false;
   }
   const from = env.SMTP_FROM ?? env.SMTP_USER;
   try {
     await transport.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, text: opts.text });
-    logInfo("Email sent", { to: opts.to, subject: opts.subject });
+    logInfo("Email sent", { to: maskEmail(opts.to), subject: opts.subject });
     return true;
   } catch (error) {
     logError("Failed to send email", {
-      to: opts.to,
+      to: maskEmail(opts.to),
       subject: opts.subject,
       error: error instanceof Error ? error.message : String(error),
     });

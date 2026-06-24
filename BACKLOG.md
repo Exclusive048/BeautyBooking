@@ -13,8 +13,8 @@
 
 ## 🎯 ТЕКУЩИЙ ФОКУС
 
-- **R2-06 notification-слой** — последний R2-discovery-sweep, 5 открытых пунктов (A/B/F/H/I). Рекомендуемый старт:
-  **R2-06-B** (shared `?focus=` reader) — разблокирует весь booking-CTA-deeplink family и независим от product-decision-задач.
+- **🎉 R2-06 sweep ЗАКРЫТ** (A–I все ✅, 2026-06-24). Следующее: **package-booking discovery** (decision #4) →
+  затем 🟡/🔵 consolidation sweep (R2-02-B/C, R2-04-C, R2-05-H/G/J/A2/E, R2-03-A, R2-06-A calendar-menu 🔵).
 - **Deploy / ops** (см. секцию ниже) — env-домены, live social-auth creds, SMS creds, geocoder key, DevOps infra,
   применить FIX-R2-02-A миграцию на проде до regen seed-snapshot.
 - **Product decisions решены Артёмом** (см. секцию ниже) → теперь это actionable code-задачи.
@@ -23,24 +23,14 @@
 
 ## 🔴 PRE-LAUNCH BLOCKERS (code)
 
-- **PII-LOGGING-FIX-A** — 3 сайта пишут raw phone/email в production logs: `src/lib/email/sender.ts:41,47`
-  (`{ to: opts.to }`), `src/app/api/cabinet/user/profile/email/verify/route.ts:99` (`email: normalizedEmail`),
-  `src/lib/sms/index.ts:66,74` (phone — verify masked). Fix: обернуть в `maskPhone`/`maskEmail`. **Блокирует Sentry**
-  (иначе он молча зальёт PII; 152-ФЗ). Helpers уже есть (`src/lib/logging/masking.ts`). ~30–45 мин. (Источник: SENSITIVE-DATA-LOGS-AUDIT-A 2026-06-02.)
-
-> Прочие 🔴 из прошлых волн (R2-05-A/B category+billing, R2-02-A timezone, booking-integrity) — закрыты, см. `BACKLOG-DONE.md`.
-> Остальные «launch-blocker»-задачи — **операционные**, вынесены в «🚀 Deploy / ops».
+- **Нет открытых code-блокеров.** Последний (**PII-LOGGING-FIX-A**) закрыт 2026-06-24 — см. `BACKLOG-DONE.md`.
+  Прочие 🔴 из прошлых волн (R2-05-A/B category+billing, R2-02-A timezone, booking-integrity) — тоже закрыты.
+  Остаток до launch — **операционный**, см. «🚀 Deploy / ops» ниже.
 
 ---
 
 ## 🟠 HIGH PRIORITY
 
-- **R2-06-A** — booking-reschedule (`BOOKING_RESCHEDULE_REQUESTED`) без inline accept/decline ни на одной поверхности;
-  studio-календарь вообще не имеет «принять предложенное время» (только Move/Cancel, игнорящие proposal); deeplink
-  теряет `?focus=`. Fix: inline accept/decline на нотификации (master+studio) + studio accept-proposed-time + `?focus=` reader.
-- **R2-06-B** — booking/reminder/chat/review deeplinks **теряют** `?focus=`/`?bookingId=`/`&chat=open` → лендят на список
-  без подсветки (`master/bookings` читает только q/tab/client; dashboard + client-bookings не читают booking-param).
-  Fix: **shared `?focus=<id>` reader** на bookings/dashboard/client-bookings. *(Рекомендуемый первый R2-06 фикс — un-breaks весь CTA family, независим от product-decisions.)*
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
 - **R2-05-H** — plan enable/disable toggle без confirmation guard (mis-click отключает план + рассылает «приостановлен»
@@ -58,10 +48,6 @@
 - **R2-05-G** — нет фидбэка репортёру при модерации отзыва; нет UI восстановления soft-deleted отзыва (только manual SQL).
 - **R2-05-A2** — category reject reason только в логах (нет колонки); владельцы portfolio-item не уведомляются при delist.
 - **R2-05-J** — `BillingPlanPrice.isActive` без admin UI + latent direct-DB mass-expiry path (renewal может залогировать CRITICAL).
-- **R2-06-F** — все `BILLING_*` нотификации без in-app CTA (только push несёт scope-correct `billingUpgradeHref`).
-  Fix: `openHref = billingUpgradeHref(scope)` для billing-нотификаций.
-- **R2-06-H** — review UI показывает affordance на *persisted* FINISHED+14d, а серверный гейт = *runtime*-FINISHED+3d →
-  server-eligible CONFIRMED-past бронь без кнопки отзыва (и persisted-FINISHED 4–14d с мёртвой). Fix: surface на runtime-FINISHED + выровнять окно.
 - **R2-03-A** — seed-артефакт: 38 showcase-броней Анны без `BookingServiceItem` → analytics revenue ₽0. Fix: добавить priced items в `seed-showcase-master.ts`.
 - **R2-03-B** — analytics revenue без `Service.price` fallback (в отличие от `day.service.ts`). Latent (prod всегда пишет items). Fix: shared fallback или backfill.
 
@@ -84,7 +70,6 @@
 - **R2-02-D/E/F** — PREMIUM badge + «На платформе 1 мес.» на 1-дневном master-профиле; master-facing copy виден клиенту; empty-name `<title>`.
 - **R2-05-E** — review delete = soft, но JSDoc + confirm-copy говорят «полностью убирает из БД» (copy-only mislabel).
 - **R2-05-F** — seed `Provider.ratingCount` drift (recalc корректит на следующем add/delete).
-- **R2-06-I** — нет явного self-review block в `createReview` (mitigated booking-ownership). Fix: `authorId !== owner` guard.
 - **BC-F1/F2/F3** — factual (не баги): нет multi-year term; нет multi-license/seat; нет proration/refund на смене плана.
 - **QA-106 (server-string)** — off-schedule message «Окошко уже занято…» для direct-API (UI уже исправлен FIX-25).
 - **RULE-12-BOOKING-CONTRACT-OPTIONAL** — booking-flow provider/service/studio ids в URL (нужны funnel'у; encoding = contract change, flagged).
@@ -93,6 +78,7 @@
 - **CI/structural** — PRE-COMMIT-SCHEMA-MIGRATION-PAIR · FINDMANY-TAKE-CI-CHECK · ENV-TEMPLATES-CI-CHECK · RUNBOOK-COVERAGE-CI · LOGGER-DISCIPLINE-CI-GATE · BUNDLE-SIZE-BASELINE · SW-SUPABASE-RULE-CLEANUP · STORIES-TAKE-CAP.
 - **a11y/perf** — STORIES-VIEWER-A11Y-CONSOLIDATE · FRAMER-MOTION-REDUCED-MOTION-SWEEP · BOOKING-PARTIAL-UNIQUE-INDEX-A · BOOKING-STATUS-PROMOTION-CRON · BOOKING-AUDIT-LOG-A.
 - **Studio/VK** — studio-admin chat with master (нужен auth-model decision) · studio public-page sidebar entry · VK notifications delivery subsystem (VK Bot API).
+- **R2-06-A follow-up (optional)** — surface accept/decline reschedule ALSO в studio calendar/journal action-menu (FIX-R2-06-A сделал inline-on-notification — основная parity-поверхность). Нужен threading `proposedStartAt/actionRequiredBy` в `ScheduleBookingCell`/`StudioBookingRow` DTO; reuse the same `/confirm` + `/decline-reschedule` endpoints. Также: studio calendar `?focus=` reader (для deep-link highlight на календаре).
 - **Legacy retire** — `studio-settings-page.tsx` (837 LOC, 3 live sub-route importers) + `studio-services-page.tsx` + `moneyRUBPlain` — когда portfolio/profile sub-routes получат studio-cabinet redesign (LEGACY-CLEANUP-EXEC остаток).
 - **TELEGRAM-ALERT-PII-REVIEW** — review cuid в alert-тексте (admin chat only).
 - Feature-buckets — CRM/Schedule/Catalog/Marketing/Notifications enhancements · mobile app · code-quality · admin dashboard/catalog enhancements.
@@ -124,10 +110,10 @@
 
 ---
 
-## ❓ (verify) — подтвердить у Артёма (не удалено, оставлено активным)
+## ✅ (verify) — оба пункта подтверждены и закрыты 2026-06-24 (см. BACKLOG-DONE.md)
 
-- **MIGRATION-RECONCILIATION «full scope»** — старый бэклог упоминал остаток «1–2 ч / 24 операции»; MIGRATION-RECONCILIATION-BATCH (2026-05-30) + `check:schema-drift` выглядят как полное закрытие. Подтвердить, что остатка нет → иначе вернуть в 🔴.
-- **QA-26 suite (2026-06-06)** — в старом бэклоге значилось «дополнительные находки» без детализации. Подтвердить scope/severity или закрыть.
+- **MIGRATION-RECONCILIATION «full scope»** → **DONE.** `npm run check:schema-drift` = `OK — 0 drift` (schema.prisma ⟺ migrations history reconciled). *(`migrate status` показывает 1 not-yet-applied миграцию `…_provider_timezone_default_moscow` — это ОТДЕЛЬНАЯ deploy-ops задача «применить на проде», не reconciliation-gap; остаётся в «🚀 Deploy / ops».)*
+- **QA-26 suite** → **phantom (не существовало).** Это был misread Explore-агента: оригинальный бэклог имел заголовок секции `### QA (from QA-02 client discovery→booking funnel, 2026-06-06)`, чьи находки (QA-101 dev-only, QA-108 fixed, …) уже ✅ закрыты FIX-25/FIX-01. Нет «QA-26».
 
 ---
 

@@ -129,10 +129,11 @@ function buildBookingPayload(booking: BookingWithRelations): Prisma.InputJsonVal
 }
 
 function bookingPushUrl(bookingId: string, audience: "CLIENT" | "MASTER"): string {
+  // FIX-R2-06-B: canonical `?focus=<id>` deep-link param (shared focus reader).
   if (audience === "MASTER") {
-    return `/cabinet/master/dashboard?bookingId=${bookingId}`;
+    return `/cabinet/master/dashboard?focus=${bookingId}`;
   }
-  return `/cabinet/bookings?bookingId=${bookingId}`;
+  return `/cabinet/bookings?focus=${bookingId}`;
 }
 
 function providerNotificationPushUrl(booking: BookingWithRelations, recipientUserId: string): string {
