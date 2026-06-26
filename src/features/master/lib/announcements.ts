@@ -24,18 +24,24 @@ export const ANNOUNCEMENTS: ReadonlyArray<AnnouncementItem> = [
     href: "/cabinet/master/profile",
   },
   {
-    id: "announce-whatsapp",
+    // FIX-EXP-CONTENT-GRAMMAR (EXP-018): platform reminders go via Telegram + SMS
+    // + push — NOT WhatsApp (which isn't an integrated channel). Don't advertise
+    // a channel we don't deliver.
+    id: "announce-reminders",
     type: "announce",
     label: "АНОНС",
-    title: "Авто-напоминания клиентам по WhatsApp",
+    title: "Авто-напоминания клиентам в Telegram и по SMS",
     description: "Включается в настройках. Бесплатно для Premium-аккаунтов.",
     href: "/cabinet/master/account",
   },
   {
-    id: "training-checks",
-    type: "training",
-    label: "ОБУЧЕНИЕ",
-    title: "Вебинар: как поднять средний чек на 30%",
-    description: "Чт 7 мая, 19:00. Бесплатно для мастеров платформы.",
+    // FIX-EXP-CONTENT-GRAMMAR (EXP-018): replaced a stale dated webinar
+    // («Чт 7 мая, 19:00» — long past) with an evergreen, truthful tip about a
+    // real feature (service packages). No date to go stale.
+    id: "tip-packages",
+    type: "tip",
+    label: "СОВЕТ",
+    title: "Соберите пакет услуг со скидкой",
+    description: "Пакеты повышают средний чек — клиент бронирует несколько услуг сразу.",
   },
 ];

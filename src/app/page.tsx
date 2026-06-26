@@ -5,7 +5,9 @@ import { getPublicStats } from "@/lib/stats/public-stats";
 import { logError } from "@/lib/logging/logger";
 
 export const metadata: Metadata = {
-  title: "МастерРядом — запись к мастерам онлайн",
+  // FIX-EXP-CONTENT-GRAMMAR (EXP-001): brand-first homepage title via `absolute`
+  // so the root template ("%s | МастерРядом") doesn't append a second brand.
+  title: { absolute: "МастерРядом — запись к мастерам онлайн" },
   description:
     "Найди мастера маникюра, массажа или стрижки рядом. Онлайн-запись.",
   alternates: { canonical: "/" },

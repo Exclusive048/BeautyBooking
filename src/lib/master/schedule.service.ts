@@ -80,6 +80,8 @@ export type ScheduleWeekData = {
   /** Computed dynamic hour range for the visible time grid (start/end in whole hours). */
   hourRange: { start: number; end: number };
   fetchedAt: Date;
+  /** EXP-019: master (salon) tz — booking-card labels + footer time render in it, matching the grid. */
+  timezone: string;
 };
 
 const REVENUE_STATUSES: BookingStatus[] = [
@@ -422,6 +424,7 @@ export const getMasterScheduleWeek = cache(
       },
       hourRange,
       fetchedAt: now,
+      timezone: master.timezone,
     };
   },
 );

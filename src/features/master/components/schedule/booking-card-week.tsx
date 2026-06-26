@@ -1,7 +1,7 @@
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BookingCardActionsMenu } from "@/features/master/components/schedule/booking-card-actions-menu";
-import { formatHm } from "@/lib/master/schedule-utils";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import type { ScheduleBookingItem } from "@/lib/master/schedule.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -14,6 +14,12 @@ type Props = {
   booking: ScheduleBookingItem;
   topPx: number;
   heightPx: number;
+  /**
+   * EXP-019: master (salon) tz. The card LABEL must format in the same tz as
+   * its grid POSITION (`startMinuteOfDay` = `getLocalTimeParts(date, masterTz)`)
+   * — else the label and the slot it's drawn in disagree by the tz offset.
+   */
+  timezone: string;
 };
 
 /**
@@ -26,7 +32,7 @@ type Props = {
  * lives in the corner with `group-hover` reveal — keeps the body legible
  * on long bookings and accessible on short ones.
  */
-export function BookingCardWeek({ booking, topPx, heightPx }: Props) {
+export function BookingCardWeek({ booking, topPx, heightPx, timezone }: Props) {
   const isPending = booking.runtimeStatus === "PENDING" || booking.runtimeStatus === "CHANGE_REQUESTED";
   const isNewClient = booking.isNewClient;
   const compact = heightPx < 64;
@@ -56,7 +62,7 @@ export function BookingCardWeek({ booking, topPx, heightPx }: Props) {
     >
       <div className="flex items-center justify-between gap-2 font-mono text-[10px] tabular-nums opacity-90">
         <span>
-          {formatHm(booking.startAtUtc)}–{formatHm(booking.endAtUtc)}
+          {formatLocalHm(booking.startAtUtc, timezone)}–{formatLocalHm(booking.endAtUtc, timezone)}
         </span>
         {isPending ? (
           <Clock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />

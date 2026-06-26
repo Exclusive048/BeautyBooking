@@ -4,7 +4,7 @@ import { PrivacyContent, PRIVACY_SECTIONS } from "@/features/legal/content/priva
 import { getLegalDraftMode } from "@/lib/legal/config";
 
 export const metadata: Metadata = {
-  title: "Политика конфиденциальности — МастерРядом",
+  title: "Политика конфиденциальности",
   description:
     "Политика конфиденциальности МастерРядом: какие персональные данные обрабатываем, передача третьим лицам, права субъекта.",
   alternates: { canonical: "/privacy" },

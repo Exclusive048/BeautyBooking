@@ -9,6 +9,7 @@ import { ServicesSkeleton } from "@/components/blocks/skeletons/ServicesSkeleton
 import { StudioHeroSection } from "@/features/public-studio/sections/hero-section";
 import { StudioDetailsSection } from "@/features/public-studio/sections/details-section";
 import { StudioPhotosSection } from "@/features/public-studio/sections/photos-section";
+import { StudioPackagesSection } from "@/features/public-studio/sections/packages-section";
 import { StudioReviewsSection } from "@/features/public-studio/sections/reviews-section";
 import { StudioServicesSection } from "@/features/public-studio/sections/services-section";
 import { StudioSlotBarSection } from "@/features/public-studio/sections/slot-bar-section";
@@ -69,6 +70,10 @@ export function PublicStudioProfilePage({ studioId }: Props) {
 
       <Suspense fallback={<ServicesSkeleton />}>
         <StudioServicesSection studioId={studioId} />
+      </Suspense>
+
+      <Suspense fallback={<ServicesSkeleton />}>
+        <StudioPackagesSection studioId={studioId} />
       </Suspense>
 
       <Suspense fallback={<ServicesSkeleton />}>

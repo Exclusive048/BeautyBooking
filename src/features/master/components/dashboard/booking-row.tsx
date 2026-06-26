@@ -3,18 +3,13 @@ import { BookingActionButtons } from "@/features/master/components/dashboard/boo
 import { BookingRowActions } from "@/features/master/components/dashboard/booking-row-actions";
 import { isBookingPastConfirmWindow } from "@/lib/bookings/action-state";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 
 const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
-
-function formatHm(date: Date): string {
-  const h = String(date.getUTCHours()).padStart(2, "0");
-  const m = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
-}
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -25,6 +20,8 @@ function initialsOf(name: string): string {
 
 type Props = {
   booking: DashboardBooking;
+  /** Salon (master) tz — EXP-017: booking times shown in salon-tz, matching the kanban. */
+  timezone: string;
 };
 
 /**
@@ -36,15 +33,15 @@ type Props = {
  * (server-resolved in `dashboard.service.ts`). The row no longer
  * needs the master's own provider id.
  */
-export function BookingRow({ booking }: Props) {
+export function BookingRow({ booking, timezone }: Props) {
   return (
     <div data-focus-id={booking.id} className="flex gap-4 px-4 py-4">
       <div className="w-12 shrink-0 text-center">
         <p className="font-display text-base text-text-main">
-          {formatHm(booking.startAtUtc)}
+          {formatLocalHm(booking.startAtUtc, timezone)}
         </p>
         <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-text-sec">
-          до {formatHm(booking.endAtUtc)}
+          до {formatLocalHm(booking.endAtUtc, timezone)}
         </p>
       </div>
 

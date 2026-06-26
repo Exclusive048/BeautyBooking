@@ -45,7 +45,7 @@ import { logError } from "@/lib/logging/logger";
  * multi-master is MVP-2.
  */
 
-function mapPrismaBookingConflict(error: unknown): AppError | null {
+export function mapPrismaBookingConflict(error: unknown): AppError | null {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002" || error.code === "P2034") {
       return new AppError(
@@ -79,14 +79,51 @@ type LoadedSoloPackage = {
   components: SoloPackageComponent[];
 };
 
+/** Whether the owning provider is a solo master or a studio. */
+export type PackageBookingKind = "solo" | "studio";
+
+export type LoadedPackageComponent = {
+  serviceId: string;
+  name: string;
+  title: string | null;
+  /**
+   * The component's catalog base price/duration (`basePrice ?? price`,
+   * `baseDurationMin ?? durationMin`). SOLO masters serve their own catalog so
+   * this IS the booked value. For STUDIO packages it's only indicative (the
+   * card/preview) — the authoritative per-master price/duration comes from the
+   * chosen master's MasterService override via `resolveBookingCore` at
+   * propose/create time.
+   */
+  basePrice: number;
+  baseDurationMin: number;
+  sortOrder: number;
+};
+
+export type LoadedPackageRecord = {
+  kind: PackageBookingKind;
+  id: string;
+  name: string;
+  /** Solo: the master's own provider id. Studio: the studio's provider id (== ServicePackage.masterId). */
+  providerId: string;
+  /** Studio: the `Studio` row id (for `Booking.studioId`). Solo: null. */
+  studioId: string | null;
+  timezone: string;
+  minBookingHoursAhead: number;
+  /** Solo: the master's buffer. Studio: the studio-provider buffer (per-master buffers resolved in `resolveBookingCore`). */
+  bufferMin: number;
+  discountType: DiscountType;
+  discountValue: number;
+  components: LoadedPackageComponent[];
+};
+
 /**
- * Loads a package for SOLO booking: the package + its components in
- * `sortOrder`, with each component's solo effective price/duration (no
- * MasterService override — solo master serves its own catalog services,
- * mirroring resolveBookingCore's solo branch: basePrice ?? price,
- * baseDurationMin ?? durationMin).
+ * Shared package loader (PACKAGE-BOOKING-MVP-2 lifted the solo gate). Loads the
+ * package + its enabled/active components in `sortOrder`, resolves whether the
+ * owning provider is a SOLO master or a STUDIO, and (for studio) the `Studio`
+ * row id needed for `Booking.studioId`. Both `loadSoloPackage` (MVP-1) and
+ * `loadStudioPackage` (MVP-2) wrap this — one query, one validation, no fork.
  */
-export async function loadSoloPackage(packageId: string): Promise<LoadedSoloPackage> {
+export async function loadPackageForBooking(packageId: string): Promise<LoadedPackageRecord> {
   const pkg = await prisma.servicePackage.findUnique({
     where: { id: packageId },
     select: {
@@ -133,12 +170,33 @@ export async function loadSoloPackage(packageId: string): Promise<LoadedSoloPack
     throw new AppError("Пакет не найден.", 404, "PACKAGE_NOT_FOUND");
   }
   const master = pkg.master;
-  if (!master || master.type !== ProviderType.MASTER || master.studioId) {
-    // MVP-1 is solo only. Studio packages → MVP-2.
-    throw new AppError("Бронирование пакета доступно только у мастера.", 400, "PACKAGE_NOT_SOLO");
+  if (!master) {
+    throw new AppError("Пакет не найден.", 404, "PACKAGE_NOT_FOUND");
   }
 
-  const components: SoloPackageComponent[] = pkg.items
+  let kind: PackageBookingKind;
+  let studioRowId: string | null = null;
+  if (master.type === ProviderType.MASTER && !master.studioId) {
+    kind = "solo";
+  } else if (master.type === ProviderType.STUDIO) {
+    kind = "studio";
+    const studio = await prisma.studio.findFirst({
+      where: { providerId: master.id },
+      select: { id: true },
+    });
+    if (!studio) {
+      // A STUDIO provider without a Studio row is a data anomaly — not bookable.
+      throw new AppError("Бронирование пакета недоступно.", 400, "PACKAGE_NOT_BOOKABLE");
+    }
+    studioRowId = studio.id;
+  } else {
+    // A master that belongs to a studio (master.studioId set) doesn't own
+    // public packages in this model — studio packages are owned by the STUDIO
+    // provider. Treat as not bookable.
+    throw new AppError("Бронирование пакета недоступно.", 400, "PACKAGE_NOT_BOOKABLE");
+  }
+
+  const components: LoadedPackageComponent[] = pkg.items
     .filter((item) => item.service && item.service.isEnabled && item.service.isActive)
     .map((item) => {
       const s = item.service!;
@@ -146,8 +204,8 @@ export async function loadSoloPackage(packageId: string): Promise<LoadedSoloPack
         serviceId: s.id,
         name: s.name,
         title: s.title,
-        effectivePrice: s.basePrice ?? s.price,
-        durationMin: s.baseDurationMin ?? s.durationMin,
+        basePrice: s.basePrice ?? s.price,
+        baseDurationMin: s.baseDurationMin ?? s.durationMin,
         sortOrder: item.sortOrder,
       };
     });
@@ -157,15 +215,48 @@ export async function loadSoloPackage(packageId: string): Promise<LoadedSoloPack
   }
 
   return {
+    kind,
     id: pkg.id,
     name: pkg.name,
     providerId: master.id,
+    studioId: studioRowId,
     timezone: master.timezone,
     minBookingHoursAhead: master.minBookingHoursAhead,
     bufferMin: normalizeBufferMinutes(master.bufferBetweenBookingsMin),
     discountType: pkg.discountType,
     discountValue: pkg.discountValue,
     components,
+  };
+}
+
+/**
+ * Loads a package for SOLO booking. SOLO masters serve their own catalog
+ * services (no MasterService override — mirrors resolveBookingCore's solo
+ * branch: basePrice ?? price, baseDurationMin ?? durationMin), so the loader's
+ * base price/duration ARE the booked values here.
+ */
+export async function loadSoloPackage(packageId: string): Promise<LoadedSoloPackage> {
+  const pkg = await loadPackageForBooking(packageId);
+  if (pkg.kind !== "solo") {
+    throw new AppError("Бронирование пакета доступно только у мастера.", 400, "PACKAGE_NOT_SOLO");
+  }
+  return {
+    id: pkg.id,
+    name: pkg.name,
+    providerId: pkg.providerId,
+    timezone: pkg.timezone,
+    minBookingHoursAhead: pkg.minBookingHoursAhead,
+    bufferMin: pkg.bufferMin,
+    discountType: pkg.discountType,
+    discountValue: pkg.discountValue,
+    components: pkg.components.map((c) => ({
+      serviceId: c.serviceId,
+      name: c.name,
+      title: c.title,
+      effectivePrice: c.basePrice,
+      durationMin: c.baseDurationMin,
+      sortOrder: c.sortOrder,
+    })),
   };
 }
 

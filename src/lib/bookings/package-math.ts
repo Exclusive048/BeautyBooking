@@ -106,3 +106,60 @@ export function intraPackageOverlap(slots: PackageSlot[], bufferMin: number): bo
   }
   return false;
 }
+
+export type PackageComponentSlot = {
+  startAtUtc: Date;
+  endAtUtc: Date;
+  /** The chosen master for this component (studio package — different masters per component). */
+  masterProviderId: string | null;
+  /** The chosen master's between-bookings buffer, in minutes. */
+  bufferMin: number;
+};
+
+/**
+ * PACKAGE-BOOKING-MVP-2 — the BY-CLIENT intra-package overlap guard for
+ * STUDIO multi-master packages.
+ *
+ * The invariant (MVP-2): a studio package's components are sequential along
+ * the ONE CLIENT's timeline, even across different masters (the client walks
+ * master to master — there is NO parallel placement). So the constraint that
+ * matters is "the client can't be in two chairs at once": any two component
+ * windows must not overlap in CLIENT time, REGARDLESS of which master each is
+ * with.
+ *
+ * This is the axis the solo `intraPackageOverlap` does NOT model: solo is
+ * single-master, so by-time == by-master == by-client. Studio is multi-master,
+ * so a naive by-MASTER check (each master's `ensureNoConflicts` only sees its
+ * OWN bookings) would wrongly ALLOW two different-master components at the same
+ * instant. This helper closes that — it pairwise-checks the client windows.
+ *
+ * Two refinements over a pure non-overlap check:
+ *   - DIFFERENT masters → buffer 0 (the client teleports between chairs; the
+ *     only constraint is non-overlap; touching back-to-back is allowed). This
+ *     is what catches the critical "same-instant-different-masters" case.
+ *   - SAME master twice (the client picked one master for two services) → that
+ *     master ALSO needs its between-bookings buffer, and the two siblings are
+ *     invisible to `ensureNoConflicts` until the second is created in-tx, so
+ *     pad by the master's buffer here too (single-gap, matching the engine's
+ *     `ensureNoConflicts` semantics — same as solo `intraPackageOverlap`).
+ *
+ * Returns true iff any pair violates its constraint.
+ */
+export function intraPackageOverlapMultiMaster(components: PackageComponentSlot[]): boolean {
+  for (let i = 0; i < components.length; i += 1) {
+    for (let j = i + 1; j < components.length; j += 1) {
+      const a = components[i]!;
+      const b = components[j]!;
+      const sameMaster =
+        a.masterProviderId !== null && a.masterProviderId === b.masterProviderId;
+      const bufferMin = sameMaster ? Math.max(a.bufferMin, b.bufferMin) : 0;
+      const buffer = Math.max(0, Math.floor(bufferMin)) * 60 * 1000;
+      const aStart = a.startAtUtc.getTime();
+      const aEnd = a.endAtUtc.getTime();
+      const bStart = b.startAtUtc.getTime();
+      const bEnd = b.endAtUtc.getTime();
+      if (aStart < bEnd + buffer && bStart < aEnd + buffer) return true;
+    }
+  }
+  return false;
+}

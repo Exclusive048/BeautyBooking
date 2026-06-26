@@ -85,6 +85,12 @@ const OWNER_LAST = "Алмазова";
 const STUDIO_PUBLIC_USERNAME = "vision-studio";
 const STUDIO_NAME = "Vision Beauty Studio";
 
+// FIX-EXP-SEED-HYGIENE (EXP-006): the showcase studio is in Yekaterinburg
+// (Asia/Yekaterinburg, +5) — a deliberate non-MSK RF provider so the salon-tz
+// regression surface (R2-04-BA used a +5 salon) survives without KZ data.
+// SALON_TZ must equal the seeded City.timezone for Yekaterinburg.
+const SALON_TZ = "Asia/Yekaterinburg";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Input = {
@@ -211,11 +217,45 @@ function startOfUtcDay(date: Date): Date {
   return out;
 }
 
+/**
+ * Offset (ms) of `timeZone` from UTC at the given instant. Mirrors
+ * src/lib/schedule/timezone.ts getTimeZoneOffsetMs (RF zones fixed-offset).
+ */
+function tzOffsetMs(at: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p = Object.fromEntries(dtf.formatToParts(at).map((x) => [x.type, x.value]));
+  const asUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour) === 24 ? 0 : Number(p.hour),
+    Number(p.minute),
+    Number(p.second)
+  );
+  return asUtc - at.getTime();
+}
+
+/**
+ * UTC instant whose wall-clock in SALON_TZ is (hour:minute) on the day
+ * `offsetDays` from `base`. FIX-EXP-SEED-HYGIENE: salon-local intent under
+ * the studio's Yekaterinburg timezone (no naive-UTC drift).
+ */
 function dateAtLocalUtc(offsetDays: number, hour: number, minute = 0, base = new Date()): Date {
   const day = startOfUtcDay(base);
   day.setUTCDate(day.getUTCDate() + offsetDays);
-  day.setUTCHours(hour, minute, 0, 0);
-  return day;
+  const guess = new Date(
+    Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour, minute, 0, 0)
+  );
+  return new Date(guess.getTime() - tzOffsetMs(guess, SALON_TZ));
 }
 
 function findPlan(plans: BillingPlan[], code: string): BillingPlan {
@@ -241,8 +281,8 @@ async function ensureOwner(): Promise<UserProfile> {
 
 async function ensureStudioProvider(ownerUserId: string): Promise<Provider> {
   const cityRow = await prisma.city.findFirst({
-    where: { OR: [{ slug: "almaty" }, { name: "Алматы" }] },
-    select: { id: true },
+    where: { OR: [{ slug: "ekb" }, { name: "Екатеринбург" }] },
+    select: { id: true, timezone: true },
   });
 
   return prisma.provider.upsert({
@@ -252,11 +292,11 @@ async function ensureStudioProvider(ownerUserId: string): Promise<Provider> {
       name: STUDIO_NAME,
       tagline: "Команда из 7 мастеров · полный цикл бьюти-услуг",
       description:
-        "Уютная студия в центре Алматы. Маникюр, парикмахерские услуги, брови, косметология, массаж и макияж — всё под одной крышей.",
-      address: "ул. Жибек Жолы, 75",
-      district: "Алмалинский район",
+        "Уютная студия в центре Екатеринбурга. Маникюр, парикмахерские услуги, брови, косметология, массаж и макияж — всё под одной крышей.",
+      address: "ул. Вайнера, 16",
+      district: "Ленинский район",
       cityId: cityRow?.id ?? null,
-      timezone: "Asia/Almaty",
+      timezone: cityRow?.timezone ?? SALON_TZ,
       isPublished: true,
       categories: ["nails", "hair", "brows", "skin", "massage", "makeup"],
       rating: 4.8,
@@ -272,12 +312,12 @@ async function ensureStudioProvider(ownerUserId: string): Promise<Provider> {
       name: STUDIO_NAME,
       tagline: "Команда из 7 мастеров · полный цикл бьюти-услуг",
       description:
-        "Уютная студия в центре Алматы. Маникюр, парикмахерские услуги, брови, косметология, массаж и макияж — всё под одной крышей.",
+        "Уютная студия в центре Екатеринбурга. Маникюр, парикмахерские услуги, брови, косметология, массаж и макияж — всё под одной крышей.",
       publicUsername: STUDIO_PUBLIC_USERNAME,
-      address: "ул. Жибек Жолы, 75",
-      district: "Алмалинский район",
+      address: "ул. Вайнера, 16",
+      district: "Ленинский район",
       cityId: cityRow?.id ?? null,
-      timezone: "Asia/Almaty",
+      timezone: cityRow?.timezone ?? SALON_TZ,
       isPublished: true,
       categories: ["nails", "hair", "brows", "skin", "massage", "makeup"],
       rating: 4.8,
@@ -360,6 +400,11 @@ type SeededMaster = {
 
 async function ensureMasters(studioProviderId: string, studioId: string): Promise<SeededMaster[]> {
   const out: SeededMaster[] = [];
+  // FIX-EXP-SEED-HYGIENE: studio masters share the studio's RF city/timezone.
+  const cityRow = await prisma.city.findFirst({
+    where: { OR: [{ slug: "ekb" }, { name: "Екатеринбург" }] },
+    select: { id: true, timezone: true },
+  });
   for (const def of MASTERS) {
     const slug = masterSlug(def.ordinal, def.firstName, def.lastName);
     const email = seedEmail("master", slug);
@@ -383,8 +428,9 @@ async function ensureMasters(studioProviderId: string, studioId: string): Promis
         name: `${def.firstName} ${def.lastName}`,
         tagline: def.tagline,
         studioId: studioProviderId,
+        cityId: cityRow?.id ?? null,
         isPublished: true,
-        timezone: "Asia/Almaty",
+        timezone: cityRow?.timezone ?? SALON_TZ,
         scheduleMode: ScheduleMode.FLEXIBLE,
         slotStepMin: 30,
         bufferBetweenBookingsMin: 15,
@@ -401,9 +447,10 @@ async function ensureMasters(studioProviderId: string, studioId: string): Promis
         tagline: def.tagline,
         publicUsername: slug,
         studioId: studioProviderId,
-        address: "ул. Жибек Жолы, 75",
-        district: "Алмалинский район",
-        timezone: "Asia/Almaty",
+        cityId: cityRow?.id ?? null,
+        address: "ул. Вайнера, 16",
+        district: "Ленинский район",
+        timezone: cityRow?.timezone ?? SALON_TZ,
         isPublished: true,
         scheduleMode: ScheduleMode.FLEXIBLE,
         slotStepMin: 30,

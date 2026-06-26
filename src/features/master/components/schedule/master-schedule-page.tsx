@@ -79,8 +79,8 @@ export async function MasterSchedulePage({ searchParams }: Props) {
         <ScheduleControls weekStartIso={toIsoDateKey(weekStart)} />
         <ScheduleKpiCards stats={data.kpi} />
         <ScheduleLegend />
-        <WeekGrid days={data.days} hourRange={data.hourRange} />
-        <FooterHint fetchedAt={data.fetchedAt} />
+        <WeekGrid days={data.days} hourRange={data.hourRange} timezone={data.timezone} />
+        <FooterHint fetchedAt={data.fetchedAt} timezone={data.timezone} />
       </div>
     </>
   );

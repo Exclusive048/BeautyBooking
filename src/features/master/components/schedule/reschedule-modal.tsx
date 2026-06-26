@@ -85,13 +85,6 @@ function formatDateLabel(dateKey: string, timeZone: string): string {
   });
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function formatHm(d: Date): string {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 /**
  * MASTER-RESCHEDULE-FIX-A — replaces the raw `<input type="date" />` +
@@ -270,10 +263,14 @@ export function RescheduleModal({
 
   if (!open) return null;
 
+  // EXP-019: the "current time" label must render in the SAME tz as the slot
+  // picker below it (viewer/salon tz) — the old `getHours()`/`getDate()` form
+  // read the host process tz, so the original-time label disagreed with the
+  // slots by the tz offset.
   const original = new Date(startAtUtc);
   const originalLabel = Number.isNaN(original.getTime())
     ? "—"
-    : `${original.getDate()}.${pad(original.getMonth() + 1)} · ${formatHm(original)}`;
+    : `${UI_FMT.dateShort(startAtUtc, { timeZone: viewerTimeZone })} · ${UI_FMT.timeShort(startAtUtc, { timeZone: viewerTimeZone })}`;
 
   // ── #5а pending guard ────────────────────────────────────────────
   // When the booking already has a pending change request, the modal

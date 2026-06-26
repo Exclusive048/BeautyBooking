@@ -10,7 +10,7 @@ import type { SupportContactOption } from "@/lib/support/contact-shared";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Поддержка — МастерРядом",
+  title: "Поддержка",
   description:
     "Сообщите об ошибке или предложите улучшение МастерРядом. Мы ответим в течение дня.",
   alternates: { canonical: "/support" },

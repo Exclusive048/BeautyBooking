@@ -7,7 +7,7 @@ import { CTABlock } from "@/features/marketing/sections/cta-block";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Как записаться — МастерРядом",
+  title: "Как записаться",
   description:
     "Запись к мастеру красоты за 5 простых шагов. Без звонков, без переписки в мессенджерах — открыл, выбрал, записался.",
   alternates: { canonical: "/how-to-book" },

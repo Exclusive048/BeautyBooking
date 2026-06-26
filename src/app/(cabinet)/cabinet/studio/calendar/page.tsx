@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { StudioSchedulePage } from "@/features/studio-cabinet/schedule/components/studio-schedule-page";
-import { toDateKey } from "@/features/studio-cabinet/schedule/lib/time-grid";
 import {
   parseScheduleView,
   type StudioScheduleView,
@@ -43,10 +42,10 @@ export default async function StudioCalendarRoute({ searchParams }: Props) {
 
   const params = searchParams instanceof Promise ? await searchParams : searchParams;
   const view: StudioScheduleView = parseScheduleView(params?.view);
+  // EXP-020: when there's no valid `?date`, leave it undefined so the service
+  // resolves the default day in the STUDIO's tz (not the UTC/host calendar day).
   const dateKey =
-    params?.date && DATE_KEY_RE.test(params.date)
-      ? params.date
-      : toDateKey(new Date());
+    params?.date && DATE_KEY_RE.test(params.date) ? params.date : undefined;
 
   // STUDIO-MASTERS-PRIVACY-FIX-A: verify the deep-link token against
   // the current studio scope before threading it to the page. Invalid

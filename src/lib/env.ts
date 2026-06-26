@@ -85,6 +85,12 @@ const envSchema = z.object({
   YANDEX_SUGGEST_API_KEY: z.string().optional(),
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: z.string().optional(),
 
+  // FIX-EXP-CONTENT-GRAMMAR (EXP-005): real legal ИНН for the footer requisites.
+  // Optional — the footer shows an obvious "[не указан]" placeholder when unset
+  // (never a fake-looking number). Set the real value before production launch
+  // (see deploy-checklist «legal requisites»).
+  NEXT_PUBLIC_LEGAL_INN: z.string().optional(),
+
   // ── OpenAI (legacy — visual-search only, AI chat surfaces migrated to Yandex) ─
   // OPENAI_API_KEY remains in schema because `src/lib/visual-search/*` still
   // imports the OpenAI SDK directly (vision + embeddings — Yandex multimodal
@@ -245,6 +251,7 @@ const clientEnv = {
   NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: process.env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED,
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
+  NEXT_PUBLIC_LEGAL_INN: process.env.NEXT_PUBLIC_LEGAL_INN,
 };
 
 export const env: AppEnv =

@@ -98,6 +98,11 @@ model UserProfile {
 
   emailNotificationsEnabled Boolean @default(false)
 
+  // FIX-EXP-NOTIFICATIONS (EXP-027): per-user push on/off preference. Opt-in
+  // (default false) — set true only via an explicit user gesture (the push
+  // toggle requests permission + subscribes). Gates delivery in sendPushToUser.
+  pushNotificationsEnabled Boolean @default(false)
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 

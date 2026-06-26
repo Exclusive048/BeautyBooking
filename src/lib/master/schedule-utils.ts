@@ -135,9 +135,7 @@ export function hhmmToMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-/** "HH:mm" formatter for absolute Date instances rendered in master tz. */
-export function formatHm(date: Date): string {
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
-}
+// FIX-EXP-TZ-CROSS-SURFACE: the old `formatHm(date)` here read `date.getHours()`
+// (host process tz), which made booking-card labels disagree with their
+// salon-tz grid position. Removed — all booking/slot "HH:MM" displays now route
+// through the entity-tz `formatLocalHm(date, timeZone)` in `@/lib/schedule/timezone`.

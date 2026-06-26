@@ -290,7 +290,9 @@ function ReviewCard({
                 ) : null}
               </div>
               <div className="truncate text-xs text-text-sec">
-                {review.serviceName ?? "—"} · {formatDate(review.createdAt)}
+                {/* FIX-EXP-CONTENT-GRAMMAR (EXP-016): drop the bare «— ·» when
+                    there's no linked service — show date only, no empty dash. */}
+                {[review.serviceName, formatDate(review.createdAt)].filter(Boolean).join(" · ")}
               </div>
             </div>
           </div>

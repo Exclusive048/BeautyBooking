@@ -236,9 +236,12 @@ export const UI_TEXT = {
       eyebrowNoCategory: "Каталог · {city}",
       titleTemplate: "{count} {plural} рядом",
       subtitleAvailable: "свободны на этой неделе",
-      pluralOne: "мастер",
-      pluralFew: "мастера",
-      pluralMany: "мастеров",
+      // FIX-EXP-CONTENT-GRAMMAR (EXP-008): the count is all published providers
+      // (masters AND studios), so the truthful collective is «специалист», not
+      // «мастер» (which excludes studios like Vision / Аура).
+      pluralOne: "специалист",
+      pluralFew: "специалиста",
+      pluralMany: "специалистов",
     },
     sort: {
       label: "Сорт:",
@@ -357,7 +360,11 @@ export const UI_TEXT = {
       perMonth: "/мес",
       free: "навсегда",
       placeholder: "[Уточняется]",
-      placeholderHint: "Цена будет настроена администратором",
+      // FIX-EXP-PRICING-COPY (EXP-014): public neutral "coming soon" copy — must
+      // NOT reference the administrator / internal process. Fires whenever the
+      // marketing resolver (FIX-R2-05-AB) returns no positive price; replaces
+      // "Цена будет настроена администратором" (admin-process leak).
+      placeholderHint: "Цена скоро появится",
     },
     plan: {
       ctaFree: "Начать бесплатно",
@@ -595,7 +602,9 @@ export const UI_TEXT = {
       heroFeature2: "Бронируйте время онлайн — без звонков",
       heroFeature3: "Напоминания и перенос в пару кликов",
       socialProofMasters: "2 000+",
-      socialProofMastersLabel: "мастеров на платформе",
+      // FIX-EXP-CONTENT-GRAMMAR (EXP-008): `stats.masters` counts all published
+      // providers (masters + studios) — truthful label is «специалистов».
+      socialProofMastersLabel: "специалистов на платформе",
       socialProofBookings: "15 000+",
       socialProofBookingsLabel: "успешных записей",
       resendCode: "Отправить повторно",
@@ -734,7 +743,11 @@ export const UI_TEXT = {
       "Маркетплейс мастеров красоты. Находите лучших мастеров рядом и записывайтесь онлайн без звонков.",
     legal: {
       copyright: "© {year} МастерРядом",
-      entity: "Дмитриев Артем Романович, ИНН 1234567890",
+      // FIX-EXP-CONTENT-GRAMMAR (EXP-005): the ИНН is filled from
+      // `NEXT_PUBLIC_LEGAL_INN` (FooterCopyright). When unset, the footer shows
+      // `innUnset` — an OBVIOUS placeholder, never a fake-looking number.
+      entityTemplate: "Дмитриев Артем Романович, ИНН {inn}",
+      innUnset: "[не указан]",
     },
     socials: {
       vk: "VK",
@@ -1171,6 +1184,17 @@ export const UI_TEXT = {
         saved: "Email сохранён.",
         toggleFailed: "Не удалось изменить настройки уведомлений.",
       },
+      push: {
+        title: "Push-уведомления",
+        desc: "Получайте уведомления о записях в браузере, даже когда сайт закрыт.",
+        receiveToggle: "Получать push-уведомления",
+        permissionPrompt: "При включении браузер попросит разрешение на уведомления.",
+        unsupported: "Ваш браузер не поддерживает push-уведомления.",
+        denied:
+          "Уведомления запрещены в браузере. Разрешите их в настройках сайта, затем включите снова.",
+        enableFailed: "Не удалось включить push-уведомления. Попробуйте ещё раз.",
+        toggleFailed: "Не удалось изменить настройки push-уведомлений.",
+      },
     },
   },
   studio: {
@@ -1426,7 +1450,9 @@ export const UI_TEXT = {
   },
   homeGuest: {
     eyebrow: "BEAUTY MARKETPLACE",
-    eyebrowMastersSuffix: "мастеров",
+    // FIX-EXP-CONTENT-GRAMMAR (EXP-008): stat counts all published providers
+    // (masters + studios) — truthful term is «специалистов», not «мастеров».
+    eyebrowMastersSuffix: "специалистов",
     heroTitle: "Запишитесь к лучшим",
     heroTitleAccent: "мастерам",
     heroTitleAfter: "красоты — без звонков и переписок",
@@ -7138,6 +7164,51 @@ export const UI_TEXT = {
     reviewLeave: "Оставить отзыв",
     reviewEmpty: "Пока нет отзывов",
     reviewsCountLabel: "отзывов",
+    // PACKAGE-BOOKING-MVP-2 — studio package section + multi-master booking flow.
+    packages: {
+      heading: "Пакеты",
+      subtitle: "Несколько услуг в один визит со скидкой комплекта",
+      includesLabel: "ВКЛЮЧАЕТ",
+      finalPriceLabel: "ИТОГО",
+      durationTemplate: "⏱ {minutes} мин",
+      youSaveTemplate: "Экономия {amount}",
+      bookCta: "Записаться на пакет",
+    },
+    packageBooking: {
+      buildHint:
+        "Выберите мастера и время для каждой услуги. Услуги идут одна за другой — в один визит, одна оплата со скидкой комплекта.",
+      componentLabel: "Услуга {index} из {total}",
+      pickMaster: "Выберите мастера",
+      noMasters: "Для этой услуги пока нет доступных мастеров.",
+      waitingPrevious: "Доступно после выбора предыдущих услуг",
+      change: "Изменить",
+      slotsLoading: "Загружаем свободные окна…",
+      slotsError: "Не удалось загрузить окна. Попробуйте другой день.",
+      noSlots: "На этот день свободных окон нет.",
+      proposeError: "Не удалось рассчитать пакет. Проверьте выбранное время.",
+      proposing: "Рассчитываем…",
+      networkError: "Не удалось связаться с сервером. Попробуйте ещё раз.",
+      bookError: "Не удалось записать пакет. Попробуйте ещё раз.",
+      toReview: "Продолжить",
+      back: "Назад",
+      total: "Итого со скидкой",
+      continue: "Продолжить",
+      nameLabel: "Имя",
+      namePlaceholder: "Как к вам обращаться",
+      phoneLabel: "Телефон",
+      phonePlaceholder: "+7 999 123-45-67",
+      commentLabel: "Комментарий (необязательно)",
+      commentPlaceholder: "Пожелания к записи",
+      bookingAs: "Записываем как {name}",
+      nameRequired: "Укажите имя.",
+      phoneInvalid: "Проверьте номер телефона.",
+      submit: "Записать пакет",
+      submitting: "Записываем…",
+      successTitle: "Пакет забронирован",
+      successBody: "Все услуги записаны последовательно. Студия подтвердит запись.",
+      close: "Закрыть",
+      priceNote: "Итоговая цена зависит от выбранных мастеров.",
+    },
   },
   bookingWidget: {
     backToStudio: "К странице студии",
@@ -7450,7 +7521,7 @@ export const UI_TEXT = {
         "Запись онлайн в студию {name}. Услуги, цены, отзывы и свободные окна.",
       masterDescriptionFallback:
         "Запись онлайн к мастеру {name}. Услуги, цены, отзывы и свободные окна.",
-      titleTemplate: "{name} — запись онлайн | МастерРядом",
+      titleTemplate: "{name} — запись онлайн",
       servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
       ogBookOnline: "Записаться онлайн",
       ogReviews: "отзывов",
@@ -7474,12 +7545,12 @@ export const UI_TEXT = {
         "Запись онлайн в студию {name}. Выберите услуги и свободное время.",
       masterDescriptionFallback:
         "Запись онлайн к мастеру {name}. Выберите услуги и свободное время.",
-      titleTemplate: "{name} — запись онлайн | МастерРядом",
+      titleTemplate: "{name} — запись онлайн",
     },
     modelOffer: {
       notFoundTitle: "Предложение не найдено | МастерРядом",
       notFoundDescription: "Предложение для моделей недоступно или было закрыто.",
-      titleTemplate: "{service} для моделей | МастерРядом",
+      titleTemplate: "{service} для моделей",
       descriptionTemplate: "Предложение от мастера {name}: {date} {start}-{end}.",
       backToOffers: "← Все предложения",
       masterLabel: "Мастер",

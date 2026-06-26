@@ -8,7 +8,7 @@ import { CTABlock } from "@/features/marketing/sections/cta-block";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "О компании — МастерРядом",
+  title: "О компании",
   description:
     "Маркетплейс мастеров красоты — от записи до отзыва без звонков и хаоса в мессенджерах.",
   alternates: { canonical: "/about" },

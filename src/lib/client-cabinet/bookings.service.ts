@@ -2,16 +2,10 @@ import { BookingStatus, type ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
+import { classifyClientBookingGroup } from "@/lib/client-cabinet/booking-classification";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-
-const FINISHED_STATUSES: BookingStatus[] = [BookingStatus.FINISHED];
-const CANCELLED_STATUSES: BookingStatus[] = [
-  BookingStatus.CANCELLED,
-  BookingStatus.REJECTED,
-  BookingStatus.NO_SHOW,
-];
 
 export type ClientBookingFilter = {
   status?: "all" | "upcoming" | "finished" | "cancelled";
@@ -73,12 +67,6 @@ export type ClientBookingsPayload = {
   bookings: ClientBookingDTO[];
   kpi: ClientBookingsKpi;
 };
-
-function statusGroup(status: BookingStatus): "upcoming" | "finished" | "cancelled" {
-  if (FINISHED_STATUSES.includes(status)) return "finished";
-  if (CANCELLED_STATUSES.includes(status)) return "cancelled";
-  return "upcoming";
-}
 
 export async function listClientBookings(
   userId: string,
@@ -156,7 +144,16 @@ export async function listClientBookings(
     const salonTz = displayProvider.timezone ?? r.provider.timezone;
     const start = r.startAtUtc;
     const end = r.endAtUtc;
-    const group = statusGroup(r.status);
+    // FIX-EXP-013: datetime-aware classification via the canonical
+    // runtime-finished cutoff — an elapsed-but-not-FINISHED booking is history,
+    // not "upcoming". Reuses `resolveBookingRuntimeStatus` (same predicate as
+    // canReview / can-leave); instant-based, so the entity-tz is irrelevant here.
+    const group = classifyClientBookingGroup({
+      status: r.status,
+      startAtUtc: start,
+      endAtUtc: end,
+      now,
+    });
     // FIX-20 (Item 2): "today" in the SALON's tz (not host/server tz) so the
     // «Сегодня» badge/highlight matches the salon-tz time shown in the list.
     const isToday =

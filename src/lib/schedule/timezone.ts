@@ -54,6 +54,26 @@ export function getLocalTimeParts(date: Date, timeZone: string): { hour: number;
   return { hour: parts.hour, minute: parts.minute };
 }
 
+/**
+ * FIX-EXP-TZ-CROSS-SURFACE — the single entity-tz "HH:MM" formatter.
+ *
+ * The cross-surface contradiction class (EXP-017/019, the FIX-04/11/20/22
+ * tail): surfaces formatted a stored-UTC booking/slot instant with a local
+ * `formatHm` that read `date.getUTCHours()` (UTC) or `date.getHours()` (host
+ * process tz) — so the same booking showed a different time on the dashboard
+ * vs the kanban, and a week-card's label disagreed with its salon-tz grid
+ * position. Both UTC and host-tz are wrong: appointment times must be shown in
+ * the ENTITY's (salon's) own tz (QA-107 / FIX-22).
+ *
+ * `timeZone` is REQUIRED (no default) on purpose — a caller cannot accidentally
+ * format in UTC/host tz and re-diverge. All booking/slot "HH:MM" displays route
+ * through this one helper. Client-safe (Intl only, type-only import above).
+ */
+export function formatLocalHm(date: Date, timeZone: string): string {
+  const { hour, minute } = getLocalTimeParts(date, timeZone);
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
   const parts = partsFromDate(date, timeZone);
   const utcFromParts = Date.UTC(

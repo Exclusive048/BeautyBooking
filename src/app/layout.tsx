@@ -65,8 +65,8 @@ const LOCAL_SW_RESET_SCRIPT = `
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // FIX-EXP-A11Y-PWA (EXP-033): no `maximumScale`/`userScalable: false` — those
+  // block pinch-to-zoom, breaking WCAG 1.4.4 (Resize Text) for low-vision users.
   viewportFit: "cover",
   // brand-kit: mobile browser chrome tint matches the brand palette
   // — `#720808` (brand-deep) in light, `#a10728` (brand-core) in dark.
@@ -106,11 +106,10 @@ export const metadata: Metadata = {
     title: UI_TEXT.meta.title,
     description: UI_TEXT.meta.description,
   },
-  // brand-kit: PWA manifest + icons now served from `/brand/`. Legacy
-  // `/manifest.json` and `/icons/*` files remain in `public/` (the
-  // service worker may still cache them on existing installs);
-  // they're orphaned references at this point and tracked for
-  // cleanup in BACKLOG.
+  // brand-kit: PWA manifest + icons served from `/brand/`. The orphan
+  // off-brand `public/manifest.json` (theme_color #c6a97e) was deleted in
+  // FIX-EXP-A11Y-PWA (EXP-032) — only this `/brand/manifest.webmanifest` is
+  // linked. (Legacy `/icons/*` orphans remain — separate cleanup.)
   manifest: "/brand/manifest.webmanifest",
   icons: {
     icon: [

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { proportionalDiscountedPrices, intraPackageOverlap } from "./package-math";
+import {
+  proportionalDiscountedPrices,
+  intraPackageOverlap,
+  intraPackageOverlapMultiMaster,
+} from "./package-math";
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -118,5 +122,112 @@ describe("intraPackageOverlap", () => {
       slot("2026-07-08T11:30:00Z", "2026-07-08T12:30:00Z"), // overlaps slot[0]
     ];
     expect(intraPackageOverlap(slots, 0)).toBe(true);
+  });
+});
+
+describe("intraPackageOverlapMultiMaster (by-client, studio)", () => {
+  const comp = (
+    startIso: string,
+    endIso: string,
+    masterProviderId: string | null,
+    bufferMin: number,
+  ) => ({
+    startAtUtc: new Date(startIso),
+    endAtUtc: new Date(endIso),
+    masterProviderId,
+    bufferMin,
+  });
+
+  it("single component → never overlaps", () => {
+    expect(
+      intraPackageOverlapMultiMaster([
+        comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 15),
+      ]),
+    ).toBe(false);
+  });
+
+  it("🔴 same instant, DIFFERENT masters → REJECTED (one client can't be in two chairs)", () => {
+    // The critical MVP-2 case. A naive by-master check would wrongly ALLOW this.
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 15),
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:30:00Z", "m2", 15),
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(true);
+  });
+
+  it("overlapping windows, different masters → rejected", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 30),
+      comp("2026-07-08T10:30:00Z", "2026-07-08T11:30:00Z", "m2", 30),
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(true);
+  });
+
+  it("non-overlapping windows, different masters → ALLOWED (gaps OK)", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 30),
+      comp("2026-07-08T13:00:00Z", "2026-07-08T14:00:00Z", "m2", 30),
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(false);
+  });
+
+  it("back-to-back, DIFFERENT masters → ALLOWED (buffer 0, client teleports)", () => {
+    // Even though each master has a buffer, the cross-master constraint is
+    // pure non-overlap — the client just walks to the next chair.
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 15),
+      comp("2026-07-08T11:00:00Z", "2026-07-08T12:00:00Z", "m2", 15),
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(false);
+  });
+
+  it("SAME master twice, gap < buffer → overlap (master needs its buffer)", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 15),
+      comp("2026-07-08T11:10:00Z", "2026-07-08T12:00:00Z", "m1", 15), // 10-min gap < 15
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(true);
+  });
+
+  it("SAME master twice, gap == buffer → allowed", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 15),
+      comp("2026-07-08T11:15:00Z", "2026-07-08T12:00:00Z", "m1", 15), // 15-min gap
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(false);
+  });
+
+  it("SAME master twice, back-to-back (buffer 0) → allowed", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 0),
+      comp("2026-07-08T11:00:00Z", "2026-07-08T12:00:00Z", "m1", 0),
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(false);
+  });
+
+  it("asymmetric buffers on same master → uses the larger buffer", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", "m1", 10),
+      comp("2026-07-08T11:20:00Z", "2026-07-08T12:00:00Z", "m1", 30), // 20-min gap < 30
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(true);
+  });
+
+  it("3 components, mixed masters, the 1st and 3rd (different masters) overlap → detected pairwise", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T12:00:00Z", "m1", 15),
+      comp("2026-07-08T13:00:00Z", "2026-07-08T13:30:00Z", "m2", 15),
+      comp("2026-07-08T11:30:00Z", "2026-07-08T12:30:00Z", "m3", 15), // overlaps comp[0] in client time
+    ];
+    expect(intraPackageOverlapMultiMaster(components)).toBe(true);
+  });
+
+  it("null master ids are never treated as 'same master' (no buffer pad)", () => {
+    const components = [
+      comp("2026-07-08T10:00:00Z", "2026-07-08T11:00:00Z", null, 15),
+      comp("2026-07-08T11:00:00Z", "2026-07-08T12:00:00Z", null, 15),
+    ];
+    // Two null-master back-to-back → buffer 0 (not same-master) → allowed.
+    expect(intraPackageOverlapMultiMaster(components)).toBe(false);
   });
 });

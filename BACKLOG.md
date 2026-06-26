@@ -14,11 +14,20 @@
 ## 🎯 ТЕКУЩИЙ ФОКУС
 
 - **🎉 R2-06 sweep ЗАКРЫТ** (A–I все ✅, 2026-06-24). **🎉 EXP-волна затриажена** (33 находки в секции
-  «🔍 EXPLORATORY» ниже) + **Group 1 (discovery/catalog) ЗАКРЫТ** (EXP-021/024/025/026/030, 2026-06-24).
-- **🎉 PACKAGE-BOOKING MVP-1 (solo sequential) ЗАКРЫТ** (2026-06-24; см. BACKLOG-DONE.md) — atomic N-slot tx,
-  proportional discount (Σ exact), cancel-whole, reschedule-parts, cart UX. Schema + миграция `20260624140407_add_booking_package`.
-- Следующее: **PACKAGE-BOOKING MVP-2 (studio multi-master)** ↓ → затем оставшиеся EXP-группы (tz-cross-surface
-  EXP-017/019/020/023, pricing-copy, content/grammar, notifications, chat, a11y, seed-hygiene) → 🟡/🔵 consolidation sweep.
+  «🔍 EXPLORATORY» ниже) + **Group 1 (discovery/catalog) ЗАКРЫТ** (EXP-021/024/025/026/030, 2026-06-24)
+  + **TZ-cross-surface ЗАКРЫТ** (EXP-017/019/020/023, 2026-06-25 — shared entity-tz `formatLocalHm`)
+  + **Pricing-copy ЗАКРЫТ** (EXP-014 copy / EXP-015 CTA, 2026-06-25 — neutral public fallback + truthful `#pricing-plans` anchor)
+  + **Content/grammar/SEO ЗАКРЫТ** (EXP-001/002/003/004/005/008/016/018, 2026-06-25 — source-fixed: title-template convention, consent grammar, genitive-month helper, configurable ИНН, truthful provider-count, etc)
+  + **Chat/UX ЗАКРЫТ** (EXP-012 list-refresh-on-send / EXP-022 redirect setState-guard, 2026-06-25)
+  + **a11y/PWA/cleanup ЗАКРЫТ** (EXP-033 pinch-zoom / EXP-032 orphan manifest / EXP-013 datetime upcoming-split, 2026-06-25).
+- **🎉 PACKAGE-BOOKING ФИЧА ЗАКРЫТА (solo MVP-1 + studio MVP-2)** (2026-06-24/25; см. BACKLOG-DONE.md). MVP-2 (studio
+  multi-master): клиент выбирает мастера на каждый компонент (только assigned — `assertMasterPerformsService`), компоненты
+  **sequential по timeline КЛИЕНТА** (не parallel — клиент один, не может быть в двух креслах), **by-client** intra-package
+  overlap, salon-tz per component, atomic + proportional (Σ exact) + cancel-whole + reschedule-parts; **surfaced на studio
+  public profile** (R2-04-PKG закрыт). Reuse MVP-1 каркаса (no fork, no new migration). Engine-safety SHA-identical.
+- **Seed-hygiene ЗАКРЫТ** (FIX-EXP-SEED-HYGIENE ✅ 2026-06-26 — EXP-006/007/010/011 + R2-03-A: RF-only seed (no KZ), Vision→Екатеринбург +5 для tz-testability, priced items → analytics non-zero, snapshot регенерирован).
+- **Notifications/push ЗАКРЫТ** (FIX-EXP-NOTIFICATIONS ✅ 2026-06-26 — EXP-027 push gesture-gating + re-enable, EXP-028 client per-channel prefs incl. push, send-gating через `pushNotificationsEnabled`; EXP-029 per-event matrix DEFERRED как next feature). **🎉 EXP-консолидация завершена** (discovery/catalog · tz · pricing-copy · content/grammar · chat · a11y/PWA · seed-hygiene · notifications).
+- Следующее: **pre-deploy verification runs** (deploy-ops чеклист на staging/prod) → затем EXP-029 per-event matrix + legacy/@deprecated sweep + commit-grouping для PR.
 - **Deploy / ops** (см. секцию ниже) — env-домены, live social-auth creds, SMS creds, geocoder key, DevOps infra,
   применить FIX-R2-02-A миграцию на проде до regen seed-snapshot.
 - **Product decisions решены Артёмом** (см. секцию ниже) → теперь это actionable code-задачи.
@@ -35,11 +44,6 @@
 
 ## 🟠 HIGH PRIORITY
 
-- **PACKAGE-BOOKING MVP-2 (studio multi-master)** — расширить пакетное бронирование на студии: per-component
-  выбор мастера клиентом (или авто), multi-master availability, каждый компонент через `assertMasterPerformsService`
-  + salon-tz guard, **параллельное** (не строго sequential) размещение когда компоненты у разных мастеров. Reuse
-  `createSoloPackageBooking` integrity-каркас (atomic tx + intra-package overlap **per master** + proportional discount
-  + cancel-whole). `loadSoloPackage` сейчас явно reject'ит studio (`PACKAGE_NOT_SOLO`) — снять для studio-пути.
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
 - **R2-05-H** — plan enable/disable toggle без confirmation guard (mis-click отключает план + рассылает «приостановлен»
@@ -57,7 +61,7 @@
 - **R2-05-G** — нет фидбэка репортёру при модерации отзыва; нет UI восстановления soft-deleted отзыва (только manual SQL).
 - **R2-05-A2** — category reject reason только в логах (нет колонки); владельцы portfolio-item не уведомляются при delist.
 - **R2-05-J** — `BillingPlanPrice.isActive` без admin UI + latent direct-DB mass-expiry path (renewal может залогировать CRITICAL).
-- **R2-03-A** — seed-артефакт: 38 showcase-броней Анны без `BookingServiceItem` → analytics revenue ₽0. Fix: добавить priced items в `seed-showcase-master.ts`.
+- ✅ **R2-03-A** *(FIX-EXP-SEED-HYGIENE 2026-06-26)* — closed: priced `BookingServiceItem` добавлены в `seed-showcase-master.ts` (priceSnapshot=service.price); analytics revenue Анны 51 000 ₽ / 14 (был ₽0), reconciles с dashboard (Δ=0). R2-03-B (latent fallback) остаётся.
 - **R2-03-B** — analytics revenue без `Service.price` fallback (в отличие от `day.service.ts`). Latent (prod всегда пишет items). Fix: shared fallback или backfill.
 
 **Прочее:**
@@ -103,6 +107,7 @@
 - **SMS** — `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`PASSWORD` + баланс SMSC + smoke RU/KZ.
 - **`YANDEX_GEOCODER_API_KEY`** в QA/prod env — prerequisite для tz-derivation walk на onboarding (FIX-R2-02-A).
 - **Seed `BillingPlanPrice` rows** — явные active rows для каждого предлагаемого периода (1/3/6/12mo) в QA/prod (BC-1 consistency; fallback есть, но явная row предпочтительнее).
+- **🚩 Legal — real ИНН** — выставить `NEXT_PUBLIC_LEGAL_INN` (реальный ИНН Артёма) в prod env до launch (152-ФЗ / footer requisites). Config wired (EXP-005); unset → footer показывает obvious «[не указан]». Значение — данные Артёма, в код НЕ вшито.
 - **YooKassa** — replay `payment.succeeded`/`refund` + idempotency в live env.
 - **🚩 Применить миграции `20260619000000_provider_timezone_default_moscow` + `20260624140407_add_booking_package`** на проде (`prisma migrate deploy`) **до** regen seed-snapshot.
 - **🚩 Регенерировать `.qa/snapshots/post-seed.dump`** — текущий snapshot PRE-`add_booking_package` (нет таблицы `BookingPackage` / `ServicePackageItem.sortOrder`); restore вернёт схему назад. Пересоздать дамп после применения миграции.
@@ -114,7 +119,7 @@
 ## 🧩 PRODUCT DECISIONS — решены Артёмом → actionable code
 
 - **BC-CAP** → считать **ACTIVE-only** (сейчас `ensureStudioTeamLimit` считает INVITED/DISABLED+pending invites тоже) **+** задать числа cap для PRO/PREMIUM (FREE=2 есть).
-- **Package booking** (R2-04-PKG) → **MVP-1 (solo sequential) ✅ ЗАКРЫТ 2026-06-24** (atomic tx + proportional discount + cancel-whole + reschedule-parts + cart UX; см. BACKLOG-DONE.md). **MVP-2 (studio multi-master)** — см. HIGH PRIORITY ниже.
+- **Package booking** (R2-04-PKG) → **✅ ФИЧА ЗАКРЫТА (solo MVP-1 + studio MVP-2)** (2026-06-24/25; atomic tx + proportional discount + cancel-whole + reschedule-parts; studio multi-master с by-client sequential placement + surfaced на studio public profile; см. BACKLOG-DONE.md).
 - **R2-05-C-v2** (opt-in renewal на росте цены) → при повышении цены — renewal **opt-in**: 2-дневный grace + reminders на 24h/2h.
 - **R2-05-I** (copy) → поведение «disable плана = блок новых signups, active subs не истекают» оставить; **поправить copy** «приостановлен» (вводит в заблуждение).
 - **Studio reschedule full parity** → studio-календарь получает «принять предложенное клиентом время» (сейчас только Move/Cancel) — пересекается с R2-06-A.
@@ -142,45 +147,47 @@
 - ✅ 🟡 **EXP-030** — *floor-fix*: footer «Мастера рядом» → `/catalog` (city-scoped, не dead-end); empty-state получил «Сбросить всё» CTA. *Pipeline сам не построен* → новый backlog `CATALOG-AVAILABLE-TODAY-PIPELINE` ниже.
 - ✅ 🔵 **EXP-026** — оба endpoint'а теперь трактуют `to` как **inclusive** (в shared primitive). Callers `to` не шлют → zero runtime impact, contract выровнен.
 
-**TZ cross-surface (out-of-scope для dev/MSK run; reported где cross-surface contradiction, не pure wrong-absolute-time):**
-- 🟡 **EXP-017** — одна бронь = два времени на master-поверхностях (dashboard 07:00 UTC vs kanban 12:00 salon-tz).
-- 🟡 **EXP-019** — master week-schedule: карточка нарисована в 12:00-слоте, а лейбл «10:00–11:00» (расхождение = Almaty/MSK offset).
-- 🟡 **EXP-023** — профиль chip «Сегодня свободно с 11:30» игнорит min-ahead+lunch (реальный earliest = 14:00).
-- 🔵 **EXP-020** *(verify-on-prod)* — studio calendar «today» = UTC-date, расходится с master/client (local-tz) на 1 день у local-midnight.
+**TZ cross-surface (FIX-EXP-TZ-CROSS-SURFACE ✅ 2026-06-25 — shared entity-tz primitive `formatLocalHm(date, tz)` в client-safe `src/lib/schedule/timezone.ts`; live-verified на Almaty +5; engine SHA-identical):**
+- ✅ 🟡 **EXP-017** — dashboard attention/upcoming/greeting форматируют bookings в **salon-tz** (`formatLocalHm`, было `getUTCHours`) → совпадают с kanban. Удалены 3 локальные UTC-`formatHm` копии. Live: dashboard 16:00/19:00/15:00 == kanban (Almaty).
+- ✅ 🟡 **EXP-019** — master week-schedule card лейбл теперь salon-tz (`formatLocalHm`, было host-tz `schedule-utils.formatHm`) → совпадает с grid-позицией (та же salon-tz). Удалён host-tz `formatHm` export. Live: все 6 карточек label-top == grid-top.
+- ✅ 🟡 **EXP-023** — профиль chip earliest-bookable теперь применяет `earliestBookableUtc(min-ahead)` cutoff + buffer в `buildSlotsForDay` (service-agnostic probe — не регрессит studio-masters). Live: chip «14:30» == widget первый bookable слот.
+- ✅ 🔵 **EXP-020** — studio calendar «today» резолвится через `toLocalDateKey(now, studioTz)` (было `isSameUtcDay`/UTC-date) → совпадает с master/client. Live: «ЧТ 25 июня» = studio-tz today. Near-midnight rollover покрыт unit-тестом `toLocalDateKey`.
 
-**Pricing/billing copy:**
-- 🟡 **EXP-014** — public `/pricing` PRO/PREMIUM показывают «[Уточняется] · Цена будет настроена администратором» (admin-process copy наружу); admin/billing все планы «Бесплатно», MRR 0 (root = unset seed prices; см. deploy-ops «Seed BillingPlanPrice»).
-- 🔵 **EXP-015** — `/pricing` «Сравнить тарифы» CTA ведёт на `/become-master`, не на сравнение.
+**Pricing/billing copy (FIX-EXP-PRICING-COPY ✅ 2026-06-25 — copy + CTA only, resolver/seed untouched):**
+- ✅ 🟡 **EXP-014** *(copy)* — fallback `placeholderHint` сменён с admin-process «Цена будет настроена администратором» на нейтральное public «Цена скоро появится» (`UI_TEXT.pricing.periods.placeholderHint`). Fires на обоих fallback-branch'ах plan-card (`!plan` + `plan.prices.length === 0` = FIX-R2-05-AB no-price path). Resolver не тронут; FREE «0 ₽ навсегда» по-прежнему отличим. **Live (оба таба, обе темы):** PRO/PREMIUM показывают «[Уточняется]» + «Цена скоро появится», без admin-языка. ⚠️ **Seed-root остаётся deploy-ops** — «all plans Бесплатно / MRR 0» = unset `BillingPlanPrice` (см. deploy-ops «Seed BillingPlanPrice»); **этот fix цены НЕ сидил** (verified planPrices=0).
+- ✅ 🔵 **EXP-015** *(CTA)* — «Сравнить тарифы» теперь ведёт на реальное сравнение: `<a href="#pricing-plans">` (plain anchor — native smooth-scroll) к секции 3-х plan-card'ов на той же странице, вместо неправдивого редиректа на `/become-master`. `#pricing-plans` id добавлен на plan-cards `<section>`. **Live:** клик → hash `#pricing-plans` → smooth-scroll к comparison (scrollY 2701→433). *(Note: `pricing.comparison.*` UI_TEXT — dead, feature-comparison таблица не рендерится; реальное сравнение = 3 карточки.)*
 
-**Content/grammar/SEO:**
-- 🟡 **EXP-001** — `<title>` дублирует бренд-суффикс («… — МастерРядом | МастерРядом») sitewide.
-- 🟡 **EXP-002** — login consent checkbox грамматически неверен (legal): «Я принимаю Пользовательск**им** соглашени**ем**…» (instrumental после accusative-глагола).
-- 🟡 **EXP-003** — «С нами с **июнь** 2026 г.» — nominative month после «с» (нужен genitive «июня»).
-- 🔵 **EXP-004** — нет пробела перед TZ-меткой в booking-success: «13:00**(Алматы, GMT+5)**».
-- 🔵 **EXP-005** — placeholder ИНН `1234567890` в footer (sitewide legal text).
-- 🔵 **EXP-008** — счётчик «43 мастера» включает студии (label accuracy).
-- 🔵 **EXP-016** — пустой service-label «— ·» в client review-карточках.
-- 🔵 **EXP-018** — master dashboard «Анонсы» с past-dated вебинаром (Чт 7 мая) + WhatsApp (не интегрированный канал).
+**Content/grammar/SEO (FIX-EXP-CONTENT-GRAMMAR ✅ 2026-06-25 — source-fixed, live-verified):**
+- ✅ 🟡 **EXP-001** — bare-title convention: root template `"%s | МастерРядом"` (kept) = единственный brand-adder; stripped self-branded суффикс с 14 static page titles + 3 dynamic `UI_TEXT.pages.*.titleTemplate` (publicProfile/publicBooking/modelOffer) + homepage → `title:{absolute}`. **Live:** «Тарифы | МастерРядом», «… | МастерРядом» на `/u/anna-sokolova` (был triple), homepage single — везде 1× бренд.
+- ✅ 🟡 **EXP-002** *(legal/152-ФЗ)* — `LegalConsentCheckbox` (3 варианта): глагол «принимаю/принимаете {accusative}» → «соглашаюсь с / согласны с {instrumental}» (link text уже инструментальный → теперь верно). Документы/ссылки (`/terms`,`/privacy`) не тронуты, legal-смысл сохранён. **Live (/login):** «Я соглашаюсь с Пользовательским соглашением и Политикой конфиденциальности.», обе ссылки работают.
+- ✅ 🟡 **EXP-003** — helper `formatMemberSince` (был `Intl(month:"long")`=nominative «июнь») → genitive `MONTHS_GENITIVE`. `displayBirthday` дедуплицирован на тот же const. **Live:** «С нами с июня 2026».
+- ✅ 🔵 **EXP-004** — booking-success zone-label был `ml-1` (CSS-margin без space-char → «13:00—14:00(Алматы…)» в тексте/screen-reader) → реальный `{" "}` space. (client-bookings уже имел real space — verified «Время салона (Алматы, GMT+5)».)
+- ✅ 🔵 **EXP-005** *(legal/deploy)* — footer ИНН → `NEXT_PUBLIC_LEGAL_INN` (env.ts + оба `.env*.example`); `text.ts` `entityTemplate` + `innUnset:"[не указан]"`; `FooterCopyright` читает env, unset/fake `1234567890` → **obvious** «[не указан]» (никогда fake-число). Имя «Дмитриев Артем Романович» сохранено. **Live:** «… ИНН [не указан]». ⚠️ **real ИНН → deploy-ops** (config wired, value pending; fix число НЕ выдумывал).
+- ✅ 🔵 **EXP-008** — `getPublicStats.masters` = все published providers (masters + studios). Relabel «мастер» → «специалист» на **3** surface: catalog H1 plural (1/2/5 корректно), home hero eyebrow, login social-proof. **Live:** «7 специалистов рядом», «43 СПЕЦИАЛИСТОВ», «43 специалистов на платформе». (`statMastersLabel` — dead/без consumer; «{N} мастеров на смене» в studio — genuinely masters, не тронуто.)
+- ✅ 🔵 **EXP-016** — client review-card `{serviceName ?? "—"} · {date}` → `[serviceName,date].filter(Boolean).join(" · ")` (зеркало studio-card). **Live:** service-less карточки = «25 июня 2026 г.», no bare «— ·».
+- ✅ 🔵 **EXP-018** — master dashboard `announcements.ts`: WhatsApp (не интегрирован) → «в Telegram и по SMS»; past-dated вебинар (Чт 7 мая) → evergreen truthful tip «Соберите пакет услуг со скидкой» (real feature, без даты). **Live:** 3 анонса, no WhatsApp/webinar.
 
-**Notifications/push UX:**
-- 🟡 **EXP-027** — нет user-facing push-контрола; prod авто-`requestPermission()` без user-gesture (браузеры душат) + нет re-enable после deny.
-- 🔵 **EXP-028** — у клиентов нет notification-preferences (меньше контроля чем у мастеров: только in-app центр).
-- 🔵 **EXP-029** — нет per-event-type routing (документированный «Скоро»); VK delivery WIP, SMS не wired.
+**Notifications/push UX (FIX-EXP-NOTIFICATIONS ✅ 2026-06-26 — per-channel prefs + push gesture-gating):**
+- ✅ 🟡 **EXP-027** — push permission больше НЕ запрашивается gesture-lessly на load: `push-manager.tsx` mount теперь только re-sync (subscribe лишь если pref включён И permission уже granted; никогда не prompt). Запрос разрешения перенесён в явный toggle (`PushNotificationsSection`, user-gesture). Re-enable после deny: toggle перечитывает permission + показывает guidance. Новое поле `UserProfile.pushNotificationsEnabled` (миграция `20260626000000`) гейтит ВСЕ push-send пути в `sendPushToUser` (chokepoint). **Live:** `Notification.permission`=default после load (no auto-prompt); toggle on→DB `t`, off→DB `f` (оба направления). **Push toggle добавлен и мастерам** (shared ChannelsCard) — иначе removal авто-запроса оставил бы мастеров без способа включить push.
+- ✅ 🔵 **EXP-028** — клиентский `/cabinet/settings` уже имел email/telegram/vk-секции; добавлена **push**-секция (per-channel on/off, parity с мастерами). Email-гейтинг был; telegram гейтится через `getTelegramChatIdForUser` (isEnabled); push теперь гейтится через `pushNotificationsEnabled`. send-test (4) пинит push-гейт.
+- 🟡 **EXP-029** *(DEFERRED — next feature, post-pre-deploy)* — per-event×channel routing matrix. Остаётся «Скоро»-плейсхолдер (master `PerEventPlaceholder`). НЕ строим в этом проходе (per locked decision). Foundation (per-channel on/off) готов — matrix построится поверх той же модели. VK delivery WIP, SMS не wired.
+- 🚀 **DEPLOY/STAGING** — реальный «prompt появляется на gesture» + фактическая push-доставка проверяются на staging (dev: next-pwa отключает SW; push требует prod-build + HTTPS + VAPID). A/B (manual-only vs gesture-prompt) выбирается на staging — оба механизма заложены (manual toggle = default; `syncExistingSubscription` reusable для будущего gesture-trigger).
 
-**Chat/UX:**
-- 🟡 **EXP-012** — chat conversation-list не рефрешится после первого сообщения в новом треде (нужен reload). *(смежно с FIX-R2-06-B `?focus=`/SSE-рефреш паттерном.)*
-- 🔵 **EXP-022** *(intermittent, low-confidence)* — React «setState on unmounted» + «Invalid token» при `/u/[master]/booking`→профиль redirect (solo-master), mobile. Не воспроизвёлся на retry.
+**Chat/UX (FIX-EXP-CHAT-UX ✅ 2026-06-25):**
+- ✅ 🟡 **EXP-012** — root: `useConversations` ревалидировал список ТОЛЬКО на входящий `CHAT_MESSAGE_RECEIVED`, но отправитель НЕ получает его на своё первое сообщение → список оставался пустым до reload. Fix: `ChatShell` прокидывает `refresh` списка → `ChatWindow` → `Composer.onSent` (после POST-success) дёргает и thread-refresh, и list-**revalidate** (refetch, не optimistic-insert → no phantom). **Live (Алёна↔Анна, CONFIRMED booking, 0 msgs):** первое сообщение → тред появился в левом списке мгновенно, без reload; 2-е сообщение в существующем треде → список остался 1 строкой (no duplicate, no regression).
+- ✅ 🔵 **EXP-022** *(intermittent — code guard, absence ≠ proof)* — `/u/[master]/booking` solo-master redirect = **server** `permanentRedirect` (clean). Реальный unguarded setState — detached `void (async()=>…)()` enrich-fetch в `booking-flow-stepper.tsx` (post-submit success-card), `dispatch` без mounted-guard → пост-unmount при mobile sheet-close/navigate-to-profile. Fix: `mountedRef` + `if (enriched && mountedRef.current)` перед dispatch. **«Invalid token» verdict:** 0 dynamic imports в `/booking` route (grep), redirect-URL well-formed → не app-bug (likely dev HMR/framework redirect-prefetch chunk artifact). **Best-effort walk:** 3× solo /booking→profile (mobile 390×844) = 0 console errors (только benign next/image-quality warnings).
 
-**a11y/PWA/cleanup:**
-- 🔵 **EXP-033** — viewport `user-scalable=no, maximum-scale=1` блокирует pinch-zoom (WCAG 1.4.4).
-- 🔵 **EXP-032** — orphan `/manifest.json` (200) со stale off-brand `theme_color #c6a97e` (живой = `/brand/manifest.webmanifest`).
-- 🔵 **EXP-013** *(seed-amplified)* — «Предстоящие» включает уже-прошедшие брони (split по статусу CONFIRMED/PENDING, не по datetime).
+**a11y/PWA/cleanup (FIX-EXP-A11Y-PWA ✅ 2026-06-25):**
+- ✅ 🔵 **EXP-033** — `viewport` export (`layout.tsx`): убраны `maximumScale: 1` + `userScalable: false` (блокировали pinch-zoom, WCAG 1.4.4). Осталось `width=device-width, initial-scale=1, viewport-fit=cover`. **Live (mobile):** viewport content без `user-scalable=no`, zoom разблокирован.
+- ✅ 🔵 **EXP-032** — orphan `public/manifest.json` (off-brand `theme_color #c6a97e`) **удалён** (в src/ его не линковал никто — только comment + build-artifact sw.js precache, который регенерится на build; живой `manifest:` = `/brand/manifest.webmanifest`). Comment в `layout.tsx` обновлён. **Live:** `/manifest.json` → 404, `/brand/manifest.webmanifest` → 200, head linkает brand-manifest.
+- ✅ 🔵 **EXP-013** *(reuse runtime-finished cutoff, no new "past")* — `/cabinet/bookings` split был **status-based** (CONFIRMED/PENDING → «Предстоящие» даже если elapsed). Fix: новый pure `classifyClientBookingGroup` (`src/lib/client-cabinet/booking-classification.ts`) **переиспользует `resolveBookingRuntimeStatus`** (тот же canonical predicate, что `can-leave`/`canReview`) → группа upcoming/finished/cancelled по datetime+статусу (instant-based, tz-agnostic; entity-tz = display-only `isToday`). Elapsed-но-не-FINISHED бронь → history. Reschedule/cancel gated на `booking.isUpcoming` (`client-bookings-page.tsx:521`) → elapsed теряет Перенести. **Live (Виктория, Анна = Almaty +5):** «Предстоящие»=1; elapsed PENDING (25 июня 16:00 Almaty) → history, action-row «Оставить отзыв» (НЕ «Перенести»); future CONFIRMED (26 июня) → upcoming + «Перенести/Отменить». 8 unit-тестов. **No third 'past' definition** (divergence-class avoided).
 
-**Seed-data hygiene:**
-- 🔵 **EXP-006** — Almaty адрес+TZ под Москва-городом (city/address mismatch; TZ-label by-design FIX-22).
-- 🔵 **EXP-007** — public review-preview: 3 отзыва все от одного автора (preview-ordering/seed).
-- 🔵 **EXP-010** — seed placeholder email `seed-client-…@test.masterryadom.local` виден в client profile.
-- 🔵 **EXP-011** — push delivery падает на invalid seed PushSubscription (`p256dh … 65 bytes`); log-noise, не user-visible.
+**Seed-data hygiene (FIX-EXP-SEED-HYGIENE ✅ 2026-06-26 — RF-only seed, re-seed + DB-verified, snapshot regenerated):**
+- ✅ 🔵 **EXP-006 + R2-03-A** — все провайдеры → Россия (no KZ): Анна → Москва (Europe/Moscow, «ул. Покровка, 22», cityId=moscow), Vision + 8 мастеров → **Екатеринбург (Asia/Yekaterinburg +5)** — намеренный non-MSK RF-провайдер, сохраняет salon-tz regression-surface (R2-04-BA) без KZ; bulk-Новосибирск (+7) тоже остаётся. TZ derived из City (FIX-R2-02-A). Booking-времена пересчитаны из salon-local intent под новой tz (`dateAtLocalUtc` tz-aware, не naive-UTC) — Анна показывает 11:00/14:00/… в Москве (в рабочих часах), не сдвиг. **R2-03-A:** добавлены priced `BookingServiceItem` (priceSnapshot=service.price) → analytics revenue Анны **51 000 ₽ / 14** (был ₽0); priceSnapshot==service.price → dashboard==analytics → R2-03 Δ=0 reconcile, теперь non-zero.
+- ✅ 🔵 **EXP-007** — public review-preview (3 newest, createdAt desc): master-отзывы получили spread createdAt (3 distinct-author newest), отзывы showcase-клиента (Елена) сдвинуты старше (−10..−12d) → preview = 3 разных автора (Сергей Петров · Галина Семёнова · Евгений Кузнецов).
+- ✅ 🔵 **EXP-010** — showcase-client email → `elena.petrova.91@yandex.ru` (реалистичный; reset.ts ловит по +7999 phone-prefix). Bulk-клиенты (фоновые, не показываются в demo-profile) остаются на test-домене.
+- ✅ 🔵 **EXP-011** — invalid seed `PushSubscription` (p256dh 22-char ASCII ≠ 65 bytes) **удалён** (не подделан — forged key всё равно упал бы web-push). Push KPI Анны = «Выключены». 0 push-ошибок в логе.
+- **Snapshot:** `.qa/snapshots/post-seed.dump` регенерирован (RF-данные + priced items + BookingPackage schema) — canonical baseline; clears the deploy-ops snapshot-regen item.
 
 **Verify-on-prod (dev-config / dev-amplified — проверить на проде, не fix-в-dev):**
 - 🔵 **EXP-009** — Telegram login widget «Bot domain invalid» (TG bot domain не сконфижен на localhost). Проверить prod bot-domain. *(пересекается с deploy-ops «Telegram live round-trip».)*

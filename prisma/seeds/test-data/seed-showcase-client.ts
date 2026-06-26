@@ -18,7 +18,7 @@
  *
  * Identity:
  *   phone:    +79995000000 (SHOWCASE_PHONE_CLIENT — schema 100/200/300/400/500)
- *   email:    seed-client-elena-petrova@test.masterryadom.local
+ *   email:    elena.petrova.91@yandex.ru  (realistic demo email — EXP-010)
  *             — caught by reset.ts via SEED_EMAIL_DOMAIN AND the new
  *             +79995 prefix in SHOWCASE_PHONE_PREFIXES.
  *   roles:    [CLIENT] only — not a master/studio.
@@ -63,11 +63,15 @@ import {
 } from "@prisma/client";
 import { logSeed } from "./helpers/log";
 import { ensureUserByPhone } from "./helpers/ensure-user";
-import { SHOWCASE_PHONE_CLIENT, seedEmail } from "./helpers/markers";
+import { SHOWCASE_PHONE_CLIENT } from "./helpers/markers";
 import { prisma } from "./helpers/prisma";
 
 const PHONE = SHOWCASE_PHONE_CLIENT;
-const EMAIL = seedEmail("client", "elena-petrova");
+// EXP-010: realistic demo email (the seed placeholder
+// `seed-client-…@test.masterryadom.local` was visible in /cabinet/profile).
+// reset.ts still catches this row via the +7999 showcase phone prefix, so the
+// non-test domain is safe. Unique — no other seed user holds it.
+const EMAIL = "elena.petrova.91@yandex.ru";
 const FIRST_NAME = "Елена";
 const LAST_NAME = "Петрова";
 const DISPLAY_NAME = `${FIRST_NAME} ${LAST_NAME}`;
@@ -320,10 +324,16 @@ const REVIEW_PLANS: ReviewPlan[] = [
 
 async function ensureReviews(bookings: Booking[], client: UserProfile, providerId: string): Promise<number> {
   let count = 0;
-  for (const plan of REVIEW_PLANS) {
+  for (let i = 0; i < REVIEW_PLANS.length; i += 1) {
+    const plan = REVIEW_PLANS[i]!;
     const id = bookingSeedId(plan.bookingIndex);
     const booking = bookings.find((b) => b.id === id);
     if (!booking || booking.status !== BookingStatus.FINISHED) continue;
+
+    // EXP-007: keep this client's reviews OLDER than the showcase master's
+    // own reviews so Anna's public-profile preview (3 newest, createdAt desc)
+    // shows three distinct authors instead of Елена Петрова repeated.
+    const reviewCreatedAt = new Date(Date.now() - (i + 10) * 24 * 60 * 60_000);
 
     await prisma.review.upsert({
       where: { bookingId: booking.id },
@@ -332,6 +342,7 @@ async function ensureReviews(bookings: Booking[], client: UserProfile, providerI
         text: plan.text,
         replyText: plan.replyText ?? null,
         repliedAt: plan.replyText ? new Date() : null,
+        createdAt: reviewCreatedAt,
       },
       create: {
         bookingId: booking.id,
@@ -343,6 +354,7 @@ async function ensureReviews(bookings: Booking[], client: UserProfile, providerI
         text: plan.text,
         replyText: plan.replyText ?? null,
         repliedAt: plan.replyText ? new Date() : null,
+        createdAt: reviewCreatedAt,
       },
     });
     count += 1;

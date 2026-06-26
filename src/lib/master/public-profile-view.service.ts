@@ -11,6 +11,8 @@ import { buildSlotsForDay } from "@/lib/schedule/slots";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
+import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { logError } from "@/lib/logging/logger";
 
 /**
@@ -88,6 +90,11 @@ export const getMasterPublicProfileView = cache(
         select: {
           createdAt: true,
           slotStepMin: true,
+          // EXP-023: the availability chip must respect the same booking-window
+          // cutoff + buffer the booking widget applies, so it shows the FIRST
+          // actually-bookable slot (not the next raw schedule step after now).
+          minBookingHoursAhead: true,
+          bufferBetweenBookingsMin: true,
           // QA-115: studio affiliation (studioId references the studio's provider row).
           studio: { select: { name: true, publicUsername: true, isPublished: true } },
         },
@@ -152,6 +159,8 @@ export const getMasterPublicProfileView = cache(
       provider.id,
       provider.timezone,
       normalizeSlotStepMin(ownerMeta?.slotStepMin),
+      Math.max(0, ownerMeta?.minBookingHoursAhead ?? 0),
+      normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
     );
 
     const bundles = packages
@@ -244,9 +253,16 @@ async function computeAvailabilityHint(
   providerId: string,
   timezone: string,
   slotStepMin: number,
+  minBookingHoursAhead: number,
+  bufferMin: number,
 ): Promise<AvailabilityHint> {
   try {
     const now = new Date();
+    // EXP-023: the first BOOKABLE slot is at/after `now + minBookingHoursAhead`,
+    // not just at/after `now`. `earliestBookableUtc` is the SAME cutoff
+    // primitive `listBookableSlots` (EXP-025) applies, so the chip's time
+    // matches the first slot the booking widget actually offers.
+    const earliestBookable = earliestBookableUtc({ minBookingHoursAhead }, now);
     const todayKey = toLocalDateKey(now, timezone);
     const toKeyExclusive = addDaysToDateKey(todayKey, AVAILABILITY_PROBE_DAYS);
     const ctx = await createScheduleContext({
@@ -288,12 +304,17 @@ async function computeAvailabilityHint(
           dateKey: cursor,
           timeZone: timezone,
           serviceDurationMin: AVAILABILITY_PROBE_DURATION_MIN,
-          bufferMin: 0,
+          // EXP-023: use the provider's real between-bookings buffer (was 0) so
+          // the probe pads existing bookings exactly as the widget does.
+          bufferMin,
           bookings: bookingsByDateKey.get(cursor) ?? [],
           now,
           slotStepMin,
         });
-        const upcoming = slots.find((slot) => slot.startAtUtc.getTime() >= now.getTime());
+        // EXP-023: first slot at/after the min-booking-ahead cutoff (was `now`).
+        const upcoming = slots.find(
+          (slot) => slot.startAtUtc.getTime() >= earliestBookable.getTime(),
+        );
         if (upcoming) {
           if (i === 0) {
             return {

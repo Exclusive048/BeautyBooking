@@ -90,8 +90,14 @@ export function SuccessPhase({ booking, onCancel }: Props) {
           <Calendar className="h-4 w-4 shrink-0 text-text-sec" aria-hidden strokeWidth={1.6} />
           <span>
             {formatRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}
+            {/* FIX-EXP-CONTENT-GRAMMAR (EXP-004): a real space char (not just an
+                `ml-1` margin) before the zone label — otherwise the range and
+                «(Алматы, GMT+5)» run together in text / screen-reader output. */}
             {zoneLabel ? (
-              <span className="ml-1 font-mono text-xs text-primary">{zoneLabel}</span>
+              <>
+                {" "}
+                <span className="font-mono text-xs text-primary">{zoneLabel}</span>
+              </>
             ) : null}
           </span>
         </div>

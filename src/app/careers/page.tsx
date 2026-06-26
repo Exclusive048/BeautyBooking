@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Карьера — МастерРядом",
+  title: "Карьера",
   description: "Информация о будущих вакансиях в МастерРядом.",
   alternates: { canonical: "/careers" },
 };

@@ -124,6 +124,7 @@ export async function MasterDashboardPage() {
           now={now}
           context={adviceContext}
           nextBooking={nextBooking}
+          timezone={data.master.timezone}
         />
 
         <KpiCardsGrid
@@ -139,11 +140,13 @@ export async function MasterDashboardPage() {
           <UpcomingBookingsSection
             upcoming={data.upcomingBookings}
             totalTodayCount={data.todayBookings.length}
+            timezone={data.master.timezone}
           />
           <AttentionSection
             pendingBookings={data.pendingBookings}
             unansweredReviews={data.unansweredReviews}
             freeSlot={data.freeSlot}
+            timezone={data.master.timezone}
           />
         </div>
 

@@ -29,7 +29,10 @@ type Props = {
  */
 export function ChatShell({ perspective }: Props) {
   const searchParams = useSearchParams();
-  const { conversations, isLoading } = useConversations(perspective);
+  // FIX-EXP-CHAT-UX (EXP-012): expose the list refresh so a freshly-sent first
+  // message (which creates the conversation server-side but never delivers a
+  // CHAT_MESSAGE_RECEIVED to the *sender*) can revalidate the left list.
+  const { conversations, isLoading, refresh: refreshList } = useConversations(perspective);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [mobileWindowOpen, setMobileWindowOpen] = useState(false);
 
@@ -100,6 +103,7 @@ export function ChatShell({ perspective }: Props) {
             conversationSlug={activeSlug}
             viewerTimezone={viewerTimezone}
             onMobileBack={handleMobileBack}
+            onMessageSent={refreshList}
           />
         ) : isLoading ? (
           <div className="flex flex-1 items-center justify-center text-sm text-text-sec">

@@ -10,6 +10,8 @@ type Props = {
   hourStart: number;
   hourEnd: number;
   hourPx: number;
+  /** EXP-019: master (salon) tz for the booking-card time label. */
+  timezone: string;
 };
 
 /**
@@ -23,7 +25,7 @@ type Props = {
  *   6. Bookings (stacking on top so they intercept clicks before the
  *      empty-cells overlay underneath)
  */
-export function WeekGridColumn({ day, hourStart, hourEnd, hourPx }: Props) {
+export function WeekGridColumn({ day, hourStart, hourEnd, hourPx, timezone }: Props) {
   const totalHours = hourEnd - hourStart;
   const totalMin = totalHours * 60;
   const pxPerMin = hourPx / 60;
@@ -101,6 +103,7 @@ export function WeekGridColumn({ day, hourStart, hourEnd, hourPx }: Props) {
             booking={booking}
             topPx={Math.max(0, top)}
             heightPx={Math.min(totalMin * pxPerMin - Math.max(0, top), height)}
+            timezone={timezone}
           />
         );
       })}
