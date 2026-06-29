@@ -1,9 +1,9 @@
 import { BookingStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { z } from "zod";
 import { AppError } from "@/lib/api/errors";
+import { isTelegramEnabled } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
-const PROFILE_ITEM_COUNT = 6;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const updateProfileSchema = z.object({
@@ -129,8 +129,15 @@ function computeCompletion(input: {
     tgLinked: input.tgLinked,
     vkLinked: input.vkLinked,
   };
-  const done = Object.values(items).filter(Boolean).length;
-  const percent = Math.round((done / PROFILE_ITEM_COUNT) * 100);
+  // FIX-TELEGRAM-COPY-SWEEP: when user-facing Telegram is off the `tgLinked`
+  // step isn't a real completion step (the row is hidden) — exclude it from the
+  // denominator so 100% stays reachable. `items.tgLinked` is still emitted (DTO
+  // type contract) but not counted when off.
+  const countedEntries = Object.entries(items).filter(
+    ([key]) => isTelegramEnabled || key !== "tgLinked"
+  );
+  const done = countedEntries.filter(([, value]) => value).length;
+  const percent = Math.round((done / countedEntries.length) * 100);
   return { percent, items };
 }
 

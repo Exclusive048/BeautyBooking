@@ -92,6 +92,15 @@ const envSchema = z.object({
   YANDEX_SUGGEST_API_KEY: z.string().optional(),
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: z.string().optional(),
 
+  // ── Yandex OAuth (Yandex ID) ───────────────────────────────────────────────
+  // FIX-YANDEX-OAUTH: new auth provider, bespoke-parallel to VK. Register a
+  // Yandex OAuth app (oauth.yandex.ru), set the creds + redirect_uri, and flip
+  // NEXT_PUBLIC_YANDEX_ENABLED=true. Default OFF → button absent until creds.
+  YANDEX_OAUTH_CLIENT_ID: z.string().optional(),
+  YANDEX_OAUTH_SECRET: z.string().optional(),
+  YANDEX_OAUTH_REDIRECT_URI: z.string().optional(),
+  NEXT_PUBLIC_YANDEX_ENABLED: boolFlag,
+
   // FIX-EXP-CONTENT-GRAMMAR (EXP-005): real legal ИНН for the footer requisites.
   // Optional — the footer shows an obvious "[не указан]" placeholder when unset
   // (never a fake-looking number). Set the real value before production launch
@@ -263,6 +272,7 @@ const clientEnv = {
   NEXT_PUBLIC_TELEGRAM_ENABLED: process.env.NEXT_PUBLIC_TELEGRAM_ENABLED,
   NEXT_PUBLIC_VK_ENABLED: process.env.NEXT_PUBLIC_VK_ENABLED,
   NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: process.env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED,
+  NEXT_PUBLIC_YANDEX_ENABLED: process.env.NEXT_PUBLIC_YANDEX_ENABLED,
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
   NEXT_PUBLIC_LEGAL_INN: process.env.NEXT_PUBLIC_LEGAL_INN,
@@ -306,6 +316,15 @@ export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
 export const isTelegramEnabled =
   String(env.NEXT_PUBLIC_TELEGRAM_ENABLED) === "true";
 export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
+/**
+ * FIX-YANDEX-OAUTH — Yandex ID auth provider gate. Mirrors `isVkAuthEnabled`:
+ * both the public enable flag AND a configured client id must be present.
+ * String-coerced for client-safety (server boolean vs client raw string). The
+ * `YandexLoginButton` self-gates on this; the button is absent until a real
+ * Yandex OAuth app is registered + `NEXT_PUBLIC_YANDEX_ENABLED=true`.
+ */
+export const isYandexAuthEnabled =
+  String(env.NEXT_PUBLIC_YANDEX_ENABLED) === "true" && Boolean(env.YANDEX_OAUTH_CLIENT_ID);
 /**
  * VK-NOTIFICATIONS-FLAG-A: VK push-notifications subsystem is incomplete
  * (no delivery path in `notifications/delivery.ts`). The flag gates the

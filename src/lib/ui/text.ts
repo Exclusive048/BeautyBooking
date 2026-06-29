@@ -633,6 +633,10 @@ export const UI_TEXT = {
       loginButton: "Войти через VK",
       loginFailed: "Не удалось войти через VK",
     },
+    yandex: {
+      loginButton: "Войти через Яндекс",
+      loginFailed: "Не удалось войти через Яндекс",
+    },
   },
   nav: {
     catalog: "Каталог",
@@ -7520,8 +7524,7 @@ export const UI_TEXT = {
         "Срок действия — 12 месяцев",
         "Принимается у любого мастера на платформе",
       ],
-      footerText: "Хотите узнать первыми о запуске?",
-      footerCta: "Подпишитесь на Telegram-канал →",
+      footerText: "Подарочные карты появятся совсем скоро.",
     },
     publicProfile: {
       notFoundTitle: "Профиль не найден | МастерРядом",

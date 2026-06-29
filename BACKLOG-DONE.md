@@ -9,6 +9,34 @@
 
 ---
 
+## 2026-06-29 — FIX-YANDEX-OAUTH (new auth provider + Telegram legal-doc copy; no commit, QA-ветка)
+
+- ✅ **Yandex ID добавлен как auth-провайдер, bespoke-parallel к VK.** Gates: typecheck ✅ / lint baseline (1err·5warn) / encoding·mojibake·ui-text ✅ / **test 809 ✅** (+7) / build ✅ / prisma validate ✅ / schema-drift 0. Live (dev): start-redirect + button render/absence verified; callback round-trip = staging. Captures → `.qa/diagnostics/yandex-oauth/`.
+- **Архитектура:** НЕ provider-abstraction (deferred post-launch), НЕ refactor VK. `src/lib/yandex/` (config·pkce·cookies·oauth·schemas — структурно параллельно `src/lib/vk/`, своя копия чтобы будущий AUTH-PROVIDER-ABSTRACTION был дешёвым). `api/auth/yandex/{start,callback,unlink}`. **Account-linking зеркалит `api/auth/vk/callback` ТОЧНО:** session-user link vs no-session new-vs-existing-by-yandexUserId + `upsertYandexLink` «already linked to another user» 409 guard (anti-hijack/anti-dup) + ensureClientRole + ensureFreeSubscriptions + resolveCabinetRedirect + setSessionCookies.
+- **Yandex specifics (отличия от VK):** oauth.yandex.ru/authorize + /token + login.yandex.ru/info (header `Authorization: OAuth`); no device_id; profile fields `id`/`default_email`/`first_name`/`last_name`/`default_phone.number`/`default_avatar_id`; login-only surface (no token-refresh/logout — у VK они для notifications, Yandex не нужно). PKCE S256 + signed state/verifier cookies (HMAC over AUTH_JWT_SECRET).
+- **Schema:** `YandexLink` (userId·yandexUserId unique, accessToken·refreshToken, isEnabled, onDelete Cascade) + `UserProfile.yandexLink`. Миграция `20260629201051_add_yandex_link` (`--create-only` → review = ADD-only → deploy → resolve → snapshot regenerated с YandexLink). 8 новых error-codes в `ERROR_CODES`.
+- **UI:** `YandexLoginButton` (Яндекс «Я» logo, self-gating на `isYandexAuthEnabled`, plain `<a>` FIX-24-parity) в login-grid (adaptive cols: launch = VK+Yandex = 2-col). `page.tsx` server-resolves `yandexEnabled={isYandexAuthEnabled}`. **CSP не тронут** (top-level redirect, не framed widget; token/profile fetch — server-side).
+- **Env:** `NEXT_PUBLIC_YANDEX_ENABLED` (boolFlag, default false) + `YANDEX_OAUTH_CLIENT_ID`/`_SECRET`/`_REDIRECT_URI` + computed `isYandexAuthEnabled` (flag AND client-id → button absent until registered). Оба `.env*.example` с deploy-note.
+- **Live (dev):** Yandex ON (dummy creds) → /login «Войти через Яндекс» ×1 + VK ×1 + Telegram ×0; `/api/auth/yandex/start` → 302 oauth.yandex.ru/authorize (response_type=code, client_id, redirect_uri, state, code_challenge, S256) + Set-Cookie state+verifier. Yandex OFF → button ×0, start → 503 not-configured. **🚀 callback round-trip = staging** (needs registered Yandex app — не faked).
+- **Phase B2 — Telegram legal-doc copy (pre-launch, no binding contract):** privacy §6.2 «Telegram (Telegram Messenger Inc.)» → «ООО «Яндекс» (Яндекс ID)», §2.5 Telegram `<li>` → Yandex, channel/avatar/deletion-list de-Telegram'd (numbering 6.1–6.8 + cross-ref «(см. п. 6.7)» intact); terms «вход через Telegram» → «вход через Яндекс». /privacy + /terms render 0 Telegram. **Closes FIX-TELEGRAM-LEGAL-REVIEW as content edit** — финальный lawyer-pass перед public launch = process, не код.
+
+---
+
+## 2026-06-29 — FIX-TELEGRAM-COPY-SWEEP (Telegram blocker tail — prose + completion-meter; no commit, QA-ветка)
+
+- ✅ **Закрыт «no mention» bar в копи** (после kill-switch, который убрал функциональный Telegram). Gates: typecheck ✅ / lint baseline (1err·5warn) preserved / encoding·mojibake·ui-text ✅ / **test 802 ✅** / build ✅. Live (flag OFF, curl) + grep-proof. Captures → `.qa/diagnostics/telegram-copy-sweep/`.
+- **Audit:** comprehensive grep классифицировал каждое упоминание (list-item / sole-channel / dynamic / static-prose). Поправлено **10 surfaces** (больше, чем prompt listed — также how-it-works/how-to-book/gift-cards/client-faq/faq-data/support-contact):
+  - **list-item** (drop Telegram, keep остальные каналы): `how-it-works:46/89` + `how-to-book:63` («в Telegram, push или email» → «в push или по email»), `become-master:208` («Telegram и ВКонтакте» → «push и email»), `faq-content:36` («Telegram или VK» → «VK»), `faq-data:81` («Telegram или VK» → «VK», grammar fix «они→он»).
+  - **sole-channel** (substitute real channel): `help-content:94` («в Telegram» → «push-уведомление»), `how-it-works:104` («с уведомлением в Telegram» → «push-уведомлением и письмом на почту»).
+  - **static-prose** (rewrite): `about:48` + `become-master:76/88` (Telegram-as-problem → «переписки»/«в переписке»).
+  - **link removal:** `become-master:155` login («через Telegram» → «через ВКонтакте»), `client-faq` support `<li>` (t.me/masterryadom удалён, phone kept, unused `MessageSquare` import убран), `gift-cards` (t.me subscribe-CTA удалён + `footerCta` key dropped, `footerText` self-contained).
+  - **dynamic (gated):** `lib/support/contact.ts` — Telegram support-contact prefill option теперь за `isTelegramEnabled`.
+- **Completion meter:** server `computeCompletion` (`profile.service.ts`) + client gradient-card — `tgLinked` исключён из знаменателя когда Telegram off (`/6`→`/5`); `PROFILE_ITEM_COUNT` const убран. **Live:** `/api/cabinet/user/profile` → `"percent":40` (=2/5, было бы 33%=2/6); 100% достижим без Telegram-шага; rendered checklist 0 Telegram label.
+- **Grep-proof (live):** 8 страниц (about/become-master/how-it-works/how-to-book/gift-cards/support/faq/help) рендерят **0** Telegram refs, грамматика чистая (нет висячих «или»). Allowed-to-remain: ops-monitoring, gated-functional code, backend data fields, gated footer.
+- **НЕ тронуто:** privacy/terms legal-docs (→ **🔴 FIX-TELEGRAM-LEGAL-REVIEW**, остаётся открытым — lawyer task, Артём owns).
+
+---
+
 ## 2026-06-29 — FIX-TELEGRAM-KILLSWITCH (legal launch-blocker #1; no commit, QA-ветка)
 
 - ✅ **User-facing Telegram полностью погашен через two-layer flag.** Gates: typecheck ✅ / lint baseline (1err·5warn) preserved / encoding ✅ / mojibake ✅ / ui-text ✅ / **test 802 ✅** (+11 hard-ceiling/fail-safe) / build ✅ (exit 0). Live-verified OFF+ON оба state. Captures → отчёт ниже.

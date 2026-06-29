@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, FileText, LifeBuoy, Mail, MessageSquare, Phone } from "lucide-react";
+import { Search, FileText, LifeBuoy, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FAQAccordionItem } from "@/components/ui/faq-accordion";
 import { Card } from "@/components/ui/card";
@@ -158,17 +158,6 @@ export function ClientFaqPage() {
                 >
                   <Phone className="h-4 w-4 text-text-sec" aria-hidden />
                   8 800 111 22 33
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://t.me/masterryadom"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-text-main hover:text-primary"
-                >
-                  <MessageSquare className="h-4 w-4 text-text-sec" aria-hidden />
-                  Telegram
                 </a>
               </li>
             </ul>

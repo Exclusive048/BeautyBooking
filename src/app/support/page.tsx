@@ -70,7 +70,7 @@ export default async function SupportPage() {
       </section>
 
       {/* Quick links — before the form, so a self-serve answer takes priority.
-          Single FAQ card centered (Telegram bot removed as a support channel). */}
+          Single FAQ card centered (the messenger-bot support channel was removed). */}
       <section className="pb-8">
         <div className="mx-auto max-w-3xl px-4">
           <p className="mb-6 text-center text-sm text-text-sec">{T.quickLinks.description}</p>

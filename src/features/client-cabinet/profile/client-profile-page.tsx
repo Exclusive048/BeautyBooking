@@ -641,8 +641,14 @@ function CompletionGradientCard({
 }: {
   completion: ProfileDTO["completion"];
 }) {
-  const total = 6;
-  const done = Object.values(completion.items).filter(Boolean).length;
+  // FIX-TELEGRAM-COPY-SWEEP: exclude the tgLinked step when Telegram is off so
+  // the "X из N" text matches the (server-recomputed) percent and 100% is
+  // reachable without a Telegram step.
+  const countedEntries = Object.entries(completion.items).filter(
+    ([key]) => isTelegramEnabled || key !== "tgLinked"
+  );
+  const total = countedEntries.length;
+  const done = countedEntries.filter(([, value]) => Boolean(value)).length;
   return (
     <Card className="overflow-hidden border-0 bg-brand-gradient p-5 text-white">
       <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/80">

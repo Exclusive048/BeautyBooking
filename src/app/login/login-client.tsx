@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
+import YandexLoginButton from "@/components/auth/yandex-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,8 @@ type LoginClientProps = {
   // When false the Telegram login button is omitted entirely.
   telegramEnabled?: boolean;
   vkEnabled?: boolean;
+  // FIX-YANDEX-OAUTH: server-resolved Yandex-enabled flag (button absent when false).
+  yandexEnabled?: boolean;
 };
 
 function normalizePhone(input: string): string {
@@ -206,6 +209,7 @@ export default function LoginClient({
   telegramBotUsername,
   telegramEnabled = false,
   vkEnabled,
+  yandexEnabled = false,
 }: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
@@ -777,15 +781,23 @@ export default function LoginClient({
               <div className="h-px flex-1 bg-border-subtle" />
             </div>
 
-            {/* Social login — 1-col on small, 2-col from sm:. FIX-TELEGRAM-
-                KILLSWITCH: the Telegram button is omitted entirely when the
-                flag is off; the grid collapses to a single column so VK fills
-                the row (no half-width lone button). */}
-            <div className={telegramEnabled ? "grid gap-2.5 sm:grid-cols-2" : "grid gap-2.5"}>
+            {/* Social login — grid columns adapt to the number of enabled
+                providers (Telegram gated by FIX-TELEGRAM-KILLSWITCH; VK + Yandex
+                self-gate). Launch config = VK + Yandex → 2 columns. */}
+            <div
+              className={`grid gap-2.5${
+                [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length >= 3
+                  ? " sm:grid-cols-3"
+                  : [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length === 2
+                    ? " sm:grid-cols-2"
+                    : ""
+              }`}
+            >
               {telegramEnabled && (
                 <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
               )}
               <VkLoginButton enabled={vkEnabled} />
+              <YandexLoginButton enabled={yandexEnabled} />
             </div>
 
             {/* Bottom hint */}

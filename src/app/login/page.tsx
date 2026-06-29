@@ -11,7 +11,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getLoginHeroImageAsset } from "@/lib/media/queries";
 import { isEmailConfigured } from "@/lib/email/sender";
 import { getPublicStats, type PublicStats } from "@/lib/stats/public-stats";
-import { env } from "@/lib/env";
+import { env, isYandexAuthEnabled } from "@/lib/env";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 
 export default async function LoginPage() {
@@ -43,6 +43,9 @@ export default async function LoginPage() {
         telegramBotUsername={telegramEnabled ? (env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "") : ""}
         telegramEnabled={telegramEnabled}
         vkEnabled={String(env.NEXT_PUBLIC_VK_ENABLED) === "true"}
+        // FIX-YANDEX-OAUTH: button absent until a Yandex OAuth app is registered
+        // (isYandexAuthEnabled requires both the flag AND a client id).
+        yandexEnabled={isYandexAuthEnabled}
       />
     </Suspense>
   );

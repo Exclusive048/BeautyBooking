@@ -42,11 +42,14 @@
   1. ✅ **FIX-TELEGRAM-KILLSWITCH** *(2026-06-29 — см. BACKLOG-DONE.md)* — user-facing Telegram погашен через two-layer flag
      (`NEXT_PUBLIC_TELEGRAM_ENABLED` env hard-ceiling, default false + admin SystemConfig toggle below it). Login/cabinets/
      delivery/footer/profile-contacts/partnership — gated absent + inert when off; ops-monitoring Telegram не тронут; код не удалён (re-enableable).
-  2. **RF-email allow-list** — `.superRefine` на `otpEmailRequestSchema` (`src/lib/auth/schemas.ts:19-26`) + `EMAIL_DOMAIN_ALLOWLIST`
+  2. ✅ **Yandex OAuth (add)** *(FIX-YANDEX-OAUTH 2026-06-29 — code-complete; см. BACKLOG-DONE.md)* — bespoke-parallel к VK: `src/lib/yandex/*`
+     (config/pkce/cookies/oauth/schemas) + `api/auth/yandex/{start,callback,unlink}` + `YandexLink` model (миграция `20260629201051`) + `YandexLoginButton`
+     (self-gating) + env `YANDEX_OAUTH_*` + `isYandexAuthEnabled`. Account-linking зеркалит vk/callback точно (new-vs-existing + 409 guard). CSP не тронут
+     (top-level redirect, не framed widget). Default OFF. **🚀 Live OAuth round-trip = deploy-ops** (нужен registered Yandex app + creds + redirect_uri).
+  3. **RF-email allow-list** — `.superRefine` на `otpEmailRequestSchema` (`src/lib/auth/schemas.ts:19-26`) + `EMAIL_DOMAIN_ALLOWLIST`
      env (comma-split). **Нужно от Артёма:** список RF-доменов + fail-open-vs-closed-when-unset (рекоменд. fail-closed на prod с loud deploy-error).
-  3. **Yandex OAuth (add)** — зеркало VK pattern (`src/lib/yandex/*` + auth routes + `YandexLink` model + login button + env + CSP). **Нужно от Артёма:** Yandex OAuth app creds.
   4. **VK completion** — в коде ~complete (login + new-vs-existing linking работают); остаток = deploy-ops (redirect_uri registration, live creds, `VK_ID_REDIRECT_URI` → `мастеррядом.online`) + опц. hardening (logout-call, token-refresh).
-  - Порядок: #1 ✅ → RF-email → Yandex → VK. SMS — отдельно (deploy-ops, провайдер built).
+  - Порядок: #1 Telegram ✅ → #2 Yandex ✅ → RF-email → VK. SMS — отдельно (deploy-ops, провайдер built).
 
 ---
 
@@ -54,13 +57,13 @@
 
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
-- **FIX-TELEGRAM-COPY-SWEEP** *(spawned by FIX-TELEGRAM-KILLSWITCH 2026-06-29)* — flag убрал *функциональный* Telegram, но в **prose/маркетинге**
-  остались текстовые упоминания (не gated, нужен copy-decision): `about/page.tsx:48` (problem-framing), `become-master/page.tsx:155` («войдите
-  через Telegram» — теперь ложь), `:208` («Уведомления в Telegram и ВКонтакте»), `faq-content.tsx:36`, `help-content.tsx:94`, `client-faq-page.tsx:171`,
-  `support/page.tsx`. Решить замену копи (убрать/заменить канал). Не legal-doc.
-- **🔴 FIX-TELEGRAM-LEGAL-REVIEW** *(spawned 2026-06-29 — нужен Артём/юрист, НЕ авто-править)* — юр-документы описывают Telegram как обработчик данных:
-  `privacy-content.tsx` (§6.2 «Telegram (Telegram Messenger Inc.)», +телеграм-данные в §3) + `terms-content.tsx:90` («вход через Telegram»). Удаление
-  Telegram-процессора меняет юр-обязательства → **lawyer review**, не код-фикс.
+- ✅ **FIX-TELEGRAM-COPY-SWEEP** *(2026-06-29 — см. BACKLOG-DONE.md)* — все prose/маркетинг/FAQ/help/support упоминания Telegram убраны
+  (about · become-master · how-it-works · how-to-book · gift-cards · faq · help · client-faq · faq-data · support contact-option gated) + completion-meter
+  `/6`→`/5` (tgLinked исключён когда off, 100% достижим). Grep-proof: **0** user-facing Telegram copy. Legal-docs НЕ тронуты (→ ниже).
+- ✅ **FIX-TELEGRAM-LEGAL-REVIEW** *(closed as content edit 2026-06-29 в FIX-YANDEX-OAUTH — pre-launch, нет binding contract)* — Telegram удалён из
+  юр-документов как copy: `privacy-content.tsx` (§6.2 Telegram-процессор → «ООО «Яндекс» (Яндекс ID)», §2.5 Telegram→Yandex `<li>`, channel/avatar/deletion
+  lists de-Telegram'd, numbering 6.1–6.8 + cross-ref intact) + `terms-content.tsx` («вход через Telegram» → «вход через Яндекс»). **Process (не код):**
+  финальный lawyer-pass перед public launch всё ещё рекомендуется.
 
 ---
 
@@ -113,6 +116,9 @@
 
 - **env → `мастеррядом.online`** — выставить `VK_ID_REDIRECT_URI` + `APP_PUBLIC_URL` (stale `beautyhub.art` живёт только в gitignored `.env`/`.env.local`; в tracked-коде 0).
 - **VK** — зарегистрировать redirect_uri + live VK round-trip QA с реальными creds.
+- **Yandex OAuth** *(FIX-YANDEX-OAUTH)* — зарегистрировать Yandex OAuth app (oauth.yandex.ru, scopes login:info/login:email/login:avatar), выставить
+  `YANDEX_OAUTH_CLIENT_ID`/`YANDEX_OAUTH_SECRET`/`YANDEX_OAUTH_REDIRECT_URI` (→ `…/api/auth/yandex/callback`) + `NEXT_PUBLIC_YANDEX_ENABLED=true`, live round-trip QA.
+  Код-комплит + start-redirect проверен; callback round-trip — только на staging с реальным app.
 - **Telegram** — live round-trip с зарегистрированными creds (login + connect-modal).
 - **SMS** — `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`PASSWORD` + баланс SMSC + smoke RU/KZ.
 - **`YANDEX_GEOCODER_API_KEY`** в QA/prod env — prerequisite для tz-derivation walk на onboarding (FIX-R2-02-A).

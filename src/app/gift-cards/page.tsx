@@ -32,15 +32,7 @@ export default function GiftCardsPage() {
             </ul>
           </div>
           <p className="text-sm text-text-sec">
-            {UI_TEXT.pages.giftCards.footerText}{" "}
-            <a
-              href="https://t.me/masterryadom_news"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              {UI_TEXT.pages.giftCards.footerCta}
-            </a>
+            {UI_TEXT.pages.giftCards.footerText}
           </p>
         </div>
       </InfoPageLayout>
