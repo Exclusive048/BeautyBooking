@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
 
@@ -126,6 +127,34 @@ export async function updateStudioProviderProfile(
   }
   const resolvedTimezone =
     input.timezone !== undefined ? input.timezone : derivedTimezone;
+
+  // Publication gate (R2-02-B): mirror master's `profile.service.ts` exactly —
+  // publishing requires a non-empty address AND a resolved cityId. (Master does
+  // NOT require services, so neither do we — the prompt is explicit: mirror, do
+  // not invent a stricter studio rule.) Forward-only: the gate fires only on the
+  // publish ACTION (isPublished:true in this request). Setting isPublished:false,
+  // or any request that omits isPublished, is never blocked — an already-published
+  // studio is never retroactively unpublished. The canonical address/cityId fall
+  // back to the stored row when this request just toggles publish without an
+  // address change.
+  if (input.isPublished === true) {
+    const existing = await prisma.provider.findUnique({
+      where: { id: providerId },
+      select: { address: true, cityId: true },
+    });
+    const canonicalAddress =
+      typeof input.address === "string" && input.address.trim()
+        ? input.address.trim()
+        : (existing?.address?.trim() ?? "");
+    const canonicalCityId = derivedCityId ?? existing?.cityId ?? null;
+    if (!canonicalAddress || !canonicalCityId) {
+      throw new AppError(
+        "Заполните адрес, чтобы опубликовать студию",
+        400,
+        "ADDRESS_REQUIRED",
+      );
+    }
+  }
 
   const provider = await prisma.provider.update({
     where: { id: providerId },

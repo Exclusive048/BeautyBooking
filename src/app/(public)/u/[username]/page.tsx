@@ -193,7 +193,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  const title = UI_TEXT.pages.publicProfile.titleTemplate.replace("{name}", provider.name);
+  // R2-02-F: guard the empty-name edge case so the title never renders a bare
+  // " — запись онлайн" (leading dash) when a provider has a blank name.
+  const titleName = provider.name.trim() || UI_TEXT.pages.publicProfile.nameFallback;
+  const title = UI_TEXT.pages.publicProfile.titleTemplate.replace("{name}", titleName);
   const description = buildDescription({
     name: provider.name,
     type: provider.type,

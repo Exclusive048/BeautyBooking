@@ -46,21 +46,16 @@
 
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
-- **R2-05-H** — plan enable/disable toggle без confirmation guard (mis-click отключает план + рассылает «приостановлен»
-  всем active subs). Reversible, но рискованно. Fix: confirm-modal когда `activeSubscriptionsCount > 0`.
 
 ---
 
 ## 🟡 MEDIUM PRIORITY
 
 **R2 (Round 2) residual:**
-- **R2-02-B** — studio publish ungated (`studio.ts` ставит `isPublished` из input без address/service/master-проверки),
-  асимметрично master `ADDRESS_REQUIRED`. Fix: требовать ≥1 услугу до publish.
-- **R2-02-C** — published пустая студия отдаёт dead-end 4-step booking wizard. Fix: «настраивается»/redirect для пустой студии.
 - **R2-04-C** — many-services public booking page = flat 35-item list без группировки. Fix: группировать по globalCategory / фильтр категорий.
 - **R2-05-G** — нет фидбэка репортёру при модерации отзыва; нет UI восстановления soft-deleted отзыва (только manual SQL).
 - **R2-05-A2** — category reject reason только в логах (нет колонки); владельцы portfolio-item не уведомляются при delist.
-- **R2-05-J** — `BillingPlanPrice.isActive` без admin UI + latent direct-DB mass-expiry path (renewal может залогировать CRITICAL).
+- **R2-05-J** — `BillingPlanPrice.isActive` без admin UI — **by-design** (деактивация выражается удалением period-row при цене ≤0; resolver monthly-fallback handles; create hardcodes `isActive:true`; только direct-DB ставит `false`). «renewal может залогировать CRITICAL» — **неточно**: `renew/run/route.ts` на missing price отдаёт `null` gracefully → пишет `RENEWAL_FAILED·MISSING_PRICE` audit + `PAST_DUE` + continue, **без** `logError` → не достигает `alertCritical`. Низкий приоритет; не дефект-путь.
 - ✅ **R2-03-A** *(FIX-EXP-SEED-HYGIENE 2026-06-26)* — closed: priced `BookingServiceItem` добавлены в `seed-showcase-master.ts` (priceSnapshot=service.price); analytics revenue Анны 51 000 ₽ / 14 (был ₽0), reconciles с dashboard (Δ=0). R2-03-B (latent fallback) остаётся.
 - **R2-03-B** — analytics revenue без `Service.price` fallback (в отличие от `day.service.ts`). Latent (prod всегда пишет items). Fix: shared fallback или backfill.
 
@@ -73,6 +68,7 @@
 - **ENV-DATABASE-CLEANUP** — 3 orphan vars в `.env`/`.env.local`.
 - **OPENAPI-COVERAGE-INCREMENTAL** — гнать allowlist 216→0 по кластерам.
 - **VISUAL-SEARCH-YANDEX-MIGRATION** (post-launch) — vision+embeddings на Yandex + schema `vector(1536)→vector(256)`.
+- **QA-121** — двойной mobile bottom-nav на client-кабинете: глобальный `<BottomNav/>` (`layout.tsx`) self-hide'ится только для `/cabinet/master` + `/cabinet/studio` (`bottom-nav.tsx:297-299`), но не для `/cabinet/(user)/*`, который рендерит свой `<CabinetBottomNav/>` (`cabinet-layout.tsx:48`) → на `/cabinet/bookings` и пр. два fixed `bottom-0 lg:hidden` nav стекаются на mobile. Минорный (mobile-only clutter), ship-without. *(Выпал из беклога при DOCS-CLEANUP trim — «see new BACKLOG item QA-121» был написан, но не зафайлен; re-filed PRE-STAGING.)*
 - **UI a11y/polish** — REDUCED-MOTION-A · TAP-TARGET-AUDIT-A · TAILWIND-COLOR-LINT · STORYBOOK-SETUP (из UI-UX-AUDIT).
 - **CRM/booking фичи** — manual tag assignment · late-cancel CRM tracking · online payments + штрафы (`lateCancelAction==="fine"`) · manual finish-booking endpoint · anonymization-vs-deletion на account delete.
 
@@ -80,15 +76,10 @@
 
 ## 🔵 NICE-TO-HAVE
 
-- **R2-01-D** — master-created manual booking = `PENDING, actionRequiredBy: MASTER` (redundant self-action).
-- **R2-02-D/E/F** — PREMIUM badge + «На платформе 1 мес.» на 1-дневном master-профиле; master-facing copy виден клиенту; empty-name `<title>`.
-- **R2-05-E** — review delete = soft, но JSDoc + confirm-copy говорят «полностью убирает из БД» (copy-only mislabel).
-- **R2-05-F** — seed `Provider.ratingCount` drift (recalc корректит на следующем add/delete).
+- **R2-02-D (badge only)** — PREMIUM badge на 1-дневном paid/trial master-профиле оставлен as-is (бейдж отражает активную подписку/триал, не «заслугу»; tenure-неточность «1 мес.» исправлена в FIX-PRE-STAGING). Revisit если нужно product-правило «tenure-gated badge».
+- **R2-05-F** — seed `Provider.ratingCount` drift (Анна 47 hardcoded vs 9 actual = 6 master-seed + 3 client-seed reviews). Self-corrects на следующем review add/delete. Чистый фикс требует post-orchestration recalc (после обоих seed'ов) + export private `recalculateTargetRatings` — несоразмерно для 🔵 self-correcting. Noted, не fixed.
 - **BC-F1/F2/F3** — factual (не баги): нет multi-year term; нет multi-license/seat; нет proration/refund на смене плана.
-- **QA-106 (server-string)** — off-schedule message «Окошко уже занято…» для direct-API (UI уже исправлен FIX-25).
 - **RULE-12-BOOKING-CONTRACT-OPTIONAL** — booking-flow provider/service/studio ids в URL (нужны funnel'у; encoding = contract change, flagged).
-- **STUDIO-SCHEDULE-UTC-DAY-GROUPING** — studio day-grouping UTC-based (host-independent, но не studio-tz-aligned).
-- **FOOTER-VK-HANDLE-FIX** — footer `vk.com/beautyhub` (stale community handle).
 - **CI/structural** — PRE-COMMIT-SCHEMA-MIGRATION-PAIR · FINDMANY-TAKE-CI-CHECK · ENV-TEMPLATES-CI-CHECK · RUNBOOK-COVERAGE-CI · LOGGER-DISCIPLINE-CI-GATE · BUNDLE-SIZE-BASELINE · SW-SUPABASE-RULE-CLEANUP · STORIES-TAKE-CAP.
 - **a11y/perf** — STORIES-VIEWER-A11Y-CONSOLIDATE · FRAMER-MOTION-REDUCED-MOTION-SWEEP · BOOKING-PARTIAL-UNIQUE-INDEX-A · BOOKING-STATUS-PROMOTION-CRON · BOOKING-AUDIT-LOG-A.
 - **Studio/VK** — studio-admin chat with master (нужен auth-model decision) · studio public-page sidebar entry · VK notifications delivery subsystem (VK Bot API).
@@ -108,9 +99,10 @@
 - **`YANDEX_GEOCODER_API_KEY`** в QA/prod env — prerequisite для tz-derivation walk на onboarding (FIX-R2-02-A).
 - **Seed `BillingPlanPrice` rows** — явные active rows для каждого предлагаемого периода (1/3/6/12mo) в QA/prod (BC-1 consistency; fallback есть, но явная row предпочтительнее).
 - **🚩 Legal — real ИНН** — выставить `NEXT_PUBLIC_LEGAL_INN` (реальный ИНН Артёма) в prod env до launch (152-ФЗ / footer requisites). Config wired (EXP-005); unset → footer показывает obvious «[не указан]». Значение — данные Артёма, в код НЕ вшито.
+- **🚩 Footer VK** — выставить `NEXT_PUBLIC_VK_COMMUNITY_URL` (реальный VK-паблик МастерРядом) в prod env. Config wired (FIX-PRE-STAGING, FOOTER-VK); unset → footer **опускает** VK-иконку (старый `vk.com/beautyhub` удалён, wrong handle не выдумывался). Значение — реальный handle, в код НЕ вшито.
 - **YooKassa** — replay `payment.succeeded`/`refund` + idempotency в live env.
-- **🚩 Применить миграции `20260619000000_provider_timezone_default_moscow` + `20260624140407_add_booking_package`** на проде (`prisma migrate deploy`) **до** regen seed-snapshot.
-- **🚩 Регенерировать `.qa/snapshots/post-seed.dump`** — текущий snapshot PRE-`add_booking_package` (нет таблицы `BookingPackage` / `ServicePackageItem.sortOrder`); restore вернёт схему назад. Пересоздать дамп после применения миграции.
+- **🚩 Применить миграции на проде** (`prisma migrate deploy`) — **3** недавние, не 2: `20260619000000_provider_timezone_default_moscow` + `20260624140407_add_booking_package` + `20260626000000_add_push_notifications_enabled` (последняя добавлена 2026-06-26, после того как этот пункт писался).
+- **Snapshot `.qa/snapshots/post-seed.dump`** — **gitignored / local-only** (`.gitignore:91`; НЕ tracked, не попадает в коммиты, не prod-артефакт). Уже регенерирован FIX-EXP-SEED-HYGIENE (несёт `BookingPackage` + push schema) → это актуальный локальный dev-baseline. Регенерировать локально только при изменении схемы/seed (после нового `migrate dev`). *(Снимает прежний пункт «regen snapshot» — он был выполнен.)*
 - **Email infra** — SMTP provider + DNS (DKIM/SPF/DMARC).
 - **DevOps infra (4 решения)** — Postgres hosting · TLS termination · backups · deploy-rollback policy.
 

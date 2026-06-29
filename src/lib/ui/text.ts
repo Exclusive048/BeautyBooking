@@ -4505,6 +4505,10 @@ export const UI_TEXT = {
         errorStrictLimit: "Лимит «{feature}» строже родительского тарифа. Можно только ослаблять.",
         errorInheritanceCycle: "Обнаружен цикл наследования тарифов — выберите другой родительский тариф.",
         errorParentNotFound: "Родительский тариф не найден. Обновите страницу и попробуйте ещё раз.",
+        disableConfirmTitle: "Приостановить тариф?",
+        disableConfirmBody:
+          "Активные подписчики получат уведомление о приостановке тарифа — отозвать его нельзя. Затронуто подписчиков: {count}. Продолжить?",
+        disableConfirmAction: "Приостановить",
       },
       features: {
         searchPlaceholder: "Поиск возможности…",
@@ -4668,7 +4672,7 @@ export const UI_TEXT = {
         title: "Удалить отзыв",
         body: "Отзыв от {author} будет удалён. Действие нельзя отменить.",
         warning:
-          "Удаление полностью убирает отзыв из БД и пересчитывает рейтинг мастера или студии.",
+          "Отзыв скрывается с публичных страниц и перестаёт учитываться в рейтинге мастера или студии.",
         reasonLabel: "Причина (для аудита)",
         reasonPlaceholder: "Например: грубое нарушение правил платформы",
         cancel: "Отмена",
@@ -5448,8 +5452,8 @@ export const UI_TEXT = {
     },
     booking: {
       title: "Запись",
-      emptyTitle: "Выберите услугу, чтобы записаться",
-      emptyDesc: "Добавьте хотя бы одну услугу, и мы покажем итог и ближайшие окошки.",
+      emptyTitle: "Онлайн-запись пока недоступна",
+      emptyDesc: "Мастер ещё не добавил услуги для записи. Загляните позже или свяжитесь с ним напрямую.",
       chooseTime: "Выбрать время",
       backToCart: "Назад к корзине",
       continueToConfirm: "Продолжить",
@@ -7522,6 +7526,7 @@ export const UI_TEXT = {
       masterDescriptionFallback:
         "Запись онлайн к мастеру {name}. Услуги, цены, отзывы и свободные окна.",
       titleTemplate: "{name} — запись онлайн",
+      nameFallback: "Специалист",
       servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
       ogBookOnline: "Записаться онлайн",
       ogReviews: "отзывов",
@@ -7546,6 +7551,7 @@ export const UI_TEXT = {
       masterDescriptionFallback:
         "Запись онлайн к мастеру {name}. Выберите услуги и свободное время.",
       titleTemplate: "{name} — запись онлайн",
+      nameFallback: "Специалист",
     },
     modelOffer: {
       notFoundTitle: "Предложение не найдено | МастерРядом",

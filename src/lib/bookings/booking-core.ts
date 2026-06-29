@@ -135,7 +135,7 @@ export async function ensureNoConflicts(
 
   if (conflict) {
     throw new AppError(
-      "Окошко уже занято. Обновите расписание и выберите другое время.",
+      "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
       409,
       "SLOT_CONFLICT"
     );
@@ -373,7 +373,7 @@ export async function resolveBookingCore(input: {
   });
   if (!hasSlot) {
     throw new AppError(
-      "Окошко уже занято. Обновите расписание и выберите другое время.",
+      "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
       409,
       "SLOT_CONFLICT"
     );

@@ -9,6 +9,36 @@
 
 ---
 
+## 2026-06-26 — FIX-PRE-STAGING (behavioral + copy/cosmetic sweep; no commit, QA-ветка)
+
+- ✅ **Закрыты все «real» остатки беклога перед staging, сгруппировано по invasiveness (behavioral / copy / docs). Gates: typecheck ✅ / lint baseline 1err·5warn preserved / ui-text ✅ / encoding ✅ / mojibake ✅ / test 791/791 ✅ / build ✅. DB baseline intact (verification read-only). Captures → `.qa/diagnostics/pre-staging-final/`.**
+
+**Phase 1 — behavioral:**
+- ✅ 🟠 **R2-05-H (plan-disable confirm-gate)** — `plan-edit-dialog.tsx`: при disable плана с active-subs (`plan.isActive && !isActive && activeSubscriptionsCount > 0`) теперь confirm-modal (`useConfirm`, danger, «Затронуто подписчиков: {count}») перед save → блокирует irreversible mass-«приостановлен» fan-out при mis-click. 0-active → без friction. Reversible toggle не тронут — гейтится только notification-path. Code+build verified (live admin-UI walkthrough заблокирован OTP-form React-controlled-input harness friction — не дефект фикса).
+- ✅ 🟡 **R2-02-B (studio publish gate)** — `studio.ts:updateStudioProviderProfile` зеркалит master `profile.service.ts` ТОЧНО: publish требует non-empty address + resolved cityId → иначе `ADDRESS_REQUIRED 400` (НЕ services — master тоже не требует; не выдумываем строже). **Forward-only:** гейт на publish-ACTION; уже-published студия НЕ force-unpublish'ится. Studio route обёрнут try/catch → AppError → чистый 4xx. **Live (DB):** все 7 студий (incl. Vision) published с address+cityId → проходят gate, никого не сбросило.
+- ✅ 🟡 **R2-02-C (empty-studio booking dead-end)** — `/u/[username]/booking`: `isStudioUnbookable` (0 enabled services ИЛИ 0 active masters) → `redirect()` на `/u/{slug}` профиль (temporary; bookability transient). Mirror master /booking-redirect. **Live (Playwright):** unbookable `studio-atmosfera-6` (0 masters) → `window.location` = профиль; bookable Vision → wizard остаётся.
+- ✅ 🔵 **R2-01-D (manual booking self-action)** — solo-master manual booking (`day.service.ts`) теперь `actionRequiredBy: null` (было `MASTER`), keep PENDING — убирает redundant self-nag из attention-panel. Safe: `confirmBooking.ts` гейтит actionRequiredBy только для CHANGE_REQUESTED, не PENDING→CONFIRMED. Studio manual path (admin→master, two-party) намеренно не тронут.
+- ✅ 🔵 **STUDIO-SCHEDULE-UTC-DAY-GROUPING** — REAL: `week-occupancy.ts` группировал bookings + today-highlight по UTC date-keys (`getUTCFullYear/Month/Date`) → mis-bucket near-midnight + wrong today для non-UTC студии. Fix via shared `toLocalDateKey(date, tz)` (self-contained: fetch salon tz внутри; query window ±1d superset; no caller change, no parallel day-def).
+
+**Phase 2 — copy/cosmetic (UI_TEXT / display-only):**
+- ✅ 🔵 **R2-05-E** — soft-delete warning «полностью убирает из БД» → «скрывается с публичных страниц и перестаёт учитываться в рейтинге» (review = hidden, не hard-delete).
+- ✅ 🔵 **QA-106** — server SLOT_CONFLICT message ×2 (`booking-core.ts:138,376`) «...Обновите расписание...» → client-friendly «Кто-то записался первым на это время. Выберите другое...» (UI уже fixed FIX-25; это direct-API string).
+- ✅ 🔵 **R2-02-D (tenure)** — `hero-block.tsx formatExperience`: `Math.max(1, months)` показывал «1 мес.» для 0-месячного (1-дневного) профиля → guard `months < 1 → null`. PREMIUM badge оставлен (active paid/trial — см. BACKLOG R2-02-D badge-only).
+- ✅ 🔵 **R2-02-E** — master-facing «Добавьте хотя бы одну услугу...» на публичном master-профиле (виден клиентам) → нейтральное «Мастер ещё не добавил услуги для записи. Загляните позже...» (owner-prompt живёт в кабинете; без owner-detection).
+- ✅ 🔵 **R2-02-F** — empty-name `<title>` guard (public profile + booking): `provider.name.trim() || nameFallback("Специалист")` → нет bare « — запись онлайн». **Live:** title показывает имя.
+- ✅ 🔵 **FOOTER-VK-HANDLE-FIX** — стэйл `vk.com/beautyhub` параметризован → `NEXT_PUBLIC_VK_COMMUNITY_URL` (env.ts + оба .env*.example); unset → footer **опускает** VK-иконку (handle не выдумывался). **Live:** footer только Telegram. Real URL → deploy-ops.
+
+**Phase 3 — docs/backlog-hygiene (3 audit slips):**
+- ✅ **QA-121 re-filed** в BACKLOG.md 🟡 (двойной mobile bottom-nav на client-кабинете — глобальный `<BottomNav/>` не excludes `/cabinet/(user)/*`; выпал при DOCS-CLEANUP trim).
+- ✅ **R2-05-J softened** — текст over-stated («renewal CRITICAL» неточно; «no admin UI» by-design); reworded под реальный graceful-path.
+- ✅ **Deploy-ops migration list** — было 2 миграции, стало 3 (добавлена `20260626000000_add_push_notifications_enabled`); snapshot-contradiction reconciled (gitignored/local-only + уже regenerated FIX-EXP-SEED-HYGIENE).
+
+**Noted (не fixed, остаются в BACKLOG):**
+- 🔵 **R2-05-F** — seed ratingCount drift (Анна 47 vs 9 actual = 6 master + 3 client seed reviews); cross-seed → чистый фикс (post-orchestration recalc + export private `recalculateTargetRatings`) несоразмерен для 🔵 self-correcting.
+- 🔵 **R2-02-D PREMIUM badge** — product-decision (paid/trial badge legitimate); revisit если нужно tenure-gated badge.
+
+---
+
 ## 2026-06-26 — FIX-EXP-NOTIFICATIONS (EXP-027/028; EXP-029 deferred)
 
 - ✅ **🎉 Завершает EXP-консолидацию. Per-channel notification prefs для клиентов + push permission gesture-gating. App-код (не seed). No commit (QA-ветка). Push prompt/delivery verification deferred to staging (dev: next-pwa отключает SW).**

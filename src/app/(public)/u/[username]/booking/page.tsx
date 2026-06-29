@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicUsername } from "@/lib/publicUsername";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
@@ -17,6 +17,33 @@ type Props = {
 
 function normalizeUsername(input: string) {
   return input.trim().toLowerCase();
+}
+
+/**
+ * R2-02-C — a published but unbookable studio (no enabled service, or no active
+ * master) would otherwise drop the client into a dead-end 4-step wizard stuck at
+ * step 1. Returns true when the studio cannot fulfil a booking; the page then
+ * `redirect()`s to `/u/{slug}` (the profile), mirroring the master pattern where
+ * /booking redirects to the profile. The redirect is issued by the page component
+ * directly (not inside this helper) so the NEXT_REDIRECT control-flow propagates
+ * exactly like the existing master `permanentRedirect`. Defense-in-depth alongside
+ * the R2-02-B publish gate.
+ */
+async function isStudioUnbookable(studioId: string): Promise<boolean> {
+  const [enabledServices, activeMasters] = await Promise.all([
+    prisma.service.count({
+      where: { providerId: studioId, isEnabled: true },
+    }),
+    prisma.provider.count({
+      where: {
+        studioId,
+        type: "MASTER",
+        ownerUserId: { not: null },
+        isPublished: true,
+      },
+    }),
+  ]);
+  return enabledServices === 0 || activeMasters === 0;
 }
 
 function truncateText(text: string, maxLength = 160): string {
@@ -77,7 +104,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  const title = UI_TEXT.pages.publicBooking.titleTemplate.replace("{name}", provider.name);
+  // R2-02-F: guard the empty-name edge case (no bare " — запись онлайн").
+  const titleName = provider.name.trim() || UI_TEXT.pages.publicBooking.nameFallback;
+  const title = UI_TEXT.pages.publicBooking.titleTemplate.replace("{name}", titleName);
   const description = buildDescription({
     name: provider.name,
     type: provider.type,
@@ -174,6 +203,10 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
       permanentRedirect(redirectUrl);
     }
 
+    if (await isStudioUnbookable(provider.id)) {
+      redirect(`/u/${studioSlug}`);
+    }
+
     const initialMasterId = master?.id;
     const initialServiceId = serviceParam;
 
@@ -244,6 +277,10 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
       master: master?.publicUsername,
     });
     permanentRedirect(redirectUrl);
+  }
+
+  if (await isStudioUnbookable(result.providerId)) {
+    redirect(`/u/${username}`);
   }
 
   const initialMasterId = master?.id;

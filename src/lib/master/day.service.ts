@@ -496,7 +496,15 @@ export async function createSoloMasterBooking(input: {
           notes: input.notes?.trim() || null,
           source: "MANUAL",
           status: "PENDING",
-          actionRequiredBy: "MASTER",
+          // R2-01-D: a solo master entering a manual booking is recording a known
+          // appointment — flagging the master to "action" their own booking is a
+          // redundant self-action (it nagged in the dashboard attention panel). Drop
+          // the self-flag. Kept PENDING (lowest-risk: no lifecycle / notification
+          // change); the master can still confirm it from the kanban — PENDING →
+          // CONFIRMED does not gate on actionRequiredBy (confirmBooking.ts checks it
+          // only for CHANGE_REQUESTED). The studio manual path (admin creates → a
+          // different master confirms) is a legitimate two-party flow, left as-is.
+          actionRequiredBy: null,
         },
         select: { id: true },
       });

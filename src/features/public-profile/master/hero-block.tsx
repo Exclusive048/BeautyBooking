@@ -33,11 +33,14 @@ function pluralizeYear(n: number): string {
 }
 
 function formatExperience(months: number | null): string | null {
-  if (months === null) return null;
+  // R2-02-D: a sub-month tenure (e.g. a 1-day-old profile → months=0) was rounded
+  // up to "1 мес." by `Math.max(1, months)`, which is inaccurate. Show nothing
+  // below a full month instead of inventing a month that hasn't elapsed.
+  if (months === null || months < 1) return null;
   if (months < 12) {
     return T.experienceTemplate.replace(
       "{value}",
-      T.experienceMonthsTemplate.replace("{count}", String(Math.max(1, months))),
+      T.experienceMonthsTemplate.replace("{count}", String(months)),
     );
   }
   const years = Math.floor(months / 12);

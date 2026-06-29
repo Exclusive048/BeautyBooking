@@ -91,6 +91,12 @@ const envSchema = z.object({
   // (see deploy-checklist «legal requisites»).
   NEXT_PUBLIC_LEGAL_INN: z.string().optional(),
 
+  // FOOTER-VK: the platform's VK community URL for the footer social link.
+  // Optional — the footer OMITS the VK icon entirely when unset, rather than
+  // linking a stale/wrong handle. Set the real community URL before production
+  // launch (see deploy-checklist «social links»).
+  NEXT_PUBLIC_VK_COMMUNITY_URL: z.string().optional(),
+
   // ── OpenAI (legacy — visual-search only, AI chat surfaces migrated to Yandex) ─
   // OPENAI_API_KEY remains in schema because `src/lib/visual-search/*` still
   // imports the OpenAI SDK directly (vision + embeddings — Yandex multimodal
@@ -252,6 +258,7 @@ const clientEnv = {
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
   NEXT_PUBLIC_LEGAL_INN: process.env.NEXT_PUBLIC_LEGAL_INN,
+  NEXT_PUBLIC_VK_COMMUNITY_URL: process.env.NEXT_PUBLIC_VK_COMMUNITY_URL,
 };
 
 export const env: AppEnv =

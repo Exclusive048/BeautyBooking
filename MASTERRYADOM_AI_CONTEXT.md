@@ -710,6 +710,7 @@ src/
 | `OTP_HMAC_SECRET` | `src/lib/auth/otp.ts:15` | ДА | бросает Error |
 | `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` | `src/lib/env.ts:79` | для карт на frontend | — |
 | `NEXT_PUBLIC_LEGAL_INN` | `src/lib/env.ts` | для footer ИНН (legal) | unset → footer «[не указан]» (FIX-EXP-CONTENT-GRAMMAR EXP-005; real value → deploy-checklist) |
+| `NEXT_PUBLIC_VK_COMMUNITY_URL` | `src/lib/env.ts` | для footer VK-ссылки | unset → footer **опускает** VK-иконку (FIX-PRE-STAGING / FOOTER-VK; real handle → deploy-checklist; стэйл `vk.com/beautyhub` удалён) |
 | `AI_FEATURES_ENABLED` | `src/lib/env.ts:100` | нет | `false` |
 | `EMAIL_AUTH_ENABLED` | `src/lib/env.ts:101` | нет | `false` |
 | `WORKER_SECRET` | `src/app/api/health/worker/route.ts:11` | нет | не проверяет |
@@ -1343,6 +1344,12 @@ graphify --help                    # Full CLI reference
 ---
 
 ## 15. ИСТОРИЯ ОБНОВЛЕНИЙ ЭТОГО ФАЙЛА
+
+- **2026-06-26 — FIX-PRE-STAGING** (ветка `testloop`, no commit). **Pre-staging sweep всех «real» остатков беклога, сгруппировано по invasiveness (Phase 1 behavioral · Phase 2 copy · Phase 3 docs). Полные детали — `BACKLOG-DONE.md` (2026-06-26 FIX-PRE-STAGING).**
+  - **Раздел 5 (Бизнес-логика):** **studio publish gate (R2-02-B, core-flow)** — `updateStudioProviderProfile` (`src/lib/studios/studio.ts`) теперь требует non-empty address + resolved cityId перед `isPublished:true` → `ADDRESS_REQUIRED 400`, **точное зеркало** master `profile.service.ts` (НЕ services — не строже). **Forward-only:** гейт на publish-ACTION; уже-published студия не force-unpublish'ится. `/api/studios/[id]` PATCH обёрнут try/catch → AppError → чистый 4xx. **Empty-studio booking (R2-02-C):** `/u/[username]/booking` редиректит unbookable студию (0 enabled services ИЛИ 0 active masters) на `/u/{slug}` профиль (mirror master /booking-redirect). **Manual booking (R2-01-D):** solo-master manual booking → `actionRequiredBy: null` (keep PENDING; убирает redundant self-nag; safe — `confirmBooking` гейтит actionRequiredBy только для CHANGE_REQUESTED). **Admin plan disable (R2-05-H):** confirm-modal перед irreversible mass-«приостановлен» fan-out при `activeSubscriptionsCount > 0`.
+  - **Раздел 7 (Env vars):** добавлен `NEXT_PUBLIC_VK_COMMUNITY_URL` (optional — footer VK community-link; unset → footer **опускает** VK-иконку, без выдуманного handle; real value → deploy-checklist).
+  - **Прочее:** STUDIO-UTC week-occupancy day-grouping → shared `toLocalDateKey` (salon-tz, fix near-midnight mis-bucket); copy-фиксы (R2-05-E soft-delete / QA-106 slot-conflict ×2 / R2-02-D tenure «1 мес.» / R2-02-E master-copy на public профиле / R2-02-F empty-name title); backlog-hygiene (QA-121 re-filed, R2-05-J softened, deploy-ops migration list 2→3 + snapshot-contradiction reconciled).
+  - **Validation:** typecheck/lint(baseline 1err·5warn)/ui-text/encoding/mojibake ✅; test **791/791** ✅; build ✅. Live: R2-02-B forward-safety (DB — все 7 студий проходят gate) / R2-02-C (Playwright — unbookable→профиль, bookable→wizard) / R2-02-F + FOOTER-VK (browser). DB baseline intact (read-only verification). Captures → `.qa/diagnostics/pre-staging-final/`. R2-05-F + R2-02-D-badge — noted, не fixed. No commit.
 
 - **2026-06-26 — FIX-EXP-NOTIFICATIONS** (ветка `testloop`, no commit). **App-код: client per-channel notification prefs + push gesture-gating (EXP-027/028). EXP-029 per-event matrix DEFERRED. 🎉 завершает EXP-консолидацию.**
   - **EXP-027:** `push-manager.tsx` больше НЕ запрашивает permission gesture-lessly на load — mount только re-sync (`syncExistingSubscription`: subscribe лишь если pref on И permission уже granted, никогда не prompt). Запрос разрешения → явный toggle (`PushNotificationsSection`, user-gesture) + re-enable-after-deny guidance. **EXP-028:** клиентский `/cabinet/(user)/settings` получил push-секцию (email/telegram/vk уже были); push-секция добавлена и мастерам (shared ChannelsCard) чтобы removal авто-запроса не оставил их без enable-пути. **Send-gating:** `sendPushToUser` (chokepoint) рано выходит если `!pushNotificationsEnabled`; email уже гейтился; telegram гейтится через `getTelegramChatIdForUser` (isEnabled) — не дублировал.

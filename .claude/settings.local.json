@@ -292,7 +292,15 @@
       "Bash(grep -rn \"from \\\\\"@/\\\\|from \\\\\"\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./src\\\\|toUtcFromLocalDateTime\" prisma/seeds/)",
       "Bash(grep -n \"\\\\\"@/\\\\*\\\\\"\\\\|baseUrl\\\\|paths\" tsconfig.json)",
       "Bash(awk '/reviews?[: ]/{print NR\": \"$0}' src/lib/master/public-profile-view.service.ts)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(awk ' *)",
+      "Bash(grep -v \"studio-settings-page.tsx$\")",
+      "Bash(grep -v \"stories.service.ts$\")",
+      "Bash(grep -v \"focal-image.tsx$\")",
+      "Bash(echo \"dev server starting \\(pid $!\\)\")",
+      "Bash(curl -s --retry 60 --retry-delay 2 --retry-connrefused -o /dev/null -w \"health: %{http_code}\\\\n\" http://localhost:3000/api/health)",
+      "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue; Write-Output \"stopped PID $_\" } } else { Write-Output \"nothing on :3000\" }; Start-Sleep 2)",
+      "Bash(echo \"dev restarting \\(pid $!\\)\")"
     ]
   }
 }

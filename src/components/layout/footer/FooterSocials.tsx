@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { UI_TEXT } from "@/lib/ui/text";
+import { env } from "@/lib/env";
 
 type SocialLink = {
   label: string;
@@ -7,30 +8,38 @@ type SocialLink = {
   icon: ReactNode;
 };
 
+const VK_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+    <path
+      fill="currentColor"
+      d="M4.8 6.5h3.2c.2 0 .4.1.5.3.2.6 1 2.6 2.1 3.9.4.4.6.5.8.5.1 0 .3-.1.4-.3.1-.4.2-1.4.1-2.5 0-.3-.2-.6-.5-.7-.2-.1-.5-.1-.3-.4.1-.2.6-.5 1.9-.5 2 0 2.7.4 2.9.7.3.4.2 1.2.2 2.2 0 .7-.1 1.6.2 1.9.2.2.4.3.6.3.3 0 .6-.2 1-.6 1.2-1.4 2.2-3.6 2.2-3.6.1-.2.3-.4.6-.4h3.1c.3 0 .5.2.4.6-.2.8-1.7 3.4-3.4 5.6-.9 1.2-.9 1.7.1 2.6.7.7 1.6 1.3 2.2 2 .4.5.7 1 .6 1.6 0 .3-.3.5-.6.5h-2.7c-.6 0-.9-.2-1.5-.7-.6-.6-1.3-1.4-2-2.3-.3-.4-.5-.6-.8-.6-.2 0-.4.2-.5.7-.2.6-.2 1.6-.2 2.4 0 .3-.2.5-.5.5h-3.2c-.2 0-.4 0-.6-.1-1.3-.4-2.8-1.5-3.8-3.1-1.6-2.5-2.8-5.6-3-7.8 0-.3.2-.5.5-.5Z"
+    />
+  </svg>
+);
+
+const TELEGRAM_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+    <path
+      fill="currentColor"
+      d="M21.3 4.6c.3-.1.6.1.6.4 0 .1 0 .2-.1.3l-3.2 15.2c-.1.4-.5.6-.9.4l-4.5-3.4-2.4 2.3c-.3.3-.8.1-.8-.3v-3.9l8.4-7.6c.2-.2 0-.5-.3-.4l-10.4 6.2-4.2-1.4c-.4-.1-.4-.6 0-.8Z"
+    />
+  </svg>
+);
+
+// FOOTER-VK: the VK community link is env-driven (NEXT_PUBLIC_VK_COMMUNITY_URL).
+// The old hardcoded `vk.com/beautyhub` was a stale pre-rebrand handle. When the
+// env var is unset we OMIT the VK icon rather than link a wrong handle — set the
+// real МастерРядом community URL in prod env (deploy-checklist «social links»).
+const vkCommunityUrl = env.NEXT_PUBLIC_VK_COMMUNITY_URL?.trim();
+
 const socials: SocialLink[] = [
-  {
-    label: UI_TEXT.footer.socials.vk,
-    href: "https://vk.com/beautyhub",
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-        <path
-          fill="currentColor"
-          d="M4.8 6.5h3.2c.2 0 .4.1.5.3.2.6 1 2.6 2.1 3.9.4.4.6.5.8.5.1 0 .3-.1.4-.3.1-.4.2-1.4.1-2.5 0-.3-.2-.6-.5-.7-.2-.1-.5-.1-.3-.4.1-.2.6-.5 1.9-.5 2 0 2.7.4 2.9.7.3.4.2 1.2.2 2.2 0 .7-.1 1.6.2 1.9.2.2.4.3.6.3.3 0 .6-.2 1-.6 1.2-1.4 2.2-3.6 2.2-3.6.1-.2.3-.4.6-.4h3.1c.3 0 .5.2.4.6-.2.8-1.7 3.4-3.4 5.6-.9 1.2-.9 1.7.1 2.6.7.7 1.6 1.3 2.2 2 .4.5.7 1 .6 1.6 0 .3-.3.5-.6.5h-2.7c-.6 0-.9-.2-1.5-.7-.6-.6-1.3-1.4-2-2.3-.3-.4-.5-.6-.8-.6-.2 0-.4.2-.5.7-.2.6-.2 1.6-.2 2.4 0 .3-.2.5-.5.5h-3.2c-.2 0-.4 0-.6-.1-1.3-.4-2.8-1.5-3.8-3.1-1.6-2.5-2.8-5.6-3-7.8 0-.3.2-.5.5-.5Z"
-        />
-      </svg>
-    ),
-  },
+  ...(vkCommunityUrl
+    ? [{ label: UI_TEXT.footer.socials.vk, href: vkCommunityUrl, icon: VK_ICON }]
+    : []),
   {
     label: UI_TEXT.footer.socials.telegram,
     href: "https://t.me/masterryadom_news",
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-        <path
-          fill="currentColor"
-          d="M21.3 4.6c.3-.1.6.1.6.4 0 .1 0 .2-.1.3l-3.2 15.2c-.1.4-.5.6-.9.4l-4.5-3.4-2.4 2.3c-.3.3-.8.1-.8-.3v-3.9l8.4-7.6c.2-.2 0-.5-.3-.4l-10.4 6.2-4.2-1.4c-.4-.1-.4-.6 0-.8Z"
-        />
-      </svg>
-    ),
+    icon: TELEGRAM_ICON,
   },
 ];
 
