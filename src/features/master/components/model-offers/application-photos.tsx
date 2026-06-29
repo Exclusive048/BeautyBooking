@@ -1,5 +1,5 @@
-/* eslint-disable @next/next/no-img-element */
 import type { ApplicationPhoto } from "@/lib/master/model-offers-view.service";
+import { FocalImage } from "@/components/ui/focal-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.applicationCard;
@@ -11,8 +11,9 @@ type Props = {
 /**
  * Compact photo strip (≤4 thumbnails) on each application card. URLs are
  * pre-signed token-delivery links built server-side. Lightbox is 29b
- * backlog — for now thumbnails are static. Uses raw `<img>` so the focal
- * crop is uniform; private-delivery already takes care of CDN sizing.
+ * backlog — for now thumbnails are static. FIX-21: routed through the
+ * resilient `<FocalImage>` (fixed-size) so a dead token degrades to the
+ * neutral placeholder instead of a broken-image icon.
  */
 export function ApplicationPhotos({ photos }: Props) {
   if (photos.length === 0) {
@@ -29,10 +30,12 @@ export function ApplicationPhotos({ photos }: Props) {
       </p>
       <div className="flex flex-wrap gap-2">
         {photos.slice(0, 4).map((photo) => (
-          <img
+          <FocalImage
             key={photo.id}
             src={photo.url}
             alt=""
+            width={64}
+            height={64}
             className="h-16 w-16 rounded-lg border border-border-subtle bg-bg-input object-cover"
             loading="lazy"
           />

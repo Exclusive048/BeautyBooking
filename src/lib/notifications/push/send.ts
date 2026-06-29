@@ -17,6 +17,16 @@ function getStatusCode(error: unknown): number | null {
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
   if (!isPushEnabled) return;
 
+  // FIX-EXP-NOTIFICATIONS (EXP-027/028): per-user push preference gates ALL
+  // push send paths (delivery / billing / admin-initiated all call this).
+  // A user who turned push off receives nothing, even if a stale subscription
+  // row still exists. Single chokepoint — keep it here, not in callers.
+  const profile = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: { pushNotificationsEnabled: true },
+  });
+  if (!profile?.pushNotificationsEnabled) return;
+
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
     select: { id: true, endpoint: true, p256dh: true, auth: true },

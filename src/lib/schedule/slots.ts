@@ -17,6 +17,12 @@ type BuildSlotsInput = {
   bufferMin: number;
   bookings: BookingRange[];
   now: Date;
+  /**
+   * Grid granularity in minutes (the master's saved `slotStepMin`, e.g. 15/30/60).
+   * FIX-05 (QA-111): previously hardcoded to 30 — the master's setting was inert.
+   * Falls back to 30 only when a caller omits it (callers pass the normalized value).
+   */
+  slotStepMin?: number;
 };
 
 type BlockInterval = { start: number; end: number };
@@ -66,7 +72,7 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
   const nowParts = getLocalTimeParts(input.now, input.timeZone);
   const nowMinutes = nowParts.hour * 60 + nowParts.minute;
 
-  const stepMin = 30;
+  const stepMin = input.slotStepMin ?? 30;
   const slots: AvailabilitySlot[] = [];
   const blockIntervals = buildBlockIntervals(input.dayPlan.breaks);
   const dateForLocal = dateFromLocalDateKey(input.dateKey, input.timeZone);

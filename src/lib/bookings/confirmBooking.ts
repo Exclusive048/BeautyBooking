@@ -1,3 +1,4 @@
+import { Prisma, type BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
@@ -127,55 +128,85 @@ export async function confirmBooking(
   const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
   const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
 
-  const conflicts = await prisma.booking.findMany({
-    where: {
-      ...conflictWhere,
-      id: { not: booking.id },
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null, lt: bufferedEnd },
-      endAtUtc: { not: null, gt: bufferedStart },
-    },
-    select: { id: true, startAtUtc: true, endAtUtc: true },
-    take: 1,
-  });
+  // FIX-R2-01-B: the conflict re-check now runs INSIDE the move transaction
+  // under Serializable isolation, mirroring `createBooking` /
+  // `createSoloMasterBooking`. Previously it ran outside the tx (and the tx
+  // used default isolation), leaving a TOCTOU window: two concurrent
+  // approvals onto overlapping slots could both pass the pre-check and both
+  // commit → double-book. Buffer resolution + the buffered window are pure
+  // config reads + arithmetic, so they stay outside; only the
+  // conflict-detection READ and the WRITE must share one Serializable
+  // snapshot. The exclude-self filter (`id: { not: booking.id }`) is
+  // preserved — a reschedule still holds its OLD slot at approval time, so
+  // the moved booking must not conflict with its own row. `ensureNoConflicts`
+  // is intentionally NOT adopted here: it has no exclude-self, so a shift
+  // overlapping the booking's own current slot would falsely conflict.
+  let updated: { id: string; status: BookingStatus };
+  try {
+    updated = await prisma.$transaction(
+      async (tx) => {
+        const conflicts = await tx.booking.findMany({
+          where: {
+            ...conflictWhere,
+            id: { not: booking.id },
+            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+            startAtUtc: { not: null, lt: bufferedEnd },
+            endAtUtc: { not: null, gt: bufferedStart },
+          },
+          select: { id: true, startAtUtc: true, endAtUtc: true },
+          take: 1,
+        });
 
-  const conflict = conflicts.find((b) => {
-    if (!b.startAtUtc || !b.endAtUtc) return false;
-    const itemStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
-    const itemEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
-    return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
-  });
-  if (conflict) {
-    throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
-  }
+        const conflict = conflicts.find((b) => {
+          if (!b.startAtUtc || !b.endAtUtc) return false;
+          const itemStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
+          const itemEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
+          return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
+        });
+        if (conflict) {
+          throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
+        }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const updated = await tx.booking.update({
-      where: { id: bookingId },
-      data: {
-        status: "CONFIRMED",
-        actionRequiredBy: null,
-        requestedBy: null,
-        changeComment: null,
-        proposedStartAt: null,
-        proposedEndAt: null,
-        ...(appliesRequestedChange
-          ? {
-              startAtUtc,
-              endAtUtc,
-              startAt: startAtUtc,
-              endAt: endAtUtc,
-              slotLabel: startAtUtc.toISOString(),
-              reminder24hSentAt: null,
-              reminder2hSentAt: null,
-            }
-          : {}),
+        return tx.booking.update({
+          where: { id: bookingId },
+          data: {
+            status: "CONFIRMED",
+            actionRequiredBy: null,
+            requestedBy: null,
+            changeComment: null,
+            proposedStartAt: null,
+            proposedEndAt: null,
+            ...(appliesRequestedChange
+              ? {
+                  startAtUtc,
+                  endAtUtc,
+                  startAt: startAtUtc,
+                  endAt: endAtUtc,
+                  slotLabel: startAtUtc.toISOString(),
+                  reminder24hSentAt: null,
+                  reminder2hSentAt: null,
+                }
+              : {}),
+          },
+          select: { id: true, status: true },
+        });
       },
-      select: { id: true, status: true },
-    });
-
-    return updated;
-  });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+  } catch (error) {
+    // A true-concurrent approval race surfaces under Serializable as a
+    // write-conflict / serialization failure (P2034) or a unique race
+    // (P2002) at COMMIT time. Map it to the same clean, retryable 409 the
+    // in-tx predicate check throws — never a 500. Mirrors
+    // `mapPrismaBookingConflict` in `createBooking`.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2034" || error.code === "P2002")
+    ) {
+      throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
+    }
+    throw error;
+  }
 
   try {
     await scheduleBookingReminders(updated.id);

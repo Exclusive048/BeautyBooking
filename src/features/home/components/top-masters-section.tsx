@@ -1,15 +1,15 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { FocalImage } from "@/components/ui/focal-image";
 import { searchCatalog, type CatalogProviderItem } from "@/lib/catalog/catalog.service";
 import { logError } from "@/lib/logging/logger";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type TopMaster = {
-  id: string;
+  // QA-103: no internal CUID — key/link off publicUsername.
   publicUsername: string | null;
   title: string;
   tagline: string | null;
@@ -32,7 +32,6 @@ async function loadTopMasters(): Promise<TopMaster[] | null> {
       .filter((it): it is CatalogProviderItem => it.type === "master")
       .slice(0, 4)
       .map<TopMaster>((m) => ({
-        id: m.id,
         publicUsername: m.publicUsername,
         title: m.title,
         tagline: m.tagline,
@@ -56,7 +55,7 @@ function formatPriceRub(kopeks: number): string {
 
 function MasterCard({ master }: { master: TopMaster }) {
   const profileHref = providerPublicUrl(
-    { id: master.id, publicUsername: master.publicUsername },
+    { id: master.publicUsername ?? "", publicUsername: master.publicUsername },
     "card",
   ) ?? "#";
 
@@ -66,18 +65,16 @@ function MasterCard({ master }: { master: TopMaster }) {
         {/* Cover photo */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
           {master.photo ? (
-            <Image
+            <FocalImage
               src={master.photo}
               alt={master.title}
-              fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
           ) : master.avatarUrl ? (
-            <Image
+            <FocalImage
               src={master.avatarUrl}
               alt={master.title}
-              fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
@@ -134,8 +131,8 @@ export async function TopMastersSection() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {masters.map((master) => (
-          <MasterCard key={master.id} master={master} />
+        {masters.map((master, index) => (
+          <MasterCard key={master.publicUsername ?? index} master={master} />
         ))}
       </div>
 

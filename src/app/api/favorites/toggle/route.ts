@@ -33,7 +33,10 @@ export async function POST(req: Request) {
     }
 
     const body = await parseBody(req, favoriteToggleSchema);
-    const result = await toggleProviderFavorite(user.id, body.providerId);
+    const result = await toggleProviderFavorite(user.id, {
+      providerId: body.providerId,
+      providerUsername: body.providerUsername,
+    });
     return jsonOk(result);
   } catch (error) {
     const appError = toAppError(error);

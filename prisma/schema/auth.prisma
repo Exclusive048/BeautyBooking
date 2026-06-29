@@ -66,6 +66,9 @@ model UserProfile {
 
   bookings Booking[] @relation("BookingClient")
 
+  // PACKAGE-BOOKING-MVP-1: packages this client booked.
+  bookingPackages BookingPackage[] @relation("BookingPackageClient")
+
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
   refreshSessions   RefreshSession[]
@@ -94,6 +97,11 @@ model UserProfile {
   updatedAt DateTime @updatedAt
 
   emailNotificationsEnabled Boolean @default(false)
+
+  // FIX-EXP-NOTIFICATIONS (EXP-027): per-user push on/off preference. Opt-in
+  // (default false) — set true only via an explicit user gesture (the push
+  // toggle requests permission + subscribes). Gates delivery in sendPushToUser.
+  pushNotificationsEnabled Boolean @default(false)
 
   isDeleted Boolean   @default(false)
   deletedAt DateTime?

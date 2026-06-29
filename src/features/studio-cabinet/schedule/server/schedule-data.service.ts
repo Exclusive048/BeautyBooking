@@ -5,12 +5,12 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { bookingToneFromStatus } from "../lib/booking-status-display";
 import {
   DAY_END_HOUR,
   DAY_START_HOUR,
   addUtcDays,
-  isSameUtcDay,
   parseDateKey,
   startOfUtcDay,
   toDateKey,
@@ -258,11 +258,14 @@ async function buildWeekData(
   studioId: string,
   providerId: string,
   dateKey: string,
+  // EXP-020: "today" resolved in the STUDIO's own tz (YYYY-MM-DD), not the UTC
+  // calendar day — so the highlighted column matches the master/client cabinets
+  // (which all key "today" off `toLocalDateKey(now, entityTz)`).
+  studioTodayKey: string,
 ): Promise<ScheduleWeekData> {
   const target = parseDateKey(dateKey);
   const weekStart = startOfUtcWeekMonday(target);
   const weekEnd = addUtcDays(weekStart, 7);
-  const today = startOfUtcDay(new Date());
 
   const [masters, bookings] = await Promise.all([
     prisma.provider.findMany({
@@ -302,7 +305,7 @@ async function buildWeekData(
       dateKey: toDateKey(date),
       weekdayLabel: WEEKDAY_SHORT_RU[index],
       dayNumber: date.getUTCDate(),
-      isToday: isSameUtcDay(date, today),
+      isToday: toDateKey(date) === studioTodayKey,
     };
   });
 
@@ -399,27 +402,33 @@ async function loadServices(
 
 export async function loadStudioScheduleData(input: {
   studioId: string;
-  dateKey: string;
+  // EXP-020: optional — when the URL has no valid `?date`, the default day is
+  // resolved in the STUDIO's tz (not the UTC/host calendar day).
+  dateKey?: string;
   view: "day" | "week";
 }): Promise<StudioScheduleData> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
-    select: { id: true, providerId: true },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
     throw new Error(`Studio not found: ${input.studioId}`);
   }
 
+  const studioTimezone = studio.provider.timezone;
+  const studioTodayKey = toLocalDateKey(new Date(), studioTimezone);
+  const effectiveDateKey = input.dateKey ?? studioTodayKey;
+
   const [day, services, week] = await Promise.all([
-    buildDayData(studio.id, studio.providerId, input.dateKey),
+    buildDayData(studio.id, studio.providerId, effectiveDateKey),
     loadServices(studio.id, studio.providerId),
     input.view === "week"
-      ? buildWeekData(studio.id, studio.providerId, input.dateKey)
+      ? buildWeekData(studio.id, studio.providerId, effectiveDateKey, studioTodayKey)
       : Promise.resolve(null),
   ]);
 
   return {
-    dateKey: input.dateKey,
+    dateKey: effectiveDateKey,
     view: input.view,
     day,
     kpis: computeKpis(day),

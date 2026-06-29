@@ -3,7 +3,8 @@ import { ok, fail } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { createInitialPayment } from "@/lib/payments/yookassa/client";
-import { BILLING_PERIODS, BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
+import { BILLING_PERIODS } from "@/lib/billing/constants";
+import { resolvePlanPrice } from "@/lib/billing/pricing";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { formatTimeBucketUtc, sha256 } from "@/lib/billing/utils";
 import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
@@ -46,11 +47,12 @@ export async function POST(req: Request) {
       tier: true,
       scope: true,
       isActive: true,
+      // FIX-BC-1: fetch ALL active price rows so the shared resolver has both
+      // the exact-period row and the monthly fallback (previously only a
+      // filtered subset was fetched, which silently dropped the 3/6mo fallback
+      // and ignored the stored 12mo row).
       prices: {
-        where: {
-          isActive: true,
-          periodMonths: { in: periodMonths === 12 ? [1, 12] : [periodMonths] },
-        },
+        where: { isActive: true },
         select: { periodMonths: true, priceKopeks: true },
       },
     },
@@ -63,25 +65,19 @@ export async function POST(req: Request) {
     return fail("Тариф не относится к выбранному разделу.", 400, "VALIDATION_ERROR");
   }
 
-  const monthlyPriceKopeks = plan.prices.find((entry) => entry.periodMonths === 1)?.priceKopeks ?? null;
-  const selectedPeriodPriceKopeks =
-    plan.prices.find((entry) => entry.periodMonths === periodMonths)?.priceKopeks ?? null;
-  const priceKopeks =
-    periodMonths === 12 && monthlyPriceKopeks !== null
-      ? Math.floor(monthlyPriceKopeks * 12 * (1 - BILLING_YEARLY_DISCOUNT))
-      : selectedPeriodPriceKopeks ??
-        (monthlyPriceKopeks !== null ? monthlyPriceKopeks * periodMonths : null);
-  if (priceKopeks === null) {
-    return fail("Цена для выбранного срока не найдена.", 404, "NOT_FOUND");
-  }
-
   const now = new Date();
   const existing = await prisma.userSubscription.findUnique({
     where: { userId_scope: { userId: user.id, scope } },
     select: { id: true, status: true, planId: true },
   });
 
-  if (priceKopeks <= 0 || plan.tier === "FREE") {
+  // FIX-R2-05-B: the FREE tier activates without payment — decided by TIER, not by a
+  // 0 price. This runs BEFORE the paid resolver so a FREE plan (which carries no
+  // positive price rows) never 404s on "цена не найдена". Only paid tiers go through
+  // `resolvePlanPrice`, where a 0/non-positive stored period now falls back to
+  // monthly×N (never free) — so an admin cannot give away a paid term by leaving a
+  // period at 0. A genuinely-free plan is the FREE tier, not a 0-priced PRO/PREMIUM.
+  if (plan.tier === "FREE") {
     const subscription = await prisma.userSubscription.upsert({
       where: { userId_scope: { userId: user.id, scope } },
       create: {
@@ -123,6 +119,15 @@ export async function POST(req: Request) {
     return ok({ mode: "free-activated" });
   }
 
+  // FIX-BC-1: one shared resolver — same amount shown in the cabinet and charged at
+  // renewal (no signup↔renewal divergence). FIX-R2-05-B: a 0/non-positive stored row
+  // is treated as "no price" → monthly fallback; a paid period can never resolve to 0,
+  // and the defensive `<= 0` guard ensures a paid checkout never creates a 0 payment.
+  const priceKopeks = resolvePlanPrice(plan.prices, periodMonths);
+  if (priceKopeks === null || priceKopeks <= 0) {
+    return fail("Цена для выбранного срока не найдена.", 404, "NOT_FOUND");
+  }
+
   let subscriptionId = existing?.id ?? null;
   if (!existing) {
     const created = await prisma.userSubscription.create({
@@ -150,15 +155,15 @@ export async function POST(req: Request) {
         cancelAtPeriodEnd: false,
       },
     });
-  } else if (existing.planId !== plan.id) {
-    await prisma.userSubscription.update({
-      where: { id: existing.id },
-      data: {
-        cancelAtPeriodEnd: true,
-        autoRenew: false,
-      },
-    });
   }
+  // FIX-BC-2: do NOT mutate an ACTIVE subscription here when upgrading to a
+  // different plan. Previously this set `cancelAtPeriodEnd:true, autoRenew:false`
+  // BEFORE payment — so an *abandoned* upgrade silently downgraded a paying
+  // customer at period end. The plan switch is now applied only by the success
+  // webhook (`webhook-processor.ts`), which sets the new plan + a fresh period
+  // and restores `autoRenew:true, cancelAtPeriodEnd:false`. An abandoned upgrade
+  // leaves the active paid subscription completely untouched. The payment row is
+  // still typed `UPGRADE` (below) so the webhook knows to switch the plan.
 
   if (!subscriptionId) {
     return fail("Не удалось создать подписку.", 500, "SUBSCRIPTION_ERROR");

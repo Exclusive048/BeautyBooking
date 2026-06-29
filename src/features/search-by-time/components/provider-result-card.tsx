@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { SlotBubblesRow } from "@/features/search-by-time/components/slot-bubbles-row";
 import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 import { FocalImage } from "@/components/ui/focal-image";
@@ -17,12 +17,12 @@ export function ProviderResultCard({ item }: Props) {
   const showNew = item.reviewsCount <= 0;
   const priceText =
     item.service.price > 0
-      ? `${item.service.title} ${UI_TEXT.catalog.priceAllIncluded}: ${moneyRUB(item.service.price)}`
+      ? `${item.service.title} ${UI_TEXT.catalog.priceAllIncluded}: ${moneyRUBFromKopeks(item.service.price)}`
       : item.priceFrom && item.priceFrom > 0
-        ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}`
+        ? `${UI_TEXT.catalog.priceFrom} ${moneyRUBFromKopeks(item.priceFrom)}`
         : UI_TEXT.catalog.priceOnRequest;
 
-  const href = providerPublicUrl({ id: item.providerId, publicUsername: item.publicUsername }, "search-result-card") ?? "#";
+  const href = providerPublicUrl({ id: item.publicUsername, publicUsername: item.publicUsername }, "search-result-card") ?? "#";
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card">
@@ -60,7 +60,7 @@ export function ProviderResultCard({ item }: Props) {
 
         <div className="text-xs text-text-sec">{UI_TEXT.catalog.timeSearch.freeInTime}</div>
         <SlotBubblesRow
-          provider={{ id: item.providerId, publicUsername: item.publicUsername }}
+          provider={{ id: item.publicUsername, publicUsername: item.publicUsername }}
           serviceId={item.service.id}
           slots={item.slots}
         />

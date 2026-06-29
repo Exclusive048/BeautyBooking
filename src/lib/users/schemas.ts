@@ -28,6 +28,7 @@ export const profileUpdateSchema = z.object({
   birthDate: birthDateSchema,
   address: optionalText(240),
   emailNotificationsEnabled: z.boolean().optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
 });
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;

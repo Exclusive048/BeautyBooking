@@ -33,7 +33,10 @@ model Provider {
 
   availableToday Boolean @default(false)
 
-  timezone String @default("Asia/Almaty")
+  // FIX-R2-02-A — platform default aligned with City.timezone default +
+  // env.DEFAULT_TIMEZONE (resolves the long-standing T4 Asia/Almaty mismatch).
+  // The working tz is re-derived from the provider's City on address-save.
+  timezone String @default("Europe/Moscow")
 
   bufferBetweenBookingsMin Int @default(0)
 
@@ -97,6 +100,9 @@ model Provider {
   masterServices MasterService[] @relation("MasterServices")
 
   servicePackages ServicePackage[] @relation("MasterServicePackages")
+
+  // PACKAGE-BOOKING-MVP-1: packages booked at this provider.
+  bookingPackages BookingPackage[]
 
   bookings Booking[]
 

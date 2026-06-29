@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BookingStatus } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { Drawer } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -300,7 +300,7 @@ export function ClientCardDrawer({
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
                 {photos.map((photo) => (
                   <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
-                    <Image src={photo.url} alt="" fill sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
+                    <FocalImage src={photo.url} alt="" sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
                     <Button
                       variant="ghost"
                       size="none"

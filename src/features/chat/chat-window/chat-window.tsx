@@ -15,6 +15,12 @@ type Props = {
   conversationSlug: string;
   viewerTimezone: string;
   onMobileBack?: () => void;
+  /**
+   * FIX-EXP-CHAT-UX (EXP-012): revalidate the conversation list on send. The
+   * sender doesn't receive a CHAT_MESSAGE_RECEIVED for their own message, so
+   * the first message in a new thread would otherwise never reach the list.
+   */
+  onMessageSent?: () => void;
 };
 
 export function ChatWindow({
@@ -22,6 +28,7 @@ export function ChatWindow({
   conversationSlug,
   viewerTimezone,
   onMobileBack,
+  onMessageSent,
 }: Props) {
   const { detail, isLoading, error, refresh, markRead } = useConversationThread({
     perspective,
@@ -89,7 +96,13 @@ export function ChatWindow({
         conversationSlug={conversationSlug}
         canSend={detail.canSend}
         disabledHint={disabledHint}
-        onSent={() => void refresh()}
+        onSent={() => {
+          // Refresh the active thread (right pane) AND revalidate the
+          // conversation list (left pane) — EXP-012: a new thread's first
+          // message must surface in the list without a manual reload.
+          void refresh();
+          onMessageSent?.();
+        }}
       />
     </section>
   );

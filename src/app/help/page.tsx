@@ -11,7 +11,7 @@ import {
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Помощь — МастерРядом",
+  title: "Помощь",
   description:
     "База знаний для мастеров и студий — как настроить профиль, расписание, работу с клиентами.",
   alternates: { canonical: "/help" },

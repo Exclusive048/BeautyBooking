@@ -94,6 +94,9 @@ export async function updateMeProfile(
       ...(input.emailNotificationsEnabled !== undefined
         ? { emailNotificationsEnabled: input.emailNotificationsEnabled }
         : {}),
+      ...(input.pushNotificationsEnabled !== undefined
+        ? { pushNotificationsEnabled: input.pushNotificationsEnabled }
+        : {}),
       ...(birthDate !== undefined ? { birthDate } : {}),
     },
     select: {

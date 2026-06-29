@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { encodePublicId } from "@/lib/public-id";
 
 const { portfolioFindMany, systemConfigFindUnique } = vi.hoisted(() => ({
   portfolioFindMany: vi.fn(),
@@ -72,10 +73,11 @@ describe("feed/stories getActiveStoriesGroups", () => {
     const result = await getActiveStoriesGroups();
 
     expect(result.groups).toHaveLength(2);
-    const m1 = result.groups.find((g) => g.masterId === "m1");
+    // RULE-12-REMAINDER (FIX-15): masterId + item ids are opaque tokens now.
+    const m1 = result.groups.find((g) => g.masterId === encodePublicId("m1"));
     expect(m1).toBeDefined();
     expect(m1!.items).toHaveLength(2);
-    expect(m1!.items.map((i) => i.id)).toEqual(["i1", "i2"]);
+    expect(m1!.items.map((i) => i.id)).toEqual([encodePublicId("i1"), encodePublicId("i2")]);
     expect(m1!.providerName).toBe("Master m1");
     expect(m1!.providerType).toBe("MASTER");
     expect(m1!.username).toBe("m-m1");
@@ -94,7 +96,9 @@ describe("feed/stories getActiveStoriesGroups", () => {
     ]);
 
     const result = await getActiveStoriesGroups();
-    expect(result.groups.map((g) => g.masterId)).toEqual(["m-new", "m-mid", "m-old"]);
+    expect(result.groups.map((g) => g.masterId)).toEqual(
+      ["m-new", "m-mid", "m-old"].map(encodePublicId),
+    );
   });
 
   it("caps items per master at 10", async () => {

@@ -33,13 +33,34 @@ export async function ScheduleSettingsPage() {
     buildScheduleSnapshot(providerId),
     prisma.provider.findUnique({
       where: { id: providerId },
-      select: { publicUsername: true },
+      select: { publicUsername: true, studioId: true },
     }),
     getCurrentPlan(user.id, SubscriptionScope.MASTER),
   ]);
 
   const previewHref = provider?.publicUsername ? `/u/${provider.publicUsername}` : null;
   const hotSlotsAllowed = Boolean(plan.features.hotSlots);
+
+  // QA-114 (FIX-06): a studio master's schedule edits route to a
+  // ScheduleChangeRequest awaiting studio approval — surface that in the editor.
+  // `Provider.studioId` references the studio's *provider* row (name lives there).
+  let studioApproval: { studioName: string; pending: boolean } | null = null;
+  if (provider?.studioId) {
+    const [studioProvider, pendingRequest] = await Promise.all([
+      prisma.provider.findUnique({
+        where: { id: provider.studioId },
+        select: { name: true },
+      }),
+      prisma.scheduleChangeRequest.findFirst({
+        where: { providerId, status: "PENDING" },
+        select: { id: true },
+      }),
+    ]);
+    studioApproval = {
+      studioName: studioProvider?.name ?? "",
+      pending: Boolean(pendingRequest),
+    };
+  }
 
   return (
     <SaveStatusProvider>
@@ -67,7 +88,11 @@ export async function ScheduleSettingsPage() {
       />
 
       <div className="px-4 py-6 md:px-6 lg:px-8">
-        <ScheduleSettingsBody initialSnapshot={snapshot} hotSlotsAllowed={hotSlotsAllowed} />
+        <ScheduleSettingsBody
+          initialSnapshot={snapshot}
+          hotSlotsAllowed={hotSlotsAllowed}
+          studioApproval={studioApproval}
+        />
       </div>
     </SaveStatusProvider>
   );

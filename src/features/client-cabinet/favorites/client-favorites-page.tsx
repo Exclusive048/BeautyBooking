@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FocalImage } from "@/components/ui/focal-image";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
   FavoriteCardDTO,
@@ -306,7 +306,7 @@ function FavMasterCard({
           <Link href={bookingHref} className="flex-1">
             <Button variant="primary" size="sm" className="w-full">
               {data.startingPrice
-                ? `Записаться · ${moneyRUB(data.startingPrice)}`
+                ? `Записаться · ${moneyRUBFromKopeks(data.startingPrice)}`
                 : "Записаться"}
             </Button>
           </Link>

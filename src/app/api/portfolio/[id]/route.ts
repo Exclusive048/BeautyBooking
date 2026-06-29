@@ -2,6 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getPortfolioDetail } from "@/lib/feed/portfolio.service";
+import { decodePublicId } from "@/lib/public-id";
 import { getSessionUser } from "@/lib/auth/session";
 
 type RouteContext = {
@@ -15,7 +16,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
     const user = await getSessionUser();
-    const data = await getPortfolioDetail(id, user?.id);
+    const data = await getPortfolioDetail(decodePublicId(id), user?.id);
     return jsonOk({ item: data });
   } catch (error) {
     const appError = toAppError(error);

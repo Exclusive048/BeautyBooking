@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FocalImage } from "@/components/ui/focal-image";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -64,7 +64,7 @@ export async function StudioDetailsSection({ studioId }: Props) {
               <span>({studio.reviews} {UI_TEXT.publicStudio.reviewsCountLabel})</span>
             </div>
             <div className="text-sm text-text">
-              {UI_TEXT.publicStudio.from} <span className="font-semibold">{moneyRUB(studio.priceFrom)}</span>
+              {UI_TEXT.publicStudio.from} <span className="font-semibold">{moneyRUBFromKopeks(studio.priceFrom)}</span>
             </div>
           </div>
           <div className="text-sm text-text-muted">

@@ -104,6 +104,10 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     if (parsed.data.status !== undefined) {
       data.status = parsed.data.status;
       data.reviewedAt = parsed.data.status === CategoryStatus.PENDING ? null : new Date();
+      // FIX-R2-05-A: keep visibility in lockstep with status on the admin edit path
+      // too — APPROVED ⟹ public, PENDING/REJECTED ⟹ personal-scope/hidden. Without
+      // this, editing a category's status to APPROVED here repeats the publish bug.
+      data.visibleToAll = parsed.data.status === CategoryStatus.APPROVED;
     }
     if (parsed.data.isSystem !== undefined) {
       data.isSystem = parsed.data.isSystem;

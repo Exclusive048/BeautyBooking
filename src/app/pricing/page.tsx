@@ -16,7 +16,7 @@ import { getSessionUserId } from "@/lib/auth/session";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Тарифы — МастерРядом",
+  title: "Тарифы",
   description:
     "Подписка вместо комиссий. Тарифы для мастеров и студий — выберите план под свою нагрузку.",
   alternates: { canonical: "/pricing" },
@@ -87,8 +87,11 @@ export default async function PricingPage({ searchParams }: PageProps) {
       </section>
 
       {/* 3 plan cards — `key={activeTab}` forces a fresh subtree on tab switch
-          so any client-side state (none today, but future-proof) doesn't leak. */}
-      <section key={activeTab} className="mx-auto max-w-[1280px] px-4 py-8">
+          so any client-side state (none today, but future-proof) doesn't leak.
+          FIX-EXP-PRICING-COPY (EXP-015): `id` anchor — the final-CTA "Сравнить
+          тарифы" scrolls here (the real tariff comparison) instead of the
+          unrelated /become-master redirect. */}
+      <section id="pricing-plans" key={activeTab} className="mx-auto max-w-[1280px] px-4 py-8">
         <div className="grid gap-6 md:grid-cols-3">
           <PlanCard plan={deck.free} fallbackCode={`${scopeUpper}_FREE`} />
           <PlanCard plan={deck.pro} fallbackCode={`${scopeUpper}_PRO`} highlighted />
@@ -129,8 +132,10 @@ export default async function PricingPage({ searchParams }: PageProps) {
           <Button asChild variant="primary" size="lg">
             <Link href="/login">{T.finalCta.primary}</Link>
           </Button>
+          {/* FIX-EXP-PRICING-COPY (EXP-015): plain same-page anchor (not next/link)
+              for guaranteed native scroll to the #pricing-plans comparison. */}
           <Button asChild variant="ghost" size="lg">
-            <Link href="/become-master">{T.finalCta.secondary}</Link>
+            <a href="#pricing-plans">{T.finalCta.secondary}</a>
           </Button>
         </div>
       </section>

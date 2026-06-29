@@ -3,6 +3,7 @@ import { HeaderBlock } from "@/components/ui/header-block";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
+import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
 import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
 import { getSessionUser } from "@/lib/auth/session";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
         <TelegramNotificationsSection />
         <VkNotificationsSection />
         <EmailNotificationsSection />
+        <PushNotificationsSection />
       </div>
 
       <DeleteAccountSection phone={user.phone ?? null} />

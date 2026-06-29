@@ -1,3 +1,5 @@
+import { billingUpgradeHref } from "@/lib/billing/upgrade-href";
+
 type NotificationPresentation = {
   showToast: boolean;
   toastDurationMs: number;
@@ -98,7 +100,32 @@ function parseBookingPayload(payload: unknown): { bookingId: string; providerTyp
   return { bookingId: record.bookingId, providerType };
 }
 
+// R2-06-F: billing notifications get an in-app CTA to the scope-correct billing
+// page (the same `billingUpgradeHref` target the push deep-link uses). Scope is
+// read from `payload.billingScope` (persisted by `createBillingNotification`);
+// absent → bare `/cabinet/billing`, which resolves by role (FIX-26), not a dead-end.
+const BILLING_HREF_TYPES = new Set<string>([
+  "BILLING_PAYMENT_SUCCEEDED",
+  "BILLING_PAYMENT_FAILED",
+  "BILLING_PAYMENT_REFUNDED",
+  "BILLING_RENEWAL_CONFIRMATION_REQUIRED",
+  "BILLING_SUBSCRIPTION_CANCELLED",
+  "BILLING_SUBSCRIPTION_CANCELLED_BY_ADMIN",
+  "BILLING_SUBSCRIPTION_EXPIRED",
+  "BILLING_TRIAL_ENDING_SOON",
+  "BILLING_TRIAL_EXPIRED",
+  "BILLING_PLAN_GRANTED_BY_ADMIN",
+  "BILLING_PLAN_EDITED",
+]);
+
 export function resolveNotificationOpenHref(type: string, payload: unknown): string | undefined {
+  if (BILLING_HREF_TYPES.has(type)) {
+    const record = parsePayloadRecord(payload);
+    const scope = record?.billingScope;
+    if (scope === "MASTER" || scope === "STUDIO") return billingUpgradeHref(scope);
+    return "/cabinet/billing";
+  }
+
   const booking = parseBookingPayload(payload);
   if (!booking) return undefined;
 
@@ -106,11 +133,11 @@ export function resolveNotificationOpenHref(type: string, payload: unknown): str
     if (booking.providerType === "STUDIO") {
       return "/cabinet/studio/calendar";
     }
-    return `/cabinet/master/dashboard?bookingId=${booking.bookingId}`;
+    return `/cabinet/master/dashboard?focus=${booking.bookingId}`;
   }
 
   if (BOOKING_CLIENT_HREF_TYPES.has(type)) {
-    return `/cabinet/bookings?bookingId=${booking.bookingId}`;
+    return `/cabinet/bookings?focus=${booking.bookingId}`;
   }
 
   return undefined;

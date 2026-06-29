@@ -5,6 +5,7 @@ import { FooterCTA } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
 import { FooterSocials } from "@/components/layout/footer/FooterSocials";
+import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const APP_ROOT = path.join(process.cwd(), "src", "app");
@@ -31,8 +32,11 @@ function buildFooterLinks() {
 
   const clients: FooterLinkItem[] = [
     { label: UI_TEXT.footer.links.howToBook, href: "/how-to-book" },
-    { label: UI_TEXT.footer.links.popularServices, href: "/catalog?sort=popular" },
-    { label: UI_TEXT.footer.links.mastersNearby, href: "/catalog?available=today" },
+    { label: UI_TEXT.footer.links.popularServices, href: buildCatalogUrl({ sort: "popular" }) },
+    // EXP-030: `availableToday` is a never-computed snapshot (always false →
+    // permanent "0 мастеров рядом" dead-end). Point at the plain catalog,
+    // which is now city-scoped (EXP-021) → genuinely "masters nearby".
+    { label: UI_TEXT.footer.links.mastersNearby, href: buildCatalogUrl({}) },
     { label: UI_TEXT.footer.links.offersForModels, href: "/models" },
   ];
 

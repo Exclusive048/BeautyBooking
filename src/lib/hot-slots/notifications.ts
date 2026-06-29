@@ -104,7 +104,10 @@ export async function notifyHotSlotSubscribers(input: HotSlotNotificationInput):
       body,
       payloadJson: payload,
       bookingId: null,
-      pushUrl: bookingPath ?? "/hot-slots",
+      // R2-06-G: no `/hot-slots` page exists (404). When the provider has no
+      // public username (no booking deep-link), fall back to the catalog
+      // hot-slots filter — the canonical browse surface (the old /hot route).
+      pushUrl: bookingPath ?? "/catalog?hot=true",
       telegramText,
     });
   }

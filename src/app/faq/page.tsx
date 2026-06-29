@@ -7,7 +7,7 @@ import { safeJsonLd } from "@/lib/seo/schema";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Часто спрашивают — МастерРядом",
+  title: "Часто спрашивают",
   description:
     "Ответы на популярные вопросы о МастерРядом: регистрация, отмена записи, тарифы для мастеров, работа в студии, горящие окошки.",
   alternates: { canonical: "/faq" },

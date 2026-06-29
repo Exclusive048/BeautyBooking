@@ -2,6 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getPortfolioDetail } from "@/lib/feed/portfolio.service";
+import { decodePublicId } from "@/lib/public-id";
 import { getSessionUser } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export async function GET(req: Request, { params }: Props) {
   try {
     const { id } = await Promise.resolve(params);
     const user = await getSessionUser();
-    const item = await getPortfolioDetail(id, user?.id);
+    const item = await getPortfolioDetail(decodePublicId(id), user?.id);
     return jsonOk({ item });
   } catch (error) {
     const appError = toAppError(error);

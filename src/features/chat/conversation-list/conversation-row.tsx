@@ -1,8 +1,8 @@
 "use client";
 
 import { Check } from "lucide-react";
-import Image from "next/image";
 import { cn } from "@/lib/cn";
+import { FocalImage } from "@/components/ui/focal-image";
 import { formatRowTime } from "@/features/chat/lib/format-time";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ConversationListItemDto } from "@/features/chat/types";
@@ -45,7 +45,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
 
       <div className="relative shrink-0">
         {partner.avatarUrl ? (
-          <Image
+          <FocalImage
             src={partner.avatarUrl}
             alt={partner.name}
             width={42}

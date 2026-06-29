@@ -1,14 +1,17 @@
 import { Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+// Rule 12 (RULE-12-SWEEP): the public model-offer payload carries NO internal
+// CUIDs. The offer is addressed by `publicCode`, the master linked via
+// `publicUsername`; the apply flow (`/api/model-offers/<code>/apply`) resolves
+// the master + service server-side from the code, so the client never needs
+// the service / master / category ids. (Display uses title/slug only.)
 export type PublicModelOfferCategory = {
-  id: string;
   title: string;
   slug: string | null;
 };
 
 export type PublicModelOfferService = {
-  id: string;
   title: string;
   description: string | null;
   durationMin: number;
@@ -19,7 +22,6 @@ export type PublicModelOfferService = {
 };
 
 export type PublicModelOfferMaster = {
-  id: string;
   name: string;
   publicUsername: string | null;
   avatarUrl: string | null;
@@ -180,7 +182,6 @@ function toPublicItem(input: {
     extraBusyMin: input.extraBusyMin ?? 0,
     requirements: input.requirements ?? [],
     service: {
-      id: service.id,
       title: service.title?.trim() || service.name,
       description: service.description ?? null,
       durationMin: resolveOfferDuration({
@@ -191,14 +192,12 @@ function toPublicItem(input: {
       originalPrice: Number.isFinite(originalPrice) ? originalPrice : null,
       category: service.globalCategory
         ? {
-            id: service.globalCategory.id,
             title: service.globalCategory.name,
             slug: service.globalCategory.slug ?? null,
           }
         : null,
     },
     master: {
-      id: input.master.id,
       name: input.master.name,
       publicUsername: input.master.publicUsername ?? null,
       avatarUrl: input.master.avatarUrl ?? null,

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 import { AccountType, MembershipStatus, ProviderType } from "@prisma/client";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
@@ -152,6 +153,8 @@ export async function POST(req: Request) {
       district: "District not set",
       categories: [],
       availableToday: false,
+      // FIX-R2-02-A — platform default tz instead of the stale Asia/Almaty.
+      timezone: env.DEFAULT_TIMEZONE,
     },
     include: providerWithServicesInclude,
   });

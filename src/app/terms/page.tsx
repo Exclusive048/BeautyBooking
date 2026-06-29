@@ -4,7 +4,7 @@ import { TermsContent, TERMS_SECTIONS } from "@/features/legal/content/terms-con
 import { getLegalDraftMode } from "@/lib/legal/config";
 
 export const metadata: Metadata = {
-  title: "Пользовательское соглашение — МастерРядом",
+  title: "Пользовательское соглашение",
   description:
     "Пользовательское соглашение МастерРядом: правила использования сервиса, оплата, ответственность сторон.",
   alternates: { canonical: "/terms" },

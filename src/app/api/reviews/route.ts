@@ -6,6 +6,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { createReviewSchema, listReviewsQuerySchema } from "@/lib/reviews/schemas";
 import { createReview, listReviews } from "@/lib/reviews/service";
 import { loadReviewWithRelations, notifyReviewLeft } from "@/lib/notifications/review-notifications";
+import { decodePublicId } from "@/lib/public-id";
 import { parseBody, parseQuery } from "@/lib/validation";
 import type { ApiFieldErrors } from "@/lib/api/contracts";
 
@@ -70,7 +71,11 @@ export async function POST(req: Request) {
       privateTagIds: body.privateTagIds,
     });
     try {
-      const fullReview = await loadReviewWithRelations(review.id);
+      // R2-06-E (FIX-18 tail): `review.id` from createReview is the opaque
+      // public token; decode it before the raw `findFirst` lookup (raw cuids
+      // pass through) so the REVIEW_LEFT notification actually fires — it was
+      // silently a no-op because the encoded id never matched a raw row.
+      const fullReview = await loadReviewWithRelations(decodePublicId(review.id));
       if (fullReview) {
         await notifyReviewLeft(fullReview);
       }

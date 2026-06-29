@@ -1,5 +1,6 @@
 import { AccountType, MembershipStatus, ProviderType, StudioRole, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 import { addRoleToUser } from "@/lib/auth/roles";
 import { ensureUniqueUsername, generateDefaultUsername } from "@/lib/publicUsername";
 import { ensureFreeSubscription } from "@/lib/billing/ensure-free-subscription";
@@ -146,6 +147,10 @@ export async function createMasterProfile(
         district: "",
         categories: [],
         availableToday: false,
+        // FIX-R2-02-A — start on the platform default (Europe/Moscow), not the
+        // stale Asia/Almaty schema default. Re-derived from the city on the
+        // first address-save.
+        timezone: env.DEFAULT_TIMEZONE,
         publicUsername: uniqueUsername,
         publicUsernameUpdatedAt: new Date(),
       },
@@ -228,6 +233,9 @@ export async function createStudioProfile(
         district: "",
         categories: [],
         availableToday: false,
+        // FIX-R2-02-A — platform default (Europe/Moscow), re-derived from the
+        // city on the first address-save.
+        timezone: env.DEFAULT_TIMEZONE,
         publicUsername: await ensureUniqueUsername(
           prisma,
           generateDefaultUsername({

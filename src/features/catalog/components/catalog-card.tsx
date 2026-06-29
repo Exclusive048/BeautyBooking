@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Heart, Star } from "lucide-react";
 import { FocalImage } from "@/components/ui/focal-image";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
@@ -18,7 +18,8 @@ import {
 
 type CatalogCardItem = {
   type: "master" | "studio";
-  id: string;
+  // QA-103: public search no longer carries the internal CUID — favorites,
+  // profile link and the hue placeholder all key off publicUsername.
   publicUsername: string | null;
   title: string;
   tagline: string | null;
@@ -65,8 +66,8 @@ const TC = UI_TEXT.catalog2.card;
  *   - Rating row with star
  *   - Footer: "от X ₽" + slot indicator with green dot
  *
- * Hue placeholder is deterministic via `hueFromId(item.id)` — masters without
- * portfolio still get a stable, distinctive card colour across renders.
+ * Hue placeholder is deterministic via `hueFromId(item.publicUsername)` — masters
+ * without portfolio still get a stable, distinctive card colour across renders.
  */
 export function CatalogCard({
   item,
@@ -102,7 +103,7 @@ export function CatalogCard({
       const res = await fetch("/api/favorites/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ providerId: item.id }),
+        body: JSON.stringify({ providerUsername: item.publicUsername }),
       });
       const json = (await res.json().catch(() => null)) as
         | ApiResponse<{ favorited: boolean }>
@@ -126,15 +127,15 @@ export function CatalogCard({
       setFavoritePending(false);
     }
   }
-  const href = providerPublicUrl({ id: item.id, publicUsername: item.publicUsername }, "catalog-card") ?? "#";
+  const href = providerPublicUrl({ id: item.publicUsername ?? "", publicUsername: item.publicUsername }, "catalog-card") ?? "#";
   const bookingHref = item.publicUsername ? `/u/${item.publicUsername}/booking` : "#";
 
   const hasServiceQuery = serviceQuery.trim().length > 0;
   const priceText =
     hasServiceQuery && item.primaryService && item.primaryService.price > 0
-      ? moneyRUB(item.primaryService.price)
+      ? moneyRUBFromKopeks(item.primaryService.price)
       : item.minPrice && item.minPrice > 0
-        ? moneyRUB(item.minPrice)
+        ? moneyRUBFromKopeks(item.minPrice)
         : "—";
 
   // CATALOG-ENHANCEMENTS-A: availability is now precision-aware. The
@@ -153,7 +154,7 @@ export function CatalogCard({
 
   const isNew = item.reviewsCount <= 0;
   const photo = item.photos[0] ?? null;
-  const hue = hueFromId(item.id);
+  const hue = hueFromId(item.publicUsername ?? item.title);
 
   return (
     <article

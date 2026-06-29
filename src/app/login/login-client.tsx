@@ -25,6 +25,10 @@ type LoginClientProps = {
   heroImageUrl: string | null;
   emailEnabled?: boolean;
   stats?: PublicStats | null;
+  // QA-001: resolved server-side in page.tsx and passed down so the social
+  // buttons render the same branch on server + client (no hydration mismatch).
+  telegramBotUsername?: string;
+  vkEnabled?: boolean;
 };
 
 function normalizePhone(input: string): string {
@@ -192,9 +196,25 @@ const stepVariants = {
 
 // ---------- Main component ----------
 
-export default function LoginClient({ heroImageUrl, emailEnabled = false, stats = null }: LoginClientProps) {
+export default function LoginClient({
+  heroImageUrl,
+  emailEnabled = false,
+  stats = null,
+  telegramBotUsername,
+  vkEnabled,
+}: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
+  // FIX-23: the Telegram widget now uses redirect mode (`data-auth-url`) to
+  // avoid the CSP `unsafe-eval`; auth failures bounce back here with
+  // `?error=telegram`, surfaced once on mount via the initial error state.
+  const initialTelegramError = useMemo(
+    () =>
+      (searchParams.get("error") ?? "").startsWith("telegram")
+        ? UI_TEXT.auth.telegram.loginFailed
+        : null,
+    [searchParams],
+  );
   const reduce = useReducedMotion();
   const panelAnim = reduce ? undefined : panelVariants;
   const panelItemAnim = reduce ? undefined : panelItemVariants;
@@ -206,7 +226,7 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"input" | "code">("input");
   const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
+  const [errorText, setErrorText] = useState<string | null>(initialTelegramError);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);
@@ -755,8 +775,8 @@ export default function LoginClient({ heroImageUrl, emailEnabled = false, stats 
 
             {/* Social login — 1-col on small, 2-col from sm: */}
             <div className="grid gap-2.5 sm:grid-cols-2">
-              <TelegramLoginButton showConfigError={false} />
-              <VkLoginButton />
+              <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
+              <VkLoginButton enabled={vkEnabled} />
             </div>
 
             {/* Bottom hint */}

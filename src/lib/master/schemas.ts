@@ -37,6 +37,9 @@ export const updateMasterProfileSchema = z.object({
   // 31a: free-form district label (район/микрорайон) — display-only on
   // public surfaces, doesn't affect geocoding. Empty string clears it.
   district: z.string().trim().max(120).optional(),
+  // FIX-R2-02-A: explicit IANA timezone override from the cabinet selector.
+  // Defaults to the city-derived value but the master can override it.
+  timezone: z.string().trim().min(3).max(64).optional(),
 });
 
 export const upsertMasterServicesSchema = z.object({

@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/api/errors";
+import { getDayOfWeek, getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 
 /**
  * BOOKING-WIDGET-A — Provider policy enforcement.
@@ -209,4 +210,56 @@ export function assertWithinMasterWorkHours(input: {
       "OUTSIDE_WORK_HOURS",
     );
   }
+}
+
+/**
+ * FIX-R2-04-B — derive the salon-local "parts" of a real-UTC booking
+ * instant for the studio work-hours guard.
+ *
+ * The defect this closes: `moveStudioBooking` / `createStudioBooking`
+ * read `getUTCHours()` / `getUTCDay()` / a UTC-derived dateKey on a
+ * **real-UTC** instant (the move dialog + storage both send/keep
+ * real-UTC — DB-verified: a Vision booking `15:00 UTC` = `10:00
+ * Asia/Almaty`). But the master work-hours window (`startLocal` /
+ * `endLocal` strings like "10:00") is **salon-local**, so the hour,
+ * weekday, AND override-date must all be read in the salon timezone,
+ * NOT in UTC. Reading them in UTC offsets the whole comparison by the
+ * salon's UTC offset → wrong window for every non-UTC (RU/CIS) studio.
+ *
+ * This mirrors how the slot engine (`schedule/slots.ts`,
+ * `schedule/engine-context.ts`) and the booking-label formatters
+ * (FIX-04/11/20/22) read local parts: via the same `getLocalTimeParts`
+ * / `getDayOfWeek` / `toLocalDateKey` helpers, against the master
+ * provider's own `timezone`. Using the SAME helpers + SAME tz as the
+ * engine keeps the guard and slot-gen in agreement — a slot the engine
+ * offered passes the guard; a time the engine would not offer fails it.
+ *
+ * - `weekday` (0=Sun..6=Sat) matches `WeeklyScheduleDay.weekday` and the
+ *   engine's local-weekday resolution.
+ * - `dateKey` matches the engine's `toLocalDateKey(override.date, tz)`
+ *   bucketing for the `ScheduleOverride` lookup (overrides are stored at
+ *   UTC-midnight of the local date key, so the local dateKey resolves
+ *   the right override row).
+ *
+ * Pure (Intl only, no Prisma) so the rule is unit-tested exhaustively.
+ */
+export type SalonLocalParts = {
+  /** Minutes-from-midnight in salon-local time (hour*60 + minute). */
+  minutesFromMidnight: number;
+  /** Weekday in salon-local time, 0 = Sun .. 6 = Sat. */
+  weekday: number;
+  /** YYYY-MM-DD salon-local date key for the ScheduleOverride lookup. */
+  dateKey: string;
+};
+
+export function resolveSalonLocalParts(
+  instantUtc: Date,
+  timeZone: string,
+): SalonLocalParts {
+  const { hour, minute } = getLocalTimeParts(instantUtc, timeZone);
+  return {
+    minutesFromMidnight: hour * 60 + minute,
+    weekday: getDayOfWeek(instantUtc, timeZone),
+    dateKey: toLocalDateKey(instantUtc, timeZone),
+  };
 }

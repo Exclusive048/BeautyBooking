@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { buildTimezoneOptions } from "@/lib/ui/timezone-options";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioGeneralData } from "../lib/types";
 
@@ -27,13 +29,17 @@ export function GeneralForm({ data }: Props) {
   const [name, setName] = useState(data.name);
   const [tagline, setTagline] = useState(data.tagline);
   const [description, setDescription] = useState(data.description ?? "");
+  const [timezone, setTimezone] = useState(data.timezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const timezoneOptions = buildTimezoneOptions(data.timezone);
 
   const dirty =
     name !== data.name ||
     tagline !== data.tagline ||
-    (description ?? "") !== (data.description ?? "");
+    (description ?? "") !== (data.description ?? "") ||
+    timezone !== data.timezone;
 
   const handleSubmit = async () => {
     if (!dirty || submitting) return;
@@ -47,6 +53,7 @@ export function GeneralForm({ data }: Props) {
           name: name.trim(),
           tagline: tagline.trim(),
           description: description.trim() || null,
+          timezone,
         }),
       });
       if (!response.ok) {
@@ -68,6 +75,7 @@ export function GeneralForm({ data }: Props) {
     setName(data.name);
     setTagline(data.tagline);
     setDescription(data.description ?? "");
+    setTimezone(data.timezone);
     setError(null);
   };
 
@@ -89,6 +97,17 @@ export function GeneralForm({ data }: Props) {
           rows={4}
           maxLength={2000}
         />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-text-main">{T.timezoneLabel}</span>
+        <Select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+          {timezoneOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+        <span className="mt-1 block text-[11px] text-text-sec">{T.timezoneHint}</span>
       </label>
       {error ? (
         <div

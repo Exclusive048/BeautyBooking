@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { reviewIdParamSchema } from "@/lib/reviews/schemas";
+import { decodePublicId } from "@/lib/public-id";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 type RouteContext = {
@@ -46,7 +47,8 @@ export async function POST(req: Request, ctx: RouteContext) {
     // filter — admin can still load deleted reviews via the admin
     // module, but AI suggest-reply should never operate on them.
     const review = await prisma.review.findFirst({
-      where: { id: parsedParams.data.id, ...ACTIVE_REVIEW_FILTER },
+      // RULE-12-REVIEWS (FIX-18): decode opaque token; raw cuids pass through.
+      where: { id: decodePublicId(parsedParams.data.id), ...ACTIVE_REVIEW_FILTER },
       select: {
         id: true,
         text: true,

@@ -31,10 +31,24 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
       proposedEndAt: true,
       requestedBy: true,
       actionRequiredBy: true,
+      bookingPackageId: true,
       provider: { select: { cancellationDeadlineHours: true } },
     },
   });
   if (!booking) throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+
+  // PACKAGE-BOOKING-MVP-1: a package child must NOT be cancelled alone —
+  // that would leave the discounted siblings as a broken partial package.
+  // The whole package is cancelled atomically via cancelSoloPackageBooking
+  // (POST /api/bookings/package/[id]/cancel). Block the lone-child path.
+  if (booking.bookingPackageId) {
+    throw new AppError(
+      "Этот пакет отменяется целиком.",
+      409,
+      "PACKAGE_CANCEL_WHOLE",
+      { bookingPackageId: booking.bookingPackageId },
+    );
+  }
 
   const runtimeStatus = resolveBookingRuntimeStatus({
     status: booking.status,

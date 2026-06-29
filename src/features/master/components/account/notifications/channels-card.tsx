@@ -1,19 +1,21 @@
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
+import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.notifications;
+const FG = UI_TEXT.billing.featureGate;
 
 /**
- * Wraps the three channel-specific sections (Telegram / VK / Email)
- * into a single visually-cohesive card. Each child component is
- * battle-tested in `/cabinet/(user)/settings` — we just frame them.
+ * Wraps the channel-specific sections (Telegram / VK / Email / Push) into a
+ * single visually-cohesive card. Each child component is shared with
+ * `/cabinet/(user)/settings` — we just frame them.
  *
- * Push is **not** surfaced here yet: the existing sections cover the
- * 3 channels masters care about most, and a dedicated push UI lives
- * in the `<NotificationsBell>` permission flow already. A unified
- * push toggle is on the BACKLOG with the per-event grid.
+ * FIX-EXP-NOTIFICATIONS (EXP-027): the push toggle is now surfaced here too.
+ * It replaces the removed gesture-less on-load permission request — masters
+ * (like clients) enable push via this explicit, gesture-gated control.
  */
 export function ChannelsCard() {
   return (
@@ -23,9 +25,24 @@ export function ChannelsCard() {
         <p className="mt-1 text-sm text-text-sec">{T.channelsSubtitle}</p>
       </header>
       <div className="space-y-3">
-        <TelegramNotificationsSection embedded />
-        <VkNotificationsSection embedded />
+        <FeatureGate
+          feature="tgNotifications"
+          scope="MASTER"
+          variant="inline"
+          description={FG.telegramLocked}
+        >
+          <TelegramNotificationsSection embedded />
+        </FeatureGate>
+        <FeatureGate
+          feature="vkNotifications"
+          scope="MASTER"
+          variant="inline"
+          description={FG.vkLocked}
+        >
+          <VkNotificationsSection embedded />
+        </FeatureGate>
         <EmailNotificationsSection />
+        <PushNotificationsSection />
       </div>
     </section>
   );

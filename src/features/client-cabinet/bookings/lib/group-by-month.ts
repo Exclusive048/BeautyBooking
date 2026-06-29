@@ -21,6 +21,25 @@ export type MonthGroup = {
   bookings: ClientBookingDTO[];
 };
 
+// QA-107/FIX-22: bucket by the SALON-local month (entity tz), not the viewer's
+// host tz — otherwise a late-evening booking near a month boundary lands in the
+// wrong month for a cross-zone viewer. Returns {year, monthIndex0} in salon tz.
+function salonYearMonth(iso: string, timeZone: string): { year: number; month0: number } {
+  const date = new Date(iso);
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+    }).formatToParts(date);
+    const year = Number(parts.find((p) => p.type === "year")?.value ?? date.getFullYear());
+    const month0 = Number(parts.find((p) => p.type === "month")?.value ?? date.getMonth() + 1) - 1;
+    return { year, month0 };
+  } catch {
+    return { year: date.getFullYear(), month0: date.getMonth() };
+  }
+}
+
 /**
  * Group bookings by their YYYY-MM bucket while preserving incoming order.
  * Bookings without `startAtUtc` (rare — only NEW with no time yet) fall
@@ -35,9 +54,9 @@ export function groupBookingsByMonth(bookings: ClientBookingDTO[]): MonthGroup[]
     let key: string;
     let label: string;
     if (b.startAtUtc) {
-      const d = new Date(b.startAtUtc);
-      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      label = `${MONTH_NAMES_RU[d.getMonth()]} ${d.getFullYear()}`;
+      const { year, month0 } = salonYearMonth(b.startAtUtc, b.provider.timezone);
+      key = `${year}-${String(month0 + 1).padStart(2, "0")}`;
+      label = `${MONTH_NAMES_RU[month0]} ${year}`;
     } else {
       key = undatedKey;
       label = "Без даты";

@@ -40,6 +40,11 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
         services={view.provider.services}
         bundles={view.bundles}
         initialServiceId={initialServiceId}
+        providerId={view.provider.id}
+        providerTimezone={view.provider.timezone}
+        // PACKAGE-BOOKING-MVP-1: solo master only (studio masters book via
+        // the studio flow). Gates the "Записаться на пакет" CTA.
+        packageBookable={view.provider.type === "MASTER" && !view.provider.studioId}
       />
     </div>
   );

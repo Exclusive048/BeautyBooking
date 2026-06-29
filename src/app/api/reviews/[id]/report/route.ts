@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { reviewIdParamSchema, reviewReportSchema } from "@/lib/reviews/schemas";
 import { reportReview } from "@/lib/reviews/service";
+import { decodePublicId } from "@/lib/public-id";
 import { parseBody } from "@/lib/validation";
 
 type RouteContext = {
@@ -27,7 +28,8 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     const body = await parseBody(req, reviewReportSchema);
     const result = await reportReview({
-      reviewId: parsedParams.data.id,
+      // RULE-12-REVIEWS (FIX-18): decode opaque token; raw cuids pass through.
+      reviewId: decodePublicId(parsedParams.data.id),
       currentUserId: user.id,
       reason: body.reason,
       comment: body.comment,

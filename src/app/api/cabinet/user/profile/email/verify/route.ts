@@ -11,6 +11,7 @@ import {
   registerOtpEmailVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
+import { maskEmail } from "@/lib/logging/masking";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
 
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
 
     logInfo("Cabinet email verify completed", {
       userId: user.id,
-      email: normalizedEmail,
+      email: maskEmail(normalizedEmail),
     });
 
     return jsonOk({ verified: true, verifiedAt: now.toISOString() });

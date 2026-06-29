@@ -165,7 +165,8 @@ function toCenterItem(event: NotificationEvent): NotificationCenterNotificationI
       return `/cabinet/model-applications?applicationId=${payload.applicationId}`;
     }
     if (typeof payload.offerId === "string") {
-      return `/cabinet/master/model-offers?offerId=${payload.offerId}`;
+      // R2-06-C: the model-offers page reads `?filterOffer=`, not `?offerId=`.
+      return `/cabinet/master/model-offers?filterOffer=${payload.offerId}`;
     }
     return resolveNotificationOpenHref(event.type, payload);
   };

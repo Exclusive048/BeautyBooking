@@ -9,6 +9,7 @@ import { ExceptionsTab } from "./exceptions-tab";
 import { HoursTab } from "./hours-tab";
 import { RulesTab } from "./rules-tab";
 import { VisibilityTab } from "./visibility-tab";
+import { StudioApprovalBanner } from "./studio-approval-banner";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
@@ -28,6 +29,11 @@ type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
   /** Forwarded to the Rules tab so it can render the locked Hot Slots state. */
   hotSlotsAllowed: boolean;
+  /**
+   * QA-114 (FIX-06): studio-approval context for a studio master. `null` for
+   * independent masters (no banner shown).
+   */
+  studioApproval: { studioName: string; pending: boolean } | null;
 };
 
 /**
@@ -36,7 +42,7 @@ type Props = {
  * tabs (Hours, Exceptions, Breaks, Rules, Visibility) render real content
  * after 25-SETTINGS-C.
  */
-export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed }: Props) {
+export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioApproval }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,6 +63,13 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed }: Props
 
   return (
     <div className="space-y-6">
+      {studioApproval ? (
+        <StudioApprovalBanner
+          studioName={studioApproval.studioName}
+          initialPending={studioApproval.pending}
+        />
+      ) : null}
+
       <Tabs items={TAB_ITEMS} value={active} onChange={setTab} />
 
       {active === "hours" ? (

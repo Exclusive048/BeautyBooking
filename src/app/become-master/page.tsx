@@ -16,7 +16,7 @@ import {
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Стать мастером — МастерРядом",
+  title: "Стать мастером",
   description:
     "Подключите кабинет на МастерРядом — без комиссий с услуг. CRM, расписание, аналитика и поток клиентов из каталога.",
   alternates: { canonical: "/become-master" },

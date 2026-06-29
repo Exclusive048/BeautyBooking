@@ -1,46 +1,10 @@
 import { ok, fail } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
-import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
-import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
+import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
-
-type EffectiveSchedule = {
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  fixedSlotSet: Set<string>;
-};
-
-async function resolveDuration(masterId: string, serviceId: string) {
-  return resolveServiceDuration(masterId, serviceId);
-}
-
-function normalizeFixedSlotTime(value: string): string | null {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
-    return null;
-  }
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function normalizeFixedSlotTimes(values: string[]): string[] {
-  const unique = new Set<string>();
-  for (const value of values) {
-    const normalized = normalizeFixedSlotTime(value);
-    if (normalized) unique.add(normalized);
-  }
-  return Array.from(unique).sort((left, right) => left.localeCompare(right));
-}
-
-function dayIndexFromDateKey(dateKey: string): number {
-  const day = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
-  return day === 0 ? 6 : day - 1;
-}
 
 export async function GET(
   req: Request,
@@ -63,117 +27,38 @@ export async function GET(
       return fail("Invalid limit", 400, "LIMIT_INVALID");
     }
 
-    const duration = await resolveDuration(p.id, serviceId);
-    if (!duration.ok) return fail(duration.message, duration.status, duration.code);
-
-    const result = await listAvailabilitySlotsPaginated(p.id, serviceId, duration.data, {
-      fromKey,
-      toKeyExclusive: toKey || undefined,
-      limit,
-    });
-    if (!result.ok) return fail(result.message, result.status, result.code);
-
     const provider = await prisma.provider.findUnique({
       where: { id: p.id },
-      select: { id: true, timezone: true },
+      // EXP-025: `minBookingHoursAhead` is required so the shared
+      // bookable-window primitive can drop too-soon slots — the cutoff
+      // this endpoint previously skipped (vs `/slots`).
+      select: { id: true, timezone: true, minBookingHoursAhead: true },
     });
     if (!provider) return fail("Master not found", 404, "MASTER_NOT_FOUND");
 
-    const rangeFromUtc = dateFromLocalDateKey(result.data.meta.fromDate, provider.timezone, 0, 0);
-    const rangeToExclusiveUtc = dateFromLocalDateKey(result.data.meta.toDateExclusive, provider.timezone, 0, 0);
+    const duration = await resolveServiceDuration(p.id, serviceId);
+    if (!duration.ok) return fail(duration.message, duration.status, duration.code);
 
-    const [weeklyConfig, overrides] = await Promise.all([
-      prisma.weeklyScheduleConfig.findUnique({
-        where: { providerId: provider.id },
-        select: {
-          days: {
-            select: {
-              weekday: true,
-              isActive: true,
-              scheduleMode: true,
-              fixedSlotTimes: true,
-              templateId: true,
-            },
-          },
-        },
-      }),
-      prisma.scheduleOverride.findMany({
-        where: { providerId: provider.id, date: { gte: rangeFromUtc, lt: rangeToExclusiveUtc } },
-        select: {
-          date: true,
-          isDayOff: true,
-          isWorkday: true,
-          scheduleMode: true,
-          fixedSlotTimes: true,
-        },
-        orderBy: { date: "asc" },
-      }),
-    ]);
+    // EXP-026: align `to` to the inclusive contract `/slots` documents
+    // (callers today never send `to`; this just stops the two endpoints
+    // disagreeing on the off-by-one). Convert inclusive `to` → exclusive.
+    const toKeyExclusive = toKey ? addDaysToDateKey(toKey, 1) : undefined;
 
-    const weekByDay = new Map<number, EffectiveSchedule>();
-    for (const day of weeklyConfig?.days ?? []) {
-      weekByDay.set(day.weekday, {
-        isWorkday: Boolean(day.isActive && day.templateId),
-        scheduleMode: day.scheduleMode ?? "FLEXIBLE",
-        fixedSlotSet: new Set(normalizeFixedSlotTimes(day.fixedSlotTimes ?? [])),
-      });
-    }
-
-    const exceptionsByDate = new Map<string, EffectiveSchedule>();
-    for (const row of overrides) {
-      const dateKey = toLocalDateKey(row.date, provider.timezone);
-      const fixedTimes = normalizeFixedSlotTimes(row.fixedSlotTimes ?? []);
-      exceptionsByDate.set(dateKey, {
-        isWorkday: row.isWorkday ?? !row.isDayOff,
-        scheduleMode: row.scheduleMode ?? (fixedTimes.length > 0 ? "FIXED" : "FLEXIBLE"),
-        fixedSlotSet: new Set(fixedTimes),
-      });
-    }
-
-    const effectiveCache = new Map<string, EffectiveSchedule>();
-    const getEffective = (dateKey: string): EffectiveSchedule => {
-      const cached = effectiveCache.get(dateKey);
-      if (cached) return cached;
-
-      const fromException = exceptionsByDate.get(dateKey);
-      if (fromException) {
-        effectiveCache.set(dateKey, fromException);
-        return fromException;
-      }
-
-      const weekday = dayIndexFromDateKey(dateKey) + 1;
-      const fromWeek = weekByDay.get(weekday);
-      if (fromWeek) {
-        effectiveCache.set(dateKey, fromWeek);
-        return fromWeek;
-      }
-
-      const fallback: EffectiveSchedule = {
-        isWorkday: true,
-        scheduleMode: "FLEXIBLE",
-        fixedSlotSet: new Set<string>(),
-      };
-      effectiveCache.set(dateKey, fallback);
-      return fallback;
-    };
-
-    const filtered = result.data.slots.filter((slot) => {
-      const startsAt = slot.startAtUtc instanceof Date ? slot.startAtUtc : new Date(slot.startAtUtc);
-      if (Number.isNaN(startsAt.getTime())) return false;
-
-      const dateKey = toLocalDateKey(startsAt, provider.timezone);
-      const effective = getEffective(dateKey);
-
-      if (!effective.isWorkday) return false;
-      if (effective.scheduleMode !== "FIXED") return true;
-      if (effective.fixedSlotSet.size === 0) return false;
-
-      const { hour, minute } = getLocalTimeParts(startsAt, provider.timezone);
-      const localTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-      return effective.fixedSlotSet.has(localTime);
+    // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
+    // applied identically. A slot returned here is one `assertBookingWindow`
+    // will accept at submit.
+    const bookable = await listBookableSlots({
+      provider,
+      serviceId,
+      durationMinutes: duration.data,
+      fromKey,
+      toKeyExclusive,
+      limit,
+      now: new Date(),
     });
+    if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
 
-    return ok({ slots: filtered, meta: result.data.meta });
+    return ok({ slots: bookable.slots, meta: bookable.meta });
   } catch (error) {
     const appError = toAppError(error);
     const requestId = getRequestId(req);

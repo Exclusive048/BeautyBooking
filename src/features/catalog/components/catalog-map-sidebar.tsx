@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import { FocalImage } from "@/components/ui/focal-image";
@@ -76,7 +76,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                   <div className="text-xs text-muted-foreground">{formatRating(item.ratingAvg)}</div>
                 </div>
                 <div className="text-right text-xs text-foreground">
-                  <div>{item.priceFrom && item.priceFrom > 0 ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}` : UI_TEXT.catalog.priceOnRequest}</div>
+                  <div>{item.priceFrom && item.priceFrom > 0 ? `${UI_TEXT.catalog.priceFrom} ${moneyRUBFromKopeks(item.priceFrom)}` : UI_TEXT.catalog.priceOnRequest}</div>
                   <div className="text-muted-foreground">→</div>
                 </div>
               </div>
@@ -137,7 +137,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                   <div className="text-xs text-muted-foreground">{formatRating(item.ratingAvg)}</div>
                 </div>
                 <div className="text-right text-xs text-foreground">
-                  <div>{item.priceFrom && item.priceFrom > 0 ? `${UI_TEXT.catalog.priceFrom} ${moneyRUB(item.priceFrom)}` : UI_TEXT.catalog.priceOnRequest}</div>
+                  <div>{item.priceFrom && item.priceFrom > 0 ? `${UI_TEXT.catalog.priceFrom} ${moneyRUBFromKopeks(item.priceFrom)}` : UI_TEXT.catalog.priceOnRequest}</div>
                   <div className="text-muted-foreground">→</div>
                 </div>
               </div>

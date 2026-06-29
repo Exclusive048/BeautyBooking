@@ -108,7 +108,8 @@ function resolveModelOpenHref(type: NotificationCenterNotificationItem["type"], 
     }
   }
   if (typeof record.offerId === "string" && record.offerId.trim().length > 0) {
-    return `/cabinet/master/model-offers?offerId=${record.offerId}`;
+    // R2-06-C: the model-offers page reads `?filterOffer=`, not `?offerId=`.
+    return `/cabinet/master/model-offers?filterOffer=${record.offerId}`;
   }
   return undefined;
 }
@@ -119,7 +120,7 @@ function resolveChatOpenHref(type: NotificationCenterNotificationItem["type"], p
   if (!payload || typeof payload !== "object") return undefined;
   const record = payload as { bookingId?: unknown; senderType?: unknown };
   if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return undefined;
-  const params = new URLSearchParams({ bookingId: record.bookingId, chat: "open" });
+  const params = new URLSearchParams({ focus: record.bookingId, chat: "open" });
   if (record.senderType === "CLIENT") {
     return `/cabinet/master/dashboard?${params.toString()}`;
   }
@@ -299,7 +300,9 @@ export async function getNotificationCenterData(input: {
         readAt: null,
         createdAt: item.createdAt.toISOString(),
         payloadJson: null,
-        openHref: "/cabinet/studio/team",
+        // R2-06-D: schedule-change requests live on the dedicated
+        // /schedule-requests page (with inline Approve/Reject), not /team.
+        openHref: "/cabinet/studio/schedule-requests",
       };
     });
 

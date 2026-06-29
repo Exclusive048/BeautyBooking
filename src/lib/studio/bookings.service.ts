@@ -1,14 +1,18 @@
+import { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
+import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
   assertMasterPerformsService,
   assertWithinMasterWorkHours,
+  resolveSalonLocalParts,
   type MasterWorkWindow,
 } from "@/lib/bookings/policy-enforcement";
 import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
+import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
@@ -40,17 +44,34 @@ const DEFAULT_ACTIVE_DAYS = new Set([1, 2, 3, 4, 5, 6]);
  *
  * Per-day overrides take precedence over the weekly config — matches
  * what the schedule engine does at slot-build time.
+ *
+ * FIX-R2-04-B: `weekday` (0=Sun..6=Sat) and `dateKey` (YYYY-MM-DD) are
+ * now SALON-LOCAL (derived by `resolveSalonLocalParts` against the
+ * master's tz), not UTC-derived from the instant. For a non-UTC studio
+ * a real-UTC instant near local midnight resolves to a different
+ * UTC day/date than its salon-local day/date — reading them in UTC
+ * looked up the wrong weekly day / override row. The `date: dateKey`
+ * query still matches the UTC-midnight-stored override (overrides are
+ * persisted at `Date.UTC(y,m,d,0,0,0)` of the local dateKey), exactly
+ * as the engine buckets them via `toLocalDateKey(row.date, tz)`.
  */
 async function resolveMasterWorkWindow(
   masterProviderId: string,
-  newStartLocal: Date,
+  weekday: number,
+  dateKey: string,
 ): Promise<MasterWorkWindow> {
-  const weekday = newStartLocal.getUTCDay();
-  const dateKey = `${newStartLocal.getUTCFullYear()}-${String(newStartLocal.getUTCMonth() + 1).padStart(2, "0")}-${String(newStartLocal.getUTCDate()).padStart(2, "0")}`;
-
+  // FIX-R2-04-B: `ScheduleOverride.date` is a DateTime stored at
+  // UTC-midnight of the salon-local date key (editor `saveException`
+  // writes `parseDateKeyToUtcStart(dateKey)`; the engine matches via
+  // `toLocalDateKey(row.date, tz)`). A bare "YYYY-MM-DD" string is
+  // rejected by Prisma 6 ("Expected ISO-8601 DateTime") — the prior
+  // `date: dateKey` (string) form threw `PrismaClientValidationError`
+  // whenever this resolver ran. Convert the salon-local dateKey to the
+  // exact stored instant so the override point-lookup actually matches.
+  const overrideDate = parseDateKeyToUtcStart(dateKey);
   const [override, weeklyDay] = await Promise.all([
     prisma.scheduleOverride.findFirst({
-      where: { providerId: masterProviderId, date: dateKey },
+      where: { providerId: masterProviderId, date: overrideDate },
       include: { template: { select: { startLocal: true, endLocal: true } } },
     }),
     prisma.weeklyScheduleDay.findFirst({
@@ -180,9 +201,19 @@ export async function createStudioBooking(input: {
   // resolver + `assertWithinMasterWorkHours` predicate + inline
   // findMany conflict check (no self-exclusion needed at create
   // time — booking doesn't exist yet).
-  const workWindow = await resolveMasterWorkWindow(master.id, input.startAt);
-  const startMinutesLocal =
-    input.startAt.getUTCHours() * 60 + input.startAt.getUTCMinutes();
+  // FIX-R2-04-B: read the booking instant in the SALON timezone (the
+  // master provider's tz) before the work-hours comparison.
+  // `getUTCHours()` on a real-UTC instant is the salon's UTC offset off
+  // the salon-local window, so a non-UTC studio's window was shifted —
+  // wrongly allowing out-of-hours + wrongly rejecting in-hours creates.
+  const salonTz = master.timezone;
+  const localStart = resolveSalonLocalParts(input.startAt, salonTz);
+  const workWindow = await resolveMasterWorkWindow(
+    master.id,
+    localStart.weekday,
+    localStart.dateKey,
+  );
+  const startMinutesLocal = localStart.minutesFromMidnight;
   const endMinutesLocal = startMinutesLocal + durationMin;
   assertWithinMasterWorkHours({
     bookingStartMinutes: startMinutesLocal,
@@ -190,79 +221,114 @@ export async function createStudioBooking(input: {
     window: workWindow,
   });
 
-  // `requireActiveStudioMaster` only returns ownership/published flags;
-  // the buffer column lives on the provider row directly.
+  // `requireActiveStudioMaster` only returns ownership/published/tz
+  // flags; the buffer column lives on the provider row directly. Buffer
+  // resolution is a pure config read + arithmetic, so it stays OUTSIDE
+  // the transaction (mirrors FIX-R2-01-B `confirmBooking`).
   const masterRow = await prisma.provider.findUnique({
     where: { id: master.id },
     select: { bufferBetweenBookingsMin: true },
   });
   const buffer = normalizeBufferMinutes(masterRow?.bufferBetweenBookingsMin);
-  const conflicts = await prisma.booking.findMany({
-    where: {
-      providerId: studio.providerId,
-      masterProviderId: master.id,
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null },
-      endAtUtc: { not: null },
-    },
-    select: { startAtUtc: true, endAtUtc: true },
-  });
-  const hasConflict = conflicts.some((row) => {
-    if (!row.startAtUtc || !row.endAtUtc) return false;
-    const itemStart = buffer
-      ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
-      : row.startAtUtc;
-    const itemEnd = buffer
-      ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
-      : row.endAtUtc;
-    return input.startAt < itemEnd && endAt > itemStart;
-  });
-  if (hasConflict) {
-    throw new AppError(
-      "Окошко уже занято у выбранного мастера. Выберите другое время.",
-      409,
-      "SLOT_CONFLICT",
+
+  // FIX-R2-04-A: the conflict re-check now runs INSIDE the create
+  // transaction under Serializable isolation (was pre-tx with default
+  // isolation → TOCTOU: two concurrent creates onto overlapping slots
+  // could both pass a pre-check and both commit → double-book). Mirrors
+  // `createBooking` / FIX-R2-01-B `confirmBooking`: only the
+  // conflict-detection READ + the WRITEs must share one Serializable
+  // snapshot. Same buffer-aware overlap primitive — no new conflict
+  // definition (no self-exclusion needed: the booking doesn't exist
+  // yet at create time).
+  let created: { id: string };
+  try {
+    created = await prisma.$transaction(
+      async (tx) => {
+        const conflicts = await tx.booking.findMany({
+          where: {
+            providerId: studio.providerId,
+            masterProviderId: master.id,
+            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+            startAtUtc: { not: null },
+            endAtUtc: { not: null },
+          },
+          select: { startAtUtc: true, endAtUtc: true },
+        });
+        const hasConflict = conflicts.some((row) => {
+          if (!row.startAtUtc || !row.endAtUtc) return false;
+          const itemStart = buffer
+            ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
+            : row.startAtUtc;
+          const itemEnd = buffer
+            ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
+            : row.endAtUtc;
+          return input.startAt < itemEnd && endAt > itemStart;
+        });
+        if (hasConflict) {
+          throw new AppError(
+            "Окошко уже занято у выбранного мастера. Выберите другое время.",
+            409,
+            "SLOT_CONFLICT",
+          );
+        }
+
+        const booking = await tx.booking.create({
+          data: {
+            providerId: studio.providerId,
+            studioId: studio.id,
+            serviceId: service.id,
+            masterProviderId: master.id,
+            masterId: master.id,
+            startAtUtc: input.startAt,
+            endAtUtc: endAt,
+            startAt: input.startAt,
+            endAt,
+            slotLabel: input.startAt.toISOString(),
+            clientName: input.clientName.trim(),
+            clientNameSnapshot: input.clientName.trim(),
+            clientPhone: input.clientPhone?.trim() || "",
+            clientPhoneSnapshot: input.clientPhone?.trim() || null,
+            notes: input.notes?.trim() || null,
+            status: "PENDING",
+            actionRequiredBy: "MASTER",
+            source: "MANUAL",
+          },
+          select: { id: true },
+        });
+
+        await tx.bookingServiceItem.create({
+          data: {
+            bookingId: booking.id,
+            studioId: studio.id,
+            serviceId: service.id,
+            titleSnapshot: service.title?.trim() || service.name,
+            priceSnapshot: price,
+            durationSnapshotMin: durationMin,
+          },
+        });
+
+        return booking;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+  } catch (error) {
+    // A true-concurrent create race surfaces under Serializable as a
+    // write-conflict / serialization failure (P2034) or a unique race
+    // (P2002) at COMMIT time. Map it to the same retryable 409 the
+    // in-tx predicate throws — never a 500 (mirrors confirmBooking /
+    // createBooking's mapPrismaBookingConflict).
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2034" || error.code === "P2002")
+    ) {
+      throw new AppError(
+        "Окошко уже занято у выбранного мастера. Выберите другое время.",
+        409,
+        "SLOT_CONFLICT",
+      );
+    }
+    throw error;
   }
-
-  const created = await prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.create({
-      data: {
-        providerId: studio.providerId,
-        studioId: studio.id,
-        serviceId: service.id,
-        masterProviderId: master.id,
-        masterId: master.id,
-        startAtUtc: input.startAt,
-        endAtUtc: endAt,
-        startAt: input.startAt,
-        endAt,
-        slotLabel: input.startAt.toISOString(),
-        clientName: input.clientName.trim(),
-        clientNameSnapshot: input.clientName.trim(),
-        clientPhone: input.clientPhone?.trim() || "",
-        clientPhoneSnapshot: input.clientPhone?.trim() || null,
-        notes: input.notes?.trim() || null,
-        status: "PENDING",
-        actionRequiredBy: "MASTER",
-        source: "MANUAL",
-      },
-      select: { id: true },
-    });
-
-    await tx.bookingServiceItem.create({
-      data: {
-        bookingId: booking.id,
-        studioId: studio.id,
-        serviceId: service.id,
-        titleSnapshot: service.title?.trim() || service.name,
-        priceSnapshot: price,
-        durationSnapshotMin: durationMin,
-      },
-    });
-
-    return booking;
-  });
 
   await invalidateSlotsForBookingRange({
     providerId: studio.providerId,
@@ -311,7 +377,7 @@ export async function moveStudioBooking(input: {
   if (!studio) {
     throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
   }
-  await requireActiveStudioMaster({
+  const targetMaster = await requireActiveStudioMaster({
     studioProviderId: studio.providerId,
     masterId: input.targetMasterId,
   });
@@ -360,12 +426,20 @@ export async function moveStudioBooking(input: {
 
   // #1в: new time must lie within target master's work window for
   // that weekday (per-date override > weekly config > defaults).
+  // FIX-R2-04-B: derive weekday/dateKey/minutes in the SALON timezone
+  // (the target master provider's tz). getUTCHours() / getUTCDay() on
+  // the real-UTC instant offset the window by the salon's UTC offset —
+  // for a +5 Almaty 10-19 salon the guard wrongly ALLOWED a 20:00 local
+  // move (read as 15:00 UTC, "in window") and wrongly REJECTED an 11:00
+  // local one (read as 06:00 UTC, "before open").
+  const salonTz = targetMaster.timezone;
+  const localStart = resolveSalonLocalParts(input.targetStartAt, salonTz);
   const workWindow = await resolveMasterWorkWindow(
     input.targetMasterId,
-    input.targetStartAt,
+    localStart.weekday,
+    localStart.dateKey,
   );
-  const startMinutesLocal =
-    input.targetStartAt.getUTCHours() * 60 + input.targetStartAt.getUTCMinutes();
+  const startMinutesLocal = localStart.minutesFromMidnight;
   const endMinutesLocal = startMinutesLocal + safeDuration;
   assertWithinMasterWorkHours({
     bookingStartMinutes: startMinutesLocal,
@@ -375,107 +449,137 @@ export async function moveStudioBooking(input: {
 
   // #1б: ensure no overlap with another active booking on the target
   // master, EXCLUDING this booking itself (so a move-to-same-time
-  // no-op doesn't conflict with self).
+  // no-op doesn't conflict with self). Buffer + the new window are
+  // pure config reads + arithmetic → resolved OUTSIDE the tx (mirrors
+  // FIX-R2-01-B `confirmBooking`).
   const masterRow = await prisma.provider.findUnique({
     where: { id: input.targetMasterId },
     select: { bufferBetweenBookingsMin: true },
   });
   const buffer = normalizeBufferMinutes(masterRow?.bufferBetweenBookingsMin);
-  const conflictWhere = {
-    providerId: booking.providerId,
-    masterProviderId: input.targetMasterId,
-  };
-  const conflicts = await prisma.booking.findMany({
-    where: {
-      ...conflictWhere,
-      id: { not: booking.id },
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null },
-      endAtUtc: { not: null },
-    },
-    select: { id: true, startAtUtc: true, endAtUtc: true },
-  });
   const newStart = input.targetStartAt;
   const newEnd = endAt;
-  const hasConflict = conflicts.some((row) => {
-    if (!row.startAtUtc || !row.endAtUtc) return false;
-    const itemStart = buffer
-      ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
-      : row.startAtUtc;
-    const itemEnd = buffer
-      ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
-      : row.endAtUtc;
-    return newStart < itemEnd && newEnd > itemStart;
-  });
-  if (hasConflict) {
-    throw new AppError(
-      "Окошко уже занято у выбранного мастера. Выберите другое время.",
-      409,
-      "SLOT_CONFLICT",
-    );
-  }
   const previousStartAtUtc = booking.startAtUtc;
   const previousEndAtUtc = booking.endAtUtc;
   const previousMasterProviderId = booking.masterProviderId;
 
-  await prisma.$transaction(async (tx) => {
-    await tx.booking.update({
-      where: { id: booking.id },
-      data: {
-        studioId: input.studioId,
-        masterProviderId: input.targetMasterId,
-        masterId: input.targetMasterId,
-        startAtUtc: input.targetStartAt,
-        endAtUtc: endAt,
-        startAt: input.targetStartAt,
-        endAt,
-      },
-    });
+  // FIX-R2-04-A: the conflict re-check now runs INSIDE the move
+  // transaction under Serializable isolation (was pre-tx with default
+  // isolation → TOCTOU: a concurrent create/move onto the same target
+  // slot in the window could double-book). Mirrors FIX-R2-01-B
+  // `confirmBooking`: only the conflict-detection READ + the WRITEs must
+  // share one Serializable snapshot. Same buffer-aware overlap
+  // primitive — no new conflict definition. The exclude-self filter
+  // (`id: { not: booking.id }`) is preserved so a shift that overlaps
+  // the booking's OWN current slot doesn't false-conflict.
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        const conflicts = await tx.booking.findMany({
+          where: {
+            providerId: booking.providerId,
+            masterProviderId: input.targetMasterId,
+            id: { not: booking.id },
+            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+            startAtUtc: { not: null },
+            endAtUtc: { not: null },
+          },
+          select: { id: true, startAtUtc: true, endAtUtc: true },
+        });
+        const hasConflict = conflicts.some((row) => {
+          if (!row.startAtUtc || !row.endAtUtc) return false;
+          const itemStart = buffer
+            ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
+            : row.startAtUtc;
+          const itemEnd = buffer
+            ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
+            : row.endAtUtc;
+          return newStart < itemEnd && newEnd > itemStart;
+        });
+        if (hasConflict) {
+          throw new AppError(
+            "Окошко уже занято у выбранного мастера. Выберите другое время.",
+            409,
+            "SLOT_CONFLICT",
+          );
+        }
 
-    if (input.strategy === "CHANGE_SERVICE" || input.pricing === "APPLY_TARGET") {
-      const serviceIds = Array.from(
-        new Set(booking.serviceItems.map((item) => item.serviceId).filter((serviceId): serviceId is string => Boolean(serviceId)))
-      );
-      const overrides =
-        serviceIds.length > 0
-          ? await tx.masterService.findMany({
-              where: {
-                masterProviderId: input.targetMasterId,
-                serviceId: { in: serviceIds },
-              },
-              select: {
-                serviceId: true,
-                isEnabled: true,
-                priceOverride: true,
-                durationOverrideMin: true,
-                service: { select: { price: true, durationMin: true } },
-              },
-            })
-          : [];
-      const overrideByServiceId = new Map(overrides.map((override) => [override.serviceId, override]));
-
-      for (const item of booking.serviceItems) {
-        if (!item.serviceId) continue;
-        const override = overrideByServiceId.get(item.serviceId);
-
-        if (!override || !override.isEnabled) continue;
-
-        await tx.bookingServiceItem.update({
-          where: { id: item.id },
+        await tx.booking.update({
+          where: { id: booking.id },
           data: {
-            durationSnapshotMin:
-              input.strategy === "CHANGE_SERVICE"
-                ? override.durationOverrideMin ?? override.service.durationMin
-                : item.durationSnapshotMin,
-            priceSnapshot:
-              input.pricing === "APPLY_TARGET"
-                ? override.priceOverride ?? override.service.price
-                : item.priceSnapshot,
+            studioId: input.studioId,
+            masterProviderId: input.targetMasterId,
+            masterId: input.targetMasterId,
+            startAtUtc: input.targetStartAt,
+            endAtUtc: endAt,
+            startAt: input.targetStartAt,
+            endAt,
           },
         });
-      }
+
+        if (input.strategy === "CHANGE_SERVICE" || input.pricing === "APPLY_TARGET") {
+          const serviceIds = Array.from(
+            new Set(booking.serviceItems.map((item) => item.serviceId).filter((serviceId): serviceId is string => Boolean(serviceId)))
+          );
+          const overrides =
+            serviceIds.length > 0
+              ? await tx.masterService.findMany({
+                  where: {
+                    masterProviderId: input.targetMasterId,
+                    serviceId: { in: serviceIds },
+                  },
+                  select: {
+                    serviceId: true,
+                    isEnabled: true,
+                    priceOverride: true,
+                    durationOverrideMin: true,
+                    service: { select: { price: true, durationMin: true } },
+                  },
+                })
+              : [];
+          const overrideByServiceId = new Map(overrides.map((override) => [override.serviceId, override]));
+
+          for (const item of booking.serviceItems) {
+            if (!item.serviceId) continue;
+            const override = overrideByServiceId.get(item.serviceId);
+
+            if (!override || !override.isEnabled) continue;
+
+            await tx.bookingServiceItem.update({
+              where: { id: item.id },
+              data: {
+                durationSnapshotMin:
+                  input.strategy === "CHANGE_SERVICE"
+                    ? override.durationOverrideMin ?? override.service.durationMin
+                    : item.durationSnapshotMin,
+                priceSnapshot:
+                  input.pricing === "APPLY_TARGET"
+                    ? override.priceOverride ?? override.service.price
+                    : item.priceSnapshot,
+              },
+            });
+          }
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  } catch (error) {
+    // A true-concurrent move/create race surfaces under Serializable as
+    // a write-conflict / serialization failure (P2034) or a unique race
+    // (P2002) at COMMIT time. Map it to the same retryable 409 the in-tx
+    // predicate throws — never a 500 (mirrors confirmBooking).
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2034" || error.code === "P2002")
+    ) {
+      throw new AppError(
+        "Окошко уже занято у выбранного мастера. Выберите другое время.",
+        409,
+        "SLOT_CONFLICT",
+      );
     }
-  });
+    throw error;
+  }
 
   await invalidateSlotsForBookingMove({
     previous: {
@@ -557,51 +661,47 @@ export async function updateMasterBookingStatus(input: {
     booking.requestedBy === "CLIENT" &&
     booking.actionRequiredBy === "MASTER";
 
-  if (!rejectsChangeRequest && (isRejectAction || isCancelAction)) {
+  // FIX-R2-06-A: declining a client-proposed reschedule reverts to the original
+  // time (no move, no slot change). Shared with the studio decline route so the
+  // two paths can't drift.
+  if (rejectsChangeRequest) {
+    return declineClientRescheduleRequest(booking.id, "MASTER");
+  }
+
+  if (isRejectAction || isCancelAction) {
     ensureBookingActionWindow(booking.startAtUtc);
   }
 
-  if (!rejectsChangeRequest && (isRejectAction || isCancelAction) && comment.length === 0) {
+  if ((isRejectAction || isCancelAction) && comment.length === 0) {
     throw new AppError("Comment is required", 400, "VALIDATION_ERROR");
   }
 
   const updated = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
       where: { id: booking.id },
-      data: rejectsChangeRequest
-        ? {
-            status: "CONFIRMED",
-            proposedStartAt: null,
-            proposedEndAt: null,
-            requestedBy: null,
-            actionRequiredBy: null,
-            changeComment: null,
-          }
-        : {
-            status: input.status,
-            cancelledBy: "PROVIDER",
-            cancelReason: comment || null,
-            cancelledAtUtc: new Date(),
-            requestedBy: "MASTER",
-            actionRequiredBy: null,
-            proposedStartAt: null,
-            proposedEndAt: null,
-            changeComment: comment || null,
-          },
+      data: {
+        status: input.status,
+        cancelledBy: "PROVIDER",
+        cancelReason: comment || null,
+        cancelledAtUtc: new Date(),
+        requestedBy: "MASTER",
+        actionRequiredBy: null,
+        proposedStartAt: null,
+        proposedEndAt: null,
+        changeComment: comment || null,
+      },
       select: { id: true, status: true },
     });
 
     return updated;
   });
 
-  if (!rejectsChangeRequest) {
-    await invalidateSlotsForBookingRange({
-      providerId: booking.providerId,
-      masterProviderId: booking.masterProviderId ?? null,
-      startAtUtc: booking.startAtUtc,
-      endAtUtc: booking.endAtUtc,
-    });
-  }
+  await invalidateSlotsForBookingRange({
+    providerId: booking.providerId,
+    masterProviderId: booking.masterProviderId ?? null,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
 
   return { id: updated.id, status: updated.status };
 }

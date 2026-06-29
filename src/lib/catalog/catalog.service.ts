@@ -37,7 +37,10 @@ type ServiceLite = {
 
 export type CatalogProviderItem = {
   type: "master" | "studio";
-  id: string;
+  // Rule 12 (QA-103): public search NEVER emits the internal CUID `id` —
+  // it enables enumeration + exposes record identity/order. Consumers key
+  // off `publicUsername` (profile links, favorites, React keys). The
+  // pagination cursor is already opaque (encodeCursor base64url).
   publicUsername: string | null;
   title: string;
   tagline: string | null;
@@ -104,6 +107,13 @@ export type CatalogSearchResult = {
 type CatalogSearchInput = {
   serviceQuery?: string;
   district?: string;
+  // EXP-021: the header city selector filters `/models` but was a no-op on
+  // `/catalog` (the search query never received the selected city). The route
+  // resolves the cookie via `getServerCity()` and passes `cityId` here.
+  // null/undefined = "all cities" (no filter); a value scopes to that city.
+  // Ungeocoded providers (cityId = null) are excluded from a city view —
+  // same semantics as `/models`.
+  cityId?: string;
   date?: string;
   priceMin?: number;
   priceMax?: number;
@@ -308,6 +318,12 @@ function buildWhere(
         mode: "insensitive",
       },
     });
+  }
+
+  // EXP-021: scope to the selected city when one is chosen. No city → no
+  // filter (all cities). Mirrors the `/models` city-scoping mechanism.
+  if (input.cityId) {
+    and.push({ cityId: input.cityId });
   }
 
   if (typeof input.availableToday === "boolean") {
@@ -711,7 +727,6 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
 
     return {
       type: provider.type === ProviderType.STUDIO ? "studio" : "master",
-      id: provider.id,
       publicUsername: provider.publicUsername ?? null,
       title: provider.name,
       tagline: provider.tagline?.trim() || null,

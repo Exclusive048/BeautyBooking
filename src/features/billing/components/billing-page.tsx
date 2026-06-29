@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
 import { BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
+import { resolvePlanPrice } from "@/lib/billing/pricing";
 import { cn } from "@/lib/cn";
 import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
@@ -83,12 +84,10 @@ function getDisplayMonthlyPriceKopeks(plan: BillingPlan, periodMonths: PeriodMon
 }
 
 function getCheckoutAmountKopeks(plan: BillingPlan, periodMonths: PeriodMonths): number | null {
-  const price = getPrice(plan, periodMonths);
-  if (price) return price.priceKopeks;
-  const monthly = getBaseMonthlyPriceKopeks(plan);
-  if (monthly === null) return null;
-  if (periodMonths === 12) return Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT));
-  return monthly * periodMonths;
+  // FIX-BC-1: delegate to the shared resolver so the amount the user is shown
+  // here is byte-for-byte the amount checkout charges and the amount renewal
+  // will charge — one source of truth, no display↔charge↔renewal drift.
+  return resolvePlanPrice(plan.prices, periodMonths);
 }
 
 function getSavingsPct(plan: BillingPlan, periodMonths: PeriodMonths): number {

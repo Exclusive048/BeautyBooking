@@ -2,6 +2,7 @@ import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
+import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
   addWeeks,
@@ -79,6 +80,8 @@ export type ScheduleWeekData = {
   /** Computed dynamic hour range for the visible time grid (start/end in whole hours). */
   hourRange: { start: number; end: number };
   fetchedAt: Date;
+  /** EXP-019: master (salon) tz — booking-card labels + footer time render in it, matching the grid. */
+  timezone: string;
 };
 
 const REVENUE_STATUSES: BookingStatus[] = [
@@ -99,8 +102,22 @@ function bookingPrice(item: {
   return item.service.price;
 }
 
-function minuteOfDay(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
+/**
+ * Minute-of-day for grid card positioning, computed in the schedule
+ * owner's OWN timezone (not the host process tz).
+ *
+ * QA-113 (FIX-11): `date.getHours()` reads the host process timezone.
+ * On the MSK production host this happened to equal the master tz, so
+ * the grid looked correct; on a UTC host the cards shifted by the tz
+ * offset (e.g. −3h for Europe/Moscow) even though the availability
+ * engine stayed TZ-safe (QA-07). Grid positions must be derived from
+ * the entity's own tz to stay stable regardless of where the server
+ * runs. GRID-ONLY: the availability engine never calls this helper —
+ * its working intervals arrive as entity-local HH:MM strings.
+ */
+function minuteOfDay(date: Date, timeZone: string): number {
+  const { hour, minute } = getLocalTimeParts(date, timeZone);
+  return hour * 60 + minute;
 }
 
 /**
@@ -152,9 +169,10 @@ function parseInterval(s: string, e: string): { startMin: number; endMin: number
 function computeFreeSlotsToday(input: {
   today: ScheduleDay | undefined;
   now: Date;
+  timeZone: string;
 }): { count: number; firstFreeAfter: string | null } {
   if (!input.today || input.today.isOff) return { count: 0, firstFreeAfter: null };
-  const nowMin = minuteOfDay(input.now);
+  const nowMin = minuteOfDay(input.now, input.timeZone);
   let count = 0;
   let firstFree: string | null = null;
   const occupied: Array<{ startMin: number; endMin: number }> = [
@@ -200,8 +218,6 @@ export const getMasterScheduleWeek = cache(
   async (input: { masterId: string; weekStart: Date; now?: Date }): Promise<ScheduleWeekData> => {
     const now = input.now ?? new Date();
     const weekEnd = addWeeks(input.weekStart, 1);
-    const weekDays = getWeekDays(input.weekStart, now);
-    const todayIso = toIsoDateKey(now);
 
     const master = await prisma.provider.findUnique({
       where: { id: input.masterId },
@@ -210,6 +226,14 @@ export const getMasterScheduleWeek = cache(
     if (!master) {
       throw new Error(`Master not found: ${input.masterId}`);
     }
+
+    // FIX-20 (QA-123): day-grouping + "today" computed in the MASTER's own
+    // timezone, not the host process tz. On a UTC prod host, a booking in the
+    // master's early-morning hours (east of UTC) otherwise lands in the previous
+    // UTC day column. The vertical offset already uses master.timezone (FIX-11);
+    // this is the sibling day-grouping axis. Slot generation is untouched.
+    const todayIso = toLocalDateKey(now, master.timezone);
+    const weekDays = getWeekDays(input.weekStart, now, todayIso);
 
     // Day plans, bookings, and time blocks all in one parallel batch.
     const ctx = await ScheduleEngine.createContext({
@@ -285,15 +309,14 @@ export const getMasterScheduleWeek = cache(
       if (row.clientUserId) visitCountByClient.set(row.clientUserId, row._count._all);
     }
 
-    // Group bookings by day iso. We assume booking startAt and the week-day
-    // share the same calendar day in the master timezone — for an MVP this
-    // is the same boundary the seed data uses, so timezone subtleties don't
-    // bite. Production callers running in foreign locales will want the
-    // master.timezone applied via Intl.DateTimeFormat here.
+    // Group bookings by day iso in the MASTER's own timezone (FIX-20/QA-123) —
+    // `toLocalDateKey(startAtUtc, master.timezone)` so the column is correct on
+    // a UTC host for an east-of-UTC master (was a host-tz `toIsoDateKey`).
     const bookingsByDay = new Map<string, ScheduleBookingItem[]>();
     for (const row of bookingRows) {
       if (!row.startAtUtc || !row.endAtUtc) continue;
-      const iso = toIsoDateKey(row.startAtUtc);
+      // FIX-20 (QA-123): group by the booking's day in the MASTER's tz.
+      const iso = toLocalDateKey(row.startAtUtc, master.timezone);
       const visitCount = row.clientUserId
         ? visitCountByClient.get(row.clientUserId) ?? 0
         : 0;
@@ -312,8 +335,8 @@ export const getMasterScheduleWeek = cache(
         durationMin: row.service.durationMin,
         startAtUtc: row.startAtUtc,
         endAtUtc: row.endAtUtc,
-        startMinuteOfDay: minuteOfDay(row.startAtUtc),
-        endMinuteOfDay: minuteOfDay(row.endAtUtc),
+        startMinuteOfDay: minuteOfDay(row.startAtUtc, master.timezone),
+        endMinuteOfDay: minuteOfDay(row.endAtUtc, master.timezone),
         price: bookingPrice(row),
         actionRequiredBy: row.actionRequiredBy ?? null,
       };
@@ -324,15 +347,16 @@ export const getMasterScheduleWeek = cache(
 
     const timeBlocksByDay = new Map<string, ScheduleTimeBlockItem[]>();
     for (const row of timeBlockRows) {
-      const iso = toIsoDateKey(row.startAt);
+      // FIX-20 (QA-123): group by the block's day in the MASTER's tz.
+      const iso = toLocalDateKey(row.startAt, master.timezone);
       const item: ScheduleTimeBlockItem = {
         id: row.id,
         type: row.type as "BREAK" | "BLOCK",
         note: row.note,
         startAtUtc: row.startAt,
         endAtUtc: row.endAt,
-        startMinuteOfDay: minuteOfDay(row.startAt),
-        endMinuteOfDay: minuteOfDay(row.endAt),
+        startMinuteOfDay: minuteOfDay(row.startAt, master.timezone),
+        endMinuteOfDay: minuteOfDay(row.endAt, master.timezone),
       };
       const list = timeBlocksByDay.get(iso) ?? [];
       list.push(item);
@@ -383,6 +407,7 @@ export const getMasterScheduleWeek = cache(
     const { count: freeSlotsToday, firstFreeAfter } = computeFreeSlotsToday({
       today,
       now,
+      timeZone: master.timezone,
     });
 
     return {
@@ -399,6 +424,7 @@ export const getMasterScheduleWeek = cache(
       },
       hourRange,
       fetchedAt: now,
+      timezone: master.timezone,
     };
   },
 );

@@ -10,6 +10,8 @@ const MIN_COL_PX = 168;
 type Props = {
   days: ScheduleDay[];
   hourRange: { start: number; end: number };
+  /** EXP-019: master (salon) tz threaded to the booking-card label formatter. */
+  timezone: string;
 };
 
 /**
@@ -18,7 +20,7 @@ type Props = {
  * uses `minmax(168px, 1fr)` so columns expand on desktop but force a
  * horizontal scroll on narrow viewports (mobile day-view comes in 25b).
  */
-export function WeekGrid({ days, hourRange }: Props) {
+export function WeekGrid({ days, hourRange, timezone }: Props) {
   const gridTemplate = `64px repeat(7, minmax(${MIN_COL_PX}px, 1fr))`;
   return (
     <div className="overflow-x-auto rounded-2xl border border-border-subtle bg-bg-card">
@@ -42,6 +44,7 @@ export function WeekGrid({ days, hourRange }: Props) {
               hourStart={hourRange.start}
               hourEnd={hourRange.end}
               hourPx={HOUR_PX}
+              timezone={timezone}
             />
           ))}
         </div>

@@ -1,5 +1,6 @@
 import type { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { encodePublicId } from "@/lib/public-id";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 
@@ -20,12 +21,16 @@ const STORIES_MAX_GROUPS = 50;
 const STORIES_MAX_ITEMS_PER_MASTER = 10;
 
 export type StoriesGroupItem = {
+  // Rule 12 (RULE-12-REMAINDER): opaque token, NOT the raw portfolio CUID.
+  // Used client-side only (localStorage view-tracking + React key).
   id: string;
   mediaUrl: string;
   createdAt: string; // ISO
 };
 
 export type StoriesGroup = {
+  // Rule 12: opaque group token, NOT the raw provider CUID. Client uses it for
+  // React keys + group dedup only; profile links go via `username` (/u/<...>).
   masterId: string;
   providerName: string;
   providerType: ProviderType;
@@ -91,7 +96,7 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
     if (!group) {
       if (byMaster.size >= STORIES_MAX_GROUPS) continue;
       group = {
-        masterId: item.masterId,
+        masterId: encodePublicId(item.masterId),
         providerName: item.master.name,
         providerType: item.master.type,
         username: item.master.publicUsername,
@@ -102,7 +107,7 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
     }
     if (group.items.length >= STORIES_MAX_ITEMS_PER_MASTER) continue;
     group.items.push({
-      id: item.id,
+      id: encodePublicId(item.id),
       mediaUrl: item.mediaUrl,
       createdAt: item.createdAt.toISOString(),
     });

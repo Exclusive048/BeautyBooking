@@ -23,8 +23,10 @@ export default async function StudioNotificationsRoute({ searchParams }: Props) 
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
+  let studioProviderId: string;
   try {
-    await resolveCurrentStudioAccess(user.id);
+    const access = await resolveCurrentStudioAccess(user.id);
+    studioProviderId = access.providerId;
   } catch {
     redirect("/403");
   }
@@ -35,6 +37,7 @@ export default async function StudioNotificationsRoute({ searchParams }: Props) 
 
   const data = await loadStudioNotificationsData({
     userId: user.id,
+    studioProviderId,
     phone: user.phone ?? null,
     activeChip,
     sort,

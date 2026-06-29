@@ -11,10 +11,8 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 type PortfolioDetail = {
   id: string;
-  masterId: string;
   masterName: string;
   masterPublicUsername: string | null;
-  serviceIds: string[];
   serviceOptions: Array<{
     serviceId: string;
     title: string;
@@ -72,7 +70,7 @@ export default function BookFromPortfolioClient() {
   const bookLink = useMemo(() => {
     if (!detail) return "#";
     const base = providerPublicUrl(
-      { id: detail.masterId, publicUsername: detail.masterPublicUsername },
+      { id: detail.masterPublicUsername ?? "", publicUsername: detail.masterPublicUsername },
       "portfolio-book"
     );
     if (!base) return "#";

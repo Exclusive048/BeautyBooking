@@ -22,6 +22,38 @@ function resolveDurationMinutes(booking: BookingForReviewCheck): number {
   return booking.service?.durationMin ?? 0;
 }
 
+/**
+ * The review window for a booking: `finishedAt` (start + duration + grace) and
+ * the `deadline` (finishedAt + REVIEW_WINDOW_DAYS). Returns null when the
+ * booking can never be reviewed by status/shape (terminal status, no start, no
+ * duration). now-independent — eligibility is `now ∈ [finishedAt, deadline]`.
+ * Shared so every surface (bookings DTO button, reviews page list, sidebar
+ * count, server can-leave gate) computes the SAME window — no divergent numbers.
+ */
+export function reviewWindowFor(
+  booking: BookingForReviewCheck,
+): { finishedAt: Date; deadline: Date } | null {
+  if (!booking.startAtUtc) return null;
+  // resolveBookingRuntimeStatus returns FINISHED for any non-terminal status
+  // once now ≥ finishedAt; REJECTED/CANCELLED/NO_SHOW never become FINISHED.
+  const runtimeIfPast = resolveBookingRuntimeStatus({
+    status: booking.status,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+    now: new Date(8640000000000000), // far future → reveals "would it finish?"
+  });
+  if (runtimeIfPast !== "FINISHED") return null;
+
+  const durationMinutes = resolveDurationMinutes(booking);
+  if (durationMinutes <= 0) return null;
+
+  const finishedAt = new Date(
+    booking.startAtUtc.getTime() + (durationMinutes + REVIEW_GRACE_MINUTES) * 60 * 1000,
+  );
+  const deadline = new Date(finishedAt.getTime() + REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  return { finishedAt, deadline };
+}
+
 export function canLeaveReview(input: {
   booking: BookingForReviewCheck;
   currentUserId: string;
@@ -29,25 +61,9 @@ export function canLeaveReview(input: {
 }): boolean {
   const { booking, currentUserId, nowUtc } = input;
   if (!booking.clientUserId || booking.clientUserId !== currentUserId) return false;
-  if (!booking.startAtUtc) return false;
 
-  const runtimeStatus = resolveBookingRuntimeStatus({
-    status: booking.status,
-    startAtUtc: booking.startAtUtc,
-    endAtUtc: booking.endAtUtc,
-    now: nowUtc,
-  });
-  if (runtimeStatus !== "FINISHED") return false;
+  const window = reviewWindowFor(booking);
+  if (!window) return false;
 
-  const durationMinutes = resolveDurationMinutes(booking);
-  if (durationMinutes <= 0) return false;
-
-  const finishedAt = new Date(
-    booking.startAtUtc.getTime() + (durationMinutes + REVIEW_GRACE_MINUTES) * 60 * 1000
-  );
-  const deadline = new Date(
-    finishedAt.getTime() + REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000
-  );
-
-  return nowUtc >= finishedAt && nowUtc <= deadline;
+  return nowUtc >= window.finishedAt && nowUtc <= window.deadline;
 }

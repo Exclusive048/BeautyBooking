@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { moneyRUBPlain } from "@/lib/format";
+import { moneyRUBPlainFromKopeks } from "@/lib/format";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -276,7 +276,7 @@ export function HotSlotsSettingsSection({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs text-text-main">{service.title}</p>
                       <p className="truncate text-xs text-text-sec">
-                        {moneyRUBPlain(service.effectivePrice)} {UI_TEXT.common.currencyRub} / {service.effectiveDurationMin} {UI_TEXT.common.minutesShort}
+                        {moneyRUBPlainFromKopeks(service.effectivePrice)} {UI_TEXT.common.currencyRub} / {service.effectiveDurationMin} {UI_TEXT.common.minutesShort}
                       </p>
                     </div>
                     <Switch

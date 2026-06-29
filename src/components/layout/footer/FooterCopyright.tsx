@@ -1,10 +1,17 @@
 import { FooterLink } from "@/components/layout/footer/FooterLink";
+import { env } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const COPYRIGHT_TEXT = UI_TEXT.footer.legal.copyright.replace("{year}", String(CURRENT_YEAR));
-// TODO: Replace legal entity details before production launch.
-const LEGAL_ENTITY_TEXT = UI_TEXT.footer.legal.entity;
+// FIX-EXP-CONTENT-GRAMMAR (EXP-005): the real ИНН comes from
+// `NEXT_PUBLIC_LEGAL_INN`. When it's unset (or the old fake "1234567890"), show
+// an OBVIOUS bracketed placeholder — never a fake-looking real number. Set the
+// real requisites before launch (deploy-checklist «legal requisites»).
+const RAW_INN = env.NEXT_PUBLIC_LEGAL_INN?.trim();
+const INN_VALUE =
+  RAW_INN && RAW_INN !== "1234567890" ? RAW_INN : UI_TEXT.footer.legal.innUnset;
+const LEGAL_ENTITY_TEXT = UI_TEXT.footer.legal.entityTemplate.replace("{inn}", INN_VALUE);
 
 const LEGAL_LINKS = [
   { label: UI_TEXT.footer.links.privacy, href: "/privacy" },

@@ -1,7 +1,9 @@
 // Realistic service templates keyed by category slug. The seed picks 2-5 of
 // these per master, and writes the chosen subset as `Service` rows attached
-// to the provider with the matching `globalCategoryId`. Prices are in RUB
-// (kopecks aren't used at the Service.price level — Booking payments do).
+// to the provider with the matching `globalCategoryId`. `priceMin`/`priceMax`
+// are in **RUB** for readability; the seed converts them to **kopeks** (×100)
+// before writing `Service.price`, which is the DB convention (UI_FMT.priceLabel
+// divides by 100). See seed-providers.ts ensureServices (QA-105 fix).
 export type ServiceTemplate = {
   name: string;
   durationMin: number;

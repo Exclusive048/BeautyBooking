@@ -335,6 +335,12 @@ export async function updateMasterProfile(
     avatarUrl?: string | null;
     isPublished?: boolean;
     district?: string;
+    /**
+     * FIX-R2-02-A — explicit timezone override from the cabinet selector.
+     * Applied last so it wins over any value derived from the city on this
+     * same call (selector is the deliberate override; an IANA string).
+     */
+    timezone?: string;
   }
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
@@ -385,6 +391,10 @@ export async function updateMasterProfile(
             cityId: detection.cityId,
             geoLat: detection.geoLat,
             geoLng: detection.geoLng,
+            // FIX-R2-02-A — the provider's working timezone follows the city
+            // it operates in. Without this a Moscow master kept the stale
+            // Asia/Almaty default (+2h skew) across slots / today / reminders.
+            timezone: detection.timezone,
           },
         });
         resolvedCityId = detection.cityId;
@@ -396,6 +406,17 @@ export async function updateMasterProfile(
         resolvedCityId = null;
       }
     }
+  }
+
+  // 2b. Explicit timezone override (cabinet selector). Applied after the
+  //     city-derivation so a deliberate override always wins. Normally sent in
+  //     its own PATCH (just `{ timezone }`), so this rarely collides with an
+  //     address change in the same call.
+  if (typeof input.timezone === "string" && input.timezone.trim()) {
+    await prisma.provider.update({
+      where: { id: masterId },
+      data: { timezone: input.timezone.trim() },
+    });
   }
 
   // 3. Publication gate: requires both a non-empty address AND a resolved cityId.

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   formatRublesPrecise,
   parseRublesToKopeks,
@@ -74,6 +75,12 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
   const [features, setFeatures] = useState<PlanFeatureOverrides>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // R2-05-H: confirm gate before the irreversible mass-notification path
+  // (disabling a plan that has active subscribers fans out a "приостановлен"
+  // notification to all of them — a mis-click is unrecoverable). The reversible
+  // toggle itself stays frictionless; only the save-that-disables-with-active-subs
+  // is gated. Below the threshold (0 active subs) saving proceeds without friction.
+  const { confirm, modal: confirmModal } = useConfirm();
 
   useEffect(() => {
     if (!open || !plan) return;
@@ -114,6 +121,27 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
         ? Math.trunc(sortOrderNum)
         : 0;
 
+    // R2-05-H: gate the disable-with-active-subscribers path. `plan.isActive`
+    // is the original (open-time) value; `isActive` is the pending toggle. Only
+    // an active→inactive transition fans out the "приостановлен" mass notice,
+    // and only when there are active subscribers to receive it.
+    const willDisableWithActiveSubs =
+      plan.isActive === true &&
+      isActive === false &&
+      plan.activeSubscriptionsCount > 0;
+    if (willDisableWithActiveSubs) {
+      const confirmed = await confirm({
+        title: T.disableConfirmTitle,
+        message: T.disableConfirmBody.replace(
+          "{count}",
+          String(plan.activeSubscriptionsCount),
+        ),
+        confirmLabel: T.disableConfirmAction,
+        variant: "danger",
+      });
+      if (!confirmed) return;
+    }
+
     setSubmitting(true);
     try {
       await onSubmit({
@@ -142,6 +170,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
   ];
 
   return (
+    <>
     <ModalSurface open={open} onClose={onClose} title={T.title}>
       {!plan ? null : (
         <div className="space-y-5">
@@ -299,6 +328,8 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
         </div>
       )}
     </ModalSurface>
+    {confirmModal}
+    </>
   );
 }
 

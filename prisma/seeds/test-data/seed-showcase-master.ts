@@ -23,7 +23,7 @@
  *   - 22 bookings spread across all 11 BookingStatus values
  *   - 6 reviews, 2 unanswered
  *   - 12 notifications across 10 NotificationType values, 5 unread
- *   - 1 PushSubscription so the Push KPI lands in the "Включены" state
+ *   - no PushSubscription (EXP-011: the old invalid seed key is deleted)
  *   - 3 ClientCards seeded for the future CRM redesign
  *
  * Dates are computed relative to NOW so the upcoming/past split always
@@ -72,6 +72,11 @@ const FIRST_NAME = "Анна";
 const LAST_NAME = "Соколова";
 const DISPLAY_NAME = `${FIRST_NAME} ${LAST_NAME}`;
 
+// FIX-EXP-SEED-HYGIENE (EXP-006): showcase master lives in Russia (Moscow).
+// SALON_TZ must equal the seeded City.timezone for Moscow so booking times
+// (computed below) agree with the provider tz derived from the city row.
+const SALON_TZ = "Europe/Moscow";
+
 const TEMPLATE_WEEKDAY = "showcase-anna-weekday";
 const TEMPLATE_SATURDAY = "showcase-anna-saturday";
 
@@ -103,11 +108,46 @@ function startOfDayUtc(date: Date): Date {
   return out;
 }
 
+/**
+ * Offset (ms) of `timeZone` from UTC at the given instant. Mirrors
+ * src/lib/schedule/timezone.ts getTimeZoneOffsetMs. RF zones are fixed-offset
+ * (no DST), so this is constant per zone but computed correctly regardless.
+ */
+function tzOffsetMs(at: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p = Object.fromEntries(dtf.formatToParts(at).map((x) => [x.type, x.value]));
+  const asUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour) === 24 ? 0 : Number(p.hour),
+    Number(p.minute),
+    Number(p.second)
+  );
+  return asUtc - at.getTime();
+}
+
+/**
+ * UTC instant whose wall-clock in SALON_TZ is (hour:minute) on the day
+ * `offsetDays` from `base`. FIX-EXP-SEED-HYGIENE: bookings carry true
+ * salon-local intent under the provider's RF timezone (no naive-UTC drift).
+ */
 function dateAtLocalUtc(offsetDays: number, hour: number, minute = 0, base = new Date()): Date {
   const day = startOfDayUtc(base);
   day.setUTCDate(day.getUTCDate() + offsetDays);
-  day.setUTCHours(hour, minute, 0, 0);
-  return day;
+  const guess = new Date(
+    Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour, minute, 0, 0)
+  );
+  return new Date(guess.getTime() - tzOffsetMs(guess, SALON_TZ));
 }
 
 function dateAtMidnight(offsetDays: number, base = new Date()): Date {
@@ -139,8 +179,8 @@ async function ensureUser(): Promise<UserProfile> {
 
 async function ensureProvider(userId: string) {
   const cityRow = await prisma.city.findFirst({
-    where: { OR: [{ slug: "almaty" }, { name: "Алматы" }] },
-    select: { id: true },
+    where: { OR: [{ slug: "moscow" }, { name: "Москва" }] },
+    select: { id: true, timezone: true },
   });
 
   return prisma.provider.upsert({
@@ -151,10 +191,10 @@ async function ensureProvider(userId: string) {
       tagline: "Маникюр · педикюр · брови",
       description:
         "Мастер маникюра, педикюра и ухода за бровями. 8 лет опыта, индивидуальный подход без давления.",
-      address: "ул. Достык, 89",
-      district: "Медеуский район",
+      address: "ул. Покровка, 22",
+      district: "Басманный район",
       cityId: cityRow?.id ?? null,
-      timezone: "Asia/Almaty",
+      timezone: cityRow?.timezone ?? SALON_TZ,
       isPublished: true,
       categories: ["nails", "brows"],
       rating: 4.9,
@@ -182,10 +222,10 @@ async function ensureProvider(userId: string) {
       description:
         "Мастер маникюра, педикюра и ухода за бровями. 8 лет опыта, индивидуальный подход без давления.",
       publicUsername: PUBLIC_USERNAME,
-      address: "ул. Достык, 89",
-      district: "Медеуский район",
+      address: "ул. Покровка, 22",
+      district: "Басманный район",
       cityId: cityRow?.id ?? null,
-      timezone: "Asia/Almaty",
+      timezone: cityRow?.timezone ?? SALON_TZ,
       isPublished: true,
       categories: ["nails", "brows"],
       rating: 4.9,
@@ -540,10 +580,21 @@ const BOOKING_PLANS: BookingPlan[] = [
 
 function buildSlotLabel(start: Date, durationMin: number): string {
   const end = new Date(start.getTime() + durationMin * 60_000);
-  const fmt = (n: number) => String(n).padStart(2, "0");
-  const date = `${start.getUTCDate()}.${fmt(start.getUTCMonth() + 1)}`;
-  const fromHM = `${fmt(start.getUTCHours())}:${fmt(start.getUTCMinutes())}`;
-  const toHM = `${fmt(end.getUTCHours())}:${fmt(end.getUTCMinutes())}`;
+  // Render in salon-local time (SALON_TZ), not UTC, so labels + notification
+  // bodies read as the actual appointment time (FIX-EXP-SEED-HYGIENE).
+  const dtf = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: SALON_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const part = (d: Date, type: string) =>
+    dtf.formatToParts(d).find((p) => p.type === type)?.value ?? "00";
+  const date = `${part(start, "day")}.${part(start, "month")}`;
+  const fromHM = `${part(start, "hour")}:${part(start, "minute")}`;
+  const toHM = `${part(end, "hour")}:${part(end, "minute")}`;
   return `${date} ${fromHM}-${toHM}`;
 }
 
@@ -611,6 +662,21 @@ async function ensureBookings(input: {
       update: data,
       create: { id, ...data },
     });
+
+    // R2-03-A: priced BookingServiceItem so master analytics shows real
+    // revenue (analytics sums priceSnapshot with NO Service.price fallback).
+    // Mirrors the production write shape (createBooking / studio bookings).
+    await prisma.bookingServiceItem.deleteMany({ where: { bookingId: booking.id } });
+    await prisma.bookingServiceItem.create({
+      data: {
+        bookingId: booking.id,
+        serviceId: service.id,
+        titleSnapshot: service.name,
+        priceSnapshot: service.price,
+        durationSnapshotMin: service.durationMin,
+      },
+    });
+
     out.push(booking);
   }
   return out;
@@ -643,6 +709,11 @@ async function ensureReviews(args: {
     const booking = finished[i];
     if (!booking.clientUserId) continue;
     const withReply = i < 4;
+    // EXP-007: the public profile preview shows the 3 newest reviews
+    // (orderBy createdAt desc, limit 3). The finished bookings i=3,4,5 are
+    // by three DISTINCT clients, so we make those the most recent — the
+    // preview then shows three different authors instead of one repeated.
+    const reviewCreatedAt = new Date(Date.now() - (6 - i) * 18 * 60 * 60_000);
     const review = await prisma.review.upsert({
       where: { bookingId: booking.id },
       update: {
@@ -654,6 +725,7 @@ async function ensureReviews(args: {
         text: reviewTexts[i % reviewTexts.length] ?? "",
         replyText: withReply ? (replies[i % replies.length] ?? null) : null,
         repliedAt: withReply ? new Date(Date.now() - (i + 1) * DAY_MS) : null,
+        createdAt: reviewCreatedAt,
       },
       create: {
         bookingId: booking.id,
@@ -665,6 +737,7 @@ async function ensureReviews(args: {
         text: reviewTexts[i % reviewTexts.length] ?? "",
         replyText: withReply ? (replies[i % replies.length] ?? null) : null,
         repliedAt: withReply ? new Date(Date.now() - (i + 1) * DAY_MS) : null,
+        createdAt: reviewCreatedAt,
       },
     });
     if (!withReply) unanswered += 1;
@@ -903,20 +976,15 @@ function buildBookingPayload(booking: Booking): Prisma.InputJsonValue {
   };
 }
 
-async function ensurePushSubscription(userId: string) {
-  const endpoint = "https://fcm.googleapis.com/fcm/send/seed-showcase-anna";
-  await prisma.pushSubscription.upsert({
-    where: { endpoint },
-    update: {
-      userId,
-      p256dh: "seed-showcase-p256dh",
-      auth: "seed-showcase-auth",
-    },
-    create: {
-      userId,
-      endpoint,
-      p256dh: "seed-showcase-p256dh",
-      auth: "seed-showcase-auth",
+async function removePushSubscription(userId: string) {
+  // EXP-011: the previous seed inserted an INVALID PushSubscription —
+  // p256dh was a 22-char ASCII string, not a 65-byte base64 P-256 key — so
+  // every booking notification logged "subscription p256dh should be 65
+  // bytes". We delete it rather than forge a fake key (a forged key would
+  // still fail the web-push send). The Push KPI now reads "Выключены".
+  await prisma.pushSubscription.deleteMany({
+    where: {
+      OR: [{ userId }, { endpoint: "https://fcm.googleapis.com/fcm/send/seed-showcase-anna" }],
     },
   });
 }
@@ -1118,9 +1186,10 @@ async function ensureModelOffers(args: {
  *   - sortOrder 0..5 — explicit so reorder testing has a known starting state
  *
  * Idempotent: deletes any seed-prefixed portfolio rows for this master
- * first, then re-creates. Public photos use a stable picsum seed so the
- * URLs survive reruns. Categories looked up by slug; gracefully no-ops
- * if the category seed hasn't run yet.
+ * first, then re-creates. Photos point at bundled local placeholders under
+ * /public/portfolio-placeholders/<seed>.png (same-origin, offline-safe, no
+ * next.config remote host needed — QA-102). Categories looked up by slug;
+ * gracefully no-ops if the category seed hasn't run yet.
  */
 /**
  * 2 service packages (bundles) for the showcase master, used by 31c
@@ -1240,7 +1309,10 @@ async function ensurePortfolio(args: {
       data: {
         id: `${idPrefix}${seed.suffix}`,
         masterId: args.providerId,
-        mediaUrl: `https://picsum.photos/seed/${seed.seed}/640/640`,
+        // QA-102: bundled local placeholders under /public (same-origin, so
+        // next/image needs no remotePatterns entry and they load offline).
+        // Replaces picsum.photos (unconfigured host → broken images / 400).
+        mediaUrl: `/portfolio-placeholders/${seed.seed}.png`,
         caption: null,
         globalCategoryId: categoryId,
         categorySource: categoryId ? "user" : null,
@@ -1347,8 +1419,8 @@ export async function seedShowcaseMaster(input: Input): Promise<void> {
   });
   logSeed.step(`Уведомления (${notifStats.total}, непрочитанных: ${notifStats.unread})`);
 
-  await ensurePushSubscription(user.id);
-  logSeed.step("Push subscription (Push KPI «Включены»)");
+  await removePushSubscription(user.id);
+  logSeed.step("Push subscription удалена (EXP-011: невалидный seed-ключ)");
 
   const portfolioStats = await ensurePortfolio({ providerId: provider.id, services });
   logSeed.step(`Портфолио (${portfolioStats.count}, скрытых: ${portfolioStats.hidden})`);

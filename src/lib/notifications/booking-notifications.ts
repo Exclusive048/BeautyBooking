@@ -1,6 +1,7 @@
 import { MembershipStatus, NotificationType, Prisma, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 const bookingInclude = {
   clientUser: { select: { id: true } },
@@ -39,7 +40,11 @@ function formatDateLabel(date: Date | null, timezone: string): string | null {
     minute: "2-digit",
     timeZone: timezone,
   });
-  return label;
+  // QA-107/FIX-22: reminders/notifications are server-rendered (no browser
+  // viewer context), so they always carry the salon's explicit zone label —
+  // the recipient can't silently mis-read the time against their own clock.
+  const zone = formatZoneLabel({ iso: date.toISOString(), timeZone: timezone });
+  return zone ? `${label} ${zone}` : label;
 }
 
 function resolveServiceLabel(service: { name: string; title: string | null }): string {
@@ -124,10 +129,11 @@ function buildBookingPayload(booking: BookingWithRelations): Prisma.InputJsonVal
 }
 
 function bookingPushUrl(bookingId: string, audience: "CLIENT" | "MASTER"): string {
+  // FIX-R2-06-B: canonical `?focus=<id>` deep-link param (shared focus reader).
   if (audience === "MASTER") {
-    return `/cabinet/master/dashboard?bookingId=${bookingId}`;
+    return `/cabinet/master/dashboard?focus=${bookingId}`;
   }
-  return `/cabinet/bookings?bookingId=${bookingId}`;
+  return `/cabinet/bookings?focus=${bookingId}`;
 }
 
 function providerNotificationPushUrl(booking: BookingWithRelations, recipientUserId: string): string {

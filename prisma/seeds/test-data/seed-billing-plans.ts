@@ -7,6 +7,15 @@ import { logSeed } from "./helpers/log";
 // then layer paid features on top for PRO / PREMIUM. Re-running the seed
 // preserves admin-tuned values because we use the upsert `update: {}` idiom
 // when the plan already exists.
+//
+// FIX-28 (PLAN-PARITY cleanup): two dead grants removed from these defaults —
+//   • `financeReport` dropped from ALL plans — the feature was never shipped
+//     (studio Finance page removed, 0 runtime consumers); catalog marks it
+//     `status: "planned"`.
+//   • `hotSlots` dropped from STUDIO_* plans — hot-slots is master-only
+//     (`appliesTo: MASTER`, no studio surface; the rule endpoint is
+//     master-provider-scoped). Master plans keep it.
+// Existing production rows are admin-tunable; this only governs fresh seeds.
 
 type PlanSeed = {
   code: string;
@@ -33,7 +42,6 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       hotSlots: false,
       tgNotifications: false,
       vkNotifications: false,
-      financeReport: false,
       clientVisitHistory: false,
       clientNotes: false,
       highlightCard: false,
@@ -61,7 +69,6 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       hotSlots: true,
       tgNotifications: true,
       vkNotifications: true,
-      financeReport: true,
       clientVisitHistory: true,
       clientNotes: true,
       highlightCard: false,
@@ -90,7 +97,6 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       hotSlots: true,
       tgNotifications: true,
       vkNotifications: true,
-      financeReport: true,
       clientVisitHistory: true,
       clientNotes: true,
       highlightCard: true,
@@ -117,10 +123,8 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       notifications: true,
       analytics_dashboard: true,
       onlinePayments: false,
-      hotSlots: false,
       tgNotifications: false,
       vkNotifications: false,
-      financeReport: false,
       clientVisitHistory: false,
       clientNotes: false,
       highlightCard: false,
@@ -141,10 +145,8 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       profilePublicPage: true,
       notifications: true,
       onlinePayments: true,
-      hotSlots: true,
       tgNotifications: true,
       vkNotifications: true,
-      financeReport: true,
       clientVisitHistory: true,
       clientNotes: true,
       highlightCard: false,
@@ -168,10 +170,8 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       profilePublicPage: true,
       notifications: true,
       onlinePayments: true,
-      hotSlots: true,
       tgNotifications: true,
       vkNotifications: true,
-      financeReport: true,
       clientVisitHistory: true,
       clientNotes: true,
       highlightCard: true,

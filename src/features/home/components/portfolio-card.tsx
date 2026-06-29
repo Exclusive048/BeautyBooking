@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Star, ExternalLink } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -44,10 +44,9 @@ export function PortfolioCard({ item, onSelect }: Props) {
         aria-label={serviceLabel ?? item.masterName}
       >
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-[28px]">
-          <Image
+          <FocalImage
             src={item.mediaUrl}
             alt={item.caption ?? serviceLabel ?? item.masterName}
-            fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           />
@@ -87,7 +86,7 @@ export function PortfolioCard({ item, onSelect }: Props) {
         {/* Avatar */}
         <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-primary/10">
           {item.masterAvatarUrl ? (
-            <Image
+            <FocalImage
               src={item.masterAvatarUrl}
               alt={item.masterName}
               width={28}

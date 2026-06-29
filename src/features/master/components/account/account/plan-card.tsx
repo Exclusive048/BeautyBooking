@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Crown, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { billingUpgradeHref } from "@/lib/billing/upgrade-href";
 import type { MasterAccountPlan } from "@/lib/master/account-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -78,7 +79,7 @@ export function PlanCard({ plan }: Props) {
       </div>
       <div className="mt-4">
         <Button asChild variant="secondary" size="sm">
-          <Link href="/cabinet/billing" className="gap-1.5">
+          <Link href={billingUpgradeHref("MASTER")} className="gap-1.5">
             {T.manageBillingCta}
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </Link>

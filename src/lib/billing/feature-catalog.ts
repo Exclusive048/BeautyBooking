@@ -125,12 +125,18 @@ export const FEATURE_CATALOG = {
   },
   financeReport: {
     kind: "boolean",
+    // FIX-28 (PLAN-PARITY dead-gate): the dedicated finance report was never
+    // shipped — the studio Finance page was removed (STUDIO-FINANCE-REMOVE-A)
+    // and no surface reads `features.financeReport`. Marked `planned` (matches
+    // maxNotifications/smsNotifications/clientImport) + dropped from all seed
+    // plan grants so no tier advertises an unbuilt feature. Wire it back to a
+    // tier only when a real finance report ships.
     title: "Финансовый отчет",
     description: "Базовый финансовый отчет.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 81,
-    status: "active",
+    status: "planned",
   },
   notifications: {
     kind: "boolean",
@@ -191,7 +197,11 @@ export const FEATURE_CATALOG = {
     title: "Заметки о клиенте",
     description: "Личные заметки по клиентам.",
     group: "Клиенты",
-    appliesTo: "MASTER",
+    // FIX-28 (PLAN-PARITY-clientNotes-appliesTo): studios genuinely use client
+    // notes — STUDIO_PRO/PREMIUM grant it and the studio CRM card routes gate
+    // on it via `canAccessClientCards` (`/api/studio/clients/[key]/card`). So
+    // the catalog metadata now reflects real usage (was MASTER-only).
+    appliesTo: "BOTH",
     uiOrder: 140,
     status: "active",
   },

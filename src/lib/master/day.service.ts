@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/api/errors";
+import { ensureNoConflicts, normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBookingDto";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
@@ -6,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import type { BookingStatus } from "@prisma/client";
+import { Prisma, type BookingStatus } from "@prisma/client";
 
 export type MasterDayBooking = {
   id: string;
@@ -425,7 +426,7 @@ export async function createSoloMasterBooking(input: {
 }): Promise<{ id: string }> {
   const master = await prisma.provider.findUnique({
     where: { id: input.masterId },
-    select: { id: true, studioId: true, type: true },
+    select: { id: true, studioId: true, type: true, bufferBetweenBookingsMin: true },
   });
   if (!master || master.type !== "MASTER") {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
@@ -455,40 +456,73 @@ export async function createSoloMasterBooking(input: {
 
   const endAt = new Date(input.startAt.getTime() + service.durationMin * 60000);
 
-  const created = await prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.create({
-      data: {
-        providerId: input.masterId,
-        masterProviderId: input.masterId,
-        masterId: input.masterId,
-        serviceId: service.id,
-        startAtUtc: input.startAt,
-        endAtUtc: endAt,
-        startAt: input.startAt,
-        endAt,
-        slotLabel: input.startAt.toISOString(),
-        clientName: input.clientName.trim(),
-        clientPhone: input.clientPhone?.trim() || "",
-        notes: input.notes?.trim() || null,
-        source: "MANUAL",
-        status: "PENDING",
-        actionRequiredBy: "MASTER",
-      },
-      select: { id: true },
-    });
+  // FIX-R2-01-A: close the manual-booking double-book hole. R2-01 found this
+  // path created a booking with NO overlap check — a master could silently
+  // double-book their own slot (every other path — client funnel, reschedule,
+  // studio — checks). Mirror the create funnel (`createBooking`): the shared,
+  // buffer-aware `ensureNoConflicts` runs BOTH pre-transaction (fast-fail) and
+  // INSIDE a Serializable transaction (no TOCTOU). On overlap → 409
+  // SLOT_CONFLICT, consistent with every other booking path. Scope matches how
+  // solo-master bookings are stored (providerId === masterProviderId === masterId).
+  // The intentional operator relaxations stay — min-hours, work-hours/off-schedule
+  // and walk-in (no registered client) are NOT enforced here, only the silent
+  // overlap is closed.
+  const conflictScope = {
+    providerId: input.masterId,
+    masterProviderId: input.masterId,
+    startAtUtc: input.startAt,
+    endAtUtc: endAt,
+    bufferMin: normalizeBufferMinutes(master.bufferBetweenBookingsMin),
+  };
+  await ensureNoConflicts(prisma, conflictScope);
 
-    await tx.bookingServiceItem.create({
-      data: {
-        bookingId: booking.id,
-        serviceId: service.id,
-        titleSnapshot: service.title?.trim() || service.name,
-        priceSnapshot: service.price,
-        durationSnapshotMin: service.durationMin,
-      },
-    });
+  const created = await prisma.$transaction(
+    async (tx) => {
+      await ensureNoConflicts(tx, conflictScope);
 
-    return booking;
-  });
+      const booking = await tx.booking.create({
+        data: {
+          providerId: input.masterId,
+          masterProviderId: input.masterId,
+          masterId: input.masterId,
+          serviceId: service.id,
+          startAtUtc: input.startAt,
+          endAtUtc: endAt,
+          startAt: input.startAt,
+          endAt,
+          slotLabel: input.startAt.toISOString(),
+          clientName: input.clientName.trim(),
+          clientPhone: input.clientPhone?.trim() || "",
+          notes: input.notes?.trim() || null,
+          source: "MANUAL",
+          status: "PENDING",
+          // R2-01-D: a solo master entering a manual booking is recording a known
+          // appointment — flagging the master to "action" their own booking is a
+          // redundant self-action (it nagged in the dashboard attention panel). Drop
+          // the self-flag. Kept PENDING (lowest-risk: no lifecycle / notification
+          // change); the master can still confirm it from the kanban — PENDING →
+          // CONFIRMED does not gate on actionRequiredBy (confirmBooking.ts checks it
+          // only for CHANGE_REQUESTED). The studio manual path (admin creates → a
+          // different master confirms) is a legitimate two-party flow, left as-is.
+          actionRequiredBy: null,
+        },
+        select: { id: true },
+      });
+
+      await tx.bookingServiceItem.create({
+        data: {
+          bookingId: booking.id,
+          serviceId: service.id,
+          titleSnapshot: service.title?.trim() || service.name,
+          priceSnapshot: service.price,
+          durationSnapshotMin: service.durationMin,
+        },
+      });
+
+      return booking;
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  );
 
   await invalidateSlotsForBookingRange({
     providerId: input.masterId,

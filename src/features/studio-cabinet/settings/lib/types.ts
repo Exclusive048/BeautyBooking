@@ -39,6 +39,8 @@ export type StudioGeneralData = {
   description: string | null;
   avatarUrl: string | null;
   isPublished: boolean;
+  /** FIX-R2-02-A — current IANA timezone, shown + editable in the selector. */
+  timezone: string;
   address: {
     cityName: string | null;
     address: string | null;

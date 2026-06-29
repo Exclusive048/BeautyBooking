@@ -25,10 +25,15 @@ function ConsentText({ variant, linkClass }: { variant: LegalConsentVariant; lin
     </Link>
   );
 
+  // FIX-EXP-CONTENT-GRAMMAR (EXP-002, legal/152-ФЗ): the link text is in the
+  // instrumental case ("Пользовательским соглашением"), so the governing verb
+  // must take "с + instrumental" — "соглашаюсь с" / "согласны с" (not the
+  // accusative "принимаю", which produced "принимаю Пользовательским
+  // соглашением"). Same documents, same links, corrected grammar only.
   if (variant === "detailed") {
     return (
       <>
-        Нажимая «Получить код», вы подтверждаете, что ознакомились и принимаете {termsLink} и{" "}
+        Нажимая «Получить код», вы подтверждаете, что ознакомились и согласны с {termsLink} и{" "}
         {privacyLink}, а также даете согласие на обработку персональных данных.
       </>
     );
@@ -37,15 +42,15 @@ function ConsentText({ variant, linkClass }: { variant: LegalConsentVariant; lin
   if (variant === "split") {
     return (
       <>
-        <span>Я принимаю {termsLink}.</span>
-        <span className="mt-1 block">Я принимаю {privacyLink}.</span>
+        <span>Я соглашаюсь с {termsLink}.</span>
+        <span className="mt-1 block">Я соглашаюсь с {privacyLink}.</span>
       </>
     );
   }
 
   return (
     <>
-      Я принимаю {termsLink} и {privacyLink}.
+      Я соглашаюсь с {termsLink} и {privacyLink}.
     </>
   );
 }

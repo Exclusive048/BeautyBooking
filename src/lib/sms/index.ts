@@ -1,5 +1,6 @@
 import { env, isSmsConfigured } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { maskPhone } from "@/lib/logging/masking";
 import { createMockSmsProvider } from "./mock-provider";
 import { createSmscProvider } from "./smsc-provider";
 import type { SmsProvider, SmsSendResult } from "./types";
@@ -65,7 +66,7 @@ export async function sendOtpSms(
   if (result.success) {
     logInfo("OTP SMS delivered", {
       provider: provider.name,
-      phone,
+      phone: maskPhone(phone),
       messageId: result.messageId,
       cost: result.cost,
       balanceLeft: result.balanceLeft,
@@ -73,7 +74,7 @@ export async function sendOtpSms(
   } else {
     logError("OTP SMS delivery failed", {
       provider: provider.name,
-      phone,
+      phone: maskPhone(phone),
       error: result.error,
       message: result.message,
     });

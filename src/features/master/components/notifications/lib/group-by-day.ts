@@ -1,4 +1,5 @@
 import type { NotificationCenterNotificationItem } from "@/lib/notifications/center";
+import { getDayOfWeek, toLocalDateKey } from "@/lib/schedule/timezone";
 
 const WEEKDAY_LABELS = [
   "воскресенье",
@@ -35,34 +36,55 @@ export type NotificationDayGroup = {
 
 export type NotificationSort = "newest" | "oldest";
 
-function ymd(date: Date): string {
+/** Process-TZ calendar key (legacy path — when no entity timeZone is given). */
+function processYmd(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+// FIX-04 (QA-113): when `timeZone` is supplied (master/studio self-view), the
+// day bucketing + "today"/"yesterday" must be computed in the recipient
+// entity's own timezone, not the Node process TZ (UTC on prod). Falls back to
+// the process TZ when no timeZone is given (no client callers exist today —
+// the QA-107 per-viewer track owns client-facing groupings).
+function dayKeyOf(date: Date, timeZone?: string): string {
+  return timeZone ? toLocalDateKey(date, timeZone) : processYmd(date);
 }
 
-function describeDay(target: Date, today: Date): { key: string; label: string } {
-  const targetStart = startOfDay(target);
-  const todayStart = startOfDay(today);
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+/** Calendar day before a `YYYY-MM-DD` key (TZ-agnostic — pure calendar math). */
+function prevDayKey(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
 
-  if (targetStart.getTime() === todayStart.getTime()) {
+function describeDay(
+  target: Date,
+  today: Date,
+  timeZone?: string,
+): { key: string; label: string } {
+  const targetKey = dayKeyOf(target, timeZone);
+  const todayKey = dayKeyOf(today, timeZone);
+
+  if (targetKey === todayKey) {
     return { key: "today", label: "Сегодня" };
   }
-  if (targetStart.getTime() === yesterdayStart.getTime()) {
+  if (targetKey === prevDayKey(todayKey)) {
     return { key: "yesterday", label: "Вчера" };
   }
-  const month = MONTH_GENITIVE[target.getMonth()] ?? "";
-  const weekday = WEEKDAY_LABELS[target.getDay()] ?? "";
+  const [, mStr, dStr] = targetKey.split("-");
+  const month = MONTH_GENITIVE[Number(mStr) - 1] ?? "";
+  const weekdayIdx = timeZone ? getDayOfWeek(target, timeZone) : target.getDay();
+  const weekday = WEEKDAY_LABELS[weekdayIdx] ?? "";
   return {
-    key: ymd(target),
-    label: `${target.getDate()} ${month} · ${weekday}`,
+    key: targetKey,
+    label: `${Number(dStr)} ${month} · ${weekday}`,
   };
 }
 
@@ -76,13 +98,14 @@ function describeDay(target: Date, today: Date): { key: string; label: string } 
 export function groupNotificationsByDay(
   items: NotificationCenterNotificationItem[],
   sort: NotificationSort,
-  now: Date = new Date()
+  now: Date = new Date(),
+  timeZone?: string
 ): NotificationDayGroup[] {
   const groupsByKey = new Map<string, NotificationDayGroup>();
 
   for (const item of items) {
     const created = new Date(item.createdAt);
-    const { key, label } = describeDay(created, now);
+    const { key, label } = describeDay(created, now, timeZone);
     const existing = groupsByKey.get(key);
     if (existing) {
       existing.items.push(item);

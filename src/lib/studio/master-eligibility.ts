@@ -36,14 +36,23 @@ export function isStudioMasterActive(
 export async function requireActiveStudioMaster(input: {
   studioProviderId: string;
   masterId: string;
-}): Promise<{ id: string; ownerUserId: string | null; isPublished: boolean }> {
+}): Promise<{
+  id: string;
+  ownerUserId: string | null;
+  isPublished: boolean;
+  // FIX-R2-04-B: the master provider's own timezone — the salon-local
+  // tz in which the work-hours window (and the engine's slot-gen) is
+  // interpreted. Surfaced here so the studio create/move paths read the
+  // booking instant in the salon tz without an extra query.
+  timezone: string;
+}> {
   const master = await prisma.provider.findFirst({
     where: {
       id: input.masterId,
       type: "MASTER",
       studioId: input.studioProviderId,
     },
-    select: { id: true, ownerUserId: true, isPublished: true },
+    select: { id: true, ownerUserId: true, isPublished: true, timezone: true },
   });
   if (!master) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");

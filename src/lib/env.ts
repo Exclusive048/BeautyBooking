@@ -85,6 +85,18 @@ const envSchema = z.object({
   YANDEX_SUGGEST_API_KEY: z.string().optional(),
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: z.string().optional(),
 
+  // FIX-EXP-CONTENT-GRAMMAR (EXP-005): real legal ИНН for the footer requisites.
+  // Optional — the footer shows an obvious "[не указан]" placeholder when unset
+  // (never a fake-looking number). Set the real value before production launch
+  // (see deploy-checklist «legal requisites»).
+  NEXT_PUBLIC_LEGAL_INN: z.string().optional(),
+
+  // FOOTER-VK: the platform's VK community URL for the footer social link.
+  // Optional — the footer OMITS the VK icon entirely when unset, rather than
+  // linking a stale/wrong handle. Set the real community URL before production
+  // launch (see deploy-checklist «social links»).
+  NEXT_PUBLIC_VK_COMMUNITY_URL: z.string().optional(),
+
   // ── OpenAI (legacy — visual-search only, AI chat surfaces migrated to Yandex) ─
   // OPENAI_API_KEY remains in schema because `src/lib/visual-search/*` still
   // imports the OpenAI SDK directly (vision + embeddings — Yandex multimodal
@@ -189,9 +201,26 @@ const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 const isTestEnv = process.env.NODE_ENV === "test";
 const isProdRuntime = process.env.NODE_ENV === "production" && !isBuildPhase;
 
-const _parsed = refinedSchema.safeParse(process.env);
+// QA-108 fix — validate the full schema + fail-fast ONLY on the server.
+//
+// This module is also evaluated in the CLIENT bundle so the browser can read the
+// `NEXT_PUBLIC_*` values. But the full schema requires server-only secrets
+// (`DATABASE_URL` / `AUTH_JWT_SECRET` / `OTP_HMAC_SECRET`) that are never sent to
+// the browser, so a client-side parse ALWAYS fails. In a production build
+// `NODE_ENV` inlines to "production" on the client too, so the previous
+// unconditional fail-fast ran `process.exit(1)` in the browser — where
+// `process.exit` does not exist — throwing at module-eval and replacing EVERY
+// page with the error boundary.
+//
+// Gating on `typeof window === "undefined"` (a) preserves the real server-side
+// fail-fast for a genuinely misconfigured server, and (b) lets Next/webpack
+// dead-code-eliminate the validation + `process.exit` (incl. the error string)
+// out of the client bundle. The client falls back to `process.env` (with the
+// `NEXT_PUBLIC_*` values inlined) exactly as before. CLAUDE.md rules 11 & 13.
+const isServerRuntime = typeof window === "undefined";
+const _parsed = isServerRuntime ? refinedSchema.safeParse(process.env) : null;
 
-if (!_parsed.success) {
+if (isServerRuntime && _parsed && !_parsed.success) {
   const lines = _parsed.error.issues
     .map((i) => `  • ${i.path.length ? i.path.join(".") : "root"}: ${i.message}`)
     .join("\n");
@@ -206,9 +235,44 @@ if (!_parsed.success) {
 
 export type AppEnv = z.infer<typeof refinedSchema>;
 
-export const env: AppEnv = _parsed.success
-  ? _parsed.data
-  : (process.env as unknown as AppEnv);
+// QA-001 / FIX-09 — client env must reference each public var as a LITERAL
+// `process.env.NEXT_PUBLIC_X`. Next/webpack only statically inlines that exact
+// text; the previous `process.env as AppEnv` alias defeated the inlining, so
+// every client read of `env.NEXT_PUBLIC_*` returned `undefined` (root cause of
+// the /login #418 + broken push/maps/telegram on the client). Enumerate the
+// FULL NEXT_PUBLIC_* set from the schema here — a missing key = undefined on the
+// client. `NODE_ENV` is included so `isProduction` is correct client-side too
+// (push-manager early-returns on `!isProduction`). Server-only vars are
+// intentionally absent (their client consumers must run server-side).
+// boolFlag/coerce vars arrive as raw strings here (not Zod-transformed) — the
+// computed flags below string-coerce them.
+//
+// ⚠️ Do NOT "simplify" this back to `process.env as AppEnv` — it re-breaks every
+// client NEXT_PUBLIC_* consumer (see CLAUDE.md rule 11 + 13).
+const clientEnv = {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME,
+  NEXT_PUBLIC_VK_ENABLED: process.env.NEXT_PUBLIC_VK_ENABLED,
+  NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: process.env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED,
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+  NEXT_PUBLIC_YANDEX_MAPS_API_KEY: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
+  NEXT_PUBLIC_LEGAL_INN: process.env.NEXT_PUBLIC_LEGAL_INN,
+  NEXT_PUBLIC_VK_COMMUNITY_URL: process.env.NEXT_PUBLIC_VK_COMMUNITY_URL,
+};
+
+export const env: AppEnv =
+  _parsed && _parsed.success
+    ? _parsed.data
+    : isServerRuntime
+      ? // Server runtime where the full parse failed (e.g. Vitest / a
+        // misconfigured server): fall back to the COMPLETE `process.env` so
+        // server-only secrets (AUTH_JWT_SECRET, OTP_HMAC_SECRET, …) remain
+        // available. `clientEnv` would drop them. (FIX-10: FIX-09 wrongly used
+        // clientEnv for this branch → broke auth/token unit tests.)
+        (process.env as unknown as AppEnv)
+      : // Client bundle: the literal-inlined NEXT_PUBLIC_* set (QA-001/FIX-09).
+        (clientEnv as unknown as AppEnv);
 
 // ── Computed flags ────────────────────────────────────────────────────────────
 export const isPushEnabled = Boolean(

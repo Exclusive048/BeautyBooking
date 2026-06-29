@@ -138,6 +138,18 @@ export function BookingFlowStepper({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // FIX-EXP-CHAT-UX (EXP-022): the post-submit success-card enrich fetch is a
+  // detached fire-and-forget async task — guard its dispatch so it can't update
+  // state after the stepper unmounts (e.g. mobile sheet close / navigate to the
+  // profile right after booking). Intermittent React "state update on an
+  // unmounted component" warning otherwise.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // Service change in the parent — reset selection
   const lastServiceIdRef = useRef(serviceId);
   useEffect(() => {
@@ -400,7 +412,9 @@ export function BookingFlowStepper({
               servicePrice,
               providerTimezone,
             });
-            if (enriched) {
+            // EXP-022: skip the state update if the stepper unmounted while
+            // this detached fetch was in flight.
+            if (enriched && mountedRef.current) {
               dispatch({ type: "loadConfirmedBooking", booking: enriched });
             }
           }

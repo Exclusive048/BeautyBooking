@@ -13,7 +13,7 @@ import { getModelOfferUserState } from "@/lib/model-offers/user-state";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Для моделей — МастерРядом",
+  title: "Для моделей",
   description:
     "Услуги со скидкой за участие в практике мастера. Каждый оффер показывает время услуги, время на контент и фото.",
   alternates: { canonical: "/models" },

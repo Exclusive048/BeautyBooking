@@ -9,7 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { moneyRUB } from "@/lib/format";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import type {
   ChatPerspective,
   ThreadBookingCardDto,
@@ -101,7 +101,7 @@ function BookingCard({
         ) : null}
 
         <div className="pt-1 font-mono text-base font-semibold text-text-main">
-          {moneyRUB(card.priceSnapshot)}
+          {moneyRUBFromKopeks(card.priceSnapshot)}
         </div>
 
         <div className="pt-2">

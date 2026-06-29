@@ -237,6 +237,9 @@ model ServicePackage {
 
   items ServicePackageItem[]
 
+  // PACKAGE-BOOKING-MVP-1: booked instances of this package.
+  bookingPackages BookingPackage[]
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -254,8 +257,14 @@ model ServicePackageItem {
 
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
+  // PACKAGE-BOOKING-MVP-1: component sequencing for sequential solo placement
+  // (component i+1 starts after component i ends + buffer). Backfilled by the
+  // migration to the current per-package createdAt order.
+  sortOrder Int @default(0)
+
   createdAt DateTime @default(now())
 
   @@id([packageId, serviceId])
   @@index([serviceId])
+  @@index([packageId, sortOrder])
 }

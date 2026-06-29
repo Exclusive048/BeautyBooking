@@ -1,10 +1,10 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FocalImage } from "@/components/ui/focal-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import type {
@@ -106,13 +106,14 @@ export function PortfolioCard({
           type="button"
           onClick={() => setEditOpen(true)}
           aria-label={T.editAriaLabel}
-          className="block h-full w-full"
+          className="relative block h-full w-full"
         >
-          <img
+          <FocalImage
             src={item.mediaUrl}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            className="object-cover"
           />
         </button>
 

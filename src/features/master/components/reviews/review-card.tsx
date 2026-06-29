@@ -41,13 +41,15 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
   const serviceLabel = serviceName?.trim() || NO_SERVICE;
 
   return (
-    <article className="rounded-2xl border border-border-subtle bg-bg-card p-5">
+    <article data-focus-id={review.id} className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={cn(
               "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-              pickAvatarColor(review.authorId)
+              // RULE-12-REVIEWS (FIX-18): authorId removed from DTO; seed the
+              // cosmetic avatar colour from the author name instead.
+              pickAvatarColor(review.authorName)
             )}
             aria-hidden
           >

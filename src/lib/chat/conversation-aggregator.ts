@@ -295,7 +295,7 @@ function buildPartner(input: {
         phone: null,
         roleSummary: "Клиент",
         bookingUrl: input.bookingId
-          ? `/cabinet/master/bookings?bookingId=${input.bookingId}`
+          ? `/cabinet/master/bookings?focus=${input.bookingId}`
           : null,
         publicProfileUrl: null,
       };
@@ -307,7 +307,7 @@ function buildPartner(input: {
       phone: c.phone,
       roleSummary: "Клиент",
       bookingUrl: input.bookingId
-        ? `/cabinet/master/bookings?bookingId=${input.bookingId}`
+        ? `/cabinet/master/bookings?focus=${input.bookingId}`
         : null,
       publicProfileUrl: null,
     };

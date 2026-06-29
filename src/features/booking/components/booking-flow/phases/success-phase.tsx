@@ -6,6 +6,8 @@ import { ArrowRight, Calendar, CheckCircle2, Clock, MapPin, Receipt } from "luci
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ConfirmedBooking } from "@/features/booking/components/booking-flow/types";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
@@ -59,6 +61,16 @@ function formatRange(startIso: string, endIso: string | null, timezone: string):
  */
 export function SuccessPhase({ booking, onCancel }: Props) {
   const [cancelling, setCancelling] = useState(false);
+  const viewerTz = useViewerTimeZoneContext();
+  // QA-107/FIX-22: the confirmed time is the salon's local time; show the
+  // explicit zone label when the viewer's zone differs.
+  const zoneLabel = zonesDifferForViewer({
+    iso: booking.startAtUtc,
+    salonTimeZone: booking.timezone,
+    viewerTimeZone: viewerTz,
+  })
+    ? formatZoneLabel({ iso: booking.startAtUtc, timeZone: booking.timezone })
+    : "";
 
   return (
     <div className="space-y-5 p-5">
@@ -76,7 +88,18 @@ export function SuccessPhase({ booking, onCancel }: Props) {
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm text-text-main">
           <Calendar className="h-4 w-4 shrink-0 text-text-sec" aria-hidden strokeWidth={1.6} />
-          <span>{formatRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</span>
+          <span>
+            {formatRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}
+            {/* FIX-EXP-CONTENT-GRAMMAR (EXP-004): a real space char (not just an
+                `ml-1` margin) before the zone label — otherwise the range and
+                «(Алматы, GMT+5)» run together in text / screen-reader output. */}
+            {zoneLabel ? (
+              <>
+                {" "}
+                <span className="font-mono text-xs text-primary">{zoneLabel}</span>
+              </>
+            ) : null}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-text-main">
           <Clock className="h-4 w-4 shrink-0 text-text-sec" aria-hidden strokeWidth={1.6} />

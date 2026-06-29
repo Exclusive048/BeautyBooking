@@ -5,6 +5,7 @@ import {
   minutesUntil,
 } from "@/features/master/lib/time-greeting";
 import { pickAdvice, type AdviceContext } from "@/features/master/lib/dashboard-advice";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.hero;
@@ -14,12 +15,6 @@ function initialsOf(name: string): string {
   const first = parts[0]?.charAt(0) ?? "";
   const last = parts.length > 1 ? parts[parts.length - 1]!.charAt(0) : "";
   return (first + last).toUpperCase() || "•";
-}
-
-function formatHm(date: Date): string {
-  const h = String(date.getUTCHours()).padStart(2, "0");
-  const m = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
 }
 
 type NextBookingInfo = {
@@ -34,6 +29,8 @@ type Props = {
   now: Date;
   context: AdviceContext;
   nextBooking: NextBookingInfo | null;
+  /** Salon (master) tz — EXP-017: next-booking time shown in salon-tz, matching the kanban. */
+  timezone: string;
 };
 
 /**
@@ -43,7 +40,7 @@ type Props = {
  * `pickAdvice(context)` which is a small rule engine that we'll later
  * swap for the in-app Advisor module.
  */
-export function GreetingHero({ firstName, now, context, nextBooking }: Props) {
+export function GreetingHero({ firstName, now, context, nextBooking, timezone }: Props) {
   const greeting = getTimeGreeting(now);
   const dateLabel = formatHeroDate(now);
   const advice = pickAdvice(context);
@@ -96,7 +93,7 @@ export function GreetingHero({ firstName, now, context, nextBooking }: Props) {
               </p>
               <p className="truncate text-sm font-medium">{nextBooking.clientName}</p>
               <p className="truncate text-xs text-white/80">
-                {formatHm(nextBooking.startAtUtc)} · {nextBooking.serviceTitle}
+                {formatLocalHm(nextBooking.startAtUtc, timezone)} · {nextBooking.serviceTitle}
               </p>
             </div>
             <div aria-hidden className="h-8 w-px bg-white/20" />

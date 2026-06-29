@@ -7,7 +7,7 @@ import { PartnershipForm } from "@/features/partners/components/partnership-form
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
-  title: "Сотрудничество — МастерРядом",
+  title: "Сотрудничество",
   description:
     "Школы, бренды, медиа, бьюти-сообщества и технологические партнёры — расскажите о вашем предложении.",
   alternates: { canonical: "/partners" },

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createRecurringPayment } from "@/lib/payments/yookassa/client";
 import { addMonthsUtc, sha256 } from "@/lib/billing/utils";
 import { BILLING_PERIODS, PAST_DUE_GRACE_DAYS } from "@/lib/billing/constants";
+import { resolvePlanPrice } from "@/lib/billing/pricing";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError } from "@/lib/logging/logger";
@@ -173,18 +174,20 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // Price not found or disabled → move to grace period
-    const price = await prisma.billingPlanPrice.findUnique({
-      where: {
-        planId_periodMonths: {
-          planId: subscription.planId,
-          periodMonths: subscription.periodMonths,
-        },
-      },
-      select: { priceKopeks: true, isActive: true },
+    // FIX-BC-1: resolve the renewal amount with the SAME shared resolver the
+    // checkout/cabinet uses — so a sub renews at exactly the amount it signed up
+    // for, and a period whose exact `BillingPlanPrice` row is absent falls back
+    // to the monthly-derived price (instead of silently expiring a paying
+    // subscriber on a valid card). `null` only when even the monthly row is
+    // gone → surfaced as RENEWAL_FAILED/MISSING_PRICE + grace (admin-visible,
+    // not silent), identical policy to checkout's 404.
+    const activePrices = await prisma.billingPlanPrice.findMany({
+      where: { planId: subscription.planId, isActive: true },
+      select: { periodMonths: true, priceKopeks: true },
     });
+    const resolvedPriceKopeks = resolvePlanPrice(activePrices, subscription.periodMonths);
 
-    if (!price?.isActive) {
+    if (resolvedPriceKopeks === null) {
       await prisma.userSubscription.update({
         where: { id: subscription.id },
         data: { status: "PAST_DUE", graceUntil },
@@ -267,7 +270,7 @@ export async function POST(req: Request) {
         subscriptionId: subscription.id,
         type: "RENEWAL",
         status: "PENDING",
-        amountKopeks: price.priceKopeks,
+        amountKopeks: resolvedPriceKopeks,
         currency: "RUB",
         periodMonths: subscription.periodMonths,
         idempotenceKey,
@@ -286,7 +289,7 @@ export async function POST(req: Request) {
 
     try {
       const yookassa = await createRecurringPayment({
-        amountKopeks: price.priceKopeks,
+        amountKopeks: resolvedPriceKopeks,
         paymentMethodId: subscription.paymentMethodId,
         description: `Автопродление ${subscription.plan.name}`,
         idempotenceKey,

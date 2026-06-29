@@ -3,6 +3,7 @@ import { cn } from "@/lib/cn";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { AddressEditor } from "../editable/address-editor";
+import { TimezoneSelector } from "../editable/timezone-selector";
 import { SectionShell } from "./section-shell";
 import { MapDisplay } from "./map-display";
 
@@ -29,6 +30,7 @@ export function LocationSection({ data }: Props) {
       <div className="divide-y divide-border-subtle">
         <CityRow value={data.cityName} isEmpty={isCityEmpty} />
         <AddressEditor value={data.address ?? ""} />
+        <TimezoneSelector current={data.timezone} />
       </div>
       <div className="mt-4">
         <MapDisplay geoLat={data.geoLat} geoLng={data.geoLng} />

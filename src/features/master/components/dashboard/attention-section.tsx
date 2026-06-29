@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmBookingAction } from "@/features/master/components/dashboard/confirm-booking-action";
 import { TaskRow, type TaskUrgency } from "@/features/master/components/dashboard/task-row";
 import type { DashboardData } from "@/lib/master/dashboard.service";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.attention;
@@ -17,12 +18,6 @@ function pluralizeTasks(n: number): string {
   return "задач";
 }
 
-function formatHm(date: Date): string {
-  const h = String(date.getUTCHours()).padStart(2, "0");
-  const m = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
-}
-
 type TaskItem = {
   key: string;
   icon: typeof AlertCircle;
@@ -30,13 +25,18 @@ type TaskItem = {
   description: string;
   cta: ReactNode;
   urgency: TaskUrgency;
+  /** FIX-R2-06-B: deep-link focus anchor (pending booking id) for `?focus=`. */
+  focusId?: string;
 };
 
-function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredReviews" | "freeSlot">): TaskItem[] {
+function buildTasks(
+  data: Pick<DashboardData, "pendingBookings" | "unansweredReviews" | "freeSlot">,
+  timezone: string,
+): TaskItem[] {
   const tasks: TaskItem[] = [];
 
   for (const pb of data.pendingBookings) {
-    const when = pb.startAtUtc ? `${formatHm(pb.startAtUtc)}` : "";
+    const when = pb.startAtUtc ? formatLocalHm(pb.startAtUtc, timezone) : "";
     tasks.push({
       key: `pending-${pb.id}`,
       icon: AlertCircle,
@@ -49,6 +49,7 @@ function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredRev
       // navigation away from the dashboard.
       cta: <ConfirmBookingAction bookingId={pb.id} />,
       urgency: "high",
+      focusId: pb.id,
     });
   }
 
@@ -75,8 +76,8 @@ function buildTasks(data: Pick<DashboardData, "pendingBookings" | "unansweredRev
       key: "free-slot",
       icon: Calendar,
       title: T.freeSlotTitle
-        .replace("{from}", formatHm(data.freeSlot.startAtUtc))
-        .replace("{to}", formatHm(data.freeSlot.endAtUtc)),
+        .replace("{from}", formatLocalHm(data.freeSlot.startAtUtc, timezone))
+        .replace("{to}", formatLocalHm(data.freeSlot.endAtUtc, timezone)),
       description: T.freeSlotDescription.replace(
         "{minutes}",
         String(data.freeSlot.durationMin),
@@ -102,6 +103,8 @@ type Props = {
   pendingBookings: DashboardData["pendingBookings"];
   unansweredReviews: DashboardData["unansweredReviews"];
   freeSlot: DashboardData["freeSlot"];
+  /** Salon (master) tz — EXP-017: booking/slot times shown in salon-tz, matching the kanban. */
+  timezone: string;
 };
 
 /**
@@ -113,8 +116,9 @@ export function AttentionSection({
   pendingBookings,
   unansweredReviews,
   freeSlot,
+  timezone,
 }: Props) {
-  const tasks = buildTasks({ pendingBookings, unansweredReviews, freeSlot });
+  const tasks = buildTasks({ pendingBookings, unansweredReviews, freeSlot }, timezone);
   const hasTasks = tasks.length > 0;
 
   return (
@@ -147,6 +151,7 @@ export function AttentionSection({
               description={task.description}
               cta={task.cta}
               urgency={task.urgency}
+              focusId={task.focusId}
             />
           ))}
         </div>

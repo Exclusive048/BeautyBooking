@@ -314,6 +314,61 @@ async function ensureMasterReviewAccess(review: {
   throw new AppError("Forbidden", 403, "FORBIDDEN");
 }
 
+type ProviderSideRef = {
+  ownerUserId: string | null;
+  studioId: string | null;
+  masterProfile: { userId: string } | null;
+};
+
+/**
+ * R2-06-I — is `authorId` on the provider side of this booking (so a review by
+ * them would be a self-review)? Covers: solo master (provider owner /
+ * masterProfile), the master-in-studio who performed it (`masterProvider`), and
+ * the studio owner / active OWNER|ADMIN members of the booking's studio. Keys on
+ * THIS booking's provider linkage — never a global "is a provider" check, so a
+ * provider reviewing a DIFFERENT provider's booking is not blocked.
+ */
+async function isBookingProviderSide(
+  booking: {
+    provider: { id: string; type: string } & ProviderSideRef;
+    masterProvider: ProviderSideRef | null;
+  },
+  authorId: string,
+): Promise<boolean> {
+  const directIds = new Set<string>();
+  for (const ref of [booking.provider, booking.masterProvider]) {
+    if (ref?.ownerUserId) directIds.add(ref.ownerUserId);
+    if (ref?.masterProfile?.userId) directIds.add(ref.masterProfile.userId);
+  }
+  if (directIds.has(authorId)) return true;
+
+  // Studio owner / admins — resolve the studio provider ref for either a
+  // STUDIO-target booking or a master-in-studio booking.
+  const studioProviderId =
+    booking.provider.type === "STUDIO"
+      ? booking.provider.id
+      : booking.provider.studioId ?? booking.masterProvider?.studioId ?? null;
+  if (!studioProviderId) return false;
+
+  const studio = await prisma.studio.findUnique({
+    where: { providerId: studioProviderId },
+    select: { id: true, ownerUserId: true },
+  });
+  if (!studio) return false;
+  if (studio.ownerUserId === authorId) return true;
+
+  const membership = await prisma.studioMembership.findFirst({
+    where: {
+      studioId: studio.id,
+      userId: authorId,
+      status: MembershipStatus.ACTIVE,
+      roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
+    },
+    select: { id: true },
+  });
+  return membership !== null;
+}
+
 export async function createReview(input: {
   currentUserId: string;
   bookingId: string;
@@ -332,12 +387,35 @@ export async function createReview(input: {
       startAtUtc: true,
       endAtUtc: true,
       service: { select: { durationMin: true } },
-      provider: { select: { id: true, type: true } },
+      provider: {
+        select: {
+          id: true,
+          type: true,
+          ownerUserId: true,
+          studioId: true,
+          masterProfile: { select: { userId: true } },
+        },
+      },
+      // R2-06-I: needed to detect a self-review (the performing master-in-studio).
+      masterProvider: {
+        select: {
+          studioId: true,
+          ownerUserId: true,
+          masterProfile: { select: { userId: true } },
+        },
+      },
     },
   });
 
   if (!booking) {
     throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+  }
+
+  // R2-06-I: a provider must not review their own booking. Reject server-side
+  // (the source of truth) for every provider-side role: solo master, the
+  // master-in-studio who performed it, and the studio owner/admins.
+  if (await isBookingProviderSide(booking, input.currentUserId)) {
+    throw new AppError("You cannot review your own booking", 403, "REVIEW_NOT_ALLOWED");
   }
 
   const isAllowed = canLeaveReview({
@@ -415,7 +493,8 @@ export async function createReview(input: {
     await invalidateAdvisorCache(created.targetId);
   }
 
-  return toReviewDto(created);
+  // RULE-12-REVIEWS (FIX-18): creator is the author → isOwnReview true; id encoded.
+  return toReviewDto(created, { currentUserId: input.currentUserId });
 }
 
 export async function listReviews(input: {
@@ -442,7 +521,13 @@ export async function listReviews(input: {
     skip: input.offset,
     include: reviewInclude,
   });
-  return reviews.map((review) => toReviewDto(review, { includePrivateTags }));
+  return reviews.map((review) =>
+    toReviewDto(review, {
+      includePrivateTags,
+      // RULE-12-REVIEWS (FIX-18): per-viewer own-review flag computed server-side.
+      currentUserId: input.currentUser?.id ?? null,
+    })
+  );
 }
 
 export async function getReviewAvailabilityForBooking(input: {

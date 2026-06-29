@@ -1,5 +1,6 @@
 import { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 const ACTIVE_BOOKING_STATUSES_NOTIN = [
   BookingStatus.REJECTED,
@@ -58,9 +59,11 @@ export async function getMasterWeekOccupancy(input: {
   const weekStart = startOfUtcWeekMonday(now);
   const weekEnd = addUtcDays(weekStart, 7);
 
-  const todayKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
-
-  const [config, bookings] = await Promise.all([
+  const [provider, config, bookings] = await Promise.all([
+    prisma.provider.findUnique({
+      where: { id: input.providerId },
+      select: { timezone: true },
+    }),
     prisma.weeklyScheduleConfig.findUnique({
       where: { providerId: input.providerId },
       select: { days: { select: { weekday: true, isActive: true } } },
@@ -68,36 +71,48 @@ export async function getMasterWeekOccupancy(input: {
     prisma.booking.findMany({
       where: {
         OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }],
-        startAtUtc: { gte: weekStart, lt: weekEnd },
+        // Widen the UTC query window ±1 day: a booking whose *local* day falls in
+        // this week can sit just outside the UTC week boundary (a salon-tz offset
+        // shifts the instant up to ~12h). Day assignment below is by local date
+        // key, so rows outside the 7 local days simply match no cell.
+        startAtUtc: { gte: addUtcDays(weekStart, -1), lt: addUtcDays(weekEnd, 1) },
         status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
       },
       select: { startAtUtc: true },
     }),
   ]);
 
+  // STUDIO-SCHEDULE-UTC-DAY-GROUPING: bucket bookings and resolve "today" in the
+  // master's salon timezone via the shared `toLocalDateKey` primitive — not in
+  // UTC. UTC date keys mis-bucket near-midnight bookings and mis-highlight the
+  // "today" column for a non-UTC studio (+5/+7 etc.), the same divergence class
+  // the master/client cabinets already closed (EXP-013/EXP-020). The week anchor
+  // stays UTC-Monday; for the platform's RU/CIS (non-negative offset) market the
+  // 7 UTC-midnight instants resolve to the correct Mon..Sun local dates.
+  const timeZone = provider?.timezone ?? "Europe/Moscow";
+  const todayKey = toLocalDateKey(now, timeZone);
+
   const activeWeekdays = new Set(
     (config?.days ?? []).filter((day) => day.isActive).map((day) => day.weekday),
   );
 
-  const bookingsByDay = new Map<number, number>();
+  const bookingsByLocalDay = new Map<string, number>();
   for (const booking of bookings) {
     if (!booking.startAtUtc) continue;
-    const offset = Math.floor(
-      (booking.startAtUtc.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000),
-    );
-    if (offset < 0 || offset > 6) continue;
-    bookingsByDay.set(offset, (bookingsByDay.get(offset) ?? 0) + 1);
+    const key = toLocalDateKey(booking.startAtUtc, timeZone);
+    bookingsByLocalDay.set(key, (bookingsByLocalDay.get(key) ?? 0) + 1);
   }
 
   return Array.from({ length: 7 }, (_, dayIndex) => {
     const date = addUtcDays(weekStart, dayIndex);
     const weekday = dayIndex + 1; // 1=Mon ... 7=Sun
     const isDayOff = !activeWeekdays.has(weekday);
-    const booked = bookingsByDay.get(dayIndex) ?? 0;
-    const cellKey = `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
+    const cellKey = toLocalDateKey(date, timeZone);
+    const booked = bookingsByLocalDay.get(cellKey) ?? 0;
+    const dayOfMonth = Number(cellKey.split("-")[2]);
     return {
       weekday,
-      dateLabel: `${WEEKDAY_LABELS[dayIndex]} ${date.getUTCDate()}`,
+      dateLabel: `${WEEKDAY_LABELS[dayIndex]} ${dayOfMonth}`,
       booked,
       total: isDayOff ? 0 : DAILY_CAPACITY,
       isDayOff,

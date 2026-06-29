@@ -9,8 +9,10 @@ import {
 import { isDateKey } from "@/lib/schedule/dateKey";
 import { getMasterAnalyticsView } from "@/lib/master/analytics-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
+import { FeatureGate } from "@/components/billing/FeatureGate";
 import { AnalyticsKpiCards } from "./analytics-kpi-cards";
-import { FeatureGate } from "./feature-gate";
+
+const ANALYTICS_LOCK_BODY = UI_TEXT.cabinetMaster.analytics.lock.body;
 import { FunnelSection } from "./funnel-section";
 import { HeatmapSection } from "./heatmap-section";
 import { InsightsSection } from "./insights-section";
@@ -100,29 +102,29 @@ export async function MasterAnalyticsPage({ searchParams }: Props) {
           rangeToKey={validCustomRange?.toKey ?? data.range.toKey}
         />
 
-        <FeatureGate available={features.dashboard}>
+        <FeatureGate scope="MASTER" feature="analytics_dashboard" available={features.dashboard} description={ANALYTICS_LOCK_BODY}>
           <AnalyticsKpiCards kpi={data.kpi} comparison={comparison} />
         </FeatureGate>
 
-        <FeatureGate available={features.revenue}>
+        <FeatureGate scope="MASTER" feature="analytics_revenue" available={features.revenue} description={ANALYTICS_LOCK_BODY}>
           <RevenueSection data={data.revenue} comparison={comparison} />
         </FeatureGate>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr,1fr]">
-          <FeatureGate available={features.bookingInsights}>
+          <FeatureGate scope="MASTER" feature="analytics_booking_insights" available={features.bookingInsights} description={ANALYTICS_LOCK_BODY}>
             <HeatmapSection data={data.heatmap} />
           </FeatureGate>
-          <FeatureGate available={features.revenue}>
+          <FeatureGate scope="MASTER" feature="analytics_revenue" available={features.revenue} description={ANALYTICS_LOCK_BODY}>
             <TopServicesSection services={data.topServices} periodLabel={periodLabel} />
           </FeatureGate>
         </div>
 
-        <FeatureGate available={features.revenue}>
+        <FeatureGate scope="MASTER" feature="analytics_revenue" available={features.revenue} description={ANALYTICS_LOCK_BODY}>
           <FunnelSection steps={data.funnel} periodLabel={periodLabel} />
         </FeatureGate>
 
         {data.insights.length > 0 ? (
-          <FeatureGate available={features.bookingInsights}>
+          <FeatureGate scope="MASTER" feature="analytics_booking_insights" available={features.bookingInsights} description={ANALYTICS_LOCK_BODY}>
             <InsightsSection insights={data.insights} periodLabel={periodLabel} />
           </FeatureGate>
         ) : null}

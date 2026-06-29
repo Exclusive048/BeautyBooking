@@ -9,6 +9,7 @@ export type MeIdentity = {
   email: string | null;
   externalPhotoUrl: string | null;
   emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
 };
 
 export const ME_CACHE_TTL_SECONDS = 30;
@@ -40,6 +41,7 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
       email: true,
       externalPhotoUrl: true,
       emailNotificationsEnabled: true,
+      pushNotificationsEnabled: true,
       isDeleted: true,
     },
   });
@@ -53,5 +55,6 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
     email: profile.email,
     externalPhotoUrl: profile.externalPhotoUrl,
     emailNotificationsEnabled: profile.emailNotificationsEnabled,
+    pushNotificationsEnabled: profile.pushNotificationsEnabled,
   };
 }

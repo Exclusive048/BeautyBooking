@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getPendingBookingsForMaster, type PendingBookingRow } from "@/lib/bookings/master-pending-list";
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { getUnansweredReviewsForMaster, type UnansweredReviewRow } from "@/lib/reviews/unanswered-list";
+import { getDayOfWeek } from "@/lib/schedule/timezone";
 
 export type DashboardBooking = {
   id: string;
@@ -64,6 +65,8 @@ export type DashboardData = {
     avatarUrl: string | null;
     publicUsername: string | null;
     timezone: string;
+    /** QA-115 (FIX-06): studio affiliation; `null` for independent masters. */
+    studio: { name: string } | null;
   };
   kpis: {
     todayRevenue: number;
@@ -169,7 +172,13 @@ async function resolveTodayWorkingWindow(args: {
   // routing lives in the schedule engine; for the dashboard's "free slot
   // hint" we rely on the template — close enough, and avoids pulling the
   // full ScheduleEngine into the layout's render path.
-  const weekday = args.now.getUTCDay();
+  // QA-112: resolve "today" in the PROVIDER's timezone (not the server's UTC
+  // day) and use the WeeklyScheduleDay ISO convention (1=Mon … 7=Sun). The old
+  // `getUTCDay()` (0=Sun … 6=Sat) both ignored the provider tz AND never matched
+  // a Sunday row (stored as weekday 7, not 0) → capacity rendered "0ч". ISO
+  // mapping also aligns with the seed convention fixed in QA-116.
+  const jsWeekday = getDayOfWeek(args.now, args.timezone);
+  const weekday = jsWeekday === 0 ? 7 : jsWeekday;
   const config = await prisma.weeklyScheduleConfig.findUnique({
     where: { providerId: args.providerId },
     select: {
@@ -222,6 +231,8 @@ export const getMasterDashboardData = cache(
         publicUsername: true,
         timezone: true,
         studioId: true,
+        // QA-115 (FIX-06): studio affiliation (studioId references the studio's provider row).
+        studio: { select: { name: true } },
       },
     });
     if (!master) {
@@ -411,6 +422,7 @@ export const getMasterDashboardData = cache(
         avatarUrl: master.avatarUrl,
         publicUsername: master.publicUsername,
         timezone: master.timezone,
+        studio: master.studio ? { name: master.studio.name } : null,
       },
       kpis: {
         todayRevenue,

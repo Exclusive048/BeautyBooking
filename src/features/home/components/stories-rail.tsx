@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import useSWR from "swr";
+import { FocalImage } from "@/components/ui/focal-image";
 import { motion, useReducedMotion } from "framer-motion";
 import { useStoriesViewer } from "@/features/home/stories-viewer-context";
 import {
@@ -66,10 +66,9 @@ function StoryRing({
         >
           <div className="relative h-full w-full overflow-hidden rounded-full bg-bg-card">
             {group.avatarUrl ? (
-              <Image
+              <FocalImage
                 src={group.avatarUrl}
                 alt=""
-                fill
                 sizes="72px"
                 className="object-cover"
               />

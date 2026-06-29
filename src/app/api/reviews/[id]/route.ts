@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { reviewIdParamSchema } from "@/lib/reviews/schemas";
 import { deleteReview, updateReview } from "@/lib/reviews/service";
+import { decodePublicId } from "@/lib/public-id";
 import { parseBody } from "@/lib/validation";
 
 const updateReviewBodySchema = z.object({
@@ -34,7 +35,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     const body = await parseBody(req, updateReviewBodySchema);
 
     const result = await updateReview({
-      reviewId: parsedParam.data.id,
+      // RULE-12-REVIEWS (FIX-18): decode opaque token; raw cuids pass through.
+      reviewId: decodePublicId(parsedParam.data.id),
       currentUser: { id: user.id, roles: user.roles },
       rating: body.rating,
       text: body.text,
@@ -69,7 +71,8 @@ export async function DELETE(req: Request, ctx: RouteContext) {
     }
 
     const result = await deleteReview({
-      reviewId: parsed.data.id,
+      // RULE-12-REVIEWS (FIX-18): decode opaque token; raw cuids pass through.
+      reviewId: decodePublicId(parsed.data.id),
       currentUser: { id: user.id, roles: user.roles },
     });
 

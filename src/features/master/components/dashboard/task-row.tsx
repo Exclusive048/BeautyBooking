@@ -10,6 +10,8 @@ type Props = {
   /** Trailing action — `<Link>` button OR a client island. */
   cta: ReactNode;
   urgency: TaskUrgency;
+  /** FIX-R2-06-B: deep-link focus anchor (e.g. the pending booking id). */
+  focusId?: string;
 };
 
 /**
@@ -18,14 +20,14 @@ type Props = {
  * client island (e.g. inline confirm/decline) — keeps the row
  * presentation-only.
  */
-export function TaskRow({ icon: Icon, title, description, cta, urgency }: Props) {
+export function TaskRow({ icon: Icon, title, description, cta, urgency, focusId }: Props) {
   const iconColor =
     urgency === "high"
       ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
       : "bg-primary/10 text-primary";
 
   return (
-    <div className="flex items-start gap-3 px-4 py-3.5">
+    <div data-focus-id={focusId} className="flex items-start gap-3 px-4 py-3.5">
       <span
         aria-hidden
         className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${iconColor}`}

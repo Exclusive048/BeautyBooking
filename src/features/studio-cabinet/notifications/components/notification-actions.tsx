@@ -34,10 +34,42 @@ type Props = {
  */
 export function NotificationActions({ notificationId, type, payloadJson, openHref }: Props) {
   const router = useRouter();
-  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [busy, setBusy] = useState<"approve" | "reject" | "rsAccept" | "rsDecline" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const refresh = () => startTransition(() => router.refresh());
+
+  const payload = readNotificationPayload(payloadJson);
+
+  // FIX-R2-06-A: studio admins reach parity with the solo master — accept /
+  // decline a client-proposed reschedule inline (two-sided approval). Accept
+  // reuses the shared atomic `confirmBooking` path (re-validated, FIX-R2-01-B);
+  // decline reverts to the original time. Both endpoints admit a studio admin
+  // via `requireBookingConfirmAccess` (→ actor "MASTER").
+  const callBookingRescheduleDecision = async (decision: "rsAccept" | "rsDecline") => {
+    if (!payload.bookingId || busy) return;
+    setBusy(decision);
+    setError(null);
+    try {
+      const url =
+        decision === "rsAccept"
+          ? `/api/bookings/${encodeURIComponent(payload.bookingId)}/confirm`
+          : `/api/bookings/${encodeURIComponent(payload.bookingId)}/decline-reschedule`;
+      const response = await fetch(url, { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null;
+        setError(body?.error?.message ?? E.bookingReschedule);
+        return;
+      }
+      refresh();
+    } catch {
+      setError(E.bookingReschedule);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // SCHEDULE_REQUEST pseudo-id format is `schedule-request:<realId>` —
   // see `getNotificationCenterData` in `src/lib/notifications/center.ts`.
@@ -121,9 +153,54 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
     );
   }
 
+  // FIX-R2-06-A: inline accept/decline for a client-proposed reschedule.
+  // Hide once resolved (merged payload no longer CHANGE_REQUESTED).
+  if (
+    type === NotificationType.BOOKING_RESCHEDULE_REQUESTED &&
+    payload.bookingId &&
+    (!payload.bookingStatus || payload.bookingStatus === "CHANGE_REQUESTED")
+  ) {
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={busy !== null}
+            onClick={() => void callBookingRescheduleDecision("rsAccept")}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden />
+            {T.acceptReschedule}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={busy !== null}
+            onClick={() => void callBookingRescheduleDecision("rsDecline")}
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+            {T.declineReschedule}
+          </Button>
+          <Link
+            href="/cabinet/studio/bookings"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            {T.openBooking}
+          </Link>
+        </div>
+        {error ? (
+          <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   // Navigation pattern (mirror master notif for non-actionable types).
   // Compute deep links from the merged payload.
-  const payload = readNotificationPayload(payloadJson);
   const navLinks: Array<{ label: string; href: string; icon: typeof CalendarClock }> = [];
 
   if (

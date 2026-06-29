@@ -1,4 +1,5 @@
 import { ok, fail } from "@/lib/api/response";
+import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { requireAuth } from "@/lib/auth/guards";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
@@ -114,7 +115,15 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     }
   }
 
-  const updated = await updateStudioProviderProfile(id, payload);
+  // Surface AppError from the service (e.g. R2-02-B publish gate ADDRESS_REQUIRED)
+  // as a clean 4xx instead of an unhandled 500.
+  let updated;
+  try {
+    updated = await updateStudioProviderProfile(id, payload);
+  } catch (error) {
+    const appError = error instanceof AppError ? error : toAppError(error);
+    return fail(appError.message, appError.status, appError.code, appError.details);
+  }
   if (!updated) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
 
   return ok({ studio: updated });

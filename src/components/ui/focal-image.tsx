@@ -1,5 +1,9 @@
+"use client";
+
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { cn } from "@/lib/cn";
+import { IMAGE_FALLBACK_SRC, isOptimizableImageSrc } from "./image-host";
 
 type FocalImageProps = {
   src: string;
@@ -17,10 +21,28 @@ type FocalImageProps = {
   // Fill mode: fills the parent (parent must have position:relative + explicit dimensions)
   // Used automatically when width/height are not provided
   sizes?: string;
+  quality?: number;
   priority?: boolean;
   loading?: "lazy" | "eager";
+  /**
+   * Skip `next/image` optimization (serves the raw URL). Mirrors the
+   * `next/image` `unoptimized` flag — used where a caller deliberately wants
+   * the original bytes (e.g. a full-screen lightbox view).
+   */
+  unoptimized?: boolean;
+  /** Forwarded to `next/image` (e.g. story viewer marks an item viewed). */
+  onLoad?: () => void;
+  /**
+   * Object-fit of the PLACEHOLDER fallback only. The real image's object-fit
+   * stays driven by `className` (as before) so existing callers are unchanged;
+   * `fit` keeps the fallback faithful for `object-contain` surfaces. Default
+   * `"cover"` preserves prior behaviour.
+   */
+  fit?: "cover" | "contain";
   className?: string;
   style?: CSSProperties;
+  /** Override the local placeholder shown when the image is unavailable. */
+  fallbackSrc?: string;
 };
 
 function buildObjectPosition(
@@ -38,27 +60,27 @@ function buildObjectPosition(
 }
 
 /**
- * Returns false unconditionally — kept as a stub for call-site compatibility.
+ * Shared focal/portfolio image renderer with per-image resilience (QA-102-L1).
  *
- * Historically this returned `true` for /api/media/* URLs because the route
- * issued a 302 redirect to S3, which Next.js Image Optimizer doesn't handle
- * reliably (received-null errors). Since 06-MEDIA-PIPELINE the route streams
- * bytes directly with proper Content-Type and Cache-Control, so the optimizer
- * works as expected and `unoptimized={true}` is no longer needed.
+ * A master's avatar / portfolio URL can point at an UNCONFIGURED remote host
+ * (not in `next.config` `images.remotePatterns`) or a DEAD/404 URL. Two
+ * failure modes, both handled here so one bad image degrades to a placeholder
+ * for THAT image only — never breaking the whole route:
  *
- * Component preserved for backward-compat with ~45 call sites — migrate to
- * <Image> from next/image directly when touching them.
- */
-function needsUnoptimized(src: string): boolean {
-  // Returns false since /api/media/file/{id} now streams properly (was 302).
-  // Component preserved for backward-compat with 45 usages — migrate to <Image> directly.
-  void src;
-  return false;
-}
-
-/**
- * @deprecated Use <Image> from next/image directly. This wrapper exists only
- *   to keep the legacy call sites compiling — it no longer adds any value.
+ *   1. Unconfigured host → `next/image` throws at render time (SSR + client).
+ *      Guarded by `isOptimizableImageSrc(src)`: an unsafe host never reaches
+ *      `<Image>`; we render the local placeholder directly. This is the
+ *      server-side sanitization the `onError` path alone could not catch.
+ *   2. Dead / 404 on an allowed host → `onError` flips to the placeholder.
+ *
+ * The placeholder is a local same-origin asset rendered as a CSS background
+ * (no second `next/image` to fail, no raw `<img>`, identical box → no layout
+ * shift, theme-neutral). Rule 13: client component, no server-only imports —
+ * plain props + `next/image` only.
+ *
+ * @deprecated for NEW code prefer composing `next/image` + this resilience
+ *   pattern directly; this wrapper is the shared resilient renderer used by
+ *   ~40 legacy call sites.
  */
 export function FocalImage({
   src,
@@ -70,14 +92,53 @@ export function FocalImage({
   width,
   height,
   sizes,
+  quality,
   priority,
   loading,
+  unoptimized,
+  onLoad,
+  fit = "cover",
   className,
   style,
+  fallbackSrc,
 }: FocalImageProps) {
+  const [errored, setErrored] = useState(false);
   const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight);
   const combinedStyle: CSSProperties = { ...style, objectPosition };
-  const unoptimized = needsUnoptimized(src);
+
+  const showFallback = errored || !isOptimizableImageSrc(src);
+
+  if (showFallback) {
+    const placeholder = fallbackSrc ?? IMAGE_FALLBACK_SRC;
+    const fallbackStyle: CSSProperties = {
+      ...style,
+      backgroundImage: `url("${placeholder}")`,
+      backgroundSize: fit,
+      backgroundPosition: objectPosition,
+      backgroundRepeat: "no-repeat",
+    };
+    const decorative = alt.trim() === "";
+    const a11y = decorative
+      ? { "aria-hidden": true as const }
+      : { role: "img" as const, "aria-label": alt };
+
+    if (width && height) {
+      return (
+        <div
+          {...a11y}
+          className={className}
+          style={{ ...fallbackStyle, width, height }}
+        />
+      );
+    }
+    return (
+      <div
+        {...a11y}
+        className={cn("absolute inset-0", className)}
+        style={fallbackStyle}
+      />
+    );
+  }
 
   if (width && height) {
     return (
@@ -87,11 +148,14 @@ export function FocalImage({
         width={width}
         height={height}
         sizes={sizes ?? `${width}px`}
+        quality={quality}
         priority={priority}
         loading={loading}
+        unoptimized={unoptimized}
         className={className}
         style={combinedStyle}
-        unoptimized={unoptimized}
+        onError={() => setErrored(true)}
+        onLoad={onLoad}
       />
     );
   }
@@ -102,11 +166,14 @@ export function FocalImage({
       alt={alt}
       fill
       sizes={sizes ?? "100vw"}
+      quality={quality}
       priority={priority}
       loading={loading}
+      unoptimized={unoptimized}
       className={className}
       style={combinedStyle}
-      unoptimized={unoptimized}
+      onError={() => setErrored(true)}
+      onLoad={onLoad}
     />
   );
 }

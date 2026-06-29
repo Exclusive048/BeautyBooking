@@ -74,6 +74,8 @@ export type MasterProfileViewData = {
     district: string | null;
     cityName: string | null;
     cityId: string | null;
+    /** FIX-R2-02-A — current IANA timezone, shown + editable in the selector. */
+    timezone: string;
     geoLat: number | null;
     geoLng: number | null;
   };
@@ -98,6 +100,7 @@ export async function getMasterProfileView(input: {
       publicUsername: true,
       district: true,
       cityId: true,
+      timezone: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -133,6 +136,7 @@ function composeView(input: {
     publicUsername: string | null;
     district: string;
     cityId: string | null;
+    timezone: string;
   };
   user: {
     phone: string | null;
@@ -204,6 +208,7 @@ function composeView(input: {
       district: provider.district || null,
       cityName,
       cityId: provider.cityId,
+      timezone: provider.timezone,
       geoLat: data.master.geoLat,
       geoLng: data.master.geoLng,
     },

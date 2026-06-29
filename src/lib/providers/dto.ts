@@ -1,5 +1,22 @@
 export type ProviderTypeDto = "MASTER" | "STUDIO";
 
+// ─────────────────────────────────────────────────────────────────────────
+// Rule 12 — DOCUMENTED BOOKING-FLOW EXCEPTION (RULE-12-PROVIDERS, FIX-16).
+//
+// `ProviderProfileDto.id` / `.studioId` and `ProviderServiceDto.id` are the
+// internal CUIDs the public profile → booking flow genuinely needs for the
+// client's subsequent requests — the slots endpoint
+// (`/api/public/providers/<id>/slots`), `createBooking({ providerId })`, the
+// favorite toggle, and the master-in-studio "book at studio" link are all
+// keyed by these ids. Rule 12 explicitly exempts "booking-флоу где id нужен
+// клиенту для последующих запросов".
+//
+// Removing them would require a booking-endpoint CONTRACT change (slots +
+// createBooking + favorite accepting an opaque token / publicUsername) on the
+// conversion-critical path — flagged for decision, NOT done unilaterally
+// (RULE-12-PROVIDERS-OPTIONAL in BACKLOG). All NON-booking provider/feed
+// surfaces are clean (FIX-13/14/15) or carry their own documented exception.
+// ─────────────────────────────────────────────────────────────────────────
 export type ProviderServiceDto = {
   id: string;
   name: string;
