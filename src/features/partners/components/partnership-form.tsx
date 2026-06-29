@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.partners.form;
@@ -185,21 +186,24 @@ export function PartnershipForm() {
             required
           />
         </Field>
-        <Field
-          label={
-            <>
-              {T.telegram.label}{" "}
-              <span className="font-normal text-text-sec">{T.optional}</span>
-            </>
-          }
-        >
-          <Input
-            value={telegram}
-            onChange={(e) => setTelegram(e.target.value)}
-            placeholder={T.telegram.placeholder}
-            maxLength={80}
-          />
-        </Field>
+        {/* FIX-TELEGRAM-KILLSWITCH: Telegram contact field absent when off. */}
+        {isTelegramEnabled && (
+          <Field
+            label={
+              <>
+                {T.telegram.label}{" "}
+                <span className="font-normal text-text-sec">{T.optional}</span>
+              </>
+            }
+          >
+            <Input
+              value={telegram}
+              onChange={(e) => setTelegram(e.target.value)}
+              placeholder={T.telegram.placeholder}
+              maxLength={80}
+            />
+          </Field>
+        )}
       </div>
 
       <Field

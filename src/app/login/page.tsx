@@ -12,6 +12,7 @@ import { getLoginHeroImageAsset } from "@/lib/media/queries";
 import { isEmailConfigured } from "@/lib/email/sender";
 import { getPublicStats, type PublicStats } from "@/lib/stats/public-stats";
 import { env } from "@/lib/env";
+import { getTelegramEnabled } from "@/lib/telegram/feature";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
@@ -19,9 +20,12 @@ export default async function LoginPage() {
     const decision = await resolveCabinetRedirect(user.id);
     redirect(decision.target);
   }
-  const [heroImage, stats] = await Promise.all([
+  const [heroImage, stats, telegramEnabled] = await Promise.all([
     getLoginHeroImageAsset(),
     getPublicStats().catch((): PublicStats | null => null),
+    // FIX-TELEGRAM-KILLSWITCH: effective value (env hard ceiling + admin
+    // toggle). When off, the Telegram login button is ABSENT (not disabled).
+    getTelegramEnabled(),
   ]);
 
   return (
@@ -33,7 +37,11 @@ export default async function LoginPage() {
         // QA-001: resolve NEXT_PUBLIC_* on the server (real values) and pass
         // down — avoids the client `env`-alias returning `undefined` and the
         // social buttons rendering a different branch than the server HTML.
-        telegramBotUsername={env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? ""}
+        // FIX-TELEGRAM-KILLSWITCH: don't leak the bot username into the
+        // serialized props when Telegram is off (no rendered button + no trace
+        // in the RSC payload).
+        telegramBotUsername={telegramEnabled ? (env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "") : ""}
+        telegramEnabled={telegramEnabled}
         vkEnabled={String(env.NEXT_PUBLIC_VK_ENABLED) === "true"}
       />
     </Suspense>

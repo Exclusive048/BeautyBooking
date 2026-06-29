@@ -1,6 +1,7 @@
 import type { NotificationType, Prisma } from "@prisma/client";
 import { createNotification, publishNotifications } from "@/lib/notifications/service";
 import { getTelegramChatIdForUser } from "@/lib/notifications/recipients";
+import { isTelegramEnabled } from "@/lib/env";
 import { createTelegramSendJob } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
 import { logError } from "@/lib/logging/logger";
@@ -110,7 +111,10 @@ export async function deliverNotification(input: DeliveryInput): Promise<void> {
     url: input.pushUrl,
   });
 
-  if (input.telegramText) {
+  // FIX-TELEGRAM-KILLSWITCH: fast env-ceiling skip (sync, no DB) before the
+  // plan check. The effective admin-toggle check happens at the recipients
+  // chokepoint (`getTelegramChatIdForUser`), which covers every enqueue path.
+  if (input.telegramText && isTelegramEnabled) {
     void (async () => {
       try {
         const plan = await getCurrentPlan(input.userId);

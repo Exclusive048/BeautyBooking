@@ -36,9 +36,17 @@
 
 ## 🔴 PRE-LAUNCH BLOCKERS (code)
 
-- **Нет открытых code-блокеров.** Последний (**PII-LOGGING-FIX-A**) закрыт 2026-06-24 — см. `BACKLOG-DONE.md`.
+- **Нет открытых *общих* code-блокеров.** Последний (**PII-LOGGING-FIX-A**) закрыт 2026-06-24 — см. `BACKLOG-DONE.md`.
   Прочие 🔴 из прошлых волн (R2-05-A/B category+billing, R2-02-A timezone, booking-integrity) — тоже закрыты.
-  Остаток до launch — **операционный**, см. «🚀 Deploy / ops» ниже.
+- **🔴 LEGAL launch-blockers (auth/channels) — precede deploy** *(из AUTH-DISCOVERY 2026-06-29)*:
+  1. ✅ **FIX-TELEGRAM-KILLSWITCH** *(2026-06-29 — см. BACKLOG-DONE.md)* — user-facing Telegram погашен через two-layer flag
+     (`NEXT_PUBLIC_TELEGRAM_ENABLED` env hard-ceiling, default false + admin SystemConfig toggle below it). Login/cabinets/
+     delivery/footer/profile-contacts/partnership — gated absent + inert when off; ops-monitoring Telegram не тронут; код не удалён (re-enableable).
+  2. **RF-email allow-list** — `.superRefine` на `otpEmailRequestSchema` (`src/lib/auth/schemas.ts:19-26`) + `EMAIL_DOMAIN_ALLOWLIST`
+     env (comma-split). **Нужно от Артёма:** список RF-доменов + fail-open-vs-closed-when-unset (рекоменд. fail-closed на prod с loud deploy-error).
+  3. **Yandex OAuth (add)** — зеркало VK pattern (`src/lib/yandex/*` + auth routes + `YandexLink` model + login button + env + CSP). **Нужно от Артёма:** Yandex OAuth app creds.
+  4. **VK completion** — в коде ~complete (login + new-vs-existing linking работают); остаток = deploy-ops (redirect_uri registration, live creds, `VK_ID_REDIRECT_URI` → `мастеррядом.online`) + опц. hardening (logout-call, token-refresh).
+  - Порядок: #1 ✅ → RF-email → Yandex → VK. SMS — отдельно (deploy-ops, провайдер built).
 
 ---
 
@@ -46,6 +54,13 @@
 
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
+- **FIX-TELEGRAM-COPY-SWEEP** *(spawned by FIX-TELEGRAM-KILLSWITCH 2026-06-29)* — flag убрал *функциональный* Telegram, но в **prose/маркетинге**
+  остались текстовые упоминания (не gated, нужен copy-decision): `about/page.tsx:48` (problem-framing), `become-master/page.tsx:155` («войдите
+  через Telegram» — теперь ложь), `:208` («Уведомления в Telegram и ВКонтакте»), `faq-content.tsx:36`, `help-content.tsx:94`, `client-faq-page.tsx:171`,
+  `support/page.tsx`. Решить замену копи (убрать/заменить канал). Не legal-doc.
+- **🔴 FIX-TELEGRAM-LEGAL-REVIEW** *(spawned 2026-06-29 — нужен Артём/юрист, НЕ авто-править)* — юр-документы описывают Telegram как обработчик данных:
+  `privacy-content.tsx` (§6.2 «Telegram (Telegram Messenger Inc.)», +телеграм-данные в §3) + `terms-content.tsx:90` («вход через Telegram»). Удаление
+  Telegram-процессора меняет юр-обязательства → **lawyer review**, не код-фикс.
 
 ---
 
@@ -68,6 +83,10 @@
 - **ENV-DATABASE-CLEANUP** — 3 orphan vars в `.env`/`.env.local`.
 - **OPENAPI-COVERAGE-INCREMENTAL** — гнать allowlist 216→0 по кластерам.
 - **VISUAL-SEARCH-YANDEX-MIGRATION** (post-launch) — vision+embeddings на Yandex + schema `vector(1536)→vector(256)`.
+- **AUTH-PROVIDER-ABSTRACTION** *(post-launch refactor, spawned by AUTH-DISCOVERY 2026-06-29)* — сейчас каждый OAuth-провайдер
+  bespoke (VK = чистый `src/lib/vk/*`; Telegram размазан по `src/lib/auth/*`; login-grid = hardcoded JSX). После закрытия legal-блокеров
+  (RF-email · Yandex · VK) — унифицировать в provider-abstraction + registry-driven login-grid, выведенный из 3 рабочих провайдеров.
+  **Не рефакторить под fine-pressure** — отложено на после launch.
 - **QA-121** — двойной mobile bottom-nav на client-кабинете: глобальный `<BottomNav/>` (`layout.tsx`) self-hide'ится только для `/cabinet/master` + `/cabinet/studio` (`bottom-nav.tsx:297-299`), но не для `/cabinet/(user)/*`, который рендерит свой `<CabinetBottomNav/>` (`cabinet-layout.tsx:48`) → на `/cabinet/bookings` и пр. два fixed `bottom-0 lg:hidden` nav стекаются на mobile. Минорный (mobile-only clutter), ship-without. *(Выпал из беклога при DOCS-CLEANUP trim — «see new BACKLOG item QA-121» был написан, но не зафайлен; re-filed PRE-STAGING.)*
 - **UI a11y/polish** — REDUCED-MOTION-A · TAP-TARGET-AUDIT-A · TAILWIND-COLOR-LINT · STORYBOOK-SETUP (из UI-UX-AUDIT).
 - **CRM/booking фичи** — manual tag assignment · late-cancel CRM tracking · online payments + штрафы (`lateCancelAction==="fine"`) · manual finish-booking endpoint · anonymization-vs-deletion на account delete.

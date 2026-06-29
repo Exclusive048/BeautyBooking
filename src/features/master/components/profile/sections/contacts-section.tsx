@@ -1,6 +1,7 @@
 import { BadgeCheck, Phone, Send, User } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ProfileContacts } from "@/lib/master/profile-view.service";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 import { EditableFieldRow } from "../editable/editable-field-row";
 import { SectionShell } from "./section-shell";
@@ -45,18 +46,21 @@ export function ContactsSection({ data }: Props) {
             maxLength={120}
           />
         </li>
-        <ReadonlyRow
-          icon={Send}
-          label={T.telegramLabel}
-          value={
-            data.telegramUsername
-              ? `@${data.telegramUsername}`
-              : data.telegramConnected
-                ? T.connectedLabel
-                : null
-          }
-          verified={data.telegramConnected}
-        />
+        {/* FIX-TELEGRAM-KILLSWITCH: Telegram contact row absent when off. */}
+        {isTelegramEnabled && (
+          <ReadonlyRow
+            icon={Send}
+            label={T.telegramLabel}
+            value={
+              data.telegramUsername
+                ? `@${data.telegramUsername}`
+                : data.telegramConnected
+                  ? T.connectedLabel
+                  : null
+            }
+            verified={data.telegramConnected}
+          />
+        )}
         <ReadonlyRow
           icon={User}
           label={T.vkLabel}

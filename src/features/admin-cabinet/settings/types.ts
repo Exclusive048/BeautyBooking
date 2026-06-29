@@ -2,6 +2,10 @@ export type SystemFlags = {
   onlinePaymentsEnabled: boolean;
   visualSearchEnabled: boolean;
   legalDraftMode: boolean;
+  // FIX-TELEGRAM-KILLSWITCH: admin toggle for user-facing Telegram. Effective
+  // only BELOW the env ceiling (NEXT_PUBLIC_TELEGRAM_ENABLED) — when the env is
+  // off this displays as false (locked) regardless of the stored value.
+  telegramEnabled: boolean;
 };
 
 export type SeoValues = {

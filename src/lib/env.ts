@@ -57,6 +57,13 @@ const envSchema = z.object({
   // ── Telegram ──────────────────────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: z.string().optional(),
+  // FIX-TELEGRAM-KILLSWITCH: legal kill-switch for *user-facing* Telegram
+  // (login, cabinet-connect, notification delivery, footer). Defaults to false
+  // (fail-safe OFF) — an unset/misread flag must never leave Telegram on.
+  // Public flag so the client gates UI without a server round-trip (mirrors
+  // NEXT_PUBLIC_VK_ENABLED). Does NOT touch the internal ops-monitoring
+  // Telegram (MONITORING_TELEGRAM_*) — separate system.
+  NEXT_PUBLIC_TELEGRAM_ENABLED: boolFlag,
 
   // ── VK OAuth ──────────────────────────────────────────────────────────────
   VK_CLIENT_ID: z.string().optional(),
@@ -253,6 +260,7 @@ const clientEnv = {
   NODE_ENV: process.env.NODE_ENV,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME,
+  NEXT_PUBLIC_TELEGRAM_ENABLED: process.env.NEXT_PUBLIC_TELEGRAM_ENABLED,
   NEXT_PUBLIC_VK_ENABLED: process.env.NEXT_PUBLIC_VK_ENABLED,
   NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: process.env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED,
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
@@ -280,6 +288,23 @@ export const isPushEnabled = Boolean(
 );
 export const isPaymentsEnabled = Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
 export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
+/**
+ * FIX-TELEGRAM-KILLSWITCH — env HARD CEILING for user-facing Telegram. When
+ * false (the launch default), Telegram is absent from the UI and inert in
+ * delivery everywhere. The admin SystemConfig toggle (see
+ * `getTelegramEnabled` in src/lib/telegram/feature.ts) can only act BELOW this
+ * ceiling — it can never re-enable Telegram past an env-OFF.
+ *
+ * String-coerced for client-safety: on the server `env` is Zod-parsed →
+ * boolean; on the client the parse falls back to raw `process.env` (string).
+ * `String(x) === "true"` normalises both (same rationale as
+ * `isVkNotificationsEnabled`).
+ *
+ * Distinct from `isTelegramAuthEnabled` (token presence) — this is the
+ * intent/legal switch, independent of whether a bot token is configured.
+ */
+export const isTelegramEnabled =
+  String(env.NEXT_PUBLIC_TELEGRAM_ENABLED) === "true";
 export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
 /**
  * VK-NOTIFICATIONS-FLAG-A: VK push-notifications subsystem is incomplete

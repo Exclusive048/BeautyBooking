@@ -28,6 +28,9 @@ type LoginClientProps = {
   // QA-001: resolved server-side in page.tsx and passed down so the social
   // buttons render the same branch on server + client (no hydration mismatch).
   telegramBotUsername?: string;
+  // FIX-TELEGRAM-KILLSWITCH: effective Telegram flag (resolved server-side).
+  // When false the Telegram login button is omitted entirely.
+  telegramEnabled?: boolean;
   vkEnabled?: boolean;
 };
 
@@ -201,6 +204,7 @@ export default function LoginClient({
   emailEnabled = false,
   stats = null,
   telegramBotUsername,
+  telegramEnabled = false,
   vkEnabled,
 }: LoginClientProps) {
   const searchParams = useSearchParams();
@@ -773,9 +777,14 @@ export default function LoginClient({
               <div className="h-px flex-1 bg-border-subtle" />
             </div>
 
-            {/* Social login — 1-col on small, 2-col from sm: */}
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
+            {/* Social login — 1-col on small, 2-col from sm:. FIX-TELEGRAM-
+                KILLSWITCH: the Telegram button is omitted entirely when the
+                flag is off; the grid collapses to a single column so VK fills
+                the row (no half-width lone button). */}
+            <div className={telegramEnabled ? "grid gap-2.5 sm:grid-cols-2" : "grid gap-2.5"}>
+              {telegramEnabled && (
+                <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
+              )}
               <VkLoginButton enabled={vkEnabled} />
             </div>
 

@@ -38,6 +38,7 @@ import {
 } from "./hooks/use-profile-autosave";
 import { EmailVerifyModal } from "./modals/email-verify-modal";
 import { TelegramConnectModal } from "./modals/telegram-connect-modal";
+import { isTelegramEnabled } from "@/lib/env";
 
 const T = UI_TEXT.clientCabinet.profilePage;
 
@@ -252,7 +253,7 @@ export function ClientProfilePage({ userId }: Props) {
         />
       ) : null}
 
-      {tgModalOpen ? (
+      {isTelegramEnabled && tgModalOpen ? (
         <TelegramConnectModal
           key="tg-modal"
           onClose={() => setTgModalOpen(false)}
@@ -519,21 +520,25 @@ function LinkedAccountsCard({
       />
 
       <div className="space-y-2.5">
-        <ConnectRow
-          icon={<MessageCircle className="h-5 w-5" aria-hidden />}
-          iconColor="#2AABEE"
-          name="Telegram"
-          connected={tg.connected}
-          status={
-            tg.connected
-              ? tg.username
-                ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
-                : `подключён ${formatConnectedAt(tg.connectedAt)}`
-              : "Войти через Telegram и получать уведомления"
-          }
-          actionLabel={tg.connected ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
-          onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
-        />
+        {/* FIX-TELEGRAM-KILLSWITCH: the Telegram connect row is absent when the
+            flag is off (the connect modal + unlink handler are gated inert). */}
+        {isTelegramEnabled && (
+          <ConnectRow
+            icon={<MessageCircle className="h-5 w-5" aria-hidden />}
+            iconColor="#2AABEE"
+            name="Telegram"
+            connected={tg.connected}
+            status={
+              tg.connected
+                ? tg.username
+                  ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
+                  : `подключён ${formatConnectedAt(tg.connectedAt)}`
+                : "Войти через Telegram и получать уведомления"
+            }
+            actionLabel={tg.connected ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
+            onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
+          />
+        )}
         <ConnectRow
           icon={<Users className="h-5 w-5" aria-hidden />}
           iconColor="#0077FF"
@@ -679,7 +684,10 @@ function ChecklistCard({
       <div className="mb-3 text-sm font-semibold text-text-main">
         {T.completion.checklistTitle}
       </div>
-      {CHECKLIST_ROWS.map((row) => {
+      {CHECKLIST_ROWS.filter(
+        // FIX-TELEGRAM-KILLSWITCH: drop the "Telegram" checklist row when off.
+        (row) => isTelegramEnabled || row.key !== "tgLinked"
+      ).map((row) => {
         const done = items[row.key];
         return (
           <div

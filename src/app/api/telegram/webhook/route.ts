@@ -1,5 +1,6 @@
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
+import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { getTelegramWebhookSecret } from "@/lib/telegram/config";
 import { handleTelegramWebhook } from "@/lib/telegram/webhook";
 import { getRequestId, logError } from "@/lib/logging/logger";
@@ -10,6 +11,13 @@ import { z } from "zod";
 const telegramWebhookBodySchema = z.record(z.string(), z.unknown());
 
 export async function POST(req: Request) {
+  // FIX-TELEGRAM-KILLSWITCH: the bot webhook is inert when user-facing Telegram
+  // is disabled — no command handling, no linking. Return 200 no-op (the bot
+  // is being removed; no real Telegram server should be calling this).
+  if (!(await getTelegramEnabled())) {
+    return ok(null);
+  }
+
   const secret = getTelegramWebhookSecret();
   if (secret) {
     const header = req.headers.get("X-Telegram-Bot-Api-Secret-Token");

@@ -9,6 +9,16 @@
 
 ---
 
+## 2026-06-29 — FIX-TELEGRAM-KILLSWITCH (legal launch-blocker #1; no commit, QA-ветка)
+
+- ✅ **User-facing Telegram полностью погашен через two-layer flag.** Gates: typecheck ✅ / lint baseline (1err·5warn) preserved / encoding ✅ / mojibake ✅ / ui-text ✅ / **test 802 ✅** (+11 hard-ceiling/fail-safe) / build ✅ (exit 0). Live-verified OFF+ON оба state. Captures → отчёт ниже.
+- **Two-layer:** (1) env **hard ceiling** `NEXT_PUBLIC_TELEGRAM_ENABLED` (`boolFlag`, default **false** = fail-safe OFF) → `isTelegramEnabled` (client+server, string-coerced); (2) admin `SystemConfig` toggle `telegramEnabled` (flag-registry + `/admin/settings` + audit + Redis cache). 🔴 **Hard ceiling, НЕ fallback:** `getTelegramEnabled()` (`src/lib/telegram/feature.ts`) = `envOff ? false : dbToggle` — DB toggle НЕ может re-enable past env-off. Pinned 11 unit-тестами (incl. `resolveEffective(false,true)===false`).
+- **Gated absent + inert (OFF):** login button (`login-client`/`page.tsx`, + bot-username не течёт в RSC props) · cabinet-connect (client settings · master `channels-card`+`connections-card` · studio `notifications-section` · `TelegramNotificationsSection` component-guard) · profile-contacts (master `contacts-section` · studio `studio-profile-form`) · partnership-form field · footer (`FooterSocials`) · client-profile (connect-row + modal + checklist) · announcement copy. **Delivery inert:** chokepoint `getTelegramChatIdForUser` → null (covers delivery/booking/admin-initiated) + `delivery.ts` env fast-skip + worker `processTelegramSend` safety + webhook 200 no-op. **Ops-monitoring (`MONITORING_TELEGRAM_*`) НЕ тронут** (отдельная система, code-verified). **Код/модели/routes НЕ удалены** (gated, re-enableable).
+- **Live (curl, dev):** OFF → /login 0×Telegram (VK present, bot-username gone), footer 0× t.me, webhook 200 no-op, authed client-settings 0× rendered Telegram-section (только null schema-поля в data-payload). ON (env=true) → /login 2×«Войти через Telegram», footer t.me present, webhook 403 (secret-check active). Env restored to baseline.
+- **Spawned:** 🟠 FIX-TELEGRAM-COPY-SWEEP (prose/маркетинг) · 🔴 FIX-TELEGRAM-LEGAL-REVIEW (privacy/terms — lawyer) · 🔵 AUTH-PROVIDER-ABSTRACTION (post-launch). Next legal-blockers: RF-email → Yandex OAuth → VK completion.
+
+---
+
 ## 2026-06-26 — FIX-PRE-STAGING (behavioral + copy/cosmetic sweep; no commit, QA-ветка)
 
 - ✅ **Закрыты все «real» остатки беклога перед staging, сгруппировано по invasiveness (behavioral / copy / docs). Gates: typecheck ✅ / lint baseline 1err·5warn preserved / ui-text ✅ / encoding ✅ / mojibake ✅ / test 791/791 ✅ / build ✅. DB baseline intact (verification read-only). Captures → `.qa/diagnostics/pre-staging-final/`.**

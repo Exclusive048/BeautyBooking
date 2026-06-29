@@ -10,6 +10,7 @@ import {
 } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
+import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
@@ -258,6 +259,12 @@ async function moveToDeadQueue(job: Job): Promise<void> {
 async function processTelegramSend(
   job: Extract<Job, { type: typeof TELEGRAM_SEND_JOB_TYPE }>
 ): Promise<void> {
+  // FIX-TELEGRAM-KILLSWITCH: final safety gate. Drop any already-queued
+  // telegram job when user-facing Telegram is disabled — no API call, no retry,
+  // no dead-letter. (Enqueue paths are already gated; this catches in-flight
+  // jobs queued before the flag flipped.)
+  if (!(await getTelegramEnabled())) return;
+
   const scheduleAt = getJobScheduleAt(job);
   if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
     await enqueueRetry(job, scheduleAt - Date.now());

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { UI_TEXT } from "@/lib/ui/text";
-import { env } from "@/lib/env";
+import { env, isTelegramEnabled } from "@/lib/env";
 
 type SocialLink = {
   label: string;
@@ -36,11 +36,11 @@ const socials: SocialLink[] = [
   ...(vkCommunityUrl
     ? [{ label: UI_TEXT.footer.socials.vk, href: vkCommunityUrl, icon: VK_ICON }]
     : []),
-  {
-    label: UI_TEXT.footer.socials.telegram,
-    href: "https://t.me/masterryadom_news",
-    icon: TELEGRAM_ICON,
-  },
+  // FIX-TELEGRAM-KILLSWITCH: the Telegram footer link is omitted when the flag
+  // is off (env hard ceiling — readable here client + server).
+  ...(isTelegramEnabled
+    ? [{ label: UI_TEXT.footer.socials.telegram, href: "https://t.me/masterryadom_news", icon: TELEGRAM_ICON }]
+    : []),
 ];
 
 export function FooterSocials() {

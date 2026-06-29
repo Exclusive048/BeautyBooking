@@ -24,13 +24,13 @@ export const ANNOUNCEMENTS: ReadonlyArray<AnnouncementItem> = [
     href: "/cabinet/master/profile",
   },
   {
-    // FIX-EXP-CONTENT-GRAMMAR (EXP-018): platform reminders go via Telegram + SMS
-    // + push — NOT WhatsApp (which isn't an integrated channel). Don't advertise
-    // a channel we don't deliver.
+    // FIX-EXP-CONTENT-GRAMMAR (EXP-018): don't advertise a channel we don't
+    // deliver. FIX-TELEGRAM-KILLSWITCH: Telegram is removed (legal) — reminders
+    // go to clients via push + email (both live). SMS is a deploy-ops toggle.
     id: "announce-reminders",
     type: "announce",
     label: "АНОНС",
-    title: "Авто-напоминания клиентам в Telegram и по SMS",
+    title: "Авто-напоминания клиентам по почте и в push",
     description: "Включается в настройках. Бесплатно для Premium-аккаунтов.",
     href: "/cabinet/master/account",
   },

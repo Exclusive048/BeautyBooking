@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, type Ref, type KeyboardEvent } from "re
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -254,15 +255,18 @@ export function StudioProfileForm({
                 className={inputClass}
               />
             </div>
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-text-label">{studioFormText.telegramLabel}</div>
-              <Input
-                value={telegram}
-                onChange={(event) => onTelegramChange(event.target.value)}
-                placeholder={studioFormText.telegramPlaceholder}
-                className={inputClass}
-              />
-            </div>
+            {/* FIX-TELEGRAM-KILLSWITCH: Telegram contact field absent when off. */}
+            {isTelegramEnabled && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-text-label">{studioFormText.telegramLabel}</div>
+                <Input
+                  value={telegram}
+                  onChange={(event) => onTelegramChange(event.target.value)}
+                  placeholder={studioFormText.telegramPlaceholder}
+                  className={inputClass}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <div className="text-xs font-medium text-text-label">{studioFormText.vkLabel}</div>
               <Input
