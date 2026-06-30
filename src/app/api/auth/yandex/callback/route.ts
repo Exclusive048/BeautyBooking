@@ -135,8 +135,8 @@ export async function GET(req: Request) {
             error: error instanceof Error ? error.stack : error,
           });
           void sendTelegramAlert(
-            `User ${sessionUser.id} logged in without free subscription`,
-            `auth:free-subscription:yandex-link:${sessionUser.id}`
+            "A user logged in without a free subscription",
+            "auth:free-subscription:yandex-link"
           );
         }
 
@@ -212,8 +212,8 @@ export async function GET(req: Request) {
           error: error instanceof Error ? error.stack : error,
         });
         void sendTelegramAlert(
-          `User ${user.id} logged in without free subscription`,
-          `auth:free-subscription:yandex-auth:${user.id}`
+          "A user logged in without a free subscription",
+          "auth:free-subscription:yandex-auth"
         );
       }
 

@@ -118,8 +118,8 @@ export async function POST(req: Request) {
         error: error instanceof Error ? error.stack : error,
       });
       void sendTelegramAlert(
-        `User ${profile.id} logged in via email without free subscription`,
-        `auth:free-subscription:email-otp:${profile.id}`
+        "A user logged in via email without a free subscription",
+        "auth:free-subscription:email-otp"
       );
     });
     void invalidateMeIdentityCache(profile.id);

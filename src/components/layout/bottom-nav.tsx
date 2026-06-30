@@ -292,11 +292,21 @@ export function BottomNav() {
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
-  // Inside master/studio cabinets their own bottom navs are rendered;
-  // hide the global one so they don't overlap.
+  // Inside the master/studio/client cabinets their own bottom navs are
+  // rendered; hide the global one so they don't overlap. The client cabinet
+  // is the rest of the /cabinet subtree (its (user) route group is invisible
+  // in the URL — /cabinet, /cabinet/bookings, …), EXCEPT /cabinet/billing,
+  // which sits outside that group and relies on this global nav on mobile.
   const isInsideMaster = pathname.startsWith("/cabinet/master");
   const isInsideStudio = pathname.startsWith("/cabinet/studio");
-  if (isHidden || isInsideMaster || isInsideStudio) return null;
+  const isCabinetBillingFallback =
+    pathname === "/cabinet/billing" || pathname.startsWith("/cabinet/billing/");
+  const isInsideClientCabinet =
+    (pathname === "/cabinet" || pathname.startsWith("/cabinet/")) &&
+    !isInsideMaster &&
+    !isInsideStudio &&
+    !isCabinetBillingFallback;
+  if (isHidden || isInsideMaster || isInsideStudio || isInsideClientCabinet) return null;
 
   const showSwitcher = isLoggedIn && availableRoles.length > 1;
 

@@ -91,3 +91,13 @@ playwright-report/
 .qa/snapshots/
 .qa/auth/          # сессии с токенами — проверь, возможно уже есть
 .claude/settings.local.json
+
+# next-pwa generated service-worker artifacts (PWA-ARTIFACTS-GITIGNORE 2026-06-30).
+# Regenerated on every `npm run build` with new content-hashes (fallback-<hash>.js),
+# so tracking them churns the tree + pollutes commits. dest:"public" emits these:
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/fallback-*.js
+public/worker-*.js

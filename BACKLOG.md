@@ -38,7 +38,7 @@
 
 - **Нет открытых *общих* code-блокеров.** Последний (**PII-LOGGING-FIX-A**) закрыт 2026-06-24 — см. `BACKLOG-DONE.md`.
   Прочие 🔴 из прошлых волн (R2-05-A/B category+billing, R2-02-A timezone, booking-integrity) — тоже закрыты.
-- **🔴 LEGAL launch-blockers (auth/channels) — precede deploy** *(из AUTH-DISCOVERY 2026-06-29)*:
+- **🔴 LEGAL launch-blockers (auth/channels) — precede deploy** *(из AUTH-DISCOVERY 2026-06-29)*. **⏰ DEADLINE: FZ-199 (поправки в КоАП) вступают в силу 7 июля 2026** — штрафы до 700k₽ за иностранные auth-сервисы. Code-сторона блокеров закрыта (Telegram удалён, Yandex добавлен, VK готов); остаток — **deploy-ops verification** (см. PRE-DEPLOY-CHECKLIST Layer 2). Time-critical:
   1. ✅ **FIX-TELEGRAM-KILLSWITCH** *(2026-06-29 — см. BACKLOG-DONE.md)* — user-facing Telegram погашен через two-layer flag
      (`NEXT_PUBLIC_TELEGRAM_ENABLED` env hard-ceiling, default false + admin SystemConfig toggle below it). Login/cabinets/
      delivery/footer/profile-contacts/partnership — gated absent + inert when off; ops-monitoring Telegram не тронут; код не удалён (re-enableable).
@@ -46,10 +46,13 @@
      (config/pkce/cookies/oauth/schemas) + `api/auth/yandex/{start,callback,unlink}` + `YandexLink` model (миграция `20260629201051`) + `YandexLoginButton`
      (self-gating) + env `YANDEX_OAUTH_*` + `isYandexAuthEnabled`. Account-linking зеркалит vk/callback точно (new-vs-existing + 409 guard). CSP не тронут
      (top-level redirect, не framed widget). Default OFF. **🚀 Live OAuth round-trip = deploy-ops** (нужен registered Yandex app + creds + redirect_uri).
-  3. **RF-email allow-list** — `.superRefine` на `otpEmailRequestSchema` (`src/lib/auth/schemas.ts:19-26`) + `EMAIL_DOMAIN_ALLOWLIST`
-     env (comma-split). **Нужно от Артёма:** список RF-доменов + fail-open-vs-closed-when-unset (рекоменд. fail-closed на prod с loud deploy-error).
-  4. **VK completion** — в коде ~complete (login + new-vs-existing linking работают); остаток = deploy-ops (redirect_uri registration, live creds, `VK_ID_REDIRECT_URI` → `мастеррядом.online`) + опц. hardening (logout-call, token-refresh).
-  - Порядок: #1 Telegram ✅ → #2 Yandex ✅ → RF-email → VK. SMS — отдельно (deploy-ops, провайдер built).
+  3. ❌ **RF-email allow-list — CANCELLED / not required** *(решено PRE-DEPLOY-CHECKLIST 2026-06-30)*. Rationale: FZ-199/149-ФЗ ограничивают
+     **механизм авторизации сайта** (иностранные login-кнопки типа Google/Apple), а **не** домен email-адреса, который вводит пользователь.
+     Email-OTP — это собственный механизм платформы, поэтому RF-domain фильтр не нужен. Verified: `otpEmailRequestSchema` принимает любой
+     deliverable email (нет `.superRefine`/allow-list — confirmed clean). Никакого кода не требуется.
+  4. **VK completion** — code-complete (login + new-vs-existing linking работают). Остаток = чисто **deploy-ops**, **folded into PRE-DEPLOY-CHECKLIST**
+     (нет отдельного промпта): register prod `redirect_uri` (`мастеррядом.online`) в VK app + live creds + live round-trip. Опц. hardening (logout-call, token-refresh) — post-launch.
+  - Порядок: #1 Telegram ✅ → #2 Yandex ✅ (code) → ~~RF-email~~ (cancelled) → VK (deploy-ops). SMS — отдельно (deploy-ops, провайдер built).
 
 ---
 
@@ -83,14 +86,16 @@
 - **MONEY-BRAND-TYPE-A** — brand-type `Kopeks` для compile-time защиты от рубли/копейки mix (~20 сайтов).
 - **PRISMA-INCLUDE-WHERE-CI-CHECK** — AST-гейт против nested-include без `where` (N+1 over-fetch class).
 - **SMS-MONITORING-A** — admin balance-widget + daily low-balance cron (после live SMSC).
-- **ENV-DATABASE-CLEANUP** — 3 orphan vars в `.env`/`.env.local`.
+- **ENV-CONSOLIDATION** *(ENV-FILE-AUDIT + ENV-CONSOLIDATION 2026-06-30)* — split by ownership. ✅ **Tracked side (agent):** `.env.production.example` = единый canonical полный prod-template (cross-check vs env.ts 72 ключа — все required + launch-critical optionals покрыты; gaps только explainable: `MEDIA_LOCAL_*` = dev local-storage, `VK_ID_*` = alias-documented, `AI_PROVIDER` = vestigial-commented); `.env.example` = dev-onboarding (consistent, минус docker-only `POSTGRES_*`/`REDIS_PASSWORD`); VK-alias + AI_PROVIDER notes добавлены в оба; `.gitignore` verified (`.env`/`.env.local`/`.env.production` IGNORED, оба `.example` tracked). ⏳ **Local side (Артём, gitignored — agent не трогает):** в `.env.local` скопировать `WORKER_SECRET`+`AI_FEATURES_ENABLED` из `.env`; удалить 4 dead var (`SUPADATABASE_URL`,`SUPADIRECT_URL`,`OTP_EXPIRATION_TIME`,`DATABASE_URL_V6`); fix 2 stale `beautyhub.art`→`мастеррядом.online`; `Remove-Item .env` → один local-файл. Step-list в отчёте ENV-CONSOLIDATION. *(Снимает прежний ENV-DATABASE-CLEANUP «3 orphan vars».)*
+- ✅ **PWA-ARTIFACTS-GITIGNORE** *(FIX-PREDEPLOY-GAPS 2026-06-30)* — `public/{sw.js,sw.js.map,workbox-*.js,workbox-*.js.map,fallback-*.js,worker-*.js}` добавлены в `.gitignore` + `git rm --cached` (staged untrack, **не** закоммичено — Артём review+commit). Post-fresh-build: regenerated файлы (incl. новый fallback-hash) все IGNORED, zero `M`/`??` churn. Files остаются на диске.
+- ✅ **VK_ID_*-SCHEMA-GAP** *(FIX-PREDEPLOY-GAPS 2026-06-30)* — `env.ts` теперь объявляет `VK_ID_CLIENT_ID/SECRET/REDIRECT_URI` (optional) рядом с canonical `VK_*` → оба набора имён валидируются Zod, ни один не bypass'ит. `vk/config.ts` читает через `env` (alias-first, behaviour identical); `yandex/config.ts` read-path `process.env`→`env` (rule 11). Importers server-only (rule 13 safe). Ни одна var не стала required; `isVkAuthEnabled` gating не тронут; start-route 503-without-creds preserved.
 - **OPENAPI-COVERAGE-INCREMENTAL** — гнать allowlist 216→0 по кластерам.
 - **VISUAL-SEARCH-YANDEX-MIGRATION** (post-launch) — vision+embeddings на Yandex + schema `vector(1536)→vector(256)`.
 - **AUTH-PROVIDER-ABSTRACTION** *(post-launch refactor, spawned by AUTH-DISCOVERY 2026-06-29)* — сейчас каждый OAuth-провайдер
   bespoke (VK = чистый `src/lib/vk/*`; Telegram размазан по `src/lib/auth/*`; login-grid = hardcoded JSX). После закрытия legal-блокеров
-  (RF-email · Yandex · VK) — унифицировать в provider-abstraction + registry-driven login-grid, выведенный из 3 рабочих провайдеров.
+  (Yandex · VK; RF-email cancelled) — унифицировать в provider-abstraction + registry-driven login-grid, выведенный из рабочих провайдеров.
   **Не рефакторить под fine-pressure** — отложено на после launch.
-- **QA-121** — двойной mobile bottom-nav на client-кабинете: глобальный `<BottomNav/>` (`layout.tsx`) self-hide'ится только для `/cabinet/master` + `/cabinet/studio` (`bottom-nav.tsx:297-299`), но не для `/cabinet/(user)/*`, который рендерит свой `<CabinetBottomNav/>` (`cabinet-layout.tsx:48`) → на `/cabinet/bookings` и пр. два fixed `bottom-0 lg:hidden` nav стекаются на mobile. Минорный (mobile-only clutter), ship-without. *(Выпал из беклога при DOCS-CLEANUP trim — «see new BACKLOG item QA-121» был написан, но не зафайлен; re-filed PRE-STAGING.)*
+- ✅ **QA-121** *(WAVE-1 2026-07-01)* — двойной mobile bottom-nav на client-кабинете закрыт: `bottom-nav.tsx` теперь исключает весь `/cabinet`-subtree (incl. invisible `(user)`-группу) минус `/cabinet/billing` (стоит вне группы, полагается на глобальный nav). См. BACKLOG-DONE.md.
 - **UI a11y/polish** — REDUCED-MOTION-A · TAP-TARGET-AUDIT-A · TAILWIND-COLOR-LINT · STORYBOOK-SETUP (из UI-UX-AUDIT).
 - **CRM/booking фичи** — manual tag assignment · late-cancel CRM tracking · online payments + штрафы (`lateCancelAction==="fine"`) · manual finish-booking endpoint · anonymization-vs-deletion на account delete.
 
@@ -106,15 +111,16 @@
 - **a11y/perf** — STORIES-VIEWER-A11Y-CONSOLIDATE · FRAMER-MOTION-REDUCED-MOTION-SWEEP · BOOKING-PARTIAL-UNIQUE-INDEX-A · BOOKING-STATUS-PROMOTION-CRON · BOOKING-AUDIT-LOG-A.
 - **Studio/VK** — studio-admin chat with master (нужен auth-model decision) · studio public-page sidebar entry · VK notifications delivery subsystem (VK Bot API).
 - **R2-06-A follow-up (optional)** — surface accept/decline reschedule ALSO в studio calendar/journal action-menu (FIX-R2-06-A сделал inline-on-notification — основная parity-поверхность). Нужен threading `proposedStartAt/actionRequiredBy` в `ScheduleBookingCell`/`StudioBookingRow` DTO; reuse the same `/confirm` + `/decline-reschedule` endpoints. Также: studio calendar `?focus=` reader (для deep-link highlight на календаре).
+- ✅ **STUDIO-BOOKING-E2E** *(2026-06-30 — LIVE-VERIFIED; moved → BACKLOG-DONE.md WAVE-1 reconciliation)* — R2-06-A (studio reschedule two-sided #32) + R2-06-I (self-review block #33) проверены вживую на Vision. Полная live-matrix + seed-детали — в BACKLOG-DONE.md.
 - **Legacy retire** — `studio-settings-page.tsx` (837 LOC, 3 live sub-route importers) + `studio-services-page.tsx` + `moneyRUBPlain` — когда portfolio/profile sub-routes получат studio-cabinet redesign (LEGACY-CLEANUP-EXEC остаток).
-- **TELEGRAM-ALERT-PII-REVIEW** — review cuid в alert-тексте (admin chat only).
+- ✅ **TELEGRAM-ALERT-PII-REVIEW** *(WAVE-1 2026-07-01)* — raw user cuid убран из ops-monitoring alert (8 auth-login сайтов: message + alert-key обезличены, dedup стал per-condition; `logError({userProfileId})` сохраняет id в structured logs). Kept ops-канал, не user-facing Telegram. См. BACKLOG-DONE.md.
 - Feature-buckets — CRM/Schedule/Catalog/Marketing/Notifications enhancements · mobile app · code-quality · admin dashboard/catalog enhancements.
 
 ---
 
 ## 🚀 DEPLOY / OPS (operational, не code — но не потерять)
 
-- **env → `мастеррядом.online`** — выставить `VK_ID_REDIRECT_URI` + `APP_PUBLIC_URL` (stale `beautyhub.art` живёт только в gitignored `.env`/`.env.local`; в tracked-коде 0).
+- **env → `мастеррядом.online`** — выставить `VK_REDIRECT_URI`/`VK_ID_REDIRECT_URI` + `APP_PUBLIC_URL` в **prod env** (значения; gitignored `.env`/`.env.local` правит Артём локально). ✅ Tracked stale-домены закрыты *(FIX-PREDEPLOY-GAPS 2026-06-30)*: `.env.production.example` (8 строк) + `.env.example` (1) + `next.config.ts:98` `allowedDevOrigins` → все `мастеррядом.online`, grep tracked-templates+config = CLEAN.
 - **VK** — зарегистрировать redirect_uri + live VK round-trip QA с реальными creds.
 - **Yandex OAuth** *(FIX-YANDEX-OAUTH)* — зарегистрировать Yandex OAuth app (oauth.yandex.ru, scopes login:info/login:email/login:avatar), выставить
   `YANDEX_OAUTH_CLIENT_ID`/`YANDEX_OAUTH_SECRET`/`YANDEX_OAUTH_REDIRECT_URI` (→ `…/api/auth/yandex/callback`) + `NEXT_PUBLIC_YANDEX_ENABLED=true`, live round-trip QA.
@@ -126,7 +132,7 @@
 - **🚩 Legal — real ИНН** — выставить `NEXT_PUBLIC_LEGAL_INN` (реальный ИНН Артёма) в prod env до launch (152-ФЗ / footer requisites). Config wired (EXP-005); unset → footer показывает obvious «[не указан]». Значение — данные Артёма, в код НЕ вшито.
 - **🚩 Footer VK** — выставить `NEXT_PUBLIC_VK_COMMUNITY_URL` (реальный VK-паблик МастерРядом) в prod env. Config wired (FIX-PRE-STAGING, FOOTER-VK); unset → footer **опускает** VK-иконку (старый `vk.com/beautyhub` удалён, wrong handle не выдумывался). Значение — реальный handle, в код НЕ вшито.
 - **YooKassa** — replay `payment.succeeded`/`refund` + idempotency в live env.
-- **🚩 Применить миграции на проде** (`prisma migrate deploy`) — **3** недавние, не 2: `20260619000000_provider_timezone_default_moscow` + `20260624140407_add_booking_package` + `20260626000000_add_push_notifications_enabled` (последняя добавлена 2026-06-26, после того как этот пункт писался).
+- **🚩 Применить миграции на проде** (`prisma migrate deploy`) — **4** недавние *(PRE-DEPLOY-CHECKLIST Layer-1 — все ADD-only, корректно упорядочены, applied last в 22-migration history)*: `20260619000000_provider_timezone_default_moscow` + `20260624140407_add_booking_package` + `20260626000000_add_push_notifications_enabled` + `20260629201051_add_yandex_link` (последняя — Yandex auth, добавлена после того как этот пункт писался).
 - **Snapshot `.qa/snapshots/post-seed.dump`** — **gitignored / local-only** (`.gitignore:91`; НЕ tracked, не попадает в коммиты, не prod-артефакт). Уже регенерирован FIX-EXP-SEED-HYGIENE (несёт `BookingPackage` + push schema) → это актуальный локальный dev-baseline. Регенерировать локально только при изменении схемы/seed (после нового `migrate dev`). *(Снимает прежний пункт «regen snapshot» — он был выполнен.)*
 - **Email infra** — SMTP provider + DNS (DKIM/SPF/DMARC).
 - **DevOps infra (4 решения)** — Postgres hosting · TLS termination · backups · deploy-rollback policy.
@@ -138,7 +144,7 @@
 - **BC-CAP** → считать **ACTIVE-only** (сейчас `ensureStudioTeamLimit` считает INVITED/DISABLED+pending invites тоже) **+** задать числа cap для PRO/PREMIUM (FREE=2 есть).
 - **Package booking** (R2-04-PKG) → **✅ ФИЧА ЗАКРЫТА (solo MVP-1 + studio MVP-2)** (2026-06-24/25; atomic tx + proportional discount + cancel-whole + reschedule-parts; studio multi-master с by-client sequential placement + surfaced на studio public profile; см. BACKLOG-DONE.md).
 - **R2-05-C-v2** (opt-in renewal на росте цены) → при повышении цены — renewal **opt-in**: 2-дневный grace + reminders на 24h/2h.
-- **R2-05-I** (copy) → поведение «disable плана = блок новых signups, active subs не истекают» оставить; **поправить copy** «приостановлен» (вводит в заблуждение).
+- ✅ **R2-05-I** (copy) *(WAVE-1 2026-07-01)* — поведение оставлено; copy «приостановлен» поправлена → «закрыт для новых подписок» (subscriber notice + admin dialog body + test). См. BACKLOG-DONE.md.
 - **Studio reschedule full parity** → studio-календарь получает «принять предложенное клиентом время» (сейчас только Move/Cancel) — пересекается с R2-06-A.
 
 ---

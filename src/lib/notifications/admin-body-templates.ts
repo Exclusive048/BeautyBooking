@@ -64,7 +64,9 @@ export function buildPlanEditedSummary(diff: PlanEditDiff): string | null {
 
   if (diff.isActive) {
     parts.push(
-      diff.isActive.after ? "тариф снова активен" : "тариф приостановлен",
+      diff.isActive.after
+        ? "тариф снова открыт для новых подписок"
+        : "тариф закрыт для новых подписок",
     );
   }
 

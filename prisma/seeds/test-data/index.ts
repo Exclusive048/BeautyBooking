@@ -100,6 +100,7 @@ import { seedShowcaseMaster } from "./seed-showcase-master";
 import { seedShowcaseStudio } from "./seed-showcase-studio";
 import { seedShowcaseAdmin } from "./seed-showcase-admin";
 import { seedShowcaseClient } from "./seed-showcase-client";
+import { seedShowcaseStudioClientBookings } from "./seed-showcase-studio-client-bookings";
 
 async function main() {
   if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
@@ -137,6 +138,11 @@ async function main() {
   // (creates bookings/reviews against Anna's services). MUST run AFTER
   // seedShowcaseMaster.
   await seedShowcaseClient();
+  // STUDIO-BOOKING-E2E: Vision studio-master bookings for the showcase client
+  // (R2-06-A reschedule + R2-06-I self-review block). MUST run AFTER BOTH
+  // seedShowcaseStudio (Vision studio/master/service) AND seedShowcaseClient
+  // (Елена's profile) — it resolves all of them by stable key.
+  await seedShowcaseStudioClientBookings();
 
   logSeed.summary({
     cities: cities.length,

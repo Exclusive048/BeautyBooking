@@ -66,9 +66,17 @@ const envSchema = z.object({
   NEXT_PUBLIC_TELEGRAM_ENABLED: boolFlag,
 
   // ── VK OAuth ──────────────────────────────────────────────────────────────
+  // VK creds accept two name sets: the canonical `VK_*` (what the prod template
+  // ships) and the `VK_ID_*` aliases (local dev / VK ID console naming). Both are
+  // declared here so NEITHER bypasses Zod (VK_ID_*-SCHEMA-GAP fix): `vk/config.ts`
+  // reads them via `env` (not `process.env`), alias-first then canonical. All
+  // optional — gating stays on `isVkAuthEnabled` (canonical `VK_CLIENT_ID`).
   VK_CLIENT_ID: z.string().optional(),
   VK_CLIENT_SECRET: z.string().optional(),
   VK_REDIRECT_URI: z.string().optional(),
+  VK_ID_CLIENT_ID: z.string().optional(),
+  VK_ID_CLIENT_SECRET: z.string().optional(),
+  VK_ID_REDIRECT_URI: z.string().optional(),
   NEXT_PUBLIC_VK_ENABLED: boolFlag,
   // VK-NOTIFICATIONS-FLAG-A: independent flag for the VK push-notifications
   // subsystem. VK login (`NEXT_PUBLIC_VK_ENABLED`) and VK notifications

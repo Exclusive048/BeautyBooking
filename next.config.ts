@@ -95,7 +95,7 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
-  allowedDevOrigins: ["https://beautyhub.art", "https://www.beautyhub.art"],
+  allowedDevOrigins: ["https://мастеррядом.online", "https://www.мастеррядом.online"],
   async redirects() {
     return [
       // /help/masters was the original master-only knowledge base. The page has
