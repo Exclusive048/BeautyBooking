@@ -73,7 +73,7 @@
 ## 🟡 MEDIUM PRIORITY
 
 **R2 (Round 2) residual:**
-- **R2-04-C** — many-services public booking page = flat 35-item list без группировки. Fix: группировать по globalCategory / фильтр категорий.
+- ✅ **R2-04-C** *(FIX-R2-04-C 2026-07-01)* — public booking service list сгруппирован по attached category (`globalCategory.name`, order by `orderIndex`, uncategorized → «Другие услуги»). Presentational — same bookability/selection/submit. Реализовано в studio booking widget + master public profile (shared chokepoint DTO + pure helper). Live-verified (Vision 35 svc/11 cats, Галина 7/3; both themes + mobile/desktop; rule-12 clean; selection advances). См. BACKLOG-DONE.md.
 - **R2-05-G** — нет фидбэка репортёру при модерации отзыва; нет UI восстановления soft-deleted отзыва (только manual SQL).
 - **R2-05-A2** — category reject reason только в логах (нет колонки); владельцы portfolio-item не уведомляются при delist.
 - **R2-05-J** — `BillingPlanPrice.isActive` без admin UI — **by-design** (деактивация выражается удалением period-row при цене ≤0; resolver monthly-fallback handles; create hardcodes `isActive:true`; только direct-DB ставит `false`). «renewal может залогировать CRITICAL» — **неточно**: `renew/run/route.ts` на missing price отдаёт `null` gracefully → пишет `RENEWAL_FAILED·MISSING_PRICE` audit + `PAST_DUE` + continue, **без** `logError` → не достигает `alertCritical`. Низкий приоритет; не дефект-путь.

@@ -39,7 +39,13 @@ type ProviderCardSource = Pick<
   | "categories"
   | "availableToday"
 >;
-type ProviderServiceSource = Pick<Service, "id" | "name" | "durationMin" | "price">;
+type ProviderServiceSource = Pick<Service, "id" | "name" | "durationMin" | "price"> & {
+  // FIX-R2-04-C: canonical attached category = Service.globalCategory (label +
+  // orderIndex). Optional — the public booking surfaces (getProviderProfile)
+  // select it for grouping; cabinet/internal callers (e.g. /api/providers/me)
+  // omit it and simply get `categoryName: null` (no grouping needed there).
+  globalCategory?: { name: string; orderIndex: number } | null;
+};
 
 export function mapProviderService(service: ProviderServiceSource): ProviderServiceDto {
   return {
@@ -47,6 +53,8 @@ export function mapProviderService(service: ProviderServiceSource): ProviderServ
     name: service.name,
     durationMin: service.durationMin,
     price: service.price,
+    categoryName: service.globalCategory?.name ?? null,
+    categoryOrder: service.globalCategory?.orderIndex ?? null,
   };
 }
 

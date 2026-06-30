@@ -5434,6 +5434,7 @@ export const UI_TEXT = {
       add: "Добавить",
       remove: "Удалить",
       priceOnRequest: "Цена по запросу",
+      categoryOther: "Другие услуги",
     },
     portfolio: {
       title: "Портфолио",
@@ -7248,6 +7249,7 @@ export const UI_TEXT = {
       searchPlaceholder: "Найти услугу — «маникюр», «балаяж»…",
       searchEmpty: "Ничего не нашлось. Попробуйте по-другому.",
       catAll: "Всё",
+      categoryOther: "Другие услуги",
       pick: "Выбрать",
       noServices: "Услуги пока не добавлены",
       priceOnRequest: "Цена по запросу",
