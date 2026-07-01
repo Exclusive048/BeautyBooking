@@ -7,7 +7,7 @@ import { Star, Reply, Pencil, Trash2, ExternalLink, MessageSquare } from "lucide
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Badge } from "@/components/ui/badge";
 import type {
@@ -369,7 +369,7 @@ function Avatar({
 }) {
   if (url) {
     return (
-      <FocalImage
+      <ResilientImage
         src={url}
         alt=""
         width={size}

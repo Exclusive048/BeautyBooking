@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ExternalLink, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import {
@@ -51,7 +51,7 @@ export function MasterDetailHeader({
       <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
         <div className="flex flex-wrap items-start gap-4">
           {detail.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={detail.avatarUrl}
               alt=""
               width={64}

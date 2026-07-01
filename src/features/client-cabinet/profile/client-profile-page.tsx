@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -804,6 +804,6 @@ function ProfileSkeleton() {
 }
 
 // Suppress lint hint about unused imports leftover from the consolidation —
-// `FocalImage` + `Textarea` may be re-introduced when photo previews / email
+// `ResilientImage` + `Textarea` may be re-introduced when photo previews / email
 // modals land. Mark as referenced explicitly.
-export const _ProfileImports = { FocalImage, Textarea, MapPin };
+export const _ProfileImports = { ResilientImage, Textarea, MapPin };

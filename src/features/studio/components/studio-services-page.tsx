@@ -9,7 +9,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { MasterCardDrawer } from "@/features/studio/components/master-card-drawer";
-import { moneyRUBPlain } from "@/lib/format";
+import { moneyRUBPlainFromKopeks } from "@/lib/format";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import {
   normalizeStudioServiceDurationMin,
@@ -614,7 +614,7 @@ export function StudioServicesPage({ studioId }: Props) {
                           {service.baseDurationMin} {t.durationMin}
                         </span>
                         <span className="rounded-full bg-bg-elevated px-2 py-1 text-text-main">
-                          {moneyRUBPlain(service.basePrice)} {t.currency}
+                          {moneyRUBPlainFromKopeks(service.basePrice)} {t.currency}
                         </span>
                       </div>
 

@@ -8,7 +8,7 @@ import type { MediaAssetDto } from "@/lib/media/types";
 import { assetHasCrop } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CropPicker } from "@/features/media/components/crop-picker";
 
@@ -142,7 +142,7 @@ export function AvatarEditor({
   const pickerAsset = cropAsset ?? activeAsset;
 
   const avatarPreview = imageUrl ? (
-    <FocalImage
+    <ResilientImage
       src={imageUrl}
       alt=""
       cropX={activeAsset?.cropX ?? null}
@@ -168,7 +168,7 @@ export function AvatarEditor({
             className="group relative block h-full w-full overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
           >
             {imageUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={imageUrl}
                 alt=""
                 cropX={activeAsset?.cropX ?? null}

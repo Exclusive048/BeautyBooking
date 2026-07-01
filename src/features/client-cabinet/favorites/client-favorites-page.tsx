@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
@@ -398,7 +398,7 @@ function PhotoBlock({
   if (photoUrl) {
     return (
       <div className="relative h-40 w-full overflow-hidden">
-        <FocalImage
+        <ResilientImage
           src={photoUrl}
           alt={label ?? ""}
           width={400}

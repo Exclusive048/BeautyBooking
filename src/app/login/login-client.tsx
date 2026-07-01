@@ -10,7 +10,7 @@ import YandexLoginButton from "@/components/auth/yandex-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { cn } from "@/lib/cn";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
@@ -464,7 +464,7 @@ export default function LoginClient({
 
           {/* Optional hero photo overlay */}
           {heroImageUrl ? (
-            <FocalImage
+            <ResilientImage
               src={heroImageUrl}
               alt=""
               sizes="(max-width: 1200px) 50vw, 600px"

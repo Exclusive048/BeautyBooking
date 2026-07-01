@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { Star } from "lucide-react";
@@ -37,7 +37,7 @@ export function FeedCard({ item, index }: Props) {
       className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle/60 bg-bg-card shadow-card transition-shadow duration-200 hover:shadow-hover"
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-        <FocalImage
+        <ResilientImage
           src={item.mediaUrl}
           alt={altText}
           sizes="(min-width: 1024px) 33vw, (min-width: 768px) 33vw, 50vw"

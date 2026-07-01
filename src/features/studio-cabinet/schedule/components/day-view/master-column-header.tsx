@@ -1,4 +1,4 @@
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
 
@@ -15,7 +15,7 @@ export function MasterColumnHeader({ master }: { master: ScheduleMasterColumn })
   return (
     <div className="flex items-center gap-2 border-b border-border-subtle bg-bg-card px-3 py-2.5">
       {master.avatarUrl ? (
-        <FocalImage
+        <ResilientImage
           src={master.avatarUrl}
           alt=""
           width={28}

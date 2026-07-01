@@ -4,7 +4,7 @@ import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import type {
@@ -108,7 +108,7 @@ export function PortfolioCard({
           aria-label={T.editAriaLabel}
           className="relative block h-full w-full"
         >
-          <FocalImage
+          <ResilientImage
             src={item.mediaUrl}
             alt=""
             loading="lazy"

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Heart, Star } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
@@ -170,7 +170,7 @@ export function CatalogCard({
       {/* Photo / hue placeholder. Aspect-[4/3] matches reference proportions. */}
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         {photo ? (
-          <FocalImage
+          <ResilientImage
             src={photo}
             alt={item.title}
             width={400}
@@ -231,7 +231,7 @@ export function CatalogCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
           {item.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={item.avatarUrl}
               alt=""
               width={36}

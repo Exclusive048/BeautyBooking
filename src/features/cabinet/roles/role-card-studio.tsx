@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type StudioActiveData = {
@@ -119,7 +119,7 @@ export function RoleCardStudio(props: Props) {
         <div className="flex items-center gap-4">
           <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.logoUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={data.logoUrl}
                 alt={data.name}
                 width={60}

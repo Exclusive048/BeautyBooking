@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Camera, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -59,7 +59,7 @@ export function PortfolioReadonlySection({ data }: Props) {
               href="/cabinet/master/portfolio"
               className="relative block h-full w-full overflow-hidden rounded-xl bg-bg-input transition-shadow hover:shadow-card"
             >
-              <FocalImage
+              <ResilientImage
                 src={item.mediaUrl}
                 alt=""
                 className="object-cover"

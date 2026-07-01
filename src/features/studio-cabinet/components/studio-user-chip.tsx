@@ -1,5 +1,5 @@
 import { Building2 } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -31,7 +31,7 @@ export function StudioUserChip({ name, avatarUrl, studioName }: Props) {
   return (
     <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
       {avatarUrl ? (
-        <FocalImage
+        <ResilientImage
           src={avatarUrl}
           alt=""
           width={36}

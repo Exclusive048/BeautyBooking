@@ -5,12 +5,9 @@ import { useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { IMAGE_FALLBACK_SRC, isOptimizableImageSrc } from "./image-host";
 
-type FocalImageProps = {
+type ResilientImageProps = {
   src: string;
   alt: string;
-  // Legacy focal point props — kept for call-site compatibility but ignored
-  focalX?: number | null;
-  focalY?: number | null;
   cropX?: number | null;
   cropY?: number | null;
   cropWidth?: number | null;
@@ -78,11 +75,11 @@ function buildObjectPosition(
  * shift, theme-neutral). Rule 13: client component, no server-only imports —
  * plain props + `next/image` only.
  *
- * @deprecated for NEW code prefer composing `next/image` + this resilience
- *   pattern directly; this wrapper is the shared resilient renderer used by
- *   ~40 legacy call sites.
+ * The shared resilient image renderer — use this instead of a bare `next/image`
+ * for any user-supplied image URL (avatars, portfolio, hero, banners), so one
+ * bad/unconfigured/404 URL degrades to a placeholder for THAT image only.
  */
-export function FocalImage({
+export function ResilientImage({
   src,
   alt,
   cropX,
@@ -101,7 +98,7 @@ export function FocalImage({
   className,
   style,
   fallbackSrc,
-}: FocalImageProps) {
+}: ResilientImageProps) {
   const [errored, setErrored] = useState(false);
   const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight);
   const combinedStyle: CSSProperties = { ...style, objectPosition };

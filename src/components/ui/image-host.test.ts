@@ -5,7 +5,7 @@ import {
   isOptimizableImageSrc,
 } from "./image-host";
 
-// FIX-21 (IMG-RESILIENCE-SWEEP): lock the host-guard contract that <FocalImage>
+// FIX-21 (IMG-RESILIENCE-SWEEP): lock the host-guard contract that <ResilientImage>
 // relies on so every migrated surface degrades a bad image to the placeholder
 // instead of throwing / breaking its route. Pure string logic → node-safe.
 describe("isOptimizableImageSrc", () => {
@@ -27,7 +27,7 @@ describe("isOptimizableImageSrc", () => {
 
   it("rejects local blob/object previews — they are NOT remote-host class", () => {
     // Reference-photo / crop / composer previews use createObjectURL — these
-    // must keep their raw <img>, never route through FocalImage (would regress
+    // must keep their raw <img>, never route through ResilientImage (would regress
     // to the placeholder). The guard returns false for them by design.
     expect(isOptimizableImageSrc("blob:http://localhost:3000/uuid")).toBe(false);
     expect(isOptimizableImageSrc("data:image/png;base64,AAAA")).toBe(false);

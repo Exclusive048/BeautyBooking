@@ -2,7 +2,7 @@
 
 import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { formatRowTime } from "@/features/chat/lib/format-time";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ConversationListItemDto } from "@/features/chat/types";
@@ -45,7 +45,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
 
       <div className="relative shrink-0">
         {partner.avatarUrl ? (
-          <FocalImage
+          <ResilientImage
             src={partner.avatarUrl}
             alt={partner.name}
             width={42}

@@ -13,7 +13,7 @@ import {
 import { getSessionUser } from "@/lib/auth/session";
 import { getPublicModelOffer } from "@/lib/model-offers/public.service";
 import { ModelOfferApplyForm } from "@/features/model-offers/components/public-model-offer-apply";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PageProps = {
@@ -78,7 +78,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
               <div className="flex items-start gap-4">
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-border bg-muted">
                   {offer.master.avatarUrl ? (
-                    <FocalImage
+                    <ResilientImage
                       src={offer.master.avatarUrl}
                       alt={offer.master.name}
                       className="object-cover"

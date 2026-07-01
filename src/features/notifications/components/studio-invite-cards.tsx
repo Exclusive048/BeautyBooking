@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -87,7 +87,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
             <div className="flex items-start gap-3">
               <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-bg-input">
                 {invite.studioAvatarUrl ? (
-                  <FocalImage
+                  <ResilientImage
                     src={invite.studioAvatarUrl}
                     alt={invite.studioName}
                     width={48}

@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { moneyRUBFromKopeks } from "@/lib/format";
@@ -367,7 +367,7 @@ function BookingRow({
 
         <div className="flex items-center gap-2 text-sm text-text-sec">
           {booking.provider.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={booking.provider.avatarUrl}
               alt=""
               width={20}

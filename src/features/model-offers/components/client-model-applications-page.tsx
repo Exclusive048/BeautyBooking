@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -254,7 +254,7 @@ export function ClientModelApplicationsPage() {
 
             <div className="mt-3 flex items-center gap-3">
               {item.offer.master.avatarUrl ? (
-                <FocalImage
+                <ResilientImage
                   src={item.offer.master.avatarUrl}
                   alt=""
                   width={36}

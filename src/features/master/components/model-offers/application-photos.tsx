@@ -1,5 +1,5 @@
 import type { ApplicationPhoto } from "@/lib/master/model-offers-view.service";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.applicationCard;
@@ -12,7 +12,7 @@ type Props = {
  * Compact photo strip (≤4 thumbnails) on each application card. URLs are
  * pre-signed token-delivery links built server-side. Lightbox is 29b
  * backlog — for now thumbnails are static. FIX-21: routed through the
- * resilient `<FocalImage>` (fixed-size) so a dead token degrades to the
+ * resilient `<ResilientImage>` (fixed-size) so a dead token degrades to the
  * neutral placeholder instead of a broken-image icon.
  */
 export function ApplicationPhotos({ photos }: Props) {
@@ -30,7 +30,7 @@ export function ApplicationPhotos({ photos }: Props) {
       </p>
       <div className="flex flex-wrap gap-2">
         {photos.slice(0, 4).map((photo) => (
-          <FocalImage
+          <ResilientImage
             key={photo.id}
             src={photo.url}
             alt=""

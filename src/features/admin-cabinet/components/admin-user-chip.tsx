@@ -1,4 +1,4 @@
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import type { AdminPanelRole, AdminPanelUser } from "@/features/admin-cabinet/types";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -27,7 +27,7 @@ export function AdminUserChip({ name, avatarUrl, role }: Props) {
   return (
     <div className="mx-3 mb-3 mt-4 flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-card px-3 py-2.5 shadow-card">
       {avatarUrl ? (
-        <FocalImage
+        <ResilientImage
           src={avatarUrl}
           alt=""
           width={32}

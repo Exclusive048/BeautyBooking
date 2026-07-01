@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Building2, ChevronRight, MapPin, Share2, Star } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Button } from "@/components/ui/button";
 import { FavoriteToggleButton } from "@/components/ui/favorite-toggle-button";
 import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
@@ -109,7 +109,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
           >
             <PremiumRing active={isPremium}>
               {provider.avatarUrl ? (
-                <FocalImage
+                <ResilientImage
                   src={provider.avatarUrl}
                   alt={provider.name}
                   width={132}

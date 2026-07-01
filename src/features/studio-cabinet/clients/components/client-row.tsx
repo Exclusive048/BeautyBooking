@@ -1,4 +1,4 @@
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import type {
   StudioCabinetServiceOption,
   StudioCabinetShellExtras,
@@ -69,7 +69,7 @@ export function ClientTableRow({ row, studioId, scheduleMasters, services }: Row
         {row.mainMaster ? (
           <div className="flex items-center gap-2">
             {row.mainMaster.avatarUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={row.mainMaster.avatarUrl}
                 alt=""
                 width={28}

@@ -1,6 +1,6 @@
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { BookingCardActions } from "@/features/master/components/bookings/booking-card-actions";
 import { BookingManageActions } from "@/features/master/components/bookings/booking-manage-actions";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
@@ -34,7 +34,7 @@ export function BookingCard({ booking, column }: Props) {
     <article data-focus-id={booking.id} className="rounded-xl border border-border-subtle bg-bg-card p-3">
       <header className="mb-2 flex items-start gap-2">
         {booking.clientAvatarUrl ? (
-          <FocalImage
+          <ResilientImage
             src={booking.clientAvatarUrl}
             alt=""
             width={28}

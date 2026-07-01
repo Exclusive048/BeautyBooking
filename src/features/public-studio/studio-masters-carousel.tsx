@@ -8,7 +8,7 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl, studioBookingUrl } from "@/lib/public-urls";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 
 export type StudioMasterCard = {
   id: string;
@@ -124,7 +124,7 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
             <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
               <div className="relative h-48 overflow-hidden bg-muted">
                 {master.avatarUrl ? (
-                  <FocalImage
+                  <ResilientImage
                     src={master.avatarUrl}
                     alt={master.name}
                     sizes="288px"

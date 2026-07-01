@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -111,7 +111,7 @@ export function PortfolioStrip({ items }: Props) {
                       {UI_TEXT.publicProfile.portfolio.indexedBadge}
                     </div>
                   ) : null}
-                  <FocalImage
+                  <ResilientImage
                     src={item.mediaUrl}
                     alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
                     sizes="(max-width: 640px) 50vw, 33vw"
@@ -175,7 +175,7 @@ export function PortfolioStrip({ items }: Props) {
                 {selectedItem ? (
                   <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                     <div className="relative aspect-[3/4] max-h-[72vh] w-full">
-                      <FocalImage
+                      <ResilientImage
                         src={selectedItem.mediaUrl}
                         alt={
                           selectedItem.caption ??

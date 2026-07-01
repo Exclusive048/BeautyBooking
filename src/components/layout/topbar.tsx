@@ -19,7 +19,7 @@ import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { getSiteLogoAsset } from "@/lib/media/queries";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { TopbarAuthButton } from "@/components/layout/topbar-auth-button";
 
 type WorkspaceLink = {
@@ -36,7 +36,7 @@ function WorkspaceShortcutLink({ item, isStudio }: { item: WorkspaceLink; isStud
       <Link href={item.href} aria-label={item.ariaLabel} title={item.label}>
         <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border-subtle/80 bg-bg-card text-text-sec">
           {item.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={item.avatarUrl}
               alt=""
               width={32}
@@ -166,7 +166,7 @@ export async function Topbar() {
               aria-label={UI_TEXT.nav.siteLogoAlt}
               className="shrink-0"
             >
-              <FocalImage
+              <ResilientImage
                 src={siteLogo.url}
                 alt={UI_TEXT.nav.siteLogoAlt}
                 width={36}

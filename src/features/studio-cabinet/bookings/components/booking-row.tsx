@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -98,7 +98,7 @@ export function BookingRow({
         <td className="px-3 py-3 align-top">
           <div className="flex items-center gap-2">
             {row.master.avatarUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={row.master.avatarUrl}
                 alt=""
                 width={28}

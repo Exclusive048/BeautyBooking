@@ -1,4 +1,4 @@
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -51,7 +51,7 @@ export async function StudioPhotosSection({ studioId }: Props) {
               {portfolio.length > 0
                 ? portfolio.map((asset) => (
                     <div key={asset.id} className="relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
-                      <FocalImage src={asset.url} alt="" sizes="(max-width: 768px) 50vw, 25vw" className="object-cover" />
+                      <ResilientImage src={asset.url} alt="" sizes="(max-width: 768px) 50vw, 25vw" className="object-cover" />
                     </div>
                   ))
                 : Array.from({ length: 8 }).map((_, i) => (
