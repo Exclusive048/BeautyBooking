@@ -4,47 +4,54 @@ import {
   intraPackageOverlap,
   intraPackageOverlapMultiMaster,
 } from "./package-math";
+import { toKopeks } from "@/lib/money/kopeks";
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
+// Test boundary (MONEY-BRAND-TYPE-A): brand the raw kopeks inputs, then widen
+// the branded `Kopeks[]` result back to `number[]` for the numeric assertions.
+// Values are unchanged — this only annotates the units at the test boundary.
+const pdp = (prices: number[], finalTotal: number): number[] =>
+  proportionalDiscountedPrices(prices.map(toKopeks), toKopeks(finalTotal));
+
 describe("proportionalDiscountedPrices", () => {
   it("empty input → empty output", () => {
-    expect(proportionalDiscountedPrices([], 0)).toEqual([]);
+    expect(pdp([], 0)).toEqual([]);
   });
 
   it("single component → gets the whole final total", () => {
-    expect(proportionalDiscountedPrices([5000], 4000)).toEqual([4000]);
+    expect(pdp([5000], 4000)).toEqual([4000]);
   });
 
   it("no discount (final === total) → each component keeps its price", () => {
     const prices = [1000, 2000, 3000];
-    expect(proportionalDiscountedPrices(prices, 6000)).toEqual([1000, 2000, 3000]);
+    expect(pdp(prices, 6000)).toEqual([1000, 2000, 3000]);
   });
 
   it("3 equal components, final 200 → Σ exactly 200 (two get 67, one 66)", () => {
-    const out = proportionalDiscountedPrices([100, 100, 100], 200);
+    const out = pdp([100, 100, 100], 200);
     expect(sum(out)).toBe(200);
     expect([...out].sort()).toEqual([66, 67, 67]);
   });
 
   it("indivisible: 3 equal, final 100 → Σ exactly 100 (largest-remainder hands the kopek out)", () => {
-    const out = proportionalDiscountedPrices([100, 100, 100], 100);
+    const out = pdp([100, 100, 100], 100);
     expect(sum(out)).toBe(100);
     expect([...out].sort()).toEqual([33, 33, 34]);
   });
 
   it("weighted split [1000,2000,3000] final 5000 → [833,1667,2500], Σ 5000", () => {
-    const out = proportionalDiscountedPrices([1000, 2000, 3000], 5000);
+    const out = pdp([1000, 2000, 3000], 5000);
     expect(sum(out)).toBe(5000);
     expect(out).toEqual([833, 1667, 2500]);
   });
 
   it("all-free components → all zero", () => {
-    expect(proportionalDiscountedPrices([0, 0], 0)).toEqual([0, 0]);
+    expect(pdp([0, 0], 0)).toEqual([0, 0]);
   });
 
   it("proportional bias: larger component gets the larger share", () => {
-    const out = proportionalDiscountedPrices([100, 900], 500);
+    const out = pdp([100, 900], 500);
     expect(sum(out)).toBe(500);
     expect(out[1]).toBeGreaterThan(out[0]!);
   });
@@ -58,7 +65,7 @@ describe("proportionalDiscountedPrices", () => {
       [[7, 11, 13], 19],
     ];
     for (const [prices, final] of cases) {
-      const out = proportionalDiscountedPrices(prices, final);
+      const out = pdp(prices, final);
       expect(sum(out)).toBe(final);
       expect(out.every((x) => x >= 0)).toBe(true);
     }

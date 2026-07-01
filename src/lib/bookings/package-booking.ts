@@ -21,6 +21,7 @@ import {
   packageFinalTotal,
   intraPackageOverlap,
 } from "@/lib/bookings/package-math";
+import { toKopeks } from "@/lib/money/kopeks";
 import {
   canCancelOrReschedule,
   ensureBookingActionWindow,
@@ -363,7 +364,7 @@ export async function proposeSoloPackagePlacement(input: {
     cursor = new Date(end.getTime() + pkg.bufferMin * 60 * 1000);
   }
 
-  const prices = pkg.components.map((c) => c.effectivePrice);
+  const prices = pkg.components.map((c) => toKopeks(c.effectivePrice));
   const finalTotal = packageFinalTotal(prices, pkg.discountType as "PERCENT" | "FIXED", pkg.discountValue);
   const split = proportionalDiscountedPrices(prices, finalTotal);
 
@@ -450,12 +451,12 @@ export async function createSoloPackageBooking(input: {
 
   // 3. Proportional discounted price per component (Σ === final, exact).
   const finalTotal = packageFinalTotal(
-    cores.map((c) => c.service.effectivePrice),
+    cores.map((c) => toKopeks(c.service.effectivePrice)),
     pkg.discountType as "PERCENT" | "FIXED",
     pkg.discountValue,
   );
   const split = proportionalDiscountedPrices(
-    cores.map((c) => c.service.effectivePrice),
+    cores.map((c) => toKopeks(c.service.effectivePrice)),
     finalTotal,
   );
 

@@ -4,6 +4,7 @@ import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBooking
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
+import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
@@ -90,9 +91,12 @@ function parseDateKey(date: string): Date {
   return parsed;
 }
 
-function sumBookingPrice(input: { serviceItems: Array<{ priceSnapshot: number }>; servicePrice: number }): number {
+function sumBookingPrice(input: {
+  serviceItems: Array<{ priceSnapshot: number }>;
+  servicePrice: Kopeks;
+}): Kopeks {
   const snap = input.serviceItems.reduce((sum, item) => sum + Math.max(0, item.priceSnapshot), 0);
-  return snap > 0 ? snap : input.servicePrice;
+  return toKopeks(snap > 0 ? snap : input.servicePrice);
 }
 
 function normalizeBookingAnswers(
@@ -347,7 +351,7 @@ export async function getMasterDay(input: {
       serviceTitle: baseDto.serviceName,
       serviceName: baseDto.serviceName,
       durationMin: baseDto.durationMin,
-      price: sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price }),
+      price: sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: toKopeks(item.service.price) }),
     };
   });
 
@@ -371,7 +375,7 @@ export async function getMasterDay(input: {
       now: nowDate,
     });
     if (status !== "FINISHED") return sum;
-    return sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: item.service.price });
+    return sum + sumBookingPrice({ serviceItems: item.serviceItems, servicePrice: toKopeks(item.service.price) });
   }, 0);
 
   const dayPlan = await ScheduleEngine.getDayPlan({

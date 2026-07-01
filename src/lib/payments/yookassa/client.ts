@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
+import { kopeksToRubles, type Kopeks } from "@/lib/money/kopeks";
 
 type YookassaConfirmation = {
   type: string;
@@ -32,7 +33,7 @@ const PAYMENTS_URL = "https://api.yookassa.ru/v3/payments";
 const REFUNDS_URL = "https://api.yookassa.ru/v3/refunds";
 
 type CreateInitialPaymentInput = {
-  amountKopeks: number;
+  amountKopeks: Kopeks;
   description: string;
   returnUrl: string;
   idempotenceKey: string;
@@ -40,7 +41,7 @@ type CreateInitialPaymentInput = {
 };
 
 type CreateRecurringPaymentInput = {
-  amountKopeks: number;
+  amountKopeks: Kopeks;
   paymentMethodId: string;
   description: string;
   idempotenceKey: string;
@@ -49,12 +50,14 @@ type CreateRecurringPaymentInput = {
 
 type CreateRefundInput = {
   paymentId: string;
-  amountKopeks: number;
+  amountKopeks: Kopeks;
   idempotenceKey: string;
 };
 
-function formatAmount(kopeks: number): string {
-  return (kopeks / 100).toFixed(2);
+function formatAmount(kopeks: Kopeks): string {
+  // kopeks → rubles at the single YooKassa unit boundary (identical to
+  // `(kopeks / 100).toFixed(2)`).
+  return kopeksToRubles(kopeks).toFixed(2);
 }
 
 function getAuthHeader(): string {

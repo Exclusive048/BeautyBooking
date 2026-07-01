@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { toKopeks } from "@/lib/money/kopeks";
 
 import { prisma } from "@/lib/prisma";
 
@@ -134,7 +135,7 @@ export async function POST(req: Request) {
 
       paymentId: payment.yookassaPaymentId,
 
-      amountKopeks: refundAmount,
+      amountKopeks: toKopeks(refundAmount),
 
       idempotenceKey,
 

@@ -1,9 +1,10 @@
 import { DiscountType } from "@prisma/client";
+import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 
 export type BundlePricing = {
-  totalPrice: number;
-  discountAmount: number;
-  finalPrice: number;
+  totalPrice: Kopeks;
+  discountAmount: Kopeks;
+  finalPrice: Kopeks;
   totalDurationMin: number;
 };
 
@@ -17,7 +18,9 @@ export type BundlePricing = {
  * but capped at the sum so the bundle never has a negative final price.
  */
 export function computeBundlePricing(input: {
-  services: Array<{ price: number; durationMin: number }>;
+  // `price` in kopeks; `discountValue` is dual-unit (percent for PERCENT,
+  // kopeks for FIXED) so it is intentionally a plain number, not `Kopeks`.
+  services: Array<{ price: Kopeks; durationMin: number }>;
   discountType: DiscountType;
   discountValue: number;
 }): BundlePricing {
@@ -32,5 +35,11 @@ export function computeBundlePricing(input: {
       ? Math.round((totalPrice * value) / 100)
       : Math.min(totalPrice, value);
   const finalPrice = Math.max(0, totalPrice - discountAmount);
-  return { totalPrice, discountAmount, finalPrice, totalDurationMin };
+  // Re-brand once at the return (JS arithmetic above widened to `number`).
+  return {
+    totalPrice: toKopeks(totalPrice),
+    discountAmount: toKopeks(discountAmount),
+    finalPrice: toKopeks(finalPrice),
+    totalDurationMin,
+  };
 }

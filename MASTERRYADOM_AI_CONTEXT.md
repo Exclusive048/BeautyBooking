@@ -227,6 +227,7 @@ src/
 │   ├── master/             # Логика мастера
 │   ├── masters/            # Работа с мастерами
 │   ├── media/              # Медиафайлы, S3, local storage
+│   ├── money/              # Branded `Kopeks` type + boundary converters (MONEY-BRAND-TYPE-A)
 │   ├── model-offers/       # Офферы для моделей
 │   ├── monitoring/         # Алерты, статус
 │   ├── notifications/      # Уведомления (push, telegram, center)
@@ -1246,6 +1247,11 @@ The following architectural choices block 4 pre-launch runbooks. **Each decision
 **Billing:**
 - Использовать `getBillingFeatures()` для проверки доступа к функциям
 - Не делать прямые запросы к BillingPlan — использовать `src/lib/billing/`
+
+**Деньги — branded `Kopeks` (MONEY-BRAND-TYPE-A):**
+- Все суммы — в **копейках** (integer); тип `Kopeks` из `src/lib/money/kopeks.ts` (`number & { __brand }`, erased at runtime). `Kopeks ⊆ number` → брендированное значение свободно течёт в `number`-слот, но raw `number` (рубли/count) отвергается там, где ждут `Kopeks`.
+- **Brand at boundaries, don't litter casts:** конструировать один раз на DB-read/input границе через `toKopeks(...)`; переходить единицы один раз на display/YooKassa границе через `kopeksToRubles`/`rublesToKopeks`; держать branded через арифметику (JS-арифметика **виснет** brand назад в `number` → re-brand один раз на return хелпера, `toKopeks(sum)`). **Единственные `as Kopeks` — 2 конструктора в `kopeks.ts`.** Новый money-хелпер: подпись `Kopeks` in/out, re-brand на return.
+- НЕ branded: `discountValue` (dual-unit — percent для PERCENT, kopeks для FIXED), длительности, counts, проценты. Брендированы chokepoints: `computeBundlePricing` · `package-math` · `resolvePlanPrice` (output) · `day.service.sumBookingPrice` · analytics `loadBookingRevenueMap` · YooKassa `formatAmount`/`amountKopeks`.
 
 ### Архитектурные patterns (выучены в redesign sprint)
 

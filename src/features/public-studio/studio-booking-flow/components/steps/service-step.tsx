@@ -12,6 +12,9 @@ import { groupServicesByCategory } from "@/lib/providers/group-services";
 
 type ServiceItem = ProviderProfileDto["services"][number];
 
+// Client-only render key for the uncategorized bucket (never a DB id — rule 12).
+const UNCATEGORIZED_CHIP_KEY = "__uncat__";
+
 type Props = {
   services: ServiceItem[];
   masters: StudioMaster[];
@@ -40,6 +43,25 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
   // FIX-R2-04-C: group the (search-filtered) services by attached category.
   // Presentational only — selection mechanic (onPick) unchanged.
   const groups = useMemo(() => groupServicesByCategory(filtered), [filtered]);
+
+  // WAVE-2-SMALL: category filter-chips over the R2-04-C sections. Chips are
+  // derived from `groups` (labels, not ids — rule 12), so they always reflect
+  // the current search results. Presentational filtering only.
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+  const chips = useMemo(
+    () =>
+      groups.map((group) => ({
+        key: group.categoryName ?? UNCATEGORIZED_CHIP_KEY,
+        label: group.categoryName ?? UI_TEXT.bookingWidget.serviceStep.categoryOther,
+      })),
+    [groups],
+  );
+  // Guard against search dropping the active category out of the result set —
+  // fall back to "all" so the user is never trapped in an empty category.
+  const activeExists = activeCat !== null && chips.some((chip) => chip.key === activeCat);
+  const visibleGroups = activeExists
+    ? groups.filter((group) => (group.categoryName ?? UNCATEGORIZED_CHIP_KEY) === activeCat)
+    : groups;
 
   const heading = prefilledMaster
     ? UI_TEXT.bookingWidget.serviceStep.titleMaster.replace("{master}", prefilledMaster.name.split(" ")[0] ?? "")
@@ -72,13 +94,45 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
         />
       </div>
 
+      {chips.length > 1 ? (
+        <div
+          className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
+          role="group"
+          aria-label={UI_TEXT.bookingWidget.serviceStep.titleStudio}
+        >
+          <Button
+            type="button"
+            variant={activeCat === null ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setActiveCat(null)}
+            className="shrink-0 rounded-full"
+            aria-pressed={activeCat === null}
+          >
+            {UI_TEXT.bookingWidget.serviceStep.catAll}
+          </Button>
+          {chips.map((chip) => (
+            <Button
+              key={chip.key}
+              type="button"
+              variant={activeCat === chip.key ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setActiveCat(chip.key)}
+              className="shrink-0 rounded-full"
+              aria-pressed={activeCat === chip.key}
+            >
+              {chip.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-8 text-center text-sm text-text-muted">
           {query ? UI_TEXT.bookingWidget.serviceStep.searchEmpty : UI_TEXT.bookingWidget.serviceStep.noServices}
         </div>
       ) : (
         <div className="space-y-6">
-          {groups.map((group) => (
+          {visibleGroups.map((group) => (
             <div key={group.categoryName ?? "__uncat"} className="space-y-2.5">
               <div className="flex items-center gap-2.5">
                 <h3 className="font-display text-sm font-semibold text-text">

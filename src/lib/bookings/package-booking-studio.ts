@@ -11,6 +11,7 @@ import {
   packageFinalTotal,
   intraPackageOverlapMultiMaster,
 } from "@/lib/bookings/package-math";
+import { toKopeks } from "@/lib/money/kopeks";
 import {
   loadPackageForBooking,
   mapPrismaBookingConflict,
@@ -175,7 +176,7 @@ export async function proposeStudioPackagePlacement(input: {
     };
   }
 
-  const prices = cores.map((c) => c.service.effectivePrice);
+  const prices = cores.map((c) => toKopeks(c.service.effectivePrice));
   const finalTotal = packageFinalTotal(
     prices,
     pkg.discountType as "PERCENT" | "FIXED",
@@ -254,7 +255,7 @@ export async function createStudioPackageBooking(input: {
   }
 
   // 3. Proportional discounted price per component (Σ === final, exact kopeks).
-  const prices = cores.map((c) => c.service.effectivePrice);
+  const prices = cores.map((c) => toKopeks(c.service.effectivePrice));
   const finalTotal = packageFinalTotal(
     prices,
     pkg.discountType as "PERCENT" | "FIXED",

@@ -517,7 +517,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-4">
+      {/* min-w-0: let the wizard column shrink below content width so the
+          service-step category filter-chip strip scrolls internally instead
+          of forcing page-level horizontal overflow on mobile (WAVE-2-SMALL). */}
+      <div className="min-w-0 space-y-4">
         <BookingHero
           studio={studio}
           masters={masters}

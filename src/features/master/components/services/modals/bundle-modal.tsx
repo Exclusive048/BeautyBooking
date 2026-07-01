@@ -15,6 +15,7 @@ import type {
 } from "@/lib/master/services-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { computeBundlePricing } from "../lib/compute-bundle-pricing";
+import { toKopeks } from "@/lib/money/kopeks";
 import { formatDuration, formatRubles } from "../lib/format";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.bundle;
@@ -78,7 +79,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
     () =>
       computeBundlePricing({
         services: selectedServices.map((service) => ({
-          price: service.price,
+          price: toKopeks(service.price),
           durationMin: service.durationMin,
         })),
         discountType,

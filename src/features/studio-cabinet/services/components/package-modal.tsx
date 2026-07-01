@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { computeBundlePricing } from "@/features/master/components/services/lib/compute-bundle-pricing";
+import { toKopeks } from "@/lib/money/kopeks";
 import type {
   StudioPackagePickerService,
   StudioPackageView,
@@ -98,7 +99,7 @@ export function PackageModal({
     () =>
       computeBundlePricing({
         services: selectedServices.map((s) => ({
-          price: s.priceKopeks,
+          price: toKopeks(s.priceKopeks),
           durationMin: s.durationMin,
         })),
         discountType,
