@@ -41,6 +41,9 @@ const envSchema = z.object({
   WORKER_SECRET: z.string().optional(),
   BILLING_RENEW_SECRET: z.string().optional(),
   MRR_SNAPSHOT_SECRET: z.string().optional(),
+  // CATALOG-AVAILABLE-TODAY: token gating the availableToday recompute trigger.
+  // Fail-closed — the endpoint refuses when unset (never runs unauthenticated).
+  AVAILABILITY_CRON_TOKEN: z.string().optional(),
 
   // ── Storage ───────────────────────────────────────────────────────────────
   STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),

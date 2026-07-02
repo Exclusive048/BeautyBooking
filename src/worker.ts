@@ -47,6 +47,7 @@ import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
 import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
 import { processPlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
+import { recomputeAvailableToday } from "@/lib/schedule/recompute-available-today";
 
 ensureVisualSearchStartupConfig();
 
@@ -100,6 +101,26 @@ function sleep(ms: number): Promise<void> {
 }
 
 function startPeriodicJobs() {
+  // CATALOG-AVAILABLE-TODAY Phase 3: recompute `Provider.availableToday` for
+  // published providers. Fire-and-guard — a sweep error logs but NEVER crashes
+  // the worker or blocks other jobs (same isolation as the jobs below). Runs
+  // once at startup (fresh values immediately post-deploy, not all-`false`
+  // until the first tick) + every 30 min. The sweep is engine-safe (a pure
+  // read + a column write; slot-gen untouched).
+  const runAvailableTodaySweep = () => {
+    void recomputeAvailableToday()
+      .then((summary) => {
+        logInfo("availableToday.recompute.done", summary);
+      })
+      .catch((error) => {
+        logError("availableToday.recompute.failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  };
+  // Startup run — non-blocking (fire-and-forget; never delays worker boot).
+  runAvailableTodaySweep();
+
   const intervalMs = 30 * 60 * 1000;
   setInterval(() => {
     void runHotSlotExpiringJob().catch((error) => {
@@ -112,6 +133,7 @@ function startPeriodicJobs() {
         error: error instanceof Error ? error.message : String(error),
       });
     });
+    runAvailableTodaySweep();
   }, intervalMs);
 
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
