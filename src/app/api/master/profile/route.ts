@@ -78,6 +78,8 @@ export async function PATCH(req: Request) {
       ...(body.avatarUrl !== undefined ? { avatarUrl: body.avatarUrl } : {}),
       ...(body.district !== undefined ? { district: body.district } : {}),
       ...(body.timezone !== undefined ? { timezone: body.timezone } : {}),
+      ...(body.socialVk !== undefined ? { socialVk: body.socialVk } : {}),
+      ...(body.socialInstagram !== undefined ? { socialInstagram: body.socialInstagram } : {}),
     });
     return jsonProfileOk(data);
   } catch (error) {

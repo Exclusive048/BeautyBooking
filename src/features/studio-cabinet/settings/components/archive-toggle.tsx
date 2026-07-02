@@ -9,17 +9,18 @@ const T = UI_TEXT.studioCabinet.settingsV2.danger;
 const TX = UI_TEXT.studioCabinet.settingsV2.toasts;
 
 type Props = {
-  studioId: string;
+  /** Provider id — `/api/studios/[id]` keys on the Provider, not the Studio. */
+  providerId: string;
   isPublished: boolean;
 };
 
 /**
  * Archive = `Provider.isPublished = false` via the existing
- * `PATCH /api/studios/[id]` endpoint. Reversible by re-publishing
- * elsewhere (legacy profile editor). Keeps studio data intact —
- * different from the permanent delete below.
+ * `PATCH /api/studios/[id]` endpoint. Reversible by re-publishing in the
+ * «Профиль и медиа» section. Keeps studio data intact — different from the
+ * permanent delete below.
  */
-export function ArchiveToggle({ studioId, isPublished }: Props) {
+export function ArchiveToggle({ providerId, isPublished }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export function ArchiveToggle({ studioId, isPublished }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/studios/${encodeURIComponent(studioId)}`, {
+      const response = await fetch(`/api/studios/${encodeURIComponent(providerId)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ isPublished: false }),

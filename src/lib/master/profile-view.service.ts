@@ -69,6 +69,11 @@ export type MasterProfileViewData = {
   about: {
     bio: string | null;
   };
+  /** FEAT-PROVIDER-SOCIALS: free-text community links (normalized safe URL or null). */
+  socials: {
+    vk: string | null;
+    instagram: string | null;
+  };
   location: {
     address: string | null;
     district: string | null;
@@ -203,6 +208,10 @@ function composeView(input: {
     },
     contacts,
     about: { bio: data.master.bio },
+    socials: {
+      vk: data.master.socialVk,
+      instagram: data.master.socialInstagram,
+    },
     location: {
       address: data.master.address || null,
       district: provider.district || null,

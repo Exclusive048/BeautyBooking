@@ -686,6 +686,23 @@ export const UI_TEXT = {
     createStudioCta: "Создать студию",
     more: "Ещё",
   },
+  // FEAT-PROVIDER-SOCIALS: shared strings for the VK / Instagram community-link
+  // inputs (studio + master cabinets), their live preview, and the public icons.
+  social: {
+    vkLabel: "VK",
+    instagramLabel: "Instagram",
+    vkPlaceholder: "vk.com/studio или @studio",
+    instagramPlaceholder: "instagram.com/studio или @studio",
+    vkAria: "Сообщество ВКонтакте",
+    instagramAria: "Страница в Instagram",
+    previewTemplate: "Ссылка: {label}",
+    invalid: "Не распознали ссылку. Укажите адрес на vk.com или instagram.com.",
+    hint: "Полный адрес или @имя — покажем аккуратной иконкой в профиле.",
+    masterSectionTitle: "Соцсети",
+    masterSectionSubtitle: "Ссылки на ваши сообщества — покажем в публичном профиле",
+    editAria: "Изменить ссылку",
+    notSet: "Не указано",
+  },
   footer: {
     aria: {
       nav: "Навигация футера",
@@ -1222,8 +1239,6 @@ export const UI_TEXT = {
       phonePlaceholder: "+7 900 000 00 00",
       emailLabel: "Email",
       emailPlaceholder: "studio@email.com",
-      telegramLabel: "Telegram",
-      telegramPlaceholder: "@username",
       vkLabel: "VK",
       vkPlaceholder: "vk.com/studio",
       instagramLabel: "Instagram",
@@ -6574,15 +6589,21 @@ export const UI_TEXT = {
       nav: {
         sectionsLabel: "Разделы",
         general: "Общее",
+        profileMedia: "Профиль и медиа",
+        portfolio: "Портфолио",
         ownerTeam: "Владелец и команда",
         notifications: "Уведомления и связь",
         policy: "Правила студии",
         danger: "Опасная зона",
       },
+      portfolio: {
+        cardTitle: "Портфолио",
+        cardDesc: "Добавляйте работы студии — они появятся на публичной странице.",
+      },
       general: {
         cardTitle: "Карточка студии",
         cardDesc: "Базовые данные. Видны на публичной странице студии.",
-        logoHint: "Загрузка логотипа — в редакторе профиля (legacy флоу).",
+        logoHint: "Логотип, обложку и адрес меняйте в разделе «Профиль и медиа».",
         nameLabel: "Название",
         taglineLabel: "Краткий слоган",
         descriptionLabel: "Описание",
@@ -6597,7 +6618,7 @@ export const UI_TEXT = {
         districtLabel: "Район",
         openMap: "Открыть на Яндекс.Картах",
         addressEditHint:
-          "Изменение адреса и геокодирование — в legacy редакторе профиля. Перенесём в новый интерфейс отдельным апдейтом.",
+          "Изменить адрес и координаты можно в разделе «Профиль и медиа».",
       },
       ownerTeam: {
         ownerTitle: "Владелец студии",

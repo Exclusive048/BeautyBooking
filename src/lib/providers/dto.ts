@@ -72,6 +72,10 @@ export type ProviderProfileDto = {
   categories: string[];
   availableToday: boolean;
   timezone: string;
+  // FEAT-PROVIDER-SOCIALS: normalized safe community-link URLs (or null).
+  // Rule-12-safe — a social link is public by design (no internal id).
+  socialVk: string | null;
+  socialInstagram: string | null;
   cancellationDeadlineHours: number | null;
   hotSlotsEnabled: boolean;
   geoLat: number | null;

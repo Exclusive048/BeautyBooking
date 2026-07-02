@@ -46,7 +46,9 @@ export function GeneralForm({ data }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/studios/${encodeURIComponent(data.studioId)}`, {
+      // `/api/studios/[id]` keys on the **Provider** id, not the Studio id
+      // (LEGACY-STUDIO-SETTINGS-PORT-AND-RETIRE — was `data.studioId` → 404).
+      const response = await fetch(`/api/studios/${encodeURIComponent(data.providerId)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

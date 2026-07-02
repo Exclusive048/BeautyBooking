@@ -11,6 +11,7 @@ import { HeaderSection } from "./sections/header-section";
 import { LocationSection } from "./sections/location-section";
 import { PortfolioReadonlySection } from "./sections/portfolio-readonly-section";
 import { ServicesReadonlySection } from "./sections/services-readonly-section";
+import { SocialsSection } from "./sections/socials-section";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -49,6 +50,7 @@ export async function MasterProfilePage() {
           <main className="space-y-4 lg:col-span-6">
             <HeaderSection providerId={view.providerId} data={view.header} />
             <ContactsSection data={view.contacts} />
+            <SocialsSection vk={view.socials.vk} instagram={view.socials.instagram} />
             <AboutSection bio={view.about.bio} />
             <LocationSection data={view.location} />
             <ServicesReadonlySection data={view.services} />

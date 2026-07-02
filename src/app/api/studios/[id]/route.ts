@@ -22,6 +22,10 @@ const updateSchema = z
     contactName: z.string().trim().nullable().optional(),
     contactPhone: z.string().trim().nullable().optional(),
     contactEmail: z.string().trim().email().nullable().optional(),
+    // FEAT-PROVIDER-SOCIALS: raw input (URL or handle); normalized + host/scheme
+    // validated server-side in updateStudioProviderProfile (the security boundary).
+    socialVk: z.string().trim().max(200).nullable().optional(),
+    socialInstagram: z.string().trim().max(200).nullable().optional(),
     description: z.string().trim().max(2000).nullable().optional(),
     geoLat: z.number().nullable().optional(),
     geoLng: z.number().nullable().optional(),
@@ -41,6 +45,8 @@ const updateSchema = z
       data.contactName !== undefined ||
       data.contactPhone !== undefined ||
       data.contactEmail !== undefined ||
+      data.socialVk !== undefined ||
+      data.socialInstagram !== undefined ||
       data.description !== undefined ||
       data.geoLat !== undefined ||
       data.geoLng !== undefined ||

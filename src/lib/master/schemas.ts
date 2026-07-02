@@ -40,6 +40,10 @@ export const updateMasterProfileSchema = z.object({
   // FIX-R2-02-A: explicit IANA timezone override from the cabinet selector.
   // Defaults to the city-derived value but the master can override it.
   timezone: z.string().trim().min(3).max(64).optional(),
+  // FEAT-PROVIDER-SOCIALS: raw VK / Instagram input (URL or handle); normalized
+  // + host/scheme validated server-side in updateMasterProfile (security boundary).
+  socialVk: z.string().trim().max(200).nullable().optional(),
+  socialInstagram: z.string().trim().max(200).nullable().optional(),
 });
 
 export const upsertMasterServicesSchema = z.object({

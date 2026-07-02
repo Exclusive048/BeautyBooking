@@ -5,7 +5,9 @@ import {
   AlertOctagon,
   Bell,
   Building2,
+  Images,
   ShieldCheck,
+  UserRound,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -25,6 +27,8 @@ const SECTIONS: Array<{
   icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }> = [
   { key: "general", labelKey: "general", icon: Building2 },
+  { key: "profile-media", labelKey: "profileMedia", icon: UserRound },
+  { key: "portfolio", labelKey: "portfolio", icon: Images },
   { key: "owner-team", labelKey: "ownerTeam", icon: Users },
   { key: "notifications", labelKey: "notifications", icon: Bell },
   { key: "policy", labelKey: "policy", icon: ShieldCheck },

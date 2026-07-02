@@ -20,6 +20,8 @@ type ProviderProfileSource = Pick<
   | "categories"
   | "availableToday"
   | "timezone"
+  | "socialVk"
+  | "socialInstagram"
   | "cancellationDeadlineHours"
   | "geoLat"
   | "geoLng"
@@ -95,6 +97,8 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     categories: provider.categories,
     availableToday: provider.availableToday,
     timezone: provider.timezone,
+    socialVk: provider.socialVk ?? null,
+    socialInstagram: provider.socialInstagram ?? null,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
     hotSlotsEnabled: false,
     geoLat: provider.geoLat,

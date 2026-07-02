@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { Button } from "@/components/ui/button";
 import { FavoriteToggleButton } from "@/components/ui/favorite-toggle-button";
+import { ProviderSocialLinks } from "@/components/ui/provider-social-links";
 import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
 import { AvailabilityHint } from "@/features/public-profile/master/components/availability-hint";
 import { PremiumRing } from "@/features/public-profile/master/components/premium-ring";
@@ -230,6 +231,14 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 ))}
               </motion.div>
             ) : null}
+
+            {/* FEAT-PROVIDER-SOCIALS: VK / Instagram community icons (shown only
+                when set; each href re-validated in the shared component). */}
+            <ProviderSocialLinks
+              vk={provider.socialVk}
+              instagram={provider.socialInstagram}
+              className="mt-4"
+            />
           </div>
 
           <div className="flex shrink-0 items-center gap-2 self-start">

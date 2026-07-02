@@ -27,7 +27,7 @@ export function DangerSection({ studio }: Props) {
   return (
     <div className="space-y-4">
       <SectionCard danger title={T.archiveTitle} description={T.archiveDesc}>
-        <ArchiveToggle studioId={studio.studioId} isPublished={studio.isPublished} />
+        <ArchiveToggle providerId={studio.providerId} isPublished={studio.isPublished} />
       </SectionCard>
 
       <SectionCard danger title={T.deleteTitle} description={T.deleteDesc}>

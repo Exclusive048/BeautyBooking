@@ -41,6 +41,8 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       categories: true,
       availableToday: true,
       timezone: true,
+      socialVk: true,
+      socialInstagram: true,
       cancellationDeadlineHours: true,
       discountRule: { select: { isEnabled: true } },
       geoLat: true,
