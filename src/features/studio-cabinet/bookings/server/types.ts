@@ -36,6 +36,12 @@ export type StudioBookingsListData = {
   items: StudioBookingRow[];
   nextCursor: string | null;
   rangeCounts: StudioBookingsRangeCounts;
+  /**
+   * FIX-STUDIO-CALENDAR-SALON-TZ: the salon's own tz. The journal shows
+   * each booking's start time + today/tomorrow date in this tz (matching
+   * the calendar), not the admin's browser tz.
+   */
+  timezone: string;
 };
 
 export type StudioBookingsKpis = {

@@ -6,6 +6,8 @@
  * `top`/`height` math on the client and bucket assignment on the server.
  */
 
+import { getLocalTimeParts } from "@/lib/schedule/timezone";
+
 export const DAY_START_HOUR = 9;
 export const DAY_END_HOUR = 21;
 export const SLOT_MINUTES = 30;
@@ -31,15 +33,29 @@ export function toDateKey(value: Date): string {
 }
 
 /**
- * Distance from the top of the grid (in pixels) for a UTC instant
- * rendered on a given day-of-grid in the viewer's local time zone.
- * The grid uses UTC throughout — local-time display happens via
- * `formatTime` on the client.
+ * FIX-STUDIO-CALENDAR-SALON-TZ: minute-of-day of a UTC instant in the
+ * SALON's own tz. The grid axis (09:00–21:00) is salon-local, so a
+ * booking's vertical position must be derived from its salon-local
+ * time — not the UTC time-of-day (which shifts every non-UTC salon
+ * off-grid) nor the host process tz. Mirrors the master surface's
+ * `minuteOfDay(date, tz)` (schedule.service.ts). GRID-ONLY: display,
+ * never slot-gen.
  */
-export function offsetPxFromDayStart(value: Date, dayStartUtc: Date): number {
-  const minutes = (value.getTime() - dayStartUtc.getTime()) / 60000;
+export function salonMinuteOfDay(value: Date, timeZone: string): number {
+  const { hour, minute } = getLocalTimeParts(value, timeZone);
+  return hour * 60 + minute;
+}
+
+/**
+ * Distance from the top of the grid (in pixels) for a salon-local
+ * minute-of-day (see `salonMinuteOfDay`). Replaces the old
+ * UTC-anchored `offsetPxFromDayStart` — with a fixed 09:00–21:00 axis,
+ * anchoring on UTC-middnight drew a +5 salon's whole day above the top
+ * edge (clipped). `top < 0` still means "before the visible window".
+ */
+export function offsetPxFromMinute(minuteOfDay: number): number {
   const dayStartMinutes = DAY_START_HOUR * 60;
-  return ((minutes - dayStartMinutes) / SLOT_MINUTES) * SLOT_HEIGHT_PX;
+  return ((minuteOfDay - dayStartMinutes) / SLOT_MINUTES) * SLOT_HEIGHT_PX;
 }
 
 export function durationPx(startUtc: Date, endUtc: Date): number {

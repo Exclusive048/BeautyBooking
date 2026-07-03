@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRightLeft, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleBookingCell, ScheduleMasterColumn } from "../../server/types";
@@ -16,21 +17,23 @@ type Props = {
   studioId: string;
   booking: ScheduleBookingCell | null;
   masters: ScheduleMasterColumn[];
+  /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for the booking-time range. */
+  timezone: string;
   onClose: () => void;
 };
 
-function formatRange(startIso: string, endIso: string): string {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  const fmt = (d: Date) =>
-    d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${fmt(start)} — ${fmt(end)}`;
+function formatRange(startIso: string, endIso: string, timeZone: string): string {
+  return `${formatLocalHm(new Date(startIso), timeZone)} — ${formatLocalHm(
+    new Date(endIso),
+    timeZone,
+  )}`;
 }
 
 export function BookingActionMenu({
   studioId,
   booking,
   masters,
+  timezone,
   onClose,
 }: Props) {
   const [moveMode, setMoveMode] = useState<"master" | "time" | null>(null);
@@ -56,7 +59,7 @@ export function BookingActionMenu({
             <div className="rounded-lg border border-border-subtle bg-bg-input/40 p-3">
               <div className="flex items-center gap-2 text-xs text-text-sec">
                 <Clock className="h-3.5 w-3.5" aria-hidden />
-                {formatRange(booking.startAtUtc, booking.endAtUtc)}
+                {formatRange(booking.startAtUtc, booking.endAtUtc, timezone)}
               </div>
               <p className="mt-1.5 text-sm font-semibold text-text-main">
                 {booking.clientName || "—"}

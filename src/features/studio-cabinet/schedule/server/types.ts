@@ -88,6 +88,13 @@ export type ScheduleWeekData = {
 export type StudioScheduleData = {
   dateKey: string;
   view: "day" | "week";
+  /**
+   * FIX-STUDIO-CALENDAR-SALON-TZ: the salon's own tz (`Provider.timezone`).
+   * The day grid positions + labels appointment times in this tz so a
+   * cross-tz admin (e.g. Moscow browser) sees the salon's local schedule,
+   * not the browser's — matching the client-cabinet convention (QA-107).
+   */
+  timezone: string;
   day: ScheduleDayData;
   kpis: ScheduleKpis;
   week: ScheduleWeekData | null;

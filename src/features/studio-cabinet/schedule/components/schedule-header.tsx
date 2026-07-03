@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { ChevronLeft, ChevronRight, Coffee, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { UI_TEXT } from "@/lib/ui/text";
 import {
   addUtcDays,
@@ -50,6 +52,8 @@ type Props = {
   view: StudioScheduleView;
   dateKey: string;
   dayStartIso: string;
+  /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for the manage-breaks display. */
+  timezone: string;
   kpis: ScheduleKpis;
   masters: ScheduleMasterColumn[];
   breaks: ScheduleBreakCell[];
@@ -67,6 +71,7 @@ export function ScheduleHeader({
   view,
   dateKey,
   dayStartIso,
+  timezone,
   kpis,
   masters,
   breaks,
@@ -74,6 +79,21 @@ export function ScheduleHeader({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const viewerTimeZone = useViewerTimeZoneContext();
+  // FIX-STUDIO-CALENDAR-SALON-TZ: the whole grid is rendered in the salon's
+  // tz. When the admin's browser tz differs (e.g. Moscow admin, +5 salon),
+  // annotate «Время салона (город, GMT+N)» once at the header so the admin
+  // never mistakes salon times for their own wall clock. Reuses the single
+  // shared zone-label primitive (same as the client cabinet). Same-tz admins
+  // see no label (clean common case).
+  const showZoneNote = zonesDifferForViewer({
+    iso: dayStartIso,
+    salonTimeZone: timezone,
+    viewerTimeZone,
+  });
+  const zoneLabel = showZoneNote
+    ? formatZoneLabel({ iso: dayStartIso, timeZone: timezone })
+    : "";
   const [refreshing, startRefresh] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
   const [breaksOpen, setBreaksOpen] = useState(false);
@@ -138,6 +158,11 @@ export function ScheduleHeader({
                 .replace("{masters}", String(kpis.mastersOnShift))
                 .replace("{occupancy}", String(kpis.occupancyPercent))}
             </p>
+            {zoneLabel ? (
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-input/50 px-2 py-0.5 text-[11px] font-medium text-text-sec">
+                {T.salonTimeNote} {zoneLabel}
+              </p>
+            ) : null}
           </div>
           <Button variant="primary" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" aria-hidden />
@@ -246,6 +271,7 @@ export function ScheduleHeader({
         masters={masters}
         breaks={breaks}
         dayStartIso={dayStartIso}
+        timezone={timezone}
         open={breaksOpen}
         onClose={() => setBreaksOpen(false)}
       />

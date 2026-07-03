@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
   ScheduleBreakCell,
@@ -21,6 +22,8 @@ type Props = {
   masters: ScheduleMasterColumn[];
   breaks: ScheduleBreakCell[];
   dayStartIso: string;
+  /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for the existing-breaks range. */
+  timezone: string;
   open: boolean;
   onClose: () => void;
 };
@@ -60,6 +63,7 @@ export function ManageBreaksDialog({
   masters,
   breaks,
   dayStartIso,
+  timezone,
   open,
   onClose,
 }: Props) {
@@ -166,15 +170,14 @@ export function ManageBreaksDialog({
             <ul className="space-y-1.5">
               {breaks.map((entry) => {
                 const master = masters.find((m) => m.id === entry.masterId);
-                const startDate = new Date(entry.startAtUtc);
-                const endDate = new Date(entry.endAtUtc);
-                const range = `${startDate.toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })} — ${endDate.toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}`;
+                // FIX-STUDIO-CALENDAR-SALON-TZ: existing breaks are shown in
+                // the salon's tz (matching the calendar grid). The add-break
+                // datetime-local inputs below still edit in the browser tz —
+                // a `datetime-local` widget has no tz API (separate concern).
+                const range = `${formatLocalHm(
+                  new Date(entry.startAtUtc),
+                  timezone,
+                )} — ${formatLocalHm(new Date(entry.endAtUtc), timezone)}`;
                 return (
                   <li
                     key={entry.id}

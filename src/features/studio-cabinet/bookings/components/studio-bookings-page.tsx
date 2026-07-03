@@ -64,6 +64,7 @@ export function StudioBookingsPage({
         studioId={studioId}
         rows={list.items}
         masters={scheduleMasters}
+        timezone={list.timezone}
       />
       <BookingsPagination nextCursor={list.nextCursor} />
     </div>

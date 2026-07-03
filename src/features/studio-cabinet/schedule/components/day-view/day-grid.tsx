@@ -6,6 +6,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { assignLanes, laneStyle } from "@/lib/calendar/lane-layout";
 import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
+import { formatLocalHm, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { BOOKING_CELL_CLASS } from "../../lib/booking-status-display";
 import {
   GRID_HEIGHT_PX,
@@ -14,7 +15,9 @@ import {
   durationPx,
   formatTime,
   iterateSlotMinutes,
-  offsetPxFromDayStart,
+  offsetPxFromMinute,
+  parseDateKey,
+  salonMinuteOfDay,
 } from "../../lib/time-grid";
 import type {
   ScheduleBookingCell,
@@ -48,18 +51,22 @@ type Props = {
    * "no deep-link" — grid renders normally.
    */
   focusMasterId?: string;
+  /**
+   * FIX-STUDIO-CALENDAR-SALON-TZ: the salon's own tz. Drives both the
+   * booking-cell vertical POSITION and its "HH:MM" LABEL so they agree
+   * with each other and with the salon-local axis — regardless of the
+   * admin's browser tz.
+   */
+  timezone: string;
 };
 
-function localTimeShort(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
+export function DayGrid({
+  studioId,
+  day,
+  timezone,
+  services,
+  focusMasterId,
+}: Props) {
   const [createSlot, setCreateSlot] = useState<{
     masterId: string;
     startAtUtc: string;
@@ -84,10 +91,14 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
   }, [focusMasterId]);
 
   const handleEmptyClick = (masterId: string, slotMinutesValue: number) => {
-    const dayStart = new Date(day.dayStartIso);
-    const start = new Date(dayStart);
-    start.setUTCMinutes(slotMinutesValue);
-    setCreateSlot({ masterId, startAtUtc: start.toISOString() });
+    // FIX-STUDIO-CALENDAR-SALON-TZ: the grid axis is salon-local, so a
+    // clicked slot minute-of-day is a salon-local HH:MM. Convert it back
+    // to the correct UTC instant on the salon day (not the browser day).
+    const salonDay = parseDateKey(day.dateKey);
+    const hour = Math.floor(slotMinutesValue / 60);
+    const minute = slotMinutesValue % 60;
+    const startUtc = toUtcFromLocalDateTime(salonDay, hour, minute, timezone);
+    setCreateSlot({ masterId, startAtUtc: startUtc.toISOString() });
   };
 
   if (day.columns.length === 0) {
@@ -131,7 +142,6 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
               const breaksForColumn = day.breaks.filter(
                 (b) => b.masterId === column.id,
               );
-              const dayStart = new Date(day.dayStartIso);
               const isFocused = focusMasterId === column.id;
               return (
                 <div
@@ -188,7 +198,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
                       <BreakCell
                         key={entry.id}
                         entry={entry}
-                        dayStart={dayStart}
+                        timezone={timezone}
                       />
                     ))}
 
@@ -207,15 +217,15 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
                             BOOKING_CELL_CLASS[booking.tone],
                           )}
                           style={{
-                            top: offsetPxFromDayStart(start, dayStart),
+                            top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
                             height: durationPx(start, end),
                             left,
                             width,
                           }}
                         >
                           <div className="font-mono text-[10px]">
-                            {localTimeShort(booking.startAtUtc)} —{" "}
-                            {localTimeShort(booking.endAtUtc)}
+                            {formatLocalHm(start, timezone)} —{" "}
+                            {formatLocalHm(end, timezone)}
                           </div>
                           <div className="truncate font-semibold">
                             {booking.clientName || "—"}
@@ -234,7 +244,10 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
 
                     {/* Current time line */}
                     {column.isAvailable ? (
-                      <CurrentTimeLine dayStartIso={day.dayStartIso} />
+                      <CurrentTimeLine
+                        dateKey={day.dateKey}
+                        timezone={timezone}
+                      />
                     ) : null}
 
                     {/* Disabled overlay */}
@@ -262,6 +275,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
         studioId={studioId}
         booking={activeBooking}
         masters={day.columns}
+        timezone={timezone}
         onClose={() => setActiveBooking(null)}
       />
     </>
@@ -270,10 +284,10 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
 
 function BreakCell({
   entry,
-  dayStart,
+  timezone,
 }: {
   entry: ScheduleBreakCell;
-  dayStart: Date;
+  timezone: string;
 }) {
   const start = new Date(entry.startAtUtc);
   const end = new Date(entry.endAtUtc);
@@ -281,7 +295,7 @@ function BreakCell({
     <div
       className="absolute left-1 right-1 z-[5] flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-[11px] font-medium text-text-sec"
       style={{
-        top: offsetPxFromDayStart(start, dayStart),
+        top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
         height: durationPx(start, end),
       }}
       title={entry.note ?? undefined}

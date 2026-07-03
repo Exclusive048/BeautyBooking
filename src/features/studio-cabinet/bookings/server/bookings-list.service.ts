@@ -99,15 +99,21 @@ export async function listStudioBookings(input: {
 }): Promise<StudioBookingsListData> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
-    select: { id: true, providerId: true },
+    select: {
+      id: true,
+      providerId: true,
+      provider: { select: { timezone: true } },
+    },
   });
   if (!studio) {
     return {
       items: [],
       nextCursor: null,
       rangeCounts: { today: 0, tomorrow: 0, week: 0, all: 0 },
+      timezone: "Europe/Moscow",
     };
   }
+  const timezone = studio.provider.timezone;
 
   const baseScope: Prisma.BookingWhereInput = {
     OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
@@ -330,5 +336,5 @@ export async function listStudioBookings(input: {
     all: allCount,
   };
 
-  return { items, nextCursor, rangeCounts };
+  return { items, nextCursor, rangeCounts, timezone };
 }

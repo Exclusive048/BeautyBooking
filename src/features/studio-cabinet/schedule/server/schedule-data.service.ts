@@ -430,6 +430,7 @@ export async function loadStudioScheduleData(input: {
   return {
     dateKey: effectiveDateKey,
     view: input.view,
+    timezone: studioTimezone,
     day,
     kpis: computeKpis(day),
     week,

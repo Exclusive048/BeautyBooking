@@ -6202,6 +6202,7 @@ export const UI_TEXT = {
         refreshedAtTemplate: "обновлено {time}",
         addBooking: "Добавить запись",
         manageBreaks: "Перерывы",
+        salonTimeNote: "Время салона",
       },
       breakDialog: {
         title: "Перерывы мастеров",
