@@ -5476,8 +5476,14 @@ export const UI_TEXT = {
     },
     booking: {
       title: "Запись",
+      // FIX-BATCH-C Defect 2: distinct empty states.
+      // `emptyTitle`/`emptyDesc` = genuine no-services-at-all (empty catalog).
+      // `selectServiceTitle`/`selectServiceDesc` = has services but the client
+      // hasn't picked one yet (empty cart) — must NOT claim the master has no services.
       emptyTitle: "Онлайн-запись пока недоступна",
       emptyDesc: "Мастер ещё не добавил услуги для записи. Загляните позже или свяжитесь с ним напрямую.",
+      selectServiceTitle: "Выберите услугу, чтобы записаться",
+      selectServiceDesc: "Отметьте услугу в списке — и мы подберём свободное время.",
       chooseTime: "Выбрать время",
       backToCart: "Назад к корзине",
       continueToConfirm: "Продолжить",
@@ -7300,6 +7306,9 @@ export const UI_TEXT = {
       tomorrow: "Завтра",
       daysOfWeek: ["вс", "пн", "вт", "ср", "чт", "пт", "сб"],
       months: ["янв", "фев", "мар", "апр", "мая", "июня", "июля", "авг", "сен", "окт", "ноя", "дек"],
+      // FIX-BATCH-C Defect 1 (QA-107/FIX-22): slot times are shown in the SALON's
+      // timezone; this note + «(город, GMT+N)» label clarifies that for a cross-tz client.
+      salonTimeNote: "Время салона",
     },
     youStep: {
       title: "Последний шаг",
@@ -7337,6 +7346,8 @@ export const UI_TEXT = {
       submitting: "Создаём запись…",
       freeCancelTemplate: "Бесплатная отмена за {hours} ч",
       freeCancelHint: "Мы напомним о записи",
+      // FIX-BATCH-C Defect 1: salon-tz note in the summary (mirrors whenStep).
+      salonTimeNote: "Время салона",
     },
     errors: {
       // FIX-25 (QA-106): SLOT_CONFLICT covers both "taken" and off-schedule

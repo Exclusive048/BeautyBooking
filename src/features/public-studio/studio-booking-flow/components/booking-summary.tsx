@@ -11,6 +11,8 @@ type Props = {
   isAnyMaster: boolean;
   dateLabel: string | null;
   timeLabel: string | null;
+  /** FIX-BATCH-C Defect 1: «(город, GMT+N)» salon-tz label, "" when same zone. */
+  zoneLabel?: string | null;
   totalKopeks: number | null;
   cancellationDeadlineHours: number | null;
   submitDisabled: boolean;
@@ -25,6 +27,7 @@ export function BookingSummary({
   isAnyMaster,
   dateLabel,
   timeLabel,
+  zoneLabel,
   totalKopeks,
   cancellationDeadlineHours,
   submitDisabled,
@@ -74,6 +77,11 @@ export function BookingSummary({
             {dateLabel && timeLabel ? `${dateLabel} · ${timeLabel}` : UI_TEXT.bookingWidget.summary.emptyW}
           </dd>
         </div>
+        {timeLabel && zoneLabel ? (
+          <div className="flex justify-end text-xs font-medium text-primary">
+            {UI_TEXT.bookingWidget.summary.salonTimeNote} {zoneLabel}
+          </div>
+        ) : null}
         {totalKopeks !== null && totalKopeks > 0 ? (
           <div className="flex items-center justify-between gap-2 border-t border-border-subtle pt-2">
             <dt className="text-text-muted">{UI_TEXT.bookingWidget.summary.total}</dt>

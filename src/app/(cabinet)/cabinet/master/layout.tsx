@@ -79,7 +79,11 @@ export default async function MasterCabinetLayout({
           actions instead of a one-size-fits-all topbar. */}
       <div className="flex min-h-screen bg-bg-page">
         <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
-          <div className="sticky top-0 h-screen overflow-y-auto">
+          {/* FIX-BATCH-A: park the sidebar directly under the now-sticky global
+              navbar (top-[var(--topbar-h)]) instead of top-0, so the z-30 navbar
+              no longer covers the sidebar's brand/top rows. Height is trimmed by
+              the same offset to keep the whole sidebar reachable while pinned. */}
+          <div className="sticky top-[var(--topbar-h)] h-[calc(100dvh-var(--topbar-h))] overflow-y-auto">
             <MasterSidebar
               counts={{
                 pendingBookings,

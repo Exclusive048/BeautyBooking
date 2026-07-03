@@ -33,7 +33,8 @@ export function AdminShell({ user, children }: Props) {
     <div className="flex min-h-screen w-full bg-bg-page">
       {/* Desktop sidebar — fixed-width column with its own scroll. */}
       <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
-        <div className="sticky top-0 h-screen overflow-y-auto">
+        {/* FIX-BATCH-A: park below the now-sticky global navbar (see master layout). */}
+        <div className="sticky top-[var(--topbar-h)] h-[calc(100dvh-var(--topbar-h))] overflow-y-auto">
           <AdminSidebar user={user} />
         </div>
       </div>
