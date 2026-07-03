@@ -82,8 +82,8 @@
 
   .dark {
     /* === Surfaces — deep burgundy === */
-    --bg-page: 26 5 7;               /* #1A0507 */
-    --bg-card: 36 10 13;              /* #240A0D */
+    --bg-page: 31 20 23;             /* #1F1417 softer warm charcoal (FIX-BATCH-H) */
+    --bg-card: 48 32 38;             /* #302026 elevated charcoal (FIX-BATCH-H) */
     --bg-input: 31 8 11;
     --bg-input-focus: 42 13 17;
 
@@ -95,14 +95,14 @@
 
     /* === Borders === */
     --border-subtle: 90 24 32;       /* burgundy-tinted */
-    --border-focus: 232 82 111;      /* lighter raspberry */
+    --border-focus: 122 16 44;       /* burgundy focus ring (FIX-BATCH-H) */
 
-    /* === Primary — lighter for dark contrast === */
-    --primary: 232 82 111;           /* #E8526F lifted raspberry */
-    --primary-hover: 244 114 138;    /* #F4728A */
-    --primary-magenta: 254 198 211;  /* #FEC6D3 baby pink */
-    --primary-glow: 232 82 111;
-    --primary-foreground: 26 5 7;    /* dark on light primary */
+    /* === Primary — burgundy, brand-consistent (FIX-BATCH-H, was salmon-pink) === */
+    --primary: 122 16 44;            /* #7A102C burgundy */
+    --primary-hover: 158 30 62;      /* #9E1E3E */
+    --primary-magenta: 190 72 104;   /* #BE4868 */
+    --primary-glow: 158 30 62;       /* #9E1E3E */
+    --primary-foreground: 237 227 228; /* #EDE3E4 light on burgundy fill (FIX-FINAL-TAILS) */
 
     /* === Secondary accents === */
     --rose: 90 24 32;                /* deep rose for dark mode */
@@ -142,7 +142,7 @@
     --text-muted: var(--text-sec);
     --accent: var(--primary);
     --accent-hover: var(--primary-hover);
-    --accent-foreground: 26 5 7;
+    --accent-foreground: 237 227 228; /* #EDE3E4 light on burgundy fill (FIX-FINAL-TAILS) */
     --ring: var(--primary-glow);
     --shadow: var(--shadow-sm);
     --destructive: 220 38 38;
