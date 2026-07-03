@@ -7195,6 +7195,10 @@ export const UI_TEXT = {
     addService: "＋",
     servicePriceOnRequest: "Цена по запросу",
     allServices: "Все услуги",
+    // FIX-BATCH-B: category grouping ported from the booking wizard (R2-04-C).
+    // `categoryAll` = the "all" filter chip; `categoryOther` = uncategorized bucket label.
+    categoryAll: "Все",
+    categoryOther: "Другие услуги",
     noServices: "Услуги пока не добавлены",
     goToBooking: "К записи",
     sectionPhotos: "Фотографии студии",

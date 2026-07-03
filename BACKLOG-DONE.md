@@ -9,6 +9,29 @@
 
 ---
 
+## 2026-07-03 — FIX-BATCH-B (port category grouping to the public studio profile; no commit, QA-ветка `predeploy`)
+
+- ✅ **Presentational port only. R2-04-C теперь complete на ОБОИХ surfaces (wizard + profile).** Booking-wizard группировал 35 услуг Vision в 11 категорий + filter-chips (R2-04-C), но публичный **профиль студии** `/u/[studio]` показывал divergent flat/tabbed список — grouping никогда не портировали на профиль.
+- **Phase A (audit, read-only):**
+  - Studio-profile services = `sections/services-section.tsx` → **`studio-services-list.tsx`**, который использовал **homegrown `buildGroups`** (name-substring matching услуг против `studio.categories` string[]) — divergent, ненадёжный tabbed-view (одна группа за раз).
+  - **DTO уже несёт категорию:** `studio.services` = `ProviderServiceDto[]` с `categoryName`/`categoryOrder` (R2-04-C wired `getProviderProfile` chokepoint) — доходит до этой поверхности через `getStudioProfile`. Порт = чистая презентация.
+  - Wizard-treatment для зеркалирования = `service-step.tsx` (helper + «Всё» chip + per-cat chips + section headers name+count). Wizard-coupled (search/onPick) → зеркалю inline (тот же паттерн, что master `services-menu.tsx` тоже рендерит inline).
+  - Master `services-menu.tsx` **уже** использует `groupServicesByCategory` → NULL category → single «Другие услуги» bucket → graceful flat.
+- **Phase B (port, reuse):**
+  - **🔴 `studio-services-list.tsx` переписан на shared `groupServicesByCategory`** (`src/lib/providers/group-services.ts` — тот же helper что wizard + master + R2-04-C; group by `categoryName` LABEL, не raw id — rule 12). Homegrown `buildGroups`+`normalize` retired. Grouping НЕ форкнут.
+  - Treatment зеркалит wizard: **«Все» chip + per-category chips** (horizontal-scroll) + **section headers (name + count badge)**, все sections видны, chip фильтрует. Deep-link booking сохранён (`studioBookingUrl(studio,{serviceId})` — тот же, что был). `categories` prop убран (grouping теперь по per-service categoryName; DTO `.categories` field остался — используется `details-section.tsx` badges).
+  - Edge-cases от helper: uncategorized → «Другие услуги» last; single-service category → своя группа; empty groups не рендерятся. UI_TEXT: +`publicStudio.categoryAll` («Все») + `categoryOther` («Другие услуги»).
+- **Phase C (live, оба theme × mobile 390/desktop 1280):**
+  - **Studio profile `/u/vision-studio`:** chips = «Все» + **11 категорий**; **11 section headers** с counts Σ=**35** (Маникюр 5 · Косметология 5 · Стрижка/Массаж/Макияж 4 · Окрашивание/Брови/Педикюр 3 · Ресницы 2 · Перманент/Татуаж 1) — **точно совпадает с wizard**. Flat «Все услуги» tab исчез.
+  - **Booking works from a group:** клик услуги в группе → deep-link `/u/vision-studio/booking?serviceId=…` → wizard загрузился с **«Маникюр классический» pre-selected** в summary. Selection/price/duration intact.
+  - **Chip filter:** «Маникюр» → только секция «Маникюр (5)»; «Все» → все 11.
+  - **Edge:** single-service categories (Перманент/Татуаж = 1) рендерятся; no empty headings; в Vision uncategorized нет (все categorized).
+  - **Master `/u/anna-sokolova` unaffected:** 5 услуг (NULL category) → single **«Другие услуги» (5)** bucket, graceful, no crash, 5 add-buttons. Не трогал master `services-menu.tsx`.
+  - **rule-12:** chips/headers = category **labels** (не cuids); booking serviceId = documented booking-flow exception (unchanged, был и раньше). Mobile: chip row `overflow-x:auto` scrollable (mirror wizard). 0 console-errors.
+- **Validation:** typecheck ✅ / lint baseline (1 pre-existing error `email-verify-modal` + 6 warns — 0 в моих 3 файлах) / encoding·mojibake·ui-text ✅ / **test 864 ✅** (incl. `group-services.test.ts`) / **build ✅ Compiled successfully** (239/239, exit 0). Captures `.qa/diagnostics/fix-batch-b/` (grouped desktop light/dark, chip-filter, mobile scroll, master flat). Baseline restored (social columns dropped). Diff = 3 files (`studio-services-list` rewrite + `services-section` prop-drop + 2 UI_TEXT keys). No schema/API/booking-logic change (DTO already carried the category). No commit.
+
+---
+
 ## 2026-07-03 — FIX-BATCH-C (booking wizard tz-label + empty-state copy + master date-strip; no commit, QA-ветка `predeploy`)
 
 - ✅ **Три дефекта конверсии/tz-корректности. Defect 1 tz — CASE (b) РЕАЛЬНАЯ correctness-fix (не только label).**

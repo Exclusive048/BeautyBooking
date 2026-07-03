@@ -44,7 +44,6 @@ export async function StudioServicesSection({ studioId }: Props) {
       <Section title={UI_TEXT.publicStudio.servicesTitle} subtitle={UI_TEXT.publicStudio.servicesSubtitle}>
         <StudioServicesList
           studio={{ id: studio.id, publicUsername: studio.publicUsername }}
-          categories={studio.categories}
           services={studio.services}
         />
       </Section>

@@ -7,55 +7,45 @@ import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { studioBookingUrl } from "@/lib/public-urls";
+import { groupServicesByCategory } from "@/lib/providers/group-services";
+
+// Client-only render key for the uncategorized bucket (never a DB id — rule 12).
+const UNCATEGORIZED_CHIP_KEY = "__uncat__";
 
 type Props = {
   studio: { id: string; publicUsername: string | null };
-  categories: string[];
   services: ProviderServiceDto[];
 };
 
-type ServiceGroup = {
-  title: string;
-  services: ProviderServiceDto[];
-};
+/**
+ * FIX-BATCH-B: the public studio profile services list now mirrors the booking
+ * wizard's R2-04-C treatment — services grouped into category sections (headers
+ * + count) with per-category filter-chips ("Все" + each category). Reuses the
+ * SAME shared `groupServicesByCategory` helper as the wizard + master profile
+ * (one grouping source; groups by `categoryName` LABEL, never a raw id — rule
+ * 12). The former homegrown name-substring grouping (`buildGroups`) is retired.
+ * Presentational only — each service still deep-links into the booking flow.
+ */
+export function StudioServicesList({ studio, services }: Props) {
+  // Same grouping as the wizard: category order asc, uncategorized bucket last,
+  // empty groups omitted, input order preserved within a group.
+  const groups = useMemo(() => groupServicesByCategory(services), [services]);
 
-function normalize(value: string): string {
-  return value.trim().toLowerCase();
-}
+  // Filter-chips derived from the groups (labels, not ids — rule 12).
+  const chips = useMemo(
+    () =>
+      groups.map((group) => ({
+        key: group.categoryName ?? UNCATEGORIZED_CHIP_KEY,
+        label: group.categoryName ?? UI_TEXT.publicStudio.categoryOther,
+      })),
+    [groups],
+  );
 
-function buildGroups(categories: string[], services: ProviderServiceDto[]): ServiceGroup[] {
-  if (services.length === 0) return [];
-  if (categories.length === 0) {
-    return [{ title: UI_TEXT.publicStudio.allServices, services }];
-  }
-
-  const remaining = [...services];
-  const groups: ServiceGroup[] = [];
-
-  for (const category of categories) {
-    const key = normalize(category);
-    const inGroup = remaining.filter((service) => normalize(service.name).includes(key));
-    if (inGroup.length > 0) {
-      groups.push({ title: category, services: inGroup });
-      for (const item of inGroup) {
-        const index = remaining.findIndex((service) => service.id === item.id);
-        if (index >= 0) remaining.splice(index, 1);
-      }
-    }
-  }
-
-  if (remaining.length > 0) {
-    groups.push({ title: UI_TEXT.publicStudio.allServices, services: remaining });
-  }
-
-  return groups.length > 0 ? groups : [{ title: UI_TEXT.publicStudio.allServices, services }];
-}
-
-export function StudioServicesList({ studio, categories, services }: Props) {
-  const groups = useMemo(() => buildGroups(categories, services), [categories, services]);
-  const [activeGroup, setActiveGroup] = useState(groups[0]?.title ?? UI_TEXT.publicStudio.allServices);
-
-  const activeServices = groups.find((group) => group.title === activeGroup)?.services ?? [];
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+  const activeExists = activeCat !== null && chips.some((chip) => chip.key === activeCat);
+  const visibleGroups = activeExists
+    ? groups.filter((group) => (group.categoryName ?? UNCATEGORIZED_CHIP_KEY) === activeCat)
+    : groups;
 
   if (services.length === 0) {
     return (
@@ -67,46 +57,75 @@ export function StudioServicesList({ studio, categories, services }: Props) {
 
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 md:p-6">
-      <div className="flex flex-wrap gap-2">
-        {groups.map((group) => {
-          const active = group.title === activeGroup;
-          return (
+      {/* Category filter-chips (horizontal-scroll on mobile) — mirrors the wizard. */}
+      {chips.length > 1 ? (
+        <div
+          className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
+          role="group"
+          aria-label={UI_TEXT.publicStudio.servicesTitle}
+        >
+          <Button
+            type="button"
+            onClick={() => setActiveCat(null)}
+            size="sm"
+            variant={activeCat === null ? "primary" : "secondary"}
+            className="shrink-0 rounded-full px-3 text-xs"
+            aria-pressed={activeCat === null}
+          >
+            {UI_TEXT.publicStudio.categoryAll}
+          </Button>
+          {chips.map((chip) => (
             <Button
-              key={group.title}
+              key={chip.key}
               type="button"
-              onClick={() => setActiveGroup(group.title)}
+              onClick={() => setActiveCat(chip.key)}
               size="sm"
-              variant={active ? "primary" : "secondary"}
-              className="rounded-full px-3 text-xs"
+              variant={activeCat === chip.key ? "primary" : "secondary"}
+              className="shrink-0 rounded-full px-3 text-xs"
+              aria-pressed={activeCat === chip.key}
             >
-              {group.title}
+              {chip.label}
             </Button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : null}
 
-      <div className="mt-4 space-y-3">
-        {activeServices.map((service) => (
-          <article key={service.id} className="rounded-xl border border-border-subtle bg-bg-input/60 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-text-main">{service.name}</div>
-                <div className="mt-1 text-xs text-text-sec">
-                  {service.price > 0
-                    ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
-                    : UI_TEXT.publicStudio.servicePriceOnRequest}
-                </div>
-              </div>
-              <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
-                <Link
-                  href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services") ?? "#"}
-                  aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
-                >
-                  {UI_TEXT.publicStudio.addService}
-                </Link>
-              </Button>
+      <div className={`space-y-6 ${chips.length > 1 ? "mt-4" : ""}`}>
+        {visibleGroups.map((group) => (
+          <div key={group.categoryName ?? "__uncat"} className="space-y-3">
+            <div className="flex items-center gap-2.5">
+              <h3 className="font-display text-sm font-semibold text-text-main">
+                {group.categoryName ?? UI_TEXT.publicStudio.categoryOther}
+              </h3>
+              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-[10px] text-text-sec">
+                {group.services.length}
+              </span>
             </div>
-          </article>
+            <div className="space-y-3">
+              {group.services.map((service) => (
+                <article key={service.id} className="rounded-xl border border-border-subtle bg-bg-input/60 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-text-main">{service.name}</div>
+                      <div className="mt-1 text-xs text-text-sec">
+                        {service.price > 0
+                          ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
+                          : UI_TEXT.publicStudio.servicePriceOnRequest}
+                      </div>
+                    </div>
+                    <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
+                      <Link
+                        href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services") ?? "#"}
+                        aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
+                      >
+                        {UI_TEXT.publicStudio.addService}
+                      </Link>
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>
