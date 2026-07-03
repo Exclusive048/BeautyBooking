@@ -764,10 +764,13 @@ export const UI_TEXT = {
       "Маркетплейс мастеров красоты. Находите лучших мастеров рядом и записывайтесь онлайн без звонков.",
     legal: {
       copyright: "© {year} МастерРядом",
-      // FIX-EXP-CONTENT-GRAMMAR (EXP-005): the ИНН is filled from
-      // `NEXT_PUBLIC_LEGAL_INN` (FooterCopyright). When unset, the footer shows
-      // `innUnset` — an OBVIOUS placeholder, never a fake-looking number.
+      // The ИНН is filled from `NEXT_PUBLIC_LEGAL_INN` (FooterCopyright).
+      // FIX-VISUAL-POLISH I8: when it's unset (or the old fake "1234567890"),
+      // the footer shows the legal entity WITHOUT the ИНН clause
+      // (`entityWithoutInn`) — a graceful degrade, never the literal
+      // «[не указан]». Set the real requisites before launch.
       entityTemplate: "Дмитриев Артем Романович, ИНН {inn}",
+      entityWithoutInn: "Дмитриев Артем Романович",
       innUnset: "[не указан]",
     },
     socials: {

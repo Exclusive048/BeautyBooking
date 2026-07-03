@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { buildTimezoneOptions } from "@/lib/ui/timezone-options";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioGeneralData } from "../lib/types";
@@ -18,28 +17,27 @@ type Props = {
 };
 
 /**
- * Editable card for name / tagline / description. Persists via the
- * existing `PATCH /api/studios/[id]` endpoint (no new mutation surface
- * needed). Avatar/address editing live elsewhere (address requires the
- * geocode + map preview UI; avatar requires the MediaAsset uploader) —
- * surfaced read-only here with a Yandex Maps link for address review.
+ * Editable card for tagline / timezone. Persists via the existing
+ * `PATCH /api/studios/[id]` endpoint (partial update — no new mutation
+ * surface needed).
+ *
+ * FIX-VISUAL-POLISH F3: Название + Описание были ЗДЕСЬ И в «Профиль и медиа»
+ * (пользователь видел одно поле дважды). Каноническое место — «Профиль и
+ * медиа» (полный редактор публичного профиля с аватаром/баннером/адресом/
+ * контактами). Здесь оставлены только уникальные поля (Слоган + Часовой
+ * пояс). Save-путь сохранён: этот PATCH отправляет `{ tagline, timezone }`,
+ * а имя/описание сохраняет «Профиль и медиа».
  */
 export function GeneralForm({ data }: Props) {
   const router = useRouter();
-  const [name, setName] = useState(data.name);
   const [tagline, setTagline] = useState(data.tagline);
-  const [description, setDescription] = useState(data.description ?? "");
   const [timezone, setTimezone] = useState(data.timezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const timezoneOptions = buildTimezoneOptions(data.timezone);
 
-  const dirty =
-    name !== data.name ||
-    tagline !== data.tagline ||
-    (description ?? "") !== (data.description ?? "") ||
-    timezone !== data.timezone;
+  const dirty = tagline !== data.tagline || timezone !== data.timezone;
 
   const handleSubmit = async () => {
     if (!dirty || submitting) return;
@@ -52,9 +50,7 @@ export function GeneralForm({ data }: Props) {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
           tagline: tagline.trim(),
-          description: description.trim() || null,
           timezone,
         }),
       });
@@ -74,9 +70,7 @@ export function GeneralForm({ data }: Props) {
   };
 
   const reset = () => {
-    setName(data.name);
     setTagline(data.tagline);
-    setDescription(data.description ?? "");
     setTimezone(data.timezone);
     setError(null);
   };
@@ -84,21 +78,8 @@ export function GeneralForm({ data }: Props) {
   return (
     <div className="space-y-3">
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.nameLabel}</span>
-        <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
-      </label>
-      <label className="block">
         <span className="mb-1 block text-xs font-medium text-text-main">{T.taglineLabel}</span>
         <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={140} />
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.descriptionLabel}</span>
-        <Textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={4}
-          maxLength={2000}
-        />
       </label>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-text-main">{T.timezoneLabel}</span>

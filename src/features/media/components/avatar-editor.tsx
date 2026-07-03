@@ -179,9 +179,12 @@ export function AvatarEditor({
                 className="object-cover"
               />
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-text-sec">
-                <Camera className="h-4 w-4" />
-                <span className="text-[10px] leading-none">{t.noAvatar}</span>
+              // FIX-VISUAL-POLISH F2: only the Camera icon here — the bottom
+              // action bar already labels "Загрузить". On the small 80px studio
+              // avatar the extra centered "Нет фото" text collided with that bar
+              // ("Нет фото / Загрузить фото" overlap). One label, no overlap.
+              <div className="flex h-full w-full items-center justify-center text-text-sec">
+                <Camera className="h-5 w-5" />
               </div>
             )}
             <div

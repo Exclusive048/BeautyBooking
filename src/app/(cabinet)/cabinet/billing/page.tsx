@@ -1,6 +1,7 @@
 import { AccountType } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { BillingPage } from "@/features/billing/components/billing-page";
+import { MasterCabinetShell } from "@/features/master/components/master-cabinet-shell";
 import { StudioNavbar } from "@/features/studio-cabinet/components/studio-navbar";
 import { hasMasterProfile } from "@/lib/auth/roles";
 import { getSessionUser } from "@/lib/auth/session";
@@ -66,9 +67,12 @@ export default async function Page({ searchParams }: PageProps) {
       redirect("/403");
     }
 
+    // FIX-VISUAL-POLISH G7: render inside the master cabinet shell (sidebar +
+    // bottom-nav) so billing is consistent with the other /cabinet/master/*
+    // pages instead of the previous bare full-width section.
     return (
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
-        <main className="min-w-0">
+      <MasterCabinetShell userId={user.id}>
+        <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 lg:px-8">
           {master.studioId ? (
             <section className="space-y-4">
               <div className="lux-card rounded-[24px] p-6">
@@ -96,8 +100,8 @@ export default async function Page({ searchParams }: PageProps) {
           ) : (
             <BillingPage scope="MASTER" />
           )}
-        </main>
-      </section>
+        </div>
+      </MasterCabinetShell>
     );
   }
 

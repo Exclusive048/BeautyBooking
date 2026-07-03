@@ -9,6 +9,26 @@
 
 ---
 
+## 2026-07-03 — FIX-VISUAL-POLISH (F+G+I combined polish batch; no commit, QA-ветка `predeploy`)
+
+- ✅ **Presentational + copy only** (no logic/data/schema change). Audit-still-present проверен для каждого дефекта; всё live-verified (both themes + mobile/desktop, 0 console errors). Baseline restored (social-cols dropped, 0 temp bookings, tagline net-zero).
+- **Group F — alignment:**
+  - **F1** (studio-booking hero rating-pill «doubling»): root — `absolute right-4 top-4` back-link overlапал `right-4 top-3` rating-pill в верхнем правом углу баннера. Back-link вынесен в breadcrumb «‹ К странице студии» над карточкой (`booking-hero.tsx`); rating-pill теперь single. Live (mobile+desktop): «★ 4.8 · 15 отзывов» один, без коллизии.
+  - **F2** (studio-settings avatar overlap): no-image clickable аватар рендерил И центральный «Нет фото», И нижний бар «Загрузить» → collision на 80px. Убран redundant центральный текст, оставлена Camera-иконка + один нижний label (`avatar-editor.tsx`; единственный consumer clickable-variant — этот studio-аватар, blast-radius контролируем). Live: «Загрузить фото» одной строкой.
+  - **F3** (duplicate Название/Описание «Общее»↔«Профиль и медиа»): **IA-решение — каноническое место «Профиль и медиа»** (полный редактор публичного профиля: аватар/баннер/адрес/контакты/соцсети). Из «Общее» (`general-form.tsx`) убраны visible-инпуты Название+Описание; остались уникальные Слоган + Часовой пояс. **Оба save-пути целы** — live: «Общее» теперь PATCH `{tagline, timezone}` → 200 (net-zero round-trip, tagline восстановлен); «Профиль и медиа» не тронут, сохраняет name/description.
+  - **F4** (two bells): убран redundant page-header `NotificationButton` с master-dashboard (`master-dashboard-page.tsx` + unused imports/`unreadBadge` fetch). Глобальный topbar `NotificationsBell` — единственный sitewide. Live: ровно 1 bell (light+dark).
+- **Group G — workspace:**
+  - **G5** (marketing footer в кабинете + ~480px dead gap): новый client-wrapper `src/components/layout/conditional-footer.tsx` — прячет `<Footer>` на `/cabinet`+`/admin` (зеркалит `AppShellContent` workspace-split). Public-страницы footer сохраняют (verified public booking-page). Live: cabinet footer отсутствует (bodyH≈vh, gap исчез).
+  - **G6** (kanban over-stretch): `items-start` на board-row (`kanban-board.tsx`) — колонки по своему контенту, не тянутся до самой высокой (пропали «stretched bands»); + desktop `lg:max-h-[calc(100dvh-var(--topbar-h)-12rem)]` cap на колонку (`kanban-column.tsx`) — длинная «Завершены» (23 карты) скроллится внутри, не раздувает страницу. Live: высоты 443/607/432/643/643, страница 1034px (было бы ~3413px).
+  - **G7** (billing без sidebar): shell master-layout извлечён в reusable `src/features/master/components/master-cabinet-shell.tsx` (sidebar + bottom-nav + trial banner + manual-booking ctx); layout делегирует туда, И shared `/cabinet/billing` (master scope) рендерится внутри shell. Live: полный sidebar (21 nav-link) + billing-контент, 0 console errors.
+- **Group I — nitpicks:**
+  - **I8** (footer ИНН): при unset/fake `NEXT_PUBLIC_LEGAL_INN` — legal-строка без ИНН-клаузы (`entityWithoutInn` = «Дмитриев Артем Романович»), не литерал «ИНН [не указан]» (`FooterCopyright.tsx` + UI_TEXT). Live: «Дмитриев Артем Романович», без «[не указан]».
+  - **I9** (studio dashboard delta copy): neutral no-change delta теперь чистое «—» (без стрелки) вместо «· 0.0» / «· 0%» / «· 0 п.п.» (`format-delta.ts` zero-cases → «—» + `studio-kpi-row.tsx` neutral-render без arrow). Live: rating pill «—», реальные дельты сохраняют ↑ +334%/+350%/+2 п.п. Occupancy scope — та же 30-дневная база, что у остальных tiles (data-driven, не copy-bug).
+- **Files:** `booking-hero.tsx`, `avatar-editor.tsx`, `general-form.tsx`, `master-dashboard-page.tsx`, `app-shell.tsx` + new `conditional-footer.tsx`, `kanban-board.tsx`, `kanban-column.tsx`, new `master-cabinet-shell.tsx` + `(cabinet)/cabinet/master/layout.tsx` + `(cabinet)/cabinet/billing/page.tsx`, `FooterCopyright.tsx`, `format-delta.ts`, `studio-kpi-row.tsx`, `src/lib/ui/text.ts` (+`entityWithoutInn`, +`salonTimeNote` уже был).
+- **Validation:** typecheck / lint (baseline 1err `email-verify-modal:233` + 6warn, мои файлы clean) / encoding / mojibake / ui-text / **test 875** / build ✅. Captures `.qa/diagnostics/visual-polish/` (7 png). No commit.
+
+---
+
 ## 2026-07-03 — FIX-STUDIO-CALENDAR-SALON-TZ (tz-correctness SWEEP; no commit, QA-ветка `predeploy`)
 
 - ✅ **3-я «browser-tz-instead-of-entity-tz» находка** (после Batch-C wizard = real bug, Batch-E flag на studio day-grid `localTimeShort`). SWEEP всего класса, не одна точка. **Display-only, engine-safety: zero `src/lib/schedule/` diff** (импортируются только client-safe display-хелперы `@/lib/schedule/timezone` — `formatLocalHm`/`getLocalTimeParts`/`toLocalDateKey`/`toUtcFromLocalDateTime`; slot-gen не тронут).

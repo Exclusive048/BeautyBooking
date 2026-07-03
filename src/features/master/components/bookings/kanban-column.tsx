@@ -25,11 +25,17 @@ type Props = {
  * title, count, hint subtitle, and aggregated price; body lists cards or
  * the empty placeholder. Width is fixed (320px / 280px / 300px responsive)
  * so the parent scroll container can snap on each column.
+ *
+ * FIX-VISUAL-POLISH G6: on desktop (lg+) the column is height-capped so a
+ * long column (e.g. «Завершены» with dozens of cards) scrolls INSIDE its
+ * body instead of ballooning the whole page to several viewports. Combined
+ * with the board's `items-start`, columns read as cards, not stretched
+ * bands. Mobile keeps natural page-scroll (one column per viewport).
  */
 export function KanbanColumn({ id, title, hint, bookings }: Props) {
   const sum = bookings.reduce((s, b) => s + b.price, 0);
   return (
-    <section className="flex w-[320px] shrink-0 snap-start flex-col lg:w-[280px] xl:w-[300px]">
+    <section className="flex w-[320px] shrink-0 snap-start flex-col lg:max-h-[calc(100dvh-var(--topbar-h)-12rem)] lg:w-[280px] xl:w-[300px]">
       <header className="rounded-t-2xl border border-border-subtle bg-bg-card px-4 py-3">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">

@@ -1,4 +1,5 @@
 import { AppShellContent } from "@/components/layout/app-shell-content";
+import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { Topbar } from "@/components/layout/topbar";
 import { Footer } from "@/components/layout/footer";
 import { CityPromptOverlay } from "@/features/cities/components/city-prompt-overlay";
@@ -18,7 +19,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 w-full">
         <AppShellContent>{children}</AppShellContent>
       </main>
-      <Footer />
+      {/* FIX-VISUAL-POLISH G5: hide the marketing footer on /cabinet + /admin
+          workspace routes (public pages keep it). Closes the ~480px dead gap. */}
+      <ConditionalFooter>
+        <Footer />
+      </ConditionalFooter>
       {/* Single mount point for the first-visit city prompt — the overlay
           itself decides visibility based on cookie + pathname (it hides on
           /admin and /cabinet routes). */}
