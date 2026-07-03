@@ -2,6 +2,7 @@ import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BookingCardActionsMenu } from "@/features/master/components/schedule/booking-card-actions-menu";
 import { formatLocalHm } from "@/lib/schedule/timezone";
+import { laneStyle, type LanePlacement } from "@/lib/calendar/lane-layout";
 import type { ScheduleBookingItem } from "@/lib/master/schedule.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -14,6 +15,11 @@ type Props = {
   booking: ScheduleBookingItem;
   topPx: number;
   heightPx: number;
+  /**
+   * FIX-BATCH-E: lane placement for overlapping bookings. `undefined` → full
+   * width (no overlap). Drives the card's horizontal `left`/`width`.
+   */
+  placement?: LanePlacement;
   /**
    * EXP-019: master (salon) tz. The card LABEL must format in the same tz as
    * its grid POSITION (`startMinuteOfDay` = `getLocalTimeParts(date, masterTz)`)
@@ -32,7 +38,8 @@ type Props = {
  * lives in the corner with `group-hover` reveal — keeps the body legible
  * on long bookings and accessible on short ones.
  */
-export function BookingCardWeek({ booking, topPx, heightPx, timezone }: Props) {
+export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone }: Props) {
+  const { left, width } = laneStyle(placement);
   const isPending = booking.runtimeStatus === "PENDING" || booking.runtimeStatus === "CHANGE_REQUESTED";
   const isNewClient = booking.isNewClient;
   const compact = heightPx < 64;
@@ -55,8 +62,8 @@ export function BookingCardWeek({ booking, topPx, heightPx, timezone }: Props) {
       className={`group absolute overflow-hidden rounded-lg px-2.5 py-1.5 ${cardClass}`}
       style={{
         top: topPx,
-        left: 4,
-        right: 4,
+        left,
+        width,
         height: heightPx - 4,
       }}
     >

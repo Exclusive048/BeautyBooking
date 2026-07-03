@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { assignLanes, laneStyle } from "@/lib/calendar/lane-layout";
+import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
 import { BOOKING_CELL_CLASS } from "../../lib/booking-status-display";
 import {
   GRID_HEIGHT_PX,
@@ -98,8 +100,13 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
-        <div className="flex max-h-[70vh] overflow-auto">
+      {/* FIX-BATCH-E: HScrollShadow makes the horizontal scroll discoverable when
+          more master columns exist than fit at ≤1280 (edge fade). The inner div
+          stays the scroll parent so the sticky time axis / headers keep working. */}
+      <HScrollShadow
+        wrapperClassName="rounded-2xl border border-border-subtle bg-bg-card"
+        scrollClassName="flex max-h-[70vh] overflow-auto"
+      >
           {/* Time axis sticky left */}
           <div className="sticky left-0 z-30 bg-bg-card">
             <div className="h-12 border-b border-r border-border-subtle bg-bg-card" />
@@ -111,6 +118,15 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
             {day.columns.map((column) => {
               const bookingsForColumn = day.bookings.filter(
                 (b) => b.masterId === column.id,
+              );
+              // FIX-BATCH-E: split overlapping bookings in this master's column
+              // into side-by-side lanes (epoch-ms axis) — no more stacking.
+              const columnLanes = assignLanes(
+                bookingsForColumn.map((b) => ({
+                  id: b.id,
+                  start: new Date(b.startAtUtc).getTime(),
+                  end: new Date(b.endAtUtc).getTime(),
+                })),
               );
               const breaksForColumn = day.breaks.filter(
                 (b) => b.masterId === column.id,
@@ -180,18 +196,21 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
                     {bookingsForColumn.map((booking) => {
                       const start = new Date(booking.startAtUtc);
                       const end = new Date(booking.endAtUtc);
+                      const { left, width } = laneStyle(columnLanes.get(booking.id));
                       return (
                         <button
                           key={booking.id}
                           type="button"
                           onClick={() => setActiveBooking(booking)}
                           className={cn(
-                            "absolute left-1 right-1 z-10 overflow-hidden rounded-lg p-1.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-sm",
+                            "absolute z-10 overflow-hidden rounded-lg p-1.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-sm",
                             BOOKING_CELL_CLASS[booking.tone],
                           )}
                           style={{
                             top: offsetPxFromDayStart(start, dayStart),
                             height: durationPx(start, end),
+                            left,
+                            width,
                           }}
                         >
                           <div className="font-mono text-[10px]">
@@ -225,8 +244,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
               );
             })}
           </div>
-        </div>
-      </div>
+      </HScrollShadow>
 
       {/* Create dialog */}
       <CreateBookingDialog
