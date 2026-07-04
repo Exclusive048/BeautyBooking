@@ -56,12 +56,12 @@ export default async function SupportPage() {
         />
 
         <div className="relative mx-auto max-w-3xl px-4 py-12 text-center lg:py-16">
-          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
             {T.hero.eyebrow}
           </p>
           <h1 className="mb-4 font-display text-3xl leading-[1.1] text-text-main lg:text-4xl">
             {T.hero.titleBefore}{" "}
-            <em className="font-display font-normal italic text-primary">{T.hero.titleItalic}</em>
+            <em className="font-display font-normal italic text-accent-text">{T.hero.titleItalic}</em>
           </h1>
           <p className="mx-auto max-w-xl text-base leading-relaxed text-text-sec">
             {T.hero.description}
@@ -84,7 +84,7 @@ export default async function SupportPage() {
                 <p className="text-sm text-text-sec">{T.quickLinks.faq.description}</p>
               </div>
               <ArrowRight
-                className="h-5 w-5 shrink-0 text-text-sec transition-colors group-hover:text-primary"
+                className="h-5 w-5 shrink-0 text-text-sec transition-colors group-hover:text-accent-text"
                 aria-hidden
               />
             </Link>
@@ -111,7 +111,7 @@ export default async function SupportPage() {
         <p className="mb-3 text-sm text-text-sec">{T.alternativeContact.description}</p>
         <a
           href={T.alternativeContact.emailHref}
-          className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+          className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
         >
           {T.alternativeContact.email}
         </a>

@@ -34,7 +34,7 @@ export function ServicesFilterChips({ filterCounts, activeFilter }: Props) {
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
               isActive
                 ? "bg-primary text-white shadow-card"
-                : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-primary"
+                : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-accent-text"
             )}
           >
             <span>{row.label}</span>

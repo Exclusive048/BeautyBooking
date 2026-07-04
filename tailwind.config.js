@@ -45,6 +45,10 @@ module.exports = {
         "primary-magenta": "rgb(var(--primary-magenta) / <alpha-value>)",
         "primary-glow": "rgb(var(--primary-glow) / <alpha-value>)",
         accent: "rgb(var(--accent) / <alpha-value>)",
+        // Accent-TEXT — split from --primary fill (FIX-DARK-ACCENT-TEXT-SPLIT).
+        // Burgundy in light, gold in dark. Use `text-accent-text` for accent
+        // TEXT/icons on themed surfaces; keep `text-primary` only on fixed-light fills.
+        "accent-text": "rgb(var(--accent-text) / <alpha-value>)",
         "accent-hover": "rgb(var(--accent-hover) / <alpha-value>)",
         "surface-hover": "rgb(var(--surface-hover) / <alpha-value>)",
         ring: "rgb(var(--ring) / <alpha-value>)",

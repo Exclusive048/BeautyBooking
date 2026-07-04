@@ -47,7 +47,7 @@ export function ReviewActionsIsland({
             onClick={() => setReplyMode(true)}
             className={cn(
               "inline-flex items-center gap-1 transition-colors",
-              "text-text-sec hover:text-primary"
+              "text-text-sec hover:text-accent-text"
             )}
           >
             <ReplyIcon className="h-3.5 w-3.5" aria-hidden />

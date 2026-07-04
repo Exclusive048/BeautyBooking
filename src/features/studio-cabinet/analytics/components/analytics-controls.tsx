@@ -69,7 +69,7 @@ export function AnalyticsControls({ period, view, compare }: Props) {
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                   active
-                    ? "border-primary/40 bg-primary/10 text-primary"
+                    ? "border-primary/40 bg-primary/10 text-accent-text"
                     : "border-border-subtle bg-bg-card text-text-sec hover:text-text-main",
                 )}
               >
@@ -100,7 +100,7 @@ export function AnalyticsControls({ period, view, compare }: Props) {
               className={cn(
                 "rounded-xl border px-4 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "border-primary/40 bg-primary/10 text-primary"
+                  ? "border-primary/40 bg-primary/10 text-accent-text"
                   : "border-border-subtle bg-bg-card text-text-main hover:bg-bg-input/60",
               )}
             >

@@ -57,7 +57,7 @@ export function PortfolioFilterChips({
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                 isActive
                   ? "bg-primary text-white shadow-card"
-                  : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-primary"
+                  : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-accent-text"
               )}
             >
               <span>{row.label}</span>
@@ -116,7 +116,7 @@ function CategoryChip({
         "inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         active
-          ? "border-primary/40 bg-primary/10 text-primary"
+          ? "border-primary/40 bg-primary/10 text-accent-text"
           : "border-border-subtle bg-bg-card text-text-sec hover:border-primary/30 hover:text-text-main"
       )}
     >

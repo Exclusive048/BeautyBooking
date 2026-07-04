@@ -37,7 +37,7 @@ function TileCard({ icon: Icon, label, value, unit, sublabel, delta }: Tile) {
       <div className="flex items-center justify-between">
         <span
           aria-hidden
-          className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary"
+          className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-accent-text"
         >
           <Icon className="h-4 w-4" />
         </span>

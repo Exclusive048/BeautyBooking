@@ -40,7 +40,7 @@ export function HowItWorksSection() {
       <motion.div variants={item} className="text-center">
         <h2 className="text-3xl font-bold tracking-tight text-text-main sm:text-4xl">
           {T.title}{" "}
-          <em className="font-display font-normal italic text-primary">{T.titleAccent}</em>
+          <em className="font-display font-normal italic text-accent-text">{T.titleAccent}</em>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-base text-text-sec">{T.subtitle}</p>
       </motion.div>
@@ -59,7 +59,7 @@ export function HowItWorksSection() {
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 font-mono text-xs font-semibold tabular-nums text-white">
                 {index + 1}
               </div>
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-accent-text">
                 <Icon className="h-8 w-8" strokeWidth={1.75} />
               </div>
               <div>

@@ -762,7 +762,7 @@ export default function LoginClient({
                         type="button"
                         onClick={resendCode}
                         disabled={loading}
-                        className="text-sm font-medium text-primary transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
+                        className="text-sm font-medium text-accent-text transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
                       >
                         {T.resendCode}
                       </button>

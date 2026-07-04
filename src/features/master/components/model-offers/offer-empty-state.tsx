@@ -10,7 +10,7 @@ const T = UI_TEXT.cabinetMaster.modelOffers.empty;
 export function OfferEmptyState() {
   return (
     <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 p-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-accent-text">
         <Sparkles className="h-5 w-5" aria-hidden />
       </div>
       <h3 className="mt-3 font-display text-lg text-text-main">{T.offersTitle}</h3>

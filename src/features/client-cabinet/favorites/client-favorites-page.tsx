@@ -237,7 +237,7 @@ function FavoritesSortBar({
               onClick={() => onChange(opt.value)}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 active
-                  ? "border-primary/40 bg-bg-input text-primary"
+                  ? "border-primary/40 bg-bg-input text-accent-text"
                   : "border-border-subtle bg-bg-card text-text-sec hover:border-border-subtle/80"
               }`}
             >
@@ -281,7 +281,7 @@ function FavMasterCard({
         </div>
 
         <div className="flex items-center gap-1.5 text-xs">
-          <Star className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden />
+          <Star className="h-3.5 w-3.5 fill-primary text-accent-text" aria-hidden />
           <span className="font-mono font-semibold text-text-main">
             {data.rating > 0 ? data.rating.toFixed(1) : "—"}
           </span>
@@ -347,7 +347,7 @@ function FavStudioCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <Star className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden />
+          <Star className="h-3.5 w-3.5 fill-primary text-accent-text" aria-hidden />
           <span className="font-mono font-semibold text-text-main">
             {data.rating > 0 ? data.rating.toFixed(1) : "—"}
           </span>
@@ -430,7 +430,7 @@ function UnfavoriteButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Убрать из избранного"
-      className="absolute right-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-bg-card/95 text-primary shadow-card backdrop-blur transition hover:scale-105"
+      className="absolute right-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-bg-card/95 text-accent-text shadow-card backdrop-blur transition hover:scale-105"
     >
       <Heart className="h-4 w-4 fill-current" aria-hidden />
     </button>

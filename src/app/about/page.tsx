@@ -24,7 +24,7 @@ export default function AboutPage() {
         title={
           <>
             Маркетплейс мастеров красоты —{" "}
-            <em className="font-display font-normal italic text-primary">
+            <em className="font-display font-normal italic text-accent-text">
               просто, прозрачно, рядом
             </em>
           </>
@@ -41,7 +41,7 @@ export default function AboutPage() {
         title={
           <>
             Почему мы это{" "}
-            <em className="font-display font-normal italic text-primary">делаем</em>
+            <em className="font-display font-normal italic text-accent-text">делаем</em>
           </>
         }
         paragraphs={[
@@ -55,7 +55,7 @@ export default function AboutPage() {
         title={
           <>
             Что для нас{" "}
-            <em className="font-display font-normal italic text-primary">важно</em>
+            <em className="font-display font-normal italic text-accent-text">важно</em>
           </>
         }
         description="Принципы, по которым строим платформу — и не отступаем от них в спешке."
@@ -104,7 +104,7 @@ export default function AboutPage() {
         title={
           <>
             Как мы{" "}
-            <em className="font-display font-normal italic text-primary">работаем</em>
+            <em className="font-display font-normal italic text-accent-text">работаем</em>
           </>
         }
         description="Не венчурный спринт, а планомерное строительство платформы, которой можно пользоваться годами."

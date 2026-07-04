@@ -21,7 +21,7 @@ export function DayHeader({ day }: Props) {
       <p
         className={cn(
           "mb-1 font-mono text-[10px] uppercase tracking-[0.18em]",
-          day.isToday ? "text-primary" : "text-text-sec",
+          day.isToday ? "text-accent-text" : "text-text-sec",
         )}
       >
         {day.shortLabel}

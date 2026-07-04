@@ -232,7 +232,7 @@ function RequirementsField({
                 type="button"
                 onClick={() => onChange(value.filter((other) => other !== item))}
                 aria-label="remove"
-                className="text-text-sec hover:text-primary"
+                className="text-text-sec hover:text-accent-text"
               >
                 <X className="h-3 w-3" aria-hidden />
               </button>

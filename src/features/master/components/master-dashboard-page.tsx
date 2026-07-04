@@ -102,7 +102,7 @@ export async function MasterDashboardPage() {
         {/* QA-115 (FIX-06): studio context for a studio master (nothing for independent). */}
         {data.master.studio ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-sec">
-            <Building2 className="h-3.5 w-3.5 text-primary" aria-hidden strokeWidth={1.6} />
+            <Building2 className="h-3.5 w-3.5 text-accent-text" aria-hidden strokeWidth={1.6} />
             <span>
               {UI_TEXT.cabinetMaster.dashboard.studioChipTemplate.replace(
                 "{name}",

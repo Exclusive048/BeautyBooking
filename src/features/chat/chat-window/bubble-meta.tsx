@@ -22,7 +22,7 @@ export function BubbleMeta({ time, isMine, isRead }: Props) {
       <span>{time}</span>
       {isMine ? (
         isRead ? (
-          <CheckCheck className="h-3 w-3 text-primary" aria-hidden strokeWidth={2} />
+          <CheckCheck className="h-3 w-3 text-accent-text" aria-hidden strokeWidth={2} />
         ) : (
           <Check className="h-3 w-3 text-text-sec" aria-hidden strokeWidth={2} />
         )

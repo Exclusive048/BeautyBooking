@@ -357,7 +357,7 @@ function BookingRow({
         <div className="font-semibold text-text-main">{booking.service.name}</div>
 
         {zoneLabel ? (
-          <div className="flex items-center gap-1 text-xs font-medium text-primary">
+          <div className="flex items-center gap-1 text-xs font-medium text-accent-text">
             <Calendar className="h-3 w-3 shrink-0" aria-hidden />
             <span>
               {T.salonTimeNote} {zoneLabel}
@@ -573,7 +573,7 @@ type ActionVariant = "default" | "primary" | "danger";
 function actionClass(variant: ActionVariant): string {
   switch (variant) {
     case "primary":
-      return "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15";
+      return "border-primary/30 bg-primary/10 text-accent-text hover:bg-primary/15";
     case "danger":
       return "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30";
     default:

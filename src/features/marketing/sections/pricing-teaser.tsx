@@ -82,7 +82,7 @@ export function PricingTeaser({
                   className={
                     plan.highlighted
                       ? "mb-2 font-mono text-xs font-medium uppercase tracking-[0.18em] text-white/85"
-                      : "mb-2 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary"
+                      : "mb-2 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text"
                   }
                 >
                   {plan.tier}
@@ -136,7 +136,7 @@ export function PricingTeaser({
                         className={
                           plan.highlighted
                             ? "mt-0.5 h-4 w-4 shrink-0 text-white"
-                            : "mt-0.5 h-4 w-4 shrink-0 text-primary"
+                            : "mt-0.5 h-4 w-4 shrink-0 text-accent-text"
                         }
                         strokeWidth={2}
                         aria-hidden

@@ -48,7 +48,7 @@ export function KpiCard({ kpi }: Props) {
           className={cn(
             "inline-flex h-9 w-9 items-center justify-center rounded-xl",
             tint === "brand"
-              ? "bg-primary/10 text-primary"
+              ? "bg-primary/10 text-accent-text"
               : "bg-bg-input text-text-sec",
           )}
         >

@@ -83,7 +83,7 @@ function CategoriesSection({
               onClick={() => onGlobalCategoryChange(active ? null : cat.id)}
               className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                 active
-                  ? "bg-primary/10 font-medium text-primary"
+                  ? "bg-primary/10 font-medium text-accent-text"
                   : "text-text-main hover:bg-bg-input/70"
               }`}
             >
@@ -97,7 +97,7 @@ function CategoriesSection({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-2 px-3 text-xs font-medium text-primary hover:underline"
+          className="mt-2 px-3 text-xs font-medium text-accent-text hover:underline"
         >
           {expanded
             ? UI_TEXT.catalog2.filters.categoriesCollapse

@@ -100,7 +100,7 @@ function KpiTile({
       <p
         className={cn(
           "mt-1.5 font-display text-lg",
-          accent === "primary" && "text-primary",
+          accent === "primary" && "text-accent-text",
           accent === "success" && "text-emerald-700 dark:text-emerald-300",
           accent === "neutral" && "text-text-main"
         )}

@@ -37,7 +37,7 @@ export function FAQSection() {
       <motion.div variants={item} className="text-center">
         <h2 className="text-3xl font-bold tracking-tight text-text-main sm:text-4xl">
           {T.title}{" "}
-          <em className="font-display font-normal italic text-primary">{T.titleAccent}</em>
+          <em className="font-display font-normal italic text-accent-text">{T.titleAccent}</em>
         </h2>
       </motion.div>
 
@@ -50,7 +50,7 @@ export function FAQSection() {
       <motion.div variants={item} className="mt-8 text-center">
         <Link
           href="/faq"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary-hover"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-primary-hover"
         >
           {T.seeAll}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

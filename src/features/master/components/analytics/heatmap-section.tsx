@@ -102,7 +102,7 @@ export function HeatmapSection({ data }: Props) {
 
       {data.insight ? (
         <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden />
           <p className="text-sm text-text-main">
             {T.insightTemplate
               .replace("{weekday}", data.insight.weekdayLabel)

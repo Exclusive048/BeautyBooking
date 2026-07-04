@@ -74,7 +74,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
             <span
               className={cn(
                 "shrink-0 font-mono text-[11px]",
-                hasUnread ? "text-primary" : "text-text-sec",
+                hasUnread ? "text-accent-text" : "text-text-sec",
               )}
             >
               {lastTime}

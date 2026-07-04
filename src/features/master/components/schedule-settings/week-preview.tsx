@@ -64,7 +64,7 @@ function DayColumn({ day, label }: { day: DayScheduleDto; label: string }) {
           {day.fixedSlotTimes.slice(0, 6).map((time) => (
             <div
               key={time}
-              className="rounded bg-primary/15 py-0.5 text-center text-[10px] text-primary"
+              className="rounded bg-primary/15 py-0.5 text-center text-[10px] text-accent-text"
             >
               {time}
             </div>

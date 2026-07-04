@@ -44,7 +44,7 @@ export function StudioPopularServices({
               <div className="font-display text-sm font-semibold tabular-nums text-text-main">
                 {UI_FMT.priceLabel(service.priceKopeks)}
               </div>
-              <div className="font-mono text-xs font-semibold tabular-nums text-primary">
+              <div className="font-mono text-xs font-semibold tabular-nums text-accent-text">
                 {UI_FMT.priceLabel(service.revenueKopeks)}
               </div>
             </li>

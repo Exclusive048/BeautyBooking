@@ -41,7 +41,7 @@ export function UpcomingBookingsSection({ upcoming, totalTodayCount, timezone }:
         </div>
         <Link
           href="/cabinet/master/bookings"
-          className="inline-flex shrink-0 items-center gap-1 text-sm text-primary transition-colors hover:underline"
+          className="inline-flex shrink-0 items-center gap-1 text-sm text-accent-text transition-colors hover:underline"
         >
           {T.seeAll}
           <ArrowRight className="h-3 w-3" aria-hidden />

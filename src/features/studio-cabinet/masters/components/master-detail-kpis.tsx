@@ -18,7 +18,7 @@ function Card({ icon: Icon, label, value, unit, sublabel }: Tile) {
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
       <span
         aria-hidden
-        className="mb-2 inline-grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary"
+        className="mb-2 inline-grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-accent-text"
       >
         <Icon className="h-4 w-4" />
       </span>

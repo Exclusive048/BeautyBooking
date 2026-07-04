@@ -70,7 +70,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Кабинет, который{" "}
-            <em className="font-display font-normal italic text-primary">работает за вас</em>
+            <em className="font-display font-normal italic text-accent-text">работает за вас</em>
           </>
         }
         description="Подключите расписание к МастерРядом и забудьте про бесконечные переписки. Клиенты записываются сами, напоминания работают, CRM ведёт историю. Без комиссий с услуг — только подписка за платформу."
@@ -85,7 +85,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Расписание в скриншотах,{" "}
-            <em className="font-display font-normal italic text-primary">клиенты в переписке</em>
+            <em className="font-display font-normal italic text-accent-text">клиенты в переписке</em>
           </>
         }
         paragraphs={[
@@ -144,7 +144,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             От регистрации до публикации —{" "}
-            <em className="font-display font-normal italic text-primary">за 30 минут</em>
+            <em className="font-display font-normal italic text-accent-text">за 30 минут</em>
           </>
         }
         description="Не нужны интеграции, не нужны разработчики. Регистрация и публикация — простой процесс."
@@ -177,7 +177,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Подписка вместо{" "}
-            <em className="font-display font-normal italic text-primary">комиссий</em>
+            <em className="font-display font-normal italic text-accent-text">комиссий</em>
           </>
         }
         description="Выберите план под вашу нагрузку. Сменить можно в любой момент."
@@ -232,7 +232,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Платформа, которую строят{" "}
-            <em className="font-display font-normal italic text-primary">для долгого использования</em>
+            <em className="font-display font-normal italic text-accent-text">для долгого использования</em>
           </>
         }
         paragraphs={[

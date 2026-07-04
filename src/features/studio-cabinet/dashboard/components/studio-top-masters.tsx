@@ -45,7 +45,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
         </div>
         <Link
           href="/cabinet/studio/team"
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          className="inline-flex items-center gap-1 text-xs font-medium text-accent-text transition-colors hover:text-accent-text/80"
         >
           {T.seeAll}
           <ArrowRight className="h-3 w-3" aria-hidden />

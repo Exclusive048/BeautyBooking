@@ -96,7 +96,7 @@ export function ReviewReplyForm({ reviewId, initialText, onCancel, onSaved }: Pr
             type="button"
             onClick={() => appendQuick(snippet)}
             disabled={busy}
-            className="inline-flex items-center rounded-full border border-border-subtle bg-bg-card px-2.5 py-1 text-xs text-text-main transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center rounded-full border border-border-subtle bg-bg-card px-2.5 py-1 text-xs text-text-main transition-colors hover:border-primary/40 hover:text-accent-text disabled:cursor-not-allowed disabled:opacity-50"
           >
             {snippet}
           </button>

@@ -94,7 +94,7 @@ export function RevenueLineChart({ data, compare }: Props) {
       </div>
       <svg
         viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="h-48 w-full text-primary"
+        className="h-48 w-full text-accent-text"
         role="img"
         aria-label="Revenue timeline"
       >

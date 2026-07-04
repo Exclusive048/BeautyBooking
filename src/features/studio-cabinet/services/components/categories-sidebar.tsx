@@ -61,7 +61,7 @@ export function CategoriesSidebar({
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-primary/10"
         >
           <Plus className="h-3.5 w-3.5" aria-hidden />
           {T.addCategory}
@@ -105,7 +105,7 @@ export function CategoriesSidebar({
                   className={cn(
                     "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition-colors",
                     active
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary/10 text-accent-text"
                       : "text-text-main hover:bg-bg-input/60",
                   )}
                   aria-pressed={active}
@@ -127,7 +127,7 @@ export function CategoriesSidebar({
                     className={cn(
                       "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-mono tabular-nums",
                       active
-                        ? "bg-primary/20 text-primary"
+                        ? "bg-primary/20 text-accent-text"
                         : "bg-bg-input text-text-sec",
                     )}
                   >

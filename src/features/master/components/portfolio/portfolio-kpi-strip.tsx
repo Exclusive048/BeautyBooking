@@ -54,7 +54,7 @@ function Tile({
       <p
         className={cn(
           "mt-1.5 font-display text-lg",
-          accent === "primary" && "text-primary",
+          accent === "primary" && "text-accent-text",
           accent === "neutral" && "text-text-main"
         )}
       >

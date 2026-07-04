@@ -27,7 +27,7 @@ function Card({ icon: Icon, label, value, sublabel, warn }: Tile) {
         className={`mb-2 inline-grid h-8 w-8 place-items-center rounded-lg ${
           warn
             ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-            : "bg-primary/10 text-primary"
+            : "bg-primary/10 text-accent-text"
         }`}
       >
         <Icon className="h-4 w-4" />

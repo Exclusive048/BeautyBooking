@@ -23,7 +23,7 @@ export function EmptyState({ cityName }: Props) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
       <div className="rounded-2xl border border-dashed border-border-subtle p-10 text-center sm:p-12">
-        <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <Sparkles className="h-6 w-6" aria-hidden />
         </span>
         <h3 className="mb-3 font-display text-2xl text-text-main">{title}</h3>
@@ -44,7 +44,7 @@ export function EmptyState({ cityName }: Props) {
           <p className="mb-3 text-sm text-text-sec">{T.fallbackPrompt}</p>
           <Link
             href="/catalog"
-            className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+            className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
           >
             {T.fallbackLink} →
           </Link>

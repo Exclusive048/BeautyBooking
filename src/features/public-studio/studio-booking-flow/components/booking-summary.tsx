@@ -78,7 +78,7 @@ export function BookingSummary({
           </dd>
         </div>
         {timeLabel && zoneLabel ? (
-          <div className="flex justify-end text-xs font-medium text-primary">
+          <div className="flex justify-end text-xs font-medium text-accent-text">
             {UI_TEXT.bookingWidget.summary.salonTimeNote} {zoneLabel}
           </div>
         ) : null}

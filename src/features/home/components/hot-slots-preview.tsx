@@ -126,7 +126,7 @@ export function HotSlotsPreview() {
             </p>
           </div>
         </div>
-        <Link href={buildCatalogUrl({ hot: true })} className="shrink-0 text-sm font-medium text-primary hover:underline">
+        <Link href={buildCatalogUrl({ hot: true })} className="shrink-0 text-sm font-medium text-accent-text hover:underline">
           {UI_TEXT.home.hotSlotsPreview.showAll}
         </Link>
       </div>
@@ -160,7 +160,7 @@ export function HotSlotsPreview() {
               {/* Header */}
               <div className="flex items-start justify-between gap-2">
                 <Link href={profileHref} className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-text-main hover:text-primary">
+                  <p className="truncate text-sm font-semibold text-text-main hover:text-accent-text">
                     {item.provider.name}
                   </p>
                   {item.provider.address ? (

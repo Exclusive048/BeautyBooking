@@ -73,7 +73,7 @@ function StoryRing({
                 className="object-cover"
               />
             ) : (
-              <span className="flex h-full w-full items-center justify-center bg-primary/10 text-sm font-semibold text-primary">
+              <span className="flex h-full w-full items-center justify-center bg-primary/10 text-sm font-semibold text-accent-text">
                 {initials || "?"}
               </span>
             )}

@@ -115,7 +115,7 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
                       <Icon className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
                       <span className="flex-1">{CABINET_LABEL[c]}</span>
                       {isActive ? (
-                        <Check className="h-4 w-4 text-primary" aria-hidden />
+                        <Check className="h-4 w-4 text-accent-text" aria-hidden />
                       ) : null}
                     </Link>
                   );

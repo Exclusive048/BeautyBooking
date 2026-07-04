@@ -26,7 +26,7 @@ type Props = {
 /**
  * Inline-edit row with autosave. View mode shows label + value + faint
  * pencil; clicking anywhere on the row enters edit mode. Edit mode is
- * a transparent input with a single bottom border in `text-primary`
+ * a transparent input with a single bottom border in `text-accent-text`
  * — per the ui-ux-pro-max skill's main pattern (no full input frame).
  *
  * Save lifecycle:
@@ -159,7 +159,7 @@ export function EditableFieldRow({
           type="button"
           onClick={enterEdit}
           aria-label={T.editAriaLabel}
-          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-primary group-hover:opacity-100 focus-visible:opacity-100"
+          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100"
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden />
         </button>

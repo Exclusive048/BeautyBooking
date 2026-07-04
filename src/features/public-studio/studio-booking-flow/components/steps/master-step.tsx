@@ -32,7 +32,7 @@ export function MasterStep({
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <User className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">

@@ -78,7 +78,7 @@ function ChipButton(props: {
       className={cn(
         "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
         selected
-          ? "border-primary bg-primary/10 text-primary"
+          ? "border-primary bg-primary/10 text-accent-text"
           : "border-border-subtle bg-bg-input text-text-sec hover:border-border hover:text-text-main"
       )}
     >

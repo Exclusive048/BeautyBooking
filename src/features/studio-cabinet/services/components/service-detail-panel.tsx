@@ -229,7 +229,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
             <button
               type="button"
               onClick={() => setAssignOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-primary/10"
             >
               <UserPlus className="h-3.5 w-3.5" aria-hidden />
               {T.assignMaster}

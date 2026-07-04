@@ -51,11 +51,11 @@ export function ApplicationCard({ application }: Props) {
           </div>
           <a
             href={`#offer-${application.offer.id}`}
-            className="mt-0.5 inline-flex items-center gap-1 text-xs text-text-sec hover:text-primary hover:underline"
+            className="mt-0.5 inline-flex items-center gap-1 text-xs text-text-sec hover:text-accent-text hover:underline"
           >
             <span>{offerLink}</span>
             {application.offer.discountPct !== null ? (
-              <span className="text-primary">· −{application.offer.discountPct}%</span>
+              <span className="text-accent-text">· −{application.offer.discountPct}%</span>
             ) : null}
           </a>
         </div>

@@ -308,7 +308,7 @@ export function ServiceModal({
                 setCreatingCategory(true);
                 setCategoryToast(null);
               }}
-              className="mt-2 inline-flex items-center gap-1 text-xs text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:underline"
+              className="mt-2 inline-flex items-center gap-1 text-xs text-accent-text transition-colors hover:underline focus-visible:outline-none focus-visible:underline"
             >
               <Plus className="h-3 w-3" aria-hidden />
               {T.categoryCreateCta}
@@ -453,7 +453,7 @@ function Toggle({
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
         disabled={disabled}
-        className="h-4 w-4 rounded border border-border-subtle text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       />
       <span>{label}</span>
     </label>

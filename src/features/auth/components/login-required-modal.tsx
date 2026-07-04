@@ -40,7 +40,7 @@ export function LoginRequiredModal({ open, onClose }: Props) {
 
   return (
     <ModalSurface open={open} onClose={onClose} className="max-w-md">
-      <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+      <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-accent-text">
         <Heart className="h-6 w-6" aria-hidden />
       </div>
 

@@ -23,7 +23,7 @@ export function InsightsSection({ insights, periodLabel }: Props) {
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <header className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" aria-hidden />
+        <Sparkles className="h-4 w-4 text-accent-text" aria-hidden />
         <h2 className="font-display text-base text-text-main">{T.heading}</h2>
         <span className="text-xs text-text-sec">
           {T.periodTemplate.replace("{period}", periodLabel)}

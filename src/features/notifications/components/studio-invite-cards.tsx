@@ -98,7 +98,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-text-main">
-                  {t.titlePrefix} <span className="text-primary">{invite.studioName}</span> {t.titleSuffix}
+                  {t.titlePrefix} <span className="text-accent-text">{invite.studioName}</span> {t.titleSuffix}
                 </div>
                 {invite.studioTagline ? (
                   <div className="mt-0.5 text-xs text-text-sec">{invite.studioTagline}</div>

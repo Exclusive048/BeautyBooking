@@ -119,7 +119,7 @@ export function WhenStep({
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <CalendarIcon className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
@@ -158,7 +158,7 @@ export function WhenStep({
                 >
                   <span
                     className={`font-mono text-[10px] uppercase tracking-wider ${
-                      isSelected ? "text-white/90" : cell.isWeekend ? "text-primary" : "text-text-muted"
+                      isSelected ? "text-white/90" : cell.isWeekend ? "text-accent-text" : "text-text-muted"
                     }`}
                   >
                     {cell.label}
@@ -189,7 +189,7 @@ export function WhenStep({
       ) : (
         <div className="space-y-4">
           {zoneLabel ? (
-            <p className="flex items-center gap-1 text-xs font-medium text-primary">
+            <p className="flex items-center gap-1 text-xs font-medium text-accent-text">
               <CalendarIcon className="h-3 w-3 shrink-0" aria-hidden />
               <span>
                 {UI_TEXT.bookingWidget.whenStep.salonTimeNote} {zoneLabel}

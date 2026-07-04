@@ -98,7 +98,7 @@ function CTACard({
             "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider",
             isBrand
               ? "border-white/25 bg-white/10 text-white"
-              : "border-primary/25 bg-primary/10 text-primary",
+              : "border-primary/25 bg-primary/10 text-accent-text",
           )}
         >
           {icon}

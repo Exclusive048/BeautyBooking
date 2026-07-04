@@ -166,7 +166,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 {studio.publicUsername ? (
                   <Link
                     href={`/u/${studio.publicUsername}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-main transition hover:border-primary/40 hover:text-primary"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-main transition hover:border-primary/40 hover:text-accent-text"
                   >
                     <Building2 className="h-3.5 w-3.5" aria-hidden strokeWidth={1.6} />
                     <span>{T.studioAffiliationTemplate.replace("{name}", studio.name)}</span>

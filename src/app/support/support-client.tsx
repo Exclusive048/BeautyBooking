@@ -298,7 +298,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowManualContact(true)}
-                className="text-xs font-medium text-primary"
+                className="text-xs font-medium text-accent-text"
               >
                 {UI_TEXT.pages.support.form.contactCustomAction}
               </Button>
@@ -378,7 +378,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
           {UI_TEXT.support.form.consent.before}
           <Link
             href="/privacy"
-            className="text-primary underline-offset-2 hover:underline"
+            className="text-accent-text underline-offset-2 hover:underline"
           >
             {UI_TEXT.support.form.consent.link}
           </Link>

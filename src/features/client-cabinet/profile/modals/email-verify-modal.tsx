@@ -251,7 +251,7 @@ function ResendRow({
     <button
       type="button"
       onClick={onResend}
-      className="text-xs text-primary hover:underline"
+      className="text-xs text-accent-text hover:underline"
     >
       {T.resend}
     </button>

@@ -122,7 +122,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                       onClick={() => setMoreOpen(false)}
                       className={cn(
                         "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
-                        active ? "bg-primary/10 text-primary" : "text-text-sec hover:bg-bg-input"
+                        active ? "bg-primary/10 text-accent-text" : "text-text-sec hover:bg-bg-input"
                       )}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
@@ -165,7 +165,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                     aria-current={active ? "page" : undefined}
                   >
                     <span className="relative">
-                      <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-text-sec")} aria-hidden />
+                      <Icon className={cn("h-5 w-5", active ? "text-accent-text" : "text-text-sec")} aria-hidden />
                       {showBadge ? (
                         <span
                           aria-label={`${pendingBookingsCount}`}
@@ -175,7 +175,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                         </span>
                       ) : null}
                     </span>
-                    <span className={cn("text-[10px] font-medium", active ? "text-primary" : "text-text-sec")}>
+                    <span className={cn("text-[10px] font-medium", active ? "text-accent-text" : "text-text-sec")}>
                       {tab.label}
                     </span>
                   </Link>
@@ -190,10 +190,10 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                 aria-expanded={moreOpen}
               >
                 <MoreHorizontal
-                  className={cn("h-5 w-5", moreActive || moreOpen ? "text-primary" : "text-text-sec")}
+                  className={cn("h-5 w-5", moreActive || moreOpen ? "text-accent-text" : "text-text-sec")}
                   aria-hidden
                 />
-                <span className={cn("text-[10px] font-medium", moreActive || moreOpen ? "text-primary" : "text-text-sec")}>
+                <span className={cn("text-[10px] font-medium", moreActive || moreOpen ? "text-accent-text" : "text-text-sec")}>
                   {tNav.more}
                 </span>
               </button>

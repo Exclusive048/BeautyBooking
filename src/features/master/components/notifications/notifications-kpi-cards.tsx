@@ -139,7 +139,7 @@ function PushTile({ pushEnabled }: { pushEnabled: boolean }) {
         ) : (
           <Link
             href="/cabinet/master/account?tab=notifications"
-            className="text-primary underline-offset-2 hover:underline"
+            className="text-accent-text underline-offset-2 hover:underline"
           >
             {T.pushOffCta}
           </Link>

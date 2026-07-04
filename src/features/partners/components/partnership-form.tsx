@@ -103,7 +103,7 @@ export function PartnershipForm() {
   if (submitted) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card/50 p-8 text-center sm:p-10">
-        <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <Check className="h-6 w-6" aria-hidden />
         </span>
         <h3 className="mb-2 font-display text-2xl text-text-main">{T.success.title}</h3>
@@ -251,7 +251,7 @@ export function PartnershipForm() {
             {T.consent.before}
             <Link
               href="/privacy"
-              className="text-primary underline-offset-2 hover:underline"
+              className="text-accent-text underline-offset-2 hover:underline"
             >
               {T.consent.link}
             </Link>

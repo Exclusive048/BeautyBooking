@@ -154,7 +154,7 @@ export function DateGrid({ providerId, providerTimezone, selectedDateKey, onSele
               "inline-flex h-6 w-6 items-center justify-center rounded-md border border-border-subtle text-text-sec transition",
               page === 0 || loading
                 ? "cursor-not-allowed opacity-40"
-                : "hover:border-primary hover:text-primary",
+                : "hover:border-primary hover:text-accent-text",
             )}
             aria-label={T.prevWeek}
           >
@@ -168,7 +168,7 @@ export function DateGrid({ providerId, providerTimezone, selectedDateKey, onSele
               "inline-flex h-6 w-6 items-center justify-center rounded-md border border-border-subtle text-text-sec transition",
               page >= totalPages - 1 || loading
                 ? "cursor-not-allowed opacity-40"
-                : "hover:border-primary hover:text-primary",
+                : "hover:border-primary hover:text-accent-text",
             )}
             aria-label={T.nextWeek}
           >

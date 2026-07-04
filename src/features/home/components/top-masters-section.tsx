@@ -85,7 +85,7 @@ function MasterCard({ master }: { master: TopMaster }) {
           )}
           {master.ratingAvg > 0 ? (
             <Badge className="absolute left-3 top-3 gap-1 border-0 bg-bg-card/95 px-2 py-1 text-text-main shadow-sm backdrop-blur-sm">
-              <Star className="h-3 w-3 fill-primary text-primary" aria-hidden />
+              <Star className="h-3 w-3 fill-primary text-accent-text" aria-hidden />
               <span className="font-mono text-xs font-semibold tabular-nums">
                 {master.ratingAvg.toFixed(1)}
               </span>
@@ -125,7 +125,7 @@ export async function TopMastersSection() {
       <div className="mb-10 text-center">
         <h2 className="text-3xl font-bold tracking-tight text-text-main sm:text-4xl">
           {T.title}{" "}
-          <em className="font-display font-normal italic text-primary">{T.titleAccent}</em>
+          <em className="font-display font-normal italic text-accent-text">{T.titleAccent}</em>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-base text-text-sec">{T.subtitle}</p>
       </div>
@@ -139,7 +139,7 @@ export async function TopMastersSection() {
       <div className="mt-10 text-center">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary-hover"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-primary-hover"
         >
           {T.seeAll}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

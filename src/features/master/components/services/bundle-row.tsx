@@ -47,7 +47,7 @@ export function BundleRow({ bundle, allServices }: Props) {
             isFirst={isFirst}
             isLast={isLast}
           />
-          <Package className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <Package className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden />
           <button
             type="button"
             onClick={() => setEditOpen(true)}

@@ -293,7 +293,7 @@ export function PackageModal({
             </span>
           </div>
           {pricing.discountAmount > 0 ? (
-            <div className="mt-0.5 flex items-baseline justify-between text-primary">
+            <div className="mt-0.5 flex items-baseline justify-between text-accent-text">
               <span>{T.previewDiscount}</span>
               <span className="font-mono tabular-nums">
                 −{UI_FMT.priceLabel(pricing.discountAmount)}

@@ -137,7 +137,7 @@ export function OfferCard({ offer, variant = "active", services, now }: Props) {
         {!isArchive && offer.counts.pending > 0 ? (
           <a
             href={`#applications`}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent-text hover:underline"
           >
             <span>{offer.counts.pending}</span>
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />

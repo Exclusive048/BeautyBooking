@@ -132,7 +132,7 @@ export function TimeGrid({
       <div className="mb-2.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-medium uppercase tracking-wider text-text-sec">
         <span>{T.timeLabel}</span>
         {zoneLabel ? (
-          <span className="font-mono normal-case text-primary">{zoneLabel}</span>
+          <span className="font-mono normal-case text-accent-text">{zoneLabel}</span>
         ) : null}
       </div>
       {loading ? (

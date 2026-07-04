@@ -75,7 +75,7 @@ function TeamRow({ member, accent }: { member: StudioTeamMember; accent: "owner"
             {accent === "owner" ? T.roleOwner : T.roleAdmin}
           </span>
           {member.isCurrentUser ? (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-primary">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-accent-text">
               {T.youChip}
             </span>
           ) : null}

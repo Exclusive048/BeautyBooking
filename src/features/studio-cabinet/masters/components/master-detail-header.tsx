@@ -80,7 +80,7 @@ export function MasterDetailHeader({
                 {statusLabel(detail.status)}
               </span>
               {detail.isCurrentUser ? (
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-primary">
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-text">
                   {T.youChip}
                 </span>
               ) : null}

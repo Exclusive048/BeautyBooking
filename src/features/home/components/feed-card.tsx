@@ -46,7 +46,7 @@ export function FeedCard({ item, index }: Props) {
         />
         {rating ? (
           <div className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-bg-card/90 px-2 py-1 shadow-sm backdrop-blur-sm">
-            <Star className="h-3 w-3 fill-primary text-primary" aria-hidden />
+            <Star className="h-3 w-3 fill-primary text-accent-text" aria-hidden />
             <span className="font-mono text-xs font-semibold tabular-nums text-text-main">
               {rating}
             </span>
@@ -62,7 +62,7 @@ export function FeedCard({ item, index }: Props) {
           <p className="truncate text-xs text-text-sec sm:text-sm">{subline}</p>
         ) : null}
         {priceRub ? (
-          <p className="mt-0.5 font-display text-sm italic text-primary sm:text-base">
+          <p className="mt-0.5 font-display text-sm italic text-accent-text sm:text-base">
             {T.card.priceFrom} {priceRub}
           </p>
         ) : null}

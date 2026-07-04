@@ -82,14 +82,14 @@ export function TagInput({ value, options, onChange }: Props) {
           return (
             <span
               key={id}
-              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-accent-text"
             >
               <span>{option.name}</span>
               <button
                 type="button"
                 onClick={() => remove(id)}
                 aria-label="remove"
-                className="text-primary/60 hover:text-primary"
+                className="text-accent-text/60 hover:text-accent-text"
               >
                 <X className="h-3 w-3" aria-hidden />
               </button>

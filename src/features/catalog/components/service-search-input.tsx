@@ -203,7 +203,7 @@ export function ServiceSearchInput({
                     onClick={() => handleCategoryClick(cat)}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-input/70"
                   >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-accent-text">
                       <Palette className="h-3.5 w-3.5" aria-hidden />
                     </span>
                     <span className="text-sm text-text-main">{cat.name}</span>

@@ -48,7 +48,7 @@ export function QuickActionTile({
 
   const iconClass = cn(
     "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
-    isPrimary ? "bg-white/20 text-white" : "bg-primary/10 text-primary",
+    isPrimary ? "bg-white/20 text-white" : "bg-primary/10 text-accent-text",
   );
 
   const content = (

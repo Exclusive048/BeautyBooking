@@ -18,7 +18,7 @@ export function KpiCard({ icon: Icon, label, value, sublabel }: Props) {
       <div className="mb-3 flex items-start">
         <span
           aria-hidden
-          className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"
+          className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-accent-text"
         >
           <Icon className="h-4 w-4" aria-hidden />
         </span>

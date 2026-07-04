@@ -77,10 +77,10 @@ export function PlanCard({ plan, fallbackCode, highlighted = false }: Props) {
     ? "rounded-2xl bg-brand-gradient p-7 text-white shadow-card"
     : "rounded-2xl border border-border-subtle bg-bg-card/50 p-7";
 
-  const labelClass = highlighted ? "text-white/85" : "text-primary";
+  const labelClass = highlighted ? "text-white/85" : "text-accent-text";
   const headingClass = highlighted ? "text-white" : "text-text-main";
   const subTextClass = highlighted ? "text-white/80" : "text-text-sec";
-  const checkClass = highlighted ? "text-white" : "text-primary";
+  const checkClass = highlighted ? "text-white" : "text-accent-text";
   const featureTextClass = highlighted ? "text-white/95" : "text-text-main";
 
   return (

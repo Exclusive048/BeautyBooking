@@ -46,12 +46,12 @@ export function CabinetBottomNav() {
               ) : null}
               <Icon
                 className={`h-5 w-5 shrink-0 transition-colors duration-200 ${
-                  active ? "text-primary" : "text-text-sec"
+                  active ? "text-accent-text" : "text-text-sec"
                 }`}
               />
               <span
                 className={`truncate text-[10px] font-medium leading-none transition-colors duration-200 ${
-                  active ? "text-primary" : "text-text-sec"
+                  active ? "text-accent-text" : "text-text-sec"
                 }`}
               >
                 {label}

@@ -300,7 +300,7 @@ export function ClientModelApplicationsPage() {
 
             {item.offer.master.publicUsername ? (
               <div className="mt-3">
-                <Link href={`/u/${item.offer.master.publicUsername}`} className="text-xs text-primary underline">
+                <Link href={`/u/${item.offer.master.publicUsername}`} className="text-xs text-accent-text underline">
                   Профиль мастера
                 </Link>
               </div>

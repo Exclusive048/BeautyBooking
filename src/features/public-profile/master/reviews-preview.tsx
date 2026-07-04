@@ -222,7 +222,7 @@ export function ReviewsPreview({
         {summaryVisible ? (
           <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 dark:border-primary/30 dark:bg-primary/10">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-text-main">
-              <Sparkles className="h-4 w-4 text-primary" />
+              <Sparkles className="h-4 w-4 text-accent-text" />
               {t.summaryTitle}
             </div>
             {summaryLoading ? (

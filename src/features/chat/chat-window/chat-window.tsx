@@ -48,7 +48,7 @@ export function ChatWindow({
           <button
             type="button"
             onClick={() => void refresh()}
-            className="text-primary underline-offset-2 hover:underline"
+            className="text-accent-text underline-offset-2 hover:underline"
           >
             {T.thread.retry}
           </button>

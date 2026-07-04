@@ -116,7 +116,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                   {offer.master.publicUsername ? (
                     <Link
                       href={`/u/${offer.master.publicUsername}`}
-                      className="mt-2 inline-flex text-sm font-medium text-primary hover:opacity-80"
+                      className="mt-2 inline-flex text-sm font-medium text-accent-text hover:opacity-80"
                     >
                       {UI_TEXT.pages.modelOffer.masterProfileCta}
                     </Link>
@@ -132,7 +132,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                     isFree
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
-                      : "bg-primary/10 text-primary"
+                      : "bg-primary/10 text-accent-text"
                   }`}
                 >
                   <Sparkles className="h-3 w-3" aria-hidden />
@@ -196,7 +196,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                   {offer.requirements.map((item) => (
                     <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
                       <CheckCircle2
-                        className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-accent-text"
                         aria-hidden
                       />
                       {item}

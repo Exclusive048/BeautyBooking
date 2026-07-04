@@ -41,7 +41,7 @@ function AvatarCircle({ name, url }: { name: string; url: string | null }) {
     .slice(0, 2)
     .toUpperCase();
   return (
-    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-accent-text">
       {initials}
     </div>
   );
@@ -83,7 +83,7 @@ function RecentMasterCard({ item }: { item: RecentMasterItem }) {
           </span>
         </div>
         {item.nextSlot ? (
-          <div className="flex items-center gap-1 text-xs font-medium text-primary">
+          <div className="flex items-center gap-1 text-xs font-medium text-accent-text">
             <Clock className="h-3 w-3" />
             <span>
               {UI_TEXT.home.rebook.nextSlot}: {item.nextSlot.date.split("-").reverse().join(".")},{" "}

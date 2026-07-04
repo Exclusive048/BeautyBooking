@@ -315,7 +315,7 @@ function ProfileHeaderCard({
               {formatVisitsLabel(data.stats.visitsCount)}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Heart className="h-3 w-3 text-primary" aria-hidden />
+              <Heart className="h-3 w-3 text-accent-text" aria-hidden />
               {data.stats.favoritesCount} в избранном
             </span>
           </div>

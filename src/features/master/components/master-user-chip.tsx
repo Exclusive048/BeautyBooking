@@ -69,7 +69,7 @@ export function MasterUserChip({
         <p className="truncate text-sm font-medium text-text-main">{name}</p>
         <p className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
           {showCrown ? (
-            <Crown className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+            <Crown className="h-3 w-3 shrink-0 text-accent-text" aria-hidden />
           ) : null}
           <span className="truncate">{statusText}</span>
         </p>

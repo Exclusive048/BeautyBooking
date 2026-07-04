@@ -47,7 +47,7 @@ export function ReviewsHeroCard({ stats }: Props) {
     <article className="flex h-full flex-col justify-between rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6">
       <div>
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-5xl font-bold text-primary">
+          <span className="font-display text-5xl font-bold text-accent-text">
             {stats.avgRating.toFixed(1)}
           </span>
           <span className="text-lg text-text-sec">{T.hero.outOfFive}</span>

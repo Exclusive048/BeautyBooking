@@ -50,7 +50,7 @@ export function SortMenu({ value, onChange }: Props) {
               }
             >
               <span>{opt.label}</span>
-              {active ? <Check className="h-3.5 w-3.5 text-primary" aria-hidden /> : null}
+              {active ? <Check className="h-3.5 w-3.5 text-accent-text" aria-hidden /> : null}
             </button>
           );
         })}

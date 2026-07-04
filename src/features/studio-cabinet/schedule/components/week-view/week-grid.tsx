@@ -35,7 +35,7 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                   key={day.dateKey}
                   className={cn(
                     "px-3 py-2 text-center font-mono text-[10px] uppercase tracking-wide",
-                    day.isToday ? "text-primary" : "text-text-sec",
+                    day.isToday ? "text-accent-text" : "text-text-sec",
                   )}
                 >
                   {day.weekdayLabel} {day.dayNumber}

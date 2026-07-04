@@ -23,7 +23,7 @@ export default function HowItWorksPage() {
         title={
           <>
             Маркетплейс для красоты —{" "}
-            <em className="font-display font-normal italic text-primary">без хаоса</em>
+            <em className="font-display font-normal italic text-accent-text">без хаоса</em>
           </>
         }
         description="Каталог для клиента, кабинет для мастера, общая система уведомлений. Все действия с одной стороны моментально отражаются на другой."
@@ -38,7 +38,7 @@ export default function HowItWorksPage() {
         title={
           <>
             Записаться к мастеру за{" "}
-            <em className="font-display font-normal italic text-primary">минуту</em>
+            <em className="font-display font-normal italic text-accent-text">минуту</em>
           </>
         }
         paragraphs={[
@@ -96,7 +96,7 @@ export default function HowItWorksPage() {
         title={
           <>
             Кабинет, который{" "}
-            <em className="font-display font-normal italic text-primary">думает за вас</em>
+            <em className="font-display font-normal italic text-accent-text">думает за вас</em>
           </>
         }
         paragraphs={[
@@ -156,7 +156,7 @@ export default function HowItWorksPage() {
         title={
           <>
             Одна платформа —{" "}
-            <em className="font-display font-normal italic text-primary">две стороны</em>
+            <em className="font-display font-normal italic text-accent-text">две стороны</em>
           </>
         }
         paragraphs={[

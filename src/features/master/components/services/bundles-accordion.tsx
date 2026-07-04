@@ -25,7 +25,7 @@ export function BundlesAccordion({ bundles, allServices }: Props) {
           className="h-4 w-4 text-text-sec transition-transform group-open:rotate-90"
           aria-hidden
         />
-        <Package className="h-4 w-4 text-primary" aria-hidden />
+        <Package className="h-4 w-4 text-accent-text" aria-hidden />
         <span className="flex-1 font-display text-base text-text-main">{T.heading}</span>
         <span className="font-mono text-xs text-text-sec">{bundles.length}</span>
       </summary>

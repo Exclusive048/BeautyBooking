@@ -169,7 +169,7 @@ function PendingReviewsBlock({ pending }: { pending: PendingReviewBooking[] }) {
   return (
     <Card className="border-primary/30 bg-bg-input/40 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Star className="h-4 w-4 fill-primary text-primary" aria-hidden />
+        <Star className="h-4 w-4 fill-primary text-accent-text" aria-hidden />
         <div className="font-semibold text-text-main">{T.pendingTitle}</div>
       </div>
       <p className="mb-3 text-sm text-text-sec">{T.pendingDescription}</p>
@@ -273,7 +273,7 @@ function ReviewCard({
                 {profileHref ? (
                   <Link
                     href={profileHref}
-                    className="truncate text-sm font-semibold text-text-main hover:text-primary"
+                    className="truncate text-sm font-semibold text-text-main hover:text-accent-text"
                   >
                     {review.target.name}
                   </Link>
@@ -305,7 +305,7 @@ function ReviewCard({
 
         {review.hasReply ? (
           <div className="mt-3 border-l-2 border-primary/60 bg-bg-input/40 p-3">
-            <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.08em] text-primary">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.08em] text-accent-text">
               <Reply className="h-3 w-3" aria-hidden />
               {T.masterReplyLabel}
             </div>
@@ -348,7 +348,7 @@ function StarRating({ rating }: { rating: number }) {
           key={i}
           className={`h-4 w-4 ${
             i < rating
-              ? "fill-primary text-primary"
+              ? "fill-primary text-accent-text"
               : "text-text-sec/40"
           }`}
           aria-hidden

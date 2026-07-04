@@ -183,7 +183,7 @@ export function WeekdayRow({
                 <button
                   type="button"
                   onClick={() => setEditingBreakIndex(index)}
-                  className="font-mono text-xs text-text-main transition hover:text-primary"
+                  className="font-mono text-xs text-text-main transition hover:text-accent-text"
                 >
                   {row.start}–{row.end}
                 </button>

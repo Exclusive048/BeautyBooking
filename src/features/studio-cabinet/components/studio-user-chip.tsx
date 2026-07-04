@@ -49,7 +49,7 @@ export function StudioUserChip({ name, avatarUrl, studioName }: Props) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-text-main">{name}</p>
         <p className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
-          <Building2 className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+          <Building2 className="h-3 w-3 shrink-0 text-accent-text" aria-hidden />
           <span className="truncate">{T.currentContext.replace("{studio}", studioName)}</span>
         </p>
       </div>

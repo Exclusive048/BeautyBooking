@@ -132,7 +132,7 @@ export function FeatureGate({
       <div
         className={`flex flex-wrap items-center gap-3 rounded-2xl border border-primary/30 bg-bg-card p-4 ${className ?? ""}`}
       >
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-primary">
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-accent-text">
           <Lock className="h-4 w-4" aria-hidden />
           <span className="font-mono text-[10px] uppercase tracking-[0.18em]">{badge}</span>
         </span>
@@ -155,7 +155,7 @@ export function FeatureGate({
       </div>
       <div className="absolute inset-0 flex items-center justify-center p-6">
         <div className="max-w-sm rounded-2xl border border-primary/30 bg-bg-card p-6 text-center shadow-card">
-          <div className="mb-2 inline-flex items-center gap-1.5 text-primary">
+          <div className="mb-2 inline-flex items-center gap-1.5 text-accent-text">
             <Lock className="h-4 w-4" aria-hidden />
             <span className="font-mono text-[10px] uppercase tracking-[0.18em]">{badge}</span>
           </div>

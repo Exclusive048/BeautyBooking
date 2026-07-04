@@ -122,7 +122,7 @@ export function PWAInstallPrompt() {
           <div className="rounded-2xl border border-border-subtle bg-bg-card px-4 py-3.5 shadow-card backdrop-blur-sm">
             <div className="flex items-start gap-3">
               <div className="shrink-0 rounded-xl bg-primary/10 p-2">
-                <Download className="h-5 w-5 text-primary" aria-hidden />
+                <Download className="h-5 w-5 text-accent-text" aria-hidden />
               </div>
 
               <div className="min-w-0 flex-1">

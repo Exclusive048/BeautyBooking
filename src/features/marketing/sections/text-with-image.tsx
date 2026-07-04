@@ -50,7 +50,7 @@ export function TextWithImage({
             className={hasImage && imagePosition === "left" ? "lg:col-start-2" : ""}
           >
             {eyebrow ? (
-              <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+              <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
                 {eyebrow}
               </p>
             ) : null}

@@ -40,7 +40,7 @@ export function ComparisonToggle({ checked }: Props) {
         type="checkbox"
         checked={checked}
         onChange={handleChange}
-        className="h-4 w-4 rounded border border-border-subtle text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       />
       <span>{T.comparisonLabel}</span>
     </label>

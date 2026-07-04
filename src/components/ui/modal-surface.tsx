@@ -180,7 +180,7 @@ export function ModalSurface({
               {header ? (
                 <header className="mb-4 flex items-start gap-3">
                   {header.icon ? (
-                    <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-accent-text">
                       {header.icon}
                     </span>
                   ) : null}

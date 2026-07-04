@@ -145,7 +145,7 @@ export function ClientFaqPage() {
               <li>
                 <a
                   href={T.contactEmailHref}
-                  className="inline-flex items-center gap-2 text-text-main hover:text-primary"
+                  className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
                 >
                   <Mail className="h-4 w-4 text-text-sec" aria-hidden />
                   {T.contactEmailAddress}
@@ -154,7 +154,7 @@ export function ClientFaqPage() {
               <li>
                 <a
                   href="tel:+78001112233"
-                  className="inline-flex items-center gap-2 text-text-main hover:text-primary"
+                  className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
                 >
                   <Phone className="h-4 w-4 text-text-sec" aria-hidden />
                   8 800 111 22 33
@@ -171,7 +171,7 @@ export function ClientFaqPage() {
               <li>
                 <a
                   href="/terms"
-                  className="inline-flex items-center gap-2 text-text-main hover:text-primary"
+                  className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
                 >
                   <FileText className="h-3.5 w-3.5 text-text-sec" aria-hidden />
                   {T.docsTerms}
@@ -180,7 +180,7 @@ export function ClientFaqPage() {
               <li>
                 <a
                   href="/privacy"
-                  className="inline-flex items-center gap-2 text-text-main hover:text-primary"
+                  className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
                 >
                   <FileText className="h-3.5 w-3.5 text-text-sec" aria-hidden />
                   {T.docsPrivacy}
@@ -189,7 +189,7 @@ export function ClientFaqPage() {
               <li>
                 <a
                   href="/faq"
-                  className="inline-flex items-center gap-2 text-text-main hover:text-primary"
+                  className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
                 >
                   <FileText className="h-3.5 w-3.5 text-text-sec" aria-hidden />
                   {T.docsCancellation}

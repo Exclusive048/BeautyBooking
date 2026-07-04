@@ -73,7 +73,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <Sparkles className="h-4 w-4" aria-hidden />
         </span>
         <div>
@@ -175,7 +175,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                                 : UI_TEXT.bookingWidget.serviceStep.priceOnRequest}
                             </div>
                           </div>
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-accent-text">
                             {isSelected ? "✓" : UI_TEXT.bookingWidget.serviceStep.pick}
                           </span>
                         </div>

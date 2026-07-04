@@ -43,7 +43,7 @@ export function PolicySection({ data }: Props) {
         {T.editHint}{" "}
         <Link
           href="/cabinet/studio/calendar"
-          className="font-medium text-primary underline-offset-2 hover:underline"
+          className="font-medium text-accent-text underline-offset-2 hover:underline"
         >
           {T.editLink}
         </Link>

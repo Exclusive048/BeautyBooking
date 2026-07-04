@@ -76,7 +76,7 @@ export function GeneralSection({ data }: Props) {
             href={data.address.mapUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text hover:underline"
           >
             <MapPin className="h-4 w-4" aria-hidden />
             {T.openMap}
