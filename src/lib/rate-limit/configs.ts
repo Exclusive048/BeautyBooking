@@ -22,6 +22,14 @@ export const RATE_LIMITS = {
   // General public API
   publicApi: { windowSeconds: 60, maxRequests: 120 },
 
+  // Payment-provider webhook ingress (YooKassa). Isolated from `publicApi` so a
+  // future public-API tightening can't starve payment notifications. 300/min per
+  // source IP is far above YooKassa's spaced retry cadence (it never floods a
+  // single merchant's webhook), while still bounding a forged-notification burst.
+  // The enqueue is cheap; the real authenticity is the worker's API re-fetch
+  // (HARDENING-02). Still fail-closed on Redis outage (path in /api/payments).
+  webhookIngress: { windowSeconds: 60, maxRequests: 300 },
+
   // Feed
   feedPortfolio: { windowSeconds: 60, maxRequests: 60 },
   feedStories: { windowSeconds: 60, maxRequests: 30 },

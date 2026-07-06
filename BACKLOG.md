@@ -78,6 +78,14 @@
 
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
+- ✅ **VITEST-SERVER-ONLY-SHIM** *(FIXED 2026-07-07 — pending commit → перенести в BACKLOG-DONE при коммите)* — 6 test-файлов
+  падали на import с ошибкой `server-only` (`proxy` · `billing/marketing-pricing` · `bookings/idempotency-key` ·
+  `schedule/available-today` · `schedule/studio-slot-aggregation` · `cabinet/.../map-email-conflict`). Причина: GUARDRAILS-01
+  (2026-07-06) добавил `import "server-only"` в server-модули, а `vitest.config.ts` не шимил пакет (в non-`react-server`-условии
+  он throw'ит на import). **Fix:** `resolve.alias` `/^server-only$/` → пустой stub `test/stubs/server-only.ts` в `vitest.config.ts`
+  (vitest-only — `next.config.ts`/`tsconfig` не тронуты, boundary-guard rule 13 в prod-бандле держится). Все 6 файлов теперь
+  импортируются + зелёные (0 real-assertion падений); suite **823 → 894** теста (95/95 файлов). `client-only` не импортируется в
+  `src/` — шим не нужен. Триаж-находок нет.
 
 ---
 
@@ -113,6 +121,7 @@
 - **TZ-DISPLAY-DEFERRED-3** *(из FIX-STUDIO-CALENDAR-SALON-TZ 2026-07-03 — всё ещё viewer-tz, нужен per-surface provider-tz plumbing; ранее жил ТОЛЬКО в BACKLOG-DONE, поднят в active SKILL-TZ-01 2026-07-06 т.к. deferred ≠ done)* — 3 поверхности показывают **время записи/слота** в браузерной tz зрителя, а не salon-tz: (1) master reschedule-modal `reschedule-modal.tsx:247,273`; (2) `/book` book-client «ближайшие слоты» `src/app/book/book-client.tsx:137`; (3) CRM client-card-drawer visit-history `client-card-drawer.tsx:341`. Все `viewerTimeZone` verified. Skill §7.
 - **TZ-DISPLAY-MINOR-2** *(NEW findings, SKILL-TZ-01 2026-07-06)* — (a) 🟡 studio `create-booking-dialog.tsx:46` (`formatTimeLocal`) рендерит кликнутый слот `startAtUtc` через `toLocaleString` **без `timeZone`** → расходится с salon-tz сеткой для cross-tz админа; (b) 🔵 **dormant** catalog card «Ближайшее» — `slot-precision-format.ts` через `catalog-card.tsx:151` передаёт `viewerTimeZone`; не срабатывает т.к. `catalog.service.ts:748` хардкодит `nextSlot:null` (латентно — вскроется при включении availability-pipeline).
 - **TZ-DISPLAY-TELEGRAM-UTC** *(= backlog #13 выше; кросс-ссылка)* — `bookingTelegramService.ts:55-62` (`formatDateTimeUtc`) время записи в **сыром UTC** без метки (in-app корректен, Telegram-путь нет). Замаскировано TG kill-switch'ем; починить до re-enable. Skill §7.
+- 🟡 **QA-TESTID-COVERAGE** *(spawned by SKILL-PLAYWRIGHT-01 2026-07-06 — recommend, не внедрено)* — в `src/` **0 `data-testid`** (verified grep), нет test-hook-конвенции → root-cause «empty selector» live-QA падений + вынуждает ловить неоднозначные `<main>`/локализованный текст. Пример живого бага: `.qa/fix-15.spec.ts:72` селектит `[data-testid="stories-rail"]`, которого нет в коде. Ввести конвенцию `data-testid`, начать с обоих shell-`<main>` (`app-shell.tsx:19` + page-mains) и строк списков (bookings/reviews). Даёт стабильные GOOD-локаторы (skill `playwright-qa` §2/§4). Не блокер; durable-фикс dual-`<main>` strict-mode + пустых селекторов.
 - **UI a11y/polish** — REDUCED-MOTION-A · TAP-TARGET-AUDIT-A · TAILWIND-COLOR-LINT · STORYBOOK-SETUP (из UI-UX-AUDIT).
 - **OVERLAY-PORTAL-REFACTOR** *(spawned by GUARDRAILS-01 2026-07-06)* — 5 genuine content-overlay'ев на hand-rolled `fixed inset-0` (сейчас warn'ят новым ESLint-гейтом, НЕ рефакторились): `city-prompt-overlay.tsx` · `portfolio-editor.tsx` (crop-modal) · `portfolio-strip.tsx` (lightbox) · `reviews-preview.tsx` · `stories-viewer-overlay.tsx` (последний — independent focus-trap, инвариант #27, консолидировать осторожно). Перевести на `<ModalSurface>`/`<Drawer>` (createPortal к body) — устраняет positioning-hazard (transform/filter/overflow ancestor). Работают сейчас; это robustness, не блокер. Каждый закрытый → снять warn или добавить в exempt-list.
 - **CRM/booking фичи** — manual tag assignment · late-cancel CRM tracking · online payments + штрафы (`lateCancelAction==="fine"`) · manual finish-booking endpoint · anonymization-vs-deletion на account delete.

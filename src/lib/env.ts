@@ -91,6 +91,12 @@ const envSchema = z.object({
   // ── YooKassa ─────────────────────────────────────────────────────────────
   YOOKASSA_SHOP_ID: z.string().optional(),
   YOOKASSA_SECRET_KEY: z.string().optional(),
+  // HARDENING-02: optional merchant-controlled URL query secret for the webhook,
+  // NOT a signature/bearer token (YooKassa does not sign notifications). When set,
+  // configure the ЛК webhook URL as
+  // `https://<host>/api/payments/yookassa/webhook?token=<value>` and the route
+  // requires a matching `?token=`. When unset the route still accepts and relies
+  // on the worker's API re-fetch for authenticity.
   YOOKASSA_WEBHOOK_TOKEN: z.string().optional(),
 
   // ── Push (VAPID) ─────────────────────────────────────────────────────────

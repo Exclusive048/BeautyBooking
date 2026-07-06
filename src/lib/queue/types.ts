@@ -41,20 +41,17 @@ export type PlanEditedNotifyPayload = {
   summary: string;
 };
 
+/**
+ * HARDENING-02: the enqueued webhook job carries only the event name and the
+ * notification object's id — NOTHING else from the (untrusted) notification
+ * body is propagated. The worker re-fetches the authoritative object from the
+ * YooKassa API by `objectId` and acts on the API-reported status/amount/metadata.
+ * `objectId` is a payment id for `payment.*` events and a refund id for
+ * `refund.*` events (the worker dispatches by event prefix).
+ */
 export type YookassaWebhookPayload = {
-  event?: string;
-  type?: string;
-  object?: {
-    id?: string;
-    status?: string;
-    metadata?: Record<string, unknown> | null;
-    payment_method?: { id?: string; saved?: boolean };
-    confirmation?: { confirmation_url?: string };
-    payment_id?: string;
-  };
-  payment?: {
-    id?: string;
-  };
+  event: string;
+  objectId: string;
 };
 
 type JobMeta = {
@@ -200,14 +197,12 @@ function isPlanEditedNotifyPayload(value: unknown): value is PlanEditedNotifyPay
 
 function isYookassaWebhookPayload(value: unknown): value is YookassaWebhookPayload {
   if (!isRecord(value)) return false;
-
-  const object = value.object;
-  if (typeof object !== "undefined" && !isRecord(object)) return false;
-
-  const payment = value.payment;
-  if (typeof payment !== "undefined" && !isRecord(payment)) return false;
-
-  return true;
+  return (
+    typeof value.event === "string" &&
+    value.event.length > 0 &&
+    typeof value.objectId === "string" &&
+    value.objectId.length > 0
+  );
 }
 
 export function isJob(value: unknown): value is Job {

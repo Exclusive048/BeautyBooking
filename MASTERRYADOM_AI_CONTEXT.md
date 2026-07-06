@@ -461,8 +461,8 @@ src/
 ### Платежи и биллинг ✅
 - **Файлы:** `src/lib/payments/yookassa/client.ts`, `src/lib/billing/`, `src/app/api/payments/yookassa/webhook/route.ts`
 - YooKassa: создание платежей, возвраты, recurring (сохранённый метод)
-- Webhook: HMAC-SHA256 подпись + IP allowlist + optional Bearer token
-- Очередь задач: webhook → enqueue → worker → processYookassaWebhookPayload
+- **Webhook auth (HARDENING-02, 2026-07-07):** YooKassa **не подписывает** уведомления (проверено по офиц. докам) — тело untrusted hint. Прежний HMAC + Bearer-token гейт отклонял КАЖДОЕ реальное уведомление (подписки навсегда PENDING) — снят. Новая модель: route делает 2 дешёвых pre-filter (optional URL `?token=` constant-time + IP-allowlist **log-only** пока XFF-trust не решён, finding #17) и enqueue'ит только `{ event, objectId }`; **worker re-fetch'ит объект из YooKassa API** (`GET /v3/payments|refunds/{id}`, Basic auth) — это authenticity-anchor: activation/cancel/refund идут ТОЛЬКО по API-reported `status`/`amount`/`metadata`. Forged webhook в худшем случае триггерит re-fetch, который ничего actionable не находит. 200 только после durable-enqueue; иначе 5xx → YooKassa ретраит (24h окно)
+- Очередь задач: webhook → enqueue `{event,objectId}` → worker → **API re-fetch** → processYookassaWebhookPayload
 - BillingPayment.idempotenceKey `@unique` — идемпотентность платежей на уровне БД
 - **Webhook идемпотентен** — `payment.succeeded` early-return при уже-`SUCCEEDED` row (не re-anchor `currentPeriodEnd`); период+план берутся из authoritative DB-payment-row (period ∈ `BILLING_PERIODS`), а не из mutable webhook metadata; upgrade-plan-switch применяется ТОЛЬКО success-webhook'ом (abandoned upgrade не трогает активную подписку) — FIX-BC-1-2
 - **Trial-конверсия (HARDENING-01 FIX-1, 2026-07-06):** success-webhook в том же grant-update очищает `isTrial`/`trialEndsAt`/`trialEndingNotificationSentAt` (оплативший mid-trial структурно невыбираем trial-cron'ом); FREE-ветка checkout — тот же clearing; `downgradeTrialToFree` — defense-in-depth skip+warn при payment-evidence (`lastPaymentAt` set ИЛИ paid-tier с будущим `currentPeriodEnd`), notification/cache-invalidation только при реальном downgrade. Backfill legacy-rows: `scripts/backfill-trial-conversion.ts` (dry-run / `--apply`; **выполнить на staging/prod до launch** — см. BACKLOG 🟠)
@@ -687,7 +687,7 @@ src/
 | /api/feed/* | 2 | portfolio + stories |
 | /api/home/* | 5 | categories, feed, portfolio, stories, tags |
 | /api/reviews/* | 7 | + `[id]/report`, `[id]/suggest-reply`, `can-leave`, `tags` |
-| /api/payments/yookassa/webhook | 1 | HMAC + IP allowlist + idempotency |
+| /api/payments/yookassa/webhook | 1 | HARDENING-02: optional `?token=` + IP-allowlist (log-only) + worker API re-fetch anchor (не HMAC — YooKassa не подписывает) |
 | /api/integrations/vk/* | 5 | OAuth + settings |
 | /api/onboarding/professional/* | 2 | master + studio onboarding |
 | /api/search/* | 3 | availability, by-photo, services |
@@ -744,7 +744,7 @@ src/
 | `NEXT_PUBLIC_YANDEX_ENABLED` | `src/lib/env.ts` (`isYandexAuthEnabled`) | gate Yandex login button | `false` (button absent until flag + client id) |
 | `YOOKASSA_SECRET_KEY` | `src/lib/payments/yookassa/client.ts:61` | для платежей | бросает Error |
 | `YOOKASSA_SHOP_ID` | `src/lib/payments/yookassa/client.ts:60` | для платежей | бросает Error |
-| `YOOKASSA_WEBHOOK_TOKEN` | `src/app/api/payments/yookassa/webhook/route.ts:84` | нет | не проверяет |
+| `YOOKASSA_WEBHOOK_TOKEN` | `src/app/api/payments/yookassa/webhook/route.ts` | нет | HARDENING-02: **optional URL query secret** (`?token=`), НЕ signature/bearer — YooKassa не подписывает. Задан → route требует matching `?token=` (constant-time); не задан → принимает, authenticity держит worker API re-fetch. ЛК URL: `.../webhook?token=<value>` |
 | `BILLING_RENEW_SECRET` | `src/app/api/billing/renew/run/route.ts:42` | нет | |
 | `MRR_SNAPSHOT_SECRET` | `src/app/api/billing/mrr/snapshot/run/route.ts` | для cron daily snapshot | endpoint 403 |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | `src/lib/notifications/push/vapid.ts:5` | для push | бросает при undefined! |
@@ -796,10 +796,7 @@ src/
 - При падении воркера задачи накапливаются в очереди без обработки.
 - Алерт есть только для uncaughtException (Telegram).
 
-**P5: YOOKASSA_WEBHOOK_TOKEN не обязателен**
-- Файл: `src/app/api/payments/yookassa/webhook/route.ts:84`
-- `if (expectedToken && token !== expectedToken)` — если переменная не задана, проверка токена пропускается.
-- HMAC + IP allowlist остаётся, но дополнительный слой защиты не применяется.
+**P5: YOOKASSA_WEBHOOK_TOKEN не обязателен** — ✅ **переосмыслено (HARDENING-02).** Токен — optional URL query secret (не signature). Не задан → route принимает; **authenticity держит worker API re-fetch** (не HMAC/token). Токен — дополнительный дешёвый pre-filter, не гейт. Остаточный риск: token в URL может осесть в LB/app access-логах → держать rotatable + не логировать (route не логирует). IP-allowlist пока log-only (finding #17).
 
 **P6: Нет CORS-политики для API**
 - `next.config.ts` устанавливает заголовки безопасности (`X-Frame-Options`, `X-Content-Type-Options`, etc.), но нет явных CORS-заголовков для API.
@@ -994,7 +991,7 @@ src/
 - JWT: HMAC-SHA256 (`AUTH_JWT_SECRET`)
 - OTP hash: HMAC-SHA256 (`OTP_HMAC_SECRET`)
 - Refresh tokens: хранятся в БД (jti), cookie httpOnly, SameSite=lax
-- YooKassa webhook: HMAC-SHA256 подпись + IP allowlist
+- YooKassa webhook: worker API re-fetch anchor + optional URL `?token=` + IP-allowlist log-only (HARDENING-02 — YooKassa не подписывает уведомления, HMAC снят)
 
 ### Потенциальные уязвимости
 - ~~OTP в логах (P1 phone + SEC-1 email)~~ ✅ **fully closed** — SMS-GATEWAY-A (phone) + OTP-LOG-DEV-GUARD-A (email + NODE_ENV guard across all 3 surfaces). Production logs strip `code`; dev/staging retain it for testing convenience via shared `isProduction` flag (env.ts) + `maskPhone`/`maskEmail` (`src/lib/logging/masking.ts`).
@@ -1127,7 +1124,7 @@ The following architectural choices block 4 pre-launch runbooks. **Each decision
 | 2 | **OtpCode.codeHash — HMAC, не plaintext** | `src/lib/auth/otp.ts:14-19` | HMAC с секретом. Если изменить алгоритм хэширования — все существующие OTP-коды инвалидируются. |
 | 3 | **RefreshSession.jti — unique** | `prisma/schema.prisma:598` | Гарантирует что каждая сессия может быть использована только один раз (single-use refresh token). |
 | 4 | **BillingPayment.idempotenceKey — unique** | `prisma/schema.prisma:1906-1907` | Предотвращает дублирование платежей. Нельзя убирать уникальный constraint. |
-| 5 | **Проверка подписи YooKassa webhook** | `src/app/api/payments/yookassa/webhook/route.ts:52-63` | HMAC-SHA256 + IP allowlist. Без этой проверки злоумышленник может имитировать успешный платёж. |
+| 5 | **YooKassa webhook authenticity = worker API re-fetch** (HARDENING-02) | `route.ts` + `webhook-processor.ts` (`getPayment`/`getRefund`) | YooKassa **не подписывает** уведомления — HMAC/Bearer сняты (отклоняли все реальные уведомления). Anchor: worker re-fetch'ит объект из YooKassa API и действует ТОЛЬКО по API-reported `status`/`amount`/`metadata`; тело webhook — untrusted hint (enqueue'ится лишь `{event,objectId}`). Forged webhook → re-fetch ничего actionable не находит. IP-allowlist сейчас **log-only** (leftmost-XFF spoofable до решения #17); `?token=` — optional URL secret. **Нельзя** «чинить» это обратно на HMAC — YooKassa не шлёт подпись. |
 | 6 | **Чувствительные роуты — fail-closed** | `src/lib/rate-limit/index.ts:152-153` | При недоступности Redis: `/api/auth`, `/api/bookings` и пр. — возвращают 429. Нельзя менять на fail-open. |
 | 7 | **MasterService.@@unique([masterProviderId, serviceId])** | `prisma/schema.prisma:923` | Мастер не может иметь дублирующиеся связи с одной услугой. |
 | 8 | **UserSubscription.@@unique([userId, scope])** | `prisma/schema.prisma:1880` | У пользователя одна подписка на каждый scope (MASTER/STUDIO). |

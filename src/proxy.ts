@@ -82,6 +82,7 @@ type RateLimitTier =
   | "modelOffer"
   | "modelApplication"
   | "cabinetMutation"
+  | "webhookIngress"
   | "publicApi";
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
@@ -129,6 +130,10 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
     if (pathname === "/api/media") return "mediaUpload";
     if (pathname === "/api/model-offers") return "modelOffer";
     if (pathname === "/api/model-applications") return "modelApplication";
+    // HARDENING-02: YooKassa webhook — generous, isolated tier so its (spaced)
+    // retries never trip a shared public-API limit. Still sensitive/fail-closed
+    // via the /api/payments prefix in rate-limit/index.ts.
+    if (pathname === "/api/payments/yookassa/webhook") return "webhookIngress";
   }
 
   if (
