@@ -36,7 +36,16 @@
 
 ## 🔴 PRE-LAUNCH BLOCKERS (code)
 
-- **Нет открытых *общих* code-блокеров.** Последний (**PII-LOGGING-FIX-A**) закрыт 2026-06-24 — см. `BACKLOG-DONE.md`.
+**Из adversarial bug-hunt 2026-07-06 (Phase 1, pre-launch; findings #1/#3/#4 закрыты HARDENING-01, #2 — HARDENING-02):**
+- **#5 Grace-period dead code** — `billing/get-current-plan.ts` (тот же паттерн в `analytics/domain/guards.ts`): PAST_DUE grace-ветка фактически не срабатывает; оплаченный grace-период не даёт доступ, который должен давать.
+- **#6 Studio move: stale `endAtUtc` при CHANGE_SERVICE** — `studio/bookings.service.ts`: при переносе со сменой услуги конец брони не пересчитывается под новую длительность → неверная длительность/конфликты.
+- **#7 `acceptNewClients` OR-undefined bypass** — `bookings/booking-core.ts`: условие с `OR: undefined` пропускает новых клиентов к провайдеру, закрывшему запись для новых.
+- **#8 «Свободно сегодня» игнорирует in-progress/cross-midnight брони** — `schedule/available-today.ts` + `public-profile-view.service.ts`: бейдж показывается, когда реальных окон нет.
+- **#9 Telegram login CSRF** — нет state/nonce в Telegram-login flow (сейчас замаскировано kill-switch'ем `NEXT_PUBLIC_TELEGRAM_ENABLED=false`; починить ДО любого re-enable).
+- **#10 Studio timezone validation self-brick** — `api/studios/[id]/route.ts`: студия может сохранить невалидную tz и «окирпичить» свой профиль (все tz-вычисления падают).
+- **#11 Admin refund guards** — `admin/billing/refund/route.ts`: нет проверки статуса платежа / cap на сумму / идемпотентности → двойной refund или refund несостоявшегося платежа возможны.
+
+- **Нет прочих открытых *общих* code-блокеров.** Последний (**PII-LOGGING-FIX-A**) закрыт 2026-06-24 — см. `BACKLOG-DONE.md`.
   Прочие 🔴 из прошлых волн (R2-05-A/B category+billing, R2-02-A timezone, booking-integrity) — тоже закрыты.
 - **🔴 LEGAL launch-blockers (auth/channels) — precede deploy** *(из AUTH-DISCOVERY 2026-06-29)*. **⏰ DEADLINE: FZ-199 (поправки в КоАП) вступают в силу 7 июля 2026** — штрафы до 700k₽ за иностранные auth-сервисы. Code-сторона блокеров закрыта (Telegram удалён, Yandex добавлен, VK готов); остаток — **deploy-ops verification** (см. PRE-DEPLOY-CHECKLIST Layer 2). Time-critical:
   1. ✅ **FIX-TELEGRAM-KILLSWITCH** *(2026-06-29 — см. BACKLOG-DONE.md)* — user-facing Telegram погашен через two-layer flag
@@ -58,6 +67,11 @@
 
 ## 🟠 HIGH PRIORITY
 
+**Из adversarial bug-hunt 2026-07-06:**
+- **#12 Non-atomic queue processing stamp → silent job loss** — `queue/queue.ts` ~204: LPOP/пометка processing не атомарны; краш между операциями теряет job без следа.
+- **#17 X-Forwarded-For trusted-proxy decision** — решить вместе с deploy-конфигом (nginx/ALB): какой hop доверенный; **также гейтит webhook IP-allowlist — cross-reference HARDENING-02**.
+- **Run trial-conversion backfill before launch** — выполнить `npx tsx scripts/backfill-trial-conversion.ts` (dry-run) → `--apply` на staging/production данных ДО launch (safety net к HARDENING-01 FIX-1; реальных affected rows скорее всего 0, т.к. webhooks были заблокированы finding #2).
+
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
 - ✅ **FIX-TELEGRAM-COPY-SWEEP** *(2026-06-29 — см. BACKLOG-DONE.md)* — все prose/маркетинг/FAQ/help/support упоминания Telegram убраны
@@ -71,6 +85,12 @@
 ---
 
 ## 🟡 MEDIUM PRIORITY
+
+**Из adversarial bug-hunt 2026-07-06:**
+- **#13 Telegram reminder в raw UTC** — `bookingTelegramService.ts`: напоминание рендерит время без salon-tz конверсии (нарушает `formatLocalHm` правило §13). Замаскировано Telegram kill-switch'ем; починить до re-enable.
+- **#14 MRR snapshot считает trials/lapsed grants** — `billing/mrr-snapshot.ts`: `isTrial=true` и admin-granted rows завышают MRR.
+- **#15 Stuck-job recovery без lease/heartbeat** — `queue/queue.ts` ~349: recovery по таймауту может украсть ещё-живой job у медленного воркера (double-processing).
+- **#16 `clampVisibleSlotsHorizon` UTC → provider-tz** — `bookings/policy-enforcement.ts`: горизонт клампится по UTC-дате, а не по дате провайдера (±1 день на границе суток).
 
 **Legacy-retire migrations (spawned by LEGACY-AUDIT 2026-07-01 — TYPE-1 dead уже удалён; ниже — TYPE-2/3 миграции, по одной на большой прогон):**
 - ✅ **LEGACY-STUDIO-SETTINGS-PORT-AND-RETIRE** *(2026-07-02 — см. BACKLOG-DONE.md; было `LEGACY-STUDIO-SETTINGS-SUBROUTES`)* — **port-and-retire** вместо редизайна: profile+portfolio-редактирование (реально жившее только на orphan-sub-routes) перенесено в NEW `studio-cabinet` settings pattern (2 новых nav-раздела «Профиль и медиа» + «Портфолио», reuse `StudioProfileHero`/`StudioProfileForm`/`PortfolioEditor`), live-verified (PATCH 200 + round-trip), затем удалён весь **2188-LOC** кластер (`features/studio/` целиком) + 3 orphan-роута. **🔴 Closed launch-gap:** студия не могла задать logo/banner/address/contacts/portfolio с reachable-страницы. **🐛 Bonus:** нашёлся + исправлен systemic `studioId→providerId` баг (GeneralForm + ArchiveToggle PATCH'или studioId → 404). Engine untouched; 817 tests + build green.

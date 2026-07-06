@@ -14,6 +14,8 @@ const userFindUnique = vi.hoisted(() => vi.fn());
 const subsFindMany = vi.hoisted(() => vi.fn());
 const subsDeleteMany = vi.hoisted(() => vi.fn());
 const sendNotification = vi.hoisted(() => vi.fn());
+const logInfo = vi.hoisted(() => vi.fn());
+const logError = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -26,6 +28,8 @@ vi.mock("@/lib/notifications/push/vapid", () => ({
   isPushEnabled: true,
   webpush: { sendNotification },
 }));
+
+vi.mock("@/lib/logging/logger", () => ({ logInfo, logError }));
 
 import { sendPushToUser } from "./send";
 
@@ -70,5 +74,46 @@ describe("sendPushToUser — per-user preference gate", () => {
     subsFindMany.mockResolvedValue([]);
     await sendPushToUser("user-1", PAYLOAD);
     expect(sendNotification).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * HARDENING-01 FIX-4 (bug hunt 2026-07-06, finding #4): the returned promise
+ * must structurally NEVER reject. Callers fire-and-forget from
+ * worker-reachable code, and a rejected detached promise triggers the
+ * worker's unhandledRejection → process.exit(1) — halting all background
+ * jobs. Prisma reads used to run before any try/catch; a transient DB error
+ * was a worker-killer.
+ */
+describe("sendPushToUser — never rejects (FIX-4)", () => {
+  it("resolves (not rejects) when the profile read throws mid-flow", async () => {
+    userFindUnique.mockRejectedValue(new Error("db down"));
+    await expect(sendPushToUser("user-1", PAYLOAD)).resolves.toBeUndefined();
+    expect(logError).toHaveBeenCalledWith(
+      "Push delivery failed before dispatch",
+      expect.objectContaining({ userId: "user-1", error: "db down" }),
+    );
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("resolves (not rejects) when the subscriptions read throws", async () => {
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    subsFindMany.mockRejectedValue(new Error("connection reset"));
+    await expect(sendPushToUser("user-1", PAYLOAD)).resolves.toBeUndefined();
+    expect(logError).toHaveBeenCalledWith(
+      "Push delivery failed before dispatch",
+      expect.objectContaining({ userId: "user-1", error: "connection reset" }),
+    );
+  });
+
+  it("a single failing endpoint is contained per-subscription (existing behavior preserved)", async () => {
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    subsFindMany.mockResolvedValue([SUBSCRIPTION]);
+    sendNotification.mockRejectedValue(new Error("endpoint gone"));
+    await expect(sendPushToUser("user-1", PAYLOAD)).resolves.toBeUndefined();
+    expect(logError).toHaveBeenCalledWith(
+      "Push notification failed",
+      expect.objectContaining({ userId: "user-1", subscriptionId: "sub-1" }),
+    );
   });
 });

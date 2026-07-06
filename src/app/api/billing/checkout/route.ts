@@ -102,6 +102,13 @@ export async function POST(req: Request) {
         cancelAtPeriodEnd: false,
         graceUntil: null,
         nextBillingAt: null,
+        // HARDENING-01 FIX-1: this branch activates a plan by mutating the
+        // subscription directly (no webhook) — terminate any live trial here
+        // too, or the trial cron would later "expire" a row that is already
+        // on FREE and spam a bogus trial-expired notification.
+        isTrial: false,
+        trialEndsAt: null,
+        trialEndingNotificationSentAt: null,
       },
       select: { id: true },
     });

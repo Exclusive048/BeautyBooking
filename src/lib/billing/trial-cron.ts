@@ -96,8 +96,11 @@ export async function processTrialExpirations(now: Date = new Date()): Promise<T
 
   for (const sub of expired) {
     try {
-      await downgradeTrialToFree({ subscriptionId: sub.id, userId: sub.userId, scope: sub.scope }, now);
-      downgraded += 1;
+      const outcome = await downgradeTrialToFree(
+        { subscriptionId: sub.id, userId: sub.userId, scope: sub.scope },
+        now,
+      );
+      if (outcome === "downgraded") downgraded += 1;
     } catch (error) {
       downgradeErrors += 1;
       logError("Trial downgrade failed", {
@@ -122,6 +125,8 @@ type DowngradeArgs = {
   scope: SubscriptionScope;
 };
 
+type DowngradeOutcome = "downgraded" | "skipped-not-trial" | "skipped-paid-evidence";
+
 /**
  * In-place mutation of a trial subscription to FREE.
  *
@@ -130,16 +135,53 @@ type DowngradeArgs = {
  * planId/isTrial/status/period fields — and write a BillingAuditLog entry so
  * the trial→free transition is queryable historically.
  *
+ * HARDENING-01 FIX-1 (defense-in-depth): the cron must be structurally unable
+ * to downgrade a PAYING subscriber even when trial flags are inconsistent
+ * (e.g. rows converted before the success webhook started clearing
+ * `isTrial`). Evidence of successful payment — `lastPaymentAt` set, or a
+ * paid-tier plan with a current (future) period — skips the row with a
+ * warning instead of wiping it to FREE.
+ *
  * Throws when the FREE plan is missing for the scope (caller logs and
  * continues to next subscription so one bad scope doesn't kill the batch).
  */
-async function downgradeTrialToFree(args: DowngradeArgs, now: Date): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+async function downgradeTrialToFree(args: DowngradeArgs, now: Date): Promise<DowngradeOutcome> {
+  const outcome = await prisma.$transaction(async (tx): Promise<DowngradeOutcome> => {
     const trial = await tx.userSubscription.findUnique({
       where: { id: args.subscriptionId },
-      select: { id: true, isTrial: true, planId: true, scope: true, userId: true },
+      select: {
+        id: true,
+        isTrial: true,
+        planId: true,
+        scope: true,
+        userId: true,
+        lastPaymentAt: true,
+        currentPeriodEnd: true,
+        plan: { select: { tier: true } },
+      },
     });
-    if (!trial || !trial.isTrial) return;
+    if (!trial || !trial.isTrial) return "skipped-not-trial";
+
+    const hasSuccessfulPayment = trial.lastPaymentAt !== null;
+    // A genuine trial's currentPeriodEnd equals trialEndsAt (<= now when the
+    // cron selects it), so a FUTURE period on a paid tier only exists after a
+    // real payment re-anchored it.
+    const paidCurrentPeriod =
+      trial.plan.tier !== "FREE" && trial.currentPeriodEnd !== null && trial.currentPeriodEnd > now;
+
+    if (hasSuccessfulPayment || paidCurrentPeriod) {
+      // Warning-level: flags are inconsistent with payment evidence — this
+      // must not happen once FIX-1 clearing + the backfill script have run.
+      logError("Trial downgrade skipped: subscription has payment evidence", {
+        subscriptionId: trial.id,
+        userId: trial.userId,
+        scope: trial.scope,
+        lastPaymentAt: trial.lastPaymentAt?.toISOString() ?? null,
+        currentPeriodEnd: trial.currentPeriodEnd?.toISOString() ?? null,
+        planTier: trial.plan.tier,
+      });
+      return "skipped-paid-evidence";
+    }
 
     const freePlan = await tx.billingPlan.findFirst({
       where: { scope: trial.scope, tier: "FREE", isActive: true },
@@ -179,7 +221,14 @@ async function downgradeTrialToFree(args: DowngradeArgs, now: Date): Promise<voi
       },
       tx,
     );
+
+    return "downgraded";
   });
+
+  // Cache invalidation + the "trial expired" notification only make sense
+  // when the row was actually downgraded — a skipped row keeps its (paid or
+  // already-converted) state and must not receive a bogus expiry notice.
+  if (outcome !== "downgraded") return outcome;
 
   await invalidatePlanCache(args.userId, args.scope);
 
@@ -198,4 +247,6 @@ async function downgradeTrialToFree(args: DowngradeArgs, now: Date): Promise<voi
       error: error instanceof Error ? error.message : String(error),
     });
   });
+
+  return outcome;
 }

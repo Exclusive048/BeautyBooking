@@ -105,10 +105,20 @@ export async function deliverNotification(input: DeliveryInput): Promise<void> {
 
   publishNotifications([record]);
 
+  // HARDENING-01 FIX-4: fire-and-forget MUST carry a .catch — a rejected
+  // detached promise inside the worker (booking reminders run here) hits the
+  // global unhandledRejection handler, which exits the whole worker process.
+  // Mirrors the existing pattern in `admin-initiated.ts`.
   void sendPushToUser(input.userId, {
     title: record.title,
     body: record.body,
     url: input.pushUrl,
+  }).catch((error) => {
+    logError("Push notification delivery failed", {
+      userId: input.userId,
+      type: input.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   // FIX-TELEGRAM-KILLSWITCH: fast env-ceiling skip (sync, no DB) before the

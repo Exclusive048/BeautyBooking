@@ -465,6 +465,8 @@ src/
 - Очередь задач: webhook → enqueue → worker → processYookassaWebhookPayload
 - BillingPayment.idempotenceKey `@unique` — идемпотентность платежей на уровне БД
 - **Webhook идемпотентен** — `payment.succeeded` early-return при уже-`SUCCEEDED` row (не re-anchor `currentPeriodEnd`); период+план берутся из authoritative DB-payment-row (period ∈ `BILLING_PERIODS`), а не из mutable webhook metadata; upgrade-plan-switch применяется ТОЛЬКО success-webhook'ом (abandoned upgrade не трогает активную подписку) — FIX-BC-1-2
+- **Trial-конверсия (HARDENING-01 FIX-1, 2026-07-06):** success-webhook в том же grant-update очищает `isTrial`/`trialEndsAt`/`trialEndingNotificationSentAt` (оплативший mid-trial структурно невыбираем trial-cron'ом); FREE-ветка checkout — тот же clearing; `downgradeTrialToFree` — defense-in-depth skip+warn при payment-evidence (`lastPaymentAt` set ИЛИ paid-tier с будущим `currentPeriodEnd`), notification/cache-invalidation только при реальном downgrade. Backfill legacy-rows: `scripts/backfill-trial-conversion.ts` (dry-run / `--apply`; **выполнить на staging/prod до launch** — см. BACKLOG 🟠)
+- **Stale-cancel guard (HARDENING-01 FIX-3):** `payment.canceled`/`failed` для RENEWAL-платежа НЕ клоббирует подписку в PAST_DUE, если она уже re-anchored мимо этого платежа (`status===ACTIVE && lastPaymentAt > payment.createdAt` — safe, т.к. renew-cron charges at/after `currentPeriodEnd`: `nextBillingAt = periodEnd`). Stale → skip subscription-mutation + suppress «Платёж не прошёл» notification, payment-row bookkeeping + audit (`staleRenewalCancellation:true`) сохраняются; genuine renewal-failure path byte-identical (PAST_DUE + grace + notification)
 - **Цена — единый `resolvePlanPrice`** (`src/lib/billing/pricing.ts`): checkout + renewal + cabinet display + marketing `/pricing` зовут один резолвер → display==signup==renewal. Row учитывается только если `>0` (`isPriceable`), иначе fallback monthly×N / `null`; FREE-активация ДО резолвера (FREE никогда не 404; платный 404 на `null`, никогда бесплатно) — FIX-R2-05-AB
 - Планы наследуют фичи через `inheritsFromPlanId`
 - BillingAuditLog — журнал биллинговых событий
@@ -473,6 +475,7 @@ src/
 ### Уведомления ✅
 - **Файлы:** `src/lib/notifications/`
 - Три канала: in-app (Notification table) + Telegram + PWA push
+- **Push delivery hardened (HARDENING-01 FIX-4, 2026-07-06):** `sendPushToUser` структурно не reject'ит (весь body в try/catch, включая Prisma-reads, которые раньше шли ДО try) + оба fire-and-forget call-site (`delivery.ts`, `billing/notifications.ts`) несут `.catch` (зеркало `admin-initiated.ts`). Причина: rejected detached promise в worker-reachable коде → `unhandledRejection` → `process.exit(1)` → все background-jobs стоят. Worker fail-fast поведение НЕ менялось
 - Notifier: Redis Pub/Sub в production, EventEmitter в dev
 - SSE stream: `/api/notifications/stream`
 - Push: web-push (VAPID)

@@ -64,38 +64,41 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
   const internalId = object.metadata?.internalPaymentId;
   const yookassaPaymentId = object.id;
 
+  // HARDENING-01 FIX-3: `createdAt` (payment) + `lastPaymentAt` (subscription)
+  // feed the stale-cancellation guard below — a late `payment.canceled` for a
+  // renewal the user has already re-paid past must not clobber the subscription.
+  const paymentSelect = {
+    id: true,
+    status: true,
+    type: true,
+    periodMonths: true,
+    amountKopeks: true,
+    metadata: true,
+    createdAt: true,
+    subscriptionId: true,
+    subscription: {
+      select: {
+        id: true,
+        userId: true,
+        scope: true,
+        planId: true,
+        status: true,
+        periodMonths: true,
+        lastPaymentAt: true,
+      },
+    },
+  } as const;
+
   const billingPayment =
     typeof internalId === "string"
       ? await prisma.billingPayment.findUnique({
           where: { id: internalId },
-          select: {
-            id: true,
-            status: true,
-            type: true,
-            periodMonths: true,
-            amountKopeks: true,
-            metadata: true,
-            subscriptionId: true,
-            subscription: {
-              select: { id: true, userId: true, scope: true, planId: true, status: true, periodMonths: true },
-            },
-          },
+          select: paymentSelect,
         })
       : yookassaPaymentId
         ? await prisma.billingPayment.findUnique({
             where: { yookassaPaymentId },
-            select: {
-              id: true,
-              status: true,
-              type: true,
-              periodMonths: true,
-              amountKopeks: true,
-              metadata: true,
-              subscriptionId: true,
-              subscription: {
-                select: { id: true, userId: true, scope: true, planId: true, status: true, periodMonths: true },
-              },
-            },
+            select: paymentSelect,
           })
         : null;
 
@@ -198,6 +201,13 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
           cancelAtPeriodEnd: false,
           autoRenew: true,
           lastPaymentAt: now,
+          // HARDENING-01 FIX-1: a paid conversion terminates the trial in the
+          // SAME grant update. Without this, a mid-trial payer kept
+          // `isTrial=true` and the trial cron force-downgraded the PAYING
+          // subscriber to FREE at day 30 (conversion-funnel wipe).
+          isTrial: false,
+          trialEndsAt: null,
+          trialEndingNotificationSentAt: null,
           paymentMethodId: object.payment_method?.saved ? object.payment_method?.id ?? undefined : undefined,
         },
       }),
@@ -241,6 +251,47 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
         confirmationUrl: object.confirmation?.confirmation_url ?? null,
       },
     });
+
+    // HARDENING-01 FIX-3: stale-cancellation guard. Harmful sequence without
+    // it: renewal needs 3DS → stays PENDING → sub PAST_DUE → user re-pays via
+    // checkout → sub ACTIVE with a fresh period → hours later YooKassa
+    // auto-cancels the abandoned pending payment → its `payment.canceled`
+    // forced the fully-paid sub back to PAST_DUE → grace cron later EXPIRED it.
+    // Evidence of re-anchoring: the sub is ACTIVE and its `lastPaymentAt`
+    // (stamped by every successful grant — webhook + renew cron) is NEWER than
+    // this payment row. Safe because renewals charge at/after
+    // `currentPeriodEnd` (`nextBillingAt = periodEnd`): during a genuine
+    // renewal failure `lastPaymentAt` still predates the renewal payment row,
+    // so the genuine path below stays byte-identical (PAST_DUE + grace +
+    // notification).
+    const isStaleRenewalCancellation =
+      billingPayment.type === "RENEWAL" &&
+      billingPayment.subscription.status === "ACTIVE" &&
+      billingPayment.subscription.lastPaymentAt !== null &&
+      billingPayment.subscription.lastPaymentAt > billingPayment.createdAt;
+
+    if (isStaleRenewalCancellation) {
+      logInfo("YooKassa stale renewal cancellation ignored", {
+        paymentId: billingPayment.id,
+        subscriptionId: billingPayment.subscriptionId,
+        event,
+        paymentCreatedAt: billingPayment.createdAt.toISOString(),
+        lastPaymentAt: billingPayment.subscription.lastPaymentAt?.toISOString(),
+      });
+      // Payment-row bookkeeping (above) + audit trail stay; the subscription
+      // mutation and the user-facing "payment failed" notification are
+      // suppressed — the user already paid, a failure notice would be a false
+      // alarm about a healthy subscription.
+      await createBillingAuditLog({
+        userId: billingPayment.subscription.userId,
+        scope: billingPayment.subscription.scope,
+        subscriptionId: billingPayment.subscriptionId,
+        paymentId: billingPayment.id,
+        action: "PAYMENT_FAILED",
+        details: { yookassaPaymentId, event, staleRenewalCancellation: true },
+      });
+      return;
+    }
 
     if (billingPayment.type === "RENEWAL") {
       await prisma.userSubscription.update({
