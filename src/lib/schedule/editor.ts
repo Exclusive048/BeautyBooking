@@ -1,3 +1,4 @@
+import "server-only"; // GUARDRAILS-01: documented server boundary (client-safe helpers live in editor-shared.ts)
 import { ScheduleMode, type Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";

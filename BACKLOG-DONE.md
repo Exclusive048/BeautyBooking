@@ -12,6 +12,10 @@
 > Формат новых записей: `- YYYY-MM-DD · <область> · <пункт как он был в активном бэклоге>` (дата неизвестна → `н/д`).
 > Существующие подробные секции ниже (формат `## дата — TASK`) сохранены как есть — их не переписываем.
 
+- 2026-07-06 · boundary · `server-only` на `prisma.ts`/`prisma-direct.ts`/`redis/connection.ts`/`schedule/editor.ts` — build clean → client/server boundary hard-guarded (GUARDRAILS-01 Phase C; no latent client→server import found).
+- 2026-07-06 · tooling/encoding · Encoding-guard hooks в `.claude/settings.json` — PreToolUse блокирует PS `Set-Content`/`Out-File` на source-файлах без safe-escape; PostToolUse снифит BOM/mojibake на touched-файле (`.claude/hooks/encoding-guard-{pre,post}.mjs`; codepoint-логика зеркалит check-mojibake) (GUARDRAILS-01 Phase A).
+- 2026-07-06 · ui/lint · ESLint `no-restricted-syntax` «no fixed-overlay outside ModalSurface/Drawer» (warn) в `eslint.config.mjs` + 8 exemptions (2 primitives / 4 nav-backdrops / 2 click-catchers); закрывает convention-note в QUALITY-GATES «после 3 recurrences нужен ESLint rule» (GUARDRAILS-01 Phase B).
+
 ---
 
 ## 2026-07-06 — Перенесено из активного BACKLOG.md (DOCS-LEDGER-01, split active/done)

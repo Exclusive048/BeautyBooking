@@ -111,6 +111,7 @@
   (Yandex · VK; RF-email cancelled) — унифицировать в provider-abstraction + registry-driven login-grid, выведенный из рабочих провайдеров.
   **Не рефакторить под fine-pressure** — отложено на после launch.
 - **UI a11y/polish** — REDUCED-MOTION-A · TAP-TARGET-AUDIT-A · TAILWIND-COLOR-LINT · STORYBOOK-SETUP (из UI-UX-AUDIT).
+- **OVERLAY-PORTAL-REFACTOR** *(spawned by GUARDRAILS-01 2026-07-06)* — 5 genuine content-overlay'ев на hand-rolled `fixed inset-0` (сейчас warn'ят новым ESLint-гейтом, НЕ рефакторились): `city-prompt-overlay.tsx` · `portfolio-editor.tsx` (crop-modal) · `portfolio-strip.tsx` (lightbox) · `reviews-preview.tsx` · `stories-viewer-overlay.tsx` (последний — independent focus-trap, инвариант #27, консолидировать осторожно). Перевести на `<ModalSurface>`/`<Drawer>` (createPortal к body) — устраняет positioning-hazard (transform/filter/overflow ancestor). Работают сейчас; это robustness, не блокер. Каждый закрытый → снять warn или добавить в exempt-list.
 - **CRM/booking фичи** — manual tag assignment · late-cancel CRM tracking · online payments + штрафы (`lateCancelAction==="fine"`) · manual finish-booking endpoint · anonymization-vs-deletion на account delete.
 
 ---

@@ -1,3 +1,4 @@
+import "server-only"; // GUARDRAILS-01: hard-fail the build if this ever reaches a client bundle
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as typeof globalThis & {
