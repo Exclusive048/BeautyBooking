@@ -7760,6 +7760,11 @@ export const UI_TEXT = {
       today: "Сегодня",
       yesterday: "Вчера",
     },
+    card: {
+      // FIX-TZ-SYSTEM-MESSAGE: prefix for the salon-tz zone label on the pinned
+      // booking card, e.g. «Время салона (Екатеринбург, GMT+5)».
+      salonTimeNote: "Время салона",
+    },
   },
 } as const;
 

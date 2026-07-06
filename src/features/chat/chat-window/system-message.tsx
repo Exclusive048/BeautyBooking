@@ -10,11 +10,16 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { moneyRUBFromKopeks } from "@/lib/format";
+import { formatLocalHm } from "@/lib/schedule/timezone";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { UI_TEXT } from "@/lib/ui/text";
 import type {
   ChatPerspective,
   ThreadBookingCardDto,
   ThreadMessageDto,
 } from "@/features/chat/types";
+
+const T = UI_TEXT.chat.card;
 
 type Props = {
   message: ThreadMessageDto;
@@ -73,6 +78,26 @@ function BookingCard({
     perspective === "client"
       ? `/cabinet/bookings#${card.id}`
       : `/cabinet/master/bookings#${card.id}`;
+
+  // FIX-TZ-SYSTEM-MESSAGE (tz-source: salon-tz): this card is bilateral — a
+  // client of an out-of-zone salon must read the salon's wall clock, not their
+  // own browser tz. Render the appointment time in salon-tz via the sanctioned
+  // `formatLocalHm`; keep `viewerTimezone` only to decide whether to append the
+  // explicit zone label (shown when the viewer's zone differs). Mirrors the
+  // reference surface client-bookings-page.tsx (QA-107/FIX-22). Message
+  // timestamps elsewhere in the thread stay deliberately viewer-tz.
+  const salonTz = card.timezone;
+  const showZone =
+    !!card.startAtUtc &&
+    zonesDifferForViewer({
+      iso: card.startAtUtc,
+      salonTimeZone: salonTz,
+      viewerTimeZone: viewerTimezone,
+    });
+  const zoneLabel = showZone
+    ? formatZoneLabel({ iso: card.startAtUtc, timeZone: salonTz })
+    : "";
+
   return (
     <Card className="w-full max-w-md overflow-hidden p-0">
       <div className="space-y-1.5 p-4 text-sm">
@@ -82,8 +107,16 @@ function BookingCard({
           <div className="flex items-center gap-1.5 text-text-sec">
             <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span>
-              {formatDate(card.startAtUtc, viewerTimezone)} ·{" "}
-              {formatTime(card.startAtUtc, viewerTimezone)}
+              {formatDate(card.startAtUtc, salonTz)} ·{" "}
+              {formatLocalHm(new Date(card.startAtUtc), salonTz)}
+            </span>
+          </div>
+        ) : null}
+
+        {zoneLabel ? (
+          <div className="flex items-center gap-1 text-xs font-medium text-accent-text">
+            <span>
+              {T.salonTimeNote} {zoneLabel}
             </span>
           </div>
         ) : null}
@@ -117,24 +150,15 @@ function BookingCard({
   );
 }
 
+// Date part (day + month) rendered in the salon's tz — the caller passes
+// `card.timezone`, never the viewer's. The appointment TIME is formatted
+// separately via `formatLocalHm` (sanctioned salon-tz helper).
 function formatDate(iso: string, timezone: string): string {
   try {
     return new Intl.DateTimeFormat("ru-RU", {
       timeZone: timezone,
       day: "numeric",
       month: "long",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
-function formatTime(iso: string, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("ru-RU", {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
     }).format(new Date(iso));
   } catch {
     return iso;

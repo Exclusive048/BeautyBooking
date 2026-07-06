@@ -78,7 +78,6 @@
 
 - **OBSERVABILITY-SENTRY-A** — нет error-aggregation/APM; production debugging = log-scraping. Ставить **после** PII-LOGGING-FIX-A
   (Sentry с `sendDefaultPii:false` + `beforeSend` PII-scrubber). ~half-day.
-- **🚨 TZ-DISPLAY-SYSTEM-MESSAGE** *(NEW finding, SKILL-TZ-01 2026-07-06 — НЕ исправлено)* — `src/features/chat/chat-window/system-message.tsx:85-86` рендерит **время записи** `card.startAtUtc` (иконка календаря + длительность + адрес = время встречи, не таймстемп сообщения) в **`viewerTimezone`, без метки**. Тот же класс, что исходный баг wizard'а, но **двусторонняя** поверхность (клиент И мастер видят карточку в чате) → cross-tz клиент читает не тот час. `ThreadBookingCardDto` не несёт `provider.timezone` — нужен plumbing tz в DTO + `formatLocalHm`/`UI_FMT.*({timeZone: salonTz})` + `formatZoneLabel`. **Кандидат на промоушен выше TZ-DISPLAY-DEFERRED-3** (стейкс выше — bilateral). Skill: `.claude/skills/timezone-correctness/SKILL.md` §7.
 
 ---
 
