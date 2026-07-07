@@ -1,7 +1,9 @@
 import { MembershipStatus, NotificationType, Prisma, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
-import { formatZoneLabel } from "@/lib/ui/zone-label";
+// HARDENING-09 #13: shared salon-tz "when" formatter — the Telegram reminder
+// path now mirrors this exact format via the same helper (single source).
+import { formatBookingWhenLabel as formatDateLabel } from "@/lib/notifications/format-booking-when";
 
 const bookingInclude = {
   clientUser: { select: { id: true } },
@@ -30,22 +32,6 @@ const bookingInclude = {
 export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: typeof bookingInclude;
 }>;
-
-function formatDateLabel(date: Date | null, timezone: string): string | null {
-  if (!date) return null;
-  const label = date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  });
-  // QA-107/FIX-22: reminders/notifications are server-rendered (no browser
-  // viewer context), so they always carry the salon's explicit zone label —
-  // the recipient can't silently mis-read the time against their own clock.
-  const zone = formatZoneLabel({ iso: date.toISOString(), timeZone: timezone });
-  return zone ? `${label} ${zone}` : label;
-}
 
 function resolveServiceLabel(service: { name: string; title: string | null }): string {
   return service.title?.trim() || service.name;

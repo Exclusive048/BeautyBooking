@@ -104,15 +104,38 @@ describe("policy-enforcement / assertAcceptsNewClient", () => {
 describe("policy-enforcement / clampVisibleSlotsHorizon", () => {
   it("uses the policy horizon when no requested toKey is given", () => {
     // policy 7 days, NOW = 2026-05-20 → horizon = 2026-05-26
-    expect(clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW)).toBe("2026-05-26");
+    expect(clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW, "UTC")).toBe("2026-05-26");
   });
   it("uses the requested toKey when it's shorter than the horizon", () => {
-    expect(clampVisibleSlotsHorizon("2026-05-22", { visibleSlotDays: 30 }, NOW)).toBe("2026-05-22");
+    expect(clampVisibleSlotsHorizon("2026-05-22", { visibleSlotDays: 30 }, NOW, "UTC")).toBe("2026-05-22");
   });
   it("clamps a requested toKey beyond the horizon", () => {
-    expect(clampVisibleSlotsHorizon("2026-12-31", { visibleSlotDays: 7 }, NOW)).toBe("2026-05-26");
+    expect(clampVisibleSlotsHorizon("2026-12-31", { visibleSlotDays: 7 }, NOW, "UTC")).toBe("2026-05-26");
   });
   it("clamps zero/negative visibleSlotDays to 1", () => {
-    expect(clampVisibleSlotsHorizon(null, { visibleSlotDays: 0 }, NOW)).toBe("2026-05-20");
+    expect(clampVisibleSlotsHorizon(null, { visibleSlotDays: 0 }, NOW, "UTC")).toBe("2026-05-20");
+  });
+
+  // HARDENING-10 #16 — horizon date-key derived in the PROVIDER timezone.
+  // NOW_EVENING is late-evening UTC → early-morning local for east-of-UTC zones,
+  // the exact window where a UTC-derived key dropped the last visible local day.
+  const NOW_EVENING = new Date("2026-05-20T20:00:00Z"); // = 2026-05-21T01:00 in +5
+
+  it("east-of-UTC provider (Yekaterinburg, GMT+5) keeps its last visible day at early-morning local hours", () => {
+    // horizon instant = NOW_EVENING + 6d = 2026-05-26T20:00Z = 2026-05-27T01:00 local(+5)
+    expect(
+      clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "Asia/Yekaterinburg"),
+    ).toBe("2026-05-27");
+    // Contrast: the old UTC derivation would have dropped it to 2026-05-26.
+    expect(
+      clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "UTC"),
+    ).toBe("2026-05-26");
+  });
+
+  it("Moscow control (GMT+3) at the same instant is unchanged", () => {
+    // 2026-05-26T20:00Z = 2026-05-26T23:00 local(+3) → same date-key as UTC here
+    expect(
+      clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "Europe/Moscow"),
+    ).toBe("2026-05-26");
   });
 });

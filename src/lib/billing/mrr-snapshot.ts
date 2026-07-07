@@ -29,18 +29,35 @@ export type CreateSnapshotResult = {
 };
 
 /**
- * Resolves each active subscription to a `{priceKopeks, periodMonths}`
+ * Resolves each *paying* subscription to a `{priceKopeks, periodMonths}`
  * tuple suitable for `calculateMRR`. The price is looked up via
  * `BillingPlanPrice` on the same `(planId, periodMonths)` tuple the
  * subscription was activated with — same lookup the renewal cron
  * uses, so MRR matches what would actually be billed.
  *
- * Subscriptions without a matching price row contribute 0 — defensive
+ * HARDENING-10 #14 — "paying" means status ACTIVE **and** non-trial **and**
+ * within the paid period (`currentPeriodEnd > now`):
+ *   - `isTrial: false` — never-billed trials contribute no revenue.
+ *   - `currentPeriodEnd > now` — excludes perpetually-ACTIVE lapsed admin
+ *     grants whose period has already ended (they're ACTIVE but not paid-current).
+ *   - only `isActive` price rows are matched — a retired price row must not
+ *     value a subscription at a stale amount.
+ * This is *stricter* than the feature-access predicate `isSubscriptionActive`
+ * (HARDENING-03): MRR is revenue, so it deliberately excludes the 7-day grace
+ * window — a PAST_DUE-in-grace sub isn't billed (and is already excluded by
+ * `status: ACTIVE` anyway). MRR and access agree on the paid-current core;
+ * grace grants access but is not revenue.
+ *
+ * Subscriptions without a matching (active) price row contribute 0 — defensive
  * against orphan rows that pre-date a price config change.
  */
-async function loadActiveSubscriptionMrrInputs(): Promise<MrrInput[]> {
+async function loadActiveSubscriptionMrrInputs(now: Date): Promise<MrrInput[]> {
   const subs = await prisma.userSubscription.findMany({
-    where: { status: SubscriptionStatus.ACTIVE },
+    where: {
+      status: SubscriptionStatus.ACTIVE,
+      isTrial: false,
+      currentPeriodEnd: { gt: now },
+    },
     select: {
       planId: true,
       periodMonths: true,
@@ -56,7 +73,7 @@ async function loadActiveSubscriptionMrrInputs(): Promise<MrrInput[]> {
 
   return subs.map((sub) => {
     const match = sub.plan.prices.find(
-      (p) => p.periodMonths === sub.periodMonths,
+      (p) => p.periodMonths === sub.periodMonths && p.isActive,
     );
     return {
       priceKopeks: match?.priceKopeks ?? 0,
@@ -74,7 +91,8 @@ async function loadActiveSubscriptionMrrInputs(): Promise<MrrInput[]> {
  * the unique-violation path and falls back to read the winner's row.
  */
 export async function createMrrSnapshotForToday(): Promise<CreateSnapshotResult> {
-  const today = utcDateOnly(new Date());
+  const now = new Date();
+  const today = utcDateOnly(now);
 
   const existing = await prisma.mrrSnapshot.findUnique({
     where: { snapshotDate: today },
@@ -88,7 +106,7 @@ export async function createMrrSnapshotForToday(): Promise<CreateSnapshotResult>
     return { created: false, snapshot: existing };
   }
 
-  const mrrInputs = await loadActiveSubscriptionMrrInputs();
+  const mrrInputs = await loadActiveSubscriptionMrrInputs(now);
   const mrrNumber = calculateMRR(mrrInputs);
   const mrrKopeks = BigInt(mrrNumber);
   const activeCount = mrrInputs.length;

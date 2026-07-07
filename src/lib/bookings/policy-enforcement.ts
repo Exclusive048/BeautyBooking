@@ -109,28 +109,28 @@ export function assertAcceptsNewClient(
 }
 
 /**
- * Clamps a UTC dateKey-derived window to `visibleSlotDays` from `now`.
- * Returns the inclusive `toDateKey` (YYYY-MM-DD) the slot endpoint
- * should not exceed. Used by the public slots route to respect the
- * provider's catalog visibility horizon.
+ * Clamps a window to `visibleSlotDays` from `now`. Returns the inclusive
+ * `toDateKey` (YYYY-MM-DD) the slot endpoint should not exceed. Used by the
+ * public slots route to respect the provider's catalog visibility horizon.
+ *
+ * HARDENING-10 #16 — the horizon date-key is derived in the **provider's**
+ * timezone (`toLocalDateKey(horizon, timeZone)`), consistent with the rest of
+ * the booking date logic. Deriving it in UTC dropped the last visible local day
+ * for east-of-UTC providers during early-morning local hours (the horizon
+ * instant's UTC date-key lagged its local date-key by one). The horizon options
+ * and the clamp are unchanged — only the date-key derivation is provider-local.
  */
 export function clampVisibleSlotsHorizon(
   requestedToKey: string | null | undefined,
   policy: Pick<ProviderPolicy, "visibleSlotDays">,
   now: Date,
+  timeZone: string,
 ): string {
   const days = Math.max(1, policy.visibleSlotDays);
   const horizon = new Date(now.getTime() + (days - 1) * MS_PER_DAY);
-  const horizonKey = toDateKeyUtc(horizon);
+  const horizonKey = toLocalDateKey(horizon, timeZone);
   if (!requestedToKey) return horizonKey;
   return requestedToKey < horizonKey ? requestedToKey : horizonKey;
-}
-
-function toDateKeyUtc(date: Date): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 /**
