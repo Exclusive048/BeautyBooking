@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTimeZone } from "@/lib/schedule/timezone";
 
 export const masterDayQuerySchema = z.object({
   date: z.string().trim().min(1),
@@ -39,7 +40,14 @@ export const updateMasterProfileSchema = z.object({
   district: z.string().trim().max(120).optional(),
   // FIX-R2-02-A: explicit IANA timezone override from the cabinet selector.
   // Defaults to the city-derived value but the master can override it.
-  timezone: z.string().trim().min(3).max(64).optional(),
+  // FIX-10: reject a non-IANA tz on write so it can't 500 downstream formatters.
+  timezone: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
+    .optional(),
   // FEAT-PROVIDER-SOCIALS: raw VK / Instagram input (URL or handle); normalized
   // + host/scheme validated server-side in updateMasterProfile (security boundary).
   socialVk: z.string().trim().max(200).nullable().optional(),

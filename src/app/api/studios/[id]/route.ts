@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
 import { ensureStudioAdmin } from "@/lib/studios/access";
 import { getStudioProviderById, updateStudioProviderProfile } from "@/lib/studios/studio";
+import { isValidTimeZone } from "@/lib/schedule/timezone";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -30,7 +31,16 @@ const updateSchema = z
     geoLat: z.number().nullable().optional(),
     geoLng: z.number().nullable().optional(),
     isPublished: z.boolean().optional(),
-    timezone: z.string().trim().optional(),
+    // FIX-10: was `z.string().trim().optional()` — an empty/garbage tz persisted
+    // and then 500'd `partsFromDate` across calendar/booking surfaces. Mirror the
+    // master schema: bounded length + IANA validity.
+    timezone: z
+      .string()
+      .trim()
+      .min(3)
+      .max(64)
+      .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
+      .optional(),
     bannerAssetId: z.string().trim().nullable().optional(),
     cancellationDeadlineHours: z.number().int().min(0).max(168).nullable().optional(),
     remindersEnabled: z.boolean().optional(),
