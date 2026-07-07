@@ -274,6 +274,13 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
           isTrial: false,
           trialEndsAt: null,
           trialEndingNotificationSentAt: null,
+          // BILLING-RENEWAL-OPTIN-02: accepting a price increase re-anchors the
+          // sub here (checkout at the new price); clear the opt-in window state
+          // so no stale pendingPriceOptIn / markers linger on the now-ACTIVE row.
+          pendingPriceOptIn: false,
+          pendingPriceKopeks: null,
+          priceOptIn24hSentAt: null,
+          priceOptIn2hSentAt: null,
           paymentMethodId: apiPayment.payment_method?.saved
             ? apiPayment.payment_method?.id ?? undefined
             : undefined,

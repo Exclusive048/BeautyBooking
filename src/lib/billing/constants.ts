@@ -7,6 +7,12 @@ export type BillingPeriodMonths = (typeof BILLING_PERIODS)[number];
 
 export const PAST_DUE_GRACE_DAYS = 7;
 
+// BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2): on a renewal PRICE INCREASE the cron
+// enters a 2-day opt-in window (PAST_DUE + graceUntil = deadline) instead of
+// auto-charging the higher amount. Reused as the opt-in deadline; a subscriber
+// who doesn't accept the new price by then lapses via the normal expiry path.
+export const PRICE_OPTIN_GRACE_DAYS = 2;
+
 /**
  * BC-CAP — canonical studio team-size cap per plan tier (single source of truth).
  *

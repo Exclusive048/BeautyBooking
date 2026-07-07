@@ -869,6 +869,25 @@ export const UI_TEXT = {
       disableFailed: "Не удалось отменить автопродление.",
       notAvailableForFree: "Недоступно для бесплатного тарифа",
     },
+    // BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2): opt-in renewal on a price increase.
+    // Copy shared by the renewal cron notifications and the cabinet banner.
+    // `{priceLabel}` / `{deadlineLabel}` are pre-formatted (₽ + RU date) by callers.
+    priceOptIn: {
+      startedTitle: "Цена подписки изменилась",
+      startedBody: (priceLabel: string, deadlineLabel: string) =>
+        `Стоимость вашего тарифа выросла до ${priceLabel}. Продлите по новой цене до ${deadlineLabel}, иначе подписка приостановится.`,
+      reminderTitle: "Продлите подписку по новой цене",
+      reminderBody: (priceLabel: string, deadlineLabel: string) =>
+        `Новая стоимость тарифа — ${priceLabel}. Примите новую цену до ${deadlineLabel}, чтобы сохранить подписку.`,
+      lapsedTitle: "Подписка приостановлена",
+      lapsedBody:
+        "Новая стоимость тарифа не была принята в отведённый срок. Подписка отключена — вы можете оформить её заново в любой момент.",
+      bannerTitle: "Цена тарифа выросла",
+      bannerBody: (priceLabel: string, deadlineLabel: string) =>
+        `Новая стоимость — ${priceLabel}. Продлите по новой цене до ${deadlineLabel}, чтобы сохранить доступ.`,
+      acceptCta: "Принять новую цену",
+      acceptFailed: "Не удалось продлить подписку. Попробуйте ещё раз.",
+    },
     currentFeatures: {
       sectionTitle: (planName: string) => `Что включено в тариф «${planName}»`,
       included: "Включено",
