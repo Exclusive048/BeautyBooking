@@ -8,6 +8,7 @@ import {
   type PlanNode,
   type PlanTier,
 } from "@/lib/billing/features";
+import { isSubscriptionActive } from "@/lib/billing/subscription-active";
 
 const PLAN_CACHE_TTL_SECONDS = 300;
 
@@ -75,6 +76,7 @@ export async function getCurrentPlan(
       id: true,
       status: true,
       currentPeriodEnd: true,
+      graceUntil: true,
       plan: {
         select: { id: true, code: true, tier: true, scope: true, features: true },
       },
@@ -82,10 +84,9 @@ export async function getCurrentPlan(
   });
 
   const now = new Date();
-  const isActive =
-    subscription &&
-    (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") &&
-    (!subscription.currentPeriodEnd || subscription.currentPeriodEnd > now);
+  // FIX-5: PAST_DUE within the 7-day grace window keeps paid features (the
+  // billing UI's «оплатите до {дата}» promise). Shared with analytics guards.
+  const isActive = isSubscriptionActive(subscription, now);
 
   let planId: string | null = isActive ? subscription?.plan?.id ?? null : null;
   let planCode: string | null = isActive ? subscription?.plan?.code ?? null : null;

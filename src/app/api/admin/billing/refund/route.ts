@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 
 import { createRefund } from "@/lib/payments/yookassa/client";
 
-import { sha256, formatTimeBucketUtc } from "@/lib/billing/utils";
+import { decideRefund } from "@/lib/billing/refund-guard";
 
 import { createBillingAuditLog } from "@/lib/billing/audit";
 
@@ -91,6 +91,8 @@ export async function POST(req: Request) {
 
         id: true,
 
+        status: true,
+
         amountKopeks: true,
 
         yookassaPaymentId: true,
@@ -111,23 +113,21 @@ export async function POST(req: Request) {
 
     }
 
+    // FIX-11: SUCCEEDED-only, full-refund-only, deterministic idempotency key.
+    // See decideRefund for the rationale (partial masking, double-refund, hour
+    // bucket).
+    const decision = decideRefund({
+      yookassaPaymentId: payment.yookassaPaymentId,
+      paymentStatus: payment.status,
+      paymentAmountKopeks: payment.amountKopeks,
+      requestedAmountKopeks: amountKopeks ?? null,
+    });
 
-
-    const refundAmount = amountKopeks ?? payment.amountKopeks;
-
-    if (refundAmount <= 0) {
-
-      return fail("Сумма возврата должна быть больше нуля.", 400, "VALIDATION_ERROR");
-
+    if (!decision.ok) {
+      return fail(decision.message, decision.status, decision.code);
     }
 
-
-
-    const idempotenceKey = sha256(
-
-      `refund:${payment.yookassaPaymentId}:${formatTimeBucketUtc(new Date())}`
-
-    );
+    const { refundAmountKopeks: refundAmount, idempotenceKey } = decision;
 
 
 
