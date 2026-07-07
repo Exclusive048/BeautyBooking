@@ -9,6 +9,8 @@ import {
   anyProviderFreeToday,
   type AvailabilityProbeProvider,
 } from "@/lib/schedule/available-today";
+import { localDayRangeUtc } from "@/lib/schedule/dateKey";
+import { bookingOverlapsRange } from "@/lib/schedule/overlap";
 
 // A working day 10:00–19:00 (salon-local), no breaks.
 const WORKING_DAY: DayPlan = {
@@ -171,6 +173,101 @@ describe("studio OR-aggregation (anyProviderFreeToday)", () => {
       true,
     );
     expect(probe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("🔴 FIX-8 salon-day conflict window", () => {
+  const EKB = "Asia/Yekaterinburg"; // UTC+5, no DST — the non-Moscow anchor
+  const MSK = "Europe/Moscow"; // UTC+3, no DST — the regression guard
+
+  describe("localDayRangeUtc uses SALON-tz day boundaries (not naive UTC)", () => {
+    it("Vision / Yekaterinburg (+5): salon-day starts 19:00Z the previous UTC day", () => {
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc("2026-07-07", EKB);
+      expect(startUtc.toISOString()).toBe("2026-07-06T19:00:00.000Z");
+      expect(endExclusiveUtc.toISOString()).toBe("2026-07-07T19:00:00.000Z");
+    });
+
+    it("Anna / Moscow (+3): salon-day starts 21:00Z the previous UTC day — NOT 00:00Z", () => {
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc("2026-07-07", MSK);
+      expect(startUtc.toISOString()).toBe("2026-07-06T21:00:00.000Z");
+      expect(endExclusiveUtc.toISOString()).toBe("2026-07-07T21:00:00.000Z");
+      // A naive-UTC probe would use 2026-07-07T00:00Z — this is the bug the
+      // salon-tz boundary prevents for any east-of-UTC salon.
+      expect(startUtc.toISOString()).not.toBe("2026-07-07T00:00:00.000Z");
+    });
+  });
+
+  describe("(a) in-progress booking across `now` — its slot is no longer free", () => {
+    // Vision (+5): today 2026-07-07, working 10:00–19:00 EKB.
+    // now = 13:30 EKB (08:30Z); an in-progress booking 13:00–14:00 EKB
+    // (08:00Z–09:00Z) — it STARTED before `now`, so `startAtUtc >= now` dropped it.
+    const now = new Date("2026-07-07T08:30:00.000Z"); // 13:30 EKB
+    const inProgress = {
+      startAtUtc: new Date("2026-07-07T08:00:00.000Z"), // 13:00 EKB
+      endAtUtc: new Date("2026-07-07T09:00:00.000Z"), // 14:00 EKB
+    };
+    const todayKey = toLocalDateKey(now, EKB); // 2026-07-07
+    const slotAt1330 = "2026-07-07T08:30:00.000Z";
+
+    const slotsGiven = (bookings: Array<{ startAtUtc: Date; endAtUtc: Date }>) =>
+      buildSlotsForDay({
+        dayPlan: WORKING_DAY,
+        dateKey: todayKey,
+        timeZone: EKB,
+        serviceDurationMin: AVAILABILITY_PROBE_DURATION_MIN,
+        bufferMin: 0,
+        bookings,
+        now,
+        slotStepMin: 30,
+      });
+
+    it("the OLD `startAtUtc >= now` filter dropped it; overlap keeps it", () => {
+      expect(inProgress.startAtUtc.getTime() >= now.getTime()).toBe(false);
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc(todayKey, EKB);
+      expect(bookingOverlapsRange(inProgress, startUtc, endExclusiveUtc)).toBe(true);
+    });
+
+    it("WITH the in-progress booking → the 13:30 slot is NOT offered", () => {
+      const slots = slotsGiven([inProgress]);
+      expect(slots.some((s) => s.startAtUtc.toISOString() === slotAt1330)).toBe(false);
+    });
+
+    it("WITHOUT it (old dropped-conflict behaviour) → the 13:30 slot WAS free (the bug)", () => {
+      const slots = slotsGiven([]);
+      expect(slots.some((s) => s.startAtUtc.toISOString() === slotAt1330)).toBe(true);
+    });
+
+    it("(c) horizon unchanged — later free slots today are still surfaced", () => {
+      const slots = slotsGiven([inProgress]);
+      const earliest = earliestBookableUtc({ minBookingHoursAhead: 0 }, now);
+      // The master is still free LATER today (14:00 EKB onward), just not at 13:30.
+      expect(anyBookableSlot(slots, earliest)).toBe(true);
+      expect(slots.some((s) => s.startAtUtc.toISOString() === "2026-07-07T09:00:00.000Z")).toBe(true);
+    });
+  });
+
+  describe("(b) cross-midnight booking (started previous salon-evening)", () => {
+    // Vision (+5): booking 23:30 EKB Jul 6 → 00:30 EKB Jul 7
+    // (2026-07-06T18:30Z → 2026-07-06T19:30Z). Its START day-key is Jul 6, so the
+    // OLD start-day-key bucketing filed it under the PREVIOUS day and today's
+    // early window ignored it. Overlap catches it. (A 10:00–19:00 salon has no
+    // bookable slot that early, so this asserts the corrected CONFLICT SET, which
+    // is what matters for early-opening / longer overnight bookings.)
+    const booking = {
+      startAtUtc: new Date("2026-07-06T18:30:00.000Z"), // 23:30 EKB Jul 6
+      endAtUtc: new Date("2026-07-06T19:30:00.000Z"), // 00:30 EKB Jul 7
+    };
+    const todayKey = "2026-07-07";
+
+    it("its start day-key is the PREVIOUS salon day (old bucketing missed it)", () => {
+      expect(toLocalDateKey(booking.startAtUtc, EKB)).toBe("2026-07-06");
+      expect(toLocalDateKey(booking.startAtUtc, EKB)).not.toBe(todayKey);
+    });
+
+    it("overlap over today's salon window INCLUDES it", () => {
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc(todayKey, EKB);
+      expect(bookingOverlapsRange(booking, startUtc, endExclusiveUtc)).toBe(true);
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError, resolveErrorCode } from "@/lib/api/errors";
-import { BookingStatus, ProviderType, Prisma } from "@prisma/client";
+import { ProviderType, Prisma } from "@prisma/client";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { dateFromKey } from "@/lib/schedule/time";
 import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
@@ -8,6 +8,7 @@ import {
   assertAcceptsNewClient,
   assertBookingWindow,
 } from "@/lib/bookings/policy-enforcement";
+import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -329,20 +330,14 @@ export async function resolveBookingCore(input: {
     // for anonymous bookings.
     const priorBookingsCount = input.clientUserId
       ? await prisma.booking.count({
-          where: {
+          // FIX-7: never emit `{ masterProviderId: undefined }` inside the OR —
+          // that made Prisma drop the key → `{}` → a match-all clause that
+          // counted the client's bookings platform-wide, bypassing the gate.
+          where: buildPriorBookingsWhere({
             clientUserId: input.clientUserId,
-            OR: [
-              { providerId: provider.id },
-              { masterProviderId: resolvedMasterProviderId ?? undefined },
-            ],
-            status: {
-              notIn: [
-                BookingStatus.REJECTED,
-                BookingStatus.CANCELLED,
-                BookingStatus.NO_SHOW,
-              ],
-            },
-          },
+            providerId: provider.id,
+            masterProviderId: resolvedMasterProviderId ?? null,
+          }),
         })
       : 0;
     assertAcceptsNewClient(provider, priorBookingsCount);

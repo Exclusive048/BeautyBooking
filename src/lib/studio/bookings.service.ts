@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
+import { resolveMoveDurationMin, resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 /**
@@ -382,13 +383,6 @@ export async function moveStudioBooking(input: {
     masterId: input.targetMasterId,
   });
 
-  const durationMin = booking.serviceItems.reduce(
-    (sum, item) => sum + Math.max(0, item.durationSnapshotMin),
-    0
-  );
-  const safeDuration = durationMin > 0 ? durationMin : 60;
-  const endAt = new Date(input.targetStartAt.getTime() + safeDuration * 60 * 1000);
-
   // STUDIO-RESCHEDULE-VALIDATION-A — three guards before mutating:
   //   #1а master ↔ service compatibility
   //   #1в work-hours boundary
@@ -397,12 +391,16 @@ export async function moveStudioBooking(input: {
   // studio admin UI can surface targeted feedback. Backend stays the
   // last-resort defense — UI also filters where possible.
 
-  // #1а: target master must have an enabled MasterService for every
-  // serviceId on the booking. KEEP_SERVICE leaves the booking on the
-  // current service so the new master MUST be able to perform it;
-  // CHANGE_SERVICE was the only branch reading MasterService before
-  // but only for duration/price update (silently skipped when
-  // missing, which let the move proceed onto an incompatible master).
+  // FIX-6 (HARDENING-04): resolve the TARGET master's per-service
+  // duration/price ONCE, up front, and derive the move window from it.
+  // Previously `endAt` (hence the conflict check + stored `endAtUtc`) was
+  // computed from the OLD service durations, while CHANGE_SERVICE rewrote
+  // `durationSnapshotMin` to the (possibly LONGER) target afterwards WITHOUT
+  // recomputing `endAtUtc` — the extra tail minutes were unprotected → a
+  // second booking could land inside the tail (double-book). Resolving once
+  // here (and reusing the same map + helper for the snapshot write below)
+  // keeps the checked window, the stored `endAtUtc`, and the stored
+  // `durationSnapshotMin` provably identical.
   const bookingServiceIds = Array.from(
     new Set(
       booking.serviceItems
@@ -410,19 +408,47 @@ export async function moveStudioBooking(input: {
         .filter((sid): sid is string => Boolean(sid)),
     ),
   );
+  const targetOverrides =
+    bookingServiceIds.length > 0
+      ? await prisma.masterService.findMany({
+          where: {
+            masterProviderId: input.targetMasterId,
+            serviceId: { in: bookingServiceIds },
+          },
+          select: {
+            serviceId: true,
+            isEnabled: true,
+            priceOverride: true,
+            durationOverrideMin: true,
+            service: { select: { price: true, durationMin: true } },
+          },
+        })
+      : [];
+  const overrideByServiceId = new Map(
+    targetOverrides.map((override) => [override.serviceId, override]),
+  );
+
+  // #1а: target master must have an enabled MasterService for every serviceId
+  // on the booking (both strategies — KEEP_SERVICE keeps the current service,
+  // so the new master MUST still be able to perform it).
   if (bookingServiceIds.length > 0) {
-    const enabledRows = await prisma.masterService.findMany({
-      where: {
-        masterProviderId: input.targetMasterId,
-        serviceId: { in: bookingServiceIds },
-        isEnabled: true,
-      },
-      select: { serviceId: true },
+    const allMatched = bookingServiceIds.every((sid) => {
+      const override = overrideByServiceId.get(sid);
+      return Boolean(override && override.isEnabled);
     });
-    const enabledSet = new Set(enabledRows.map((row) => row.serviceId));
-    const allMatched = bookingServiceIds.every((sid) => enabledSet.has(sid));
     assertMasterPerformsService({ hasEnabledMasterService: allMatched });
   }
+
+  // Window duration = what this move will PERSIST (CHANGE_SERVICE → target
+  // durations, KEEP_SERVICE → current snapshots), so the validated/stored
+  // `endAtUtc` equals the `durationSnapshotMin` written in the transaction.
+  const durationMin = resolveMoveDurationMin(
+    booking.serviceItems,
+    input.strategy,
+    overrideByServiceId,
+  );
+  const safeDuration = durationMin > 0 ? durationMin : 60;
+  const endAt = new Date(input.targetStartAt.getTime() + safeDuration * 60 * 1000);
 
   // #1в: new time must lie within target master's work window for
   // that weekday (per-date override > weekly config > defaults).
@@ -518,27 +544,10 @@ export async function moveStudioBooking(input: {
         });
 
         if (input.strategy === "CHANGE_SERVICE" || input.pricing === "APPLY_TARGET") {
-          const serviceIds = Array.from(
-            new Set(booking.serviceItems.map((item) => item.serviceId).filter((serviceId): serviceId is string => Boolean(serviceId)))
-          );
-          const overrides =
-            serviceIds.length > 0
-              ? await tx.masterService.findMany({
-                  where: {
-                    masterProviderId: input.targetMasterId,
-                    serviceId: { in: serviceIds },
-                  },
-                  select: {
-                    serviceId: true,
-                    isEnabled: true,
-                    priceOverride: true,
-                    durationOverrideMin: true,
-                    service: { select: { price: true, durationMin: true } },
-                  },
-                })
-              : [];
-          const overrideByServiceId = new Map(overrides.map((override) => [override.serviceId, override]));
-
+          // FIX-6: reuse the overrides resolved up front (the same map that
+          // sized the validated/stored `endAtUtc` window) and the same
+          // duration helper — no divergent in-tx re-fetch, so the persisted
+          // `durationSnapshotMin` equals the checked window by construction.
           for (const item of booking.serviceItems) {
             if (!item.serviceId) continue;
             const override = overrideByServiceId.get(item.serviceId);
@@ -548,10 +557,11 @@ export async function moveStudioBooking(input: {
             await tx.bookingServiceItem.update({
               where: { id: item.id },
               data: {
-                durationSnapshotMin:
-                  input.strategy === "CHANGE_SERVICE"
-                    ? override.durationOverrideMin ?? override.service.durationMin
-                    : item.durationSnapshotMin,
+                durationSnapshotMin: resolveMoveItemDurationMin(
+                  item,
+                  input.strategy,
+                  overrideByServiceId,
+                ),
                 priceSnapshot:
                   input.pricing === "APPLY_TARGET"
                     ? override.priceOverride ?? override.service.price

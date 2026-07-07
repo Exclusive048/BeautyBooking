@@ -4,7 +4,8 @@ import type { AvailabilitySlot } from "@/lib/domain/schedule";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
-import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
+import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
@@ -104,7 +105,18 @@ export async function providerHasFreeSlotToday(
     now,
   );
 
-  // Fresh bookings (not the slots cache) → the boolean is booking-accurate.
+  // FIX-8 (HARDENING-04): the conflict set is bookings that OVERLAP the
+  // salon-local day, NOT `startAtUtc >= now`. The old filter dropped
+  // in-progress bookings (started before `now`, still running) and
+  // cross-midnight bookings (started the previous salon evening) → a slot
+  // sitting under an ongoing appointment counted as free. Overlap semantics
+  // (the same primitive the engine uses) include them. Fresh bookings (not the
+  // slots cache) → the boolean is booking-accurate. The slot HORIZON is
+  // unchanged — `anyBookableSlot` still only counts slots ≥ earliest-bookable.
+  const { startUtc: dayStartUtc, endExclusiveUtc: dayEndUtc } = localDayRangeUtc(
+    todayKey,
+    timezone,
+  );
   const bookings = await prisma.booking.findMany({
     where: {
       OR: [
@@ -112,16 +124,14 @@ export async function providerHasFreeSlotToday(
         { masterProviderId: null, providerId: provider.id },
       ],
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { gte: now },
+      ...buildBookingOverlapWhere(dayStartUtc, dayEndUtc),
     },
     select: { startAtUtc: true, endAtUtc: true },
   });
   const todayBookings = bookings
     .filter(
       (booking): booking is { startAtUtc: Date; endAtUtc: Date } =>
-        booking.startAtUtc !== null &&
-        booking.endAtUtc !== null &&
-        toLocalDateKey(booking.startAtUtc, timezone) === todayKey,
+        booking.startAtUtc !== null && booking.endAtUtc !== null,
     )
     .map((booking) => ({ startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc }));
 
