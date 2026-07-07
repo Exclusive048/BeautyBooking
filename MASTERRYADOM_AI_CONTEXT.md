@@ -979,6 +979,7 @@ src/
 - `src/lib/auth/admin.ts`: проверка для admin-routes
 - Роли проверяются в каждом route handler
 - Ownership проверки: `src/lib/auth/ownership.ts`
+- **Analytics tenant-scope (HARDENING-05, 2026-07-07):** единый `buildScopeWhere(context)` (`analytics/domain/helpers.ts`) — one tenant-boundary definition для всех booking-analytics запросов. MASTER-scope early-return → `masterProviderId`/`providerId` (свои брони); STUDIO-scope → `studioId`/`providerId` conditional (**никогда `{ studioId: undefined }`** в OR → который бы дропнулся в `{}` → match-all platform-wide). Все MASTER-достижимые domain-функции (revenue/clients/bookings/kpi) и studio-cabinet inline-groupBy'и (sources/services-masters) сходятся на нём. Прежний `?? undefined` был latent footgun (недостижим: MASTER early-return + studio-cabinet хардкодит STUDIO scope + `resolveAnalyticsContext` всегда даёт non-null studioId в STUDIO), не live-leak; conditional делает границу explicit + refactor-safe.
 
 ### Валидация ✅
 - Все входные данные валидируются через Zod-схемы

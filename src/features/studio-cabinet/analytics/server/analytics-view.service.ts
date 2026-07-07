@@ -17,6 +17,7 @@ import {
   formatPeriodDisplay,
   type RollingRange,
 } from "@/lib/master/analytics-period";
+import { buildScopeWhere } from "@/features/analytics/domain/helpers";
 import { prisma } from "@/lib/prisma";
 import { SOURCE_LABEL } from "../lib/source-mapping";
 import type {
@@ -124,7 +125,10 @@ async function loadOverview(input: {
   const sourceRows = await prisma.booking.groupBy({
     by: ["source"],
     where: {
-      OR: [{ studioId: context.studioId ?? undefined }, { providerId: context.providerId }],
+      // HARDENING-05: converge on the single tenant-scope helper (never
+      // `{ studioId: undefined }` → match-all). Byte-identical for STUDIO scope
+      // (this service resolves `scope: "STUDIO"`, non-null studioId, no master filter).
+      ...buildScopeWhere(context),
       startAtUtc: { gte: currentRange.fromUtc, lt: currentRange.toUtcExclusive },
       status: { in: COMPLETED_STATUSES },
     },
@@ -232,7 +236,8 @@ async function loadServicesView(input: {
   // need a new endpoint just for this column.
   const serviceMasters = await prisma.booking.findMany({
     where: {
-      OR: [{ studioId: input.context.studioId ?? undefined }, { providerId: input.context.providerId }],
+      // HARDENING-05: single tenant-scope helper (see loadOverview note).
+      ...buildScopeWhere(input.context),
       startAtUtc: { gte: input.currentRange.fromUtc, lt: input.currentRange.toUtcExclusive },
     },
     select: { serviceId: true, masterProviderId: true },
