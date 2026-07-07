@@ -4533,6 +4533,12 @@ export const UI_TEXT = {
           sortOrderHint: "Меньше — выше в списке",
           priceLabel: "{months} мес.",
           priceCurrency: "₽",
+          // BILLING-PRICE-ACTIVE-UI-01 (R2-05-J): per-period isActive toggle.
+          priceActiveLabel: "Активна",
+          priceActiveHint:
+            "Выключите, чтобы деактивировать цену без удаления строки. Чтобы совсем убрать период — обнулите цену.",
+          priceEffectiveLabel: "Итоговая:",
+          priceEffectiveNone: "нет цены",
           inheritsFromLabel: "Наследует от тарифа",
           inheritsFromNone: "Не наследует",
           inheritsFromHint: "Дочерний тариф получает все возможности родителя; здесь — только overrides поверх них.",
@@ -4542,6 +4548,8 @@ export const UI_TEXT = {
         save: "Сохранить",
         errorPriceInvalid: "Все цены должны быть целыми неотрицательными числами в рублях.",
         errorNameRequired: "Название не должно быть пустым.",
+        errorPriceLastActive:
+          "Нельзя деактивировать цену для периода {months} мес.: тариф останется без работающей цены на этот срок. Оставьте активной месячную цену (её берут за основу остальные сроки) или обнулите цену, чтобы убрать период.",
         errorFeaturesValidation: "Не удалось сохранить: проверьте настройки возможностей.",
         errorStrictLimit: "Лимит «{feature}» строже родительского тарифа. Можно только ослаблять.",
         errorInheritanceCycle: "Обнаружен цикл наследования тарифов — выберите другой родительский тариф.",

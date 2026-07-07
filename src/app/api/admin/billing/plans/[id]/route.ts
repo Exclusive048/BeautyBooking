@@ -7,6 +7,8 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { BILLING_PERIODS } from "@/lib/billing/constants";
 import { createBillingAuditLog } from "@/lib/billing/audit";
+import { findOrphanedOfferedPeriod } from "@/lib/billing/price-active-guard";
+import { UI_TEXT } from "@/lib/ui/text";
 import { createAdminAuditLog } from "@/lib/audit/admin-audit";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -61,6 +63,10 @@ const bodySchema = z.object({
           BILLING_PERIODS.includes(value as (typeof BILLING_PERIODS)[number]),
         ),
         priceKopeks: z.number().int().min(0),
+        // BILLING-PRICE-ACTIVE-UI-01 (R2-05-J): explicit per-period active toggle.
+        // Deactivates a price WITHOUT deleting the row (resolver excludes inactive
+        // rows). Absent → preserve the existing value on update / default true on create.
+        isActive: z.boolean().optional(),
       }),
     )
     .optional(),
@@ -184,6 +190,27 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       return fail("Тариф не найден", 404, "NOT_FOUND");
     }
 
+    // BILLING-PRICE-ACTIVE-UI-01 (R2-05-J): block deactivating a price that
+    // would leave an OFFERED period unresolvable (no active exact row + no active
+    // monthly anchor). Skipped when the plan itself is/stays inactive — an
+    // inactive plan isn't sold, so an unresolvable period is moot. Authoritative
+    // server guard; the dialog mirrors it as a pre-emptive warning.
+    const effectiveActive =
+      patch.isActive !== undefined ? patch.isActive : before.isActive;
+    if (patch.prices && patch.prices.length > 0 && effectiveActive) {
+      const orphaned = findOrphanedOfferedPeriod(patch.prices);
+      if (orphaned !== null) {
+        return fail(
+          UI_TEXT.adminPanel.billing.editDialog.errorPriceLastActive.replace(
+            "{months}",
+            String(orphaned),
+          ),
+          400,
+          "BILLING_PRICE_LAST_ACTIVE",
+        );
+      }
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       // Inheritance + relaxed-limit validation when those fields are
       // part of the patch. The effective inheritance is whatever the
@@ -269,10 +296,15 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
                 planId: id,
                 periodMonths: entry.periodMonths,
                 priceKopeks: entry.priceKopeks,
-                isActive: true,
+                // R2-05-J: honor an explicit toggle at create; default active.
+                isActive: entry.isActive ?? true,
               },
               update: {
                 priceKopeks: entry.priceKopeks,
+                // R2-05-J: flip isActive when provided; preserve when absent.
+                ...(typeof entry.isActive === "boolean"
+                  ? { isActive: entry.isActive }
+                  : {}),
               },
             });
           } else {
@@ -325,17 +357,28 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
         };
       }
       if (patch.prices && patch.prices.length > 0) {
-        const beforeMap = new Map(
-          before.prices.map((p) => [p.periodMonths, p.priceKopeks]),
+        const beforeByPeriod = new Map(
+          before.prices.map((p) => [p.periodMonths, p]),
         );
-        const priceDiff: Record<string, { before: number; after: number }> = {};
+        const priceDiff: Record<string, { before: unknown; after: unknown }> = {};
         for (const entry of patch.prices) {
-          const prev = beforeMap.get(entry.periodMonths) ?? 0;
-          if (prev !== entry.priceKopeks) {
+          const prev = beforeByPeriod.get(entry.periodMonths);
+          const prevPrice = prev?.priceKopeks ?? 0;
+          if (prevPrice !== entry.priceKopeks) {
             priceDiff[`${entry.periodMonths}m`] = {
-              before: prev,
+              before: prevPrice,
               after: entry.priceKopeks,
             };
+          }
+          // R2-05-J: audit an isActive flip for a kept (positive) row.
+          if (entry.priceKopeks > 0 && typeof entry.isActive === "boolean") {
+            const prevActive = prev ? prev.isActive : true;
+            if (prevActive !== entry.isActive) {
+              priceDiff[`${entry.periodMonths}m.active`] = {
+                before: prevActive,
+                after: entry.isActive,
+              };
+            }
           }
         }
         if (Object.keys(priceDiff).length > 0) {

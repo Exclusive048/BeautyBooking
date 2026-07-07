@@ -14,6 +14,8 @@ import {
 import { tierAndScopeLabel } from "@/features/admin-cabinet/billing/lib/plan-display";
 import { PlanFeaturesEditor } from "@/features/admin-cabinet/billing/components/plan-features-editor";
 import type { PlanFeatureOverrides } from "@/lib/billing/features";
+import { resolvePlanPrice } from "@/lib/billing/pricing";
+import { findOrphanedOfferedPeriod } from "@/lib/billing/price-active-guard";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
   AdminPlanCard,
@@ -26,8 +28,9 @@ export type PlanEditValue = {
   name: string;
   isActive: boolean;
   sortOrder: number;
-  /** Always exactly four entries (1/3/6/12 months). */
-  prices: Array<{ periodMonths: 1 | 3 | 6 | 12; priceKopeks: number }>;
+  /** Always exactly four entries (1/3/6/12 months). `isActive` — R2-05-J
+   * per-period toggle: a deactivated price is kept but excluded from resolution. */
+  prices: Array<{ periodMonths: 1 | 3 | 6 | 12; priceKopeks: number; isActive: boolean }>;
   /** Parent plan id (null to detach). Sent only when the value
    * actually changed from the dialog's open state. */
   inheritsFromPlanId: string | null;
@@ -71,6 +74,8 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
   const [isActive, setIsActive] = useState(true);
   const [sortOrder, setSortOrder] = useState("0");
   const [prices, setPrices] = useState<Record<number, string>>({});
+  // R2-05-J: per-period active toggle (parallel to `prices`, keyed by months).
+  const [pricesActive, setPricesActive] = useState<Record<number, boolean>>({});
   const [inheritsFromPlanId, setInheritsFromPlanId] = useState<string | null>(null);
   const [features, setFeatures] = useState<PlanFeatureOverrides>({});
   const [submitting, setSubmitting] = useState(false);
@@ -89,10 +94,14 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
     setIsActive(plan.isActive);
     setSortOrder(String(plan.sortOrder));
     const initial: Record<number, string> = {};
+    const initialActive: Record<number, boolean> = {};
     for (const period of PERIODS) {
       initial[period] = priceForPeriod(plan, period);
+      const row = plan.prices.find((p) => p.periodMonths === period);
+      initialActive[period] = row ? row.isActive : true;
     }
     setPrices(initial);
+    setPricesActive(initialActive);
     setInheritsFromPlanId(plan.inheritsFromPlanId);
     setFeatures({ ...plan.rawFeatures });
     setError(null);
@@ -105,7 +114,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
       setError(T.errorNameRequired);
       return;
     }
-    const parsedPrices: Array<{ periodMonths: 1 | 3 | 6 | 12; priceKopeks: number }> = [];
+    const parsedPrices: Array<{ periodMonths: 1 | 3 | 6 | 12; priceKopeks: number; isActive: boolean }> = [];
     for (const period of PERIODS) {
       const raw = prices[period] ?? "0";
       const kopeks = parseRublesToKopeks(raw);
@@ -113,7 +122,11 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
         setError(T.errorPriceInvalid);
         return;
       }
-      parsedPrices.push({ periodMonths: period, priceKopeks: kopeks });
+      parsedPrices.push({
+        periodMonths: period,
+        priceKopeks: kopeks,
+        isActive: pricesActive[period] ?? true,
+      });
     }
     const sortOrderNum = Number(sortOrder);
     const sortOrderClean =
@@ -163,6 +176,20 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
   const parentCandidates = plan
     ? candidates.filter((c) => c.id !== plan.id && c.scope === plan.scope)
     : [];
+
+  // R2-05-J: live effective price per period (what `resolvePlanPrice` yields for
+  // the current price+toggle state — the R2-05-C-v2 tie-in: this is the amount
+  // renewal/checkout will read) + the orphan guard the server enforces, mirrored
+  // client-side so an admin can't save a plan that would strand an offered period.
+  const priceEntries = PERIODS.map((period) => ({
+    periodMonths: period,
+    priceKopeks: parseRublesToKopeks(prices[period] ?? "0") ?? 0,
+    isActive: pricesActive[period] ?? true,
+  }));
+  const activeRows = priceEntries
+    .filter((e) => e.priceKopeks > 0 && e.isActive)
+    .map((e) => ({ periodMonths: e.periodMonths, priceKopeks: e.priceKopeks }));
+  const orphanedPeriod = isActive ? findOrphanedOfferedPeriod(priceEntries) : null;
 
   const TABS: TabItem[] = [
     { id: "main", label: T.tabs.main },
@@ -277,27 +304,66 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                   {T.sections.prices}
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {PERIODS.map((period) => (
-                    <label key={period} className="block">
-                      <span className="mb-1.5 block text-xs font-medium text-text-sec">
-                        {T.fields.priceLabel.replace("{months}", String(period))}
-                      </span>
-                      <div className="relative">
-                        <Input
-                          inputMode="decimal"
-                          value={prices[period] ?? "0"}
-                          onChange={(event) =>
-                            setPrices({ ...prices, [period]: event.target.value })
-                          }
-                          className="pr-7"
-                        />
-                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-sec">
-                          {T.fields.priceCurrency}
+                  {PERIODS.map((period) => {
+                    const active = pricesActive[period] ?? true;
+                    const effective = resolvePlanPrice(activeRows, period);
+                    return (
+                      <div
+                        key={period}
+                        className="space-y-2 rounded-xl border border-border-subtle/60 p-2.5"
+                      >
+                        <span className="block text-xs font-medium text-text-sec">
+                          {T.fields.priceLabel.replace("{months}", String(period))}
                         </span>
+                        <div className="relative">
+                          <Input
+                            inputMode="decimal"
+                            value={prices[period] ?? "0"}
+                            onChange={(event) =>
+                              setPrices({ ...prices, [period]: event.target.value })
+                            }
+                            className="pr-7"
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-sec">
+                            {T.fields.priceCurrency}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-text-sec">
+                            {T.fields.priceActiveLabel}
+                          </span>
+                          <Switch
+                            size="sm"
+                            checked={active}
+                            onCheckedChange={(checked) =>
+                              setPricesActive({ ...pricesActive, [period]: checked })
+                            }
+                          />
+                        </div>
+                        <div className="text-[11px] text-text-sec/80">
+                          {T.fields.priceEffectiveLabel}{" "}
+                          <span
+                            className={
+                              effective === null
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-text-main"
+                            }
+                          >
+                            {effective === null
+                              ? T.fields.priceEffectiveNone
+                              : formatRublesPrecise(effective)}
+                          </span>
+                        </div>
                       </div>
-                    </label>
-                  ))}
+                    );
+                  })}
                 </div>
+                <p className="text-[11px] text-text-sec/70">{T.fields.priceActiveHint}</p>
+                {orphanedPeriod !== null ? (
+                  <p role="alert" className="text-xs text-amber-600 dark:text-amber-400">
+                    {T.errorPriceLastActive.replace("{months}", String(orphanedPeriod))}
+                  </p>
+                ) : null}
               </section>
             </div>
           ) : (
@@ -321,7 +387,11 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
             <Button variant="secondary" onClick={onClose} disabled={submitting}>
               {T.cancel}
             </Button>
-            <Button variant="primary" onClick={() => void submit()} disabled={submitting}>
+            <Button
+              variant="primary"
+              onClick={() => void submit()}
+              disabled={submitting || orphanedPeriod !== null}
+            >
               {T.save}
             </Button>
           </div>

@@ -625,7 +625,7 @@ src/
 | `/admin` | Дашборд (KPI / charts / live feed / system health) | ✅ ADMIN-DASH-A |
 | `/admin/catalog` | Модерация GlobalCategory | ✅ ADMIN-CATALOG-A |
 | `/admin/cities` | Управление городами + auto-grow модерация + algorithmic duplicate detection | ✅ ADMIN-CITIES-UI |
-| `/admin/billing` | 4 KPIs + Plans / Subscriptions / Payments tabs с cancel + refund actions | ✅ ADMIN-BILLING-A + ADMIN-BILLING-B |
+| `/admin/billing` | 4 KPIs + Plans / Subscriptions / Payments tabs с cancel + refund actions; **per-period price `isActive` toggle** (R2-05-J — деактивация цены без удаления строки + live итоговая цена + last-active-row guard `BILLING_PRICE_LAST_ACTIVE`) | ✅ ADMIN-BILLING-A + ADMIN-BILLING-B + BILLING-PRICE-ACTIVE-UI-01 |
 | `/admin/reviews` | 4 KPIs + 3 tabs (flagged / low-rating / all) + search + approve/delete с audit log | ✅ ADMIN-REVIEWS-A |
 | `/admin/settings` | Logo + login hero + 3 system flags + SEO + queue + visual search + media cleanup | ✅ ADMIN-SETTINGS-A |
 | `/admin/users` | Список + 5 role tiles + plan change через audit-logged endpoint | ✅ ADMIN-USERS-A |
