@@ -12,6 +12,23 @@
 > Формат новых записей: `- YYYY-MM-DD · <область> · <пункт как он был в активном бэклоге>` (дата неизвестна → `н/д`).
 > Существующие подробные секции ниже (формат `## дата — TASK`) сохранены как есть — их не переписываем.
 
+- 2026-07-07 · security/billing · adversarial bug-hunt 2026-07-06 Phase 1 findings #1–#4 (HARDENING-01: #1/#3/#4 · HARDENING-02: #2) — addressed & committed; per-finding detail в git history + AI_CONTEXT §15 (#5–#11 ledgered отдельными строками ниже).
+- 2026-07-07 · billing · #5 Grace-period dead code (HARDENING-03) — PAST_DUE grace-ветка теперь даёт доступ; единый `isSubscriptionActive` (get-current-plan + analytics guards).
+- 2026-07-07 · booking · #6 Studio move stale `endAtUtc` при CHANGE_SERVICE (HARDENING-04) — длительность целевого мастера резолвится ДО окна, endAtUtc + durationSnapshot пересчитываются.
+- 2026-07-07 · booking · #7 `acceptNewClients` OR-undefined bypass (HARDENING-04) — provider-scoped prior-bookings where (master → OR, no-master → providerId), без match-all.
+- 2026-07-07 · schedule · #8 «Свободно сегодня» игнорировало in-progress/cross-midnight брони (HARDENING-04) — conflict-set по salon-local дню через `buildBookingOverlapWhere`.
+- 2026-07-07 · auth/security · #9 Telegram login CSRF (HARDENING-06) — signed state-cookie + nonce round-trip + single-use auth-hash + `getTelegramEnabled` gate; dead POST-route удалён (HARDENING-09).
+- 2026-07-07 · security · #10 Studio/master timezone validation self-brick (HARDENING-06) — write-time `.refine(isValidTimeZone)` + read-time `partsFromDate` fallback Europe/Moscow.
+- 2026-07-07 · billing/security · #11 Admin refund guards (HARDENING-03) — `decideRefund`: SUCCEEDED-only + full-only + deterministic idempotency-key (нет двойного/несостоявшегося refund).
+- 2026-07-07 · queue · #12 Non-atomic queue processing stamp → silent job loss (HARDENING-07) — start-time/lease в side-hash `queue:processing:heartbeat`, `lRem`+`rPush` убран, limbo-window закрыт.
+- 2026-07-07 · queue · #15 Stuck-recovery re-queued live jobs → duplicate processing (HARDENING-07) — recovery по staleness lease (heartbeat каждые 30s), long-running job не re-queue'ится.
+- 2026-07-07 · security · #17 X-Forwarded-For trusted-proxy client-IP (HARDENING-08) — `extractClientIp` берёт энтри `TRUSTED_PROXY_HOPS` справа (не leftmost), разослан во все IP-keyed consumers; code committed, enforce-flip `YOOKASSA_IP_ALLOWLIST_ENFORCED` остаётся deploy-ops step (см. BACKLOG.md DEPLOY / OPS).
+- 2026-07-07 · analytics · ANALYTICS-OR-UNDEFINED-MATCHALL (HARDENING-05) — defensive: `buildScopeWhere` STUDIO conditional (studioId null → providerId-only, никогда `{studioId:undefined}`), сайты converged на single tenant-scope helper. Был латентным (match-all недостижим), не live-leak.
+- 2026-07-07 · tooling/test · VITEST-SERVER-ONLY-SHIM — `resolve.alias` `server-only`→stub в `vitest.config.ts` (vitest-only, boundary-guard в prod держится); 6 server-модульных test-файлов зелёные, suite 823→894.
+- 2026-07-07 · ui/tz · #13 Telegram reminder в raw UTC (HARDENING-09; = TZ-DISPLAY-TELEGRAM-UTC alias) — единый `formatBookingWhenLabel(date, tz)` salon-tz «(Город, GMT+N)», совпадает с in-app lifecycle-путём.
+- 2026-07-07 · billing · #14 MRR snapshot считал trials/lapsed grants (HARDENING-10) — query paid-and-current (`ACTIVE + !isTrial + currentPeriodEnd>now`) + price `.find` фильтрует `isActive`; grace не считается.
+- 2026-07-07 · ui/tz · #16 `clampVisibleSlotsHorizon` UTC → provider-tz (HARDENING-10) — date-key через `toLocalDateKey(horizon, timeZone)`, east-of-UTC не теряет последний видимый день.
+- 2026-07-07 · billing · REFUND-AUDIT-ACTION-DESYNC (HARDENING-10) — sync-refund пишет `PAYMENT_REFUNDED` terminal сам + webhook once-and-only-once guard; инвариант 1 init + 1 terminal per refund.
 - 2026-07-06 · ui/tz · Chat booking-card appointment time → salon-tz + zone label (FIX-TZ-SYSTEM-MESSAGE)
 - 2026-07-06 · boundary · `server-only` на `prisma.ts`/`prisma-direct.ts`/`redis/connection.ts`/`schedule/editor.ts` — build clean → client/server boundary hard-guarded (GUARDRAILS-01 Phase C; no latent client→server import found).
 - 2026-07-06 · tooling/encoding · Encoding-guard hooks в `.claude/settings.json` — PreToolUse блокирует PS `Set-Content`/`Out-File` на source-файлах без safe-escape; PostToolUse снифит BOM/mojibake на touched-файле (`.claude/hooks/encoding-guard-{pre,post}.mjs`; codepoint-логика зеркалит check-mojibake) (GUARDRAILS-01 Phase A).
