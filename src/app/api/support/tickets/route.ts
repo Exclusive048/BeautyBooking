@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { extractClientIp } from "@/lib/http/ip";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import { normalizeSupportContact } from "@/lib/support/contact-shared";
@@ -35,13 +36,6 @@ const RATE_LIMIT = 5;
 const RATE_WINDOW_SECONDS = 10 * 60;
 
 type ContactSource = "profile_option" | "manual_input" | "none";
-
-function getFirstIp(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (!forwarded) return null;
-  const first = forwarded.split(",")[0]?.trim();
-  return first || null;
-}
 
 function hashKey(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -168,7 +162,7 @@ export async function POST(req: Request) {
     };
   }
 
-  const ip = getFirstIp(req);
+  const ip = extractClientIp(req);
   const userAgent = normalizeOptional(req.headers.get("user-agent"));
   const fileName = attachment?.fileName ?? null;
   const pageUrl = normalizeOptional(data.pageUrl);

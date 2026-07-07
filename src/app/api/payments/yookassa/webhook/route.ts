@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { env } from "@/lib/env";
+import { extractClientIp } from "@/lib/http/ip";
 import { checkYookassaIpAllowlist } from "@/lib/payments/yookassa/allowlist";
 import { createYookassaWebhookJob } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
@@ -30,14 +31,14 @@ export const runtime = "nodejs";
  * makes YooKassa retry (its 24h redelivery window is the delivery safety net).
  */
 
-// finding #17 (leftmost-XFF trust, undecided). Behind the load balancer the
-// socket peer is the balancer, so `extractClientIp` reads `X-Forwarded-For`,
-// whose LEFTMOST entry is client-spoofable until the trusted-proxy hop count is
-// fixed at the deploy layer. An unenforceable check must not masquerade as
-// security, so the allowlist runs LOG-ONLY and the re-fetch anchor carries
-// authenticity. Flip this to `true` once XFF derivation is provably trustworthy
-// (LB → app hop count decided) to reject non-listed source IPs.
-const IP_ALLOWLIST_ENFORCED = false;
+// HARDENING-08 FIX-17: `extractClientIp` now peels `TRUSTED_PROXY_HOPS` trusted
+// hops from the RIGHT of X-Forwarded-For (no longer the spoofable leftmost), so
+// the allowlist CAN enforce. It stays deploy-GATED: `YOOKASSA_IP_ALLOWLIST_ENFORCED`
+// defaults false (log-only) — enforcing before the prod hop count is confirmed
+// would reject real YooKassa notifications. Flip the env to true at deploy once
+// TRUSTED_PROXY_HOPS matches the edge. The worker API re-fetch remains the
+// authenticity anchor regardless.
+const IP_ALLOWLIST_ENFORCED = env.YOOKASSA_IP_ALLOWLIST_ENFORCED;
 
 // Warn at most once per process when the optional URL secret is unset in prod —
 // avoids logging the same warning on every notification.
@@ -47,17 +48,6 @@ const webhookBodySchema = z.object({
   event: z.string().min(1),
   object: z.object({ id: z.string().min(1) }),
 });
-
-function extractClientIp(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp && realIp.trim()) return realIp.trim();
-  return null;
-}
 
 function timingSafeStringEqual(a: string, b: string): boolean {
   const aBuf = Buffer.from(a);

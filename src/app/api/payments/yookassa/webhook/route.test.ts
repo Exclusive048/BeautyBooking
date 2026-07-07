@@ -10,6 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockEnv = vi.hoisted(() => ({
   YOOKASSA_WEBHOOK_TOKEN: "test-secret" as string | undefined,
   NODE_ENV: "test" as string,
+  // HARDENING-08 FIX-17: IP allowlist enforce + trusted-proxy config read by the
+  // route and by `@/lib/http/ip` (both import `@/lib/env`, which this mocks).
+  YOOKASSA_IP_ALLOWLIST_ENFORCED: false as boolean,
+  TRUSTED_PROXY_HOPS: 1 as number,
+  TRUSTED_REAL_IP_HEADER: "" as string,
 }));
 const enqueue = vi.hoisted(() => vi.fn());
 
@@ -33,11 +38,13 @@ import { POST } from "./route";
 
 const URL_BASE = "http://localhost/api/payments/yookassa/webhook";
 
-function makeRequest(opts: { token?: string | null; body: unknown }) {
+function makeRequest(opts: { token?: string | null; body: unknown; xff?: string }) {
   const url = opts.token != null ? `${URL_BASE}?token=${encodeURIComponent(opts.token)}` : URL_BASE;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (opts.xff) headers["x-forwarded-for"] = opts.xff;
   return new Request(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body),
   });
 }
@@ -46,6 +53,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockEnv.YOOKASSA_WEBHOOK_TOKEN = "test-secret";
   mockEnv.NODE_ENV = "test";
+  mockEnv.YOOKASSA_IP_ALLOWLIST_ENFORCED = false;
+  mockEnv.TRUSTED_PROXY_HOPS = 1;
+  mockEnv.TRUSTED_REAL_IP_HEADER = "";
   enqueue.mockResolvedValue(undefined);
 });
 
@@ -133,6 +143,59 @@ describe("YooKassa webhook route (HARDENING-02)", () => {
       makeRequest({ token: "test-secret", body: { event: "payment.succeeded", object: {} } }),
     );
     expect(res.status).toBe(400);
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe("YooKassa webhook IP allowlist enforce (HARDENING-08 FIX-17)", () => {
+  const LISTED_YOOKASSA_IP = "185.71.76.1"; // in 185.71.76.0/27
+  const OUTSIDE_IP = "8.8.8.8";
+  const VALID_BODY = { event: "payment.succeeded", object: { id: "yk-777" } };
+
+  // The route captures `IP_ALLOWLIST_ENFORCED` at module load, so re-import a
+  // fresh copy after flipping the env flag (the `enqueue` spy is a hoisted
+  // singleton, so it survives the reset and still records calls).
+  async function loadRouteWithEnforce(enforced: boolean) {
+    vi.resetModules();
+    mockEnv.YOOKASSA_IP_ALLOWLIST_ENFORCED = enforced;
+    const mod = await import("./route");
+    return mod.POST;
+  }
+
+  it("enforce ON + non-listed source IP → 403, nothing enqueued", async () => {
+    const post = await loadRouteWithEnforce(true);
+    const res = await post(makeRequest({ token: "test-secret", body: VALID_BODY, xff: OUTSIDE_IP }));
+    expect(res.status).toBe(403);
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("enforce ON + listed YooKassa source IP → 200, enqueued", async () => {
+    const post = await loadRouteWithEnforce(true);
+    const res = await post(
+      makeRequest({ token: "test-secret", body: VALID_BODY, xff: LISTED_YOOKASSA_IP }),
+    );
+    expect(res.status).toBe(200);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("enforce OFF (default) + non-listed source IP → 200 (logged, NOT rejected)", async () => {
+    const post = await loadRouteWithEnforce(false);
+    const res = await post(makeRequest({ token: "test-secret", body: VALID_BODY, xff: OUTSIDE_IP }));
+    expect(res.status).toBe(200);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("enforce ON ignores a forged leftmost XFF entry — a spoofed listed IP does NOT pass", async () => {
+    const post = await loadRouteWithEnforce(true);
+    // Attacker prepends a listed IP but the real (rightmost) hop is outside.
+    const res = await post(
+      makeRequest({
+        token: "test-secret",
+        body: VALID_BODY,
+        xff: `${LISTED_YOOKASSA_IP}, ${OUTSIDE_IP}`,
+      }),
+    );
+    expect(res.status).toBe(403);
     expect(enqueue).not.toHaveBeenCalled();
   });
 });

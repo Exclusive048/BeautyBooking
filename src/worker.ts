@@ -6,6 +6,7 @@ import {
   enqueue,
   enqueueDeadJob,
   getQueueStats,
+  heartbeatJob,
   recoverStuckJobs,
 } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
@@ -58,6 +59,21 @@ let workerSecretMissingLogged = false;
 
 const HEALTHCHECK_INTERVAL_MS = 30_000;
 const STUCK_RECOVERY_INTERVAL_MS = 2 * 60 * 1000;
+// FIX-15: refresh the in-flight job's lease well within PROCESSING_TIMEOUT_MS
+// (5 min) so a live long-running job is never re-queued as "stuck".
+const JOB_HEARTBEAT_INTERVAL_MS = 30_000;
+
+/**
+ * FIX-15: keep the currently-processing job's lease fresh while it runs, so
+ * `recoverStuckJobs` only re-queues genuinely dead work. Returns a stopper the
+ * job loop calls (in `finally`) once processing/ack completes.
+ */
+function startJobHeartbeat(jobId: string): () => void {
+  const timer = setInterval(() => {
+    void heartbeatJob(jobId);
+  }, JOB_HEARTBEAT_INTERVAL_MS);
+  return () => clearInterval(timer);
+}
 const QUEUE_STATS_CHECK_EVERY_JOBS = 100;
 const QUEUE_PENDING_OVERLOAD_THRESHOLD = 1000;
 const QUEUE_DEAD_THRESHOLD = 10;
@@ -582,7 +598,14 @@ async function runLoop() {
       continue;
     }
 
-    await processJob(job);
+    // FIX-15: renew the job's lease while it runs so a live long-running job is
+    // never re-queued by recoverStuckJobs. `processJob` acks on completion.
+    const stopHeartbeat = startJobHeartbeat(job.id);
+    try {
+      await processJob(job);
+    } finally {
+      stopHeartbeat();
+    }
     await monitorQueueStatsIfNeeded();
   }
 

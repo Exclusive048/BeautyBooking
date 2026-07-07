@@ -16,6 +16,7 @@ import { invalidateMeIdentityCache } from "@/lib/users/me";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { extractClientIp } from "@/lib/http/ip";
 
 const CONSENT_DOCUMENT_VERSION = "1.0";
 
@@ -103,8 +104,7 @@ export async function POST(req: Request) {
       ms: Date.now() - verifyDbStartedAt,
     });
 
-    const forwardedFor = req.headers.get("x-forwarded-for");
-    const ipAddress = forwardedFor?.split(",")[0]?.trim() ?? null;
+    const ipAddress = extractClientIp(req);
     const userAgent = req.headers.get("user-agent");
 
     const sideEffectsStartedAt = Date.now();

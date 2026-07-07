@@ -6,6 +6,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpEmailRequestRateLimit } from "@/lib/auth/otp-rate-limit";
+import { extractClientIp } from "@/lib/http/ip";
 import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
 import {
   buildOtpEmailHtml,
@@ -42,16 +43,6 @@ export function mapEmailAlreadyUsedConflict(error: unknown): AppError | null {
     );
   }
   return null;
-}
-
-function extractClientIp(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = req.headers.get("x-real-ip");
-  return realIp?.trim() || null;
 }
 
 /**

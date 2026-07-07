@@ -496,10 +496,11 @@ src/
 
 ### Очередь задач ✅
 - **Файлы:** `src/lib/queue/queue.ts`, `src/lib/queue/types.ts`, `src/worker.ts`
-- Redis Lists: `queue:jobs`, `queue:processing`, `queue:dead`
+- Redis Lists: `queue:jobs`, `queue:processing`, `queue:dead` + side-hash `queue:processing:heartbeat` (`jobId → lease-ts`)
 - Memory fallback в dev
 - Типы заданий: telegram.send, booking.reminder, visual_search_index, yookassa.webhook, media.cleanup
-- Recovery stuck jobs: таймаут 5 мин, до 3 попыток, затем dead-letter
+- **Atomic dequeue + heartbeat lease (HARDENING-07 FIX-12/15, 2026-07-07):** `dequeue` оставляет job в `queue:processing` **ровно как его положил `lMove`** (никакого `lRem`+`rPush` для in-place-штампа `_processingStartedAt`) — start-time/lease пишется в side-hash отдельным `hSet`. Убирает limbo-окно (краш между двумя list-ops → job ни в одном списке → потерян навсегда, был money-adjacent). Краш между `lMove` и `hSet` → job в processing без heartbeat → `recoverStuckJobs` **adopt'ит** (race-safe) и recover'ит next cycle (никогда не теряет). `acknowledge` = remove-by-id + `hDel`; orphan-энтри prune'ятся.
+- Recovery stuck jobs: **по staleness lease** (`now - lastHeartbeat > 5 мин`), не fixed-from-start; worker heartbeat'ит in-flight job каждые 30s → живой long-running job не re-queue'ится (нет дубля mass-notifications). До 3 попыток, затем dead-letter
 - Воркер запускается отдельным процессом (`npm run worker`)
 - Health check воркера: POST `/api/health/worker` с WORKER_SECRET
 
@@ -724,6 +725,9 @@ src/
 | `EMAIL_AUTH_ENABLED` | `src/lib/env.ts:101` | нет | `false` |
 | `WORKER_SECRET` | `src/app/api/health/worker/route.ts:11` | нет | не проверяет |
 | `AUTH_COOKIE_NAME` | `src/lib/auth/session.ts:20` | нет | `bh_session` |
+| `TRUSTED_PROXY_HOPS` | `src/lib/http/ip.ts` (HARDENING-08 FIX-17) | нет | `1` (число доверенных reverse-proxy hop'ов; client-IP берётся N-справа от XFF, никогда leftmost. Выставить под prod-edge; too-high → re-open spoof) |
+| `TRUSTED_REAL_IP_HEADER` | `src/lib/http/ip.ts` (HARDENING-08 FIX-17) | нет | `""` (опц. dedicated real-IP header, который edge **перезаписывает**, напр. `x-real-ip`; задавать только если edge подтверждённо его ставит) |
+| `YOOKASSA_IP_ALLOWLIST_ENFORCED` | `src/app/api/payments/yookassa/webhook/route.ts` (HARDENING-08) | нет | `false` (log-only). `true` → deny non-listed source-IP. **Flip в true только после подтверждённого `TRUSTED_PROXY_HOPS`** — wrong-hop reject'ит реальные уведомления; worker API re-fetch остаётся authenticity anchor |
 | `REDIS_URL` | `src/lib/redis/connection.ts:12` | нет | нет Redis (memory fallback) |
 | `REDIS_CONNECT_TIMEOUT_MS` | `src/lib/redis/connection.ts:26` | нет | встроенный timeout |
 | `REDIS_COMMAND_TIMEOUT_MS` | `src/lib/redis/connection.ts:30` | нет | встроенный timeout |
@@ -1000,9 +1004,11 @@ src/
 - JWT: HMAC-SHA256 (`AUTH_JWT_SECRET`)
 - OTP hash: HMAC-SHA256 (`OTP_HMAC_SECRET`)
 - Refresh tokens: хранятся в БД (jti), cookie httpOnly, SameSite=lax
-- YooKassa webhook: worker API re-fetch anchor + optional URL `?token=` + IP-allowlist log-only (HARDENING-02 — YooKassa не подписывает уведомления, HMAC снят)
+- YooKassa webhook: worker API re-fetch anchor + optional URL `?token=` + IP-allowlist (HARDENING-02; enforce теперь deploy-gated через `YOOKASSA_IP_ALLOWLIST_ENFORCED`, default log-only — HARDENING-08)
+- **Client-IP derivation (HARDENING-08 FIX-17):** единый `extractClientIp`/`getClientIp` (`src/lib/http/ip.ts`) берёт IP из XFF **справа** (peel `TRUSTED_PROXY_HOPS` доверенных hop'ов), **никогда** leftmost — закрывает spoof-обход per-IP rate-limit'ов (OTP/SMS bombing) и разблокирует webhook IP-allowlist enforce. Все IP-keyed consumers (OTP · email-verify · account-delete · support · public-booking · log-error · proxy middleware) идут через него. Safe default `hops=1`; hop-count под реальный edge — deploy-решение.
 
 ### Потенциальные уязвимости
+- ~~Leftmost-XFF spoof → обход per-IP rate-limit (OTP/SMS)~~ ✅ **closed (HARDENING-08 FIX-17, pending commit)** — rightmost-peel экстрактор (`src/lib/http/ip.ts`, `TRUSTED_PROXY_HOPS`), см. §10 «Client-IP derivation».
 - ~~OTP в логах (P1 phone + SEC-1 email)~~ ✅ **fully closed** — SMS-GATEWAY-A (phone) + OTP-LOG-DEV-GUARD-A (email + NODE_ENV guard across all 3 surfaces). Production logs strip `code`; dev/staging retain it for testing convenience via shared `isProduction` flag (env.ts) + `maskPhone`/`maskEmail` (`src/lib/logging/masking.ts`).
 - ~~Raw email/phone в логах (email-sender / SMS-delivery / cabinet email-verify)~~ ✅ **closed (PII-LOGGING-FIX-A 2026-06-24)** — 6 call-sites обёрнуты в `maskEmail`/`maskPhone`. Реальный send + OTP-логирование (rule 9) не тронуты. `logError → alertError → Telegram` sink получает уже-замаскированный payload. **Политика: production logs никогда не содержат raw PII (phone/email) — оборачивать через `maskPhone`/`maskEmail`** (см. §13 «Логирование PII / secrets»).
 - Нет явного middleware для auth (каждый handler сам проверяет)

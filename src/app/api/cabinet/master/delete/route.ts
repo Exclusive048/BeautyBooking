@@ -5,15 +5,9 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { deleteMasterCabinet } from "@/lib/deletion/delete-master";
+import { extractClientIp } from "@/lib/http/ip";
 
 export const runtime = "nodejs";
-
-function getFirstIp(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (!forwarded) return null;
-  const first = forwarded.split(",")[0]?.trim();
-  return first || null;
-}
 
 function hashKey(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -23,7 +17,7 @@ export async function DELETE(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
 
-  const ip = getFirstIp(req);
+  const ip = extractClientIp(req);
   const ipKey = `rl:/api/cabinet/master/delete/ip:${hashKey(ip ?? "unknown")}`;
   const ipRateLimit = await checkRateLimit(ipKey, RATE_LIMITS.destructiveDelete);
   if (ipRateLimit.limited) {

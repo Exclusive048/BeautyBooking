@@ -5,6 +5,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { extractClientIp } from "@/lib/http/ip";
 import {
   extractSmtpErrorDetails,
   maskSmtpIdentity,
@@ -64,13 +65,6 @@ const partnershipSchema = z.object({
 
 const RATE_LIMIT = 3;
 const RATE_WINDOW_SECONDS = 10 * 60;
-
-function getFirstIp(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (!forwarded) return null;
-  const first = forwarded.split(",")[0]?.trim();
-  return first || null;
-}
 
 function hashKey(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -138,7 +132,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const ip = getFirstIp(req);
+  const ip = extractClientIp(req);
   const userAgent = req.headers.get("user-agent") ?? null;
 
   const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;

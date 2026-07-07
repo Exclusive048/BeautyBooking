@@ -32,6 +32,21 @@ const envSchema = z.object({
   // ── Auth ──────────────────────────────────────────────────────────────────
   AUTH_COOKIE_NAME: z.string().min(1).default("bh_session"),
 
+  // ── Trusted proxy / client-IP derivation (HARDENING-08 FIX-17) ────────────
+  // Number of trusted reverse-proxy hops in front of the app. The client IP is
+  // taken `TRUSTED_PROXY_HOPS` entries from the RIGHT of X-Forwarded-For (never
+  // the client-spoofable leftmost). Default 1 = a single reverse proxy (the
+  // docker-compose `127.0.0.1:3000` topology). Set to match prod exactly
+  // (e.g. 2 for CDN+LB) — too-high re-opens the OTP rate-limit spoof.
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(10).default(1),
+  // Optional dedicated real-IP header the edge OVERWRITES (e.g. "x-real-ip").
+  // Only set when the edge is confirmed to set it — otherwise it's spoofable.
+  TRUSTED_REAL_IP_HEADER: z.string().trim().default(""),
+  // Flip the YooKassa webhook IP allowlist from log-only to REJECT. Leave false
+  // until TRUSTED_PROXY_HOPS is confirmed for prod — enforcing with a wrong hop
+  // count rejects real notifications. (Worker API re-fetch is the anchor either way.)
+  YOOKASSA_IP_ALLOWLIST_ENFORCED: boolFlag,
+
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: z.string().optional(),
   REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().optional(),

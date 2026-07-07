@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { verifyToken } from "@/lib/auth/jwt";
 
@@ -105,19 +106,6 @@ function normalizePathname(pathname: string): string {
     return pathname.slice(0, -1);
   }
   return pathname;
-}
-
-function extractIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp && realIp.trim()) return realIp.trim();
-
-  return "unknown";
 }
 
 function resolveRateLimitTier(method: string, pathname: string): RateLimitTier | null {
@@ -229,7 +217,7 @@ export async function proxy(request: NextRequest) {
   const tier = resolveRateLimitTier(method, pathname);
 
   if (tier) {
-    const ip = extractIp(request);
+    const ip = getClientIp(request);
     const key = `rl:${tier}:${ip}:${method}:${pathname}`;
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
