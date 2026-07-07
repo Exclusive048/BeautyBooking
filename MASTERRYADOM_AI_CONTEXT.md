@@ -85,7 +85,7 @@
 - Платежи через ЮКасса (YooKassa)
 - Grace-period 7 дней при просрочке (PAST_DUE_GRACE_DAYS = 7)
 - **Цена плана/периода — единый `resolvePlanPrice`** (`src/lib/billing/pricing.ts`): один источник для checkout / renewal / cabinet / `/pricing`. Сохранённая цена ≤0 → fallback monthly×N (12mo со скидкой 20%), никогда не бесплатно (FIX-BC-1-2 + FIX-R2-05-AB)
-- Ограничения по плану: `maxTeamMasters` (STUDIO_FREE=2, PRO/PREMIUM admin-set, `null`=unlimited; guard `ensureStudioTeamLimit`), maxPortfolioPhotosSolo и др.
+- Ограничения по плану: `maxTeamMasters` — **ACTIVE-only счёт** (только принятые+опубликованные мастера via `STUDIO_ACTIVE_MASTER_WHERE`; pending-invites/INVITED/DISABLED место не занимают — BC-CAP). Guard `ensureStudioTeamLimit(studioId)` резолвит cap из плана **владельца** студии и enforce'ит на всех seat-becomes-ACTIVE точках (invite-accept + re-activate + attach), а не только на invite-send. Канонические числа — `STUDIO_TEAM_CAP_BY_TIER` (`billing/constants.ts`, single source): **FREE=2 / PRO=6 / PREMIUM=20** (product-confirmed), `null`=unlimited; admin-managed для PRO/PREMIUM (seed только FREE, admin-create backstop проставляет tier-default). Плюс maxPortfolioPhotosSolo и др.
 
 **Стадия:** Активная разработка / MVP-plus. SMS-шлюз НЕ интегрирован (OTP пишется в логи с комментарием "MVP"). Production launch — в активной подготовке (Q2-Q3 2026); идёт sprint редизайна кабинета мастера в ветке `newDesignSystem`.
 

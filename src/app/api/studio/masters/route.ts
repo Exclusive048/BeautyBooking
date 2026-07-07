@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
 
-    await ensureStudioTeamLimit(user.id, body.studioId);
+    await ensureStudioTeamLimit(body.studioId);
 
     const data = await createStudioMaster({
       ...body,

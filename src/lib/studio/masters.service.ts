@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { MembershipStatus, ProviderType } from "@prisma/client";
 
 export type StudioMasterServiceItem = {
@@ -289,10 +290,19 @@ export async function updateStudioMasterProfile(input: {
       type: "MASTER",
       studioId: studio.providerId,
     },
-    select: { id: true },
+    select: { id: true, ownerUserId: true, isPublished: true },
   });
   if (!master) {
     throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+  }
+
+  // BC-CAP: re-activating a claimed-but-paused master (ownerUserId set,
+  // isPublished false → true) makes it ACTIVE and consumes a seat. Enforce the
+  // team cap at this transition. Activating an unclaimed stub (ownerUserId null)
+  // does NOT make it ACTIVE, so it's not gated; pausing (isActive false) frees a
+  // seat and is never gated.
+  if (input.isActive === true && master.ownerUserId !== null && !master.isPublished) {
+    await ensureStudioTeamLimit(input.studioId);
   }
 
   await prisma.provider.update({

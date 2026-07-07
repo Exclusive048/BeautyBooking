@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 
@@ -24,6 +25,17 @@ export function isStudioMasterActive(
 ): boolean {
   return master.ownerUserId !== null && master.isPublished;
 }
+
+/**
+ * Prisma `where` fragment — the query equivalent of {@link isStudioMasterActive}
+ * (invite accepted → `ownerUserId` set, and published → not paused). Canonical
+ * "ACTIVE master" filter for counting seats against the team cap (BC-CAP). Spread
+ * alongside `{ type: "MASTER", studioId }` in a `provider.count`/`findMany`.
+ */
+export const STUDIO_ACTIVE_MASTER_WHERE = {
+  ownerUserId: { not: null },
+  isPublished: true,
+} satisfies Prisma.ProviderWhereInput;
 
 /**
  * Fetches a master Provider scoped to a studio and asserts it is ACTIVE

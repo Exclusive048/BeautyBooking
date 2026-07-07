@@ -143,7 +143,7 @@
 
 ## 🧩 PRODUCT DECISIONS — решены Артёмом → actionable code
 
-- **BC-CAP** → считать **ACTIVE-only** (сейчас `ensureStudioTeamLimit` считает INVITED/DISABLED+pending invites тоже) **+** задать числа cap для PRO/PREMIUM (FREE=2 есть).
+- ✅ **BC-CAP** *(BILLING-CAP-01 2026-07-08 — fix applied, pending commit → перенести в BACKLOG-DONE при коммите)* — team-limit теперь считает **ACTIVE-only** (`ownerUserId!=null && isPublished`, canonical `STUDIO_ACTIVE_MASTER_WHERE`); pending invites + INVITED/DISABLED больше не занимают место. Enforcement перенесён на **все seat-becomes-ACTIVE точки** (invite-accept `invites/service.ts` + re-activate `masters.service.ts` + legacy attach-by-id route), send-time guards (invite/add) остались как early-guard. Cap резолвится из плана **владельца** студии (`ensureStudioTeamLimit(studioId)` — сигнатура сменена с `(userId, studioId)`; закрыт латентный баг «ADMIN-не-владелец → FREE cap 2 на PRO студии»). Числа: `STUDIO_TEAM_CAP_BY_TIER` (`billing/constants.ts`, single source) — **FREE=2 / PRO=6 / PREMIUM=20 (product-confirmed Артёмом, BILLING-CAP-01-FIX)**; wired в prod-seed (FREE) + admin plan-CREATE backstop (STUDIO без явного cap → tier-default, закрывает «PRO по умолчанию 2» footgun) + test-seed (comment-pinned). Seat-display UI отсутствует → FIX-3 no-op. +14 unit-тестов. FULL gate: typecheck/lint(baseline)/encoding/mojibake/**test 1025** ✅.
 - **R2-05-C-v2** (opt-in renewal на росте цены) → при повышении цены — renewal **opt-in**: 2-дневный grace + reminders на 24h/2h.
 - **Studio reschedule full parity** → studio-календарь получает «принять предложенное клиентом время» (сейчас только Move/Cancel) — пересекается с R2-06-A.
 

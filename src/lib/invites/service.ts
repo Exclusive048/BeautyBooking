@@ -1,9 +1,11 @@
 import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import { toAppError } from "@/lib/api/errors";
 import { addRoleToUser } from "@/lib/auth/roles";
-import type { Result } from "@/lib/domain/result";
+import type { Result, StatusCode } from "@/lib/domain/result";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { createMasterProfile } from "@/lib/profiles/professional";
+import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { attachMasterToStudio } from "@/lib/studios/masters";
 
 type InviteAcceptResult = {
@@ -58,6 +60,22 @@ export async function acceptStudioInvite(
 
   if (invite.status === MembershipStatus.REJECTED) {
     return { ok: false, status: 409, message: "Invite already rejected", code: "INVITE_ALREADY_REJECTED" };
+  }
+
+  // BC-CAP: accepting an invite makes a master ACTIVE (consumes a seat). Under
+  // ACTIVE-only counting, pending invites don't reserve seats, so enforcement
+  // must land HERE — the point the seat actually becomes ACTIVE — not only at
+  // invite-send. Blocks joining a full studio; the invite stays pending until a
+  // seat frees up or the studio upgrades its plan.
+  try {
+    await ensureStudioTeamLimit(invite.studioId);
+  } catch (error) {
+    const appError = toAppError(error);
+    // `ensureStudioTeamLimit` throws 409 LIMIT_REACHED (cap) or 404 (studio
+    // gone); narrow to the Result StatusCode union, anything else → 500.
+    const status: StatusCode =
+      appError.status === 404 ? 404 : appError.status === 409 ? 409 : 500;
+    return { ok: false, status, message: appError.message, code: appError.code };
   }
 
   const normalizedInvitePhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
