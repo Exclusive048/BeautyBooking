@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -131,85 +132,63 @@ export function PortfolioStrip({ items }: Props) {
         </motion.div>
       )}
 
-      <AnimatePresence>
-        {selectedId ? (
-          <motion.div
-            key="lightbox"
-            className="fixed inset-0 z-50"
-            initial={reduce ? false : { opacity: 0 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.2 }}
-          >
-            <Button
-              variant="wrapper"
-              className="absolute inset-0 bg-black/65"
-              onClick={closeViewer}
-              aria-label={UI_TEXT.publicProfile.portfolio.close}
-            />
-            <div className="absolute inset-0 flex items-center justify-center p-4">
-              <motion.div
-                className="relative w-full max-w-4xl rounded-[26px] border border-border-subtle bg-bg-card p-4 shadow-hover"
-                initial={reduce ? false : { opacity: 0, scale: 0.95 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
-                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-              >
-                <button
-                  type="button"
-                  onClick={closeViewer}
-                  aria-label={UI_TEXT.publicProfile.portfolio.close}
-                  className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-bg-input transition hover:bg-bg-card"
-                >
-                  <X className="h-4 w-4 text-text-sec" aria-hidden />
-                </button>
+      {/* OVERLAY-PORTAL-REFACTOR-01: was a hand-rolled `fixed inset-0` lightbox.
+          Now portals through <ModalSurface size="xl"> (max-w-4xl preserved).
+          Backdrop-click close (was an explicit wrapper Button) is now handled
+          by ModalSurface; gains role="dialog"/aria-modal, focus-trap,
+          scroll-lock + Escape close — all previously absent. */}
+      <ModalSurface open={Boolean(selectedId)} onClose={closeViewer} size="xl">
+        <button
+          type="button"
+          onClick={closeViewer}
+          aria-label={UI_TEXT.publicProfile.portfolio.close}
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-bg-input transition hover:bg-bg-card"
+        >
+          <X className="h-4 w-4 text-text-sec" aria-hidden />
+        </button>
 
-                {error ? <div className="py-6 text-center text-sm text-rose-500">{error}</div> : null}
+        {error ? <div className="py-6 text-center text-sm text-rose-500">{error}</div> : null}
 
-                {!error && !selectedItem ? (
-                  <div className="flex min-h-[240px] items-center justify-center text-sm text-text-sec">
-                    {UI_TEXT.publicProfile.portfolio.loading}
-                  </div>
-                ) : null}
-
-                {selectedItem ? (
-                  <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                    <div className="relative aspect-[3/4] max-h-[72vh] w-full">
-                      <ResilientImage
-                        src={selectedItem.mediaUrl}
-                        alt={
-                          selectedItem.caption ??
-                          selectedItem.primaryServiceTitle ??
-                          UI_TEXT.publicProfile.portfolio.untitledWork
-                        }
-                        sizes="(max-width: 1024px) 90vw, 50vw"
-                        quality={90}
-                        className="rounded-2xl object-contain"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-lg font-semibold text-text-main">{selectedItem.masterName}</div>
-                      <div className="mt-2 text-sm text-text-sec">
-                        {selectedItem.caption ?? selectedPreview?.caption ?? ""}
-                      </div>
-                      {selectedItem.serviceOptions.length > 0 ? (
-                        <div className="mt-4 space-y-2">
-                          {selectedItem.serviceOptions.map((service) => (
-                            <div key={service.serviceId} className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2">
-                              <span className="text-sm text-text-main">{service.title}</span>
-                              <span className="text-sm font-medium text-text-sec">{UI_FMT.priceLabel(service.price)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-              </motion.div>
-            </div>
-          </motion.div>
+        {!error && !selectedItem ? (
+          <div className="flex min-h-[240px] items-center justify-center text-sm text-text-sec">
+            {UI_TEXT.publicProfile.portfolio.loading}
+          </div>
         ) : null}
-      </AnimatePresence>
+
+        {selectedItem ? (
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="relative aspect-[3/4] max-h-[72vh] w-full">
+              <ResilientImage
+                src={selectedItem.mediaUrl}
+                alt={
+                  selectedItem.caption ??
+                  selectedItem.primaryServiceTitle ??
+                  UI_TEXT.publicProfile.portfolio.untitledWork
+                }
+                sizes="(max-width: 1024px) 90vw, 50vw"
+                quality={90}
+                className="rounded-2xl object-contain"
+              />
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-text-main">{selectedItem.masterName}</div>
+              <div className="mt-2 text-sm text-text-sec">
+                {selectedItem.caption ?? selectedPreview?.caption ?? ""}
+              </div>
+              {selectedItem.serviceOptions.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  {selectedItem.serviceOptions.map((service) => (
+                    <div key={service.serviceId} className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2">
+                      <span className="text-sm text-text-main">{service.title}</span>
+                      <span className="text-sm font-medium text-text-sec">{UI_FMT.priceLabel(service.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </ModalSurface>
     </section>
   );
 }
