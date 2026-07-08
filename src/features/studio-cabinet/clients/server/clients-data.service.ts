@@ -233,6 +233,7 @@ export async function loadStudioClientsData(input: LoadStudioClientsInput): Prom
     filteredCount: filtered.length,
     totalCount: allRows.length,
     nextCursor,
+    timezone: tz,
     masterOptions: masters.map((m) => ({
       id: m.id,
       displayName: m.name,
@@ -297,6 +298,8 @@ function emptyResult(): StudioClientsData {
     filteredCount: 0,
     totalCount: 0,
     nextCursor: null,
+    // No studio → platform-default tz fallback (matches Provider.timezone default).
+    timezone: "Europe/Moscow",
     masterOptions: [],
   };
 }

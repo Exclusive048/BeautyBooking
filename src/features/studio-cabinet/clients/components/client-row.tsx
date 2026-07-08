@@ -20,9 +20,11 @@ type RowProps = {
   studioId: string;
   scheduleMasters: StudioCabinetShellExtras["scheduleMasters"];
   services: StudioCabinetServiceOption[];
+  /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the «Записать» dialog. */
+  timezone: string;
 };
 
-export function ClientTableRow({ row, studioId, scheduleMasters, services }: RowProps) {
+export function ClientTableRow({ row, studioId, scheduleMasters, services, timezone }: RowProps) {
   return (
     <tr className="border-t border-border-subtle hover:bg-bg-input/30">
       <td className="px-3 py-3 align-top">
@@ -102,6 +104,7 @@ export function ClientTableRow({ row, studioId, scheduleMasters, services }: Row
           client={{ name: row.displayName, phone: row.phone ?? "" }}
           masters={scheduleMasters}
           services={services}
+          timezone={timezone}
         />
       </td>
     </tr>

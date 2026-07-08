@@ -288,6 +288,7 @@ export function DayGrid({
         masters={day.columns}
         services={services}
         startAtUtc={createSlot?.startAtUtc ?? null}
+        timezone={timezone}
         onClose={() => setCreateSlot(null)}
       />
 

@@ -37,6 +37,13 @@ export type ClientCardData = {
   history: ClientHistoryItem[];
   visitsCount: number;
   daysSinceLastVisit: number | null;
+  /**
+   * TZ-DISPLAY-SALON-PARITY-01: the provider's (salon) tz. All bookings in one
+   * card belong to the same cabinet's provider, so the whole visit history
+   * renders in this tz (not the viewer's browser tz). Already passed in via
+   * `input.timeZone` — surfaced here so the drawer doesn't re-derive it.
+   */
+  timeZone: string;
 };
 
 type ClientIdentity = {
@@ -145,6 +152,7 @@ export async function getClientCardData(input: {
     history,
     visitsCount,
     daysSinceLastVisit: calculateDaysSinceLastVisit(lastVisitAt, input.timeZone),
+    timeZone: input.timeZone,
   };
 }
 

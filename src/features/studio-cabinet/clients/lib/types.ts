@@ -80,6 +80,11 @@ export type StudioClientsData = {
   nextCursor: string | null;
   /** Master-picker options for the filter dropdown. */
   masterOptions: StudioClientMasterChip[];
+  /**
+   * TZ-DISPLAY-SALON-PARITY-01: salon (studio provider) tz — threaded to the
+   * «Записать» create-booking dialog so its time renders/edits in salon-local.
+   */
+  timezone: string;
 };
 
 export function isStudioClientSegmentKey(value: unknown): value is StudioClientSegmentKey {

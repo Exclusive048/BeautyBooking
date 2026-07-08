@@ -36,6 +36,9 @@ export type PortfolioFeedItem = {
 
 export type PortfolioDetail = PortfolioFeedItem & {
   serviceOptions: PortfolioServiceOption[];
+  /** TZ-DISPLAY-SALON-PARITY-01: the master's (salon) tz — nearest-slot times
+   *  render in this tz, not the viewer's. */
+  masterTimezone: string;
   nearestSlots: Array<{ startAt: string }>;
   similarItems: Array<{
     id: string;
@@ -526,6 +529,8 @@ export async function getPortfolioDetail(
           publicUsername: true,
           avatarUrl: true,
           ratingAvg: true,
+          // TZ-DISPLAY-SALON-PARITY-01: salon tz for the nearest-slot times.
+          timezone: true,
           studio: { select: { name: true } },
         },
       },
@@ -639,6 +644,7 @@ export async function getPortfolioDetail(
     serviceOptions: snapshot.serviceOptions,
     favoritesCount: item._count.favorites,
     isFavorited: Array.isArray(item.favorites) ? item.favorites.length > 0 : false,
+    masterTimezone: item.master.timezone,
     nearestSlots: [],
     similarItems,
   };

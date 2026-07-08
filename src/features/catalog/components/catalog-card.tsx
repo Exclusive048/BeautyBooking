@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Heart, Star } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -42,6 +41,8 @@ type CatalogCardItem = {
   // (renamed from the implicit `todaySlotsCount > 0` signal).
   slotPrecision?: string;
   availableToday?: boolean;
+  /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the (dormant) `nextSlot` time. */
+  timezone?: string;
 };
 
 type Props = {
@@ -77,7 +78,6 @@ export function CatalogCard({
   onLoginRequired,
 }: Props) {
   const router = useRouter();
-  const viewerTimeZone = useViewerTimeZoneContext();
   const [favorited, setFavorited] = useState(initialFavorited);
   const [favoritePending, setFavoritePending] = useState(false);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
@@ -148,7 +148,10 @@ export function CatalogCard({
     precision: normalizeSlotPrecision(item.slotPrecision),
     nextSlotStartAt: item.nextSlot?.startAt ?? null,
     availableToday: item.availableToday ?? (item.todaySlotsCount ?? 0) > 0,
-    timeZone: viewerTimeZone,
+    // TZ-DISPLAY-SALON-PARITY-01: a slot time is a SALON-tz instant, never the
+    // viewer's browser tz. `nextSlot` is null today (dormant) — this is
+    // correct-when-lit. Fallback is the platform-default salon tz, not viewer.
+    timeZone: item.timezone ?? "Europe/Moscow",
     fallbackToOpen: false,
   });
 

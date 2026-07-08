@@ -21,6 +21,8 @@ type Props = {
   client: { name: string; phone: string };
   masters: ScheduleMasterColumn[];
   services: ServiceOption[];
+  /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the create-booking dialog. */
+  timezone: string;
 };
 
 /**
@@ -35,7 +37,7 @@ type Props = {
  * server component. Dialog state is scoped to one row; opening
  * another row's button independently spawns its own dialog.
  */
-export function ClientBookButton({ studioId, client, masters, services }: Props) {
+export function ClientBookButton({ studioId, client, masters, services, timezone }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -55,6 +57,7 @@ export function ClientBookButton({ studioId, client, masters, services }: Props)
         startAtUtc={null}
         masters={masters}
         services={services}
+        timezone={timezone}
         open={open}
         onClose={() => setOpen(false)}
         prefilledClient={client}

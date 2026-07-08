@@ -50,6 +50,7 @@ export function StudioBookingsPage({
         visibleCount={list.items.length}
         masters={scheduleMasters}
         services={services}
+        timezone={list.timezone}
       />
       <BookingsKpiRow kpis={kpis} />
       <BookingsFilters

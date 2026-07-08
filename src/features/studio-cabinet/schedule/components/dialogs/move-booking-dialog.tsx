@@ -8,8 +8,10 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
+import { salonInputToUtcIso, utcIsoToSalonInput } from "../../lib/datetime-input";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.moveDialog;
+const TV = UI_TEXT.studioCabinet.scheduleV2;
 const E = UI_TEXT.studioCabinet.scheduleV2.errors;
 
 type Props = {
@@ -26,24 +28,15 @@ type Props = {
   bookingServiceId: string;
   masters: ScheduleMasterColumn[];
   mode: "master" | "time";
+  /**
+   * TZ-DISPLAY-SALON-PARITY-01: salon (provider) tz. The datetime-local input
+   * is populated + read back as SALON-local wall-clock, so a cross-tz admin
+   * edits the salon's time (matching the grid), not their browser tz.
+   */
+  timezone: string;
   open: boolean;
   onClose: () => void;
 };
-
-function toLocalDateTimeInput(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
-}
-
-function fromLocalDateTimeInput(value: string): string {
-  if (!value) return new Date().toISOString();
-  return new Date(value).toISOString();
-}
 
 export function MoveBookingDialog({
   studioId,
@@ -53,21 +46,24 @@ export function MoveBookingDialog({
   bookingServiceId,
   masters,
   mode,
+  timezone,
   open,
   onClose,
 }: Props) {
   const router = useRouter();
   const [masterId, setMasterId] = useState(currentMasterId);
-  const [startAt, setStartAt] = useState(toLocalDateTimeInput(currentStartAtUtc));
+  const [startAt, setStartAt] = useState(
+    utcIsoToSalonInput(currentStartAtUtc, timezone),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setMasterId(currentMasterId);
-    setStartAt(toLocalDateTimeInput(currentStartAtUtc));
+    setStartAt(utcIsoToSalonInput(currentStartAtUtc, timezone));
     setError(null);
-  }, [open, currentMasterId, currentStartAtUtc]);
+  }, [open, currentMasterId, currentStartAtUtc, timezone]);
 
   function handleClose() {
     if (submitting) return;
@@ -86,7 +82,11 @@ export function MoveBookingDialog({
           body: JSON.stringify({
             studioId,
             targetMasterId: mode === "master" ? masterId : currentMasterId,
-            targetStartAt: fromLocalDateTimeInput(startAt),
+            // TZ-DISPLAY-SALON-PARITY-01: interpret the entered wall-clock in
+            // the SALON tz → UTC (not the browser tz). Fall back to the current
+            // instant if the input is somehow empty/malformed — never shift the
+            // booked time by accident.
+            targetStartAt: salonInputToUtcIso(startAt, timezone) ?? currentStartAtUtc,
             strategy: "KEEP_SERVICE",
             pricing: "KEEP_PRICE",
           }),
@@ -158,7 +158,10 @@ export function MoveBookingDialog({
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-text-main">
-            {T.timeLabel}
+            {T.timeLabel}{" "}
+            <span className="font-normal text-text-sec">
+              · {TV.salonTimeInputHint}
+            </span>
           </span>
           <Input
             type="datetime-local"

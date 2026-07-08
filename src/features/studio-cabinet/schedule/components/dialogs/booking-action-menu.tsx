@@ -198,6 +198,7 @@ export function BookingActionMenu({
           bookingServiceId={booking.serviceId}
           masters={masters}
           mode={moveMode}
+          timezone={timezone}
           open
           onClose={() => {
             setMoveMode(null);

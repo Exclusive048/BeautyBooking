@@ -262,6 +262,7 @@ export function ScheduleHeader({
         services={services}
         masterId={null}
         startAtUtc={null}
+        timezone={timezone}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
       />

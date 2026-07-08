@@ -6278,6 +6278,10 @@ export const UI_TEXT = {
         // whose client asked to move it — the studio must accept/decline.
         rescheduleBadge: "Клиент просит перенос",
       },
+      // TZ-DISPLAY-SALON-PARITY-01: the datetime-local inputs in the
+      // create/move dialogs are edited as SALON-local wall-clock (converted
+      // via salon tz), so a cross-tz admin knows they're not editing browser tz.
+      salonTimeInputHint: "время салона",
       actions: {
         menuTitle: "Действия с записью",
         // STUDIO-CLEANUP-FIX-A #1г: `details` key removed alongside

@@ -8,6 +8,7 @@ import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 
 type PortfolioDetail = {
   id: string;
@@ -21,6 +22,8 @@ type PortfolioDetail = {
   }>;
   totalDurationMin: number;
   totalPrice: number;
+  /** TZ-DISPLAY-SALON-PARITY-01: the master's (salon) tz for the slot times. */
+  masterTimezone: string;
   nearestSlots: Array<{ startAt: string }>;
 };
 
@@ -129,14 +132,34 @@ export default function BookFromPortfolioClient() {
               {detail.nearestSlots.length === 0 ? (
                 <span className="text-sm text-text-sec">{UI_TEXT.feed.noSlots}</span>
               ) : (
-                detail.nearestSlots.map((slot) => (
-                  <span
-                    key={slot.startAt}
-                    className="rounded-full border border-border-subtle bg-bg-input px-3 py-1 text-xs text-text-main"
-                  >
-                    {UI_FMT.dateTimeShort(slot.startAt, { timeZone: viewerTimeZone })}
-                  </span>
-                ))
+                detail.nearestSlots.map((slot) => {
+                  // TZ-DISPLAY-SALON-PARITY-01: a slot instant is SALON-tz,
+                  // labeled «(город, GMT+N)» when the viewer differs.
+                  const showZone = zonesDifferForViewer({
+                    iso: slot.startAt,
+                    salonTimeZone: detail.masterTimezone,
+                    viewerTimeZone,
+                  });
+                  return (
+                    <span
+                      key={slot.startAt}
+                      className="rounded-full border border-border-subtle bg-bg-input px-3 py-1 text-xs text-text-main"
+                    >
+                      {UI_FMT.dateTimeShort(slot.startAt, {
+                        timeZone: detail.masterTimezone,
+                      })}
+                      {showZone ? (
+                        <span className="text-text-sec">
+                          {" "}
+                          {formatZoneLabel({
+                            iso: slot.startAt,
+                            timeZone: detail.masterTimezone,
+                          })}
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                })
               )}
             </div>
           </div>
