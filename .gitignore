@@ -68,6 +68,7 @@ docs/runbooks/
 !docs/SPRINT-PATTERNS.md
 !docs/QUALITY-GATES.md
 !docs/AI-MIGRATION-STRATEGY.md
+!docs/AUTH-PROVIDER-ABSTRACTION-PLAN.md
 !docs/migration-samples/
 !docs/migration-samples/**
 
