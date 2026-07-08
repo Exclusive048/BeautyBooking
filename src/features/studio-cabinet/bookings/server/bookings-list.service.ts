@@ -7,6 +7,7 @@ import {
 import { CLIENT_STATUS_THRESHOLDS } from "@/lib/master/clients-classifier";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
+import { mapProposedReschedule } from "@/features/studio-cabinet/schedule/lib/reschedule-decision";
 import {
   bookingsTimeRangeBounds,
   type BookingsTimeRange,
@@ -170,6 +171,11 @@ export async function listStudioBookings(input: {
           clientUserId: true,
           masterProviderId: true,
           providerId: true,
+          // BOOKING-STUDIO-RESCHEDULE-PARITY-01: surface a pending client-proposed
+          // reschedule so the journal row's action menu can offer accept/decline.
+          proposedStartAt: true,
+          proposedEndAt: true,
+          actionRequiredBy: true,
           service: {
             select: { name: true, title: true, price: true, durationMin: true },
           },
@@ -326,6 +332,7 @@ export async function listStudioBookings(input: {
       priceKopeks: resolveBookingPriceKopeks(row),
       source: row.source as BookingSource,
       status: row.status,
+      ...mapProposedReschedule(row),
     };
   });
 

@@ -23,6 +23,14 @@ export type StudioBookingRow = {
   priceKopeks: number;
   source: BookingSource;
   status: BookingStatus;
+  /**
+   * BOOKING-STUDIO-RESCHEDULE-PARITY-01: a client-proposed reschedule the
+   * studio must accept/decline (see `ScheduleBookingCell`). Non-null only when
+   * `status === CHANGE_REQUESTED`; times are UTC ISO (salon-tz at display).
+   */
+  proposedStartAtUtc: string | null;
+  proposedEndAtUtc: string | null;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type StudioBookingsRangeCounts = {

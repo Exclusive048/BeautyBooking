@@ -6274,6 +6274,9 @@ export const UI_TEXT = {
       cell: {
         breakLabel: "Перерыв",
         emptyHint: "Создать запись",
+        // BOOKING-STUDIO-RESCHEDULE-PARITY-01: at-a-glance marker on a cell
+        // whose client asked to move it — the studio must accept/decline.
+        rescheduleBadge: "Клиент просит перенос",
       },
       actions: {
         menuTitle: "Действия с записью",
@@ -6282,6 +6285,15 @@ export const UI_TEXT = {
         moveToMaster: "Перенести на другого мастера",
         moveTime: "Перенести по времени",
         cancel: "Отменить запись",
+      },
+      // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline a client-proposed
+      // reschedule from the calendar cell + journal row action menu (parity with
+      // the master side). Reuses `/confirm` + `/decline-reschedule`.
+      reschedule: {
+        title: "Клиент предложил новое время",
+        proposedLabel: "Новое время",
+        accept: "Принять новое время",
+        decline: "Отклонить перенос",
       },
       createDialog: {
         title: "Новая запись",
@@ -6336,6 +6348,10 @@ export const UI_TEXT = {
         create: "Не удалось создать запись. Попробуйте ещё раз.",
         move: "Не удалось перенести запись. Возможно, конфликт времени.",
         cancel: "Не удалось отменить запись. Попробуйте ещё раз.",
+        // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline of a client-proposed
+        // reschedule failed (e.g. the new time now conflicts).
+        bookingReschedule:
+          "Не удалось выполнить действие. Попробуйте ещё раз.",
         masterRequired: "Выберите мастера.",
         serviceRequired: "Выберите услугу.",
         clientNameRequired: "Укажите имя клиента.",

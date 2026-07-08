@@ -76,6 +76,9 @@ function bookingToCell(row: StudioBookingRow): ScheduleBookingCell {
     serviceTitle: row.service.name,
     serviceId: "",
     priceKopeks: row.priceKopeks,
+    proposedStartAtUtc: row.proposedStartAtUtc,
+    proposedEndAtUtc: row.proposedEndAtUtc,
+    actionRequiredBy: row.actionRequiredBy,
   };
 }
 

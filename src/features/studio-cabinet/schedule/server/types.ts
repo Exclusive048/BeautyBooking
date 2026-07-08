@@ -32,6 +32,15 @@ export type ScheduleBookingCell = {
   serviceTitle: string;
   serviceId: string;
   priceKopeks: number;
+  /**
+   * BOOKING-STUDIO-RESCHEDULE-PARITY-01: a client-proposed reschedule the
+   * studio must accept/decline. Present (non-null) only when `status ===
+   * CHANGE_REQUESTED`. Times are UTC ISO — display in salon-tz at the surface
+   * via `formatLocalHm`. `actionRequiredBy === "MASTER"` = studio's turn.
+   */
+  proposedStartAtUtc: string | null;
+  proposedEndAtUtc: string | null;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type ScheduleBreakCell = {

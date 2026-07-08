@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { assignLanes, laneStyle } from "@/lib/calendar/lane-layout";
 import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
+import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { formatLocalHm, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { BOOKING_CELL_CLASS } from "../../lib/booking-status-display";
+import { isPendingClientReschedule } from "../../lib/reschedule-decision";
 import {
   GRID_HEIGHT_PX,
   SLOT_HEIGHT_PX,
@@ -73,6 +76,13 @@ export function DayGrid({
   } | null>(null);
   const [activeBooking, setActiveBooking] =
     useState<ScheduleBookingCell | null>(null);
+
+  // BOOKING-STUDIO-RESCHEDULE-PARITY-01: `?focus=<bookingId>` deep-link reader
+  // (shared convention). A notification (e.g. reschedule request) links here
+  // with `?date=<salon-day>&focus=<id>` so the correct day loads and the cell
+  // scrolls into view + highlights. Ready signal = booking count (re-triggers
+  // when data changes); graceful no-op if the id isn't on the current day.
+  useFocusHighlight(day.bookings.length);
 
   const slotMinutes = Array.from(iterateSlotMinutes());
 
@@ -207,10 +217,13 @@ export function DayGrid({
                       const start = new Date(booking.startAtUtc);
                       const end = new Date(booking.endAtUtc);
                       const { left, width } = laneStyle(columnLanes.get(booking.id));
+                      const pendingReschedule =
+                        isPendingClientReschedule(booking);
                       return (
                         <button
                           key={booking.id}
                           type="button"
+                          data-focus-id={booking.id}
                           onClick={() => setActiveBooking(booking)}
                           className={cn(
                             "absolute z-10 overflow-hidden rounded-lg p-1.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-sm",
@@ -223,6 +236,14 @@ export function DayGrid({
                             width,
                           }}
                         >
+                          {pendingReschedule ? (
+                            <span
+                              title={T.cell.rescheduleBadge}
+                              className="absolute right-1 top-1 z-10 text-amber-600 dark:text-amber-400"
+                            >
+                              <RefreshCw className="h-3 w-3" aria-hidden />
+                            </span>
+                          ) : null}
                           <div className="font-mono text-[10px]">
                             {formatLocalHm(start, timezone)} —{" "}
                             {formatLocalHm(end, timezone)}
