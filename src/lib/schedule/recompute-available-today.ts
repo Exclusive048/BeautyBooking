@@ -99,3 +99,107 @@ export async function recomputeAvailableToday(
     erroredIds,
   };
 }
+
+/**
+ * CATALOG-AVAILABLE-TODAY — Phase 4: targeted single-provider recompute.
+ *
+ * Recomputes ONE provider's `availableToday` (same pure read path + minimal
+ * write as the sweep), and — for a MASTER that belongs to a studio — fans out
+ * to that studio too (a studio is free-today iff any active master is, so a
+ * master's change can flip the studio). Fired per-mutation from the slot-cache
+ * invalidation hooks (via a queued `availableToday.recompute` job), giving
+ * near-real-time freshness. The 30-min sweep stays as the reconciling backstop.
+ *
+ * 🔴 ENGINE-SAFETY: reuses ONLY the Phase-1 pure helpers
+ * (`providerHasFreeSlotToday` / `hasFreeSlotToday`) — `getDayPlanFromContext` +
+ * pure `buildSlotsForDay`, never `listAvailabilitySlotsPaginated` /
+ * `setCachedSlotsForDate`. Writes only `Provider.availableToday`. Slot
+ * generation is untouched.
+ */
+async function recomputeOneProvider(
+  providerId: string,
+  now: Date,
+  summary: RecomputeAvailableTodaySummary,
+): Promise<{ studioId: string | null } | null> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: {
+      id: true,
+      type: true,
+      availableToday: true,
+      // A master's change also affects its studio (fan-out target).
+      studioId: true,
+      // Probe fields (AvailabilityProbeProvider) — MASTER probes without a re-query.
+      timezone: true,
+      slotStepMin: true,
+      minBookingHoursAhead: true,
+      bufferBetweenBookingsMin: true,
+    },
+  });
+  if (!provider) return null;
+  summary.total += 1;
+
+  const free =
+    provider.type === ProviderType.MASTER
+      ? await providerHasFreeSlotToday(provider, now)
+      : // STUDIO → OR over its ACTIVE masters (re-resolved in the helper).
+        await hasFreeSlotToday(provider.id, now);
+
+  if (free !== provider.availableToday) {
+    // Minimal-write + race-safe: only touch the row when the value differs
+    // (the `if` skips the query in the common no-op case; the `not` guards a
+    // concurrent flip between read and write).
+    await prisma.provider.updateMany({
+      where: { id: provider.id, availableToday: { not: free } },
+      data: { availableToday: free },
+    });
+    summary.changed += 1;
+  }
+
+  return {
+    studioId: provider.type === ProviderType.MASTER ? provider.studioId : null,
+  };
+}
+
+export async function recomputeAvailableTodayForProvider(
+  providerId: string,
+  now: Date = new Date(),
+): Promise<RecomputeAvailableTodaySummary> {
+  const summary: RecomputeAvailableTodaySummary = {
+    total: 0,
+    changed: 0,
+    errored: 0,
+    erroredIds: [],
+  };
+
+  let studioId: string | null = null;
+  try {
+    const result = await recomputeOneProvider(providerId, now, summary);
+    studioId = result?.studioId ?? null;
+  } catch (error) {
+    summary.errored += 1;
+    summary.erroredIds.push(providerId);
+    logError("availableToday.recompute.provider-failed", {
+      providerId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Fan-out: a master's availability change also flips its studio's
+  // `availableToday`. Skipped if the master probe failed above (the sweep
+  // reconciles). A STUDIO provider has `studioId = null` → no recursion.
+  if (studioId) {
+    try {
+      await recomputeOneProvider(studioId, now, summary);
+    } catch (error) {
+      summary.errored += 1;
+      summary.erroredIds.push(studioId);
+      logError("availableToday.recompute.provider-failed", {
+        providerId: studioId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return summary;
+}

@@ -32,6 +32,17 @@ export type MediaCleanupPayload = Record<string, never>;
 
 export type MrrSnapshotDailyPayload = Record<string, never>;
 
+/**
+ * CATALOG-AVAILABLE-TODAY Phase 4: targeted recompute of a single provider's
+ * `availableToday` after a mutation that changed its today-availability
+ * (a booking made/cancelled/moved, a schedule/day-off edit). Complements the
+ * 30-min sweep (`recomputeAvailableToday`) — near-real-time freshness instead
+ * of ≤30-min stale. The handler also fans out to the master's studio.
+ */
+export type AvailableTodayRecomputePayload = {
+  providerId: string;
+};
+
 export type PlanEditedNotifyPayload = {
   planId: string;
   planCode: string;
@@ -107,6 +118,12 @@ export type MrrSnapshotDailyJob = {
   payload: MrrSnapshotDailyPayload;
 } & JobMeta;
 
+export type AvailableTodayRecomputeJob = {
+  id: string;
+  type: "availableToday.recompute";
+  payload: AvailableTodayRecomputePayload;
+} & JobMeta;
+
 export type PlanEditedNotifyJob = {
   id: string;
   type: "notification.billing.plan-edited.mass";
@@ -121,6 +138,7 @@ export type Job =
   | MediaCleanupJob
   | YookassaWebhookJob
   | MrrSnapshotDailyJob
+  | AvailableTodayRecomputeJob
   | PlanEditedNotifyJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
@@ -130,6 +148,7 @@ export const SLOT_FREED_JOB_TYPE = "slot.freed";
 export const MEDIA_CLEANUP_JOB_TYPE = "media.cleanup";
 export const YOOKASSA_WEBHOOK_JOB_TYPE = "yookassa.webhook";
 export const MRR_SNAPSHOT_DAILY_JOB_TYPE = "mrr.snapshot.daily";
+export const AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE = "availableToday.recompute";
 export const PLAN_EDITED_NOTIFY_JOB_TYPE = "notification.billing.plan-edited.mass";
 export const DEFAULT_JOB_MAX_ATTEMPTS = 5;
 
@@ -184,6 +203,13 @@ function isMediaCleanupPayload(value: unknown): value is MediaCleanupPayload {
 
 function isMrrSnapshotDailyPayload(value: unknown): value is MrrSnapshotDailyPayload {
   return isRecord(value);
+}
+
+function isAvailableTodayRecomputePayload(
+  value: unknown,
+): value is AvailableTodayRecomputePayload {
+  if (!isRecord(value)) return false;
+  return typeof value.providerId === "string" && value.providerId.length > 0;
 }
 
 function isPlanEditedNotifyPayload(value: unknown): value is PlanEditedNotifyPayload {
@@ -247,6 +273,10 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
     return isMrrSnapshotDailyPayload(value.payload);
+  }
+
+  if (value.type === AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE) {
+    return isAvailableTodayRecomputePayload(value.payload);
   }
 
   if (value.type === PLAN_EDITED_NOTIFY_JOB_TYPE) {
@@ -394,6 +424,27 @@ export function createMrrSnapshotDailyJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: MRR_SNAPSHOT_DAILY_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createAvailableTodayRecomputeJob(
+  payload: AvailableTodayRecomputePayload,
+  input?: Partial<
+    Pick<
+      AvailableTodayRecomputeJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): AvailableTodayRecomputeJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

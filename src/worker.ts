@@ -21,6 +21,7 @@ import { env, isProduction } from "@/lib/env";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
+  AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
   BOOKING_REMINDER_JOB_TYPE,
   DEFAULT_JOB_MAX_ATTEMPTS,
   MEDIA_CLEANUP_JOB_TYPE,
@@ -48,7 +49,10 @@ import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
 import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
 import { processPlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
-import { recomputeAvailableToday } from "@/lib/schedule/recompute-available-today";
+import {
+  recomputeAvailableToday,
+  recomputeAvailableTodayForProvider,
+} from "@/lib/schedule/recompute-available-today";
 
 ensureVisualSearchStartupConfig();
 
@@ -500,6 +504,26 @@ async function processMrrSnapshotDailyJob(
   });
 }
 
+async function processAvailableTodayRecomputeJob(
+  job: Extract<Job, { type: typeof AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  // CATALOG-AVAILABLE-TODAY Phase 4: targeted recompute for the mutated provider
+  // (+ studio fan-out). Reuses the Phase-1 pure read path — no slot-gen touched.
+  const summary = await recomputeAvailableTodayForProvider(job.payload.providerId);
+  logInfo("worker.availableToday.recompute-provider.processed", {
+    providerId: job.payload.providerId,
+    total: summary.total,
+    changed: summary.changed,
+    errored: summary.errored,
+  });
+}
+
 async function processPlanEditedNotifyJob(
   job: Extract<Job, { type: typeof PLAN_EDITED_NOTIFY_JOB_TYPE }>
 ): Promise<void> {
@@ -534,6 +558,8 @@ async function processJob(job: Job): Promise<void> {
       await processMediaCleanupJob(job);
     } else if (job.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
       await processMrrSnapshotDailyJob(job);
+    } else if (job.type === AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE) {
+      await processAvailableTodayRecomputeJob(job);
     } else if (job.type === PLAN_EDITED_NOTIFY_JOB_TYPE) {
       await processPlanEditedNotifyJob(job);
     } else {

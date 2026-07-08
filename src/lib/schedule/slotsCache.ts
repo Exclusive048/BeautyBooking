@@ -3,6 +3,7 @@ import * as cache from "@/lib/cache/cache";
 import { listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { enqueueAvailableTodayRecompute } from "@/lib/schedule/available-today-recompute-enqueue";
 
 const SLOTS_TTL_SECONDS = 120;
 const SLOTS_INDEX_TTL_SECONDS = SLOTS_TTL_SECONDS;
@@ -58,6 +59,10 @@ export async function invalidateSlotsForMaster(masterId: string): Promise<void> 
     cache.delByPattern(`slots:${masterId}:*`),
     invalidateAdvisorCache(masterId),
   ]);
+  // CATALOG-AVAILABLE-TODAY Phase 4: a schedule/day-off edit for this master
+  // changes its today-availability → targeted `availableToday` recompute
+  // (queued, never throws). Additional effect AFTER the existing invalidation.
+  await enqueueAvailableTodayRecompute(masterId);
 }
 
 export async function invalidateSlotsForDateKeys(masterId: string, dateKeys: string[]): Promise<void> {
@@ -88,4 +93,10 @@ export async function invalidateSlotsForBooking(
 ): Promise<void> {
   const dateKeys = getBookingDateKeys(bookingStartUtc, bookingEndUtc, providerTimeZone);
   await invalidateSlotsForDateKeys(masterId, dateKeys);
+  // CATALOG-AVAILABLE-TODAY Phase 4: a booking made/cancelled/moved for this
+  // master changes its today-availability → targeted `availableToday` recompute
+  // (queued, never throws). Additional effect AFTER the existing invalidation.
+  // A cross-master move invalidates both masters (called once per master), so
+  // both get recomputed. The handler fans out to the master's studio.
+  await enqueueAvailableTodayRecompute(masterId);
 }
