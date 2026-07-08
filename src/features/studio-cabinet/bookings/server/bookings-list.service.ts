@@ -171,6 +171,10 @@ export async function listStudioBookings(input: {
           clientUserId: true,
           masterProviderId: true,
           providerId: true,
+          // BOOKING-JOURNAL-SERVICEID-01: the booking's gating service, threaded
+          // into the cell so Move-from-journal gates the master picker (parity
+          // with the calendar path, which selects `serviceId` the same way).
+          serviceId: true,
           // BOOKING-STUDIO-RESCHEDULE-PARITY-01: surface a pending client-proposed
           // reschedule so the journal row's action menu can offer accept/decline.
           proposedStartAt: true,
@@ -325,6 +329,9 @@ export async function listStudioBookings(input: {
         isNewClient: stats.completedCount <= 1,
         isVip: stats.revenue >= CLIENT_STATUS_THRESHOLDS.VIP_LTV_KOPEKS,
       },
+      // BOOKING-JOURNAL-SERVICEID-01: `Booking.serviceId` is a non-null FK, so
+      // this is always the real gating service (no `""` sentinel).
+      serviceId: row.serviceId,
       service: {
         name: row.service?.title?.trim() || row.service?.name || "Услуга",
         durationMin: row.service?.durationMin ?? 0,

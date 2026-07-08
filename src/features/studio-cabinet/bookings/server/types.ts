@@ -16,6 +16,15 @@ export type StudioBookingRow = {
     isNewClient: boolean;
     isVip: boolean;
   };
+  /**
+   * BOOKING-JOURNAL-SERVICEID-01: the booking's primary gating service
+   * (`Booking.serviceId`, non-null FK). Threaded into the calendar-cell shape
+   * so Move-from-journal gates the target-master picker identically to
+   * Move-from-calendar (`assertMasterPerformsService`); was hardcoded `""`
+   * which blocked every master. A package booking is N independent child rows,
+   * each with its own single `serviceId`, so there is no ambiguity here.
+   */
+  serviceId: string;
   service: {
     name: string;
     durationMin: number;

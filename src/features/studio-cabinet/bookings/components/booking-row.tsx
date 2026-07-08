@@ -12,10 +12,8 @@ import {
   bookingToneFromStatus,
 } from "@/features/studio-cabinet/schedule/lib/booking-status-display";
 import { BookingActionMenu } from "@/features/studio-cabinet/schedule/components/dialogs/booking-action-menu";
-import type {
-  ScheduleBookingCell,
-  ScheduleMasterColumn,
-} from "@/features/studio-cabinet/schedule/server/types";
+import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
+import { bookingToCell } from "../lib/booking-to-cell";
 import {
   SOURCE_BADGE_CLASS,
   getBookingSourceDisplay,
@@ -60,26 +58,6 @@ function formatDateLabel(iso: string, timeZone: string): string {
 
 function statusLabel(status: StudioBookingRow["status"]): string {
   return T.filters.statusLabels[status] ?? status;
-}
-
-function bookingToCell(row: StudioBookingRow): ScheduleBookingCell {
-  return {
-    id: row.id,
-    masterId: row.master.id,
-    startAtUtc: row.startAtUtc,
-    endAtUtc: row.endAtUtc,
-    status: row.status,
-    tone: bookingToneFromStatus(row.status),
-    clientName: row.client.displayName,
-    clientPhone: row.client.phone,
-    isNewClient: row.client.isNewClient,
-    serviceTitle: row.service.name,
-    serviceId: "",
-    priceKopeks: row.priceKopeks,
-    proposedStartAtUtc: row.proposedStartAtUtc,
-    proposedEndAtUtc: row.proposedEndAtUtc,
-    actionRequiredBy: row.actionRequiredBy,
-  };
 }
 
 export function BookingRow({
