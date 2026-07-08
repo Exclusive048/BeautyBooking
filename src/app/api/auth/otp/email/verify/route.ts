@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AccountType, ConsentType, OtpChannel } from "@prisma/client";
+import { ConsentType, OtpChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
@@ -11,7 +11,7 @@ import {
   clearOtpEmailVerifyFailures,
   registerOtpEmailVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
-import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import { resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
 import { otpEmailVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
@@ -75,18 +75,10 @@ export async function POST(req: Request) {
       prisma.userProfile.findUnique({ where: { email: normalizedEmail } }),
     ]);
 
-    let profile = existingProfile;
-
-    if (!profile) {
-      profile = await prisma.userProfile.create({
-        data: { email: normalizedEmail, roles: [AccountType.CLIENT] },
-      });
-    } else {
-      const nextRoles = await ensureClientRoleForUser(profile.id, profile.roles);
-      if (nextRoles !== profile.roles) {
-        profile = { ...profile, roles: nextRoles };
-      }
-    }
+    // OTP-EMAIL-LOGIN-RACE: create-or-recover is delegated so a P2002 from two
+    // simultaneous first-time logins re-reads the winner's row instead of
+    // erroring (6th re-read-on-conflict site — see email-login-profile.ts).
+    const profile = await resolveEmailLoginProfile(normalizedEmail, existingProfile);
 
     const ipAddress = extractClientIp(req);
     const userAgent = req.headers.get("user-agent");

@@ -348,6 +348,7 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 - **Telegram-login CSRF** (до re-enable): single-use signed `tg_login_state` cookie + nonce round-trip + `getTelegramEnabled()` gate.
 - **Timezone validation** — write-time `.refine(isValidTimeZone)` на studio/master PATCH; read-time fallback `Europe/Moscow` (закрывает stored-DoS через пустую tz).
 - **Идемпотентность** — bookings (`x-idempotency-key`+Redis lock), `BillingPayment.idempotenceKey` (@unique), YooKassa Idempotence-Key.
+- **P2002 re-read-on-conflict** — параллельные create'ы на `@unique` полях восстанавливаются re-read'ом winner-строки, не падают: `detect-city` · `conversation-slug` · email-OTP login (`resolveEmailLoginProfile`, 6-й site — `UserProfile.email`).
 - **Security headers / CSP** (`next.config.ts` + `proxy.ts`): X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy; prod — HSTS + CSP (nonce + strict-dynamic, без unsafe-inline/eval); JSON-LD экранирует `<` (`safeJsonLd`).
 - **Секреты** — JWT/OTP HMAC-SHA256; refresh в БД (jti), cookie httpOnly+SameSite=lax+secure.
 - Остаточно: нет kid/ротации JWT-секрета; IP-allowlist webhook пока log-only.
