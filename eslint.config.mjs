@@ -45,14 +45,20 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // Exemptions — explicit + justified. Two categories:
+  // Exemptions — explicit + justified. Three categories:
   //  (1) sanctioned overlay PRIMITIVES that DO portal to body;
   //  (2) genuinely non-modal fixed overlays (mobile-nav scrims, invisible
-  //      click-outside catchers) — not content modals, portaling adds nothing.
-  // Genuine content-overlay candidates (city-prompt-overlay, portfolio-editor
-  // crop, portfolio-strip lightbox, reviews-preview, stories-viewer-overlay) are
-  // intentionally NOT exempted — they warn as follow-up candidates (GUARDRAILS-01
-  // did not refactor them; see report / backlog).
+  //      click-outside catchers) — not content modals, portaling adds nothing;
+  //  (3) full-bleed MEDIA VIEWERS that a card/edge primitive can't host — a
+  //      centered ModalSurface always renders bordered-card chrome
+  //      (border/bg-card/padding/max-width) and `cn` is a plain join (no
+  //      tailwind-merge), so that chrome CANNOT be neutralized via className.
+  //      Forcing these into ModalSurface would change the full-bleed viewing
+  //      UX (framing/letterbox), violating the behavior-preserving mandate.
+  // OVERLAY-PORTAL-REFACTOR-01: the three CARD-shaped candidates (city-prompt-
+  // overlay, portfolio-strip lightbox, reviews-preview all-reviews) were
+  // migrated to <ModalSurface> and no longer warn. The two FULL-BLEED viewers
+  // below are exempted under category (3).
   {
     files: [
       "src/components/ui/modal-surface.tsx", // THE portal modal primitive
@@ -63,6 +69,17 @@ const eslintConfig = defineConfig([
       "src/features/admin-cabinet/components/admin-sidebar-mobile.tsx", // mobile sidebar backdrop
       "src/features/master/components/portfolio/portfolio-card.tsx", // invisible click-catcher (z-10 cursor-default)
       "src/features/master/components/services/row-menu.tsx", // invisible click-catcher (z-10 cursor-default)
+      // (3) full-bleed media viewers — card-modal primitive is the wrong shape:
+      // stories ALREADY createPortals to body itself (no positioning hazard —
+      // only the literal warns) + has a bespoke focus-trap + gesture nav (tap
+      // zones / hold-to-pause / swipe-down dismiss / 5s auto-advance) that
+      // conflicts with ModalSurface's backdrop + focus-trap — invariant #27.
+      "src/features/home/components/stories-viewer-overlay.tsx",
+      // full-bleed 90vw image preview on bg-black; ModalSurface's card chrome
+      // (unneutralizable without tailwind-merge) would box/letterbox it and
+      // change the viewing UX. Residual hazard (not yet portaled) tracked in
+      // BACKLOG — OVERLAY-FULLBLEED-PORTAL-PRIMITIVE.
+      "src/features/media/components/portfolio-editor.tsx",
     ],
     rules: {
       "no-restricted-syntax": "off",
