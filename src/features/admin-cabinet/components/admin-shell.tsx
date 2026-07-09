@@ -46,7 +46,7 @@ export function AdminShell({ user, children }: Props) {
         user={user}
       />
 
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main data-testid="page-main" className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar onOpenMobileNav={() => setMobileOpen(true)} />
         <div className="flex-1 px-4 py-6 md:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>

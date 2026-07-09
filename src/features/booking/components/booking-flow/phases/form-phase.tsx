@@ -274,6 +274,7 @@ export function FormPhase({
         size="lg"
         disabled={!canSubmit}
         onClick={onSubmit}
+        data-testid="booking-submit"
         className={cn("w-full gap-1.5", submitLoading && "opacity-90")}
       >
         {submitLoading ? (

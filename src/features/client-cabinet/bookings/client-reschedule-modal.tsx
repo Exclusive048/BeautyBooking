@@ -185,6 +185,7 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
             size="sm"
             onClick={handleSubmit}
             disabled={!slotIso || submitting}
+            data-testid="reschedule-submit"
           >
             <CalendarIcon className="mr-1.5 h-3.5 w-3.5" aria-hidden />
             {submitting ? T.moving : T.moveConfirm}

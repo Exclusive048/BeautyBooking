@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AccountType, ConsentType } from "@prisma/client";
+import { ConsentType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
@@ -7,7 +7,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
-import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import { resolvePhoneLoginProfile } from "@/lib/auth/phone-login-profile";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
@@ -84,21 +84,10 @@ export async function POST(req: Request) {
       prisma.userProfile.findUnique({ where: { phone } }),
     ]);
 
-    let profile = existingProfile;
-
-    if (!profile) {
-      profile = await prisma.userProfile.create({
-        data: {
-          phone,
-          roles: [AccountType.CLIENT],
-        },
-      });
-    } else {
-      const nextRoles = await ensureClientRoleForUser(profile.id, profile.roles);
-      if (nextRoles !== profile.roles) {
-        profile = { ...profile, roles: nextRoles };
-      }
-    }
+    // OTP-PHONE-LOGIN-RACE: create-or-recover is delegated so a P2002 from two
+    // simultaneous first-time logins re-reads the winner's row instead of
+    // erroring (7th re-read-on-conflict site — see phone-login-profile.ts).
+    const profile = await resolvePhoneLoginProfile(phone, existingProfile);
     logInfo("OTP verify primary DB queries done", {
       userProfileId: profile.id,
       ms: Date.now() - verifyDbStartedAt,

@@ -128,7 +128,7 @@ export function ClientBookingsPage() {
       ) : bookings.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8" data-testid="bookings-list">
           {months.map((month) => (
             <section key={month.key}>
               <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
@@ -136,7 +136,7 @@ export function ClientBookingsPage() {
               </div>
               <ul className="space-y-3">
                 {month.bookings.map((b) => (
-                  <li key={b.id} data-focus-id={b.id}>
+                  <li key={b.id} data-focus-id={b.id} data-testid="booking-row">
                     <BookingRow
                       booking={b}
                       onCancel={() => handleCancel(b)}

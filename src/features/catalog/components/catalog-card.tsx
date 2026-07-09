@@ -164,6 +164,7 @@ export function CatalogCard({
       role="link"
       tabIndex={0}
       aria-label={item.title}
+      data-testid="catalog-card"
       onClick={() => router.push(href)}
       onKeyDown={(e) => {
         if (e.key === "Enter") router.push(href);

@@ -44,7 +44,7 @@ export function CabinetLayout({
         </div>
       </div>
 
-      <main className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
+      <main data-testid="page-main" className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
 
       <CabinetBottomNav />
     </div>

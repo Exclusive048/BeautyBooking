@@ -31,7 +31,7 @@ type Props = {
  */
 export function BookingCard({ booking, column }: Props) {
   return (
-    <article data-focus-id={booking.id} className="rounded-xl border border-border-subtle bg-bg-card p-3">
+    <article data-focus-id={booking.id} data-testid="booking-row" className="rounded-xl border border-border-subtle bg-bg-card p-3">
       <header className="mb-2 flex items-start gap-2">
         {booking.clientAvatarUrl ? (
           <ResilientImage

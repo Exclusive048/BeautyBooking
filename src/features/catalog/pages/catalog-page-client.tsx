@@ -823,6 +823,7 @@ export default function CatalogPageClient({
 
           {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
             <motion.div
+              data-testid="catalog-list"
               className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
               initial="hidden"
               animate="visible"

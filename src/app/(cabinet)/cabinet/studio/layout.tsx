@@ -89,7 +89,7 @@ export default async function StudioCabinetLayout({
         </div>
 
         {/* Main content column — full width, padding only */}
-        <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-6 lg:px-8 lg:pb-8">
+        <main data-testid="page-main" className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-6 lg:px-8 lg:pb-8">
           {trialActive && daysLeft > 0 ? (
             <div className="mb-4 flex justify-end">
               <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />

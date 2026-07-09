@@ -104,6 +104,7 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
             size="sm"
             disabled={disabled}
             onClick={handleDecline}
+            data-testid="booking-decline"
             className="flex-1"
           >
             {T.card.decline}
@@ -114,6 +115,7 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
             size="sm"
             disabled={disabled}
             onClick={() => void patch("CONFIRMED")}
+            data-testid="booking-confirm"
             className="flex-1"
           >
             {T.card.confirm}

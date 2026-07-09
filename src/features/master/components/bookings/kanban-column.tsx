@@ -35,7 +35,7 @@ type Props = {
 export function KanbanColumn({ id, title, hint, bookings }: Props) {
   const sum = bookings.reduce((s, b) => s + b.price, 0);
   return (
-    <section className="flex w-[320px] shrink-0 snap-start flex-col lg:max-h-[calc(100dvh-var(--topbar-h)-12rem)] lg:w-[280px] xl:w-[300px]">
+    <section data-testid={`bookings-column-${id}`} className="flex w-[320px] shrink-0 snap-start flex-col lg:max-h-[calc(100dvh-var(--topbar-h)-12rem)] lg:w-[280px] xl:w-[300px]">
       <header className="rounded-t-2xl border border-border-subtle bg-bg-card px-4 py-3">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">

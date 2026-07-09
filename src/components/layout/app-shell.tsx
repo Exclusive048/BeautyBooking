@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           so the cabinet page-headers (`top-[var(--topbar-h)]`) sit flush under
           the navbar with no bleed-band. */}
       <Topbar />
-      <main className="flex-1 w-full">
+      <main data-testid="app-main" className="flex-1 w-full">
         <AppShellContent>{children}</AppShellContent>
       </main>
       {/* FIX-VISUAL-POLISH G5: hide the marketing footer on /cabinet + /admin

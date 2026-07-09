@@ -694,6 +694,7 @@ export default function LoginClient({
                     onClick={sendCode}
                     disabled={loading || !inputValid || (inputValid && !agreedToTerms)}
                     size="lg"
+                    data-testid="login-send-code"
                     className="w-full"
                   >
                     {loading ? T.sending : (
@@ -730,6 +731,7 @@ export default function LoginClient({
                     onClick={() => verifyCode()}
                     disabled={loading || code.length < OTP_LENGTH}
                     size="lg"
+                    data-testid="login-verify"
                     className="w-full"
                   >
                     {loading ? T.verifying : (
