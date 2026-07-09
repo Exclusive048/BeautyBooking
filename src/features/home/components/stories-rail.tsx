@@ -141,7 +141,7 @@ export function StoriesRail() {
   // Loading: skeleton with reserved height, no layout-jump when groups load
   if (isLoading && !data) {
     return (
-      <section aria-label="Сторис мастеров" className="-mx-4 sm:-mx-6">
+      <section data-testid="stories-rail" aria-label="Сторис мастеров" className="-mx-4 sm:-mx-6">
         <RailSkeleton />
       </section>
     );
@@ -154,6 +154,7 @@ export function StoriesRail() {
 
   return (
     <motion.section
+      data-testid="stories-rail"
       initial={reduce ? false : { opacity: 0, y: -8 }}
       animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={reduce ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}

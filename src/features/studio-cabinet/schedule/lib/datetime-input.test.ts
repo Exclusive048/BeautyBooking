@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { salonInputToUtcIso, utcIsoToSalonInput } from "./datetime-input";
+import {
+  salonInputToUtcIso,
+  salonLocalDatetimeInput,
+  utcIsoToSalonInput,
+} from "./datetime-input";
 
 /**
  * TZ-DISPLAY-SALON-PARITY-01 · FIX-4 — the risk surface.
@@ -108,5 +112,44 @@ describe("round-trip — no drift (the important guarantee)", () => {
     const input = utcIsoToSalonInput(original, EKB); // 2026-07-07T01:00
     expect(input).toBe("2026-07-07T01:00");
     expect(salonInputToUtcIso(input, EKB)).toBe(original);
+  });
+});
+
+/**
+ * TZ-DISPLAY-MANAGE-BREAKS-INPUT — the break dialog's default lunch time must be
+ * the SALON's wall-clock hour, not the browser's, so a cross-tz admin doesn't
+ * pre-fill (and then submit) a break shifted by their own tz.
+ */
+describe("salonLocalDatetimeInput — salon-local default datetime-local value", () => {
+  it("Vision (+5): a 13:00 default is 13:00 SALON-local and submits to 08:00Z", () => {
+    const day = "2026-07-07T00:00:00.000Z";
+    const value = salonLocalDatetimeInput(day, 13, EKB);
+    expect(value).toBe("2026-07-07T13:00");
+    // Round-trip through the real submit path: 13:00 EKB → 08:00Z (NOT 10:00Z,
+    // which is what a browser-tz Moscow admin would have produced).
+    expect(salonInputToUtcIso(value, EKB)).toBe("2026-07-07T08:00:00.000Z");
+  });
+
+  it("uses the SALON-local calendar day even when the UTC instant is a different date", () => {
+    // 20:00Z on the 6th is already 01:00 of the 7th in EKB (+5) → default on 7th.
+    expect(salonLocalDatetimeInput("2026-07-06T20:00:00.000Z", 14, EKB)).toBe(
+      "2026-07-07T14:00",
+    );
+  });
+
+  it("Moscow control (+3): 14:00 default on the viewed day", () => {
+    expect(salonLocalDatetimeInput("2026-07-07T00:00:00.000Z", 14, MSK)).toBe(
+      "2026-07-07T14:00",
+    );
+  });
+
+  it("pads a single-digit hour", () => {
+    expect(salonLocalDatetimeInput("2026-07-07T00:00:00.000Z", 9, EKB)).toBe(
+      "2026-07-07T09:00",
+    );
+  });
+
+  it("returns '' for a malformed day (never a host-tz fallback)", () => {
+    expect(salonLocalDatetimeInput("not-an-iso", 13, EKB)).toBe("");
   });
 });

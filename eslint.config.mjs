@@ -21,6 +21,14 @@ const eslintConfig = defineConfig([
     // This closes the 858/134 ↔ 823/122 drift that crept in as the
     // references folder grew.
     ".claude/**",
+    // QA-PREP-02: gitignored throwaway QA captures — per-task diagnostic
+    // scripts + smoke screenshots (.gitignore). Not application code; eslint
+    // only sees them on a machine that ran a live-QA session, so linting them
+    // adds environment-specific noise (unused-var warnings in ad-hoc .mjs/.mts
+    // capture scripts) absent from CI/clean checkouts. The committed
+    // `.qa/*.spec.ts` harness + helpers stay linted.
+    ".qa/diagnostics/**",
+    ".qa/screenshots/**",
   ]),
   // GUARDRAILS-01 (H1 overlays): a hand-rolled `fixed inset-0` modal/overlay
   // surface breaks whenever an ancestor gains transform/filter/overflow — the

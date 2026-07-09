@@ -275,12 +275,15 @@ function ProfileHeaderCard({
   data,
   status,
   userId,
-  onAvatarChanged: _onAvatarChanged,
 }: {
   data: ProfileDTO;
   status: SaveStatus;
   userId: string;
-  onAvatarChanged: () => void;
+  // `onAvatarChanged` is accepted for the caller's contract but unused here:
+  // <AvatarEditor> owns its full upload/reload pipeline (self-contained), so the
+  // parent doesn't need a change callback. Kept in the type so the wiring is
+  // discoverable if AvatarEditor later exposes an onChange.
+  onAvatarChanged?: () => void;
 }) {
   const displayName =
     [data.personal.firstName, data.personal.lastName].filter(Boolean).join(" ") ||

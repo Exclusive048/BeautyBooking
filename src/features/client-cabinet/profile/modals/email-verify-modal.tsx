@@ -175,6 +175,7 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
             </div>
             {error ? <ErrorBox message={error} /> : null}
             <ResendRow
+              key={resendAt ?? "idle"}
               resendAt={resendAt}
               onResend={() => {
                 setCode("");
@@ -226,19 +227,21 @@ function ResendRow({
   resendAt: number | null;
   onResend: () => void;
 }) {
-  const [secondsLeft, setSecondsLeft] = useState(0);
+  // LINT-BASELINE-SETSTATE-IN-EFFECT: seed the countdown once via a lazy
+  // initializer, then refresh it from the interval with a DEFERRED setState
+  // (allowed — the rule only flags a synchronous setState in the effect body;
+  // the old code called `tick()`/`setSecondsLeft(0)` synchronously there).
+  // The parent keys this row on `resendAt`, so a fresh cooldown remounts and
+  // re-seeds the initial value — no stale first second. Behaviour identical.
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    resendAt ? Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)) : 0,
+  );
 
   useEffect(() => {
-    if (!resendAt) {
-      setSecondsLeft(0);
-      return;
-    }
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000));
-      setSecondsLeft(remaining);
-    };
-    tick();
-    const interval = setInterval(tick, 1000);
+    if (!resendAt) return;
+    const interval = setInterval(() => {
+      setSecondsLeft(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)));
+    }, 1000);
     return () => clearInterval(interval);
   }, [resendAt]);
 

@@ -46,6 +46,7 @@
 | `review-row` | each review card — `master/components/reviews/review-card.tsx` |
 | `catalog-list` | catalog results grid — `features/catalog/pages/catalog-page-client.tsx` (default list view) |
 | `catalog-card` | each provider card — `features/catalog/components/catalog-card.tsx` |
+| `stories-rail` | home stories rail container (holds the story-ring buttons) — `features/home/components/stories-rail.tsx` (on both the loaded `<section>` and the loading skeleton) |
 
 ### Key CTAs
 

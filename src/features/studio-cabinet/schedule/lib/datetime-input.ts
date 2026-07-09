@@ -51,3 +51,16 @@ export function salonInputToUtcIso(value: string, timeZone: string): string | nu
   if (Number.isNaN(utc.getTime())) return null;
   return utc.toISOString();
 }
+
+/**
+ * A salon-local `datetime-local` value (`YYYY-MM-DDTHH:00`) for the day that
+ * `dayIso` falls on, at the given salon-local `hour`. Used for default break /
+ * slot times so a cross-tz admin gets the SALON's wall-clock hour (e.g. 13:00
+ * Yekaterinburg), not their own browser's. Returns "" for a malformed `dayIso`.
+ */
+export function salonLocalDatetimeInput(dayIso: string, hour: number, timeZone: string): string {
+  const day = new Date(dayIso);
+  if (Number.isNaN(day.getTime())) return "";
+  const dateKey = toLocalDateKey(day, timeZone); // salon-local YYYY-MM-DD
+  return `${dateKey}T${String(hour).padStart(2, "0")}:00`;
+}
