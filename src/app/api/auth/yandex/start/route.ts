@@ -12,7 +12,7 @@ import {
   YANDEX_STATE_TTL_SECONDS,
   YANDEX_VERIFIER_COOKIE,
 } from "@/lib/yandex/cookies";
-import { isProduction } from "@/lib/env";
+import { isProduction, isYandexAuthEnabled } from "@/lib/env";
 
 // FIX-YANDEX-OAUTH — start route, bespoke-parallel to api/auth/vk/start.
 const YANDEX_NOT_CONFIGURED_CODES = new Set([
@@ -23,6 +23,12 @@ const YANDEX_NOT_CONFIGURED_CODES = new Set([
 
 export async function GET(req: Request) {
   return withRequestContext(req, async () => {
+    // AUTH-KILLSWITCH-ENFORCE-01: refuse when Yandex auth is disabled
+    // server-side (FZ-199 kill-switch), before any cred read / OAuth work.
+    if (!isYandexAuthEnabled) {
+      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+    }
+
     try {
       const state = crypto.randomBytes(32).toString("hex");
       const codeVerifier = generateCodeVerifier();

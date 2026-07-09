@@ -8,7 +8,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { exchangeVkCodeForToken, fetchVkProfile, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { readSignedVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
 import { nextRedirect } from "@/lib/http/origin";
-import { isProduction } from "@/lib/env";
+import { isProduction, isVkAuthEnabled } from "@/lib/env";
 
 const payloadSchema = z.object({
   code: z.string().trim().min(1),
@@ -71,6 +71,12 @@ async function upsertVkLink(params: {
 
 export async function GET(req: Request) {
   try {
+    // AUTH-KILLSWITCH-ENFORCE-01: gate the connect callback too (issues the VK
+    // link) — a gate on `start` alone is bypassable by hitting `callback`.
+    if (!isVkAuthEnabled) {
+      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+    }
+
     const auth = await requireAuth();
     if (!auth.ok) return auth.response;
 

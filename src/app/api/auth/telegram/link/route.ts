@@ -5,6 +5,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
 import { verifyTelegramLogin } from "@/lib/auth/telegram";
+import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
@@ -31,6 +32,13 @@ function isAuthDateFresh(authDate: number, nowSeconds: number): boolean {
  */
 export async function POST(req: Request) {
   try {
+    // AUTH-KILLSWITCH-ENFORCE-01: gate the Telegram connect (link) on the same
+    // effective kill-switch as login — a disabled provider must not link, even
+    // with a bot token present. Refuse before touching session / hash / DB.
+    if (!(await getTelegramEnabled())) {
+      return jsonFail(503, "Telegram not configured", "SYSTEM_FEATURE_DISABLED");
+    }
+
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
 
@@ -130,6 +138,13 @@ export async function GET(req: NextRequest) {
     NextResponse.redirect(new URL(`${CABINET_PROFILE_PATH}?telegram=${result}`, req.url));
 
   try {
+    // AUTH-KILLSWITCH-ENFORCE-01: gate the redirect-mode connect callback too
+    // (the leg that actually links) on the effective kill-switch. Reuses the
+    // existing "unconfigured" result the profile page already surfaces.
+    if (!(await getTelegramEnabled())) {
+      return backToProfile("unconfigured");
+    }
+
     const user = await getSessionUser();
     if (!user) {
       // Connect requires an existing session; bounce to login if it's gone.

@@ -19,7 +19,7 @@ import {
   YANDEX_STATE_COOKIE,
   YANDEX_VERIFIER_COOKIE,
 } from "@/lib/yandex/cookies";
-import { isProduction } from "@/lib/env";
+import { isProduction, isYandexAuthEnabled } from "@/lib/env";
 
 // FIX-YANDEX-OAUTH — callback route. Account-linking logic mirrors
 // api/auth/vk/callback EXACTLY (the security-sensitive new-vs-existing-user
@@ -82,6 +82,12 @@ async function upsertYandexLink(params: {
 
 export async function GET(req: Request) {
   return withRequestContext(req, async () => {
+    // AUTH-KILLSWITCH-ENFORCE-01: gate the callback too (the session-issuing
+    // leg) — a gate on `start` alone is bypassable by hitting `callback`.
+    if (!isYandexAuthEnabled) {
+      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+    }
+
     const cookieStore = await cookies();
 
     try {
