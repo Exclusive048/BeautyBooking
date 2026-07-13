@@ -100,7 +100,7 @@
 | Zod | ^4.3 | Валидация |
 
 ### Интеграции
-YooKassa (платежи) · Яндекс S3 / Геокодер / Suggest (медиа, адреса) · Yandex ID OAuth · VK OAuth · Telegram Bot API (gated OFF, + monitoring) · YandexGPT (chat AI, §11) · OpenAI (visual-search, dormant) · web-push VAPID (push) · nodemailer SMTP (email) · SMSC.ru (SMS, код готов — не подключён) · Sharp (изображения) · AWS SDK S3.
+YooKassa (платежи) · Яндекс S3 / Геокодер / Suggest (медиа, адреса) · Yandex ID OAuth · VK OAuth · Telegram Bot API (gated OFF, + monitoring) · YandexGPT (chat AI, §11) · Yandex AI Studio (visual-search vision `qwen3.6-35b-a3b` + `text-search` embeddings, §11; dormant) · web-push VAPID (push) · nodemailer SMTP (email) · SMSC.ru (SMS, код готов — не подключён) · Sharp (изображения) · AWS SDK S3. *(OpenAI полностью удалён из кодбазы — VISUAL-SEARCH-YANDEX-MIGRATION-01 2026-07-13.)*
 
 ### CI/CD и запуск
 - GitHub Actions `.github/workflows/quality-gates.yml`: prisma validate/generate → lint → typecheck → tests → mojibake → encoding → schema-drift → context-freshness → openapi-routes.
@@ -188,7 +188,7 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 | **BillingAuditLog** / **AdminAuditLog** | action, details? / adminUserId(onDelete Restrict), action(enum), targetType?, targetId?, reason?, ipAddress?, userAgent? | админ-аудит (инв. #16/#18/#19) |
 | **MrrSnapshot** | snapshotDate(@unique @db.Date), mrrKopeks(BigInt), activeSubscriptionsCount, breakdownJson? | daily-snapshot MRR (paid-and-current: ACTIVE+!trial+currentPeriodEnd>now) |
 | **Notification** / **PushSubscription** | userId, type, title, body, payloadJson, isRead, bookingId? / endpoint(@unique), p256dh, auth | in-app / push |
-| **MediaAsset** / **MediaAssetEmbedding** | entityType, entityId, kind, storageKey, status, visualIndexed / embedding(vector(1536)) | pgvector (инв. #12) |
+| **MediaAsset** / **MediaAssetEmbedding** | entityType, entityId, kind, storageKey, status, visualIndexed / embedding(vector(256)) | pgvector + hnsw cosine index (инв. #12) |
 | **Review** | id, bookingId?, authorId, targetType, targetId, rating, replyText?, reportedAt?/reportReason?/reportComment?, deletedAt?/deletedByUserId?/deletedReason? | soft-delete (инв. #17) |
 | **ModelOffer** / **ModelApplication** | masterId, dateLocal, time…Local, status / offerId, clientUserId, status, bookingId? | офферы моделям |
 | **ClientCard** | providerId, clientUserId?, clientPhone?, notes?, tags[] | CRM (privacy — инв. #25) |
@@ -243,7 +243,7 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 ### Прочие домены
 - **Горячие слоты** (`hot-slots/*`): anti-fraud rebook-block, подписки, динамическая скидка.
 - **Очередь задач** (`queue/*`, `worker.ts`): Redis Lists `queue:{jobs,processing,dead}` + heartbeat side-hash; **atomic dequeue + lease** (краш-safe, `recoverStuckJobs` adopt по staleness 5мин, heartbeat 30с); до 3 попыток → dead-letter. Джобы: telegram.send, booking.reminder, visual_search_index, yookassa.webhook, media.cleanup, mrr.snapshot.daily. Health `/api/health/worker` (`WORKER_SECRET`).
-- **Визуальный поиск** (`visual-search/*`, ⚠️ dormant): OpenAI Vision + pgvector, `VISUAL_SEARCH_ENABLED=false`, 0 векторов хранится.
+- **Визуальный поиск** (`visual-search/*`, ⚠️ dormant): Yandex AI Studio vision (`qwen3.6-35b-a3b`) + `text-search-doc`/`text-search-query` embeddings (256, native) + pgvector `vector(256)` cosine; chokepoint `provider.ts`. `VISUAL_SEARCH_ENABLED=false`, 0 векторов. Включение: `migrate deploy` + `scripts/backfill-visual-embeddings.mts --apply` + флаг on.
 - **CRM** (`crm/*`): ClientCard/ClientNote, мастер видит только своих (инв. #25).
 - **Аналитика** (`api/analytics/*`): dashboard/revenue/clients/cohorts/bookings; единый tenant-scope `buildScopeWhere` (§10); plan-gated фичами.
 - **Model Offers / Советник (Advisor, AI)** — офферы моделям; AI-рекомендации мастеру (YandexGPT, кэш Redis).
@@ -288,8 +288,8 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 | `NEXT_PUBLIC_YANDEX_ENABLED` / `YANDEX_OAUTH_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI` | для Yandex ID login | кнопка absent без флага+id |
 | `VK_CLIENT_ID` (alias `VK_ID_CLIENT_ID`) / `_SECRET` / `_REDIRECT_URI` / `NEXT_PUBLIC_VK_ENABLED` | для VK OAuth | оба имени в env.ts |
 | `NEXT_PUBLIC_VK_COMMUNITY_URL` | для footer VK | unset → иконка опускается |
-| `YANDEX_API_KEY` / `YANDEX_FOLDER_ID` | для chat-AI | YandexGPT (см. §11) |
-| `OPENAI_API_KEY` / `VISUAL_SEARCH_ENABLED` | если visual-search | dormant, default false |
+| `YANDEX_API_KEY` / `YANDEX_FOLDER_ID` | для chat-AI **и visual-search** | YandexGPT chat + AI Studio vision/embeddings (см. §11) |
+| `VISUAL_SEARCH_ENABLED` | если visual-search | dormant, default false; требует `YANDEX_API_KEY`+`YANDEX_FOLDER_ID` (не OpenAI) |
 | `YOOKASSA_SHOP_ID` / `YOOKASSA_SECRET_KEY` | для платежей | иначе Error |
 | `YOOKASSA_WEBHOOK_TOKEN` | нет | optional URL `?token=` (не подпись); authenticity держит worker re-fetch |
 | `YOOKASSA_IP_ALLOWLIST_ENFORCED` | нет | default log-only; `true` только после подтверждённого `TRUSTED_PROXY_HOPS` |
@@ -362,7 +362,7 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 
 **Прочее:** пагинация cursor-based (feed, catalog); изображения через `next/image` (`storage.yandexcloud.net`) + Sharp; SSR публичных профилей + parallel `Promise.all`; очередь — polling-воркер (один процесс, нет горизонтального масштабирования). N+1 к контролю: `resolveStudioIdForUser` на каждый API-запрос, analytics-handlers.
 
-**AI-провайдер (chat surfaces):** **Yandex Cloud Foundation Models** (single provider), endpoint `https://llm.api.cloud.yandex.net/v1` (OpenAI-compatible), модель YandexGPT 5 Lite для 4 surfaces (review-summary / review-reply / service-description / advisor). Chokepoint — `src/lib/ai/client.ts` (`aiChat()`, Yandex-only); auth через `YANDEX_API_KEY` + `YANDEX_FOLDER_ID`. Плюс — native RU-доступ, без VPN. **Visual-search** — отдельный dormant трек, всё ещё OpenAI SDK (`OPENAI_API_KEY`, `VISUAL_SEARCH_ENABLED=false`, 0 векторов); миграция на Yandex-multimodal + `vector(1536)→vector(256)` отложена post-launch. История миграции — `docs/AI-MIGRATION-STRATEGY.md`.
+**AI-провайдер (chat surfaces):** **Yandex Cloud Foundation Models** (single provider), endpoint `https://llm.api.cloud.yandex.net/v1` (OpenAI-compatible), модель YandexGPT 5 Lite для 4 surfaces (review-summary / review-reply / service-description / advisor). Chokepoint — `src/lib/ai/client.ts` (`aiChat()`, Yandex-only); auth через `YANDEX_API_KEY` + `YANDEX_FOLDER_ID`. Плюс — native RU-доступ, без VPN. **Visual-search** (dormant, `VISUAL_SEARCH_ENABLED=false`, 0 векторов) — **тоже на Yandex** (VISUAL-SEARCH-YANDEX-MIGRATION-01 2026-07-13): vision `qwen3.6-35b-a3b` через AI Studio OpenAI-compat endpoint (`https://ai.api.cloud.yandex.net/v1`, `project=<folder>`) + `text-search-doc`/`text-search-query` embeddings (native **256**, **без `dim`-параметра** — Yandex 400-ит на `dim`), doc/query split; chokepoint `src/lib/visual-search/provider.ts`, те же `YANDEX_API_KEY`+`YANDEX_FOLDER_ID`. OpenAI полностью удалён. История/verdict — `docs/AI-MIGRATION-STRATEGY.md` + `docs/VISUAL-SEARCH-AUDIT.md`.
 
 **Инфраструктура (pending DevOps):** Postgres hosting (Yandex Managed vs self-hosted; **Supabase не используется**), TLS termination, DB backup target, deploy rollback policy — блокируют DR-runbooks. Local dev: `docker-compose.dev.yml` + `pgvector/pgvector:pg16`.
 
@@ -383,7 +383,7 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 | 9 | **HotSlot.@@unique([providerId, startAtUtc, endAtUtc])** | `prisma/schema` | Нет дубликатов горячих слотов. |
 | 10 | **timingSafeEqual для JWT-подписи** | `src/lib/auth/jwt.ts` | Защита от timing-атак; нельзя заменять на обычное сравнение. |
 | 11 | **Booking overlap check** | `booking-core.ts` (`ensureNoConflicts`) | Обязательная проверка пересечения перед созданием. |
-| 12 | **MediaAssetEmbedding.embedding: vector(1536)** | `prisma/schema` | Размерность OpenAI-эмбеддинга; смена → переиндексация всех активов (при reactivation → vector(256)). |
+| 12 | **MediaAssetEmbedding.embedding: vector(256)** | `prisma/schema` | Native-размерность Yandex `text-search-doc`/`query` (256, симметрична, `dim`-param запрещён). Смена → переиндексация всех активов через `scripts/backfill-visual-embeddings.mts`. Было `vector(1536)` (OpenAI) до VISUAL-SEARCH-YANDEX-MIGRATION-01. |
 | 13 | **UI_TEXT — единственный источник текстов** | `src/lib/ui/text.ts` | Все UI-строки отсюда; хардкод русских строк запрещён (есть скрипт-проверка). |
 | 14 | **Workspace pages — full-width layout** | `layout/app-shell-content.tsx` | `/cabinet` или `/admin` → без `max-w-screen-2xl`; marketing — constrained. Pathname-based решение; менять нельзя. |
 | 15 | **Client components не импортируют server-only модули** | граница `editor.ts` ↔ `editor-shared.ts` | Транзитивный импорт Prisma/Redis/Node API в client-компонент роняет build (`Module not found: 'net'`). Pure helpers/types — в `*-shared.ts`; типы — `import type`. |

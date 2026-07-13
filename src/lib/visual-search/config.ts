@@ -18,10 +18,11 @@ export function getVisualSearchEnabledByEnv(): boolean {
 
 export function ensureVisualSearchStartupConfig(): void {
   if (!isVisualSearchEnabled) return;
-  const apiKey = env.OPENAI_API_KEY?.trim();
-  if (apiKey) return;
+  const apiKey = env.YANDEX_API_KEY?.trim();
+  const folderId = env.YANDEX_FOLDER_ID?.trim();
+  if (apiKey && folderId) return;
   throw new AppError(
-    "OPENAI_API_KEY is required when VISUAL_SEARCH_ENABLED=true",
+    "YANDEX_API_KEY and YANDEX_FOLDER_ID are required when VISUAL_SEARCH_ENABLED=true",
     500,
     "INTERNAL_ERROR"
   );

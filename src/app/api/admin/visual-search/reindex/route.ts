@@ -1,11 +1,11 @@
-import { randomUUID } from "crypto";
-import { MediaKind } from "@prisma/client";
+import { MediaKind, Prisma } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { enqueue } from "@/lib/queue/queue";
+import { createVisualSearchIndexJob } from "@/lib/queue/types";
 
 export const runtime = "nodejs";
 
@@ -16,28 +16,53 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response;
 
   try {
-    const unindexed = await prisma.mediaAsset.findMany({
+    // Default: enqueue only not-yet-categorized assets (visualCategory=null).
+    // Force (?force=true): re-index ALL portfolio assets — resets the indexer's
+    // `visualIndexed === true` skip-guard and drops stale vectors first, so a
+    // re-index actually runs (needed e.g. after a dimension migration). Without
+    // the reset the guard would silently no-op already-indexed assets (audit F1).
+    const force = new URL(req.url).searchParams.get("force") === "true";
+
+    const assets = await prisma.mediaAsset.findMany({
       where: {
         kind: MediaKind.PORTFOLIO,
         deletedAt: null,
-        visualCategory: null,
+        ...(force ? {} : { visualCategory: null }),
       },
       select: { id: true },
       orderBy: { createdAt: "desc" },
       take: BATCH_SIZE,
     });
 
-    await Promise.all(
-      unindexed.map(async (asset) => {
-        await enqueue({
-          id: randomUUID(),
-          type: "visual_search_index",
-          payload: { assetId: asset.id },
+    if (force && assets.length > 0) {
+      const ids = assets.map((asset) => asset.id);
+      await prisma.$transaction(async (tx) => {
+        await tx.mediaAsset.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            visualIndexed: false,
+            visualIndexedAt: null,
+            visualPromptVersion: null,
+            visualDescription: null,
+            visualMeta: Prisma.DbNull,
+            visualCategory: null,
+          },
         });
-      })
+        await tx.mediaAssetEmbedding.deleteMany({ where: { assetId: { in: ids } } });
+      });
+    }
+
+    await Promise.all(
+      assets.map((asset) => enqueue(createVisualSearchIndexJob({ assetId: asset.id })))
     );
 
-    return jsonOk({ enqueued: unindexed.length });
+    return jsonOk({
+      enqueued: assets.length,
+      forced: force,
+      // A full re-index across >BATCH_SIZE assets needs the CLI backfill script
+      // (scripts/backfill-visual-embeddings.ts) — this route caps at one batch.
+      batchLimited: assets.length === BATCH_SIZE,
+    });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

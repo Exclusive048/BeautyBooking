@@ -8,13 +8,13 @@ import { getStrategy } from "@/lib/visual-search/category-registry";
 import { classifyImage } from "@/lib/visual-search/classifier";
 import { assertVisualSearchEnabled } from "@/lib/visual-search/config";
 import {
-  createTextEmbedding,
+  createDocEmbedding,
   describeImageWithStrategy,
-  isRetryableOpenAiError,
-  resizeForOpenAI,
-} from "@/lib/visual-search/openai";
+  isRetryableProviderError,
+  resizeForVision,
+} from "@/lib/visual-search/provider";
 
-const EMBEDDING_DIMENSIONS = 1536;
+const EMBEDDING_DIMENSIONS = 256;
 /*
 Debug query for indexing state:
 SELECT
@@ -124,7 +124,7 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
     await assertVisualSearchEnabled();
 
     const originalBytes = await readStorageBytes(asset.storageKey, asset.mimeType);
-    const resizedBytes = await resizeForOpenAI(originalBytes);
+    const resizedBytes = await resizeForVision(originalBytes);
 
     const classification = await classifyImage(resizedBytes);
     if (classification.category === "none" || classification.confidence === "low") {
@@ -144,7 +144,7 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
       return;
     }
 
-    const embedding = await createTextEmbedding(visualResult.text_description);
+    const embedding = await createDocEmbedding(visualResult.text_description);
     if (!embedding) {
       await markAssetAsUnrecognized(asset.id);
       return;
@@ -215,6 +215,6 @@ export function isVisualSearchMissingAssetError(error: unknown): boolean {
 }
 
 export function isVisualSearchRetryableError(error: unknown): boolean {
-  return isRetryableOpenAiError(error);
+  return isRetryableProviderError(error);
 }
 

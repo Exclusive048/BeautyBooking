@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ClassificationResult } from "@/lib/visual-search/prompt";
-import { requestVisionJson } from "@/lib/visual-search/openai";
+import { requestVisionJson } from "@/lib/visual-search/provider";
 
 const classificationSchema = z.object({
   category: z.enum(["manicure", "pedicure", "lashes", "brows", "makeup", "hairstyle", "none"]),
