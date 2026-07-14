@@ -2,7 +2,14 @@ import React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "icon" | "wrapper";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "icon"
+  | "wrapper"
+  | "inverted";
 export type ButtonSize = "sm" | "md" | "lg" | "icon" | "none";
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -18,6 +25,16 @@ const variants: Record<ButtonVariant, string> = {
     "border border-border-subtle/80 bg-bg-input text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.28)] hover:border-border-subtle hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page",
   ghost:
     "bg-transparent text-text-main hover:bg-bg-input/85 focus-visible:ring-2 focus-visible:ring-primary-glow/35",
+  // Fixed light fill (white, same in both themes) MUST pair with a fixed dark
+  // text token — never a theme-reactive one like `text-text-main`, which flips
+  // near-white in dark and disappears on the white pill. `text-primary` is the
+  // sanctioned fixed-light-fill pairing (burgundy in both themes: #720808 light
+  // / #7A102C dark — never flips light). Own dedicated variant (not `secondary`
+  // + a className override) so no competing `text-text-main` is injected: `cn`
+  // is a plain join, so an override does NOT reliably win over the variant token
+  // (FIX-ROUND-02). Use on brand-gradient / burgundy surfaces.
+  inverted:
+    "border border-transparent bg-white text-primary hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
   danger: "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-500",
   icon:
     "border border-border-subtle/80 bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",

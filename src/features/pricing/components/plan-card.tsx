@@ -162,12 +162,8 @@ export function PlanCard({ plan, fallbackCode, highlighted = false }: Props) {
       {plan ? (
         <Button
           asChild
-          variant={highlighted ? "secondary" : "primary"}
-          className={
-            highlighted
-              ? "w-full border-white/0 bg-white text-primary hover:bg-white/90"
-              : "w-full"
-          }
+          variant={highlighted ? "inverted" : "primary"}
+          className="w-full"
         >
           <Link href="/login">{plan.isFreePlan ? T.plan.ctaFree : T.plan.ctaPaid}</Link>
         </Button>

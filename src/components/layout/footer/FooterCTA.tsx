@@ -130,12 +130,9 @@ function CTACard({
       <div className="relative mt-auto">
         <Button
           asChild
-          variant={isBrand ? "secondary" : "primary"}
+          variant={isBrand ? "inverted" : "primary"}
           size="md"
-          className={cn(
-            "inline-flex items-center gap-1.5",
-            isBrand && "bg-white text-primary hover:bg-white/90",
-          )}
+          className="inline-flex items-center gap-1.5"
         >
           <Link href={href}>
             {copy.cta}

@@ -38,12 +38,7 @@ export function CTABlock({ title, description, cta }: Props) {
             </p>
           ) : null}
           <div className="flex flex-wrap justify-center gap-3">
-            <Button
-              asChild
-              variant="secondary"
-              size="lg"
-              className="border-white/0 bg-white text-primary hover:bg-white/90"
-            >
+            <Button asChild variant="inverted" size="lg">
               <Link href={cta.primary.href}>{cta.primary.label}</Link>
             </Button>
             {cta.secondary ? (
